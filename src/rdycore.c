@@ -1,4 +1,5 @@
 #include <rdycore.h>
+
 #include <private/rdycoreimpl.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
@@ -78,7 +79,7 @@ PetscBool RDyInitialized(void) {
 PetscErrorCode RDyCreate(MPI_Comm comm, RDy *rdy) {
   PetscFunctionBegin;
 
-  PetscCall(PetscNew(&app));
+  PetscCall(PetscNew(rdy));
   PetscFunctionReturn(0);
 }
 

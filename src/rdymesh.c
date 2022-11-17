@@ -1,4 +1,6 @@
-#include <rdymeshimpl.h>
+#include <private/rdymeshimpl.h>
+
+#include <petscdmplex.h>
 
 static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) {
   PetscFunctionBegin;

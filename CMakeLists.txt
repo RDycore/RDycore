@@ -3,7 +3,15 @@ cmake_minimum_required (VERSION 3.12.0)
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
-# Find PETSc.
+# Use a specific version of clang-format.
+set(CLANG_FORMAT_VERSION 14)
+
+enable_language(C)
+enable_language(Fortran)
+
+project(rdycore)
+
+# Find PETSc (must be placed after the project command)
 find_package(PETSc COMPONENTS C)
 
 # Use PETSc's compiler config.
@@ -15,14 +23,6 @@ set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 if (NOT CMAKE_Fortran_COMPILER)
   set(CMAKE_Fortran_COMPILER gfortran)
 endif()
-
-# Use a specific version of clang-format.
-set(CLANG_FORMAT_VERSION 14)
-
-enable_language(C)
-enable_language(Fortran)
-
-project(rdycore)
 
 message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")
 message(STATUS "Generating project files in build directory: ${PROJECT_BINARY_DIR}")

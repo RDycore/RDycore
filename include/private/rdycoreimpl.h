@@ -2,6 +2,7 @@
 #define RDYCOREIMPL_H
 
 #include <rdycore.h>
+#include <private/rdymeshimpl.h>
 
 #include <petsc/private/petscimpl.h>
 
