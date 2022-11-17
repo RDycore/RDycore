@@ -1,6 +1,5 @@
-#include <private/rdymeshimpl.h>
-
 #include <petscdmplex.h>
+#include <private/rdymeshimpl.h>
 
 static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) {
   PetscFunctionBegin;
@@ -125,5 +124,3 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(RDyFree(mesh.nG2A));
   PetscFunctionReturn(0);
 }
-
-
