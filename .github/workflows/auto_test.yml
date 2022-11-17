@@ -5,9 +5,9 @@ name: auto_test
 # 2. when changes are merged into the main branch (via a pull request)
 on:
   push:
-    branches: [] # main ]  <-- disabled till we have a Docker image
+    branches: [ main ]  <-- disabled till we have a Docker image
   pull_request:
-    branches: [] # main ]
+    branches: [ main ]
 
 # Below are jobs, each of which runs sequentially.
 jobs:
