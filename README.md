@@ -2,7 +2,7 @@
 
 ## Required Software
 
-To build MAM4xx, you need:
+To build RDycore, you need:
 
 * [CMake v3.12+](https://cmake.org/)
 * GNU Make
