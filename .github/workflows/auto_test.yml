@@ -1,0 +1,82 @@
+name: auto_test
+
+# This action is triggered:
+# 1. when someone creates a pull request for a merge to the main branch
+# 2. when changes are merged into the main branch (via a pull request)
+on:
+  push:
+    branches: [] # main ]  <-- disabled till we have a Docker image
+  pull_request:
+    branches: [] # main ]
+
+# Below are jobs, each of which runs sequentially.
+jobs:
+  # This job builds RDycore and runs our test suite.
+  build:
+    runs-on: ${{ matrix.os }}
+    container: coherellc/rdycore-petsc:v3.18.1
+
+    # A build matrix storing all desired configurations.
+    strategy:
+      matrix:
+        os: [ubuntu-latest] #, macos-latest]
+        build-type: [Debug] #, Release]
+
+    # Steps for building and running tests.
+    steps:
+
+    - name: Checking out repository
+      uses: actions/checkout@v2
+
+    - name: Configuring RDycore (${{ matrix.build-type }})
+      run: |
+        cmake -S . -B build \
+        -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
+        -DCMAKE_VERBOSE_MAKEFILE=ON
+
+    - name: Building RDycore (${{ matrix.build-type }})
+      run: |
+        grep PETSC_VERSION_GIT $PETSC_DIR/include/petscconf.h | sed -e s/#define\ //g
+        cd build
+        make -j all-gmake
+
+    - name: Running tests (${{ matrix.build-type }})
+      #if: github.event.pull_request.draft == false # skip for draft PRs
+      run: |
+        set +e # disable "fast fail" (continue on test failures)
+        num_failures=0
+        make unit-tests
+        num_failures=$(( $num_failures + $? ))
+        cd demo/richards
+        make V=1 codecov=1
+        #cd ../steady
+        #make V=1 codecov=1
+        cd ../th
+        make V=1 codecov=1
+        cd ../transient
+        make V=1 codecov=1 transient transient_mpfaof90 transient_snes_mpfaof90
+        cd ../../regression_tests
+        #make test-steady
+        #num_failures=$(( $num_failures + $? ))
+        make test-transient-mpfaof90
+        num_failures=$(( $num_failures + $? ))
+        make test-transient-snes-mpfaof90
+        num_failures=$(( $num_failures + $? ))
+        #make test-richards
+        #num_failures=$(( $num_failures + $? ))
+        #make test-th
+        #num_failures=$(( $num_failures + $? ))
+        cd ..
+        cat regression_tests/*testlog
+        test $num_failures -eq 0
+
+    - name: Evaluating test coverage
+      #if: github.event.pull_request.draft == false # skip for draft PRs
+      run: |
+        lcov --capture --directory . --output-file coverage.info
+        lcov --list coverage.info # debug info
+        curl -s https://codecov.io/bash > .codecov
+        chmod +x .codecov
+        ./.codecov
+        #bash <(curl -s https://codecov.io/bash  -f coverage.info)
+

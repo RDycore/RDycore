@@ -68,6 +68,8 @@ Step 3 above. Here are the options supported by RDycore:
   and driver are installed with `make install` (as in Step 7)
 * **`CMAKE_BUILD_TYPE=Debug|Release`**: controls whether a build has debugging
   information or whether it is optimized
+* **`CMAKE_VERBOSE_MAKEFILE=ON|OFF`**: if `ON`, displays compiler and linker
+  output while building. Otherwise displays only the file being built.
 
 Since RDycore gets most of its configuration information from PETSc, we don't
 need to use most other CMake options.
