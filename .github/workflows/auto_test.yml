@@ -27,6 +27,9 @@ jobs:
 
     - name: Checking out repository
       uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        submodules: recursive
 
     - name: Configuring RDycore (${{ matrix.build-type }})
       run: |
