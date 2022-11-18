@@ -3,6 +3,10 @@ add_library(rdycore
   rdycore.c
   rdymesh.c
 )
+install(
+  TARGETS rdycore
+  DESTINATION lib
+)
 set(RDYCORE_LIBRARIES rdycore;${RDYCORE_LIBRARIES})
 
 # Unit tests for the main library
