@@ -39,6 +39,9 @@ message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
 
 # For now, we build static libraries only.
 set(BUILD_SHARED_LIBS OFF)
+# ...but for external shared libraries, we set RPATH.
+set(CMAKE_BUILD_RPATH ${PROJECT_BINARY_DIR}/lib)
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
 # Report the installation prefix.
 message(STATUS "Installation prefix is ${CMAKE_INSTALL_PREFIX}")
