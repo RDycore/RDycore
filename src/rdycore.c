@@ -7,15 +7,13 @@ static void FinalizeMPI(void) { MPI_Finalize(); }
 
 // Initializes MPI and adds a call to MPI_Finalize() on process exit.
 // If MPI has been initialized prior to this call, it has no effect.
-static PetscErrorCode InitMPI(int *argc, char ***argv) {
-  PetscFunctionBegin;
+static void InitMPI(int *argc, char ***argv) {
   int mpi_initialized;
-  PetscCall(MPI_Initialized(&mpi_initialized));
+  MPI_Initialized(&mpi_initialized);
   if (!mpi_initialized) {
-    PetscCall(MPI_Init(argc, argv));
+    MPI_Init(argc, argv);
     atexit(FinalizeMPI);
   }
-  PetscFunctionReturn(0);
 }
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
@@ -25,7 +23,7 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   // We initialize MPI before PETSc to make sure that PETSc doesn't finalize
   // MPI. This allows us to run several MPI-related unit tests in the same
   // process.
-  PetscCall(InitMPI(&argc, &argv));
+  InitMPI(&argc, &argv);
 
   if (!initialized_) {
     PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
@@ -42,7 +40,7 @@ PetscErrorCode RDyInitNoArguments(void) {
   // We initialize MPI before PETSc to make sure that PETSc doesn't finalize
   // MPI. This allows us to run several MPI-related unit tests in the same
   // process.
-  PetscCall(InitMPI(NULL, NULL));
+  InitMPI(NULL, NULL);
 
   if (!initialized_) {
     PetscCall(PetscInitializeNoArguments());
