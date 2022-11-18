@@ -3,9 +3,7 @@
 
 static PetscBool initialized_ = PETSC_FALSE;
 
-static void FinalizeMPI(void) {
-  MPI_Finalize();
-}
+static void FinalizeMPI(void) { MPI_Finalize(); }
 
 // Initializes MPI and adds a call to MPI_Finalize() on process exit.
 // If MPI has been initialized prior to this call, it has no effect.

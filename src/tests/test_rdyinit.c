@@ -5,14 +5,14 @@
 #include <rdycore.h>
 
 // CMocka-related includes
+#include <cmocka.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <setjmp.h>
 #include <stdint.h>
-#include <cmocka.h>
 
 // Globals for capturing command line arguments.
-static int argc_;
+static int    argc_;
 static char **argv_;
 
 // Global for indicating whether MPI has already been initialized (we only do
@@ -84,18 +84,16 @@ static void TestMPIAllreduce(void **state) {
 }
 
 int main(int argc, char *argv[]) {
-
   // Stash command line arguments for usage in tests.
   argc_ = argc;
   argv_ = argv;
 
   // Define our set of unit tests.
-  const struct CMUnitTest tests[] =
-  {
-    cmocka_unit_test(TestRDyInit),
-    cmocka_unit_test(TestRDyInitNoArguments),
-    cmocka_unit_test(TestPetscCommWorld),
-    cmocka_unit_test(TestMPIAllreduce),
+  const struct CMUnitTest tests[] = {
+      cmocka_unit_test(TestRDyInit),
+      cmocka_unit_test(TestRDyInitNoArguments),
+      cmocka_unit_test(TestPetscCommWorld),
+      cmocka_unit_test(TestMPIAllreduce),
   };
 
   // The last two arguments are for setup and teardown functions.
