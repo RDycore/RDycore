@@ -10,38 +10,14 @@
 static int    argc_;
 static char **argv_;
 
-// Global for indicating whether MPI has already been initialized (we only do
-// it once).
-static int mpi_initialized_ = 0;
-
 // Test whether RDyInit works and initializes MPI properly.
 static void TestRDyInit(void **state) {
   int mpi_initialized;
   MPI_Initialized(&mpi_initialized);
-  assert_true(mpi_initialized == mpi_initialized_);
+  assert_false(mpi_initialized);
   assert_int_equal(0, RDyInit(argc_, argv_, "test_rdyinit - RDyInit unit test"));
   MPI_Initialized(&mpi_initialized);
   assert_true(mpi_initialized);
-  if (mpi_initialized_ != mpi_initialized) {
-    mpi_initialized_ = mpi_initialized;
-  }
-
-  assert_int_equal(0, RDyFinalize());
-}
-
-// Test whether RDyInitNoArguments works and initializes MPI properly.
-static void TestRDyInitNoArguments(void **state) {
-  int mpi_initialized;
-  MPI_Initialized(&mpi_initialized);
-  assert_true(mpi_initialized == mpi_initialized_);
-  assert_int_equal(0, RDyInitNoArguments());
-  MPI_Initialized(&mpi_initialized);
-  assert_true(mpi_initialized);
-  if (mpi_initialized_ != mpi_initialized) {
-    mpi_initialized_ = mpi_initialized;
-  }
-
-  assert_int_equal(0, RDyFinalize());
 }
 
 // Test whether the PETSC_COMM_WORLD communicator behaves properly within cmocka.
@@ -56,8 +32,6 @@ static void TestPetscCommWorld(void **state) {
   MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
   assert_true(rank >= 0);
   assert_true(rank < num_procs);
-
-  assert_int_equal(0, RDyFinalize());
 }
 
 // Test whether MPI performs as expected within CMocka's environment.
@@ -73,10 +47,9 @@ static void TestMPIAllreduce(void **state) {
 
   MPI_Allreduce(&one, &sum, 1, MPI_INT, MPI_SUM, PETSC_COMM_WORLD);
   assert_int_equal(num_procs, sum);
-
-  // This is the last test, so we finalize no matter what.
-  assert_int_equal(0, RDyFinalize());
 }
+
+static void TestRDyFinalize(void **state) { assert_int_equal(0, RDyFinalize()); }
 
 int main(int argc, char *argv[]) {
   // Stash command line arguments for usage in tests.
@@ -86,9 +59,9 @@ int main(int argc, char *argv[]) {
   // Define our set of unit tests.
   const struct CMUnitTest tests[] = {
       cmocka_unit_test(TestRDyInit),
-      cmocka_unit_test(TestRDyInitNoArguments),
       cmocka_unit_test(TestPetscCommWorld),
       cmocka_unit_test(TestMPIAllreduce),
+      cmocka_unit_test(TestRDyFinalize),
   };
 
   // The last two arguments are for setup and teardown functions.
