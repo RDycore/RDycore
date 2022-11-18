@@ -48,5 +48,7 @@ jobs:
         set +e # disable "fast fail" (continue on test failures to show output)
         cd build
         make test
+        failed=$?
         cat Testing/Temporary/LastTest.log
+        test $failed -eq 0
 
