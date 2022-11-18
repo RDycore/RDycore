@@ -1,5 +1,7 @@
 # RDycore
 
+[![Build Status](https://github.com/RDycore/RDycore/workflows/auto_test/badge.svg)](https://github.com/RDycore/RDycore/actions)
+
 ## Required Software
 
 To build RDycore, you need:
