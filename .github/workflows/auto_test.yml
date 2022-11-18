@@ -45,6 +45,7 @@ jobs:
 
     - name: Running tests (${{ matrix.build-type }})
       run: |
+        set +e # disable "fast fail" (continue on test failures to show output)
         cd build
         make test
         cat Testing/Temporary/LastTest.log
