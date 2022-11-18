@@ -15,14 +15,21 @@
 static int argc_;
 static char **argv_;
 
+// Global for indicating whether MPI has already been initialized (we only do
+// it once).
+static int mpi_initialized_ = 0;
+
 // Test whether RDyInit works and initializes MPI properly.
 static void TestRDyInit(void **state) {
   int mpi_initialized;
   MPI_Initialized(&mpi_initialized);
-  assert_false(mpi_initialized);
+  assert_true(mpi_initialized == mpi_initialized_);
   assert_int_equal(0, RDyInit(argc_, argv_, "test_rdyinit - RDyInit unit test"));
   MPI_Initialized(&mpi_initialized);
   assert_true(mpi_initialized);
+  if (mpi_initialized_ != mpi_initialized) {
+    mpi_initialized_ = mpi_initialized;
+  }
 
   assert_int_equal(0, RDyFinalize());
 }
@@ -31,10 +38,13 @@ static void TestRDyInit(void **state) {
 static void TestRDyInitNoArguments(void **state) {
   int mpi_initialized;
   MPI_Initialized(&mpi_initialized);
-  assert_false(mpi_initialized);
+  assert_true(mpi_initialized == mpi_initialized_);
   assert_int_equal(0, RDyInitNoArguments());
   MPI_Initialized(&mpi_initialized);
   assert_true(mpi_initialized);
+  if (mpi_initialized_ != mpi_initialized) {
+    mpi_initialized_ = mpi_initialized;
+  }
 
   assert_int_equal(0, RDyFinalize());
 }
