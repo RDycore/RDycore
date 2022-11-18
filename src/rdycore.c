@@ -25,7 +25,7 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   // We initialize MPI before PETSc to make sure that PETSc doesn't finalize
   // MPI. This allows us to run several MPI-related unit tests in the same
   // process.
-  PetscCall(InitMPI(argc, argv));
+  PetscCall(InitMPI(&argc, &argv));
 
   if (!initialized_) {
     PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
