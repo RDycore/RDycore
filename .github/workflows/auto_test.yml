@@ -46,5 +46,6 @@ jobs:
     - name: Running tests (${{ matrix.build-type }})
       #if: github.event.pull_request.draft == false # skip for draft PRs
       run: |
+        cd build
         make test
 
