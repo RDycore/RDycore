@@ -4,12 +4,7 @@
 
 #include <rdycore.h>
 
-// CMocka-related includes
-#include <cmocka.h>
-#include <setjmp.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "rdycore_tests.h"
 
 // Globals for capturing command line arguments.
 static int    argc_;
