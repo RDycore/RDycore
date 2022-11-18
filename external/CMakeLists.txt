@@ -13,13 +13,13 @@ set(CMOCKA_CMAKE_OPTS
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
   -DCMAKE_C_FLAGS=${CMOCKA_C_FLAGS}
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-  -DWITH_STATIC_LIB=ON
   -DWITH_EXAMPLES=OFF)
 if (CMAKE_C_COMPILER_ID STREQUAL "Intel" OR CMAKE_C_COMPILER_ID MATCHES "AppleClang")
   set(CMOCKA_CMAKE_OPTS ${CMOCKA_CMAKE_OPTS}
     -DHAVE_WORDS_BIGENDIAN=TRUE
     -DWORDS_BIGENDIAN=FALSE)
 endif()
+set(CMOCKA_LIB_NAME libcmocka${CMAKE_SHARED_LIBRARY_SUFFIX})
 ExternalProject_Add(cmocka_proj
                     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/cmocka
                     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cmocka
@@ -29,8 +29,8 @@ ExternalProject_Add(cmocka_proj
                     LOG_CONFIGURE TRUE
                     LOG_BUILD TRUE
                     LOG_INSTALL TRUE
-                    BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/libcmocka-static.a)
-add_library(cmocka STATIC IMPORTED GLOBAL)
+                    BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/${CMOCKA_LIB_NAME})
+add_library(cmocka SHARED IMPORTED GLOBAL)
 set_target_properties(cmocka PROPERTIES
-  IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/libcmocka-static.a)
+  IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${CMOCKA_LIB_NAME})
 add_dependencies(cmocka cmocka_proj)
