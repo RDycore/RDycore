@@ -58,7 +58,7 @@ jobs:
     - name: Evaluating test coverage
       #if: github.event.pull_request.draft == false # skip for draft PRs
       run: |
-        lcov --capture --directory . --output-file coverage.info
+        cp ccov/all-merged.info coverage.info
         lcov --list coverage.info # debug info
         curl -s https://codecov.io/bash > .codecov
         chmod +x .codecov
