@@ -1,6 +1,7 @@
 # RDycore
 
 [![Build Status](https://github.com/RDycore/RDycore/workflows/auto_test/badge.svg)](https://github.com/RDycore/RDycore/actions)
+[![Code Coverage](https://codecov.io/github/RDycore/RDycore/branch/main/graph/badge.svg?token=9RXZNKK194)](https://codecov.io/github/RDycore/RDycore)
 
 ## Required Software
 
