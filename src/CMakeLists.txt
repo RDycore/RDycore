@@ -3,6 +3,7 @@ add_library(rdycore
   rdycore.c
   rdymesh.c
 )
+target_code_coverage(rdycore AUTO ALL)
 install(
   TARGETS rdycore
   DESTINATION lib
