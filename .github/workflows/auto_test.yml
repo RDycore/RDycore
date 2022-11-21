@@ -55,7 +55,7 @@ jobs:
         fi
         test $failed -eq 0
 
-    - name: Evaluating test coverage
+    - name: Evaluating code coverage
       #if: github.event.pull_request.draft == false # skip for draft PRs
       run: |
         cd build

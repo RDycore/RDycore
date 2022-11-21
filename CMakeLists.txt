@@ -66,6 +66,7 @@ include(CTest)
 enable_testing()
 
 # Add code coverage support (enabled using -DENABLE_COVERAGE).
+# This adds a `make ccov-all` that produces a single coverage report.
 include(code_coverage)
 add_code_coverage_all_targets()
 
