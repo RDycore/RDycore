@@ -50,7 +50,9 @@ jobs:
         cd build
         make test
         failed=$?
-        cat Testing/Temporary/LastTest.log
+        if [ $failed -ne 0 ]; then
+          cat Testing/Temporary/LastTest.log
+        fi
         test $failed -eq 0
 
     - name: Evaluating test coverage

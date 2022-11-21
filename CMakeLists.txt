@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.12.0)
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/CMake-codecov/cmake" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/CMake-codecov/cmake" ${CMAKE_MODULE_PATH})
 
 # Use a specific version of clang-format.
 set(CLANG_FORMAT_VERSION 14)
@@ -81,9 +81,13 @@ add_subdirectory(external)
 # Create targets for RDycore library and unit tests.
 add_subdirectory(src)
 
+# Evaluate code coverage.
+coverage_evaluate()
+
 #--------------------
 # Additional targets
 #--------------------
+
 
 # Add a "make memcheck" target that runs Valgrind on all tests (Linux only).
 include(add_memcheck_target)
