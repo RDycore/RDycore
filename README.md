@@ -1,6 +1,7 @@
 # RDycore
 
 [![Build Status](https://github.com/RDycore/RDycore/workflows/auto_test/badge.svg)](https://github.com/RDycore/RDycore/actions)
+[![Code Coverage](https://codecov.io/github/RDycore/RDycore/branch/main/graph/badge.svg?token=9RXZNKK194)](https://codecov.io/github/RDycore/RDycore)
 
 ## Required Software
 
@@ -72,6 +73,7 @@ Step 3 above. Here are the options supported by RDycore:
   information or whether it is optimized
 * **`CMAKE_VERBOSE_MAKEFILE=ON|OFF`**: if `ON`, displays compiler and linker
   output while building. Otherwise displays only the file being built.
+* **`ENABLE_COVERAGE=ON|OFF`**: if `ON`, enables code coverage instrumentation.
 
 Since RDycore gets most of its configuration information from PETSc, we don't
 need to use most other CMake options.

@@ -20,6 +20,6 @@ macro(add_memcheck_target)
   else()
     # Valgrind doesn't work on Macs.
     set(VALGRIND_FOUND 0)
-endif()
+  endif()
 
 endmacro()
