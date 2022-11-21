@@ -35,7 +35,7 @@ jobs:
       run: |
         cmake -S . -B build \
         -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
-        -DENABLE_COVERAGE
+        -DENABLE_COVERAGE=ON \
         -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Building RDycore (${{ matrix.build-type }})
