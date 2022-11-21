@@ -60,12 +60,6 @@ jobs:
       run: |
         cd build
         make ccov-all
-        #cp ccov/all-merged.info coverage.info
-        #        lcov --list coverage.info # debug info
-        #        curl -s https://codecov.io/bash > .codecov
-        #        chmod +x .codecov
-        #./.codecov
-        #bash <(curl -s https://codecov.io/bash  -f coverage.info)
 
     - name: Uploading coverage report to codecov.io
       uses: codecov/codecov-action@v3
