@@ -75,8 +75,8 @@
 
 # Options
 option(
-  CODE_COVERAGE
-  "Builds targets with code coverage instrumentation. (Requires GCC or Clang)"
+  ENABLE_COVERAGE
+  "Enables code coverage instrumentation. (Requires GCC or Clang)"
   OFF)
 
 # Programs

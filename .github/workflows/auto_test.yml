@@ -35,7 +35,7 @@ jobs:
       run: |
         cmake -S . -B build \
         -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
-        -DCODE_COVERAGE=ON \
+        -DENABLE_COVERAGE=ON \
         -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Building RDycore (${{ matrix.build-type }})
@@ -58,6 +58,7 @@ jobs:
     - name: Evaluating test coverage
       #if: github.event.pull_request.draft == false # skip for draft PRs
       run: |
+        cd build
         make ccov-all
         cp ccov/all-merged.info coverage.info
         lcov --list coverage.info # debug info
