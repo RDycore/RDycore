@@ -60,9 +60,18 @@ jobs:
       run: |
         cd build
         make ccov-all
-        cp ccov/all-merged.info coverage.info
-        lcov --list coverage.info # debug info
-        curl -s https://codecov.io/bash > .codecov
-        chmod +x .codecov
-        ./.codecov
+        #cp ccov/all-merged.info coverage.info
+        #        lcov --list coverage.info # debug info
+        #        curl -s https://codecov.io/bash > .codecov
+        #        chmod +x .codecov
+        #./.codecov
         #bash <(curl -s https://codecov.io/bash  -f coverage.info)
+
+    - name: Uploading coverage report to codecov.io
+      uses: codecov/codecov-action@v3
+      with:
+        fail_ci_if_error: true
+        files: build/ccov/all-merged.info
+        flags: unittests # optional
+        name: RDycore
+        verbose: true
