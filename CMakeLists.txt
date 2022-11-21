@@ -2,7 +2,6 @@ cmake_minimum_required (VERSION 3.12.0)
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/CMake-codecov/cmake" ${CMAKE_MODULE_PATH})
 
 # Use a specific version of clang-format.
 set(CLANG_FORMAT_VERSION 14)
@@ -29,9 +28,6 @@ message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")
 message(STATUS "Generating project files in build directory: ${PROJECT_BINARY_DIR}")
 message(STATUS "C compiler is ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION})")
 message(STATUS "Fortran compiler is ${CMAKE_Fortran_COMPILER} (${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION})")
-
-# Add support for code coverage (enabled using -DENABLE_COVERAGE).
-find_package(codecov)
 
 # Version numbers (written to rdycore.h).
 set(RDYCORE_MAJOR_VERSION 0)
@@ -62,12 +58,6 @@ configure_file(
   @ONLY
 )
 
-# Configure code coverage if needed
-if (CODE_COVERAGE)
-  include(config_code_coverage)
-  config_code_coverage()
-endif()
-
 # Inherit libraries from PETSc.
 set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
 
@@ -75,19 +65,19 @@ set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
 include(CTest)
 enable_testing()
 
+# Add code coverage support (enabled using -DENABLE_COVERAGE).
+include(code_coverage)
+add_code_coverage_all_targets()
+
 # Build any additional external libraries.
 add_subdirectory(external)
 
 # Create targets for RDycore library and unit tests.
 add_subdirectory(src)
 
-# Evaluate code coverage.
-coverage_evaluate()
-
 #--------------------
 # Additional targets
 #--------------------
-
 
 # Add a "make memcheck" target that runs Valgrind on all tests (Linux only).
 include(add_memcheck_target)
