@@ -72,6 +72,7 @@ Step 3 above. Here are the options supported by RDycore:
   information or whether it is optimized
 * **`CMAKE_VERBOSE_MAKEFILE=ON|OFF`**: if `ON`, displays compiler and linker
   output while building. Otherwise displays only the file being built.
+* **`ENABLE_COVERAGE=ON|OFF`**: if `ON`, enables code coverage instrumentation.
 
 Since RDycore gets most of its configuration information from PETSc, we don't
 need to use most other CMake options.

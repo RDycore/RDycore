@@ -1,3 +1,6 @@
 [submodule "external/cmocka"]
 	path = external/cmocka
 	url = https://git.cryptomilk.org/projects/cmocka.git
+[submodule "external/CMake-codecov"]
+	path = external/CMake-codecov
+	url = git@github.com:RWTH-HPC/CMake-codecov.git
