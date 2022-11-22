@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
       cmocka_unit_test(TestRDyInit),
       cmocka_unit_test(TestPetscCommWorld),
       cmocka_unit_test(TestMPIAllreduce),
+      cmocka_unit_test(TestRDyOnFinalize),
       cmocka_unit_test(TestRDyFinalize),
   };
 
