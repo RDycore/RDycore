@@ -64,11 +64,8 @@ int main(int argc, char *argv[]) {
 
   // Define our set of unit tests.
   const struct CMUnitTest tests[] = {
-      cmocka_unit_test(TestRDyInit),
-      cmocka_unit_test(TestPetscCommWorld),
-      cmocka_unit_test(TestMPIAllreduce),
-      cmocka_unit_test(TestRDyOnFinalize),
-      cmocka_unit_test(TestRDyFinalize),
+      cmocka_unit_test(TestRDyInit),       cmocka_unit_test(TestPetscCommWorld), cmocka_unit_test(TestMPIAllreduce),
+      cmocka_unit_test(TestRDyOnFinalize), cmocka_unit_test(TestRDyFinalize),
   };
 
   // The last two arguments are for setup and teardown functions.
