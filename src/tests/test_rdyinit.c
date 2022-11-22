@@ -16,6 +16,7 @@ static void TestRDyInit(void **state) {
   MPI_Initialized(&mpi_initialized);
   assert_false(mpi_initialized);
   assert_int_equal(0, RDyInit(argc_, argv_, "test_rdyinit - RDyInit unit test"));
+  assert_true(RDyInitialized() == PETSC_TRUE);
   MPI_Initialized(&mpi_initialized);
   assert_true(mpi_initialized);
 }
@@ -48,6 +49,11 @@ static void TestMPIAllreduce(void **state) {
   MPI_Allreduce(&one, &sum, 1, MPI_INT, MPI_SUM, PETSC_COMM_WORLD);
   assert_int_equal(num_procs, sum);
 }
+
+// This function gets printed on finalization.
+static void PrintGoodbye(void) { printf("Goodbye!\n"); }
+
+static void TestRDyOnFinalize(void **state) { assert_int_equal(0, RDyOnFinalize(PrintGoodbye)); }
 
 static void TestRDyFinalize(void **state) { assert_int_equal(0, RDyFinalize()); }
 
