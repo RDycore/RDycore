@@ -2,9 +2,7 @@
 #include <private/rdymeshimpl.h>
 
 // Returns true iff start <= closure < end.
-static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) {
-  return (closure >= start) && (closure < end);
-}
+static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
 
 /// Allocates and initializes an RDyCells struct.
 /// @param [in] num_cells Number of cells
@@ -92,7 +90,7 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
 
   for (PetscInt c = cStart; c < cEnd; c++) {
     PetscInt  icell = c - cStart;
-    PetscInt  dim = 2;
+    PetscInt  dim   = 2;
     PetscReal centroid[dim], normal[dim];
     DMPlexComputeCellGeometryFVM(dm, c, &cells->areas[icell], &centroid[0], &normal[0]);
 
@@ -368,8 +366,7 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
     PetscInt *p        = NULL;
     PetscInt  use_cone = PETSC_TRUE;
     PetscCall(DMPlexGetTransitiveClosure(dm, e, use_cone, &pSize, &p));
-    PetscAssert(pSize == 3, comm, PETSC_ERR_ARG_SIZ,
-        "Incorrect transitive closure size!");
+    PetscAssert(pSize == 3, comm, PETSC_ERR_ARG_SIZ, "Incorrect transitive closure size!");
     PetscInt index               = iedge * 2;
     edges->vertex_ids[index + 0] = p[2] - vStart;
     edges->vertex_ids[index + 1] = p[4] - vStart;
@@ -378,8 +375,7 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
     // edge-to-cell
     edges->num_cells[iedge] = 0;
     PetscCall(DMPlexGetTransitiveClosure(dm, e, PETSC_FALSE, &pSize, &p));
-    PetscAssert(pSize == 2 || pSize == 3, comm, PETSC_ERR_ARG_SIZ,
-        "Incorrect transitive closure size!");
+    PetscAssert(pSize == 2 || pSize == 3, comm, PETSC_ERR_ARG_SIZ, "Incorrect transitive closure size!");
     for (PetscInt i = 2; i < pSize * 2; i += 2) {
       PetscInt offset        = edges->cell_offsets[iedge];
       PetscInt index         = offset + edges->num_cells[iedge];

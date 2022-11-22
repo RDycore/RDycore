@@ -1,8 +1,8 @@
 // This unit test suite tests the RDyMesh type. See https://cmocka.org for
 // details about the CMocka testing framework.
 
-#include <rdycore.h>
 #include <private/rdymeshimpl.h>
+#include <rdycore.h>
 
 #include "rdycore_tests.h"
 
@@ -12,15 +12,14 @@
 // FIXME: DM creation utilities.
 static PetscErrorCode CreateUnitBoxMesh(PetscInt Nx, PetscInt Ny, DM *dm) {
   PetscFunctionBegin;
-  MPI_Comm comm = PETSC_COMM_WORLD;
-  PetscInt dim = 2;
+  MPI_Comm  comm = PETSC_COMM_WORLD;
+  PetscInt  dim  = 2;
   PetscReal x1 = 0.0, x2 = 1.0;
   PetscReal y1 = 0.0, y2 = 1.0;
   PetscInt  faces[] = {Nx, Ny};
   PetscReal lower[] = {x1, y1};
   PetscReal upper[] = {x2, y2};
-  PetscCall(DMPlexCreateBoxMesh(comm, dim, PETSC_FALSE, faces, lower, upper,
-      PETSC_NULL, PETSC_TRUE, dm));
+  PetscCall(DMPlexCreateBoxMesh(comm, dim, PETSC_FALSE, faces, lower, upper, PETSC_NULL, PETSC_TRUE, dm));
   PetscCall(DMPlexDistributeSetDefault(*dm, PETSC_FALSE));
 
   // Determine the number of cells, edges, and vertices of the mesh
@@ -66,24 +65,24 @@ static PetscErrorCode CreateUnitBoxMesh(PetscInt Nx, PetscInt Ny, DM *dm) {
 
 // Test the creation of an RDyMesh from a DM.
 static void TestRDyMeshCreateFromDM(void **state) {
-  DM dm;
+  DM       dm;
   PetscInt Nx = 100, Ny = 100;
   assert_int_equal(0, CreateUnitBoxMesh(Nx, Ny, &dm));
 
   // Create a mesh that represents the entire DM.
   RDyMesh global_mesh;
   assert_int_equal(0, RDyMeshCreateFromDM(dm, &global_mesh));
-  assert_int_equal(Nx*Ny, global_mesh.num_cells);
-  assert_int_equal(Nx*Ny, global_mesh.num_cells_local);
+  assert_int_equal(Nx * Ny, global_mesh.num_cells);
+  assert_int_equal(Nx * Ny, global_mesh.num_cells_local);
 
   // Distribute the box mesh and create a local representation.
   DM dist_dm;
   assert_int_equal(0, DMPlexDistribute(dm, 0, NULL, &dist_dm));
-  if (dist_dm) { // if nproc > 1
+  if (dist_dm) {  // if nproc > 1
     RDyMesh local_mesh;
     assert_int_equal(0, RDyMeshCreateFromDM(dist_dm, &local_mesh));
-    assert_int_equal(Nx*Ny, local_mesh.num_cells);
-    assert_true(local_mesh.num_cells_local < Nx*Ny);
+    assert_int_equal(Nx * Ny, local_mesh.num_cells);
+    assert_true(local_mesh.num_cells_local < Nx * Ny);
 
     assert_int_equal(0, RDyMeshDestroy(local_mesh));
   }
@@ -92,14 +91,10 @@ static void TestRDyMeshCreateFromDM(void **state) {
 }
 
 // Called in advance of tests
-static int Setup(void **state) {
-  return RDyInitNoArguments();
-}
+static int Setup(void **state) { return RDyInitNoArguments(); }
 
 // Called upon completion of tests
-static int Teardown(void **state) {
-  return RDyFinalize();
-}
+static int Teardown(void **state) { return RDyFinalize(); }
 
 int main(int argc, char *argv[]) {
   // Define our set of unit tests.
