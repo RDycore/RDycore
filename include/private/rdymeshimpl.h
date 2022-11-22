@@ -160,9 +160,6 @@ typedef struct RDyMesh {
   PetscInt *closureSize, **closure;
   /// the maximum closure size for any cell (locally stored?)
   PetscInt maxClosureSize;
-
-  /// mapping of global cells to application/natural cells
-  PetscInt *nG2A;
 } RDyMesh;
 
 PETSC_INTERN PetscErrorCode RDyCellsCreate(PetscInt, RDyCells*);
