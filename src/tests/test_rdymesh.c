@@ -51,8 +51,14 @@ static PetscErrorCode CreateUnitBoxMesh(PetscInt Nx, PetscInt Ny, DM *dm) {
     }
     PetscCall(PetscSectionSetDof(sec, c, total_num_dof));
   }
+
   PetscCall(PetscSectionSetUp(sec));
   PetscCall(DMSetLocalSection(*dm, sec));
+
+  // Create a global section in case we are used before distribution.
+  PetscSection global_sec;
+  PetscCall(DMGetGlobalSection(*dm, &global_sec));
+
   PetscCall(PetscSectionViewFromOptions(sec, NULL, "-layout_view"));
   PetscCall(PetscSectionDestroy(&sec));
   PetscCall(DMSetBasicAdjacency(*dm, PETSC_TRUE, PETSC_TRUE));
