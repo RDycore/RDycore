@@ -10,7 +10,7 @@
 // FIXME: Seems like we're already making a lot of assumptions about
 // FIXME: DMs from which we create meshes. Might need some lower-level
 // FIXME: DM creation utilities.
-static PetscErrorCode CreateUnitBoxMesh(PetscInt Nx, PetscInt Ny, DM *dm) {
+static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   PetscFunctionBegin;
   MPI_Comm  comm = PETSC_COMM_WORLD;
   PetscInt  dim  = 2;
@@ -73,7 +73,7 @@ static PetscErrorCode CreateUnitBoxMesh(PetscInt Nx, PetscInt Ny, DM *dm) {
 static void TestRDyMeshCreateFromDM(void **state) {
   DM       dm;
   PetscInt Nx = 100, Ny = 100;
-  assert_int_equal(0, CreateUnitBoxMesh(Nx, Ny, &dm));
+  assert_int_equal(0, Create2DUnitBoxDM(Nx, Ny, &dm));
 
   // Create a mesh that represents the entire DM.
   RDyMesh global_mesh;
