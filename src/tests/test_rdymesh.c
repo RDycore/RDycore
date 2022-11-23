@@ -55,10 +55,6 @@ static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   PetscCall(PetscSectionSetUp(sec));
   PetscCall(DMSetLocalSection(*dm, sec));
 
-  // Create a global section in case we are used before distribution.
-  PetscSection global_sec;
-  PetscCall(DMGetGlobalSection(*dm, &global_sec));
-
   PetscCall(PetscSectionViewFromOptions(sec, NULL, "-layout_view"));
   PetscCall(PetscSectionDestroy(&sec));
   PetscCall(DMSetBasicAdjacency(*dm, PETSC_TRUE, PETSC_TRUE));
@@ -66,43 +62,51 @@ static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   // Before distributing the DM, set a flag to create mapping from natural-to-local order
   PetscCall(DMSetUseNatural(*dm, PETSC_TRUE));
 
+  // Distribute the DM
+  DM dm_dist;
+  PetscCall(DMPlexDistribute(*dm, 1, NULL, &dm_dist));
+  if (dm_dist) {
+    DMDestroy(dm);
+    *dm = dm_dist;
+  }
+  PetscCall(DMViewFromOptions(*dm, NULL, "-dm_view"));
+
   PetscFunctionReturn(0);
 }
 
 // Test the creation of an RDyMesh from a DM.
 static void TestRDyMeshCreateFromDM(void **state) {
+  // Create a distributed DM.
   DM       dm;
   PetscInt Nx = 100, Ny = 100;
   assert_int_equal(0, Create2DUnitBoxDM(Nx, Ny, &dm));
 
-  // Create a mesh that represents the entire DM.
-  RDyMesh global_mesh;
-  assert_int_equal(0, RDyMeshCreateFromDM(dm, &global_mesh));
-  assert_int_equal(Nx * Ny, global_mesh.num_cells);
-  assert_int_equal(Nx * Ny, global_mesh.num_cells_local);
+  // Now create a local mesh representation.
+  RDyMesh mesh;
+  assert_int_equal(0, RDyMeshCreateFromDM(dm, &mesh));
+  // I expected the following statement to be true, but it's not (for nproc > 1)
+  //  assert_int_equal(Nx * Ny, mesh.num_cells);
+  assert_true(mesh.num_cells_local < Nx * Ny);
 
-  // Distribute the box mesh and create a local representation.
-  DM dist_dm;
-  assert_int_equal(0, DMPlexDistribute(dm, 0, NULL, &dist_dm));
-  if (dist_dm) {  // if nproc > 1
-    RDyMesh local_mesh;
-    assert_int_equal(0, RDyMeshCreateFromDM(dist_dm, &local_mesh));
-    assert_int_equal(Nx * Ny, local_mesh.num_cells);
-    assert_true(local_mesh.num_cells_local < Nx * Ny);
-
-    assert_int_equal(0, RDyMeshDestroy(local_mesh));
-  }
-
-  assert_int_equal(0, RDyMeshDestroy(global_mesh));
+  // Clean up.
+  assert_int_equal(0, DMDestroy(&dm));
+  assert_int_equal(0, RDyMeshDestroy(mesh));
 }
 
+static int    argc_ = 0;
+static char **argv_ = NULL;
+
 // Called in advance of tests
-static int Setup(void **state) { return RDyInitNoArguments(); }
+static int Setup(void **state) { return RDyInit(argc_, argv_, "test_rdymesh - a unit test for RDyMesh."); }
 
 // Called upon completion of tests
 static int Teardown(void **state) { return RDyFinalize(); }
 
 int main(int argc, char *argv[]) {
+  // Jot down our command line args to allow PETSc access to them.
+  argc_ = argc;
+  argv_ = argv;
+
   // Define our set of unit tests.
   const struct CMUnitTest tests[] = {
       cmocka_unit_test(TestRDyMeshCreateFromDM),

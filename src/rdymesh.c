@@ -75,8 +75,6 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-  int nproc;
-  MPI_Comm_size(comm, &nproc);
 
   PetscInt cStart, cEnd;
   PetscInt eStart, eEnd;
@@ -106,16 +104,12 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
     cells->num_edges[icell]    = 0;
 
     // Get information about which cells are local.
-    if (nproc > 1) {
-      PetscInt gref, junkInt;
-      PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
-      if (gref >= 0) {
-        cells->is_local[icell] = PETSC_TRUE;
-      } else {
-        cells->is_local[icell] = PETSC_FALSE;
-      }
-    } else {
+    PetscInt gref, junkInt;
+    PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
+    if (gref >= 0) {
       cells->is_local[icell] = PETSC_TRUE;
+    } else {
+      cells->is_local[icell] = PETSC_FALSE;
     }
 
     PetscCall(DMPlexGetTransitiveClosure(dm, c, use_cone, &pSize, &p));
