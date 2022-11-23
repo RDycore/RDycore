@@ -118,3 +118,29 @@ make test
 
 This runs every test defined in your build configuration and dumps the results
 to `Testing/Temporary/LastTest.log`.
+
+## Measuring Code Coverage
+
+RDycore can use [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html) or
+[lcov](https://lcov.readthedocs.io/en/latest/index.html) to analyze code
+coverage (the fraction of source code that is exercised by programs and tests)
+with the GCC or Clang compilers.
+
+To instrument the `rdycore` library and unit tests for code coverage analysis,
+pass the `-DENABLE_COVERAGE=ON` flag to CMake when configuring your build. Then,
+after building, you can type
+
+```
+make ccov-all
+```
+
+to generate a single report containing all coverage information. See the
+documentation for `gcov` and `lcov` (linked above) for details on how to
+interpret thіs information.
+
+### Considerations for Apple hardware
+
+If you're on a Mac, make sure you have installed the XCode Command Line Tools.
+If you have, these tools should be located in
+`/Library/Developer/CommandLineTools/usr/bin/`, so add this directory to your
+`PATH`.
