@@ -68,12 +68,14 @@ static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   if (dm_dist) {
     DMDestroy(dm);
     *dm = dm_dist;
-  } else {
-    // Create a global section for later use.
-    PetscSection global_sec;
-    PetscCall(DMGetGlobalSection(*dm, &global_sec));
   }
   PetscCall(DMViewFromOptions(*dm, NULL, "-dm_view"));
+
+  // Create a global dummy vector to ensure that the distributed DM is ready
+  // for use. (This creates a global section needed by DMPlexGetPointLocal.)
+  Vec dummy;
+  DMCreateGlobalVector(*dm, &dummy);
+  VecDestroy(&dummy);
 
   PetscFunctionReturn(0);
 }
