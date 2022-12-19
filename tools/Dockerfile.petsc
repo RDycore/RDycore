@@ -54,6 +54,7 @@ RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
     --download-exodusii \
     --download-fblaslapack \
     --download-hdf5 \
+    --download-libceed \
     --download-metis \
     --download-netcdf \
     --download-parmetis \
