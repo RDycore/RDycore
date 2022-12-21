@@ -1,0 +1,43 @@
+# ex1 - solves the following equations for a Dam Break on a plane:
+#
+# (1) dh/dt + d(u*h)/dx + d(v*h)/dy = 0
+# (2) d(uh)/dt + d(u^2*h + 1/2 * gh^2)/dx + d(uvh)/dy = 0
+# (3) d(vh)/dt + d(uvh)/dx + d(v^2*h + 1/2 * gh^2)/dy = 0
+#
+# The 2D velocity field is (u, v) and all derivatives are partial derivatives.
+
+numerical_methods:
+  spatial_method:  fv
+  temporal_method: euler
+  riemann_solver:  roe
+
+# uniform grid (100 cells in each direction, unit grid spacing)
+grid:
+  nx: 100
+  ny: 100
+  xmin: 0
+  xmax: 100
+  ymin: 0
+  ymax: 100
+
+# regions representing upper and lower reflecting walls surrounding dam
+# FIXME: details are here for demonstration--they don't yet match ex1.c.
+regions:
+  upper_wall:
+    xmin: 45
+    xmax: 55
+    ymin: 0
+    ymax: 30
+  lower_wall:
+    xmin: 45
+    xmax: 55
+    ymin: 70
+    ymax: 100
+
+initial_conditions:
+  # etc
+
+time:
+  final_time:      7.2
+  final_time_unit: nhours
+
