@@ -1,5 +1,8 @@
 cmake_minimum_required (VERSION 3.12.0)
 
+# Configurable options
+option(ENABLE_DRIVER "Enable RDycore driver program" ON)
+
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -75,6 +78,11 @@ add_subdirectory(external)
 
 # Create targets for RDycore library and unit tests.
 add_subdirectory(src)
+
+# Build the driver if enabled.
+if (ENABLE_DRIVER)
+  add_subdirectory(driver)
+endif()
 
 #--------------------
 # Additional targets
