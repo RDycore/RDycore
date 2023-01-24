@@ -14,7 +14,7 @@ jobs:
   # This job builds RDycore and runs our test suite.
   build:
     runs-on: ${{ matrix.os }}
-    container: coherellc/rdycore-petsc:v3.18.1
+    container: coherellc/rdycore-petsc:4a6269320af
 
     # A build matrix storing all desired configurations.
     strategy:
