@@ -2,6 +2,7 @@
 add_library(rdycore
   rdycore.c
   rdymesh.c
+  rdysetup.c
 )
 target_code_coverage(rdycore AUTO ALL)
 install(

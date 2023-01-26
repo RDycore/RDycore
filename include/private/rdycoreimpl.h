@@ -33,29 +33,24 @@ struct _p_RDy {
   /// MPI rank of local process
   PetscInt rank;
   /// Number of processes in the communicator
-  PetscInt comm_size;
+  PetscInt nproc;
   /// filename storing input data for the simulation
   char filename[PETSC_MAX_PATH_LEN];
-  /// PETSc grid
+
+  //------------------------
+  // Spatial discretization
+  //------------------------
+
+  /// PETSc (DMPlex) grid
   DM dm;
-  /// Number of cells in the x direction
-  PetscInt Nx;
-  /// Number of cells in the y direction
-  PetscInt Ny;
-  /// grid spacing in the x direction
-  PetscReal dx;
-  /// grid spacing in the y direction
-  PetscReal dy;
-  /// domain extent in x
-  PetscReal Lx;
-  /// domain extent in y
-  PetscReal Ly;
-  /// water depth for the upstream of dam [m]
-  PetscReal hu;
-  /// water depth for the downstream of dam [m]
-  PetscReal hd;
-  /// water depth below which no horizontal flow occurs
-  PetscReal tiny_h;
+
+  /// mesh representing simulation domain
+  RDyMesh mesh;
+
+  //--------------
+  // Timestepping
+  //--------------
+
   /// total number of time steps
   PetscInt Nt;
   /// time step size
@@ -63,14 +58,15 @@ struct _p_RDy {
   /// index of current timestep
   PetscInt tstep;
 
+  //-----------------
+  // Simulation data
+  //-----------------
+
   PetscInt  dof;
   Vec       B, localB;
   Vec       localX;
   PetscBool debug, save, add_building;
   PetscBool interpolate;
-
-  /// mesh representing simulation domain
-  RDyMesh mesh;
 };
 
 #endif

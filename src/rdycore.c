@@ -71,24 +71,23 @@ PetscErrorCode RDyFinalize(void) {
 PetscBool RDyInitialized(void) { return initialized_; }
 
 /// Creates a new RDy object representing an RDycore simulation context.
-/// @param comm [in] the MPI communicator used by the simulation
-/// @param rdy  [out] a pointer that stores the newly created RDy.
-PetscErrorCode RDyCreate(MPI_Comm comm, RDy *rdy) {
+/// @param comm        [in] the MPI communicator used by the simulation
+/// @param config_file [in] a path to a configuration (.yaml) file
+/// @param rdy         [out] a pointer that stores the newly created RDy.
+PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   PetscFunctionBegin;
 
   PetscCall(PetscNew(rdy));
-  PetscFunctionReturn(0);
-}
 
-/// Configures the given RDy object with options supplied on the command line.
-PetscErrorCode RDySetFromOptions(RDy rdy) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(0);
-}
+  // MPI comm stuff
+  (*rdy)->comm = comm;
+  MPI_Comm_rank(comm, &((*rdy)->rank));
+  MPI_Comm_size(comm, &((*rdy)->nproc));
 
-/// Performs any setup needed by RDy after it has been configured.
-PetscErrorCode RDySetup(RDy rdy) {
-  PetscFunctionBegin;
+  // parse the config file's content into the default options database
+  strncpy((*rdy)->filename, config_file, PETSC_MAX_PATH_LEN-1);
+  PetscCall(PetscOptionsInsertFileYAML(comm, NULL, config_file, PETSC_TRUE));
+
   PetscFunctionReturn(0);
 }
 
