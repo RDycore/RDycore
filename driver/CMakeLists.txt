@@ -3,7 +3,7 @@ add_executable(rdycore_exe
   main.c
 )
 set_target_properties(rdycore_exe PROPERTIES OUTPUT_NAME rdycore)
-target_link_libraries(rdycore_exe ${RDYCORE_LIBRARIES})
+target_link_libraries(rdycore_exe INTERFACE ${RDYCORE_LIBRARIES})
 target_code_coverage(rdycore_exe AUTO ALL)
 install(
   TARGETS rdycore_exe
