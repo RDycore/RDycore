@@ -1,0 +1,21 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c.
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+grid:
+  nx: 4
+  ny: 5
+  xmin: 0
+  xmax: 4
+  ymin: 0
+  ymax: 5
+
+time:
+  final_time: 0.005
+  unit: hours
+  max_step: 1000
+
+
