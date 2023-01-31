@@ -105,9 +105,9 @@ static PetscErrorCode ReadNumerics(RDy rdy) {
     sizeof(method), &present));
   PetscCheck(present, rdy->comm, PETSC_ERR_USER, "numerics.spatial not provided!");
   if (!strcasecmp(method, "fv")) {
-    rdy->spatial = FV;
+    rdy->spatial = SPATIAL_FV;
   } else if (!strcasecmp(method, "fe")) {
-    rdy->spatial = FE;
+    rdy->spatial = SPATIAL_FE;
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid numerics.spatial: %s", method);
   }
@@ -116,11 +116,11 @@ static PetscErrorCode ReadNumerics(RDy rdy) {
     sizeof(method), &present));
   PetscCheck(present, rdy->comm, PETSC_ERR_USER, "numerics.temporal not provided!");
   if (!strcasecmp(method, "euler")) {
-    rdy->temporal = EULER;
+    rdy->temporal = TEMPORAL_EULER;
   } else if (!strcasecmp(method, "rk4")) {
-    rdy->temporal = RK4;
+    rdy->temporal = TEMPORAL_RK4;
   } else if (!strcasecmp(method, "beuler")) {
-    rdy->temporal = BEULER;
+    rdy->temporal = TEMPORAL_BEULER;
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid numerics.temporal: %s", method);
   }
@@ -129,23 +129,23 @@ static PetscErrorCode ReadNumerics(RDy rdy) {
     sizeof(method), &present));
   PetscCheck(present, rdy->comm, PETSC_ERR_USER, "numerics.riemann not provided!");
   if (!strcasecmp(method, "roe")) {
-    rdy->riemann = ROE;
+    rdy->riemann = RIEMANN_ROE;
   } else if (!strcasecmp(method, "hll")) {
-    rdy->riemann = HLL;
+    rdy->riemann = RIEMANN_HLL;
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid numerics.riemann: %s", method);
   }
 
   // Currently, only FV, EULER, and ROE are implemented.
-  if (rdy->spatial != FV) {
+  if (rdy->spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
       "Only the finite volume spatial method (FV) is currently implemented.");
   }
-  if (rdy->temporal != EULER) {
+  if (rdy->temporal != TEMPORAL_EULER) {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
       "Only the forward euler temporal method (EULER) is currently implemented.");
   }
-  if (rdy->riemann != ROE) {
+  if (rdy->riemann != RIEMANN_ROE) {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
       "Only the roe riemann solver (ROE) is currently implemented.");
   }
@@ -162,23 +162,27 @@ static PetscErrorCode ReadPhysics(RDy rdy) {
   //   bed_friction: <chezy|manning>
 
   PetscBool present;
+  rdy->sediment = PETSC_FALSE;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-physics_sediment", &rdy->sediment,
     &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "physics.sediment not provided!");
+  rdy->salinity = PETSC_FALSE;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-physics_salinity", &rdy->salinity,
     &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "physics.salinity not provided!");
 
   char model[32];
   PetscCall(PetscOptionsGetString(NULL, NULL, "-physics_bed_friction", model,
     sizeof(model), &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "physics.bed_friction not provided!");
-  if (!strcasecmp(model, "chezy")) {
-    rdy->bed_friction = CHEZY;
-  } else if (!strcasecmp(model, "manning")) {
-    rdy->bed_friction = MANNING;
+  if (present) {
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "physics.bed_friction not provided!");
+    if (!strcasecmp(model, "chezy")) {
+      rdy->bed_friction = BED_FRICTION_CHEZY;
+    } else if (!strcasecmp(model, "manning")) {
+      rdy->bed_friction = BED_FRICTION_MANNING;
+    } else {
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid physics.bed_model: %s", model);
+    }
   } else {
-    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid physics.bed_model: %s", model);
+    rdy->bed_friction = BED_FRICTION_NONE;
   }
 
   PetscFunctionReturn(0);

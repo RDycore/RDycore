@@ -8,27 +8,28 @@
 
 /// This type identifies available spatial discretization methods.
 typedef enum {
-  FV = 0, // finite volume method
-  FE      // finite element method
+  SPATIAL_FV = 0, // finite volume method
+  SPATIAL_FE      // finite element method
 } RDySpatial;
 
 /// This type identifies available temporal discretization methods.
 typedef enum {
-  EULER = 0, // forward euler method
-  RK4,       // 4th-order Runge-Kutta method
-  BEULER     // backward euler method
+  TEMPORAL_EULER = 0, // forward euler method
+  TEMPORAL_RK4,       // 4th-order Runge-Kutta method
+  TEMPORAL_BEULER     // backward euler method
 } RDyTemporal;
 
 /// This type identifies available Riemann solvers for horizontal flow.
 typedef enum {
-  ROE = 0, // Roe solver
-  HLL      // Harten, Lax, van Leer solver
+  RIEMANN_ROE = 0, // Roe solver
+  RIEMANN_HLL      // Harten, Lax, van Leer solver
 } RDyRiemann;
 
 /// This type identifies available bed friction models.
 typedef enum {
-  CHEZY = 0, // Chezy model
-  MANNING    // Manning model
+  BED_FRICTION_NONE = 0,
+  BED_FRICTION_CHEZY,
+  BED_FRICTION_MANNING
 } RDyBedFriction;
 
 /// This type serves as a "virtual table" containing function pointers that

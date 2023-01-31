@@ -91,6 +91,8 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   PetscFunctionReturn(0);
 }
 
+/// Destroys the given RDy object, freeing any allocated resources.
+/// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
   PetscCall(RDyFree(*rdy));
