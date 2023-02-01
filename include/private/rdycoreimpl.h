@@ -6,6 +6,12 @@
 
 #include <petsc/private/petscimpl.h>
 
+/// the maximum number of regions that can be defined on a domain
+#define MAX_NUM_REGIONS 128
+
+/// the maximum number of surfaces that can be defined on a domain
+#define MAX_NUM_SURFACES 128
+
 /// This type identifies available spatial discretization methods.
 typedef enum {
   SPATIAL_FV = 0, // finite volume method
@@ -31,6 +37,37 @@ typedef enum {
   BED_FRICTION_CHEZY,
   BED_FRICTION_MANNING
 } RDyBedFriction;
+
+/// This type specifies a "kind" of condition that indicates how that condition
+/// is to be enforced on a region or surface.
+typedef enum {
+  CONDITION_DIRICHLET = 0, // Dirichlet condition (value is specified)
+  CONDITION_NEUMANN        // Neumann condition (derivative is specified)
+} RDyConditionType;
+
+/// This type defines a "condition" representing
+/// * an initial condition or source/sink associated with a region
+/// * a boundary condition associated with a surface
+typedef struct {
+  /// type of the condition
+  RDyConditionType type;
+  /// value(s) associated with the condition
+  PetscReal value;
+} RDyCondition;
+
+/// This type defines a region consisting of cells identified by their local
+/// indices.
+typedef struct {
+  PetscInt *cell_ids;
+  PetscInt  num_cells;
+} RDyRegion;
+
+/// This type defines a surface consisting of edges identified by their local
+/// indices.
+typedef struct {
+  PetscInt *edge_ids;
+  PetscInt  num_edges;
+} RDySurface;
 
 /// This type serves as a "virtual table" containing function pointers that
 /// define the behavior of the dycore.
@@ -88,6 +125,24 @@ struct _p_RDy {
 
   /// mesh representing simulation domain
   RDyMesh mesh;
+
+  /// mesh regions
+  RDyRegion regions[MAX_NUM_REGIONS];
+
+  /// mesh surfaces
+  RDySurface surfaces[MAX_NUM_SURFACES];
+
+  /// initial conditions associated with mesh regions
+  RDyCondition ics[MAX_NUM_REGIONS];
+  PetscInt     num_ics;
+
+  /// sources (and sinks) associated with mesh regions
+  RDyCondition sources[MAX_NUM_REGIONS];
+  PetscInt     num_sources;
+
+  /// boundary conditions associated with mesh surfaces
+  RDyCondition bcs[MAX_NUM_SURFACES];
+  PetscInt     num_bcs;
 
   //--------------
   // Timestepping

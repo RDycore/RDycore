@@ -4,94 +4,124 @@
 
 #include <float.h>
 
-static PetscErrorCode ReadBoundaryConditions(RDy rdy) {
+//======================================================
+// Traversing YAML mappings in PETSc's options database
+//======================================================
+//
+// The design of the options database in PETSc does not currently allow for one
+// to traverse items in YAML mappings. Instead, one must know the exact name of
+// every item one wants to retrieve. This puts a large restriction on the types
+// of YAML files that can be parsed. Here, we use libyaml (which is bundled with
+// PETSc) directly to parse our configuration file.
+
+// This is the maximum length of an identifier in the YAML file.
+#define YAML_MAX_LEN 1024
+
+// This enum defines the different sections in our configuration file.
+typedef enum {
+  NO_SECTION = 0,
+  PHYSICS_SECTION,
+  NUMERICS_SECTION,
+  TIME_SECTION,
+  RESTART_SECTION,
+  GRID_SECTION,
+  GRID_REGIONS_SECTION,
+  GRID_SURFACES_SECTION,
+  INITIAL_CONDITIONS_SECTION,
+  BOUNDARY_CONDITIONS_SECTION,
+  SOURCES_SECTION,
+  FLOW_CONDITIONS_SECTION,
+  SEDIMENT_CONDITIONS_SECTION,
+  SALINITY_CONDITIONS_SECTION
+} YamlSection;
+
+// This type defines the state of our YAML parser, which allows us to determine
+// where we are in the configuration file.
+typedef struct {
+  // section being currently parsed
+  YamlSection section;
+  // is the section "open" (has its mapping been encountered)?
+  PetscBool section_open;
+  // name of subsection being currently parsed (if any, else blank string)
+  char subsection[YAML_MAX_LEN];
+  // name of config value being current parsed (if any, else blank string)
+  char value_name[YAML_MAX_LEN];
+} YamlParserState;
+
+static PetscErrorCode ParseTopLevel(yaml_event_t    *event,
+                                    YamlParserState *state,
+                                    RDy              rdy) {
   PetscFunctionBegin;
-  PetscFunctionReturn(0);
-}
 
-static PetscErrorCode ReadFlow(RDy rdy) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(0);
-}
+  // At the top level, we have only section names.
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-section type encountered at top level!");
 
-static PetscErrorCode ReadGrid(RDy rdy) {
-  PetscFunctionBegin;
-
-  // grid:
-  //   file: <path-to-file/mesh.exo> or <path-to-file/mesh.h5>
-  //
-  // OR
-  //
-  // grid:
-  //   nx: <nx>
-  //   ny: <ny>
-  //   xmin: <xmin>
-  //   xmax: <xmax>
-  //   ymin: <ymin>
-  //   ymax: <ymax>
-  //   inactive: <path-to-raster-file/inactive.pbm>
-  //
-  // (see https://netpbm.sourceforge.net/doc/pbm.html for details)
-
-  // Are we given a grid file?
-  char      grid_file[PETSC_MAX_PATH_LEN];
-  PetscBool have_grid_file;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-grid_file", grid_file, sizeof(grid_file), &have_grid_file));
-  if (have_grid_file) {
-    // Read the grid from the file.
-    PetscCall(DMPlexCreateFromFile(rdy->comm, grid_file, "grid", PETSC_TRUE, &rdy->dm));
-  } else {
-    // Look for uniform grid parameters.
-    PetscBool present;
-    PetscInt  nx, ny;
-    PetscReal xmin, xmax, ymin, ymax;
-    PetscCall(PetscOptionsGetInt(NULL, NULL, "-grid_nx", &nx, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.nx not provided!");
-    PetscCall(PetscOptionsGetInt(NULL, NULL, "-grid_ny", &ny, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ny not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_xmin", &xmin, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.xmin not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_xmax", &xmax, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.xmax not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_ymin", &ymin, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ymin not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_ymax", &ymax, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ymax not provided!");
-
-    PetscCheck((xmax > xmin), rdy->comm, PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
-    PetscCheck((ymax > ymin), rdy->comm, PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
-
-    // Create a uniform grid with the given information.
-    PetscReal lower[2] = {xmin, ymin};
-    PetscReal upper[2] = {xmax, ymax};
-    PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper, NULL, PETSC_TRUE, &rdy->dm));
-
-    // Look for (optional) raster information to punch out inactive cells.
-    char file[PETSC_MAX_PATH_LEN];
-    PetscBool have_file;
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-grid_inactive", file,
-      sizeof(file), &have_file));
-    if (have_file) {
-      // FIXME: implement inactive cell logic here.
-    }
-
-    // Now look for (optional) region information.
-    // FIXME: Have to query Petsc options database for this.
-
-    // Look for (optional) surface information.
-    // FIXME: Have to query Petsc options database for this.
-
+  // Set the current section based on the encountered value.
+  const char *value = (const char*)(event->data.scalar.value);
+  if (!strcmp(value, "physics")) {
+    state->section = PHYSICS_SECTION;
+  } else if (!strcmp(value, "numerics")) {
+    state->section = NUMERICS_SECTION;
+  } else if (!strcmp(value, "time")) {
+    state->section = TIME_SECTION;
+  } else if (!strcmp(value, "restart")) {
+    state->section = RESTART_SECTION;
+  } else if (!strcmp(value, "grid")) {
+    state->section = GRID_SECTION;
+  } else if (!strcmp(value, "initial_conditions")) {
+    state->section = INITIAL_CONDITIONS_SECTION;
+  } else if (!strcmp(value, "boundary_conditions")) {
+    state->section = BOUNDARY_CONDITIONS_SECTION;
+  } else if (!strcmp(value, "sources")) {
+    state->section = SOURCES_SECTION;
+  } else if (!strcmp(value, "flow_conditions")) {
+    state->section = FLOW_CONDITIONS_SECTION;
+  } else if (!strcmp(value, "sediment_conditions")) {
+    state->section = SEDIMENT_CONDITIONS_SECTION;
+  } else if (!strcmp(value, "salinity_conditions")) {
+    state->section = SALINITY_CONDITIONS_SECTION;
+  } else { // unrecognized section!
+    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
+        "Unrecognized section in YAML config file: %s", value);
   }
 
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode ReadInitialConditions(RDy rdy) {
+static PetscErrorCode ParsePhysics(yaml_event_t    *event,
+                                   YamlParserState *state,
+                                   RDy              rdy) {
   PetscFunctionBegin;
+
+  // physics:
+  //   sediment: <true|false>
+  //   salinity: <true|false>
+  //   bed_friction: <chezy|manning>
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in physics section!");
+
+  const char *value = (const char*)(event->data.scalar.value);
+  if (!strlen(state->value_name)) { // get the parameter name
+    PetscCheck(!strcmp(value, "sediment") ||
+               !strcmp(value, "salinity") ||
+               !strcmp(value, "bed_friction"), rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in physics section: %s", value);
+    strncpy(state->value_name, value, YAML_MAX_LEN);
+  } else { // parse the parameter's value
+    if (!strcmp(state->value_name, "sediment")) {
+    } else if (!strcmp(state->value_name, "salinity")) {
+    } else { // bed_friction
+    }
+  }
+
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode ReadNumerics(RDy rdy) {
+static PetscErrorCode ParseNumerics(yaml_event_t    *event,
+                                    YamlParserState *state,
+                                    RDy              rdy) {
   PetscFunctionBegin;
 
   // numerics:
@@ -153,63 +183,9 @@ static PetscErrorCode ReadNumerics(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode ReadPhysics(RDy rdy) {
-  PetscFunctionBegin;
-
-  // physics:
-  //   sediment: <true|false>
-  //   salinity: <true|false>
-  //   bed_friction: <chezy|manning>
-
-  PetscBool present;
-  rdy->sediment = PETSC_FALSE;
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-physics_sediment", &rdy->sediment,
-    &present));
-  rdy->salinity = PETSC_FALSE;
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-physics_salinity", &rdy->salinity,
-    &present));
-
-  char model[32];
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-physics_bed_friction", model,
-    sizeof(model), &present));
-  if (present) {
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "physics.bed_friction not provided!");
-    if (!strcasecmp(model, "chezy")) {
-      rdy->bed_friction = BED_FRICTION_CHEZY;
-    } else if (!strcasecmp(model, "manning")) {
-      rdy->bed_friction = BED_FRICTION_MANNING;
-    } else {
-      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid physics.bed_model: %s", model);
-    }
-  } else {
-    rdy->bed_friction = BED_FRICTION_NONE;
-  }
-
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode ReadRestart(RDy rdy) {
-  PetscFunctionBegin;
-
-  // restart:
-  //   format: <bin|h5>
-  //   frequency: <value>
-  //   unit: <nsteps|nminutes|nhours|ndays|nmonths|nyears>
-
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode ReadSediments(RDy rdy) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode ReadSourcesAndSinks(RDy rdy) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode ReadTime(RDy rdy) {
+static PetscErrorCode ParseTime(yaml_event_t    *event,
+                                YamlParserState *state,
+                                RDy              rdy) {
   PetscFunctionBegin;
 
   // time:
@@ -262,22 +238,230 @@ static PetscErrorCode ReadTime(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-/// Performs any setup needed by RDy after it has been configured.
+static PetscErrorCode ParseRestart(yaml_event_t    *event,
+                                   YamlParserState *state,
+                                   RDy              rdy) {
+  PetscFunctionBegin;
+
+  // restart:
+  //   format: <bin|h5>
+  //   frequency: <value>
+  //   unit: <nsteps|nminutes|nhours|ndays|nmonths|nyears>
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseGrid(yaml_event_t    *event,
+                                YamlParserState *state,
+                                RDy              rdy) {
+  PetscFunctionBegin;
+
+  // grid:
+  //   file: <path-to-file/mesh.exo> or <path-to-file/mesh.h5>
+  //
+  // OR
+  //
+  // grid:
+  //   nx: <nx>
+  //   ny: <ny>
+  //   xmin: <xmin>
+  //   xmax: <xmax>
+  //   ymin: <ymin>
+  //   ymax: <ymax>
+  //   inactive: <path-to-raster-file/inactive.pbm>
+  //
+  // (see https://netpbm.sourceforge.net/doc/pbm.html for details)
+
+  // Are we given a grid file?
+  char grid_file[PETSC_MAX_PATH_LEN];
+  PetscBool have_grid_file;
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-grid_file", grid_file, sizeof(grid_file), &have_grid_file));
+  if (have_grid_file) {
+    // Read the grid from the file.
+    PetscCall(DMPlexCreateFromFile(rdy->comm, grid_file, "grid", PETSC_TRUE, &rdy->dm));
+  } else {
+    // Look for uniform grid parameters.
+    PetscBool present;
+    PetscInt  nx, ny;
+    PetscReal xmin, xmax, ymin, ymax;
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-grid_nx", &nx, &present));
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.nx not provided!");
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-grid_ny", &ny, &present));
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ny not provided!");
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_xmin", &xmin, &present));
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.xmin not provided!");
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_xmax", &xmax, &present));
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.xmax not provided!");
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_ymin", &ymin, &present));
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ymin not provided!");
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_ymax", &ymax, &present));
+    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ymax not provided!");
+
+    PetscCheck((xmax > xmin), rdy->comm, PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
+    PetscCheck((ymax > ymin), rdy->comm, PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
+
+    // Create a uniform grid with the given information.
+    PetscReal lower[2] = {xmin, ymin};
+    PetscReal upper[2] = {xmax, ymax};
+    PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper, NULL, PETSC_TRUE, &rdy->dm));
+
+    // Look for (optional) raster information to punch out inactive cells.
+    char file[PETSC_MAX_PATH_LEN];
+    PetscBool have_file;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-grid_inactive", file,
+      sizeof(file), &have_file));
+    if (have_file) {
+      // FIXME: implement inactive cell logic here.
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
+                                             YamlParserState *state,
+                                             RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
+                                              YamlParserState *state,
+                                              RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseSources(yaml_event_t    *event,
+                                   YamlParserState *state,
+                                   RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseFlowConditions(yaml_event_t    *event,
+                                          YamlParserState *state,
+                                          RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseSedimentConditions(yaml_event_t    *event,
+                                              YamlParserState *state,
+                                              RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseSalinityConditions(yaml_event_t    *event,
+                                              YamlParserState *state,
+                                              RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+// Handles a YAML event, populating the appropriate config info within rdy.
+static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
+                                      YamlParserState *state,
+                                      RDy rdy) {
+  PetscFunctionBegin;
+
+  if ((state->section != NO_SECTION) && !state->section_open &&
+      (event->type == YAML_MAPPING_START_EVENT)) {
+    // If we're inside a section that hasn't been opened and we encounter the
+    // start of a mapping, open the section.
+    state->section_open = PETSC_TRUE;
+  } else if ((state->section != NO_SECTION) && !strlen(state->subsection) &&
+      !strlen(state->value_name) && (event->type == YAML_MAPPING_END_EVENT)) {
+    // If we're inside a opened section and we're not parsing a value or a
+    // subsection, and we encounter the end of a mapping, close the section and
+    // set it to NO_SECTION.
+    state->section_open = PETSC_FALSE;
+    state->section = NO_SECTION;
+  } else {
+    // Otherwise, dispatch the parser to the indicated section.
+    switch (state->section) {
+      case NO_SECTION:
+        PetscCall(ParseTopLevel(event, state, rdy));
+        break;
+      case PHYSICS_SECTION:
+        PetscCall(ParsePhysics(event, state, rdy));
+        break;
+      case NUMERICS_SECTION:
+        PetscCall(ParseNumerics(event, state, rdy));
+        break;
+      case TIME_SECTION:
+        PetscCall(ParseTime(event, state, rdy));
+        break;
+      case RESTART_SECTION:
+        PetscCall(ParseRestart(event, state, rdy));
+        break;
+      case GRID_SECTION, GRID_REGIONS_SECTION, GRID_SURFACES_SECTION:
+        PetscCall(ParseGrid(event, state, rdy));
+        break;
+      case INITIAL_CONDITIONS_SECTION:
+        PetscCall(ParseInitialConditions(event, state, rdy));
+        break;
+      case BOUNDARY_CONDITIONS_SECTION:
+        PetscCall(ParseBoundaryConditions(event, state, rdy));
+        break;
+      case SOURCES_SECTION:
+        PetscCall(ParseSources(event, state, rdy));
+        break;
+      case FLOW_CONDITIONS_SECTION:
+        PetscCall(ParseFlowConditions(event, state, rdy));
+        break;
+      case SEDIMENT_CONDITIONS_SECTION:
+        PetscCall(ParseSedimentConditions(event, state, rdy));
+        break;
+      case SALINITY_CONDITIONS_SECTION:
+        PetscCall(ParseSalinityConditions(event, state, rdy));
+        break;
+      default:
+        // we ignore everything else in the file.
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+/// Performs any setup needed by RDy, reading from the specified configuration
+/// file.
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
-  // read all relevant YAML "blocks"
+  // Open the config file and set up a YAML parser for it.
+  FILE *file;
+  yaml_parser_t parser;
+  yaml_parser_initialize(&parser);
+  yaml_parser_set_input_file(&parser, file);
 
-  PetscCall(ReadBoundaryConditions(rdy));
-  PetscCall(ReadFlow(rdy));
-  PetscCall(ReadGrid(rdy));
-  PetscCall(ReadInitialConditions(rdy));
-  PetscCall(ReadNumerics(rdy));
-  PetscCall(ReadPhysics(rdy));
-  PetscCall(ReadRestart(rdy));
-  PetscCall(ReadSediments(rdy));
-  PetscCall(ReadSourcesAndSinks(rdy));
-  PetscCall(ReadTime(rdy));
+  // Parse the file, handling each YAML "event" based on the parser state.
+  YamlParserState state = {0};
+  yaml_event_type_t event_type;
+  do {
+    yaml_event_t event;
+
+    // Parse the next YAML "event" and handle any errors encountered.
+    yaml_parser_parse(&parser, &event);
+    if (parser.error != YAML_NO_ERROR) {
+      char error_msg[1025];
+      strncpy(error_msg, parser.error, 1024);
+      yaml_event_delete(&event);
+      yaml_parser_delete(&parser);
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, error_msg);
+    }
+
+    // Process the event, using it to populate our YAML data, and handle
+    // any errors resulting from properly-formed YAML that doesn't conform
+    // to our spec.
+    PetscCall(HandleYamlEvent(&event, &state, rdy));
+
+    // Discard the event and move on.
+    event_type = event.type;
+    yaml_event_delete(&event);
+  } while (event_type != YAML_STREAM_END_EVENT);
+  yaml_parser_delete(&parser);
 
   PetscFunctionReturn(0);
 }
