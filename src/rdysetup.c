@@ -23,6 +23,9 @@
 typedef enum {
   NO_SECTION = 0,
   PHYSICS_SECTION,
+  PHYSICS_SEDIMENT_SECTION,
+  PHYSICS_SALINITY_SECTION,
+  PHYSICS_BED_FRICTION_SECTION,
   NUMERICS_SECTION,
   TIME_SECTION,
   RESTART_SECTION,
@@ -40,15 +43,38 @@ typedef enum {
 // This type defines the state of our YAML parser, which allows us to determine
 // where we are in the configuration file.
 typedef struct {
-  // section being currently parsed
+  // section currently being parsed
   YamlSection section;
-  // is the above section "open" (has its mapping start event been encountered)?
-  PetscBool section_open;
-  // name of subsection being currently parsed (if any, else blank string)
-  char subsection[YAML_MAX_LEN];
-  // name of parameter being current parsed (if any, else blank string)
+  // are we inside the above section (has a mapping start event occurred)?
+  PetscBool inside_section;
+  // region or surface currently being parsed (if any, else blank string)
+  char region_or_surface[YAML_MAX_LEN];
+  // are we inside a region or surface subsection (mapping start event)?
+  PetscBool inside_region_or_surface;
+  // name of parameter currently being parsed (if any, else blank string)
   char parameter[YAML_MAX_LEN];
 } YamlParserState;
+
+// This sets the index of a selection variable by matching the given string to
+// one of a set of case-sensitive items. If the string doesn't match any of
+// the items, the selection is set to -1.
+static PetscErrorCode SelectItem(const char *str,
+                                 PetscInt    num_items,
+                                 const char *items[num_items],
+                                 PetscInt    item_values[num_items],
+                                 PetscInt   *selection) {
+  PetscFunctionBegin;
+
+  *selection = -1;
+  for (PetscInt i = 0; i < num_items; ++i) {
+    if (!strcmp(str, items[i])) {
+      *selection = item_values[i];
+      break;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
 
 // this converts a YAML string to a boolean
 static PetscErrorCode ConvertToBool(MPI_Comm comm, const char *param,
@@ -69,9 +95,21 @@ static PetscErrorCode ConvertToReal(MPI_Comm comm, const char *param,
   PetscFunctionBegin;
 
   char *endp;
-  *val = strtod(str, &endp);
-  PetscCheck(endp != str, comm, PETSC_ERR_USER,
+  *val = (PetscReal)(strtod(str, &endp));
+  PetscCheck(endp != NULL, comm, PETSC_ERR_USER,
     "Invalid real value for %s: %s", param, str);
+  PetscFunctionReturn(0);
+}
+
+// this converts a YAML string to an integer
+static PetscErrorCode ConvertToInt(MPI_Comm comm, const char *param,
+                                   const char *str, PetscInt *val) {
+  PetscFunctionBegin;
+
+  char *endp;
+  *val = (PetscInt)(strtol(str, &endp, 10));
+  PetscCheck(endp != NULL, comm, PETSC_ERR_USER,
+    "Invalid integer value for %s: %s", param, str);
   PetscFunctionReturn(0);
 }
 
@@ -82,7 +120,7 @@ static PetscErrorCode ParseTopLevel(yaml_event_t    *event,
 
   // At the top level, we have only section names.
   PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
-    "Invalid YAML (non-section type encountered at top level!");
+    "Invalid YAML (non-section type encountered at top level)!");
 
   // Set the current section based on the encountered value.
   const char *value = (const char*)(event->data.scalar.value);
@@ -130,61 +168,100 @@ static PetscErrorCode ParsePhysics(yaml_event_t    *event,
     "Invalid YAML (non-scalar value encountered in physics section!");
 
   const char *value = (const char*)(event->data.scalar.value);
-  if (!strlen(state->subsection)) { // get the subsection name
-    PetscCheck(!strcmp(value, "sediment") ||
-               !strcmp(value, "salinity") ||
-               !strcmp(value, "bed_friction"), rdy->comm, PETSC_ERR_USER,
-      "Invalid subsection in physics: %s", value);
-    strncpy(state->subsection, value, YAML_MAX_LEN);
-  } else if (!strcmp(state->subsection, "sediment")) {
-    PetscCheck(!strcmp(value, "enable"), rdy->comm, PETSC_ERR_USER,
-      "Invalid parameter in physics.sediment: %s", value);
-    if (!strlen(state->parameter)) { // parameter not set
-      strncpy(state->parameter, value, YAML_MAX_LEN);
-    } else { // parameter set, parse value
-      if (!strcmp(state->parameter, "enable")) {
-        ConvertToBool(rdy->comm, state->parameter, value, &rdy->sediment);
-      }
+  PetscInt selection;
+  SelectItem(value, 3,
+    (const char*[3]){"sediment", "salinity", "bed_friction"},
+    (PetscInt[3]){PHYSICS_SEDIMENT_SECTION,
+                  PHYSICS_SALINITY_SECTION,
+                  PHYSICS_BED_FRICTION_SECTION},
+    &selection);
+  PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+    "Invalid subsection in physics: %s", value);
+  state->section = selection;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParsePhysicsSediment(yaml_event_t    *event,
+                                           YamlParserState *state,
+                                           RDy              rdy) {
+  PetscFunctionBegin;
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in physics.sediment section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  PetscCheck(!strcmp(value, "enable"), rdy->comm, PETSC_ERR_USER,
+    "Invalid parameter in physics.sediment: %s", value);
+  if (!strlen(state->parameter)) { // parameter not set
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else { // parameter set, parse value
+    if (!strcmp(state->parameter, "enable")) {
+      ConvertToBool(rdy->comm, state->parameter, value, &rdy->sediment);
     }
-  } else if (!strcmp(state->subsection, "salinity")) {
-    PetscCheck(!strcmp(value, "enable"), rdy->comm, PETSC_ERR_USER,
-      "Invalid parameter in physics.salinity: %s", value);
-    if (!strlen(state->parameter)) { // parameter not set
-      strncpy(state->parameter, value, YAML_MAX_LEN);
-    } else { // parameter set, parse value
-      if (!strcmp(state->parameter, "enable")) {
-        ConvertToBool(rdy->comm, state->parameter, value, &rdy->salinity);
-      }
+    state->parameter[0] = 0;
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParsePhysicsSalinity(yaml_event_t    *event,
+                                           YamlParserState *state,
+                                           RDy              rdy) {
+  PetscFunctionBegin;
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in physics.salinity section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  PetscCheck(!strcmp(value, "enable"), rdy->comm, PETSC_ERR_USER,
+    "Invalid parameter in physics.salinity: %s", value);
+  if (!strlen(state->parameter)) { // parameter not set
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else { // parameter set, parse value
+    if (!strcmp(state->parameter, "enable")) {
+      ConvertToBool(rdy->comm, state->parameter, value, &rdy->salinity);
     }
-  } else { // bed_friction
-    if (!strlen(state->parameter)) { // parameter not set
-      PetscCheck(!strcmp(value, "enable") ||
-                 !strcmp(value, "model") ||
-                 !strcmp(value, "coefficient"), rdy->comm, PETSC_ERR_USER,
-        "Invalid parameter in physics.bed_friction: %s", value);
-      strncpy(state->parameter, value, YAML_MAX_LEN);
-    } else { // parameter set, parse value
-      if (!strcmp(state->parameter, "enable")) {
-        PetscBool enable;
-        ConvertToBool(rdy->comm, state->parameter, value, &enable);
-        if (!enable) {
-          rdy->bed_friction = BED_FRICTION_NONE; // disabled!
-        }
-      } else if (!strcmp(state->parameter, "model") &&
-                 (rdy->bed_friction != BED_FRICTION_NONE)) {
-        PetscCheck(!strcmp(value, "chezy") || !strcmp(value, "manning"),
-                   rdy->comm, PETSC_ERR_USER, "Invalid bed_friction model: %s",
-                   value);
-        if (!strcmp(value, "chezy")) {
-          rdy->bed_friction = BED_FRICTION_CHEZY;
-        } else {
-          rdy->bed_friction = BED_FRICTION_MANNING;
-        }
-      } else { // coefficient
-        ConvertToReal(rdy->comm, state->parameter, value,
-                      &rdy->bed_friction_coef);
+    state->parameter[0] = 0;
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParsePhysicsBedFriction(yaml_event_t    *event,
+                                              YamlParserState *state,
+                                              RDy              rdy) {
+  PetscFunctionBegin;
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in physics.bed_friction section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) { // parameter not set
+    PetscCheck(!strcmp(value, "enable") ||
+               !strcmp(value, "model") ||
+               !strcmp(value, "coefficient"), rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in physics.bed_friction: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else { // parameter set, parse value
+    if (!strcmp(state->parameter, "enable")) {
+      PetscBool enable;
+      ConvertToBool(rdy->comm, state->parameter, value, &enable);
+      if (!enable) {
+        rdy->bed_friction = BED_FRICTION_NONE; // disabled!
       }
+    } else if (!strcmp(state->parameter, "model") &&
+               (rdy->bed_friction != BED_FRICTION_NONE)) {
+      PetscCheck(!strcmp(value, "chezy") || !strcmp(value, "manning"),
+                 rdy->comm, PETSC_ERR_USER, "Invalid bed_friction model: %s",
+                 value);
+      if (!strcmp(value, "chezy")) {
+        rdy->bed_friction = BED_FRICTION_CHEZY;
+      } else {
+        rdy->bed_friction = BED_FRICTION_MANNING;
+      }
+    } else { // coefficient
+      ConvertToReal(rdy->comm, state->parameter, value,
+                    &rdy->bed_friction_coef);
     }
+    state->parameter[0] = 0;
   }
 
   PetscFunctionReturn(0);
@@ -200,41 +277,38 @@ static PetscErrorCode ParseNumerics(yaml_event_t    *event,
   //   temporal: <euler|rk4|beuler>
   //   riemann: <roe|hll>
 
-  char method[32];
-  PetscBool present;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-numerics_spatial", method,
-    sizeof(method), &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "numerics.spatial not provided!");
-  if (!strcasecmp(method, "fv")) {
-    rdy->spatial = SPATIAL_FV;
-  } else if (!strcasecmp(method, "fe")) {
-    rdy->spatial = SPATIAL_FE;
-  } else {
-    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid numerics.spatial: %s", method);
-  }
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in numerics section!");
+  const char *value = (const char*)(event->data.scalar.value);
 
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-numerics_temporal", method,
-    sizeof(method), &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "numerics.temporal not provided!");
-  if (!strcasecmp(method, "euler")) {
-    rdy->temporal = TEMPORAL_EULER;
-  } else if (!strcasecmp(method, "rk4")) {
-    rdy->temporal = TEMPORAL_RK4;
-  } else if (!strcasecmp(method, "beuler")) {
-    rdy->temporal = TEMPORAL_BEULER;
-  } else {
-    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid numerics.temporal: %s", method);
-  }
-
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-numerics_riemann", method,
-    sizeof(method), &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "numerics.riemann not provided!");
-  if (!strcasecmp(method, "roe")) {
-    rdy->riemann = RIEMANN_ROE;
-  } else if (!strcasecmp(method, "hll")) {
-    rdy->riemann = RIEMANN_HLL;
-  } else {
-    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "invalid numerics.riemann: %s", method);
+  if (!strlen(state->parameter)) { // parameter not set
+    PetscInt selection;
+    SelectItem(value, 3, (const char*[3]){"spatial", "temporal", "riemann"},
+      (PetscInt[3]){0, 1, 2}, &selection);
+    PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in numerics: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else { // parameter set, get value
+    PetscInt selection;
+    if (!strcmp(state->parameter, "spatial")) {
+      SelectItem(value, 2, (const char*[2]){"fv", "fe"},
+        (PetscInt[2]){SPATIAL_FV, SPATIAL_FE}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid numerics.spatial: %s", value);
+      rdy->spatial = selection;
+    } else if (!strcmp(state->parameter, "temporal")) {
+      SelectItem(value, 3, (const char*[3]){"euler", "rk4", "beuler"},
+        (PetscInt[3]){TEMPORAL_EULER, TEMPORAL_RK4, TEMPORAL_BEULER}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid numerics.temporal: %s", value);
+    } else { // riemann
+      SelectItem(value, 2, (const char*[2]){"roe", "hll"},
+        (PetscInt[2]){RIEMANN_ROE, RIEMANN_HLL}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid numerics.riemann: %s", value);
+      rdy->riemann = selection;
+    }
+    state->parameter[0] = 0;
   }
 
   // Currently, only FV, EULER, and ROE are implemented.
@@ -264,47 +338,38 @@ static PetscErrorCode ParseTime(yaml_event_t    *event,
   //   unit: <nsteps|nminutes|nhours|ndays|nmonths|nyears>
   //   max_step: <value>
 
-  // fetch values
-  PetscBool present;
-  PetscReal final_time;
-  char      unit[32];
-  PetscInt max_step;
-  PetscCall(PetscOptionsGetReal(NULL, NULL, "-time_final_time", &final_time, &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "time.final_time not provided!");
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-time_unit", unit, sizeof(unit), &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "time.unit not provided!");
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-time_max_step", &max_step, &present));
-  PetscCheck(present, rdy->comm, PETSC_ERR_USER, "time.max_step not provided!");
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in time section!");
+  const char *value = (const char*)(event->data.scalar.value);
 
-  // validate values
-  PetscCheck((final_time > 0.0), rdy->comm, PETSC_ERR_USER,
-    "invalid final_time: %g\n", final_time);
-  PetscCheck((max_step >= 0), rdy->comm, PETSC_ERR_USER,
-    "invalid max_step: %d\n", max_step);
-  PetscBool unit_valid = PETSC_TRUE;
-  if (!strcasecmp(unit, "steps")) {
-    rdy->max_step = (int)final_time;
-    rdy->final_time = DBL_MAX;
-  } else {
-    rdy->max_step = max_step;
-    PetscReal factor = -1.0;
-    if (!strcasecmp(unit, "minutes")) {
-      factor = 1.0;
-    } else if (!strcasecmp(unit, "hours")) {
-      factor = 60.0;
-    } else if (!strcasecmp(unit, "days")) {
-      factor = 24 * 60;
-    } else if (!strcasecmp(unit, "months")) {
-      factor = 30 * 24 * 60;
-    } else if (!strcasecmp(unit, "years")) {
-      factor = 365.25 * 24 * 60;
-    } else {
-      unit_valid = PETSC_FALSE;
+  if (!strlen(state->parameter)) { // parameter not set
+    PetscInt selection;
+    SelectItem(value, 3, (const char*[3]){"final_time", "unit", "max_step"},
+      (PetscInt[3]){0, 1, 2}, &selection);
+    PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in time: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else { // parameter set, get value
+    if (!strcmp(state->parameter, "final_time")) {
+      ConvertToReal(rdy->comm, state->parameter, value, &rdy->final_time);
+      PetscCheck((rdy->final_time > 0.0), rdy->comm, PETSC_ERR_USER,
+        "invalid time.final_time: %g\n", rdy->final_time);
+    } else if (!strcmp(state->parameter, "unit")) {
+      PetscInt selection;
+      SelectItem(value, 5, (const char*[5]){"minutes", "hours", "days",
+        "months", "years"},
+        (PetscInt[5]){TIME_MINUTES, TIME_HOURS, TIME_DAYS,
+                      TIME_MONTHS, TIME_YEARS}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid time.unit: %s", value);
+      rdy->time_unit = selection;
+    } else { // max_step
+      ConvertToInt(rdy->comm, state->parameter, value, &rdy->max_step);
+      PetscCheck((rdy->max_step >= 0), rdy->comm, PETSC_ERR_USER,
+        "invalid time.max_step: %d\n", rdy->max_step);
     }
-    // Times are stored internally in minutes.
-    rdy->final_time = factor * final_time;
+    state->parameter[0] = 0;
   }
-  PetscCheck(unit_valid, rdy->comm, PETSC_ERR_USER, "invalid unit: %s", unit);
 
   PetscFunctionReturn(0);
 }
@@ -317,8 +382,77 @@ static PetscErrorCode ParseRestart(yaml_event_t    *event,
   // restart:
   //   format: <bin|h5>
   //   frequency: <value>
-  //   unit: <nsteps|nminutes|nhours|ndays|nmonths|nyears>
 
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in restart section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) { // parameter not set
+    PetscInt selection;
+    SelectItem(value, 2, (const char*[2]){"format", "frequency"},
+      (PetscInt[2]){0, 1}, &selection);
+    PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in restart: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else { // parameter set, get value
+    if (!strcmp(state->parameter, "format")) {
+      PetscInt selection;
+      SelectItem(value, 2, (const char*[2]){"bin", "h5"},
+        (PetscInt[2]){0, 1}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid restart.format: %s", value);
+      strncpy(rdy->restart_format, value, sizeof(rdy->restart_format));
+    } else { // frequency
+      ConvertToInt(rdy->comm, state->parameter, value, &rdy->restart_frequency);
+      PetscCheck((rdy->restart_frequency > 0), rdy->comm, PETSC_ERR_USER,
+        "Invalid restart.frequency: %d\n", rdy->restart_frequency);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
+                                    YamlParserState *state,
+                                    RDy              rdy) {
+  PetscFunctionBegin;
+
+  const char *value = (const char*)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) { // parameter not set
+    PetscInt selection;
+    SelectItem(value, 9,
+      (const char*[9]){"nx", "ny", "xmin", "xmax", "ymin", "ymax", "inactive",
+                       "regions", "surfaces"},
+         (PetscInt[9]){0, 1, 2, 3, 4, 5, 6, 7, 8}, &selection);
+    PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in grid: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+    if (!strcmp(state->parameter, "regions")) {
+      state->section = GRID_REGIONS_SECTION;
+    } else if (!strcmp(state->parameter, "surfaces")) {
+      state->section = GRID_SURFACES_SECTION;
+    }
+  } else {
+    if (!strcmp(state->parameter, "nx")) {
+      ConvertToInt(rdy->comm, state->parameter, value, &rdy->quadmesh.nx);
+      PetscCheck(rdy->quadmesh.nx < 1, rdy->comm, PETSC_ERR_USER,
+        "Invalid grid.nx: %d", rdy->quadmesh.nx);
+    } else if (!strcmp(state->parameter, "ny")) {
+      ConvertToInt(rdy->comm, state->parameter, value, &rdy->quadmesh.ny);
+      PetscCheck(rdy->quadmesh.ny < 1, rdy->comm, PETSC_ERR_USER,
+        "Invalid grid.ny: %d", rdy->quadmesh.ny);
+    } else if (!strcmp(state->parameter, "xmin")) {
+      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.xmin);
+    } else if (!strcmp(state->parameter, "xmax")) {
+      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.xmax);
+    } else if (!strcmp(state->parameter, "ymin")) {
+      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.ymin);
+    } else if (!strcmp(state->parameter, "ymax")) {
+      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.ymax);
+    } else { // inactive raster file
+      strncpy(rdy->quadmesh.inactive_file, value, YAML_MAX_LEN);
+    }
+  }
   PetscFunctionReturn(0);
 }
 
@@ -343,49 +477,42 @@ static PetscErrorCode ParseGrid(yaml_event_t    *event,
   //
   // (see https://netpbm.sourceforge.net/doc/pbm.html for details)
 
-  // Are we given a grid file?
-  char grid_file[PETSC_MAX_PATH_LEN];
-  PetscBool have_grid_file;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-grid_file", grid_file, sizeof(grid_file), &have_grid_file));
-  if (have_grid_file) {
-    // Read the grid from the file.
-    PetscCall(DMPlexCreateFromFile(rdy->comm, grid_file, "grid", PETSC_TRUE, &rdy->dm));
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in grid section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) { // parameter not set
+    if (!strcmp(value, "file")) {
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else {
+      PetscCall(ParseQuadGrid(event, state, rdy));
+    }
   } else {
-    // Look for uniform grid parameters.
-    PetscBool present;
-    PetscInt  nx, ny;
-    PetscReal xmin, xmax, ymin, ymax;
-    PetscCall(PetscOptionsGetInt(NULL, NULL, "-grid_nx", &nx, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.nx not provided!");
-    PetscCall(PetscOptionsGetInt(NULL, NULL, "-grid_ny", &ny, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ny not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_xmin", &xmin, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.xmin not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_xmax", &xmax, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.xmax not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_ymin", &ymin, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ymin not provided!");
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-grid_ymax", &ymax, &present));
-    PetscCheck(present, rdy->comm, PETSC_ERR_USER, "grid.ymax not provided!");
-
-    PetscCheck((xmax > xmin), rdy->comm, PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
-    PetscCheck((ymax > ymin), rdy->comm, PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
-
-    // Create a uniform grid with the given information.
-    PetscReal lower[2] = {xmin, ymin};
-    PetscReal upper[2] = {xmax, ymax};
-    PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper, NULL, PETSC_TRUE, &rdy->dm));
-
-    // Look for (optional) raster information to punch out inactive cells.
-    char file[PETSC_MAX_PATH_LEN];
-    PetscBool have_file;
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-grid_inactive", file,
-      sizeof(file), &have_file));
-    if (have_file) {
-      // FIXME: implement inactive cell logic here.
+    if (!strcmp(state->parameter, "file")) {
+      // Easy peasy--we just record the mesh file and leave.
+      strncpy(rdy->mesh_file, value, PETSC_MAX_PATH_LEN);
+    } else {
+      // Inline quad mesh generation.
+      PetscCheck(!strlen(rdy->mesh_file), rdy->comm, PETSC_ERR_USER,
+        "invalid grid parameter: %s (mesh file already given)", value);
+      PetscCall(ParseQuadGrid(event, state, rdy));
     }
   }
 
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseGridRegions(yaml_event_t    *event,
+                                       YamlParserState *state,
+                                       RDy              rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseGridSurfaces(yaml_event_t    *event,
+                                        YamlParserState *state,
+                                        RDy              rdy) {
+  PetscFunctionBegin;
   PetscFunctionReturn(0);
 }
 
@@ -437,19 +564,35 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
                                       RDy rdy) {
   PetscFunctionBegin;
 
-  if ((state->section != NO_SECTION) && !state->section_open &&
-      (event->type == YAML_MAPPING_START_EVENT)) {
-    // If we're inside a section that hasn't been opened and we encounter the
-    // start of a mapping, open the section.
-    state->section_open = PETSC_TRUE;
-  } else if ((state->section != NO_SECTION) && !strlen(state->subsection) &&
-      !strlen(state->parameter) && (event->type == YAML_MAPPING_END_EVENT)) {
-    // If we're inside a opened section and we're not parsing a value or a
-    // subsection, and we encounter the end of a mapping, close the section and
-    // set it to NO_SECTION.
-    state->section_open = PETSC_FALSE;
-    state->section = NO_SECTION;
-  } else {
+  // navigate sections via mapping starts and ends
+  if (event->type == YAML_MAPPING_START_EVENT) {
+    if (state->section != NO_SECTION) {
+      if (!state->inside_section) {
+        state->inside_section = PETSC_TRUE;
+      } else if (strlen(state->region_or_surface) &&
+                 !state->inside_region_or_surface) {
+        state->inside_region_or_surface = PETSC_TRUE;
+      }
+    }
+  } else if (event->type == YAML_MAPPING_END_EVENT) {
+    if (state->inside_region_or_surface) { // exiting a region/surface?
+      state->inside_region_or_surface = PETSC_FALSE;
+      state->region_or_surface[0] = 0;
+    } else if (state->inside_section) { // exiting a section?
+      state->inside_section = PETSC_FALSE;
+      switch (state->section) { // move up one section
+        case PHYSICS_SEDIMENT_SECTION:
+        case PHYSICS_SALINITY_SECTION:
+        case PHYSICS_BED_FRICTION_SECTION:
+          state->section = PHYSICS_SECTION;
+          break;
+        case GRID_REGIONS_SECTION:
+        case GRID_SURFACES_SECTION:
+          state->section = GRID_SECTION;
+          break;
+      }
+    }
+  } else { // parse parameters in sections
     // Otherwise, dispatch the parser to the indicated section.
     switch (state->section) {
       case NO_SECTION:
@@ -457,6 +600,15 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
         break;
       case PHYSICS_SECTION:
         PetscCall(ParsePhysics(event, state, rdy));
+        break;
+      case PHYSICS_SEDIMENT_SECTION:
+        PetscCall(ParsePhysicsSediment(event, state, rdy));
+        break;
+      case PHYSICS_SALINITY_SECTION:
+        PetscCall(ParsePhysicsSediment(event, state, rdy));
+        break;
+      case PHYSICS_BED_FRICTION_SECTION:
+        PetscCall(ParsePhysicsBedFriction(event, state, rdy));
         break;
       case NUMERICS_SECTION:
         PetscCall(ParseNumerics(event, state, rdy));
@@ -468,9 +620,13 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
         PetscCall(ParseRestart(event, state, rdy));
         break;
       case GRID_SECTION:
-      case GRID_REGIONS_SECTION:
-      case GRID_SURFACES_SECTION:
         PetscCall(ParseGrid(event, state, rdy));
+        break;
+      case GRID_REGIONS_SECTION:
+        PetscCall(ParseGridRegions(event, state, rdy));
+        break;
+      case GRID_SURFACES_SECTION:
+        PetscCall(ParseGridSurfaces(event, state, rdy));
         break;
       case INITIAL_CONDITIONS_SECTION:
         PetscCall(ParseInitialConditions(event, state, rdy));
@@ -504,7 +660,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
   // Open the config file and set up a YAML parser for it.
-  FILE *file;
+  FILE *file = fopen(rdy->filename, "r");
+  PetscCheck(file, rdy->comm, PETSC_ERR_USER,
+    "Configuration file not found: %s", rdy->filename);
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);
   yaml_parser_set_input_file(&parser, file);
@@ -535,6 +693,34 @@ PetscErrorCode RDySetup(RDy rdy) {
     yaml_event_delete(&event);
   } while (event_type != YAML_STREAM_END_EVENT);
   yaml_parser_delete(&parser);
+
+  // Create the grid from our specification.
+  if (strlen(rdy->mesh_file)) { // we are given a file
+    PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->mesh_file, "grid",
+                                   PETSC_TRUE, &rdy->dm));
+  } else { // we are asked to create a quad grid
+    PetscCheck((rdy->quadmesh.xmax > rdy->quadmesh.xmin), rdy->comm,
+               PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
+    PetscCheck((rdy->quadmesh.ymax > rdy->quadmesh.ymin), rdy->comm,
+               PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
+
+    // Create a uniform grid with the given information.
+    PetscReal lower[2] = {rdy->quadmesh.xmin, rdy->quadmesh.ymin};
+    PetscReal upper[2] = {rdy->quadmesh.xmax, rdy->quadmesh.ymax};
+    PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper,
+                                  NULL, PETSC_TRUE, &rdy->dm));
+
+    // Look for (optional) raster information to punch out inactive cells.
+    if (strlen(rdy->quadmesh.inactive_file)) {
+      // FIXME: implement inactive cell logic here.
+    }
+
+    // set up regions
+    // FIXME
+
+    // set up surfaces
+    // FIXME
+  }
 
   PetscFunctionReturn(0);
 }

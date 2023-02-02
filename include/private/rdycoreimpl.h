@@ -39,6 +39,22 @@ typedef enum {
   BED_FRICTION_MANNING
 } RDyBedFriction;
 
+/// This type identifies a time unit.
+typedef enum {
+  TIME_MINUTES = 0,
+  TIME_HOURS,
+  TIME_DAYS,
+  TIME_MONTHS,
+  TIME_YEARS
+} RDyTimeUnit;
+
+/// This type stores metadata for in-line quad meshes specified in config files.
+typedef struct {
+  PetscInt nx, ny;
+  PetscReal xmin, xmax, ymin, ymax;
+  char inactive_file[PETSC_MAX_PATH_LEN];
+} RDyQuadMesh;
+
 /// This type specifies a "kind" of condition that indicates how that condition
 /// is to be enforced on a region or surface.
 typedef enum {
@@ -122,6 +138,12 @@ struct _p_RDy {
   // Spatial discretization
   //------------------------
 
+  /// mesh file (not used when quad meshes are generated)
+  char mesh_file[PETSC_MAX_PATH_LEN];
+
+  /// quad mesh metadata (not used when mesh files are read)
+  RDyQuadMesh quadmesh;
+
   /// PETSc (DMPlex) grid
   DM dm;
 
@@ -152,17 +174,28 @@ struct _p_RDy {
 
   /// simulation time at which to end
   PetscReal final_time;
+  /// Units in which final_time is expressed
+  RDyTimeUnit time_unit;
   /// Maximum number of time steps
   PetscInt max_step;
-  /// time step size
-  PetscReal dt;
-  /// index of current timestep
-  PetscInt tstep;
+
+  //----------
+  // Restarts
+  //----------
+
+  /// Restart file format
+  char restart_format[4];
+  /// Restart frequency (in steps)
+  PetscInt restart_frequency;
 
   //-----------------
   // Simulation data
   //-----------------
 
+  /// time step size
+  PetscReal dt;
+  /// index of current timestep
+  PetscInt tstep;
   PetscInt  dof;
   Vec       B, localB;
   Vec       localX;

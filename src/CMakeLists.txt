@@ -5,6 +5,7 @@ add_library(rdycore
   rdymesh.c
   rdysetup.c
 )
+add_dependencies(rdycore yaml)
 target_code_coverage(rdycore AUTO ALL)
 install(
   TARGETS rdycore
