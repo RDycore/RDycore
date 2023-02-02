@@ -33,7 +33,8 @@ typedef enum {
 
 /// This type identifies available bed friction models.
 typedef enum {
-  BED_FRICTION_NONE = 0,
+  BED_FRICTION_NOT_SET = 0,
+  BED_FRICTION_NONE,
   BED_FRICTION_CHEZY,
   BED_FRICTION_MANNING
 } RDyBedFriction;
@@ -108,6 +109,7 @@ struct _p_RDy {
   PetscBool salinity;
 
   RDyBedFriction bed_friction;
+  PetscReal bed_friction_coef;
 
   //----------
   // Numerics

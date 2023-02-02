@@ -2,6 +2,8 @@
 #include <private/rdycoreimpl.h>
 #include <rdycore.h>
 
+#include <yaml.h>
+
 #include <float.h>
 
 //======================================================
@@ -40,13 +42,38 @@ typedef enum {
 typedef struct {
   // section being currently parsed
   YamlSection section;
-  // is the section "open" (has its mapping been encountered)?
+  // is the above section "open" (has its mapping start event been encountered)?
   PetscBool section_open;
   // name of subsection being currently parsed (if any, else blank string)
   char subsection[YAML_MAX_LEN];
-  // name of config value being current parsed (if any, else blank string)
-  char value_name[YAML_MAX_LEN];
+  // name of parameter being current parsed (if any, else blank string)
+  char parameter[YAML_MAX_LEN];
 } YamlParserState;
+
+// this converts a YAML string to a boolean
+static PetscErrorCode ConvertToBool(MPI_Comm comm, const char *param,
+                                    const char *str,
+                                    PetscBool *val) {
+  PetscFunctionBegin;
+
+  PetscCheck(!strcmp(str, "true") || !strcmp(str, "false"), comm,
+    PETSC_ERR_USER, "Invalid value for %s (bool expected, got '%s'",
+    param, str);
+  *val = !strcmp(str, "true");
+  PetscFunctionReturn(0);
+}
+
+// this converts a YAML string to a real number
+static PetscErrorCode ConvertToReal(MPI_Comm comm, const char *param,
+                                    const char *str, PetscReal *val) {
+  PetscFunctionBegin;
+
+  char *endp;
+  *val = strtod(str, &endp);
+  PetscCheck(endp != str, comm, PETSC_ERR_USER,
+    "Invalid real value for %s: %s", param, str);
+  PetscFunctionReturn(0);
+}
 
 static PetscErrorCode ParseTopLevel(yaml_event_t    *event,
                                     YamlParserState *state,
@@ -103,16 +130,60 @@ static PetscErrorCode ParsePhysics(yaml_event_t    *event,
     "Invalid YAML (non-scalar value encountered in physics section!");
 
   const char *value = (const char*)(event->data.scalar.value);
-  if (!strlen(state->value_name)) { // get the parameter name
+  if (!strlen(state->subsection)) { // get the subsection name
     PetscCheck(!strcmp(value, "sediment") ||
                !strcmp(value, "salinity") ||
                !strcmp(value, "bed_friction"), rdy->comm, PETSC_ERR_USER,
-      "Invalid parameter in physics section: %s", value);
-    strncpy(state->value_name, value, YAML_MAX_LEN);
-  } else { // parse the parameter's value
-    if (!strcmp(state->value_name, "sediment")) {
-    } else if (!strcmp(state->value_name, "salinity")) {
-    } else { // bed_friction
+      "Invalid subsection in physics: %s", value);
+    strncpy(state->subsection, value, YAML_MAX_LEN);
+  } else if (!strcmp(state->subsection, "sediment")) {
+    PetscCheck(!strcmp(value, "enable"), rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in physics.sediment: %s", value);
+    if (!strlen(state->parameter)) { // parameter not set
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else { // parameter set, parse value
+      if (!strcmp(state->parameter, "enable")) {
+        ConvertToBool(rdy->comm, state->parameter, value, &rdy->sediment);
+      }
+    }
+  } else if (!strcmp(state->subsection, "salinity")) {
+    PetscCheck(!strcmp(value, "enable"), rdy->comm, PETSC_ERR_USER,
+      "Invalid parameter in physics.salinity: %s", value);
+    if (!strlen(state->parameter)) { // parameter not set
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else { // parameter set, parse value
+      if (!strcmp(state->parameter, "enable")) {
+        ConvertToBool(rdy->comm, state->parameter, value, &rdy->salinity);
+      }
+    }
+  } else { // bed_friction
+    if (!strlen(state->parameter)) { // parameter not set
+      PetscCheck(!strcmp(value, "enable") ||
+                 !strcmp(value, "model") ||
+                 !strcmp(value, "coefficient"), rdy->comm, PETSC_ERR_USER,
+        "Invalid parameter in physics.bed_friction: %s", value);
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else { // parameter set, parse value
+      if (!strcmp(state->parameter, "enable")) {
+        PetscBool enable;
+        ConvertToBool(rdy->comm, state->parameter, value, &enable);
+        if (!enable) {
+          rdy->bed_friction = BED_FRICTION_NONE; // disabled!
+        }
+      } else if (!strcmp(state->parameter, "model") &&
+                 (rdy->bed_friction != BED_FRICTION_NONE)) {
+        PetscCheck(!strcmp(value, "chezy") || !strcmp(value, "manning"),
+                   rdy->comm, PETSC_ERR_USER, "Invalid bed_friction model: %s",
+                   value);
+        if (!strcmp(value, "chezy")) {
+          rdy->bed_friction = BED_FRICTION_CHEZY;
+        } else {
+          rdy->bed_friction = BED_FRICTION_MANNING;
+        }
+      } else { // coefficient
+        ConvertToReal(rdy->comm, state->parameter, value,
+                      &rdy->bed_friction_coef);
+      }
     }
   }
 
@@ -372,7 +443,7 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
     // start of a mapping, open the section.
     state->section_open = PETSC_TRUE;
   } else if ((state->section != NO_SECTION) && !strlen(state->subsection) &&
-      !strlen(state->value_name) && (event->type == YAML_MAPPING_END_EVENT)) {
+      !strlen(state->parameter) && (event->type == YAML_MAPPING_END_EVENT)) {
     // If we're inside a opened section and we're not parsing a value or a
     // subsection, and we encounter the end of a mapping, close the section and
     // set it to NO_SECTION.
@@ -396,7 +467,9 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
       case RESTART_SECTION:
         PetscCall(ParseRestart(event, state, rdy));
         break;
-      case GRID_SECTION, GRID_REGIONS_SECTION, GRID_SURFACES_SECTION:
+      case GRID_SECTION:
+      case GRID_REGIONS_SECTION:
+      case GRID_SURFACES_SECTION:
         PetscCall(ParseGrid(event, state, rdy));
         break;
       case INITIAL_CONDITIONS_SECTION:
@@ -446,10 +519,10 @@ PetscErrorCode RDySetup(RDy rdy) {
     yaml_parser_parse(&parser, &event);
     if (parser.error != YAML_NO_ERROR) {
       char error_msg[1025];
-      strncpy(error_msg, parser.error, 1024);
+      strncpy(error_msg, parser.problem, 1024);
       yaml_event_delete(&event);
       yaml_parser_delete(&parser);
-      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, error_msg);
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "%s", error_msg);
     }
 
     // Process the event, using it to populate our YAML data, and handle

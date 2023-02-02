@@ -10,7 +10,7 @@ install(
   TARGETS rdycore
   DESTINATION lib
 )
-set(RDYCORE_LIBRARIES rdycore;${RDYCORE_LIBRARIES})
+set(RDYCORE_LIBRARIES rdycore;yaml;${RDYCORE_LIBRARIES})
 
 # Unit tests for the main library
 add_subdirectory(tests)
