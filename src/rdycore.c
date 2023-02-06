@@ -84,9 +84,8 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   MPI_Comm_rank(comm, &((*rdy)->rank));
   MPI_Comm_size(comm, &((*rdy)->nproc));
 
-  // parse the config file's content into the default options database
+  // set the config file
   strncpy((*rdy)->filename, config_file, PETSC_MAX_PATH_LEN - 1);
-  PetscCall(PetscOptionsInsertFileYAML(comm, NULL, config_file, PETSC_TRUE));
 
   PetscFunctionReturn(0);
 }

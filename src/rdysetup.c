@@ -196,7 +196,8 @@ static PetscErrorCode ParsePhysicsSediment(yaml_event_t    *event,
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else { // parameter set, parse value
     if (!strcmp(state->parameter, "enable")) {
-      ConvertToBool(rdy->comm, state->parameter, value, &rdy->sediment);
+      PetscCall(ConvertToBool(rdy->comm, state->parameter, value,
+        &rdy->sediment));
     }
     state->parameter[0] = 0;
   }
@@ -218,7 +219,8 @@ static PetscErrorCode ParsePhysicsSalinity(yaml_event_t    *event,
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else { // parameter set, parse value
     if (!strcmp(state->parameter, "enable")) {
-      ConvertToBool(rdy->comm, state->parameter, value, &rdy->salinity);
+      PetscCall(ConvertToBool(rdy->comm, state->parameter, value,
+        &rdy->salinity));
     }
     state->parameter[0] = 0;
   }
@@ -243,7 +245,7 @@ static PetscErrorCode ParsePhysicsBedFriction(yaml_event_t    *event,
   } else { // parameter set, parse value
     if (!strcmp(state->parameter, "enable")) {
       PetscBool enable;
-      ConvertToBool(rdy->comm, state->parameter, value, &enable);
+      PetscCall(ConvertToBool(rdy->comm, state->parameter, value, &enable));
       if (!enable) {
         rdy->bed_friction = BED_FRICTION_NONE; // disabled!
       }
@@ -258,8 +260,8 @@ static PetscErrorCode ParsePhysicsBedFriction(yaml_event_t    *event,
         rdy->bed_friction = BED_FRICTION_MANNING;
       }
     } else { // coefficient
-      ConvertToReal(rdy->comm, state->parameter, value,
-                    &rdy->bed_friction_coef);
+      PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+        &rdy->bed_friction_coef));
     }
     state->parameter[0] = 0;
   }
@@ -351,7 +353,8 @@ static PetscErrorCode ParseTime(yaml_event_t    *event,
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else { // parameter set, get value
     if (!strcmp(state->parameter, "final_time")) {
-      ConvertToReal(rdy->comm, state->parameter, value, &rdy->final_time);
+      PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+        &rdy->final_time));
       PetscCheck((rdy->final_time > 0.0), rdy->comm, PETSC_ERR_USER,
         "invalid time.final_time: %g\n", rdy->final_time);
     } else if (!strcmp(state->parameter, "unit")) {
@@ -364,7 +367,8 @@ static PetscErrorCode ParseTime(yaml_event_t    *event,
         "Invalid time.unit: %s", value);
       rdy->time_unit = selection;
     } else { // max_step
-      ConvertToInt(rdy->comm, state->parameter, value, &rdy->max_step);
+      PetscCall(ConvertToInt(rdy->comm, state->parameter, value,
+                &rdy->max_step));
       PetscCheck((rdy->max_step >= 0), rdy->comm, PETSC_ERR_USER,
         "invalid time.max_step: %d\n", rdy->max_step);
     }
@@ -403,7 +407,8 @@ static PetscErrorCode ParseRestart(yaml_event_t    *event,
         "Invalid restart.format: %s", value);
       strncpy(rdy->restart_format, value, sizeof(rdy->restart_format));
     } else { // frequency
-      ConvertToInt(rdy->comm, state->parameter, value, &rdy->restart_frequency);
+      PetscCall(ConvertToInt(rdy->comm, state->parameter, value,
+        &rdy->restart_frequency));
       PetscCheck((rdy->restart_frequency > 0), rdy->comm, PETSC_ERR_USER,
         "Invalid restart.frequency: %d\n", rdy->restart_frequency);
     }
@@ -434,24 +439,31 @@ static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
     }
   } else {
     if (!strcmp(state->parameter, "nx")) {
-      ConvertToInt(rdy->comm, state->parameter, value, &rdy->quadmesh.nx);
-      PetscCheck(rdy->quadmesh.nx < 1, rdy->comm, PETSC_ERR_USER,
+      PetscCall(ConvertToInt(rdy->comm, state->parameter, value,
+        &rdy->quadmesh.nx));
+      PetscCheck(rdy->quadmesh.nx >= 1, rdy->comm, PETSC_ERR_USER,
         "Invalid grid.nx: %d", rdy->quadmesh.nx);
     } else if (!strcmp(state->parameter, "ny")) {
-      ConvertToInt(rdy->comm, state->parameter, value, &rdy->quadmesh.ny);
-      PetscCheck(rdy->quadmesh.ny < 1, rdy->comm, PETSC_ERR_USER,
+      PetscCall(ConvertToInt(rdy->comm, state->parameter, value,
+        &rdy->quadmesh.ny));
+      PetscCheck(rdy->quadmesh.ny >= 1, rdy->comm, PETSC_ERR_USER,
         "Invalid grid.ny: %d", rdy->quadmesh.ny);
     } else if (!strcmp(state->parameter, "xmin")) {
-      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.xmin);
+      PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+        &rdy->quadmesh.xmin));
     } else if (!strcmp(state->parameter, "xmax")) {
-      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.xmax);
+      PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+        &rdy->quadmesh.xmax));
     } else if (!strcmp(state->parameter, "ymin")) {
-      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.ymin);
+      PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+        &rdy->quadmesh.ymin));
     } else if (!strcmp(state->parameter, "ymax")) {
-      ConvertToReal(rdy->comm, state->parameter, value, &rdy->quadmesh.ymax);
+      PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+        &rdy->quadmesh.ymax));
     } else { // inactive raster file
       strncpy(rdy->quadmesh.inactive_file, value, YAML_MAX_LEN);
     }
+    state->parameter[0] = 0;
   }
   PetscFunctionReturn(0);
 }
@@ -564,6 +576,15 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
                                       RDy rdy) {
   PetscFunctionBegin;
 
+  // we don't need to do anything special at the beginning or the end of the
+  // document
+  if ((event->type == YAML_STREAM_START_EVENT) ||
+      (event->type == YAML_DOCUMENT_START_EVENT) ||
+      (event->type == YAML_DOCUMENT_END_EVENT) ||
+      (event->type == YAML_STREAM_END_EVENT)) {
+    PetscFunctionReturn(0);
+  }
+
   // navigate sections via mapping starts and ends
   if (event->type == YAML_MAPPING_START_EVENT) {
     if (state->section != NO_SECTION) {
@@ -590,6 +611,8 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
         case GRID_SURFACES_SECTION:
           state->section = GRID_SECTION;
           break;
+        default:
+          state->section = NO_SECTION;
       }
     }
   } else { // parse parameters in sections
