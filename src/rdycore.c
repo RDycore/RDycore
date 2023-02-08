@@ -95,6 +95,18 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
 
+  // Destroy tables of named flow/sediment/salinity conditions.
+  // NOTE: we can make destructors for these things if they get more complex
+  for (PetscInt i = 0; i < (*rdy)->num_flow_conditions; ++i) {
+    RDyFree((*rdy)->flow_conditions[i].name);
+  }
+  for (PetscInt i = 0; i < (*rdy)->num_sediment_conditions; ++i) {
+    RDyFree((*rdy)->sediment_conditions[i].name);
+  }
+  for (PetscInt i = 0; i < (*rdy)->num_salinity_conditions; ++i) {
+    RDyFree((*rdy)->salinity_conditions[i].name);
+  }
+
   // Destroy regions and surfaces.
   for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
     RDyRegionDestroy(&((*rdy)->regions[i]));

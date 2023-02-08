@@ -12,6 +12,15 @@
 // the maximum number of surfaces that can be defined on a domain
 #define MAX_NUM_SURFACES 128
 
+// the maximum number of flow conditions that can be defined for a simulation
+#define MAX_NUM_FLOW_CONDITIONS 128
+
+// the maximum number of sediment conditions that can be defined for a simulation
+#define MAX_NUM_SEDIMENT_CONDITIONS 128
+
+// the maximum number of salinity conditions that can be defined for a simulation
+#define MAX_NUM_SALINITY_CONDITIONS 128
+
 // This type identifies available spatial discretization methods.
 typedef enum {
   SPATIAL_FV = 0, // finite volume method
@@ -62,12 +71,36 @@ typedef enum {
   CONDITION_NEUMANN        // Neumann condition (derivative is specified)
 } RDyConditionType;
 
+// This type defines a flow-related condition.
+typedef struct {
+  const char       *name;
+  RDyConditionType  type;
+  PetscReal         water_flux;
+} RDyFlowCondition;
+
+// This type defines a sediment-related condition.
+typedef struct {
+  const char       *name;
+  RDyConditionType  type;
+  PetscReal         concentration;
+} RDySedimentCondition;
+
+// This type defines a salinity-related condition.
+typedef struct {
+  const char       *name;
+  RDyConditionType  type;
+  PetscReal         concentration;
+} RDySalinityCondition;
+
 // This type defines a "condition" representing
 // * an initial condition or source/sink associated with a region
 // * a boundary condition associated with a surface
 typedef struct {
-  // type of the condition
-  RDyConditionType type;
+  // flow, sediment, salinity conditions (NULL for none)
+  RDyFlowCondition     *flow;
+  RDySedimentCondition *sediment;
+  RDySalinityCondition *salinity;
+
   // value(s) associated with the condition
   PetscReal value;
 } RDyCondition;
@@ -161,17 +194,23 @@ struct _p_RDy {
   const char *surface_names[MAX_NUM_REGIONS];
   RDySurface  surfaces[MAX_NUM_SURFACES];
 
-  // initial conditions associated with mesh regions
+  // Table of named sets of flow, sediment, and salinity conditions. Used by
+  // initial/source/boundary conditions below.
+  PetscInt             num_flow_conditions;
+  RDyFlowCondition     flow_conditions[MAX_NUM_FLOW_CONDITIONS];
+  PetscInt             num_sediment_conditions;
+  RDySedimentCondition sediment_conditions[MAX_NUM_SEDIMENT_CONDITIONS];
+  PetscInt             num_salinity_conditions;
+  RDySalinityCondition salinity_conditions[MAX_NUM_SALINITY_CONDITIONS];
+
+  // initial conditions associated with mesh regions (1 per region)
   RDyCondition ics[MAX_NUM_REGIONS];
-  PetscInt     num_ics;
 
-  // sources (and sinks) associated with mesh regions
+  // sources (and sinks) associated with mesh regions (1 per region)
   RDyCondition sources[MAX_NUM_REGIONS];
-  PetscInt     num_sources;
 
-  // boundary conditions associated with mesh surfaces
+  // boundary conditions associated with mesh surfaces (1 per surface)
   RDyCondition bcs[MAX_NUM_SURFACES];
-  PetscInt     num_bcs;
 
   //--------------
   // Timestepping
