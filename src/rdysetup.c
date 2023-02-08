@@ -29,6 +29,7 @@ typedef enum {
   NUMERICS_SECTION,
   TIME_SECTION,
   RESTART_SECTION,
+  LOGGING_SECTION,
   GRID_SECTION,
   GRID_REGIONS_SECTION,
   GRID_SURFACES_SECTION,
@@ -132,6 +133,8 @@ static PetscErrorCode ParseTopLevel(yaml_event_t    *event,
     state->section = TIME_SECTION;
   } else if (!strcmp(value, "restart")) {
     state->section = RESTART_SECTION;
+  } else if (!strcmp(value, "logging")) {
+    state->section = LOGGING_SECTION;
   } else if (!strcmp(value, "grid")) {
     state->section = GRID_SECTION;
   } else if (!strcmp(value, "initial_conditions")) {
@@ -199,7 +202,7 @@ static PetscErrorCode ParsePhysicsSediment(yaml_event_t    *event,
       PetscCall(ConvertToBool(rdy->comm, state->parameter, value,
         &rdy->sediment));
     }
-    state->parameter[0] = 0;
+    state->parameter[0] = 0; // clear parameter name
   }
   PetscFunctionReturn(0);
 }
@@ -222,7 +225,7 @@ static PetscErrorCode ParsePhysicsSalinity(yaml_event_t    *event,
       PetscCall(ConvertToBool(rdy->comm, state->parameter, value,
         &rdy->salinity));
     }
-    state->parameter[0] = 0;
+    state->parameter[0] = 0; // clear parameter name
   }
   PetscFunctionReturn(0);
 }
@@ -263,7 +266,7 @@ static PetscErrorCode ParsePhysicsBedFriction(yaml_event_t    *event,
       PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
         &rdy->bed_friction_coef));
     }
-    state->parameter[0] = 0;
+    state->parameter[0] = 0; // clear parameter name
   }
 
   PetscFunctionReturn(0);
@@ -304,13 +307,13 @@ static PetscErrorCode ParseNumerics(yaml_event_t    *event,
       PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
         "Invalid numerics.temporal: %s", value);
     } else { // riemann
-      SelectItem(value, 2, (const char*[2]){"roe", "hll"},
-        (PetscInt[2]){RIEMANN_ROE, RIEMANN_HLL}, &selection);
+      SelectItem(value, 2, (const char*[2]){"roe", "hllc"},
+        (PetscInt[2]){RIEMANN_ROE, RIEMANN_HLLC}, &selection);
       PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
         "Invalid numerics.riemann: %s", value);
       rdy->riemann = selection;
     }
-    state->parameter[0] = 0;
+    state->parameter[0] = 0; // clear parameter name
   }
 
   // Currently, only FV, EULER, and ROE are implemented.
@@ -330,6 +333,7 @@ static PetscErrorCode ParseNumerics(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses parameteres in the time section
 static PetscErrorCode ParseTime(yaml_event_t    *event,
                                 YamlParserState *state,
                                 RDy              rdy) {
@@ -372,12 +376,13 @@ static PetscErrorCode ParseTime(yaml_event_t    *event,
       PetscCheck((rdy->max_step >= 0), rdy->comm, PETSC_ERR_USER,
         "invalid time.max_step: %d\n", rdy->max_step);
     }
-    state->parameter[0] = 0;
+    state->parameter[0] = 0; // clear parameter name
   }
 
   PetscFunctionReturn(0);
 }
 
+// parses parameters in the restart section
 static PetscErrorCode ParseRestart(yaml_event_t    *event,
                                    YamlParserState *state,
                                    RDy              rdy) {
@@ -416,6 +421,7 @@ static PetscErrorCode ParseRestart(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses a quadrilateral grid specified in the grid section
 static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
                                     YamlParserState *state,
                                     RDy              rdy) {
@@ -432,11 +438,6 @@ static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
     PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
       "Invalid parameter in grid: %s", value);
     strncpy(state->parameter, value, YAML_MAX_LEN);
-    if (!strcmp(state->parameter, "regions")) {
-      state->section = GRID_REGIONS_SECTION;
-    } else if (!strcmp(state->parameter, "surfaces")) {
-      state->section = GRID_SURFACES_SECTION;
-    }
   } else {
     if (!strcmp(state->parameter, "nx")) {
       PetscCall(ConvertToInt(rdy->comm, state->parameter, value,
@@ -460,21 +461,52 @@ static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
     } else if (!strcmp(state->parameter, "ymax")) {
       PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
         &rdy->quadmesh.ymax));
-    } else { // inactive raster file
+    } else if (!strcmp(state->parameter, "inactive")) {
       strncpy(rdy->quadmesh.inactive_file, value, YAML_MAX_LEN);
+    } else if (!strcmp(state->parameter, "regions")) {
+      state->section = GRID_REGIONS_SECTION;
+    } else { // surfaces
+      state->section = GRID_SURFACES_SECTION;
     }
-    state->parameter[0] = 0;
+    state->parameter[0] = 0; // clear parameter name
   }
   PetscFunctionReturn(0);
 }
 
+// parses parameters in the restart section
+static PetscErrorCode ParseLogging(yaml_event_t    *event,
+                                   YamlParserState *state,
+                                   RDy              rdy) {
+  PetscFunctionBegin;
+
+  // logging:
+  //   file: <path-to-log-file>
+
+  const char *value = (const char*)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) { // parameter not set
+    if (!strcmp(value, "file")) {
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else {
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
+        "invalid logging parameter: %s", value);
+    }
+  } else {
+    if (!strcmp(state->parameter, "file")) {
+      strncpy(rdy->log_file, value, PETSC_MAX_PATH_LEN);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+// parses parameters in the grid section
 static PetscErrorCode ParseGrid(yaml_event_t    *event,
                                 YamlParserState *state,
                                 RDy              rdy) {
   PetscFunctionBegin;
 
   // grid:
-  //   file: <path-to-file/mesh.exo> or <path-to-file/mesh.h5>
+  //   file: <path-to-msh-file>
   //
   // OR
   //
@@ -514,6 +546,7 @@ static PetscErrorCode ParseGrid(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses regions specified in the grid section
 static PetscErrorCode ParseGridRegions(yaml_event_t    *event,
                                        YamlParserState *state,
                                        RDy              rdy) {
@@ -521,6 +554,7 @@ static PetscErrorCode ParseGridRegions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses surfaces specified in the grid section
 static PetscErrorCode ParseGridSurfaces(yaml_event_t    *event,
                                         YamlParserState *state,
                                         RDy              rdy) {
@@ -528,6 +562,7 @@ static PetscErrorCode ParseGridSurfaces(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses the initial conditions section
 static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
                                              YamlParserState *state,
                                              RDy              rdy) {
@@ -535,6 +570,7 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses the boundary conditions section
 static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
@@ -542,6 +578,7 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses the sources section
 static PetscErrorCode ParseSources(yaml_event_t    *event,
                                    YamlParserState *state,
                                    RDy              rdy) {
@@ -549,6 +586,7 @@ static PetscErrorCode ParseSources(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses the flow_conditions section
 static PetscErrorCode ParseFlowConditions(yaml_event_t    *event,
                                           YamlParserState *state,
                                           RDy              rdy) {
@@ -556,6 +594,7 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses the ѕediment_conditions section
 static PetscErrorCode ParseSedimentConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
@@ -563,6 +602,7 @@ static PetscErrorCode ParseSedimentConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// parses the salinity_conditions section
 static PetscErrorCode ParseSalinityConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
@@ -641,6 +681,9 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
         break;
       case RESTART_SECTION:
         PetscCall(ParseRestart(event, state, rdy));
+        break;
+      case LOGGING_SECTION:
+        PetscCall(ParseLogging(event, state, rdy));
         break;
       case GRID_SECTION:
         PetscCall(ParseGrid(event, state, rdy));
@@ -744,6 +787,9 @@ PetscErrorCode RDySetup(RDy rdy) {
     // set up surfaces
     // FIXME
   }
+
+  // print configuration info
+  PetscCall(RDyPrintf(rdy));
 
   PetscFunctionReturn(0);
 }

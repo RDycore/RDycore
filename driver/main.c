@@ -25,13 +25,6 @@ int main(int argc, char *argv[]) {
   PetscCall(RDyCreate(comm, argv[1], &rdy));
   PetscCall(RDySetup(rdy));
 
-  // print configuration info on rank 0
-  int rank;
-  MPI_Comm_rank(comm, &rank);
-  if (rank == 0) {
-    PetscCall(RDyFprintf(stdout, rdy));
-  }
-
   // clean up
   PetscCall(RDyDestroy(&rdy));
   PetscCall(RDyFinalize());
