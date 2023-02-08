@@ -75,15 +75,17 @@ typedef struct {
 // This type defines a region consisting of cells identified by their local
 // indices.
 typedef struct {
-  PetscInt *cell_ids;
-  PetscInt  num_cells;
+  const char *name;
+  PetscInt   *cell_ids;
+  PetscInt    num_cells;
 } RDyRegion;
 
 // This type defines a surface consisting of edges identified by their local
 // indices.
 typedef struct {
-  PetscInt *edge_ids;
-  PetscInt  num_edges;
+  const char *name;
+  PetscInt   *edge_ids;
+  PetscInt    num_edges;
 } RDySurface;
 
 // This type serves as a "virtual table" containing function pointers that
@@ -151,10 +153,11 @@ struct _p_RDy {
   RDyMesh mesh;
 
   // mesh regions
-  const char *region_names[MAX_NUM_REGIONS];
+  PetscInt    num_regions;
   RDyRegion   regions[MAX_NUM_REGIONS];
 
   // mesh surfaces
+  PetscInt    num_surfaces;
   const char *surface_names[MAX_NUM_REGIONS];
   RDySurface  surfaces[MAX_NUM_SURFACES];
 
@@ -212,5 +215,10 @@ struct _p_RDy {
   PetscBool debug, save, add_building;
   PetscBool interpolate;
 };
+
+PetscErrorCode RDyRegionCreate(const char*, PetscInt, const PetscInt[], RDyRegion*);
+PetscErrorCode RDyRegionDestroy(RDyRegion*);
+PetscErrorCode RDySurfaceCreate(const char*, PetscInt, const PetscInt[], RDySurface*);
+PetscErrorCode RDySurfaceDestroy(RDySurface*);
 
 #endif

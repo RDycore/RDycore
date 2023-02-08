@@ -94,7 +94,73 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
+
+  // Destroy regions and surfaces.
+  for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
+    RDyRegionDestroy(&((*rdy)->regions[i]));
+  }
+  for (PetscInt i = 0; i < (*rdy)->num_surfaces; ++i) {
+    RDySurfaceDestroy(&((*rdy)->surfaces[i]));
+  }
+
+  if ((*rdy)->dm) {
+    DMDestroy(&((*rdy)->dm));
+  }
+
   PetscCall(RDyFree(*rdy));
   *rdy = NULL;
+  PetscFunctionReturn(0);
+}
+
+// Fills the given region with data. Region storage itself is not allocated and
+// must exist.
+PetscErrorCode RDyRegionCreate(const char* name,
+                               PetscInt num_cells,
+                               const PetscInt cell_ids[num_cells],
+                               RDyRegion* region) {
+  PetscFunctionBegin;
+
+  PetscCall(RDyAlloc(PetscInt, num_cells, &region->cell_ids));
+  memcpy(region->cell_ids, cell_ids, sizeof(PetscInt) * num_cells);
+  RDyAlloc(char, strlen(name)+1, &region->name);
+  strcpy((char*)region->name, name);
+  region->num_cells = num_cells;
+
+  PetscFunctionReturn(0);
+}
+
+// deallocates region data -- does not deallocate the region itself
+PetscErrorCode RDyRegionDestroy(RDyRegion* region) {
+  PetscFunctionBegin;
+
+  RDyFree(region->cell_ids);
+  RDyFree(region->name);
+
+  PetscFunctionReturn(0);
+}
+
+// Fills the given surface with data. Surface storage itself is not allocated
+// and must exist.
+PetscErrorCode RDySurfaceCreate(const char* name,
+                                PetscInt num_edges,
+                                const PetscInt edge_ids[num_edges],
+                                RDySurface* surface) {
+  PetscFunctionBegin;
+
+  PetscCall(RDyAlloc(PetscInt, num_edges, &surface->edge_ids));
+  memcpy(surface->edge_ids, edge_ids, sizeof(PetscInt) * num_edges);
+  RDyAlloc(char, strlen(name)+1, &surface->name);
+  strcpy((char*)surface->name, name);
+  surface->num_edges = num_edges;
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RDySurfaceDestroy(RDySurface* surface) {
+  PetscFunctionBegin;
+
+  RDyFree(surface->edge_ids);
+  RDyFree(surface->name);
+
   PetscFunctionReturn(0);
 }

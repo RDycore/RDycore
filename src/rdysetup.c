@@ -720,6 +720,66 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
   PetscFunctionReturn(0);
 }
 
+// initializes mesh region data
+static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
+  PetscFunctionBegin;
+
+  // For each label in the mesh:
+  PetscInt num_labels;
+  PetscCall(DMGetNumLabels(rdy->dm, &num_labels));
+  for (PetscInt l = 0; l < num_labels; ++l) {
+    DMLabel     label;
+    const char *label_name;
+    PetscCall(DMGetLabelByNum(rdy->dm, l, &label));
+    PetscCall(DMGetLabelName(rdy->dm, l, &label_name));
+
+    // If the label contains points corresponding to cells, construct a
+    // region (named after this label) containing cells with the corresponding
+    // indices.
+    IS cell_is; // cell index space
+    PetscCall(DMLabelGetStratumIS(label, 0, &cell_is));
+    if (cell_is) { // label has cell points
+      PetscInt num_cells;
+      PetscCall(ISGetSize(cell_is, &num_cells));
+      if (num_cells > 0) {
+        PetscCheck(rdy->num_regions < MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
+          "Maximum number of regions (%d) exceeded!", MAX_NUM_REGIONS);
+        RDyRegion *region = &rdy->regions[rdy->num_regions];
+        const PetscInt *cell_ids;
+        PetscCall(ISGetIndices(cell_is, &cell_ids));
+        PetscCall(RDyRegionCreate(label_name, num_cells, cell_ids, region));
+        PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+        ++rdy->num_regions;
+      }
+      PetscCall(ISDestroy(&cell_is));
+    } else { // no cells
+      // If the label contains points corresponding to edges, construct a
+      // surface (named after this label) containing edges with the
+      // corresponding indices.
+      IS edge_is; // edge index space
+      PetscCall(DMLabelGetStratumIS(label, 1, &edge_is));
+      if (edge_is) {
+        PetscInt num_edges;
+        PetscCall(ISGetSize(edge_is, &num_edges));
+        if (num_edges > 0) {
+          PetscCheck(rdy->num_surfaces < MAX_NUM_SURFACES, rdy->comm,
+            PETSC_ERR_USER, "Maximum number of surfaces (%d) exceeded!",
+            MAX_NUM_SURFACES);
+          RDySurface *surface = &rdy->surfaces[rdy->num_surfaces];
+          const PetscInt *edge_ids;
+          PetscCall(ISGetIndices(edge_is, &edge_ids));
+          PetscCall(RDySurfaceCreate(label_name, num_edges, edge_ids, surface));
+          PetscCall(ISRestoreIndices(edge_is, &edge_ids));
+          ++rdy->num_surfaces;
+        }
+        PetscCall(ISDestroy(&edge_is));
+      }
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file.
 PetscErrorCode RDySetup(RDy rdy) {
@@ -781,11 +841,8 @@ PetscErrorCode RDySetup(RDy rdy) {
       // FIXME: implement inactive cell logic here.
     }
 
-    // set up regions
-    // FIXME
-
-    // set up surfaces
-    // FIXME
+    // Set up mesh regions and surfaces, reading them from our DMPlex object.
+    PetscCall(InitRegionsAndSurfaces(rdy));
   }
 
   // print configuration info
