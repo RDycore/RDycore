@@ -661,6 +661,7 @@ static PetscErrorCode ParseGrid(yaml_event_t    *event,
         "invalid grid parameter: %s (mesh file already given)", value);
       PetscCall(ParseQuadGrid(event, state, rdy));
     }
+    state->parameter[0] = 0; // clear parameter name
   }
 
   PetscFunctionReturn(0);
@@ -1160,6 +1161,18 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
     const char *label_name;
     PetscCall(DMGetLabelByNum(rdy->dm, l, &label));
     PetscCall(DMGetLabelName(rdy->dm, l, &label_name));
+
+    // exclude these labels
+    PetscBool excluded = PETSC_FALSE;
+    static const char *excluded_labels[] = {"celltype", "depth",
+      "ghost", "Vertex Sets", NULL};
+    for (PetscInt i = 0; excluded_labels[i] != NULL; ++i) {
+      if (!strcmp(label_name, excluded_labels[i])) {
+        excluded = PETSC_TRUE;
+        break;
+      }
+    }
+    if (excluded) continue;
     RDyLog(rdy, "Encountered label: %s\n", label_name);
 
     // If the label contains points corresponding to cells, construct a
