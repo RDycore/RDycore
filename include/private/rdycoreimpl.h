@@ -191,7 +191,6 @@ struct _p_RDy {
 
   // mesh surfaces
   PetscInt    num_surfaces;
-  const char *surface_names[MAX_NUM_REGIONS];
   RDySurface  surfaces[MAX_NUM_SURFACES];
 
   // Table of named sets of flow, sediment, and salinity conditions. Used by
@@ -204,13 +203,13 @@ struct _p_RDy {
   RDySalinityCondition salinity_conditions[MAX_NUM_SALINITY_CONDITIONS];
 
   // initial conditions associated with mesh regions (1 per region)
-  RDyCondition ics[MAX_NUM_REGIONS];
+  RDyCondition initial_conditions[MAX_NUM_REGIONS];
 
   // sources (and sinks) associated with mesh regions (1 per region)
   RDyCondition sources[MAX_NUM_REGIONS];
 
   // boundary conditions associated with mesh surfaces (1 per surface)
-  RDyCondition bcs[MAX_NUM_SURFACES];
+  RDyCondition boundary_conditions[MAX_NUM_SURFACES];
 
   //--------------
   // Timestepping
@@ -255,9 +254,15 @@ struct _p_RDy {
   PetscBool interpolate;
 };
 
+// region and surface constructors and destructors
 PetscErrorCode RDyRegionCreate(const char*, PetscInt, const PetscInt[], RDyRegion*);
 PetscErrorCode RDyRegionDestroy(RDyRegion*);
 PetscErrorCode RDySurfaceCreate(const char*, PetscInt, const PetscInt[], RDySurface*);
 PetscErrorCode RDySurfaceDestroy(RDySurface*);
+
+// find the index of a region within the dycore, given its name (-1 if not found)
+PetscErrorCode RDyFindRegion(RDy, const char*, PetscInt*);
+// find the index of a surface within the dycore, given its name (-1 if not found)
+PetscErrorCode RDyFindSurface(RDy, const char*, PetscInt*);
 
 #endif

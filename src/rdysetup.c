@@ -123,6 +123,119 @@ static PetscErrorCode ConvertToInt(MPI_Comm comm, const char *param,
   *val = (PetscInt)(strtol(str, &endp, 10));
   PetscCheck(endp != NULL, comm, PETSC_ERR_USER,
     "Invalid integer value for %s: %s", param, str);
+
+  PetscFunctionReturn(0);
+}
+
+// retrieves the index of a flow condition using its name
+static PetscErrorCode FindFlowCondition(RDy rdy, const char *name,
+                                        PetscInt *index) {
+  PetscFunctionBegin;
+
+  // Currently, we do a linear search on the name of the condition, which is O(N)
+  // for N regions. If this is too slow, we can sort the conditions by name and
+  // use binary search, which is O(log2 N).
+  for (PetscInt i = 0; i < rdy->num_flow_conditions; ++i) {
+    if (!strcmp(rdy->flow_conditions[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+// retrieves the index of a sediment condition using its name
+static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name,
+                                            PetscInt *index) {
+  PetscFunctionBegin;
+
+  // Currently, we do a linear search on the name of the condition, which is O(N)
+  // for N regions. If this is too slow, we can sort the conditions by name and
+  // use binary search, which is O(log2 N).
+  for (PetscInt i = 0; i < rdy->num_sediment_conditions; ++i) {
+    if (!strcmp(rdy->sediment_conditions[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+// retrieves the index of a salinity condition using its name
+static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name,
+                                            PetscInt *index) {
+  PetscFunctionBegin;
+
+  // Currently, we do a linear search on the name of the condition, which is O(N)
+  // for N regions. If this is too slow, we can sort the conditions by name and
+  // use binary search, which is O(log2 N).
+  for (PetscInt i = 0; i < rdy->num_salinity_conditions; ++i) {
+    if (!strcmp(rdy->salinity_conditions[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+// opens a YAML section
+static PetscErrorCode OpenSection(YamlParserState *state,
+                                  RDy              rdy) {
+  PetscFunctionBegin;
+  if (state->section != NO_SECTION) {
+    if (!state->inside_section) {
+      state->inside_section = PETSC_TRUE;
+    } else if (strlen(state->subsection) && !state->inside_subsection) {
+      state->inside_subsection = PETSC_TRUE;
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+// closes a YAML section based on which one we're in
+static PetscErrorCode CloseSection(YamlParserState *state,
+                                   RDy              rdy) {
+  PetscFunctionBegin;
+  if (state->inside_subsection) { // exiting a subsection?
+    if (state->section == FLOW_CONDITIONS_SECTION) {
+      rdy->num_flow_conditions++;
+      PetscCheck(rdy->num_flow_conditions <= MAX_NUM_FLOW_CONDITIONS, rdy->comm,
+        PETSC_ERR_USER, "Maximum number of flow conditions (%d) exceeded!",
+        MAX_NUM_FLOW_CONDITIONS);
+    } else if (state->section == SEDIMENT_CONDITIONS_SECTION) {
+      rdy->num_sediment_conditions++;
+      PetscCheck(rdy->num_sediment_conditions <= MAX_NUM_SEDIMENT_CONDITIONS,
+        rdy->comm, PETSC_ERR_USER,
+        "Maximum number of sediment conditions (%d) exceeded!",
+        MAX_NUM_SEDIMENT_CONDITIONS);
+    } else if (state->section == SALINITY_CONDITIONS_SECTION) {
+      rdy->num_salinity_conditions++;
+      PetscCheck(rdy->num_salinity_conditions <= MAX_NUM_SALINITY_CONDITIONS,
+        rdy->comm, PETSC_ERR_USER,
+        "Maximum number of salinity conditions (%d) exceeded!",
+        MAX_NUM_SALINITY_CONDITIONS);
+    }
+    state->inside_subsection = PETSC_FALSE;
+    state->subsection[0] = 0;
+  } else if (state->inside_section) { // exiting a section?
+    state->inside_section = PETSC_FALSE;
+    switch (state->section) { // move up one section
+      case PHYSICS_SEDIMENT_SECTION:
+      case PHYSICS_SALINITY_SECTION:
+      case PHYSICS_BED_FRICTION_SECTION:
+        state->section = PHYSICS_SECTION;
+        break;
+      case GRID_REGIONS_SECTION:
+      case GRID_SURFACES_SECTION:
+        state->section = GRID_SECTION;
+        break;
+      default:
+        state->section = NO_SECTION;
+    }
+  }
   PetscFunctionReturn(0);
 }
 
@@ -575,6 +688,73 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
                                              YamlParserState *state,
                                              RDy              rdy) {
   PetscFunctionBegin;
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in initial_conditions section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  // if we're not in a subsection, our parameter is the name of the subsection
+  if (!strlen(state->subsection)) {
+    strncpy(state->subsection, value, YAML_MAX_LEN);
+  } else {
+    // we should be inside a subsection that identifies a region.
+    PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER,
+      "Invalid YAML in initial_conditions.%s", state->subsection);
+
+    // What is the region's index?
+    PetscInt region_index;
+    PetscCall(RDyFindRegion(rdy, state->subsection, &region_index));
+    PetscCheck(region_index != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid region in initial_conditions: %s", state->subsection);
+
+    RDyCondition* ic = &rdy->initial_conditions[region_index];
+    if (!strlen(state->parameter)) { // parameter name not set
+      PetscInt selection;
+      SelectItem(value, 3, (const char*[3]){"flow", "sediment", "salinity"},
+        (PetscInt[3]){0, 1, 2}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid parameter in initial_conditions.%s: %s", state->subsection, value);
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else {
+      PetscInt index;
+      if (!strcmp(state->parameter, "flow")) {
+        PetscCall(FindFlowCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid flow condition in initial_conditions.%s: %s",
+          state->subsection, value);
+        RDyFlowCondition *flow_cond = &rdy->flow_conditions[index];
+        PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm,
+          PETSC_ERR_USER,
+          "initial flow condition %s for region %s is not of dirichlet type!",
+          flow_cond->name, state->subsection);
+        ic->flow = flow_cond;
+      } else if (!strcmp(state->parameter, "sediment")) {
+        PetscCall(FindSedimentCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid sediment condition in initial_conditions.%s: %s",
+          state->subsection, value);
+        RDySedimentCondition *sed_cond = &rdy->sediment_conditions[index];
+        PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm,
+          PETSC_ERR_USER,
+          "initial sediment condition %s for region %s is not of dirichlet type!",
+          sed_cond->name, state->subsection);
+        ic->sediment = sed_cond;
+      } else { // salinity
+        PetscCall(FindSalinityCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid salinity condition in initial_conditions.%s: %s",
+          state->subsection, value);
+        RDySalinityCondition *sal_cond = &rdy->salinity_conditions[index];
+        PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm,
+          PETSC_ERR_USER,
+          "initial salinity condition %s for region %s is not of dirichlet type!",
+          sal_cond->name, state->subsection);
+        ic->salinity = sal_cond;
+      }
+      state->parameter[0] = 0; // clear parameter name
+    }
+  }
+
   PetscFunctionReturn(0);
 }
 
@@ -582,6 +762,58 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
   PetscFunctionBegin;
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in boundary_conditions section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  // if we're not in a subsection, our parameter is the name of the subsection
+  if (!strlen(state->subsection)) {
+    strncpy(state->subsection, value, YAML_MAX_LEN);
+  } else {
+    // we should be inside a subsection that identifies a surface.
+    PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER,
+      "Invalid YAML in boundary_conditions.%s", state->subsection);
+
+    // What is the surface's index?
+    PetscInt surface_index;
+    PetscCall(RDyFindSurface(rdy, state->subsection, &surface_index));
+    PetscCheck(surface_index != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid surface in boundary_conditions: %s", state->subsection);
+
+    RDyCondition* bc = &rdy->boundary_conditions[surface_index];
+    if (!strlen(state->parameter)) { // parameter name not set
+      PetscInt selection;
+      SelectItem(value, 3, (const char*[3]){"flow", "sediment", "salinity"},
+        (PetscInt[3]){0, 1, 2}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid parameter in boundary_conditions.%s: %s", state->subsection, value);
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else {
+      PetscInt index;
+      if (!strcmp(state->parameter, "flow")) {
+        PetscCall(FindFlowCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid flow condition in boundary_conditions.%s: %s",
+          state->subsection, value);
+        bc->flow = &rdy->flow_conditions[index];
+      } else if (!strcmp(state->parameter, "sediment")) {
+        PetscCall(FindSedimentCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid sediment condition in boundary_conditions.%s: %s",
+          state->subsection, value);
+        bc->sediment = &rdy->sediment_conditions[index];
+      } else { // salinity
+        PetscCall(FindSalinityCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid salinity condition in boundary_conditions.%s: %s",
+          state->subsection, value);
+        bc->salinity = &rdy->salinity_conditions[index];
+      }
+      state->parameter[0] = 0; // clear parameter name
+    }
+  }
+
   PetscFunctionReturn(0);
 }
 
@@ -589,6 +821,72 @@ static PetscErrorCode ParseSources(yaml_event_t    *event,
                                    YamlParserState *state,
                                    RDy              rdy) {
   PetscFunctionBegin;
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, rdy->comm, PETSC_ERR_USER,
+    "Invalid YAML (non-scalar value encountered in sources section!");
+  const char *value = (const char*)(event->data.scalar.value);
+
+  // if we're not in a subsection, our parameter is the name of the subsection
+  if (!strlen(state->subsection)) {
+    strncpy(state->subsection, value, YAML_MAX_LEN);
+  } else {
+    // we should be inside a subsection that identifies a region.
+    PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER,
+      "Invalid YAML in sources.%s", state->subsection);
+
+    // What is the region's index?
+    PetscInt region_index;
+    PetscCall(RDyFindRegion(rdy, state->subsection, &region_index));
+    PetscCheck(region_index != -1, rdy->comm, PETSC_ERR_USER,
+      "Invalid region in sources: %s", state->subsection);
+
+    RDyCondition* source = &rdy->sources[region_index];
+    if (!strlen(state->parameter)) { // parameter name not set
+      PetscInt selection;
+      SelectItem(value, 3, (const char*[3]){"flow", "sediment", "salinity"},
+        (PetscInt[3]){0, 1, 2}, &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid parameter in initial_conditions.%s: %s", state->subsection, value);
+      strncpy(state->parameter, value, YAML_MAX_LEN);
+    } else {
+      PetscInt index;
+      if (!strcmp(state->parameter, "flow")) {
+        PetscCall(FindFlowCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid flow condition in sources.%s: %s", state->subsection, value);
+        RDyFlowCondition *flow_cond = &rdy->flow_conditions[index];
+        PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm,
+          PETSC_ERR_USER,
+          "source flow condition %s for region %s is not of dirichlet type!",
+          flow_cond->name, state->subsection);
+        source->flow = flow_cond;
+      } else if (!strcmp(state->parameter, "sediment")) {
+        PetscCall(FindSedimentCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid sediment condition in sources…%s: %s", state->subsection,
+          value);
+        RDySedimentCondition *sed_cond = &rdy->sediment_conditions[index];
+        PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm,
+          PETSC_ERR_USER,
+          "source sediment condition %s for region %s is not of dirichlet type!",
+          sed_cond->name, state->subsection);
+        source->sediment = sed_cond;
+      } else { // salinity
+        PetscCall(FindSalinityCondition(rdy, value, &index));
+        PetscCheck(index != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid salinity condition in sources.%s: %s", state->subsection,
+          value);
+        RDySalinityCondition *sal_cond = &rdy->salinity_conditions[index];
+        PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm,
+          PETSC_ERR_USER,
+          "source salinity condition %s for region %s is not of dirichlet type!",
+          sal_cond->name, state->subsection);
+        source->salinity = sal_cond;
+      }
+      state->parameter[0] = 0; // clear parameter name
+    }
+  }
+
   PetscFunctionReturn(0);
 }
 
@@ -751,51 +1049,9 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass,
 
   // navigate sections via mapping starts and ends
   if (event->type == YAML_MAPPING_START_EVENT) {
-    if (state->section != NO_SECTION) {
-      if (!state->inside_section) {
-        state->inside_section = PETSC_TRUE;
-      } else if (strlen(state->subsection) && !state->inside_subsection) {
-        state->inside_subsection = PETSC_TRUE;
-      }
-    }
+    PetscCall(OpenSection(state, rdy));
   } else if (event->type == YAML_MAPPING_END_EVENT) {
-    if (state->inside_subsection) { // exiting a subsection?
-      if (state->section == FLOW_CONDITIONS_SECTION) {
-        rdy->num_flow_conditions++;
-        PetscCheck(rdy->num_flow_conditions <= MAX_NUM_FLOW_CONDITIONS, rdy->comm,
-          PETSC_ERR_USER, "Maximum number of flow conditions (%d) exceeded!",
-          MAX_NUM_FLOW_CONDITIONS);
-      } else if (state->section == SEDIMENT_CONDITIONS_SECTION) {
-        rdy->num_sediment_conditions++;
-        PetscCheck(rdy->num_sediment_conditions <= MAX_NUM_SEDIMENT_CONDITIONS,
-          rdy->comm, PETSC_ERR_USER,
-          "Maximum number of sediment conditions (%d) exceeded!",
-          MAX_NUM_SEDIMENT_CONDITIONS);
-      } else if (state->section == SALINITY_CONDITIONS_SECTION) {
-        rdy->num_salinity_conditions++;
-        PetscCheck(rdy->num_salinity_conditions <= MAX_NUM_SALINITY_CONDITIONS,
-          rdy->comm, PETSC_ERR_USER,
-          "Maximum number of salinity conditions (%d) exceeded!",
-          MAX_NUM_SALINITY_CONDITIONS);
-      }
-      state->inside_subsection = PETSC_FALSE;
-      state->subsection[0] = 0;
-    } else if (state->inside_section) { // exiting a section?
-      state->inside_section = PETSC_FALSE;
-      switch (state->section) { // move up one section
-        case PHYSICS_SEDIMENT_SECTION:
-        case PHYSICS_SALINITY_SECTION:
-        case PHYSICS_BED_FRICTION_SECTION:
-          state->section = PHYSICS_SECTION;
-          break;
-        case GRID_REGIONS_SECTION:
-        case GRID_SURFACES_SECTION:
-          state->section = GRID_SECTION;
-          break;
-        default:
-          state->section = NO_SECTION;
-      }
-    }
+    PetscCall(CloseSection(state, rdy));
   } else { // parse parameters in sections
     // Otherwise, dispatch the parser to the indicated section, based on which
     // pass we're performing.
@@ -949,23 +1205,66 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
     }
   }
 
+  // make sure we have at least one region and surface
+  PetscCheck(rdy->num_regions > 0, rdy->comm, PETSC_ERR_USER,
+    "No regions were found in the grid!");
+  PetscCheck(rdy->num_surfaces > 0, rdy->comm, PETSC_ERR_USER,
+    "No surfaces were found in the grid!");
+
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
+// checks the validity of initial/boundary conditions and sources
+static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
+  PetscFunctionBegin;
+
+  // Does every region have a set of initial conditions?
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    PetscCheck(rdy->initial_conditions[r].flow, rdy->comm, PETSC_ERR_USER,
+      "Region %s has no initial flow condition!", rdy->regions[r].name);
+    if (rdy->sediment) {
+      PetscCheck(rdy->initial_conditions[r].sediment, rdy->comm, PETSC_ERR_USER,
+        "Region %s has no initial sediment condition!", rdy->regions[r].name);
+    }
+    if (rdy->salinity) {
+      PetscCheck(rdy->initial_conditions[r].salinity, rdy->comm, PETSC_ERR_USER,
+        "Region %s has no initial salinity condition!", rdy->regions[r].name);
+    }
+  }
+
+  // Does every surface have a set of boundary conditions?
+  for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
+    PetscCheck(rdy->boundary_conditions[s].flow, rdy->comm, PETSC_ERR_USER,
+      "Region %s has no flow boundary condition!", rdy->surfaces[s].name);
+    if (rdy->sediment) {
+      PetscCheck(rdy->boundary_conditions[s].sediment, rdy->comm, PETSC_ERR_USER,
+        "Region %s has no sediment boundary condition!", rdy->surfaces[s].name);
+    }
+    if (rdy->salinity) {
+      PetscCheck(rdy->boundary_conditions[s].salinity, rdy->comm, PETSC_ERR_USER,
+        "Region %s has no salinity boundary condition!", rdy->surfaces[s].name);
+    }
+  }
+
+  // (no source checks so far)
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
   PetscFunctionBegin;
 
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);
   yaml_parser_set_input_file(&parser, file);
 
-  // Parse the file, handling each YAML "event" based on the parser state.
+  // parse the file, handling each YAML "event" based on the parser state
   YamlParserState state = {0};
   yaml_event_type_t event_type;
   do {
     yaml_event_t event;
 
-    // Parse the next YAML "event" and handle any errors encountered.
+    // parse the next YAML "event" and handle any errors encountered
     yaml_parser_parse(&parser, &event);
     if (parser.error != YAML_NO_ERROR) {
       char error_msg[1025];
@@ -975,12 +1274,12 @@ PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "%s", error_msg);
     }
 
-    // Process the event, using it to populate our YAML data, and handle
+    // process the event, using it to populate our YAML data, and handle
     // any errors resulting from properly-formed YAML that doesn't conform
-    // to our spec.
+    // to our spec
     PetscCall(HandleYamlEvent(pass, &event, &state, rdy));
 
-    // Discard the event and move on.
+    // discard the event and move on
     event_type = event.type;
     yaml_event_delete(&event);
   } while (event_type != YAML_STREAM_END_EVENT);
@@ -994,15 +1293,15 @@ PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
-  // Open the config file and set up a YAML parser for it.
+  // open the config file and set up a YAML parser for it
   FILE *file = fopen(rdy->filename, "r");
   PetscCheck(file, rdy->comm, PETSC_ERR_USER,
     "Configuration file not found: %s", rdy->filename);
 
-  // Do the first pass.
+  // do the first pass
   PetscCall(ParseYaml(file, FIRST_PASS, rdy));
 
-  // Create the grid from our specification.
+  // create the grid from our specification
   if (strlen(rdy->mesh_file)) { // we are given a file
     PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->mesh_file, "grid",
                                    PETSC_TRUE, &rdy->dm));
@@ -1010,13 +1309,16 @@ PetscErrorCode RDySetup(RDy rdy) {
     PetscCall(CreateQuadGrid(rdy));
   }
 
-  // Set up mesh regions and surfaces, reading them from our DMPlex object.
+  // set up mesh regions and surfaces, reading them from our DMPlex object
   PetscCall(InitRegionsAndSurfaces(rdy));
 
-  // Now do the second pass and close the file.
+  // now do the second pass and close the file
   rewind(file);
   ParseYaml(file, SECOND_PASS, rdy);
   fclose(file);
+
+  // check initial/boundary conditions and sources
+  PetscCall(CheckConditionsAndSources(rdy));
 
   // print configuration info
   PetscCall(RDyPrintf(rdy));

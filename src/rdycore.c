@@ -177,3 +177,37 @@ PetscErrorCode RDySurfaceDestroy(RDySurface* surface) {
 
   PetscFunctionReturn(0);
 }
+
+PetscErrorCode RDyFindRegion(RDy rdy, const char *name, PetscInt *index) {
+  PetscFunctionBegin;
+  *index = -1;
+  PetscCheck(rdy->num_regions > 0, rdy->comm, PETSC_ERR_USER, "No regions found!");
+
+  // Currently, we do a linear search on the name of the region, which is O(N)
+  // for N regions. If this is too slow, we can sort the regions by name and
+  // use binary search, which is O(log2 N).
+  for (PetscInt i = 0; i < rdy->num_regions; ++i) {
+    if (!strcmp(rdy->regions[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RDyFindSurface(RDy rdy, const char *name, PetscInt *index) {
+  PetscFunctionBegin;
+  *index = -1;
+  PetscCheck(rdy->num_surfaces > 0, rdy->comm, PETSC_ERR_USER, "No surfaces found!");
+
+  // Currently, we do a linear search on the name of the surface, which is O(N)
+  // for N regions. If this is too slow, we can sort the surfaces by name and
+  // use binary search, which is O(log2 N).
+  for (PetscInt i = 0; i < rdy->num_surfaces; ++i) {
+    if (!strcmp(rdy->surfaces[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+  PetscFunctionReturn(0);
+}
