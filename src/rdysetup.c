@@ -1,31 +1,32 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdymemory.h>
 #include <rdycore.h>
 
 #include <yaml.h>
 
 #include <float.h>
 
-//====================
-// 2-Pass YAML Parser
-//====================
+// ======================
+//  Two-Pass YAML Parser
+// ======================
 //
 // The design of the options database in PETSc does not currently allow for one
-// to traverse items in YAML mappings. Instead, one must know the exact name of
-// every item one wants to retrieve. This puts a large restriction on the types
-// of YAML files that can be parsed. Here, we use libyaml (which is bundled with
-// PETSc) directly to parse our configuration file.
+// to traverse items in YAML mappings--one must know the exact name of every
+// item one wants to retrieve. This puts a large restriction on the types of
+// YAML files that can be parsed, so we've rolled our own.
 //
-// Here we've implemented a two-pass parser that parses the RDycore
-// configuration file whose specification can be found at
+// Here we've implemented a two-pass parser (using libyaml) to handle the
+// RDycore configuration file whose specification can be found at
 //
 // https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
 //
-// We use two passes because some sections refer to items found in others.
-// Sections without these references are scanned on the first pass, and then
+// We use two passes because items in some sections refer to items in others.
+// Sections without such references are scanned on the first pass, and then
 // the rest are scanned on the second pass. This ensures that the ordering of
-// sections in the config file does not matter. This enforces the Principle of
-// Least Astonishment.
+// sections in the config file does not matter, which adheres to the Principle
+// of Least Astonishment. Projects that ignore this principle tend to waste an
+// astonishing amount of time.
 
 // the maximum length of an identifier or value in the YAML file
 #define YAML_MAX_LEN 1024
@@ -344,7 +345,6 @@ static PetscErrorCode ParseNumerics(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses parameteres in the time section
 static PetscErrorCode ParseTime(yaml_event_t    *event,
                                 YamlParserState *state,
                                 RDy              rdy) {
@@ -393,7 +393,6 @@ static PetscErrorCode ParseTime(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses parameters in the restart section
 static PetscErrorCode ParseRestart(yaml_event_t    *event,
                                    YamlParserState *state,
                                    RDy              rdy) {
@@ -432,7 +431,6 @@ static PetscErrorCode ParseRestart(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses a quadrilateral grid specified in the grid section
 static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
                                     YamlParserState *state,
                                     RDy              rdy) {
@@ -484,7 +482,6 @@ static PetscErrorCode ParseQuadGrid(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses parameters in the restart section
 static PetscErrorCode ParseLogging(yaml_event_t    *event,
                                    YamlParserState *state,
                                    RDy              rdy) {
@@ -510,7 +507,6 @@ static PetscErrorCode ParseLogging(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses parameters in the grid section
 static PetscErrorCode ParseGrid(yaml_event_t    *event,
                                 YamlParserState *state,
                                 RDy              rdy) {
@@ -557,7 +553,6 @@ static PetscErrorCode ParseGrid(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses regions specified in the grid section
 static PetscErrorCode ParseGridRegions(yaml_event_t    *event,
                                        YamlParserState *state,
                                        RDy              rdy) {
@@ -567,7 +562,6 @@ static PetscErrorCode ParseGridRegions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses surfaces specified in the grid section
 static PetscErrorCode ParseGridSurfaces(yaml_event_t    *event,
                                         YamlParserState *state,
                                         RDy              rdy) {
@@ -577,7 +571,6 @@ static PetscErrorCode ParseGridSurfaces(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses the initial conditions section
 static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
                                              YamlParserState *state,
                                              RDy              rdy) {
@@ -585,7 +578,6 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses the boundary conditions section
 static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
@@ -593,7 +585,6 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses the sources section
 static PetscErrorCode ParseSources(yaml_event_t    *event,
                                    YamlParserState *state,
                                    RDy              rdy) {
@@ -601,7 +592,6 @@ static PetscErrorCode ParseSources(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses the flow_conditions section
 static PetscErrorCode ParseFlowConditions(yaml_event_t    *event,
                                           YamlParserState *state,
                                           RDy              rdy) {
@@ -647,7 +637,6 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses the ѕediment_conditions section
 static PetscErrorCode ParseSedimentConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
@@ -693,7 +682,6 @@ static PetscErrorCode ParseSedimentConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
-// parses the salinity_conditions section
 static PetscErrorCode ParseSalinityConditions(yaml_event_t    *event,
                                               YamlParserState *state,
                                               RDy              rdy) {
@@ -812,7 +800,7 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass,
     // Otherwise, dispatch the parser to the indicated section, based on which
     // pass we're performing.
     if (pass == FIRST_PASS) {
-      // in the first pass, we scan everything without dependencies.
+      // in the first pass, we scan everything with no dependencies
       switch (state->section) {
         case NO_SECTION:
           PetscCall(ParseTopLevel(event, state, rdy));
@@ -863,7 +851,7 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass,
           // we ignore everything else for now
       }
     } else { // second pass
-      // in the second pass, we set up secions that refer to other sections
+      // in the second pass, we parse secions that refer to other sections
       switch (state->section) {
         case INITIAL_CONDITIONS_SECTION:
           PetscCall(ParseInitialConditions(event, state, rdy));

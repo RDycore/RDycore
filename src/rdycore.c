@@ -1,4 +1,5 @@
 #include <private/rdycoreimpl.h>
+#include <private/rdymemory.h>
 #include <rdycore.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
