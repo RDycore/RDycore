@@ -6,17 +6,28 @@
 
 #include <float.h>
 
-//======================================================
-// Traversing YAML mappings in PETSc's options database
-//======================================================
+//====================
+// 2-Pass YAML Parser
+//====================
 //
 // The design of the options database in PETSc does not currently allow for one
 // to traverse items in YAML mappings. Instead, one must know the exact name of
 // every item one wants to retrieve. This puts a large restriction on the types
 // of YAML files that can be parsed. Here, we use libyaml (which is bundled with
 // PETSc) directly to parse our configuration file.
+//
+// Here we've implemented a two-pass parser that parses the RDycore
+// configuration file whose specification can be found at
+//
+// https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
+//
+// We use two passes because some sections refer to items found in others.
+// Sections without these references are scanned on the first pass, and then
+// the rest are scanned on the second pass. This ensures that the ordering of
+// sections in the config file does not matter. This enforces the Principle of
+// Least Astonishment.
 
-// This is the maximum length of an identifier in the YAML file.
+// the maximum length of an identifier or value in the YAML file
 #define YAML_MAX_LEN 1024
 
 // This enum defines the different sections in our configuration file.
@@ -728,8 +739,15 @@ static PetscErrorCode ParseSalinityConditions(yaml_event_t    *event,
   PetscFunctionReturn(0);
 }
 
+// This defines which pass the parser is working on.
+typedef enum {
+  FIRST_PASS,
+  SECOND_PASS
+} WhichPass;
+
 // Handles a YAML event, populating the appropriate config info within rdy.
-static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
+static PetscErrorCode HandleYamlEvent(WhichPass pass,
+                                      yaml_event_t *event,
                                       YamlParserState *state,
                                       RDy rdy) {
   PetscFunctionBegin;
@@ -791,65 +809,96 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event,
       }
     }
   } else { // parse parameters in sections
-    // Otherwise, dispatch the parser to the indicated section.
-    switch (state->section) {
-      case NO_SECTION:
-        PetscCall(ParseTopLevel(event, state, rdy));
-        break;
-      case PHYSICS_SECTION:
-        PetscCall(ParsePhysics(event, state, rdy));
-        break;
-      case PHYSICS_SEDIMENT_SECTION:
-        PetscCall(ParsePhysicsSediment(event, state, rdy));
-        break;
-      case PHYSICS_SALINITY_SECTION:
-        PetscCall(ParsePhysicsSediment(event, state, rdy));
-        break;
-      case PHYSICS_BED_FRICTION_SECTION:
-        PetscCall(ParsePhysicsBedFriction(event, state, rdy));
-        break;
-      case NUMERICS_SECTION:
-        PetscCall(ParseNumerics(event, state, rdy));
-        break;
-      case TIME_SECTION:
-        PetscCall(ParseTime(event, state, rdy));
-        break;
-      case RESTART_SECTION:
-        PetscCall(ParseRestart(event, state, rdy));
-        break;
-      case LOGGING_SECTION:
-        PetscCall(ParseLogging(event, state, rdy));
-        break;
-      case GRID_SECTION:
-        PetscCall(ParseGrid(event, state, rdy));
-        break;
-      case GRID_REGIONS_SECTION:
-        PetscCall(ParseGridRegions(event, state, rdy));
-        break;
-      case GRID_SURFACES_SECTION:
-        PetscCall(ParseGridSurfaces(event, state, rdy));
-        break;
-      case INITIAL_CONDITIONS_SECTION:
-        PetscCall(ParseInitialConditions(event, state, rdy));
-        break;
-      case BOUNDARY_CONDITIONS_SECTION:
-        PetscCall(ParseBoundaryConditions(event, state, rdy));
-        break;
-      case SOURCES_SECTION:
-        PetscCall(ParseSources(event, state, rdy));
-        break;
-      case FLOW_CONDITIONS_SECTION:
-        PetscCall(ParseFlowConditions(event, state, rdy));
-        break;
-      case SEDIMENT_CONDITIONS_SECTION:
-        PetscCall(ParseSedimentConditions(event, state, rdy));
-        break;
-      case SALINITY_CONDITIONS_SECTION:
-        PetscCall(ParseSalinityConditions(event, state, rdy));
-        break;
-      default:
-        // we ignore everything else in the file.
+    // Otherwise, dispatch the parser to the indicated section, based on which
+    // pass we're performing.
+    if (pass == FIRST_PASS) {
+      // in the first pass, we scan everything without dependencies.
+      switch (state->section) {
+        case NO_SECTION:
+          PetscCall(ParseTopLevel(event, state, rdy));
+          break;
+        case PHYSICS_SECTION:
+          PetscCall(ParsePhysics(event, state, rdy));
+          break;
+        case PHYSICS_SEDIMENT_SECTION:
+          PetscCall(ParsePhysicsSediment(event, state, rdy));
+          break;
+        case PHYSICS_SALINITY_SECTION:
+          PetscCall(ParsePhysicsSediment(event, state, rdy));
+          break;
+        case PHYSICS_BED_FRICTION_SECTION:
+          PetscCall(ParsePhysicsBedFriction(event, state, rdy));
+          break;
+        case NUMERICS_SECTION:
+          PetscCall(ParseNumerics(event, state, rdy));
+          break;
+        case TIME_SECTION:
+          PetscCall(ParseTime(event, state, rdy));
+          break;
+        case RESTART_SECTION:
+          PetscCall(ParseRestart(event, state, rdy));
+          break;
+        case LOGGING_SECTION:
+          PetscCall(ParseLogging(event, state, rdy));
+          break;
+        case GRID_SECTION:
+          PetscCall(ParseGrid(event, state, rdy));
+          break;
+        case GRID_REGIONS_SECTION:
+          PetscCall(ParseGridRegions(event, state, rdy));
+          break;
+        case GRID_SURFACES_SECTION:
+          PetscCall(ParseGridSurfaces(event, state, rdy));
+          break;
+        case FLOW_CONDITIONS_SECTION:
+          PetscCall(ParseFlowConditions(event, state, rdy));
+          break;
+        case SEDIMENT_CONDITIONS_SECTION:
+          PetscCall(ParseSedimentConditions(event, state, rdy));
+          break;
+        case SALINITY_CONDITIONS_SECTION:
+          PetscCall(ParseSalinityConditions(event, state, rdy));
+          break;
+        default:
+          // we ignore everything else for now
+      }
+    } else { // second pass
+      // in the second pass, we set up secions that refer to other sections
+      switch (state->section) {
+        case INITIAL_CONDITIONS_SECTION:
+          PetscCall(ParseInitialConditions(event, state, rdy));
+          break;
+        case BOUNDARY_CONDITIONS_SECTION:
+          PetscCall(ParseBoundaryConditions(event, state, rdy));
+          break;
+        case SOURCES_SECTION:
+          PetscCall(ParseSources(event, state, rdy));
+          break;
+        default:
+      }
     }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode CreateQuadGrid(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCheck((rdy->quadmesh.xmax > rdy->quadmesh.xmin), rdy->comm,
+             PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
+  PetscCheck((rdy->quadmesh.ymax > rdy->quadmesh.ymin), rdy->comm,
+             PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
+
+  // Create a uniform grid with the given information.
+  PetscReal lower[2] = {rdy->quadmesh.xmin, rdy->quadmesh.ymin};
+  PetscReal upper[2] = {rdy->quadmesh.xmax, rdy->quadmesh.ymax};
+  PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper,
+                                NULL, PETSC_TRUE, &rdy->dm));
+
+  // Look for (optional) raster information to punch out inactive cells.
+  if (strlen(rdy->quadmesh.inactive_file)) {
+    // FIXME: implement inactive cell logic here.
   }
 
   PetscFunctionReturn(0);
@@ -915,15 +964,9 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-/// Performs any setup needed by RDy, reading from the specified configuration
-/// file.
-PetscErrorCode RDySetup(RDy rdy) {
+PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
   PetscFunctionBegin;
 
-  // Open the config file and set up a YAML parser for it.
-  FILE *file = fopen(rdy->filename, "r");
-  PetscCheck(file, rdy->comm, PETSC_ERR_USER,
-    "Configuration file not found: %s", rdy->filename);
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);
   yaml_parser_set_input_file(&parser, file);
@@ -947,7 +990,7 @@ PetscErrorCode RDySetup(RDy rdy) {
     // Process the event, using it to populate our YAML data, and handle
     // any errors resulting from properly-formed YAML that doesn't conform
     // to our spec.
-    PetscCall(HandleYamlEvent(&event, &state, rdy));
+    PetscCall(HandleYamlEvent(pass, &event, &state, rdy));
 
     // Discard the event and move on.
     event_type = event.type;
@@ -955,30 +998,37 @@ PetscErrorCode RDySetup(RDy rdy) {
   } while (event_type != YAML_STREAM_END_EVENT);
   yaml_parser_delete(&parser);
 
+  PetscFunctionReturn(0);
+}
+
+/// Performs any setup needed by RDy, reading from the specified configuration
+/// file.
+PetscErrorCode RDySetup(RDy rdy) {
+  PetscFunctionBegin;
+
+  // Open the config file and set up a YAML parser for it.
+  FILE *file = fopen(rdy->filename, "r");
+  PetscCheck(file, rdy->comm, PETSC_ERR_USER,
+    "Configuration file not found: %s", rdy->filename);
+
+  // Do the first pass.
+  PetscCall(ParseYaml(file, FIRST_PASS, rdy));
+
   // Create the grid from our specification.
   if (strlen(rdy->mesh_file)) { // we are given a file
     PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->mesh_file, "grid",
                                    PETSC_TRUE, &rdy->dm));
   } else { // we are asked to create a quad grid
-    PetscCheck((rdy->quadmesh.xmax > rdy->quadmesh.xmin), rdy->comm,
-               PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
-    PetscCheck((rdy->quadmesh.ymax > rdy->quadmesh.ymin), rdy->comm,
-               PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
-
-    // Create a uniform grid with the given information.
-    PetscReal lower[2] = {rdy->quadmesh.xmin, rdy->quadmesh.ymin};
-    PetscReal upper[2] = {rdy->quadmesh.xmax, rdy->quadmesh.ymax};
-    PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper,
-                                  NULL, PETSC_TRUE, &rdy->dm));
-
-    // Look for (optional) raster information to punch out inactive cells.
-    if (strlen(rdy->quadmesh.inactive_file)) {
-      // FIXME: implement inactive cell logic here.
-    }
-
-    // Set up mesh regions and surfaces, reading them from our DMPlex object.
-    PetscCall(InitRegionsAndSurfaces(rdy));
+    PetscCall(CreateQuadGrid(rdy));
   }
+
+  // Set up mesh regions and surfaces, reading them from our DMPlex object.
+  PetscCall(InitRegionsAndSurfaces(rdy));
+
+  // Now do the second pass and close the file.
+  rewind(file);
+  ParseYaml(file, SECOND_PASS, rdy);
+  fclose(file);
 
   // print configuration info
   PetscCall(RDyPrintf(rdy));

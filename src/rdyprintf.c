@@ -15,9 +15,9 @@ static const char* BedFrictionString(RDyBedFriction model) {
 }
 
 static void PrintPhysics(FILE *file, RDy rdy) {
-  fprintf(file, "---------\n");
-  fprintf(file, " Physics\n");
-  fprintf(file, "---------\n\n");
+  fprintf(file, "-------\n");
+  fprintf(file, "Physics\n");
+  fprintf(file, "-------\n\n");
   fprintf(file, "Sediment model: %s\n", FlagString(rdy->sediment));
   fprintf(file, "Salinity model: %s\n", FlagString(rdy->salinity));
   fprintf(file, "Bed friction model: %s\n", BedFrictionString(rdy->bed_friction));
@@ -50,9 +50,9 @@ static const char* RiemannString(RDyRiemann solver) {
 }
 
 static void PrintNumerics(FILE *file, RDy rdy) {
-  fprintf(file, "----------\n");
-  fprintf(file, " Numerics\n");
-  fprintf(file, "----------\n\n");
+  fprintf(file, "--------\n");
+  fprintf(file, "Numerics\n");
+  fprintf(file, "--------\n\n");
   fprintf(file, "Spatial discretization: %s\n", SpatialString(rdy->spatial));
   fprintf(file, "Temporal discretization: %s\n", TemporalString(rdy->temporal));
   fprintf(file, "Riemann solver: %s\n", RiemannString(rdy->riemann));
@@ -71,26 +71,30 @@ static const char* TimeUnitString(RDyTimeUnit unit) {
 }
 
 static void PrintTime(FILE *file, RDy rdy) {
-  fprintf(file, "------\n");
-  fprintf(file, " Time\n");
-  fprintf(file, "------\n\n");
+  fprintf(file, "----\n");
+  fprintf(file, "Time\n");
+  fprintf(file, "----\n\n");
   fprintf(file, "Final time: %g %s\n", rdy->final_time, TimeUnitString(rdy->time_unit));
   fprintf(file, "\n");
 }
 
 static void PrintRestart(FILE *file, RDy rdy) {
-  fprintf(file, "---------\n");
-  fprintf(file, " Restart\n");
-  fprintf(file, "---------\n\n");
-  fprintf(file, "Restart file format: %s\n", rdy->restart_format);
-  fprintf(file, "Restart frequency: %d\n", rdy->restart_frequency);
+  fprintf(file, "-------\n");
+  fprintf(file, "Restart\n");
+  fprintf(file, "-------\n\n");
+  if (rdy->restart_frequency > 0) {
+    fprintf(file, "Restart file format: %s\n", rdy->restart_format);
+    fprintf(file, "Restart frequency: %d\n", rdy->restart_frequency);
+  } else {
+    fprintf(file, "(disabled)\n");
+  }
   fprintf(file, "\n");
 }
 
 static void PrintLogging(FILE *file, RDy rdy) {
-  fprintf(file, "---------\n");
-  fprintf(file, " Logging\n");
-  fprintf(file, "---------\n\n");
+  fprintf(file, "-------\n");
+  fprintf(file, "Logging\n");
+  fprintf(file, "-------\n\n");
   if (strlen(rdy->log_file)) {
     fprintf(file, "Primary log file: %s\n", rdy->log_file);
   } else {
