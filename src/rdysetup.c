@@ -1160,6 +1160,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
     const char *label_name;
     PetscCall(DMGetLabelByNum(rdy->dm, l, &label));
     PetscCall(DMGetLabelName(rdy->dm, l, &label_name));
+    RDyLog(rdy, "Encountered label: %s\n", label_name);
 
     // If the label contains points corresponding to cells, construct a
     // region (named after this label) containing cells with the corresponding
@@ -1309,6 +1310,13 @@ PetscErrorCode RDySetup(RDy rdy) {
     PetscCall(CreateQuadGrid(rdy));
   }
 
+  // open the primary log file
+  if (strlen(rdy->log_file)) {
+    PetscCall(PetscFOpen(rdy->comm, rdy->log_file, "w", &rdy->log));
+  } else {
+    rdy->log = stdout;
+  }
+
   // set up mesh regions and surfaces, reading them from our DMPlex object
   PetscCall(InitRegionsAndSurfaces(rdy));
 
@@ -1319,13 +1327,6 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // check initial/boundary conditions and sources
   PetscCall(CheckConditionsAndSources(rdy));
-
-  // open the primary log file
-  if (strlen(rdy->log_file)) {
-    PetscCall(PetscFOpen(rdy->comm, rdy->log_file, "w", &rdy->log));
-  } else {
-    rdy->log = stdout;
-  }
 
   // print configuration info
   PetscCall(RDyPrintf(rdy));
