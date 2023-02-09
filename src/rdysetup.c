@@ -1320,6 +1320,13 @@ PetscErrorCode RDySetup(RDy rdy) {
   // check initial/boundary conditions and sources
   PetscCall(CheckConditionsAndSources(rdy));
 
+  // open the primary log file
+  if (strlen(rdy->log_file)) {
+    PetscCall(PetscFOpen(rdy->comm, rdy->log_file, "w", &rdy->log));
+  } else {
+    rdy->log = stdout;
+  }
+
   // print configuration info
   PetscCall(RDyPrintf(rdy));
 

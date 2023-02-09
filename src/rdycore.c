@@ -120,6 +120,10 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
     DMDestroy(&((*rdy)->dm));
   }
 
+  if (((*rdy)->log) && ((*rdy)->log != stdout)) {
+    PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
+  }
+
   PetscCall(RDyFree(*rdy));
   *rdy = NULL;
   PetscFunctionReturn(0);

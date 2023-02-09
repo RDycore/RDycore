@@ -236,7 +236,8 @@ struct _p_RDy {
   //---------
 
   // Primary log file
-  char log_file[PETSC_MAX_PATH_LEN];
+  char  log_file[PETSC_MAX_PATH_LEN];
+  FILE *log;
 
   //-----------------
   // Simulation data
@@ -264,5 +265,8 @@ PetscErrorCode RDySurfaceDestroy(RDySurface*);
 PetscErrorCode RDyFindRegion(RDy, const char*, PetscInt*);
 // find the index of a surface within the dycore, given its name (-1 if not found)
 PetscErrorCode RDyFindSurface(RDy, const char*, PetscInt*);
+
+// write a message to the primary log -- no need for PetscCall
+#define RDyLog(rdy, ...) PetscCall(PetscFPrintf(rdy->comm, rdy->log, __VA_ARGS__))
 
 #endif
