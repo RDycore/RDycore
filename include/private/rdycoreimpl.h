@@ -108,7 +108,6 @@ typedef struct {
 // This type defines a region consisting of cells identified by their local
 // indices.
 typedef struct {
-  const char *name;
   PetscInt   *cell_ids;
   PetscInt    num_cells;
 } RDyRegion;
@@ -116,7 +115,6 @@ typedef struct {
 // This type defines a surface consisting of edges identified by their local
 // indices.
 typedef struct {
-  const char *name;
   PetscInt   *edge_ids;
   PetscInt    num_edges;
 } RDySurface;
@@ -186,12 +184,14 @@ struct _p_RDy {
   RDyMesh mesh;
 
   // mesh regions
-  PetscInt    num_regions;
-  RDyRegion   regions[MAX_NUM_REGIONS];
+  PetscInt  num_regions;
+  PetscInt  region_ids[MAX_NUM_REGIONS];
+  RDyRegion regions[MAX_NUM_REGIONS];
 
   // mesh surfaces
-  PetscInt    num_surfaces;
-  RDySurface  surfaces[MAX_NUM_SURFACES];
+  PetscInt   num_surfaces;
+  PetscInt   surface_ids[MAX_NUM_REGIONS];
+  RDySurface surfaces[MAX_NUM_SURFACES];
 
   // Table of named sets of flow, sediment, and salinity conditions. Used by
   // initial/source/boundary conditions below.
@@ -254,17 +254,6 @@ struct _p_RDy {
   PetscBool debug, save, add_building;
   PetscBool interpolate;
 };
-
-// region and surface constructors and destructors
-PetscErrorCode RDyRegionCreate(const char*, PetscInt, const PetscInt[], RDyRegion*);
-PetscErrorCode RDyRegionDestroy(RDyRegion*);
-PetscErrorCode RDySurfaceCreate(const char*, PetscInt, const PetscInt[], RDySurface*);
-PetscErrorCode RDySurfaceDestroy(RDySurface*);
-
-// find the index of a region within the dycore, given its name (-1 if not found)
-PetscErrorCode RDyFindRegion(RDy, const char*, PetscInt*);
-// find the index of a surface within the dycore, given its name (-1 if not found)
-PetscErrorCode RDyFindSurface(RDy, const char*, PetscInt*);
 
 // write a message to the primary log -- no need for PetscCall
 #define RDyLog(rdy, ...) PetscCall(PetscFPrintf(rdy->comm, rdy->log, __VA_ARGS__))

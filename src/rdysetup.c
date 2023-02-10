@@ -704,7 +704,7 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
 
     // What is the region's index?
     PetscInt region_index;
-    PetscCall(RDyFindRegion(rdy, state->subsection, &region_index));
+    PetscCall(ConvertToInt(rdy->comm, "region", state->subsection, &region_index));
     PetscCheck(region_index != -1, rdy->comm, PETSC_ERR_USER,
       "Invalid region in initial_conditions: %s", state->subsection);
 
@@ -778,7 +778,7 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t    *event,
 
     // What is the surface's index?
     PetscInt surface_index;
-    PetscCall(RDyFindSurface(rdy, state->subsection, &surface_index));
+    PetscCall(ConvertToInt(rdy->comm, "surface", state->subsection, &surface_index));
     PetscCheck(surface_index != -1, rdy->comm, PETSC_ERR_USER,
       "Invalid surface in boundary_conditions: %s", state->subsection);
 
@@ -837,7 +837,7 @@ static PetscErrorCode ParseSources(yaml_event_t    *event,
 
     // What is the region's index?
     PetscInt region_index;
-    PetscCall(RDyFindRegion(rdy, state->subsection, &region_index));
+    PetscCall(ConvertToInt(rdy->comm, "region", state->subsection, &region_index));
     PetscCheck(region_index != -1, rdy->comm, PETSC_ERR_USER,
       "Invalid region in sources: %s", state->subsection);
 
@@ -1153,70 +1153,77 @@ static PetscErrorCode CreateQuadGrid(RDy rdy) {
 static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscFunctionBegin;
 
-  // For each label in the mesh:
-  PetscInt num_labels;
-  PetscCall(DMGetNumLabels(rdy->dm, &num_labels));
-  for (PetscInt l = 0; l < num_labels; ++l) {
-    DMLabel     label;
-    const char *label_name;
-    PetscCall(DMGetLabelByNum(rdy->dm, l, &label));
-    PetscCall(DMGetLabelName(rdy->dm, l, &label_name));
-
-    // exclude these labels
-    PetscBool excluded = PETSC_FALSE;
-    static const char *excluded_labels[] = {"celltype", "depth",
-      "ghost", "Vertex Sets", NULL};
-    for (PetscInt i = 0; excluded_labels[i] != NULL; ++i) {
-      if (!strcmp(label_name, excluded_labels[i])) {
-        excluded = PETSC_TRUE;
-        break;
+  // Get regions.
+  DMLabel label;
+  PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
+  IS cell_is; // cell index space
+  PetscCall(DMLabelGetStratumIS(label, 0, &cell_is));
+  if (cell_is) {
+    const PetscInt *region_ids;
+    PetscCall(ISGetIndices(cell_is, &region_ids));
+    PetscInt num_cells;
+    PetscCall(ISGetLocalSize(cell_is, &num_cells));
+    PetscInt region_sizes[MAX_NUM_REGIONS] = {0};
+    for (PetscInt i = 0; i < num_cells; ++i) {
+      PetscInt region_id = region_ids[i];
+      PetscCheck(region_id <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
+        "Maximum region ID (%d) exceeded: %d\n", MAX_NUM_REGIONS, region_id);
+      ++(region_sizes[region_id]);
+      rdy->region_ids[rdy->num_regions] = region_id;
+      ++rdy->num_regions;
+    }
+    PetscInt offsets[MAX_NUM_REGIONS] = {0};
+    for (PetscInt r = 0; r < MAX_NUM_REGIONS; ++r) {
+      if (region_sizes[r] > 0) {
+        RDyRegion *region = &rdy->regions[r];
+        region->num_cells = region_sizes[r];
+        PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
       }
     }
-    if (excluded) continue;
-    RDyLog(rdy, "Encountered label: %s\n", label_name);
+    for (PetscInt i = 0; i < num_cells; ++i) {
+      PetscInt region_id = region_ids[i];
+      RDyRegion *region = &rdy->regions[region_id];
+      region->cell_ids[offsets[region_id]] = i;
+      ++(offsets[region_id]);
+    }
+    PetscCall(ISRestoreIndices(cell_is, &region_ids));
+    PetscCall(ISDestroy(&cell_is));
+  }
 
-    // If the label contains points corresponding to cells, construct a
-    // region (named after this label) containing cells with the corresponding
-    // indices.
-    IS cell_is; // cell index space
-    PetscCall(DMLabelGetStratumIS(label, 0, &cell_is));
-    if (cell_is) { // label has cell points
-      PetscInt num_cells;
-      PetscCall(ISGetSize(cell_is, &num_cells));
-      if (num_cells > 0) {
-        PetscCheck(rdy->num_regions < MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
-          "Maximum number of regions (%d) exceeded!", MAX_NUM_REGIONS);
-        RDyRegion *region = &rdy->regions[rdy->num_regions];
-        const PetscInt *cell_ids;
-        PetscCall(ISGetIndices(cell_is, &cell_ids));
-        PetscCall(RDyRegionCreate(label_name, num_cells, cell_ids, region));
-        PetscCall(ISRestoreIndices(cell_is, &cell_ids));
-        ++rdy->num_regions;
-      }
-      PetscCall(ISDestroy(&cell_is));
-    } else { // no cells
-      // If the label contains points corresponding to edges, construct a
-      // surface (named after this label) containing edges with the
-      // corresponding indices.
-      IS edge_is; // edge index space
-      PetscCall(DMLabelGetStratumIS(label, 1, &edge_is));
-      if (edge_is) {
-        PetscInt num_edges;
-        PetscCall(ISGetSize(edge_is, &num_edges));
-        if (num_edges > 0) {
-          PetscCheck(rdy->num_surfaces < MAX_NUM_SURFACES, rdy->comm,
-            PETSC_ERR_USER, "Maximum number of surfaces (%d) exceeded!",
-            MAX_NUM_SURFACES);
-          RDySurface *surface = &rdy->surfaces[rdy->num_surfaces];
-          const PetscInt *edge_ids;
-          PetscCall(ISGetIndices(edge_is, &edge_ids));
-          PetscCall(RDySurfaceCreate(label_name, num_edges, edge_ids, surface));
-          PetscCall(ISRestoreIndices(edge_is, &edge_ids));
-          ++rdy->num_surfaces;
-        }
-        PetscCall(ISDestroy(&edge_is));
+  // Get surfaces.
+  PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
+  IS edge_is; // edge index space
+  PetscCall(DMLabelGetStratumIS(label, 1, &edge_is));
+  if (edge_is) {
+    const PetscInt *surface_ids; // edge indices and surface indices
+    PetscCall(ISGetIndices(edge_is, &surface_ids));
+    PetscInt num_edges;
+    PetscCall(ISGetLocalSize(edge_is, &num_edges));
+    PetscInt surface_sizes[MAX_NUM_SURFACES] = {0};
+    for (PetscInt i = 0; i < num_edges; ++i) {
+      PetscInt surface_id = surface_ids[i];
+      PetscCheck(surface_id <= MAX_NUM_SURFACES, rdy->comm, PETSC_ERR_USER,
+        "Maximum surface ID (%d) exceeded: %d\n", MAX_NUM_SURFACES, surface_id);
+      ++(surface_sizes[surface_id]);
+      rdy->surface_ids[rdy->num_surfaces] = surface_id;
+      ++rdy->num_surfaces;
+    }
+    for (PetscInt s = 0; s < MAX_NUM_SURFACES; ++s) {
+      if (surface_sizes[s] > 0) {
+        RDySurface *surface = &rdy->surfaces[s];
+        surface->num_edges = surface_sizes[s];
+        PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
       }
     }
+    PetscInt offsets[MAX_NUM_SURFACES] = {0};
+    for (PetscInt i = 0; i < num_edges; ++i) {
+      PetscInt surface_id = surface_ids[i];
+      RDySurface *surface = &rdy->surfaces[surface_id];
+      surface->edge_ids[offsets[surface_id]] = i;
+      ++(offsets[surface_id]);
+    }
+    PetscCall(ISRestoreIndices(edge_is, &surface_ids));
+    PetscCall(ISDestroy(&edge_is));
   }
 
   // make sure we have at least one region and surface
@@ -1235,28 +1242,28 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
   // Does every region have a set of initial conditions?
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     PetscCheck(rdy->initial_conditions[r].flow, rdy->comm, PETSC_ERR_USER,
-      "Region %s has no initial flow condition!", rdy->regions[r].name);
+      "Region %d has no initial flow condition!", rdy->region_ids[r]);
     if (rdy->sediment) {
       PetscCheck(rdy->initial_conditions[r].sediment, rdy->comm, PETSC_ERR_USER,
-        "Region %s has no initial sediment condition!", rdy->regions[r].name);
+        "Region %d has no initial sediment condition!", rdy->region_ids[r]);
     }
     if (rdy->salinity) {
       PetscCheck(rdy->initial_conditions[r].salinity, rdy->comm, PETSC_ERR_USER,
-        "Region %s has no initial salinity condition!", rdy->regions[r].name);
+        "Region %d has no initial salinity condition!", rdy->region_ids[r]);
     }
   }
 
   // Does every surface have a set of boundary conditions?
   for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
     PetscCheck(rdy->boundary_conditions[s].flow, rdy->comm, PETSC_ERR_USER,
-      "Region %s has no flow boundary condition!", rdy->surfaces[s].name);
+      "Surface %d has no flow boundary condition!", rdy->surface_ids[s]);
     if (rdy->sediment) {
       PetscCheck(rdy->boundary_conditions[s].sediment, rdy->comm, PETSC_ERR_USER,
-        "Region %s has no sediment boundary condition!", rdy->surfaces[s].name);
+        "Surface %d has no sediment boundary condition!", rdy->surface_ids[s]);
     }
     if (rdy->salinity) {
       PetscCheck(rdy->boundary_conditions[s].salinity, rdy->comm, PETSC_ERR_USER,
-        "Region %s has no salinity boundary condition!", rdy->surfaces[s].name);
+        "Surface %d has no salinity boundary condition!", rdy->surface_ids[s]);
     }
   }
 
