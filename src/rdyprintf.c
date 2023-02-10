@@ -113,7 +113,7 @@ PetscErrorCode RDyPrintf(RDy rdy) {
   PetscFunctionBegin;
 
   RDyLog(rdy, "==========================================================\n");
-  RDyLog(rdy, "RDycore (input read from %s)\n", rdy->filename);
+  RDyLog(rdy, "RDycore (input read from %s)\n", rdy->config_file);
   RDyLog(rdy, "==========================================================\n\n");
 
   PetscCall(PrintPhysics(rdy));

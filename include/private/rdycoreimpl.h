@@ -40,6 +40,12 @@ typedef enum {
   RIEMANN_HLLC     // Harten, Lax, van Leer Contact solver
 } RDyRiemann;
 
+// This type identifies available physics flow modes.
+typedef enum {
+  FLOW_SWE = 0,
+  FLOW_DIFFUSION
+} RDyFlowMode;
+
 // This type identifies available bed friction models.
 typedef enum {
   BED_FRICTION_NOT_SET = 0,
@@ -147,18 +153,24 @@ struct _p_RDy {
   PetscInt rank;
   // Number of processes in the communicator
   PetscInt nproc;
-  // filename storing input data for the simulation
-  char filename[PETSC_MAX_PATH_LEN];
+  // file storing input data for the simulation
+  char config_file[PETSC_MAX_PATH_LEN];
 
   //---------
   // Physics
   //---------
 
+  // flow and related parameterization(s)
+  RDyFlowMode    flow_mode;
+  RDyBedFriction bed_friction;
+  PetscReal      bed_friction_coef;
+
+  // sediment
   PetscBool sediment;
+
+  // salinity
   PetscBool salinity;
 
-  RDyBedFriction bed_friction;
-  PetscReal bed_friction_coef;
 
   //----------
   // Numerics
@@ -202,7 +214,9 @@ struct _p_RDy {
   PetscInt             num_salinity_conditions;
   RDySalinityCondition salinity_conditions[MAX_NUM_SALINITY_CONDITIONS];
 
-  // initial conditions associated with mesh regions (1 per region)
+  // initial conditions (either a filename or a set of conditions associated
+  // with mesh regions (1 per region)
+  char         initial_conditions_file[PETSC_MAX_PATH_LEN];
   RDyCondition initial_conditions[MAX_NUM_REGIONS];
 
   // sources (and sinks) associated with mesh regions (1 per region)

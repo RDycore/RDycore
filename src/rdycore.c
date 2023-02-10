@@ -86,7 +86,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   MPI_Comm_size(comm, &((*rdy)->nproc));
 
   // set the config file
-  strncpy((*rdy)->filename, config_file, PETSC_MAX_PATH_LEN - 1);
+  strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
 
   PetscFunctionReturn(0);
 }
