@@ -15,7 +15,9 @@ install(
 set(RDYCORE_LIBRARIES rdycore;yaml;${RDYCORE_LIBRARIES})
 
 # Unit tests for the main library
-add_subdirectory(tests)
+if (ENABLE_TESTS)
+  add_subdirectory(tests)
+endif()
 
 # Pass RDYCORE_LIBRARIES to the parent directory.
 set(RDYCORE_LIBRARIES ${RDYCORE_LIBRARIES} PARENT_SCOPE)

@@ -1,7 +1,8 @@
 cmake_minimum_required (VERSION 3.12.0)
 
 # Configurable options
-option(ENABLE_DRIVER "Enable RDycore driver program" ON)
+option(ENABLE_DRIVER "Enable stand-alone RDycore driver program" ON)
+option(ENABLE_TESTS  "Enable unit (and possibly driver) tests" ON)
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
@@ -65,8 +66,10 @@ configure_file(
 set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
 
 # Enable testing.
-include(CTest)
-enable_testing()
+if (ENABLE_TESTS)
+  include(CTest)
+  enable_testing()
+endif()
 
 # Add code coverage support (enabled using -DENABLE_COVERAGE).
 # This adds a `make ccov-all` that produces a single coverage report.
