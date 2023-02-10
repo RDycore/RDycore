@@ -3,8 +3,11 @@
 # We need gmsh locally to generate some test meshes.
 find_program(GMSH_EXE gmsh
              DOC "Gmsh mesh generator")
-if (GMSH_EXE STREQUAL "GMSH-NOTFOUND")
-  message(FATAL_ERROR "gmsh is required for driver tests but was not found!")
+if (GMSH_EXE MATCHES "NOTFOUND")
+  message(FATAL_ERROR "\
+Gmsh is required for driver tests but was not found! Please install it using \
+your favorite package manager or visit https://gmsh.info for more \
+information.")
 else()
   message(STATUS "Found Gmsh: ${GMSH_EXE}")
 endif()
