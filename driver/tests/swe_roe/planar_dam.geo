@@ -71,5 +71,5 @@ Physical Curve("top_wall", 2) = {2:4};
 Physical Curve("bottom_wall", 3) = {8:10};
 
 // The z=0 plane itself is a surface.
-Physical Surface(10) = {1};
+Physical Surface(1) = {1};
 

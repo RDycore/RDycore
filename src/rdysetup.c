@@ -1156,74 +1156,48 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   // Get regions.
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
-  IS cell_is; // cell index space
-  PetscCall(DMLabelGetStratumIS(label, 0, &cell_is));
-  if (cell_is) {
-    const PetscInt *region_ids;
-    PetscCall(ISGetIndices(cell_is, &region_ids));
-    PetscInt num_cells;
-    PetscCall(ISGetLocalSize(cell_is, &num_cells));
-    PetscInt region_sizes[MAX_NUM_REGIONS] = {0};
-    for (PetscInt i = 0; i < num_cells; ++i) {
-      PetscInt region_id = region_ids[i];
-      PetscCheck(region_id <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
-        "Maximum region ID (%d) exceeded: %d\n", MAX_NUM_REGIONS, region_id);
-      ++(region_sizes[region_id]);
-      rdy->region_ids[rdy->num_regions] = region_id;
-      ++rdy->num_regions;
-    }
-    PetscInt offsets[MAX_NUM_REGIONS] = {0};
-    for (PetscInt r = 0; r < MAX_NUM_REGIONS; ++r) {
-      if (region_sizes[r] > 0) {
-        RDyRegion *region = &rdy->regions[r];
-        region->num_cells = region_sizes[r];
+  for (PetscInt region_id = 0; region_id < MAX_NUM_REGIONS; ++region_id) {
+    RDyRegion *region = &rdy->regions[region_id];
+    IS cell_is; // cell index space
+    PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
+    if (cell_is) {
+      PetscInt num_cells;
+      PetscCall(ISGetLocalSize(cell_is, &num_cells));
+      if (num_cells > 0) {
+        rdy->region_ids[rdy->num_regions] = region_id;
+        ++rdy->num_regions;
+        region->num_cells = num_cells;
         PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
       }
+      const PetscInt *cell_ids;
+      PetscCall(ISGetIndices(cell_is, &cell_ids));
+      memcpy(region->cell_ids, cell_ids, sizeof(PetscInt) * num_cells);
+      PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+      PetscCall(ISDestroy(&cell_is));
     }
-    for (PetscInt i = 0; i < num_cells; ++i) {
-      PetscInt region_id = region_ids[i];
-      RDyRegion *region = &rdy->regions[region_id];
-      region->cell_ids[offsets[region_id]] = i;
-      ++(offsets[region_id]);
-    }
-    PetscCall(ISRestoreIndices(cell_is, &region_ids));
-    PetscCall(ISDestroy(&cell_is));
   }
 
   // Get surfaces.
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
-  IS edge_is; // edge index space
-  PetscCall(DMLabelGetStratumIS(label, 1, &edge_is));
-  if (edge_is) {
-    const PetscInt *surface_ids; // edge indices and surface indices
-    PetscCall(ISGetIndices(edge_is, &surface_ids));
-    PetscInt num_edges;
-    PetscCall(ISGetLocalSize(edge_is, &num_edges));
-    PetscInt surface_sizes[MAX_NUM_SURFACES] = {0};
-    for (PetscInt i = 0; i < num_edges; ++i) {
-      PetscInt surface_id = surface_ids[i];
-      PetscCheck(surface_id <= MAX_NUM_SURFACES, rdy->comm, PETSC_ERR_USER,
-        "Maximum surface ID (%d) exceeded: %d\n", MAX_NUM_SURFACES, surface_id);
-      ++(surface_sizes[surface_id]);
-      rdy->surface_ids[rdy->num_surfaces] = surface_id;
-      ++rdy->num_surfaces;
-    }
-    for (PetscInt s = 0; s < MAX_NUM_SURFACES; ++s) {
-      if (surface_sizes[s] > 0) {
-        RDySurface *surface = &rdy->surfaces[s];
-        surface->num_edges = surface_sizes[s];
+  for (PetscInt surface_id = 0; surface_id < MAX_NUM_SURFACES; ++surface_id) {
+    RDySurface *surface = &rdy->surfaces[surface_id];
+    IS edge_is; // edge index space
+    PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
+    if (edge_is) {
+      PetscInt num_edges;
+      PetscCall(ISGetLocalSize(edge_is, &num_edges));
+      if (num_edges > 0) {
+        rdy->surface_ids[rdy->num_surfaces] = surface_id;
+        ++rdy->num_surfaces;
+        surface->num_edges = num_edges;
         PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
       }
+      const PetscInt *edge_ids;
+      PetscCall(ISGetIndices(edge_is, &edge_ids));
+      memcpy(surface->edge_ids, edge_ids, sizeof(PetscInt) * num_edges);
+      PetscCall(ISRestoreIndices(edge_is, &edge_ids));
+      PetscCall(ISDestroy(&edge_is));
     }
-    PetscInt offsets[MAX_NUM_SURFACES] = {0};
-    for (PetscInt i = 0; i < num_edges; ++i) {
-      PetscInt surface_id = surface_ids[i];
-      RDySurface *surface = &rdy->surfaces[surface_id];
-      surface->edge_ids[offsets[surface_id]] = i;
-      ++(offsets[surface_id]);
-    }
-    PetscCall(ISRestoreIndices(edge_is, &surface_ids));
-    PetscCall(ISDestroy(&edge_is));
   }
 
   // make sure we have at least one region and surface
