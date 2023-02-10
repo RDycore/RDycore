@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   g++ \
   gfortran \
   git \
+  gmsh \
   lcov \
   liblapack-dev \
   libmpich-dev \
