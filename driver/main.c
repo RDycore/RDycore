@@ -25,6 +25,9 @@ int main(int argc, char *argv[]) {
   PetscCall(RDyCreate(comm, argv[1], &rdy));
   PetscCall(RDySetup(rdy));
 
+  // Run the simulation to completion.
+  PetscCall(RDyRun(rdy));
+
   // clean up
   PetscCall(RDyDestroy(&rdy));
   PetscCall(RDyFinalize());

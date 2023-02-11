@@ -5,7 +5,7 @@
 static PetscBool initialized_ = PETSC_FALSE;
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
-/// your program
+/// your program.
 PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   PetscFunctionBegin;
   if (!initialized_) {

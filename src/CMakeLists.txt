@@ -4,6 +4,7 @@ add_library(rdycore
   rdycore.c
   rdyprintf.c
   rdymesh.c
+  rdyrun.c
   rdysetup.c
 )
 add_dependencies(rdycore yaml)

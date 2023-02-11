@@ -26,9 +26,10 @@ PETSC_EXTERN PetscErrorCode RDyOnFinalize(void (*)(void));
 PETSC_EXTERN PetscErrorCode RDyFinalize(void);
 PETSC_EXTERN PetscBool RDyInitialized(void);
 
-// RDycore setup/breakdown
+// RDycore setup/run/breakdown
 PETSC_EXTERN PetscErrorCode RDyCreate(MPI_Comm, const char*, RDy*);
 PETSC_EXTERN PetscErrorCode RDySetup(RDy);
+PETSC_EXTERN PetscErrorCode RDyRun(RDy);
 PETSC_EXTERN PetscErrorCode RDyDestroy(RDy*);
 
 // Prints configuration information to the primary log file on rank 0
