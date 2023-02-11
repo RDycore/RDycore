@@ -91,6 +91,16 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   PetscFunctionReturn(0);
 }
 
+// fortran 90 version of RDyCreate
+PetscErrorCode RDyCreateF90(MPI_Fint f90_comm, const char *config_file, RDy *rdy) {
+  PetscFunctionBegin;
+
+  MPI_Comm c_comm = MPI_Comm_f2c(f90_comm);
+  PetscCall(RDyCreate(c_comm, config_file, rdy));
+
+  PetscFunctionReturn(0);
+}
+
 /// Destroys the given RDy object, freeing any allocated resources.
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {

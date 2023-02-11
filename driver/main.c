@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
   // initialize subsystems
   PetscCall(RDyInit(argc, argv, help_str));
 
-  // create rdycore and set it up with the given input file
+  // create rdycore and set it up with the given file
   MPI_Comm comm = PETSC_COMM_WORLD;
   RDy rdy;
   PetscCall(RDyCreate(comm, argv[1], &rdy));
