@@ -6,21 +6,25 @@ option(ENABLE_TESTS  "Enable unit (and possibly driver) tests" ON)
 
 # Other build parameters
 message(STATUS "Setting build parameters:")
-function(check_or_set_param name value default)
+function(check_positivity name value)
   if (${value})
     if (${value} LESS_EQUAL 0)
       message(FATAL_ERROR "Invalid ${name}: ${value}")
     endif()
-  else()
-    set(${name} ${default} PARENT_SCOPE)
   endif()
   message(STATUS "  ${name}: ${value}")
 endfunction()
-check_or_set_param("MAX_NUM_REGIONS"    ${MAX_NUM_REGIONS}    32)
-check_or_set_param("MAX_NUM_SURFACES"   ${MAX_NUM_SURFACES}   32)
-check_or_set_param("MAX_NUM_CONDITIONS" ${MAX_NUM_CONDITIONS} 32)
-set(MAX_NUM_REGIONS    ${MAX_NUM_REGIONS}    CACHE STRING "Maximum allowable number of regions")
-set(MAX_NUM_SURFACES   ${MAX_NUM_SURFACES}   CACHE STRING "Maximum allowable number of surfaces")
+
+set(MAX_NUM_REGIONS 32)
+check_positivity("MAX_NUM_REGIONS" ${MAX_NUM_REGIONS})
+set(MAX_NUM_REGIONS ${MAX_NUM_REGIONS} CACHE STRING "Maximum allowable number of regions")
+
+set(MAX_NUM_SURFACES 32)
+check_positivity("MAX_NUM_SURFACES" ${MAX_NUM_SURFACES})
+set(MAX_NUM_SURFACES ${MAX_NUM_SURFACES} CACHE STRING "Maximum allowable number of surfaces")
+
+set(MAX_NUM_CONDITIONS 32)
+check_positivity("MAX_NUM_CONDITIONS" ${MAX_NUM_CONDITIONS})
 set(MAX_NUM_CONDITIONS ${MAX_NUM_CONDITIONS} CACHE STRING "Maximum allowable number of conditions")
 
 # CMake files live in the cmake/ directory.
@@ -45,6 +49,11 @@ set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 # Default Fortran compiler (if not specified)
 if (NOT CMAKE_Fortran_COMPILER)
   set(CMAKE_Fortran_COMPILER gfortran)
+endif()
+
+# flags
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_Fortran_FLAGS "-ffree-line-length-none")
 endif()
 
 message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")

@@ -103,6 +103,7 @@ contains
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
     ierr = rdydestroy_(rdy_%c_rdy)
+    if (associated(rdy_%config_file)) deallocate(rdy_%config_file)
   end subroutine
 
 end module rdycore
