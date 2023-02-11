@@ -89,10 +89,21 @@ configure_file(
 # Inherit libraries from PETSc.
 set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
 
-# Enable testing.
 if (ENABLE_TESTS)
   include(CTest)
   enable_testing()
+
+  # If we enable tests, we'll need gmsh to generate mesh data.
+  find_program(GMSH_EXE gmsh
+               DOC "Gmsh mesh generator")
+  if (GMSH_EXE MATCHES "NOTFOUND")
+    message(FATAL_ERROR "\
+Gmsh is required for driver tests but was not found! Please install it using \
+your favorite package manager or visit https://gmsh.info for more \
+information.")
+  else()
+    message(STATUS "Found Gmsh: ${GMSH_EXE}")
+  endif()
 endif()
 
 # Add code coverage support (enabled using -DENABLE_COVERAGE).

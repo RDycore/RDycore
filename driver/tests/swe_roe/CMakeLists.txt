@@ -10,7 +10,7 @@
 # ex2b
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-generate_msh_file(planar_dam.geo)
+generate_msh(planar_dam.geo)
 foreach(np 1 2) # test on 1, 2 processes
   add_test(swe_roe_ex2b_np_${np} ${PETSC_MPIEXEC} -n ${np} ${rdycore_driver} ex2b.yaml)
 endforeach()
