@@ -570,11 +570,12 @@ static PetscErrorCode ParseLogging(yaml_event_t    *event,
 
   // logging:
   //   file: <path-to-log-file>
+  //   level: <none|warning|info|detail|debug>
 
   const char *value = (const char*)(event->data.scalar.value);
 
   if (!strlen(state->parameter)) { // parameter not set
-    if (!strcmp(value, "file")) {
+    if (!strcmp(value, "file") || !strcmp(value, "level")) {
       strncpy(state->parameter, value, YAML_MAX_LEN);
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
@@ -583,6 +584,15 @@ static PetscErrorCode ParseLogging(yaml_event_t    *event,
   } else {
     if (!strcmp(state->parameter, "file")) {
       strncpy(rdy->log_file, value, PETSC_MAX_PATH_LEN);
+    } else { // level
+      PetscInt selection;
+      SelectItem(value, 5,
+        (const char*[5]){"none", "warning", "info", "detail", "debug"},
+        (PetscInt[5]){LOG_NONE, LOG_WARNING, LOG_INFO, LOG_DETAIL, LOG_DEBUG},
+        &selection);
+      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+        "Invalid parameter in logging.level: %s", value);
+      rdy->log_level = selection;
     }
   }
   PetscFunctionReturn(0);
@@ -1191,13 +1201,6 @@ PetscErrorCode ParseConfigFile(FILE *file, RDy rdy) {
                                    PETSC_TRUE, &rdy->dm));
   } else { // we are asked to create a quad grid
     PetscCall(CreateQuadGrid(rdy));
-  }
-
-  // open the primary log file
-  if (strlen(rdy->log_file)) {
-    PetscCall(PetscFOpen(rdy->comm, rdy->log_file, "w", &rdy->log));
-  } else {
-    rdy->log = stdout;
   }
 
   // set up mesh regions and surfaces, reading them from our DMPlex object

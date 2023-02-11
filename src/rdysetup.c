@@ -4,6 +4,15 @@
 
 extern PetscErrorCode ParseConfigFile(FILE *file, RDy rdy);
 
+// sets default parameters
+static PetscErrorCode SetDefaults(RDy rdy) {
+  PetscFunctionBegin;
+
+  rdy->log_level = LOG_INFO;
+
+  PetscFunctionReturn(0);
+}
+
 // checks the validity of initial/boundary conditions and sources
 static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
@@ -48,17 +57,25 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
+  PetscCall(SetDefaults(rdy));
+
   // open the config file and set up a YAML parser for it
   FILE *file = fopen(rdy->config_file, "r");
   PetscCheck(file, rdy->comm, PETSC_ERR_USER,
     "Configuration file not found: %s", rdy->config_file);
-
 
   PetscCall(ParseConfigFile(file, rdy));
   fclose(file);
 
   // check initial/boundary conditions and sources
   PetscCall(CheckConditionsAndSources(rdy));
+
+  // open the primary log file
+  if (strlen(rdy->log_file)) {
+    PetscCall(PetscFOpen(rdy->comm, rdy->log_file, "w", &rdy->log));
+  } else {
+    rdy->log = stdout;
+  }
 
   // print configuration info
   PetscCall(RDyPrintf(rdy));
