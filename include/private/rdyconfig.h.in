@@ -1,0 +1,17 @@
+#ifndef RDYCONFIG_H
+#define RDYCONFIG_H
+
+// This file contains various build parameters set at configuration time.
+
+// the maximum number of regions that can be defined on a domain
+#define MAX_NUM_REGIONS @MAX_NUM_REGIONS@
+
+// the maximum number of surfaces that can be defined on a domain
+#define MAX_NUM_SURFACES @MAX_NUM_SURFACES@
+
+// the maximum number of flow/sediment/salinity conditions that can be defined
+// for a simulation
+#define MAX_NUM_CONDITIONS @MAX_NUM_CONDITIONS@
+
+#endif
+

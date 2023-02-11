@@ -1,6 +1,6 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdymemory.h>
+#include <private/rdymemoryimpl.h>
 
 #include <yaml.h>
 
@@ -199,21 +199,21 @@ static PetscErrorCode CloseSection(YamlParserState *state,
   if (state->inside_subsection) { // exiting a subsection?
     if (state->section == FLOW_CONDITIONS_SECTION) {
       rdy->num_flow_conditions++;
-      PetscCheck(rdy->num_flow_conditions <= MAX_NUM_FLOW_CONDITIONS, rdy->comm,
-        PETSC_ERR_USER, "Maximum number of flow conditions (%d) exceeded!",
-        MAX_NUM_FLOW_CONDITIONS);
+      PetscCheck(rdy->num_flow_conditions <= MAX_NUM_CONDITIONS, rdy->comm,
+        PETSC_ERR_USER, "Maximum number of flow conditions (%d) exceeded (increase MAX_NUM_CONDITIONS)",
+        MAX_NUM_CONDITIONS);
     } else if (state->section == SEDIMENT_CONDITIONS_SECTION) {
       rdy->num_sediment_conditions++;
-      PetscCheck(rdy->num_sediment_conditions <= MAX_NUM_SEDIMENT_CONDITIONS,
+      PetscCheck(rdy->num_sediment_conditions <= MAX_NUM_CONDITIONS,
         rdy->comm, PETSC_ERR_USER,
-        "Maximum number of sediment conditions (%d) exceeded!",
-        MAX_NUM_SEDIMENT_CONDITIONS);
+        "Maximum number of sediment conditions (%d) exceeded (increase (MAX_NUM_CONDITIONS)",
+        MAX_NUM_CONDITIONS);
     } else if (state->section == SALINITY_CONDITIONS_SECTION) {
       rdy->num_salinity_conditions++;
-      PetscCheck(rdy->num_salinity_conditions <= MAX_NUM_SALINITY_CONDITIONS,
+      PetscCheck(rdy->num_salinity_conditions <= MAX_NUM_CONDITIONS,
         rdy->comm, PETSC_ERR_USER,
-        "Maximum number of salinity conditions (%d) exceeded!",
-        MAX_NUM_SALINITY_CONDITIONS);
+        "Maximum number of salinity conditions (%d) exceeded (increase MAX_NUM_CONDITIONS)",
+        MAX_NUM_CONDITIONS);
     }
     state->inside_subsection = PETSC_FALSE;
     state->subsection[0] = 0;

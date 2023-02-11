@@ -2,24 +2,11 @@
 #define RDYCOREIMPL_H
 
 #include <rdycore.h>
+#include <private/rdyconfig.h>
+#include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 
 #include <petsc/private/petscimpl.h>
-
-// the maximum number of regions that can be defined on a domain
-#define MAX_NUM_REGIONS 128
-
-// the maximum number of surfaces that can be defined on a domain
-#define MAX_NUM_SURFACES 128
-
-// the maximum number of flow conditions that can be defined for a simulation
-#define MAX_NUM_FLOW_CONDITIONS 128
-
-// the maximum number of sediment conditions that can be defined for a simulation
-#define MAX_NUM_SEDIMENT_CONDITIONS 128
-
-// the maximum number of salinity conditions that can be defined for a simulation
-#define MAX_NUM_SALINITY_CONDITIONS 128
 
 // This type identifies available spatial discretization methods.
 typedef enum {
@@ -208,11 +195,11 @@ struct _p_RDy {
   // Table of named sets of flow, sediment, and salinity conditions. Used by
   // initial/source/boundary conditions below.
   PetscInt             num_flow_conditions;
-  RDyFlowCondition     flow_conditions[MAX_NUM_FLOW_CONDITIONS];
+  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_sediment_conditions;
-  RDySedimentCondition sediment_conditions[MAX_NUM_SEDIMENT_CONDITIONS];
+  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_salinity_conditions;
-  RDySalinityCondition salinity_conditions[MAX_NUM_SALINITY_CONDITIONS];
+  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
   // initial conditions (either a filename or a set of conditions associated
   // with mesh regions (1 per region)
@@ -249,9 +236,12 @@ struct _p_RDy {
   // Logging
   //---------
 
-  // Primary log file
-  char  log_file[PETSC_MAX_PATH_LEN];
-  FILE *log;
+  // log filename
+  char        log_file[PETSC_MAX_PATH_LEN];
+  // selected log level
+  RDyLogLevel log_level;
+  // log file handle
+  FILE       *log;
 
   //-----------------
   // Simulation data
@@ -268,8 +258,5 @@ struct _p_RDy {
   PetscBool debug, save, add_building;
   PetscBool interpolate;
 };
-
-// write a message to the primary log -- no need for PetscCall
-#define RDyLog(rdy, ...) PetscCall(PetscFPrintf(rdy->comm, rdy->log, __VA_ARGS__))
 
 #endif

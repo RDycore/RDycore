@@ -1,5 +1,5 @@
-#ifndef RDYCORE_MEMORY_H
-#define RDYCORE_MEMORY_H
+#ifndef RDYMEMORYIMPL_H
+#define RDYMEMORYIMPL_H
 
 #include <petscsys.h>
 

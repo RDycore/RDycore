@@ -16,12 +16,12 @@ static const char* BedFrictionString(RDyBedFriction model) {
 
 static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, "-------\n");
-  RDyLog(rdy, "Physics\n");
-  RDyLog(rdy, "-------\n\n");
-  RDyLog(rdy, "Sediment model: %s\n", FlagString(rdy->sediment));
-  RDyLog(rdy, "Salinity model: %s\n", FlagString(rdy->salinity));
-  RDyLog(rdy, "Bed friction model: %s\n\n", BedFrictionString(rdy->bed_friction));
+  RDyLogInfo(rdy, "-------\n");
+  RDyLogInfo(rdy, "Physics\n");
+  RDyLogInfo(rdy, "-------\n\n");
+  RDyLogInfo(rdy, "Sediment model: %s\n", FlagString(rdy->sediment));
+  RDyLogInfo(rdy, "Salinity model: %s\n", FlagString(rdy->salinity));
+  RDyLogInfo(rdy, "Bed friction model: %s\n\n", BedFrictionString(rdy->bed_friction));
   PetscFunctionReturn(0);
 }
 
@@ -52,12 +52,12 @@ static const char* RiemannString(RDyRiemann solver) {
 
 static PetscErrorCode PrintNumerics(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, "--------\n");
-  RDyLog(rdy, "Numerics\n");
-  RDyLog(rdy, "--------\n\n");
-  RDyLog(rdy, "Spatial discretization: %s\n", SpatialString(rdy->spatial));
-  RDyLog(rdy, "Temporal discretization: %s\n", TemporalString(rdy->temporal));
-  RDyLog(rdy, "Riemann solver: %s\n\n", RiemannString(rdy->riemann));
+  RDyLogInfo(rdy, "--------\n");
+  RDyLogInfo(rdy, "Numerics\n");
+  RDyLogInfo(rdy, "--------\n\n");
+  RDyLogInfo(rdy, "Spatial discretization: %s\n", SpatialString(rdy->spatial));
+  RDyLogInfo(rdy, "Temporal discretization: %s\n", TemporalString(rdy->temporal));
+  RDyLogInfo(rdy, "Riemann solver: %s\n\n", RiemannString(rdy->riemann));
   PetscFunctionReturn(0);
 }
 
@@ -74,37 +74,37 @@ static const char* TimeUnitString(RDyTimeUnit unit) {
 
 static PetscErrorCode PrintTime(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, "----\n");
-  RDyLog(rdy, "Time\n");
-  RDyLog(rdy, "----\n\n");
-  RDyLog(rdy, "Final time: %g %s\n", rdy->final_time, TimeUnitString(rdy->time_unit));
-  RDyLog(rdy, "\n");
+  RDyLogInfo(rdy, "----\n");
+  RDyLogInfo(rdy, "Time\n");
+  RDyLogInfo(rdy, "----\n\n");
+  RDyLogInfo(rdy, "Final time: %g %s\n", rdy->final_time, TimeUnitString(rdy->time_unit));
+  RDyLogInfo(rdy, "\n");
   PetscFunctionReturn(0);
 }
 
 static PetscErrorCode PrintRestart(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, "-------\n");
-  RDyLog(rdy, "Restart\n");
-  RDyLog(rdy, "-------\n\n");
+  RDyLogInfo(rdy, "-------\n");
+  RDyLogInfo(rdy, "Restart\n");
+  RDyLogInfo(rdy, "-------\n\n");
   if (rdy->restart_frequency > 0) {
-    RDyLog(rdy, "Restart file format: %s\n", rdy->restart_format);
-    RDyLog(rdy, "Restart frequency: %d\n\n", rdy->restart_frequency);
+    RDyLogInfo(rdy, "Restart file format: %s\n", rdy->restart_format);
+    RDyLogInfo(rdy, "Restart frequency: %d\n\n", rdy->restart_frequency);
   } else {
-    RDyLog(rdy, "(disabled)\n\n");
+    RDyLogInfo(rdy, "(disabled)\n\n");
   }
   PetscFunctionReturn(0);
 }
 
 static PetscErrorCode PrintLogging(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, "-------\n");
-  RDyLog(rdy, "Logging\n");
-  RDyLog(rdy, "-------\n\n");
+  RDyLogInfo(rdy, "-------\n");
+  RDyLogInfo(rdy, "Logging\n");
+  RDyLogInfo(rdy, "-------\n\n");
   if (strlen(rdy->log_file)) {
-    RDyLog(rdy, "Primary log file: %s\n\n", rdy->log_file);
+    RDyLogInfo(rdy, "Primary log file: %s\n\n", rdy->log_file);
   } else {
-    RDyLog(rdy, "Primary log file: <stdout>\n\n");
+    RDyLogInfo(rdy, "Primary log file: <stdout>\n\n");
   }
   PetscFunctionReturn(0);
 }
@@ -112,9 +112,9 @@ static PetscErrorCode PrintLogging(RDy rdy) {
 PetscErrorCode RDyPrintf(RDy rdy) {
   PetscFunctionBegin;
 
-  RDyLog(rdy, "==========================================================\n");
-  RDyLog(rdy, "RDycore (input read from %s)\n", rdy->config_file);
-  RDyLog(rdy, "==========================================================\n\n");
+  RDyLogInfo(rdy, "==========================================================\n");
+  RDyLogInfo(rdy, "RDycore (input read from %s)\n", rdy->config_file);
+  RDyLogInfo(rdy, "==========================================================\n\n");
 
   PetscCall(PrintPhysics(rdy));
   PetscCall(PrintNumerics(rdy));

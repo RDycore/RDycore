@@ -4,6 +4,25 @@ cmake_minimum_required (VERSION 3.12.0)
 option(ENABLE_DRIVER "Enable stand-alone RDycore driver program" ON)
 option(ENABLE_TESTS  "Enable unit (and possibly driver) tests" ON)
 
+# Other build parameters
+message(STATUS "Setting build parameters:")
+function(check_or_set_param name value default)
+  if (${value})
+    if (${value} LESS_EQUAL 0)
+      message(FATAL_ERROR "Invalid ${name}: ${value}")
+    endif()
+  else()
+    set(${name} ${default} PARENT_SCOPE)
+  endif()
+  message(STATUS "  ${name}: ${value}")
+endfunction()
+check_or_set_param("MAX_NUM_REGIONS"    ${MAX_NUM_REGIONS}    32)
+check_or_set_param("MAX_NUM_SURFACES"   ${MAX_NUM_SURFACES}   32)
+check_or_set_param("MAX_NUM_CONDITIONS" ${MAX_NUM_CONDITIONS} 32)
+set(MAX_NUM_REGIONS    ${MAX_NUM_REGIONS}    CACHE STRING "Maximum allowable number of regions")
+set(MAX_NUM_SURFACES   ${MAX_NUM_SURFACES}   CACHE STRING "Maximum allowable number of surfaces")
+set(MAX_NUM_CONDITIONS ${MAX_NUM_CONDITIONS} CACHE STRING "Maximum allowable number of conditions")
+
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -55,10 +74,15 @@ include_directories(${PETSC_INCLUDES})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
-# Generate rdycore.h from include/rdycore.h.in.
+# Generate headers from build parameters.
 configure_file(
   ${PROJECT_SOURCE_DIR}/include/rdycore.h.in
   ${PROJECT_BINARY_DIR}/include/rdycore.h
+  @ONLY
+)
+configure_file(
+  ${PROJECT_SOURCE_DIR}/include/private/rdyconfig.h.in
+  ${PROJECT_BINARY_DIR}/include/private/rdyconfig.h
   @ONLY
 )
 
