@@ -3,7 +3,6 @@
 
 foreach(exe_name
         test_rdyinit
-        test_rdyinitnoarguments
         test_rdymesh)
   set(exe_source ${exe_name}.c)
   add_executable(${exe_name} ${exe_source})

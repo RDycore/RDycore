@@ -18,7 +18,7 @@ module rdycore
   end type RDy
 
   interface
-    integer(c_int) function rdyinitnoarguments_() bind(c, name="RDyInitNoArguments")
+    integer(c_int) function rdyinitfortran_() bind(c, name="RDyInitFortran")
       use iso_c_binding, only: c_int
     end function
 
@@ -32,9 +32,9 @@ module rdycore
 
     integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name="RDyCreateF90")
       use iso_c_binding, only: c_int, c_ptr
-      integer(c_int), value, intent(in)  :: comm
-      type(c_ptr),    value, intent(in)  :: filename
-      type(c_ptr),           intent(out) :: rdy
+      integer,            intent(in)  :: comm
+      type(c_ptr), value, intent(in)  :: filename
+      type(c_ptr),        intent(out) :: rdy
     end function
 
     integer(c_int) function rdysetup_(rdy) bind(c, name="RDySetup")
@@ -59,7 +59,7 @@ contains
   subroutine RDyInit(ierr)
     implicit none
     integer, intent(out) :: ierr
-    ierr = rdyinitnoarguments_()
+    ierr = rdyinitfortran_()
   end subroutine
 
   subroutine RDyFinalize(ierr)
@@ -84,6 +84,7 @@ contains
     allocate(rdy_%config_file)
     rdy_%config_file(1:n) = filename(1:n)
     rdy_%config_file(n+1:n+1) = c_null_char
+    call MPI_Init(ierr)
     ierr = rdycreate_(comm, c_loc(rdy_%config_file), rdy_%c_rdy)
   end subroutine
 

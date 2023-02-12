@@ -15,12 +15,13 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   PetscFunctionReturn(0);
 }
 
-/// Initializes the RDycore library without arguments. It's used by the Fortran
-/// interface, which calls PetscInitialize itself and then this function.
-PetscErrorCode RDyInitNoArguments(void) {
+/// Initializes the RDycore library for use with Fortran. It's used by the
+/// Fortran interface.
+PetscErrorCode RDyInitFortran(void) {
   PetscFunctionBegin;
   if (!initialized_) {
     PetscCall(PetscInitializeNoArguments());
+    PetscCall(PetscInitializeFortran());
     initialized_ = PETSC_TRUE;
   }
   PetscFunctionReturn(0);
@@ -92,11 +93,13 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
 }
 
 // fortran 90 version of RDyCreate
-PetscErrorCode RDyCreateF90(MPI_Fint f90_comm, const char *config_file, RDy *rdy) {
+PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm,
+                            const char *config_file,
+                            RDy *rdy) {
   PetscFunctionBegin;
 
-  MPI_Comm c_comm = MPI_Comm_f2c(f90_comm);
-  PetscCall(RDyCreate(c_comm, config_file, rdy));
+  MPI_Comm f_comm = MPI_Comm_f2c(*f90_comm);
+  PetscCall(RDyCreate(MPI_Comm_f2c(*f90_comm), config_file, rdy));
 
   PetscFunctionReturn(0);
 }
