@@ -20,7 +20,7 @@ program rdycore_f90
   type(RDy)           :: rdy_
   PetscErrorCode      :: ierr
 
-  if (command_argument_count() /= 1) then
+  if (command_argument_count() <ٍ 1) then
     call usage()
   else
     ! fetch config file name
