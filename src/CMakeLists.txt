@@ -1,8 +1,8 @@
 # Main library -- we list all source files here (incl. those in subdirectories)
 add_library(rdycore
-  parse_config_file.c
+  read_config_file.c
   rdycore.c
-  rdyprintf.c
+  print_config.c
   rdymesh.c
   rdyrun.c
   rdysetup.c

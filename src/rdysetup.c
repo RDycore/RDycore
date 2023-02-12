@@ -2,7 +2,8 @@
 #include <private/rdycoreimpl.h>
 #include <rdycore.h>
 
-extern PetscErrorCode ParseConfigFile(FILE *file, RDy rdy);
+extern PetscErrorCode ReadConfigFile(RDy rdy);
+extern PetscErrorCode PrintConfig(RDy rdy);
 
 // sets default parameters
 static PetscErrorCode SetDefaults(RDy rdy) {
@@ -76,14 +77,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(SetDefaults(rdy));
-
-  // open the config file on all processes
-  FILE *file = fopen(rdy->config_file, "r");
-  PetscCheck(file, rdy->comm, PETSC_ERR_USER,
-    "Configuration file not found: %s", rdy->config_file);
-
-  PetscCall(ParseConfigFile(file, rdy));
-  fclose(file);
+  PetscCall(ReadConfigFile(rdy));
 
   // open the primary log file
   if (strlen(rdy->log_file)) {
@@ -99,7 +93,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CheckConditionsAndSources(rdy));
 
   // print configuration info
-  PetscCall(RDyPrintf(rdy));
+  PetscCall(PrintConfig(rdy));
 
   // set up bookkeeping data structures
   PetscCall(InitSimulationData(rdy));

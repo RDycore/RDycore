@@ -1152,12 +1152,12 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
+static PetscErrorCode ParseYaml(const char *yaml_str, WhichPass pass, RDy rdy) {
   PetscFunctionBegin;
 
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);
-  yaml_parser_set_input_file(&parser, file);
+  yaml_parser_set_input_string(&parser, yaml_str, strlen(yaml_str));
 
   // parse the file, handling each YAML "event" based on the parser state
   YamlParserState state = {0};
@@ -1189,11 +1189,42 @@ static PetscErrorCode ParseYaml(FILE *file, WhichPass pass, RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode ParseConfigFile(FILE *file, RDy rdy) {
+// reads the config file on process 0, broadcasts it as a string to all other
+// processes, and parses the string.
+PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscFunctionBegin;
 
+  // open the config file on process 0, determine its size, and broadcast its
+  // contents to all other processes.
+  long config_size;
+  char *config_str;
+  if (rdy->rank == 0) {
+    // process 0: read the file
+    FILE *file = NULL;
+    PetscCall(PetscFOpen(rdy->comm, rdy->config_file, "r", &file));
+
+    // determine the file's size and broadcast it
+    fseek(file, 0, SEEK_END);
+    config_size = ftell(file);
+    MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
+
+    // create a content string and broadcast it
+    PetscCall(RDyAlloc(char, config_size, &config_str));
+    rewind(file);
+    fread(config_str, sizeof(char), config_size, file);
+    PetscCall(PetscFClose(rdy->comm, file));
+    MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
+  } else {
+    // other processes: read the size of the content
+    MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
+
+    // recreate the configuration string.
+    PetscCall(RDyAlloc(char, config_size, &config_str));
+    MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
+  }
+
   // do the first pass
-  PetscCall(ParseYaml(file, FIRST_PASS, rdy));
+  PetscCall(ParseYaml(config_str, FIRST_PASS, rdy));
 
   // create the grid from our specification
   if (strlen(rdy->mesh_file)) { // we are given a file
@@ -1206,9 +1237,11 @@ PetscErrorCode ParseConfigFile(FILE *file, RDy rdy) {
   // set up mesh regions and surfaces, reading them from our DMPlex object
   PetscCall(InitRegionsAndSurfaces(rdy));
 
-  // now do the second pass and close the file
-  rewind(file);
-  ParseYaml(file, SECOND_PASS, rdy);
+  // now do the second pass.
+  ParseYaml(config_str, SECOND_PASS, rdy);
+
+  // Clean up.
+  RDyFree(config_str);
 
   PetscFunctionReturn(0);
 }
