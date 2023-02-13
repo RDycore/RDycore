@@ -13,7 +13,6 @@ add_executable(rdycore_f90_exe
 set_target_properties(rdycore_f90_exe PROPERTIES OUTPUT_NAME rdycore_f90)
 target_include_directories(rdycore_f90_exe PRIVATE ${PROJECT_BINARY_DIR}/src/f90-mod)
 target_link_libraries(rdycore_f90_exe PRIVATE ${RDYCORE_LIBRARIES})
-target_code_coverage(rdycore_f90_exe AUTO ALL)
 install(
   TARGETS rdycore_exe rdycore_f90_exe
   DESTINATION bin
