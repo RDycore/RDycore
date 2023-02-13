@@ -33,27 +33,25 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
   for (PetscInt s = 0; s <= MAX_SURFACE_ID; ++s) {
     if (!rdy->flow_conditions[s].name) {
       reflecting_flow = &rdy->flow_conditions[s];
-      RDyAlloc(char, strlen("reflecting")+1, &reflecting_flow->name);
+      RDyAlloc(char, strlen("reflecting") + 1, &reflecting_flow->name);
       strcpy((char*)reflecting_flow->name, "reflecting");
       reflecting_flow->type = CONDITION_REFLECTING;
       break;
     }
   }
-  PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER,
-    "Could not allocate a reflecting flow condition! Please increase MAX_SURFACE_ID.");
+  PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER, "Could not allocate a reflecting flow condition! Please increase MAX_SURFACE_ID.");
 
   if (!strlen(rdy->initial_conditions_file)) {
     // Does every region have a set of initial conditions?
     for (PetscInt r = 1; r <= rdy->num_regions; ++r) {
-      PetscCheck(rdy->initial_conditions[r].flow, rdy->comm, PETSC_ERR_USER,
-          "Region %d has no initial flow condition!", rdy->region_ids[r]);
+      PetscCheck(rdy->initial_conditions[r].flow, rdy->comm, PETSC_ERR_USER, "Region %d has no initial flow condition!", rdy->region_ids[r]);
       if (rdy->sediment) {
-        PetscCheck(rdy->initial_conditions[r].sediment, rdy->comm, PETSC_ERR_USER,
-            "Region %d has no initial sediment condition!", rdy->region_ids[r]);
+        PetscCheck(rdy->initial_conditions[r].sediment, rdy->comm, PETSC_ERR_USER, "Region %d has no initial sediment condition!",
+                   rdy->region_ids[r]);
       }
       if (rdy->salinity) {
-        PetscCheck(rdy->initial_conditions[r].salinity, rdy->comm, PETSC_ERR_USER,
-            "Region %d has no initial salinity condition!", rdy->region_ids[r]);
+        PetscCheck(rdy->initial_conditions[r].salinity, rdy->comm, PETSC_ERR_USER, "Region %d has no initial salinity condition!",
+                   rdy->region_ids[r]);
       }
     }
   }
@@ -66,15 +64,14 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
       RDyLogDebug(rdy, "Setting reflecting flow condition for surface %d\n", s);
       rdy->boundary_conditions[s].flow = reflecting_flow;
     }
-    PetscCheck(rdy->boundary_conditions[s].flow, rdy->comm, PETSC_ERR_USER,
-      "Surface %d has no flow boundary condition!", rdy->surface_ids[s]);
+    PetscCheck(rdy->boundary_conditions[s].flow, rdy->comm, PETSC_ERR_USER, "Surface %d has no flow boundary condition!", rdy->surface_ids[s]);
     if (rdy->sediment) {
-      PetscCheck(rdy->boundary_conditions[s].sediment, rdy->comm, PETSC_ERR_USER,
-        "Surface %d has no sediment boundary condition!", rdy->surface_ids[s]);
+      PetscCheck(rdy->boundary_conditions[s].sediment, rdy->comm, PETSC_ERR_USER, "Surface %d has no sediment boundary condition!",
+                 rdy->surface_ids[s]);
     }
     if (rdy->salinity) {
-      PetscCheck(rdy->boundary_conditions[s].salinity, rdy->comm, PETSC_ERR_USER,
-        "Surface %d has no salinity boundary condition!", rdy->surface_ids[s]);
+      PetscCheck(rdy->boundary_conditions[s].salinity, rdy->comm, PETSC_ERR_USER, "Surface %d has no salinity boundary condition!",
+                 rdy->surface_ids[s]);
     }
   }
 

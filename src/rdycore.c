@@ -93,9 +93,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
 }
 
 // fortran 90 version of RDyCreate
-PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm,
-                            const char *config_file,
-                            RDy *rdy) {
+PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rdy) {
   PetscFunctionBegin;
 
   MPI_Comm f_comm = MPI_Comm_f2c(*f90_comm);
@@ -145,4 +143,3 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   *rdy = NULL;
   PetscFunctionReturn(0);
 }
-

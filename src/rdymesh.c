@@ -1,6 +1,6 @@
 #include <petscdmplex.h>
-#include <private/rdymeshimpl.h>
 #include <private/rdymemoryimpl.h>
+#include <private/rdymeshimpl.h>
 
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }

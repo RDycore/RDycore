@@ -1,16 +1,10 @@
 #include <private/rdycoreimpl.h>
 #include <rdycore.h>
 
-static const char* FlagString(PetscBool flag) {
-  return flag ? "enabled" : "disabled";
-}
+static const char* FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
 
 static const char* BedFrictionString(RDyBedFriction model) {
-  static const char *strings[3] = {
-    "disabled",
-    "Chezy",
-    "Manning"
-  };
+  static const char* strings[3] = {"disabled", "Chezy", "Manning"};
   return strings[model];
 }
 
@@ -26,27 +20,17 @@ static PetscErrorCode PrintPhysics(RDy rdy, RDyLogLevel level) {
 }
 
 static const char* SpatialString(RDySpatial method) {
-  static const char *strings[2] = {
-    "finite volume (FV)",
-    "finite element (FE)"
-  };
+  static const char* strings[2] = {"finite volume (FV)", "finite element (FE)"};
   return strings[method];
 }
 
 static const char* TemporalString(RDyTemporal method) {
-  static const char *strings[3] = {
-    "forward euler",
-    "4th-order Runge-Kutta",
-    "backward euler"
-  };
+  static const char* strings[3] = {"forward euler", "4th-order Runge-Kutta", "backward euler"};
   return strings[method];
 }
 
 static const char* RiemannString(RDyRiemann solver) {
-  static const char *strings[2] = {
-    "roe",
-    "hllc"
-  };
+  static const char* strings[2] = {"roe", "hllc"};
   return strings[solver];
 }
 
@@ -62,13 +46,7 @@ static PetscErrorCode PrintNumerics(RDy rdy, RDyLogLevel level) {
 }
 
 static const char* TimeUnitString(RDyTimeUnit unit) {
-  static const char *strings[5] = {
-    "minutes",
-    "hours",
-    "days",
-    "months",
-    "years"
-  };
+  static const char* strings[5] = {"minutes", "hours", "days", "months", "years"};
   return strings[unit];
 }
 
@@ -124,4 +102,3 @@ PetscErrorCode PrintConfig(RDy rdy, RDyLogLevel level) {
 
   PetscFunctionReturn(0);
 }
-
