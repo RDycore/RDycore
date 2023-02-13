@@ -101,18 +101,6 @@ set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
 if (ENABLE_TESTS)
   include(CTest)
   enable_testing()
-
-  # If we enable tests, we'll need gmsh to generate mesh data.
-  find_program(GMSH_EXE gmsh
-               DOC "Gmsh mesh generator")
-  if (GMSH_EXE MATCHES "NOTFOUND")
-    message(FATAL_ERROR "\
-Gmsh is required for driver tests but was not found! Please install it using \
-your favorite package manager or visit https://gmsh.info for more \
-information.")
-  else()
-    message(STATUS "Found Gmsh: ${GMSH_EXE}")
-  endif()
 endif()
 
 # Add code coverage support (enabled using -DENABLE_COVERAGE).
@@ -122,6 +110,9 @@ add_code_coverage_all_targets()
 
 # Build any additional external libraries.
 add_subdirectory(external)
+
+# Include miscellaneous data and utilities.
+add_subdirectory(share)
 
 # Create targets for RDycore library and unit tests.
 add_subdirectory(src)

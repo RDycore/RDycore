@@ -1,5 +1,4 @@
 # Here we define tests for the rdycore driver.
-include(generate_msh)
 
 # location of built driver executables
 set(rdycore_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore)
