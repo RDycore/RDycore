@@ -44,7 +44,7 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
 
   if (!strlen(rdy->initial_conditions_file)) {
     // Does every region have a set of initial conditions?
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    for (PetscInt r = 1; r <= rdy->num_regions; ++r) {
       PetscCheck(rdy->initial_conditions[r].flow, rdy->comm, PETSC_ERR_USER,
           "Region %d has no initial flow condition!", rdy->region_ids[r]);
       if (rdy->sediment) {
@@ -59,7 +59,7 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
   }
 
   // Does every surface have a set of boundary conditions?
-  for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
+  for (PetscInt s = 1; s <= rdy->num_surfaces; ++s) {
     // If no flow condition was specified for a boundary, we set it to our
     // reflecting flow condition.
     if (!rdy->boundary_conditions[s].flow) {

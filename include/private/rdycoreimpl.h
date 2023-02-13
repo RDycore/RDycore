@@ -69,7 +69,8 @@ typedef enum {
 typedef struct {
   const char       *name;
   RDyConditionType  type;
-  PetscReal         water_flux;
+  PetscReal         height;
+  PetscReal         momentum[2];
 } RDyFlowCondition;
 
 // This type defines a sediment-related condition.

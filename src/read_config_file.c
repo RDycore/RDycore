@@ -273,7 +273,6 @@ static PetscErrorCode ParseTopLevel(yaml_event_t    *event,
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
         "Unrecognized section in YAML config file: %s", value);
   }
-printf("Parsing section %s\n", value);
 
   PetscFunctionReturn(0);
 }
@@ -854,40 +853,68 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t    *event,
                                           RDy              rdy) {
   PetscFunctionBegin;
 
-  const char *value = (const char*)(event->data.scalar.value);
+  if (event->type == YAML_SCALAR_EVENT) {
+    const char *value = (const char*)(event->data.scalar.value);
 
-  // if we're not in a subsection, our parameter is the name of the subsection
-  if (!strlen(state->subsection)) {
-    strncpy(state->subsection, value, YAML_MAX_LEN);
-  } else {
-    // we should be inside a subsection
-    PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER,
-      "Invalid YAML in flow_conditions.%s", state->subsection);
-
-    RDyFlowCondition* flow_cond = &rdy->flow_conditions[rdy->num_flow_conditions];
-    if (!strlen(flow_cond->name)) { // condition name not set
-      RDyAlloc(char, strlen(state->subsection), &flow_cond->name);
-      strcpy((char*)flow_cond->name, state->subsection);
-    } else if (!strlen(state->parameter)) { // parameter name not set
-      PetscInt selection;
-      SelectItem(value, 2, (const char*[2]){"type", "water_flux"},
-        (PetscInt[2]){0, 1}, &selection);
-      PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
-        "Invalid parameter in flow condition %s: %s", flow_cond->name, value);
-      strncpy(state->parameter, value, YAML_MAX_LEN);
+    // if we're not in a subsection, our parameter is the name of the subsection
+    if (!strlen(state->subsection)) {
+      strncpy(state->subsection, value, YAML_MAX_LEN);
     } else {
-      if (!strcmp(state->parameter, "type")) {
-        PetscInt selection;
-        SelectItem(value, 2, (const char*[2]){"dirichlet", "neumann"},
-          (PetscInt[2]){CONDITION_DIRICHLET, CONDITION_NEUMANN}, &selection);
-        PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
-          "Invalid flow condition %s.type: %s", flow_cond->name, value);
-        flow_cond->type = selection;
-      } else { // water_flux
-        PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
-          &flow_cond->water_flux));
+      // we should be inside a subsection
+      PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER,
+        "Invalid YAML in flow_conditions.%s", state->subsection);
+
+      RDyFlowCondition* flow_cond = &rdy->flow_conditions[rdy->num_flow_conditions];
+      if (!flow_cond->name) { // condition name not set
+        RDyAlloc(char, strlen(state->subsection)+1, &flow_cond->name);
+        strcpy((char*)flow_cond->name, state->subsection);
       }
-      state->parameter[0] = 0; // clear parameter name
+      if (!strlen(state->parameter)) { // parameter name not set
+        PetscInt selection;
+        SelectItem(value, 3, (const char*[3]){"type", "height", "momentum"},
+          (PetscInt[3]){0, 1}, &selection);
+        PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+          "Invalid parameter in flow condition '%s': %s", flow_cond->name, value);
+        strncpy(state->parameter, value, YAML_MAX_LEN);
+      } else {
+        if (!strcmp(state->parameter, "type")) {
+          PetscInt selection;
+          SelectItem(value, 2, (const char*[2]){"dirichlet", "neumann"},
+            (PetscInt[2]){CONDITION_DIRICHLET, CONDITION_NEUMANN}, &selection);
+          PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
+            "Invalid flow condition %s.type: %s", flow_cond->name, value);
+          flow_cond->type = selection;
+          state->parameter[0] = 0; // clear parameter name
+        } else if (!strcmp(state->parameter, "height")) {
+          PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+            &flow_cond->height));
+          state->parameter[0] = 0; // clear parameter name
+        } else { // momentum
+          if (flow_cond->momentum[0] == -FLT_MAX) { // px not set
+            PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+              &flow_cond->momentum[0]));
+          } else if (flow_cond->momentum[1] == -FLT_MAX) { // py not yet
+            PetscCall(ConvertToReal(rdy->comm, state->parameter, value,
+              &flow_cond->momentum[1]));
+            state->parameter[0] = 0; // clear parameter name
+          } else { // too many momentum components!
+            PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
+              "Too many components in flow_conditions.%s!", state->parameter);
+          }
+        }
+      }
+    }
+  } else {
+    RDyFlowCondition* flow_cond = &rdy->flow_conditions[rdy->num_flow_conditions];
+    if (event->type == YAML_SEQUENCE_START_EVENT) {
+      PetscCheck(!strcmp(state->parameter, "momentum"), rdy->comm, PETSC_ERR_USER,
+        "Invalid sequence encountered in flow_conditions.%s", state->parameter);
+      // Set momentum components to magic numbers.
+      flow_cond->momentum[0] = flow_cond->momentum[1] = -FLT_MAX;
+    } else if (event->type == YAML_SEQUENCE_END_EVENT) {
+      PetscCheck((flow_cond->momentum[0] != -FLT_MAX) &&
+                 (flow_cond->momentum[1] != -FLT_MAX), rdy->comm, PETSC_ERR_USER,
+        "Incomplete momentum specification for flow_conditions.%s", state->parameter);
     }
   }
 
@@ -910,15 +937,16 @@ static PetscErrorCode ParseSedimentConditions(yaml_event_t    *event,
       "Invalid YAML in sediment_conditions.%s", state->subsection);
 
     RDySedimentCondition* sed_cond = &rdy->sediment_conditions[rdy->num_sediment_conditions];
-    if (!strlen(sed_cond->name)) { // condition name not set
-      RDyAlloc(char, strlen(state->subsection), &sed_cond->name);
+    if (!sed_cond->name) { // condition name not set
+      RDyAlloc(char, strlen(state->subsection)+1, &sed_cond->name);
       strcpy((char*)sed_cond->name, state->subsection);
-    } else if (!strlen(state->parameter)) { // parameter name not set
+    }
+    if (!strlen(state->parameter)) { // parameter name not set
       PetscInt selection;
       SelectItem(value, 2, (const char*[2]){"type", "concentration"},
         (PetscInt[2]){0, 1}, &selection);
       PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
-        "Invalid parameter in sediment condition %s: %s", sed_cond->name, value);
+        "Invalid parameter in sediment condition '%s': %s", sed_cond->name, value);
       strncpy(state->parameter, value, YAML_MAX_LEN);
     } else {
       if (!strcmp(state->parameter, "type")) {
@@ -955,15 +983,16 @@ static PetscErrorCode ParseSalinityConditions(yaml_event_t    *event,
       "Invalid YAML in salinity_conditions.%s", state->subsection);
 
     RDySalinityCondition* sal_cond = &rdy->salinity_conditions[rdy->num_salinity_conditions];
-    if (!strlen(sal_cond->name)) { // condition name not set
-      RDyAlloc(char, strlen(state->subsection), &sal_cond->name);
+    if (!sal_cond->name) { // condition name not set
+      RDyAlloc(char, strlen(state->subsection)+1, &sal_cond->name);
       strcpy((char*)sal_cond->name, state->subsection);
-    } else if (!strlen(state->parameter)) { // parameter name not set
+    }
+    if (!strlen(state->parameter)) { // parameter name not set
       PetscInt selection;
       SelectItem(value, 2, (const char*[2]){"type", "concentration"},
         (PetscInt[2]){0, 1}, &selection);
       PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
-        "Invalid parameter in salinity condition %s: %s", sal_cond->name, value);
+        "Invalid parameter in salinity condition '%s': %s", sal_cond->name, value);
       strncpy(state->parameter, value, YAML_MAX_LEN);
     } else {
       if (!strcmp(state->parameter, "type")) {
