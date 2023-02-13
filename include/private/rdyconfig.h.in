@@ -3,15 +3,15 @@
 
 // This file contains various build parameters set at configuration time.
 
-// the maximum number of regions that can be defined on a domain
-#define MAX_NUM_REGIONS @MAX_NUM_REGIONS@
+// the maximum region ID that can be defined on a domain
+#define MAX_REGION_ID @MAX_REGION_ID@
 
-// the maximum number of surfaces that can be defined on a domain
-#define MAX_NUM_SURFACES @MAX_NUM_SURFACES@
+// the maximum surface ID that can be defined on a domain
+#define MAX_SURFACE_ID @MAX_SURFACE_ID@
 
-// the maximum number of flow/sediment/salinity conditions that can be defined
-// for a simulation
-#define MAX_NUM_CONDITIONS @MAX_NUM_CONDITIONS@
+// the maximum flow/sediment/salinity condition ID that can be defined for a
+// simulation
+#define MAX_CONDITION_ID @MAX_CONDITION_ID@
 
 #endif
 

@@ -132,15 +132,17 @@ Recombine Surface {5};
 Recombine Surface {6};
 Recombine Surface {7};
 
-// Define physical regions in terms of Gmsh Surfaces.
+// Define physical regions in terms of Gmsh Surfaces. The name is for humans,
+// while the integer ID is for RDycore.
 
 // The "upstream" region consists of grids 1, 3, and 6.
-Physical Surface("upstream") = {1, 3, 6};
+Physical Surface("upstream", 1) = {1, 3, 6};
 // The "downstream" region contains all other grids.
-Physical Surface("downstream") = {2, 4, 5, 7};
+Physical Surface("downstream", 2) = {2, 4, 5, 7};
 
 // Define physical surfaces for the domain boundary and dam walls in terms of
-// Gmsh Curves.
-Physical Curve("boundary") = {1, 5, 6, 7, 8, 9, 13, 14, 15, 16};
-Physical Curve("top_wall") = {2, 3, 4};
-Physical Curve("bottom_wall") = {2, 3, 4};
+// Gmsh Curves. Again, the descriptive names are for us, which RDycore uses the
+// integer IDs.
+Physical Curve("boundary", 1) = {1, 5, 6, 7, 8, 9, 13, 14, 15, 16};
+Physical Curve("top_wall", 2) = {2, 3, 4};
+Physical Curve("bottom_wall", 3) = {2, 3, 4};

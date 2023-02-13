@@ -1,5 +1,6 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
 extern PetscErrorCode ReadConfigFile(RDy rdy);
@@ -27,6 +28,20 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
 static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
 
+  // Set up a reflecting flow boundary condition.
+  RDyFlowCondition* reflecting_flow = NULL;
+  for (PetscInt s = 0; s <= MAX_SURFACE_ID; ++s) {
+    if (!rdy->flow_conditions[s].name) {
+      reflecting_flow = &rdy->flow_conditions[s];
+      RDyAlloc(char, strlen("reflecting")+1, &reflecting_flow->name);
+      strcpy((char*)reflecting_flow->name, "reflecting");
+      reflecting_flow->type = CONDITION_REFLECTING;
+      break;
+    }
+  }
+  PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER,
+    "Could not allocate a reflecting flow condition! Please increase MAX_SURFACE_ID.");
+
   if (!strlen(rdy->initial_conditions_file)) {
     // Does every region have a set of initial conditions?
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -45,6 +60,12 @@ static PetscErrorCode CheckConditionsAndSources(RDy rdy) {
 
   // Does every surface have a set of boundary conditions?
   for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
+    // If no flow condition was specified for a boundary, we set it to our
+    // reflecting flow condition.
+    if (!rdy->boundary_conditions[s].flow) {
+      RDyLogDebug(rdy, "Setting reflecting flow condition for surface %d\n", s);
+      rdy->boundary_conditions[s].flow = reflecting_flow;
+    }
     PetscCheck(rdy->boundary_conditions[s].flow, rdy->comm, PETSC_ERR_USER,
       "Surface %d has no flow boundary condition!", rdy->surface_ids[s]);
     if (rdy->sediment) {

@@ -197,37 +197,39 @@ static PetscErrorCode CloseSection(YamlParserState *state,
                                    RDy              rdy) {
   PetscFunctionBegin;
   if (state->inside_subsection) { // exiting a subsection?
+    // handle some special cases in conditions sections first
     if (state->section == FLOW_CONDITIONS_SECTION) {
       rdy->num_flow_conditions++;
-      PetscCheck(rdy->num_flow_conditions <= MAX_NUM_CONDITIONS, rdy->comm,
-        PETSC_ERR_USER, "Maximum number of flow conditions (%d) exceeded (increase MAX_NUM_CONDITIONS)",
-        MAX_NUM_CONDITIONS);
+      PetscCheck(rdy->num_flow_conditions <= MAX_CONDITION_ID, rdy->comm,
+        PETSC_ERR_USER, "Maximum flow condition ID (%d) exceeded (increase MAX_CONDITION_ID)",
+        MAX_CONDITION_ID);
     } else if (state->section == SEDIMENT_CONDITIONS_SECTION) {
       rdy->num_sediment_conditions++;
-      PetscCheck(rdy->num_sediment_conditions <= MAX_NUM_CONDITIONS,
+      PetscCheck(rdy->num_sediment_conditions <= MAX_CONDITION_ID,
         rdy->comm, PETSC_ERR_USER,
-        "Maximum number of sediment conditions (%d) exceeded (increase (MAX_NUM_CONDITIONS)",
-        MAX_NUM_CONDITIONS);
+        "Maximum number of sediment condition ID (%d) exceeded (increase (MAX_CONDITION_ID)",
+        MAX_CONDITION_ID);
     } else if (state->section == SALINITY_CONDITIONS_SECTION) {
       rdy->num_salinity_conditions++;
-      PetscCheck(rdy->num_salinity_conditions <= MAX_NUM_CONDITIONS,
+      PetscCheck(rdy->num_salinity_conditions <= MAX_CONDITION_ID,
         rdy->comm, PETSC_ERR_USER,
-        "Maximum number of salinity conditions (%d) exceeded (increase MAX_NUM_CONDITIONS)",
-        MAX_NUM_CONDITIONS);
+        "Maximum number of salinity condition ID (%d) exceeded (increase MAX_CONDITION_ID)",
+        MAX_CONDITION_ID);
+    } else { // we just need to pop out of this subsection
+      switch (state->section) { // move up one section
+        case PHYSICS_SEDIMENT_SECTION:
+        case PHYSICS_SALINITY_SECTION:
+        case PHYSICS_FLOW_SECTION:
+          state->section = PHYSICS_SECTION;
+          break;
+        default:
+      }
     }
     state->inside_subsection = PETSC_FALSE;
     state->subsection[0] = 0;
   } else if (state->inside_section) { // exiting a section?
     state->inside_section = PETSC_FALSE;
-    switch (state->section) { // move up one section
-      case PHYSICS_SEDIMENT_SECTION:
-      case PHYSICS_SALINITY_SECTION:
-      case PHYSICS_FLOW_SECTION:
-        state->section = PHYSICS_SECTION;
-        break;
-      default:
-        state->section = NO_SECTION;
-    }
+    state->section = NO_SECTION;
   }
   PetscFunctionReturn(0);
 }
@@ -271,6 +273,7 @@ static PetscErrorCode ParseTopLevel(yaml_event_t    *event,
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER,
         "Unrecognized section in YAML config file: %s", value);
   }
+printf("Parsing section %s\n", value);
 
   PetscFunctionReturn(0);
 }
@@ -311,10 +314,11 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t    *event,
     "Invalid YAML (non-scalar value encountered in physics.flow section!");
   const char *value = (const char*)(event->data.scalar.value);
 
-  // check whether we are to descend into a subsection
+  // check whether we should descend into a subsection
   if (!strlen(state->subsection)) {
-    if (!strlen(state->parameter) && !strcmp(value, "mode")) {
-      // nope -- we are setting the flow mode
+    if (!strlen(state->parameter)) {
+      PetscCheck(!strcmp(value,"mode"), rdy->comm, PETSC_ERR_USER,
+        "Invalid physics parameter: %s", value);
       strcpy(state->parameter, "mode");
     } else if (!strcmp(state->parameter, "mode")) {
       PetscInt selection;
@@ -323,6 +327,7 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t    *event,
       PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER,
         "Invalid physics.flow.mode: %s", value);
       rdy->flow_mode = selection;
+      state->parameter[0] = 0; // clear parameter name
     } else {
       // okay, we are moving on to a subsection
       strncpy(state->subsection, value, YAML_MAX_LEN);
@@ -594,6 +599,7 @@ static PetscErrorCode ParseLogging(yaml_event_t    *event,
         "Invalid parameter in logging.level: %s", value);
       rdy->log_level = selection;
     }
+    state->parameter[0] = 0; // clear parameter name
   }
   PetscFunctionReturn(0);
 }
@@ -635,10 +641,13 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t    *event,
   // if we're not in a subsection, our parameter could be a single filename or
   // the name of a subsection
   if (!strlen(state->subsection)) {
-    if (!strlen(state->parameter) && !strcmp(value, "file")) {
-      strcpy(state->parameter, "file");
+    if (strlen(state->parameter)) {
+      PetscCheck(!strcmp(value, "file"), rdy->comm, PETSC_ERR_USER,
+        "Invalid initial_conditions parameter: %s", state->parameter);
+      strcpy(state->parameter, value);
     } else if (!strcmp(state->parameter, "file")) {
       strncpy(rdy->initial_conditions_file, value, YAML_MAX_LEN);
+      state->parameter[0] = 0; // clear parameter name
     } else {
       // if we get here, we should NOT have an initial conditions file set.
       PetscCheck(!strlen(rdy->initial_conditions_file), rdy->comm, PETSC_ERR_USER,
@@ -1038,6 +1047,12 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass,
         case GRID_SECTION:
           PetscCall(ParseGrid(event, state, rdy));
           break;
+        case INITIAL_CONDITIONS_SECTION:
+          PetscCall(ParseInitialConditions(event, state, rdy));
+          break;
+        case BOUNDARY_CONDITIONS_SECTION:
+          PetscCall(ParseBoundaryConditions(event, state, rdy));
+          break;
         case FLOW_CONDITIONS_SECTION:
           PetscCall(ParseFlowConditions(event, state, rdy));
           break;
@@ -1099,7 +1114,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   // Get regions.
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
-  for (PetscInt region_id = 0; region_id < MAX_NUM_REGIONS; ++region_id) {
+  for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
     RDyRegion *region = &rdy->regions[region_id];
     IS cell_is; // cell index space
     PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
@@ -1122,7 +1137,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
 
   // Get surfaces.
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
-  for (PetscInt surface_id = 0; surface_id < MAX_NUM_SURFACES; ++surface_id) {
+  for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
     RDySurface *surface = &rdy->surfaces[surface_id];
     IS edge_is; // edge index space
     PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));

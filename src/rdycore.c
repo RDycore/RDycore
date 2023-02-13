@@ -122,11 +122,15 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   }
 
   // Destroy regions and surfaces.
-  for (PetscInt i = 0; i < MAX_NUM_REGIONS; ++i) {
-    RDyFree((*rdy)->regions[i].cell_ids);
+  for (PetscInt i = 0; i <= MAX_REGION_ID; ++i) {
+    if ((*rdy)->regions[i].cell_ids) {
+      RDyFree((*rdy)->regions[i].cell_ids);
+    }
   }
-  for (PetscInt i = 0; i < MAX_NUM_SURFACES; ++i) {
-    RDyFree((*rdy)->surfaces[i].edge_ids);
+  for (PetscInt i = 0; i <= MAX_SURFACE_ID; ++i) {
+    if ((*rdy)->surfaces[i].edge_ids) {
+      RDyFree((*rdy)->surfaces[i].edge_ids);
+    }
   }
 
   if ((*rdy)->dm) {

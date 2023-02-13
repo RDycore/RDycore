@@ -61,7 +61,8 @@ typedef struct {
 // is to be enforced on a region or surface.
 typedef enum {
   CONDITION_DIRICHLET = 0, // Dirichlet condition (value is specified)
-  CONDITION_NEUMANN        // Neumann condition (derivative is specified)
+  CONDITION_NEUMANN,       // Neumann condition (derivative is specified)
+  CONDITION_REFLECTING     // Reflecting condition
 } RDyConditionType;
 
 // This type defines a flow-related condition.
@@ -184,33 +185,33 @@ struct _p_RDy {
 
   // mesh regions
   PetscInt  num_regions;
-  PetscInt  region_ids[MAX_NUM_REGIONS];
-  RDyRegion regions[MAX_NUM_REGIONS];
+  PetscInt  region_ids[1+MAX_REGION_ID];
+  RDyRegion regions[1+MAX_REGION_ID];
 
   // mesh surfaces
   PetscInt   num_surfaces;
-  PetscInt   surface_ids[MAX_NUM_REGIONS];
-  RDySurface surfaces[MAX_NUM_SURFACES];
+  PetscInt   surface_ids[1+MAX_SURFACE_ID];
+  RDySurface surfaces[1+MAX_SURFACE_ID];
 
   // Table of named sets of flow, sediment, and salinity conditions. Used by
   // initial/source/boundary conditions below.
   PetscInt             num_flow_conditions;
-  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
+  RDyFlowCondition     flow_conditions[1+MAX_CONDITION_ID];
   PetscInt             num_sediment_conditions;
-  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
+  RDySedimentCondition sediment_conditions[1+MAX_CONDITION_ID];
   PetscInt             num_salinity_conditions;
-  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
+  RDySalinityCondition salinity_conditions[1+MAX_CONDITION_ID];
 
   // initial conditions (either a filename or a set of conditions associated
   // with mesh regions (1 per region)
   char         initial_conditions_file[PETSC_MAX_PATH_LEN];
-  RDyCondition initial_conditions[MAX_NUM_REGIONS];
+  RDyCondition initial_conditions[1+MAX_REGION_ID];
 
   // sources (and sinks) associated with mesh regions (1 per region)
-  RDyCondition sources[MAX_NUM_REGIONS];
+  RDyCondition sources[1+MAX_REGION_ID];
 
   // boundary conditions associated with mesh surfaces (1 per surface)
-  RDyCondition boundary_conditions[MAX_NUM_SURFACES];
+  RDyCondition boundary_conditions[1+MAX_SURFACE_ID];
 
   //--------------
   // Timestepping

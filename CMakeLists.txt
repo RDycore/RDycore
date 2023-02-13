@@ -5,27 +5,15 @@ option(ENABLE_DRIVER "Enable stand-alone RDycore driver program" ON)
 option(ENABLE_TESTS  "Enable unit (and possibly driver) tests" ON)
 
 # Other build parameters
+
+set(MAX_REGION_ID 32 CACHE STRING "Maximum allowable region ID")
+set(MAX_SURFACE_ID 32 CACHE STRING "Maximum allowable surface ID")
+set(MAX_CONDITION_ID 32 CACHE STRING "Maximum allowable condition ID")
+
 message(STATUS "Setting build parameters:")
-function(check_positivity name value)
-  if (${value})
-    if (${value} LESS_EQUAL 0)
-      message(FATAL_ERROR "Invalid ${name}: ${value}")
-    endif()
-  endif()
-  message(STATUS "  ${name}: ${value}")
-endfunction()
-
-set(MAX_NUM_REGIONS 32)
-check_positivity("MAX_NUM_REGIONS" ${MAX_NUM_REGIONS})
-set(MAX_NUM_REGIONS ${MAX_NUM_REGIONS} CACHE STRING "Maximum allowable number of regions")
-
-set(MAX_NUM_SURFACES 32)
-check_positivity("MAX_NUM_SURFACES" ${MAX_NUM_SURFACES})
-set(MAX_NUM_SURFACES ${MAX_NUM_SURFACES} CACHE STRING "Maximum allowable number of surfaces")
-
-set(MAX_NUM_CONDITIONS 32)
-check_positivity("MAX_NUM_CONDITIONS" ${MAX_NUM_CONDITIONS})
-set(MAX_NUM_CONDITIONS ${MAX_NUM_CONDITIONS} CACHE STRING "Maximum allowable number of conditions")
+message(STATUS "  MAX_REGION_ID: ${MAX_REGION_ID}")
+message(STATUS "  MAX_SURFACE_ID: ${MAX_SURFACE_ID}")
+message(STATUS "  MAX_CONDITION_ID: ${MAX_CONDITION_ID}")
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
