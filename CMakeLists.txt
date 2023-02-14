@@ -105,7 +105,8 @@ if (ENABLE_COVERAGE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 
   # Add a "make coverage" target.
-  add_custom_target(coverage ${LCOV_EXE} --capture --directory . --output-file coverage.info
+  add_custom_target(coverage ${LCOV_EXE} --capture --directory . -o unfiltered_coverage.info
+    COMMAND ${LCOV_EXE} --remove unfiltered_coverage.info 'external/*' -o coverage.info
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     COMMENT "Generating coverage report (coverage.info)")
 endif()
