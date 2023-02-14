@@ -39,7 +39,7 @@ set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 # If we find a space in this variable, we remove everything past that point.
 string(FIND ${PETSC_MPIEXEC} " " PETSC_MPIEXEC_SPACE)
 if (NOT PETSC_MPIEXEC_SPACE EQUAL -1)
-  string(SUBSTRING ${PETSC_MPIEXEC} 0 ${PETSC_MPIEXEC_SPACE} ${PETSC_MPIEXEC})
+  string(SUBSTRING ${PETSC_MPIEXEC} 0 ${PETSC_MPIEXEC_SPACE} PETSC_MPIEXEC)
 endif()
 
 # Default Fortran compiler (if not specified)
