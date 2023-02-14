@@ -59,13 +59,13 @@ jobs:
       #if: github.event.pull_request.draft == false # skip for draft PRs
       run: |
         cd build
-        make ccov-all
+        make coverage
 
     - name: Uploading coverage report to codecov.io
       uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
-        files: build/ccov/all-merged.info
-        flags: unittests # optional
+        files: build/coverage.info
+        #flags: unittests # optional
         name: RDycore
         verbose: true

@@ -2,7 +2,6 @@
 add_library(rdycore_f90
   rdycore.F90
 )
-target_code_coverage(rdycore_f90 AUTO ALL)
 
 install(
   TARGETS rdycore_f90

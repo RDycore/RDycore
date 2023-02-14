@@ -1,8 +1,9 @@
 cmake_minimum_required (VERSION 3.12.0)
 
 # Configurable options
-option(ENABLE_DRIVER "Enable stand-alone RDycore driver program" ON)
-option(ENABLE_TESTS  "Enable unit (and possibly driver) tests" ON)
+option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
+option(ENABLE_TESTS    "Enable unit (and possibly driver) tests" ON)
+option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 
 # Other build parameters
 
@@ -91,10 +92,23 @@ if (ENABLE_TESTS)
   enable_testing()
 endif()
 
-# Add code coverage support (enabled using -DENABLE_COVERAGE).
-# This adds a `make ccov-all` that produces a single coverage report.
-include(code_coverage)
-add_code_coverage_all_targets()
+if (ENABLE_COVERAGE)
+  message(STATUS "Enabling code coverage instrumentation")
+  find_program(LCOV_EXE lcov DOC "Lcov code coverage tool")
+  if (LCOV_EXE MATCHES "NOTFOUND")
+    message(FATAL_ERROR "Could not find lcov for code coverage reporting!")
+  endif()
+
+  # Add code coverage compiler flags
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} --coverage")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+
+  # Add a "make coverage" target.
+  add_custom_target(coverage ${LCOV_EXE} --capture --directory . --output-file coverage.info
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+    COMMENT "Generating coverage report (coverage.info)")
+endif()
 
 # Build any additional external libraries.
 add_subdirectory(external)

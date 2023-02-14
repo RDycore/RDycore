@@ -4,7 +4,6 @@ add_executable(rdycore_exe
 )
 set_target_properties(rdycore_exe PROPERTIES OUTPUT_NAME rdycore)
 target_link_libraries(rdycore_exe PRIVATE ${RDYCORE_LIBRARIES})
-target_code_coverage(rdycore_exe AUTO ALL)
 
 # Fortran driver
 add_executable(rdycore_f90_exe
