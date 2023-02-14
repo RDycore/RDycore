@@ -200,6 +200,7 @@ static PetscErrorCode CloseSection(YamlParserState *state, RDy rdy) {
           state->section = PHYSICS_SECTION;
           break;
         default:
+          break;
       }
     }
     state->inside_subsection = PETSC_FALSE;
@@ -904,6 +905,7 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass, yaml_event_t *event, YamlP
           break;
         default:
           // we ignore everything else for now
+          break;
       }
     } else {  // second pass
       // in the second pass, we parse secions that refer to other sections
@@ -918,6 +920,7 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass, yaml_event_t *event, YamlP
           PetscCall(ParseSources(event, state, rdy));
           break;
         default:
+          break;
       }
     }
   }
