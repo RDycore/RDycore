@@ -36,10 +36,12 @@ set(CMAKE_C_COMPILER ${PETSC_COMPILER})
 set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.
-# If we find a space in this variable, we remove everything past that point.
+# If we find a space in this variable, we break things up into PETSC_MPIEXEC
+# and PETSC_MPIEXEC_FLAGS.
 string(FIND ${PETSC_MPIEXEC} " " PETSC_MPIEXEC_SPACE)
 if (NOT PETSC_MPIEXEC_SPACE EQUAL -1)
   string(SUBSTRING ${PETSC_MPIEXEC} 0 ${PETSC_MPIEXEC_SPACE} PETSC_MPIEXEC)
+  string(SUBSTRING ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_SPACE} -1 PETSC_MPIEXEC_FLAGS)
 endif()
 
 # Default Fortran compiler (if not specified)
