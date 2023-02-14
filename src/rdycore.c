@@ -109,6 +109,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   // Destroy tables of named flow/sediment/salinity conditions.
   // NOTE: we can make destructors for these things if they get more complex
+  RDyLogDebug(*rdy, "Destroying flow/sediment/salinity conditions...\n");
   for (PetscInt i = 0; i < (*rdy)->num_flow_conditions; ++i) {
     RDyFree((*rdy)->flow_conditions[i].name);
   }
@@ -120,17 +121,20 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   }
 
   // Destroy regions and surfaces.
+  RDyLogDebug(*rdy, "Destroying regions...\n");
   for (PetscInt i = 0; i <= MAX_REGION_ID; ++i) {
     if ((*rdy)->regions[i].cell_ids) {
       RDyFree((*rdy)->regions[i].cell_ids);
     }
   }
+  RDyLogDebug(*rdy, "Destroying surfaces...\n");
   for (PetscInt i = 0; i <= MAX_SURFACE_ID; ++i) {
     if ((*rdy)->surfaces[i].edge_ids) {
       RDyFree((*rdy)->surfaces[i].edge_ids);
     }
   }
 
+  RDyLogDebug(*rdy, "Destroying DM...\n");
   if ((*rdy)->dm) {
     DMDestroy(&((*rdy)->dm));
   }

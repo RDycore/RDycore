@@ -50,13 +50,6 @@ typedef enum {
   TIME_YEARS
 } RDyTimeUnit;
 
-// This type stores metadata for in-line quad meshes specified in config files.
-typedef struct {
-  PetscInt nx, ny;
-  PetscReal xmin, xmax, ymin, ymax;
-  char inactive_file[PETSC_MAX_PATH_LEN];
-} RDyQuadMesh;
-
 // This type specifies a "kind" of condition that indicates how that condition
 // is to be enforced on a region or surface.
 typedef enum {
@@ -172,11 +165,8 @@ struct _p_RDy {
   // Spatial discretization
   //------------------------
 
-  // mesh file (not used when quad meshes are generated)
+  // mesh file
   char mesh_file[PETSC_MAX_PATH_LEN];
-
-  // quad mesh metadata (not used when mesh files are read)
-  RDyQuadMesh quadmesh;
 
   // PETSc (DMPlex) grid
   DM dm;

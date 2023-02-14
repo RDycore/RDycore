@@ -925,25 +925,6 @@ static PetscErrorCode HandleYamlEvent(WhichPass pass, yaml_event_t *event, YamlP
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode CreateQuadGrid(RDy rdy) {
-  PetscFunctionBegin;
-
-  PetscCheck((rdy->quadmesh.xmax > rdy->quadmesh.xmin), rdy->comm, PETSC_ERR_USER, "grid.xmax <= grid.xmin!");
-  PetscCheck((rdy->quadmesh.ymax > rdy->quadmesh.ymin), rdy->comm, PETSC_ERR_USER, "grid.ymax <= grid.ymin!");
-
-  // Create a uniform grid with the given information.
-  PetscReal lower[2] = {rdy->quadmesh.xmin, rdy->quadmesh.ymin};
-  PetscReal upper[2] = {rdy->quadmesh.xmax, rdy->quadmesh.ymax};
-  PetscCall(DMPlexCreateBoxMesh(rdy->comm, 2, PETSC_FALSE, NULL, lower, upper, NULL, PETSC_TRUE, &rdy->dm));
-
-  // Look for (optional) raster information to punch out inactive cells.
-  if (strlen(rdy->quadmesh.inactive_file)) {
-    // FIXME: implement inactive cell logic here.
-  }
-
-  PetscFunctionReturn(0);
-}
-
 // initializes mesh region/surface data
 static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscFunctionBegin;
@@ -1076,11 +1057,14 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // do the first pass
   PetscCall(ParseYaml(config_str, FIRST_PASS, rdy));
 
-  // create the grid from our specification
-  if (strlen(rdy->mesh_file)) {  // we are given a file
-    PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->mesh_file, "grid", PETSC_TRUE, &rdy->dm));
-  } else {  // we are asked to create a quad grid
-    PetscCall(CreateQuadGrid(rdy));
+  // create the grid from the given file and distribute it amongst processes.
+  PetscCheck(strlen(rdy->mesh_file), rdy->comm, PETSC_ERR_USER, "grid.file not specified!");
+  PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->mesh_file, "grid", PETSC_TRUE, &rdy->dm));
+  DM dm_dist;
+  PetscCall(DMPlexDistribute(rdy->dm, 1, NULL, &dm_dist));
+  if (dm_dist) {
+    PetscCall(DMDestroy(&rdy->dm));
+    rdy->dm = dm_dist;
   }
 
   // set up mesh regions and surfaces, reading them from our DMPlex object
