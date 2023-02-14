@@ -106,7 +106,7 @@ if (ENABLE_COVERAGE)
 
   # Add a "make coverage" target.
   add_custom_target(coverage ${LCOV_EXE} --capture --directory . -o unfiltered_coverage.info
-    COMMAND ${LCOV_EXE} --remove unfiltered_coverage.info 'external/*' -o coverage.info
+    COMMAND ${LCOV_EXE} --remove unfiltered_coverage.info '*/external/*' -o coverage.info
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     COMMENT "Generating coverage report (coverage.info)")
 endif()
