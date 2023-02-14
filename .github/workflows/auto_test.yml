@@ -68,4 +68,5 @@ jobs:
         files: build/coverage.info
         #flags: unittests # optional
         name: RDycore
+        token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
