@@ -97,8 +97,9 @@ PetscErrorCode PrintConfig(RDy rdy, RDyLogLevel level) {
 
   PetscCall(PrintPhysics(rdy, level));
   PetscCall(PrintNumerics(rdy, level));
-  PetscCall(PrintRestart(rdy, level));
+  PetscCall(PrintTime(rdy, level));
   PetscCall(PrintLogging(rdy, level));
+  PetscCall(PrintRestart(rdy, level));
 
   PetscFunctionReturn(0);
 }
