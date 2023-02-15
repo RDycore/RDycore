@@ -59,7 +59,7 @@ contains
   subroutine RDyInit(ierr)
     implicit none
     integer, intent(out) :: ierr
-    ierr = rdyinitfortran_()
+    if (.not. RDyInitialized()) ierr = rdyinitfortran_()
   end subroutine
 
   subroutine RDyFinalize(ierr)

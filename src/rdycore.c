@@ -9,7 +9,11 @@ static PetscBool initialized_ = PETSC_FALSE;
 PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   PetscFunctionBegin;
   if (!initialized_) {
-    PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
+    PetscBool petsc_initialized;
+    PetscCall(PetscInitialized(&petsc_initialized));
+    if (!petsc_initialized) {
+      PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
+    }
     initialized_ = PETSC_TRUE;
   }
   PetscFunctionReturn(0);
@@ -20,8 +24,12 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
 PetscErrorCode RDyInitFortran(void) {
   PetscFunctionBegin;
   if (!initialized_) {
-    PetscCall(PetscInitializeNoArguments());
-    PetscCall(PetscInitializeFortran());
+    PetscBool petsc_initialized;
+    PetscCall(PetscInitialized(&petsc_initialized));
+    if (!petsc_initialized) {
+      PetscCall(PetscInitializeNoArguments());
+      PetscCall(PetscInitializeFortran());
+    }
     initialized_ = PETSC_TRUE;
   }
   PetscFunctionReturn(0);
