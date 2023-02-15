@@ -84,7 +84,6 @@ contains
     allocate(rdy_%config_file)
     rdy_%config_file(1:n) = filename(1:n)
     rdy_%config_file(n+1:n+1) = c_null_char
-    call MPI_Init(ierr)
     ierr = rdycreate_(comm, c_loc(rdy_%config_file), rdy_%c_rdy)
   end subroutine
 
