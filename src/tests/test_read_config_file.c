@@ -51,7 +51,10 @@ static PetscErrorCode ReadConfigString(void **state, RDy rdy, const char *config
   MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_MAX, rdy->comm);
 
   // remove the file
-  remove(rdy->config_file);
+  /*
+  if (rdy->rank == 0) {
+    remove(rdy->config_file);
+  }*/
 
   return ierr;
 }
@@ -85,7 +88,7 @@ static void TestFullSpec(void **state) {
       "  format: h5\n"
       "  frequency: 10\n\n"
       "grid:\n"
-      "  planar_dam_10x5.msh\n\n"
+      "  file: planar_dam_10x5.msh\n\n"
       "initial_conditions:\n"
       "  1:\n"
       "    flow: dam_top_ic\n"

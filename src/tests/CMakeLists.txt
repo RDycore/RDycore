@@ -1,6 +1,10 @@
 # Here we manually define unit tests for the main RDycore library. We can
 # discuss ways of setting up tests more easily and automatically.
 
+# We need a mesh for some of our unit tests.
+file(COPY ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 foreach(exe_name
         test_rdyinit
         test_rdymesh
