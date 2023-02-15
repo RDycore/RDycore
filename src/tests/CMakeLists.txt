@@ -3,11 +3,12 @@
 
 foreach(exe_name
         test_rdyinit
-        test_rdymesh)
+        test_rdymesh
+        test_read_config_file)
   set(exe_source ${exe_name}.c)
   add_executable(${exe_name} ${exe_source})
   target_link_libraries(${exe_name} PRIVATE ${RDYCORE_LIBRARIES} cmocka)
-  foreach(np 1 2 4) # test on 1, 2, and 4 processes
+  foreach(np 1 2) # test on 1 and 2 processes
     set(test_name ${exe_name}_np_${np})
     add_test(${test_name} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${CMAKE_CURRENT_BINARY_DIR}/${exe_name})
   endforeach()

@@ -279,28 +279,29 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t *event, YamlParserState *sta
   // check whether we should descend into a subsection
   if (!strlen(state->subsection)) {
     if (!strlen(state->parameter)) {
-      PetscCheck(!strcmp(value, "mode"), rdy->comm, PETSC_ERR_USER, "Invalid physics parameter: %s", value);
-      strcpy(state->parameter, "mode");
+      if (!strcmp(value, "bed_friction")) {
+        strncpy(state->subsection, value, YAML_MAX_LEN);
+      } else {
+        PetscCheck(!strcmp(value, "mode"), rdy->comm, PETSC_ERR_USER, "Invalid physics.flow parameter: %s", value);
+        strcpy(state->parameter, "mode");
+      }
     } else if (!strcmp(state->parameter, "mode")) {
       PetscInt selection;
       SelectItem(value, 2, (const char *[2]){"swe", "diffusion"}, (PetscInt[2]){FLOW_SWE, FLOW_DIFFUSION}, &selection);
       PetscCheck(selection != -1, rdy->comm, PETSC_ERR_USER, "Invalid physics.flow.mode: %s", value);
       rdy->flow_mode      = selection;
       state->parameter[0] = 0;  // clear parameter name
-    } else {
-      // okay, we are moving on to a subsection
-      strncpy(state->subsection, value, YAML_MAX_LEN);
     }
   } else {
     // we should be inside a subsection that identifies a region.
-    PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER, "Invalid YAML in physics.%s", state->subsection);
+    PetscCheck(state->inside_subsection, rdy->comm, PETSC_ERR_USER, "Invalid YAML in physics.flow.%s", state->subsection);
 
-    // currently, the only physics subsection we allow is bed_friction.
-    PetscCheck(!strcmp(state->subsection, "bed_friction"), rdy->comm, PETSC_ERR_USER, "Invalid physics subsection: %s", state->subsection);
+    // currently, the only physics flow subsection we allow is bed_friction.
+    PetscCheck(!strcmp(state->subsection, "bed_friction"), rdy->comm, PETSC_ERR_USER, "Invalid physics.flow subsection: %s", state->subsection);
 
     if (!strlen(state->parameter)) {  // parameter not set
       PetscCheck(!strcmp(value, "enable") || !strcmp(value, "model") || !strcmp(value, "coefficient"), rdy->comm, PETSC_ERR_USER,
-                 "Invalid parameter in physics.bed_friction: %s", value);
+                 "Invalid parameter in physics.flow.bed_friction: %s", value);
       strncpy(state->parameter, value, YAML_MAX_LEN);
     } else {  // parameter set, parse value
       if (!strcmp(state->parameter, "enable")) {
