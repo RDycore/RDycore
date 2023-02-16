@@ -140,7 +140,7 @@ static PetscErrorCode CloseSection(YamlParserState *state, RDyConfig *config) {
     state->inside_subsection = PETSC_FALSE;
     state->subsection[0]     = 0;
   } else if (state->inside_section) {  // exiting a section?
-    switch (state->section) {  // move up one section
+    switch (state->section) {          // move up one section
       case PHYSICS_FLOW_SECTION:
       case PHYSICS_SEDIMENT_SECTION:
       case PHYSICS_SALINITY_SECTION:
@@ -232,7 +232,7 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t *event, YamlParserState *sta
       PetscInt selection;
       SelectItem(value, 2, (const char *[2]){"swe", "diffusion"}, (PetscInt[2]){FLOW_SWE, FLOW_DIFFUSION}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid physics.flow.mode: %s", value);
-      config->flow_mode = selection;
+      config->flow_mode   = selection;
       state->parameter[0] = 0;  // clear parameter name
     }
   } else {
@@ -245,8 +245,7 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t *event, YamlParserState *sta
     if (!strlen(state->parameter)) {  // parameter not set
       PetscInt selection;
       SelectItem(value, 3, (const char *[3]){"enable", "model", "coefficient"}, (PetscInt[3]){0, 1, 2}, &selection);
-      PetscCheck(selection != -1, state->comm, PETSC_ERR_USER,
-                 "Invalid parameter in physics.flow.bed_friction: %s", value);
+      PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in physics.flow.bed_friction: %s", value);
       strncpy(state->parameter, value, YAML_MAX_LEN);
     } else {  // parameter set, parse value
       if (!strcmp(state->parameter, "enable")) {
@@ -257,8 +256,7 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t *event, YamlParserState *sta
         }
       } else if (!strcmp(state->parameter, "model") && (config->bed_friction != BED_FRICTION_NONE)) {
         PetscInt selection;
-        SelectItem(value, 2, (const char *[2]){"chezy", "manning"},
-                   (PetscInt[2]){BED_FRICTION_CHEZY, BED_FRICTION_MANNING}, &selection);
+        SelectItem(value, 2, (const char *[2]){"chezy", "manning"}, (PetscInt[2]){BED_FRICTION_CHEZY, BED_FRICTION_MANNING}, &selection);
         PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid bed_friction model: %s", value);
       } else {  // coefficient
         PetscCall(ConvertToReal(state->comm, state->parameter, value, &config->bed_friction_coef));
@@ -273,19 +271,19 @@ static PetscErrorCode ParsePhysicsFlow(yaml_event_t *event, YamlParserState *sta
 static PetscErrorCode ParsePhysicsSediment(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
-  PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in physics.sediment section!");
+  PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
+             "Invalid YAML (non-scalar value encountered in physics.sediment section!");
   const char *value = (const char *)(event->data.scalar.value);
 
   if (!strlen(state->parameter)) {  // parameter not set
     PetscInt selection;
     SelectItem(value, 2, (const char *[2]){"enable", "d50"}, (PetscInt[2]){0, 1}, &selection);
-    PetscCheck(selection != -1, state->comm, PETSC_ERR_USER,
-               "Invalid parameter in physics.sediment: %s", value);
+    PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in physics.sediment: %s", value);
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else {  // parameter set, parse value
     if (!strcmp(state->parameter, "enable")) {
       PetscCall(ConvertToBool(state->comm, state->parameter, value, &config->sediment));
-    } else { // d50
+    } else {  // d50
       // FIXME
     }
     state->parameter[0] = 0;  // clear parameter name
@@ -296,7 +294,8 @@ static PetscErrorCode ParsePhysicsSediment(yaml_event_t *event, YamlParserState 
 static PetscErrorCode ParsePhysicsSalinity(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
-  PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in physics.salinity section!");
+  PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
+             "Invalid YAML (non-scalar value encountered in physics.salinity section!");
   const char *value = (const char *)(event->data.scalar.value);
 
   if (!strlen(state->parameter)) {  // parameter not set
@@ -409,7 +408,7 @@ static PetscErrorCode ParseRestart(yaml_event_t *event, YamlParserState *state, 
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->restart_frequency));
       PetscCheck((config->restart_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid restart.frequency: %d\n", config->restart_frequency);
     }
-    state->parameter[0] = 0; // clear parameter name
+    state->parameter[0] = 0;  // clear parameter name
   }
   PetscFunctionReturn(0);
 }
@@ -481,7 +480,7 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
     } else if (!strcmp(state->parameter, "file")) {
       strncpy(config->initial_conditions_file, value, YAML_MAX_LEN);
       state->parameter[0] = 0;  // clear parameter name
-    } else { // proceed to initial conditions subsection
+    } else {                    // proceed to initial conditions subsection
       strncpy(state->subsection, value, YAML_MAX_LEN);
     }
   } else {
@@ -502,6 +501,7 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
     } else {
       if (!strcmp(state->parameter, "flow")) {
         strncpy(ic_spec->flow_name, value, MAX_NAME_LEN);
+        ++config->num_initial_conditions;
       } else if (!strcmp(state->parameter, "sediment")) {
         strncpy(ic_spec->sediment_name, value, MAX_NAME_LEN);
       } else {  // salinity
@@ -542,6 +542,7 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserSta
     } else {
       if (!strcmp(state->parameter, "flow")) {
         strncpy(bc_spec->flow_name, value, MAX_NAME_LEN);
+        ++config->num_boundary_conditions;
       } else if (!strcmp(state->parameter, "sediment")) {
         strncpy(bc_spec->sediment_name, value, MAX_NAME_LEN);
       } else {  // salinity
@@ -581,6 +582,7 @@ static PetscErrorCode ParseSources(yaml_event_t *event, YamlParserState *state, 
     } else {
       if (!strcmp(state->parameter, "flow")) {
         strncpy(src_spec->flow_name, value, MAX_NAME_LEN);
+        ++config->num_sources;
       } else if (!strcmp(state->parameter, "sediment")) {
         strncpy(src_spec->sediment_name, value, MAX_NAME_LEN);
       } else {  // salinity
@@ -842,7 +844,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
 }
 
 // checks config for any invalid or omitted parameters
-PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig* config) {
+PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
   PetscFunctionBegin;
 
   // currently, only certain methods are implemented
@@ -856,13 +858,12 @@ PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig* config) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) is currently implemented.");
   }
 
-  PetscCheck(strlen(config->mesh_file), comm, PETSC_ERR_USER,
-    "grid.file not specified!");
+  PetscCheck(strlen(config->mesh_file), comm, PETSC_ERR_USER, "grid.file not specified!");
 
   // We can accept an initial conditions file OR a set of initial conditions,
   // but not both.
   PetscCheck((strlen(config->initial_conditions_file) && !config->num_initial_conditions) ||
-             (!strlen(config->initial_conditions_file) && config->num_initial_conditions),
+                 (!strlen(config->initial_conditions_file) && config->num_initial_conditions),
              comm, PETSC_ERR_USER,
              "Invalid initial_conditions! A file was specified, so no further "
              "parameters are allowed.");

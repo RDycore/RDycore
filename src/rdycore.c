@@ -120,7 +120,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
 
   // Destroy regions and surfaces.
-  for (PetscInt i = 0; i <= MAX_REGION_ID; ++i) {
+  for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
     if ((*rdy)->regions[i].cell_ids) {
       RDyFree((*rdy)->regions[i].cell_ids);
     }
@@ -128,7 +128,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->region_ids) RDyFree((*rdy)->region_ids);
   if ((*rdy)->regions) RDyFree((*rdy)->regions);
 
-  for (PetscInt i = 0; i <= MAX_SURFACE_ID; ++i) {
+  for (PetscInt i = 0; i < (*rdy)->num_surfaces; ++i) {
     if ((*rdy)->surfaces[i].edge_ids) {
       RDyFree((*rdy)->surfaces[i].edge_ids);
     }
