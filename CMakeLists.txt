@@ -24,6 +24,12 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_COMPILER ${PETSC_COMPILER})
 set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 
+# Add some compiler flags of our own.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
+endif()
+
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.
 # If we find a space in this variable, we break things up into PETSC_MPIEXEC
 # and PETSC_MPIEXEC_FLAGS.

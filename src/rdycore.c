@@ -104,7 +104,6 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
 PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rdy) {
   PetscFunctionBegin;
 
-  MPI_Comm f_comm = MPI_Comm_f2c(*f90_comm);
   PetscCall(RDyCreate(MPI_Comm_f2c(*f90_comm), config_file, rdy));
 
   PetscFunctionReturn(0);

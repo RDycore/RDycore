@@ -20,6 +20,8 @@ typedef enum {
 } RDyLogLevel;
 
 // These are labels that get prepended to log messages.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
 static const char *RDyLogLabels[5] = {
   "",
   "WARNING: ",
@@ -27,6 +29,7 @@ static const char *RDyLogLabels[5] = {
   "DETAIL: ",
   "DEBUG: "
 };
+#pragma GCC diagnostic pop
 
 // Writes a log message at the given level of detail. You don't need to wrap
 // this call in PetscCall.

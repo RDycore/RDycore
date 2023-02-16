@@ -609,7 +609,7 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *
       PetscCheck(state->inside_subsection, state->comm, PETSC_ERR_USER, "Invalid YAML in flow_conditions.%s", state->subsection);
 
       RDyFlowCondition *flow_cond = &config->flow_conditions[config->num_flow_conditions];
-      if (!flow_cond->name) {  // condition name not set
+      if (!strlen(flow_cond->name)) {  // condition name not set
         strncpy((char *)flow_cond->name, state->subsection, MAX_NAME_LEN);
       }
       if (!strlen(state->parameter)) {  // parameter name not set
@@ -668,7 +668,7 @@ static PetscErrorCode ParseSedimentConditions(yaml_event_t *event, YamlParserSta
     PetscCheck(state->inside_subsection, state->comm, PETSC_ERR_USER, "Invalid YAML in sediment_conditions.%s", state->subsection);
 
     RDySedimentCondition *sed_cond = &config->sediment_conditions[config->num_sediment_conditions];
-    if (!sed_cond->name) {  // condition name not set
+    if (!strlen(sed_cond->name)) {  // condition name not set
       strncpy((char *)sed_cond->name, state->subsection, MAX_NAME_LEN);
     }
     if (!strlen(state->parameter)) {  // parameter name not set
@@ -811,7 +811,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
 
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);
-  yaml_parser_set_input_string(&parser, yaml_str, strlen(yaml_str));
+  yaml_parser_set_input_string(&parser, (const unsigned char *)yaml_str, strlen(yaml_str));
 
   // parse the file, handling each YAML "event" based on the parser state
   YamlParserState   state = {.comm = comm};
