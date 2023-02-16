@@ -115,34 +115,27 @@ PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rd
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
 
-  // Destroy tables of named flow/sediment/salinity conditions.
-  // NOTE: we can make destructors for these things if they get more complex
-  RDyLogDebug(*rdy, "Destroying flow/sediment/salinity conditions...\n");
-  for (PetscInt i = 0; i < (*rdy)->num_flow_conditions; ++i) {
-    RDyFree((*rdy)->flow_conditions[i].name);
-  }
-  for (PetscInt i = 0; i < (*rdy)->num_sediment_conditions; ++i) {
-    RDyFree((*rdy)->sediment_conditions[i].name);
-  }
-  for (PetscInt i = 0; i < (*rdy)->num_salinity_conditions; ++i) {
-    RDyFree((*rdy)->salinity_conditions[i].name);
-  }
+  if ((*rdy)->initial_conditions) RDyFree((*rdy)->initial_conditions);
+  if ((*rdy)->sources) RDyFree((*rdy)->sources);
+  if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
 
   // Destroy regions and surfaces.
-  RDyLogDebug(*rdy, "Destroying regions...\n");
   for (PetscInt i = 0; i <= MAX_REGION_ID; ++i) {
     if ((*rdy)->regions[i].cell_ids) {
       RDyFree((*rdy)->regions[i].cell_ids);
     }
   }
-  RDyLogDebug(*rdy, "Destroying surfaces...\n");
+  if ((*rdy)->region_ids) RDyFree((*rdy)->region_ids);
+  if ((*rdy)->regions) RDyFree((*rdy)->regions);
+
   for (PetscInt i = 0; i <= MAX_SURFACE_ID; ++i) {
     if ((*rdy)->surfaces[i].edge_ids) {
       RDyFree((*rdy)->surfaces[i].edge_ids);
     }
   }
+  if ((*rdy)->surface_ids) RDyFree((*rdy)->surface_ids);
+  if ((*rdy)->surfaces) RDyFree((*rdy)->surfaces);
 
-  RDyLogDebug(*rdy, "Destroying DM...\n");
   if ((*rdy)->dm) {
     DMDestroy(&((*rdy)->dm));
   }

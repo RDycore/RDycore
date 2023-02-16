@@ -5,17 +5,6 @@ option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
 option(ENABLE_TESTS    "Enable unit (and possibly driver) tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 
-# Other build parameters
-
-set(MAX_REGION_ID 32 CACHE STRING "Maximum allowable region ID")
-set(MAX_SURFACE_ID 32 CACHE STRING "Maximum allowable surface ID")
-set(MAX_CONDITION_ID 32 CACHE STRING "Maximum allowable condition ID")
-
-message(STATUS "Setting build parameters:")
-message(STATUS "  MAX_REGION_ID: ${MAX_REGION_ID}")
-message(STATUS "  MAX_SURFACE_ID: ${MAX_SURFACE_ID}")
-message(STATUS "  MAX_CONDITION_ID: ${MAX_CONDITION_ID}")
-
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -81,15 +70,10 @@ include_directories(${PETSC_INCLUDES})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
-# Generate headers from build parameters.
+# Generate a header from our build parameters.
 configure_file(
   ${PROJECT_SOURCE_DIR}/include/rdycore.h.in
   ${PROJECT_BINARY_DIR}/include/rdycore.h
-  @ONLY
-)
-configure_file(
-  ${PROJECT_SOURCE_DIR}/include/private/rdyconfig.h.in
-  ${PROJECT_BINARY_DIR}/include/private/rdyconfig.h
   @ONLY
 )
 

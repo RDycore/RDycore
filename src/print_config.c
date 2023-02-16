@@ -13,9 +13,9 @@ static PetscErrorCode PrintPhysics(RDy rdy, RDyLogLevel level) {
   RDyLog(rdy, level, "-------\n");
   RDyLog(rdy, level, "Physics\n");
   RDyLog(rdy, level, "-------\n\n");
-  RDyLog(rdy, level, "Sediment model: %s\n", FlagString(rdy->sediment));
-  RDyLog(rdy, level, "Salinity model: %s\n", FlagString(rdy->salinity));
-  RDyLog(rdy, level, "Bed friction model: %s\n\n", BedFrictionString(rdy->bed_friction));
+  RDyLog(rdy, level, "Sediment model: %s\n", FlagString(rdy->config.sediment));
+  RDyLog(rdy, level, "Salinity model: %s\n", FlagString(rdy->config.salinity));
+  RDyLog(rdy, level, "Bed friction model: %s\n\n", BedFrictionString(rdy->config.bed_friction));
   PetscFunctionReturn(0);
 }
 
@@ -39,9 +39,9 @@ static PetscErrorCode PrintNumerics(RDy rdy, RDyLogLevel level) {
   RDyLog(rdy, level, "--------\n");
   RDyLog(rdy, level, "Numerics\n");
   RDyLog(rdy, level, "--------\n\n");
-  RDyLog(rdy, level, "Spatial discretization: %s\n", SpatialString(rdy->spatial));
-  RDyLog(rdy, level, "Temporal discretization: %s\n", TemporalString(rdy->temporal));
-  RDyLog(rdy, level, "Riemann solver: %s\n\n", RiemannString(rdy->riemann));
+  RDyLog(rdy, level, "Spatial discretization: %s\n", SpatialString(rdy->config.spatial));
+  RDyLog(rdy, level, "Temporal discretization: %s\n", TemporalString(rdy->config.temporal));
+  RDyLog(rdy, level, "Riemann solver: %s\n\n", RiemannString(rdy->config.riemann));
   PetscFunctionReturn(0);
 }
 
@@ -55,7 +55,7 @@ static PetscErrorCode PrintTime(RDy rdy, RDyLogLevel level) {
   RDyLog(rdy, level, "----\n");
   RDyLog(rdy, level, "Time\n");
   RDyLog(rdy, level, "----\n\n");
-  RDyLog(rdy, level, "Final time: %g %s\n", rdy->final_time, TimeUnitString(rdy->time_unit));
+  RDyLog(rdy, level, "Final time: %g %s\n", rdy->config.final_time, TimeUnitString(rdy->config.time_unit));
   RDyLog(rdy, level, "\n");
   PetscFunctionReturn(0);
 }
@@ -65,9 +65,9 @@ static PetscErrorCode PrintRestart(RDy rdy, RDyLogLevel level) {
   RDyLog(rdy, level, "-------\n");
   RDyLog(rdy, level, "Restart\n");
   RDyLog(rdy, level, "-------\n\n");
-  if (rdy->restart_frequency > 0) {
-    RDyLog(rdy, level, "Restart file format: %s\n", rdy->restart_format);
-    RDyLog(rdy, level, "Restart frequency: %d\n\n", rdy->restart_frequency);
+  if (rdy->config.restart_frequency > 0) {
+    RDyLog(rdy, level, "Restart file format: %s\n", rdy->config.restart_format);
+    RDyLog(rdy, level, "Restart frequency: %d\n\n", rdy->config.restart_frequency);
   } else {
     RDyLog(rdy, level, "(disabled)\n\n");
   }
@@ -79,8 +79,8 @@ static PetscErrorCode PrintLogging(RDy rdy, RDyLogLevel level) {
   RDyLog(rdy, level, "-------\n");
   RDyLog(rdy, level, "Logging\n");
   RDyLog(rdy, level, "-------\n\n");
-  if (strlen(rdy->log_file)) {
-    RDyLog(rdy, level, "Primary log file: %s\n\n", rdy->log_file);
+  if (strlen(rdy->config.log_file)) {
+    RDyLog(rdy, level, "Primary log file: %s\n\n", rdy->config.log_file);
   } else {
     RDyLog(rdy, level, "Primary log file: <stdout>\n\n");
   }
