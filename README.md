@@ -128,15 +128,24 @@ with the GCC or Clang compilers.
 
 To instrument the `rdycore` library and unit tests for code coverage analysis,
 pass the `-DENABLE_COVERAGE=ON` flag to CMake when configuring your build. Then,
-after building, you can type
+after building and running tests, type
 
 ```
-make ccov-all
+make coverage-all
 ```
 
-to generate a single report containing all coverage information. See the
-documentation for `gcov` and `lcov` (linked above) for details on how to
-interpret thіs information.
+to generate a single report (`coverage.info`) containing all coverage
+information. See the documentation for `gcov` and `lcov` (linked above) for
+details on how to interpret thіs information.
+
+## Checking for memory errors and leaks with Valgrind
+
+If you're using a Linux system and have [Valgrind](https://valgrind.org/)
+installed, you can run our tests using Valgrind's `memcheck` tool with
+
+```
+make memcheck
+```
 
 ### Considerations for Apple hardware
 
