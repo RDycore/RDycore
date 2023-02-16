@@ -131,7 +131,7 @@ pass the `-DENABLE_COVERAGE=ON` flag to CMake when configuring your build. Then,
 after building and running tests, type
 
 ```
-make coverage-all
+make coverage
 ```
 
 to generate a single report (`coverage.info`) containing all coverage
