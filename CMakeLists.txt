@@ -1,5 +1,10 @@
 cmake_minimum_required (VERSION 3.12.0)
 
+# Configurable options
+option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
+option(ENABLE_TESTS    "Enable unit (and possibly driver) tests" ON)
+option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
+
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -19,9 +24,29 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_COMPILER ${PETSC_COMPILER})
 set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 
+# Add some compiler flags of our own.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
+endif()
+
+# Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.
+# If we find a space in this variable, we break things up into PETSC_MPIEXEC
+# and PETSC_MPIEXEC_FLAGS.
+string(FIND ${PETSC_MPIEXEC} " " PETSC_MPIEXEC_SPACE)
+if (NOT PETSC_MPIEXEC_SPACE EQUAL -1)
+  string(SUBSTRING ${PETSC_MPIEXEC} 0 ${PETSC_MPIEXEC_SPACE} PETSC_MPIEXEC)
+  string(SUBSTRING ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_SPACE} -1 PETSC_MPIEXEC_FLAGS)
+endif()
+
 # Default Fortran compiler (if not specified)
 if (NOT CMAKE_Fortran_COMPILER)
   set(CMAKE_Fortran_COMPILER gfortran)
+endif()
+
+# flags
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_Fortran_FLAGS "-ffree-line-length-none")
 endif()
 
 message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")
@@ -51,7 +76,7 @@ include_directories(${PETSC_INCLUDES})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
-# Generate rdycore.h from include/rdycore.h.in.
+# Generate a header from our build parameters.
 configure_file(
   ${PROJECT_SOURCE_DIR}/include/rdycore.h.in
   ${PROJECT_BINARY_DIR}/include/rdycore.h
@@ -61,20 +86,43 @@ configure_file(
 # Inherit libraries from PETSc.
 set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
 
-# Enable testing.
-include(CTest)
-enable_testing()
+if (ENABLE_TESTS)
+  include(CTest)
+  enable_testing()
+endif()
 
-# Add code coverage support (enabled using -DENABLE_COVERAGE).
-# This adds a `make ccov-all` that produces a single coverage report.
-include(code_coverage)
-add_code_coverage_all_targets()
+if (ENABLE_COVERAGE)
+  message(STATUS "Enabling code coverage instrumentation")
+  find_program(LCOV_EXE lcov DOC "Lcov code coverage tool")
+  if (LCOV_EXE MATCHES "NOTFOUND")
+    message(FATAL_ERROR "Could not find lcov for code coverage reporting!")
+  endif()
+
+  # Add code coverage compiler flags
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} --coverage")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+
+  # Add a "make coverage" target.
+  add_custom_target(coverage ${LCOV_EXE} --capture --directory . -o unfiltered_coverage.info
+    COMMAND ${LCOV_EXE} --remove unfiltered_coverage.info '*/external/*' -o coverage.info
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+    COMMENT "Generating coverage report (coverage.info)")
+endif()
 
 # Build any additional external libraries.
 add_subdirectory(external)
 
+# Include miscellaneous data and utilities.
+add_subdirectory(share)
+
 # Create targets for RDycore library and unit tests.
 add_subdirectory(src)
+
+# Build the driver if enabled.
+if (ENABLE_DRIVER)
+  add_subdirectory(driver)
+endif()
 
 #--------------------
 # Additional targets

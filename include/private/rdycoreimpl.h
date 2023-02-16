@@ -2,22 +2,51 @@
 #define RDYCOREIMPL_H
 
 #include <rdycore.h>
+#include <private/rdyconfigimpl.h>
+#include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 
 #include <petsc/private/petscimpl.h>
 
-/// This type serves as a "virtual table" containing function pointers that
-/// define the behavior of the dycore.
+// This type defines a region consisting of cells identified by their local
+// indices.
+typedef struct {
+  PetscInt   *cell_ids;
+  PetscInt    num_cells;
+} RDyRegion;
+
+// This type defines a surface consisting of edges identified by their local
+// indices.
+typedef struct {
+  PetscInt   *edge_ids;
+  PetscInt    num_edges;
+} RDySurface;
+
+// This type defines a "condition" representing
+// * an initial condition or source/sink associated with a region
+// * a boundary condition associated with a surface
+typedef struct {
+  // flow, sediment, salinity conditions (NULL for none)
+  RDyFlowCondition     *flow;
+  RDySedimentCondition *sediment;
+  RDySalinityCondition *salinity;
+
+  // value(s) associated with the condition
+  PetscReal value;
+} RDyCondition;
+
+// This type serves as a "virtual table" containing function pointers that
+// define the behavior of the dycore.
 typedef struct _RDyOps *RDyOps;
 struct _RDyOps {
-  /// Called by RDyCreate to allocate implementation-specific resources, storing
-  /// the result in the given context pointer.
+  // Called by RDyCreate to allocate implementation-specific resources, storing
+  // the result in the given context pointer.
   PetscErrorCode (*create)(void**);
-  /// Called by RDyDestroy to free implementation-specific resources.
+  // Called by RDyDestroy to free implementation-specific resources.
   PetscErrorCode (*destroy)(void*);
 };
 
-/// an application context that stores data relevant to a simulation
+// an application context that stores data relevant to a simulation
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);
 
@@ -28,39 +57,53 @@ struct _p_RDy {
   // TODO: The fields below are subject to change as we find our way!
   //------------------------------------------------------------------
 
-  /// MPI communicator used for the simulation
+  // MPI communicator used for the simulation
   MPI_Comm comm;
-  /// MPI rank of local process
+  // MPI rank of local process
   PetscInt rank;
-  /// Number of processes in the communicator
-  PetscInt comm_size;
-  /// filename storing input data for the simulation
-  char filename[PETSC_MAX_PATH_LEN];
-  /// PETSc grid
+  // Number of processes in the communicator
+  PetscInt nproc;
+  // file storing input data for the simulation
+  char config_file[PETSC_MAX_PATH_LEN];
+
+  // configuration data read from config_file
+  RDyConfig config;
+
+  // PETSc (DMPlex) grid
   DM dm;
-  /// Number of cells in the x direction
-  PetscInt Nx;
-  /// Number of cells in the y direction
-  PetscInt Ny;
-  /// grid spacing in the x direction
-  PetscReal dx;
-  /// grid spacing in the y direction
-  PetscReal dy;
-  /// domain extent in x
-  PetscReal Lx;
-  /// domain extent in y
-  PetscReal Ly;
-  /// water depth for the upstream of dam [m]
-  PetscReal hu;
-  /// water depth for the downstream of dam [m]
-  PetscReal hd;
-  /// water depth below which no horizontal flow occurs
-  PetscReal tiny_h;
-  /// total number of time steps
-  PetscInt Nt;
-  /// time step size
+
+  // mesh representing simulation domain
+  RDyMesh mesh;
+
+  // mesh regions
+  PetscInt   num_regions;
+  PetscInt  *region_ids;
+  RDyRegion *regions;
+
+  // mesh surfaces
+  PetscInt    num_surfaces;
+  PetscInt   *surface_ids;
+  RDySurface *surfaces;
+
+  // initial conditions associated with mesh regions (1 per region)
+  RDyCondition *initial_conditions;
+
+  // sources (and sinks) associated with mesh regions (1 per region)
+  RDyCondition *sources;
+
+  // boundary conditions associated with mesh surfaces (1 per surface)
+  RDyCondition *boundary_conditions;
+
+  // log file handle
+  FILE       *log;
+
+  //-----------------
+  // Simulation data
+  //-----------------
+
+  // time step size
   PetscReal dt;
-  /// index of current timestep
+  // index of current timestep
   PetscInt tstep;
 
   PetscInt  dof;
@@ -68,9 +111,6 @@ struct _p_RDy {
   Vec       localX;
   PetscBool debug, save, add_building;
   PetscBool interpolate;
-
-  /// mesh representing simulation domain
-  RDyMesh mesh;
 };
 
 #endif

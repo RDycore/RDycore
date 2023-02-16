@@ -1,4 +1,5 @@
 #include <petscdmplex.h>
+#include <private/rdymemoryimpl.h>
 #include <private/rdymeshimpl.h>
 
 // Returns true iff start <= closure < end.

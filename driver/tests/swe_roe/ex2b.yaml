@@ -1,0 +1,41 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c.
+
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  final_time: 0.005
+  unit: hours
+  max_step: 1000
+
+grid:
+  file: planar_dam_10x5.msh
+
+initial_conditions:
+  1: # upstream region
+    flow: dam_top_ic
+  2: # downstream region
+    flow: dam_bottom_ic
+
+# NOTE: We use reflecting boundary conditions for the boundary, top_wall, and
+# NOTE: bottom_wall surfaces
+
+flow_conditions:
+  dam_top_ic:
+    type: dirichlet
+    height: 10
+    momentum: [0, 0]
+  dam_bottom_ic:
+    type: dirichlet
+    height: 5
+    momentum: [0, 0]
+

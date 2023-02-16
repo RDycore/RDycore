@@ -1,3 +1,6 @@
 [submodule "external/cmocka"]
 	path = external/cmocka
 	url = https://git.cryptomilk.org/projects/cmocka.git
+[submodule "external/libyaml"]
+	path = external/libyaml
+	url = https://github.com/yaml/libyaml.git

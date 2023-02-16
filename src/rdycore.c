@@ -1,25 +1,35 @@
 #include <private/rdycoreimpl.h>
+#include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
-/// your program
+/// your program.
 PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   PetscFunctionBegin;
   if (!initialized_) {
-    PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
+    PetscBool petsc_initialized;
+    PetscCall(PetscInitialized(&petsc_initialized));
+    if (!petsc_initialized) {
+      PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
+    }
     initialized_ = PETSC_TRUE;
   }
   PetscFunctionReturn(0);
 }
 
-/// Initializes the RDycore library without arguments. It's used by the Fortran
-/// interface, which calls PetscInitialize itself and then this function.
-PetscErrorCode RDyInitNoArguments(void) {
+/// Initializes the RDycore library for use with Fortran. It's used by the
+/// Fortran interface.
+PetscErrorCode RDyInitFortran(void) {
   PetscFunctionBegin;
   if (!initialized_) {
-    PetscCall(PetscInitializeNoArguments());
+    PetscBool petsc_initialized;
+    PetscCall(PetscInitialized(&petsc_initialized));
+    if (!petsc_initialized) {
+      PetscCall(PetscInitializeNoArguments());
+      PetscCall(PetscInitializeFortran());
+    }
     initialized_ = PETSC_TRUE;
   }
   PetscFunctionReturn(0);
@@ -71,29 +81,68 @@ PetscErrorCode RDyFinalize(void) {
 PetscBool RDyInitialized(void) { return initialized_; }
 
 /// Creates a new RDy object representing an RDycore simulation context.
-/// @param comm [in] the MPI communicator used by the simulation
-/// @param rdy  [out] a pointer that stores the newly created RDy.
-PetscErrorCode RDyCreate(MPI_Comm comm, RDy *rdy) {
+/// @param comm        [in] the MPI communicator used by the simulation
+/// @param config_file [in] a path to a configuration (.yaml) file
+/// @param rdy         [out] a pointer that stores the newly created RDy.
+PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   PetscFunctionBegin;
 
   PetscCall(PetscNew(rdy));
+
+  // MPI comm stuff
+  (*rdy)->comm = comm;
+  MPI_Comm_rank(comm, &((*rdy)->rank));
+  MPI_Comm_size(comm, &((*rdy)->nproc));
+
+  // set the config file
+  strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
+
   PetscFunctionReturn(0);
 }
 
-/// Configures the given RDy object with options supplied on the command line.
-PetscErrorCode RDySetFromOptions(RDy rdy) {
+// fortran 90 version of RDyCreate
+PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rdy) {
   PetscFunctionBegin;
+
+  PetscCall(RDyCreate(MPI_Comm_f2c(*f90_comm), config_file, rdy));
+
   PetscFunctionReturn(0);
 }
 
-/// Performs any setup needed by RDy after it has been configured.
-PetscErrorCode RDySetup(RDy rdy) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(0);
-}
-
+/// Destroys the given RDy object, freeing any allocated resources.
+/// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
+
+  if ((*rdy)->initial_conditions) RDyFree((*rdy)->initial_conditions);
+  if ((*rdy)->sources) RDyFree((*rdy)->sources);
+  if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
+
+  // Destroy regions and surfaces.
+  for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
+    if ((*rdy)->regions[i].cell_ids) {
+      RDyFree((*rdy)->regions[i].cell_ids);
+    }
+  }
+  if ((*rdy)->region_ids) RDyFree((*rdy)->region_ids);
+  if ((*rdy)->regions) RDyFree((*rdy)->regions);
+
+  for (PetscInt i = 0; i < (*rdy)->num_surfaces; ++i) {
+    if ((*rdy)->surfaces[i].edge_ids) {
+      RDyFree((*rdy)->surfaces[i].edge_ids);
+    }
+  }
+  if ((*rdy)->surface_ids) RDyFree((*rdy)->surface_ids);
+  if ((*rdy)->surfaces) RDyFree((*rdy)->surfaces);
+
+  if ((*rdy)->dm) {
+    DMDestroy(&((*rdy)->dm));
+  }
+
+  if (((*rdy)->log) && ((*rdy)->log != stdout)) {
+    PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
+  }
+
   PetscCall(RDyFree(*rdy));
   *rdy = NULL;
   PetscFunctionReturn(0);

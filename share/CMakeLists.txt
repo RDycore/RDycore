@@ -1,0 +1,3 @@
+# Mesh data
+set(MESH_DIR ${CMAKE_CURRENT_SOURCE_DIR}/meshes)
+set(MESH_DIR ${MESH_DIR} PARENT_SCOPE)
