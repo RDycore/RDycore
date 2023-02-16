@@ -761,7 +761,7 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event, YamlParserState *stat
         PetscCall(ParsePhysicsSediment(event, state, config));
         break;
       case PHYSICS_SALINITY_SECTION:
-        PetscCall(ParsePhysicsSediment(event, state, config));
+        PetscCall(ParsePhysicsSalinity(event, state, config));
         break;
       case NUMERICS_SECTION:
         PetscCall(ParseNumerics(event, state, config));
