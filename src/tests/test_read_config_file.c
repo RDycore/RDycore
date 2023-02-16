@@ -51,10 +51,9 @@ static PetscErrorCode ReadConfigString(void **state, RDy rdy, const char *config
   MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_MAX, rdy->comm);
 
   // remove the file
-  /*
   if (rdy->rank == 0) {
     remove(rdy->config_file);
-  }*/
+  }
 
   return ierr;
 }
