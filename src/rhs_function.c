@@ -491,7 +491,7 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   }
   */
 
-  RDyLogInfo(rdy, "Time step %d: t = %f, CFL = %f\n", rdy->step, t, amax_value * rdy->dt * 2);
+  RDyLogInfo(rdy, "Time step %d: t = %f, CFL = %f", rdy->step, t, amax_value * rdy->dt * 2);
   rdy->step++;
 
   PetscFunctionReturn(0);

@@ -34,8 +34,8 @@ static const char *RDyLogLabels[5] = {
 // Writes a log message at the given level of detail, plus a newline. You don't
 // need to wrap this in PetscCall.
 #define RDyLog(rdy, level, ...) \
-  if (((rdy)->config.log_level > LOG_NONE) && (level >= (rdy)->config.log_level)) { \
-    PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, "%s", RDyLogLabels[(rdy)->config.log_level])); \
+  if (((rdy)->config.log_level > LOG_NONE) && ((rdy)->config.log_level >= level)) { \
+    PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, "%s", RDyLogLabels[level])); \
     PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, __VA_ARGS__)); \
     PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, "\n")); \
   }

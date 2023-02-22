@@ -385,7 +385,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
     // If no flow condition was specified for a boundary, we set it to our
     // reflecting flow condition.
     if (!strlen(bc_spec->flow_name)) {
-      RDyLogDebug(rdy, "Setting reflecting flow condition for surface %d\n", surface_id);
+      RDyLogDebug(rdy, "Setting reflecting flow condition for surface %d", surface_id);
       bc->flow = reflecting_flow;
     } else {
       PetscInt flow_index;
@@ -421,6 +421,10 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->B));
   PetscCall(DMCreateLocalVector(rdy->aux_dm, &rdy->B_local));
+
+  PetscInt n_dof;
+  PetscCall(VecGetSize(rdy->X, &n_dof));
+  RDyLogDebug(rdy, "Global degrees of freedom: %d", n_dof);
 
   // set up a TS solver
   PetscCall(TSCreate(rdy->comm, &rdy->ts));
@@ -468,19 +472,23 @@ static PetscErrorCode InitSolution(RDy rdy) {
   } else {
     // we initialize from specified initial conditions by looping over regions
     // and writing values for corresponding cells
+    PetscInt n_local;
+    PetscCall(VecGetLocalSize(rdy->X, &n_local));
     PetscScalar *x_ptr;
-    VecGetArray(rdy->X, &x_ptr);
+    PetscCall(VecGetArray(rdy->X, &x_ptr));
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       RDyRegion    *region = &rdy->regions[r];
       RDyCondition *ic     = &rdy->initial_conditions[r];
       for (PetscInt c = 0; c < region->num_cells; ++c) {
-        PetscInt cell_id       = region->cell_ids[c];
-        x_ptr[3 * cell_id]     = ic->flow->height;
-        x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
-        x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+        PetscInt cell_id = region->cell_ids[c];
+        if (3 * cell_id < n_local) {  // skip ghost cells
+          x_ptr[3 * cell_id]     = ic->flow->height;
+          x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
+          x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+        }
       }
     }
-    VecRestoreArray(rdy->X, &x_ptr);
+    PetscCall(VecRestoreArray(rdy->X, &x_ptr));
   }
 
   PetscFunctionReturn(0);
