@@ -25,9 +25,7 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
   }
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
-  {
-    PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL));
-  }
+  { PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL)); }
   PetscOptionsEnd();
 
   PetscFunctionReturn(0);

@@ -443,8 +443,7 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
     PetscInt l          = edges->cell_ids[cellOffset];
     PetscInt r          = edges->cell_ids[cellOffset + 1];
 
-    PetscCheck(l >= 0, comm, PETSC_ERR_USER,
-      "non-internal 'left' edge %d encountered (expected internal edge)", l);
+    PetscCheck(l >= 0, comm, PETSC_ERR_USER, "non-internal 'left' edge %d encountered (expected internal edge)", l);
     PetscBool is_internal_edge = (r >= 0);
 
     if (is_internal_edge) {
@@ -566,9 +565,7 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
 // xyz0 - coordinates of the first vertex of the triangle
 // xyz1 - coordinates of the second vertex of the triangle
 // xyz2 - coordinates of the third vertex of the triangle
-static PetscBool AreVerticesOrientedCounterClockwise(PetscReal xyz0[3],
-                                                     PetscReal xyz1[3],
-                                                     PetscReal xyz2[3]) {
+static PetscBool AreVerticesOrientedCounterClockwise(PetscReal xyz0[3], PetscReal xyz1[3], PetscReal xyz2[3]) {
   PetscFunctionBegin;
 
   PetscBool result = PETSC_TRUE;
@@ -595,11 +592,7 @@ static PetscBool AreVerticesOrientedCounterClockwise(PetscReal xyz0[3],
 // xyz2 - Coordinates of the third vertex of the triangle
 // dz_dx - Slope in x-direction
 // dz_dy - Slope in y-direction
-static PetscErrorCode ComputeXYSlopesForTriangle(PetscReal xyz0[3],
-                                                 PetscReal xyz1[3],
-                                                 PetscReal xyz2[3],
-                                                 PetscReal *dz_dx,
-                                                 PetscReal *dz_dy) {
+static PetscErrorCode ComputeXYSlopesForTriangle(PetscReal xyz0[3], PetscReal xyz1[3], PetscReal xyz2[3], PetscReal *dz_dx, PetscReal *dz_dy) {
   PetscFunctionBegin;
 
   PetscReal x0, y0, z0;
@@ -651,8 +644,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     PetscInt nverts = cells->num_vertices[icell];
 
-    PetscCheck((nverts == 3) || (nverts == 4), comm, PETSC_ERR_USER,
-      "Cell has %d vertices (must be 3 or 4)", nverts);
+    PetscCheck((nverts == 3) || (nverts == 4), comm, PETSC_ERR_USER, "Cell has %d vertices (must be 3 or 4)", nverts);
 
     if (nverts == 3) {
       PetscInt offset = cells->vertex_offsets[icell];
@@ -663,7 +655,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
       PetscCall(ComputeXYSlopesForTriangle(vertices->points[v0].X, vertices->points[v1].X, vertices->points[v2].X, &cells->dz_dx[icell],
                                            &cells->dz_dy[icell]));
 
-    } else { // nverts == 4
+    } else {  // nverts == 4
       PetscInt offset = cells->vertex_offsets[icell];
       PetscInt v0     = cells->vertex_ids[offset + 0];
       PetscInt v1     = cells->vertex_ids[offset + 1];

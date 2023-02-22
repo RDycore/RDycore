@@ -12,9 +12,8 @@ static const PetscReal GRAVITY = 9.806;
 // hv - Momentum in y-dir
 // u - Velocity in x-dir
 // v - Velocity in y-dir
-static PetscErrorCode GetVelocityFromMomentum(PetscInt N, PetscReal tiny_h,
-  const PetscReal h[N], const PetscReal hu[N], const PetscReal hv[N],
-  PetscReal u[N], PetscReal v[N]) {
+static PetscErrorCode GetVelocityFromMomentum(PetscInt N, PetscReal tiny_h, const PetscReal h[N], const PetscReal hu[N], const PetscReal hv[N],
+                                              PetscReal u[N], PetscReal v[N]) {
   PetscFunctionBeginUser;
 
   for (PetscInt n = 0; n < N; n++) {
@@ -42,13 +41,9 @@ static PetscErrorCode GetVelocityFromMomentum(PetscInt N, PetscReal tiny_h,
 // cn   - cosine of the angle between edge and y-axis
 // fij  - flux
 // amax - maximum wave speed
-static PetscErrorCode ComputeRoeFlux(PetscInt N,
-  const PetscReal hl[N], const PetscReal hr[N],
-  const PetscReal ul[N], const PetscReal ur[N],
-  const PetscReal vl[N], const PetscReal vr[N],
-  const PetscReal sn[N], const PetscReal cn[N],
-  PetscReal fij[N][3], PetscReal amax[N]) {
-
+static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N],
+                                     const PetscReal vl[N], const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3],
+                                     PetscReal amax[N]) {
   PetscFunctionBeginUser;
 
   for (PetscInt n = 0; n < N; n++) {
@@ -138,8 +133,7 @@ static PetscErrorCode ComputeRoeFlux(PetscInt N,
 }
 
 // computes RHS on internal edges
-static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F,
-  PetscReal *amax_value) {
+static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *amax_value) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy->mesh;
@@ -153,11 +147,11 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F,
   PetscCall(VecGetArray(rdy->B_local, &b_ptr));
 
   const PetscInt ndof = 3;
-  PetscInt  num = mesh->num_internal_edges;
-  PetscReal hl_vec_int[num], hul_vec_int[num], hvl_vec_int[num], ul_vec_int[num], vl_vec_int[num];
-  PetscReal hr_vec_int[num], hur_vec_int[num], hvr_vec_int[num], ur_vec_int[num], vr_vec_int[num];
-  PetscReal sn_vec_int[num], cn_vec_int[num];
-  PetscReal flux_vec_int[num][3], amax_vec_int[num];
+  PetscInt       num  = mesh->num_internal_edges;
+  PetscReal      hl_vec_int[num], hul_vec_int[num], hvl_vec_int[num], ul_vec_int[num], vl_vec_int[num];
+  PetscReal      hr_vec_int[num], hur_vec_int[num], hvr_vec_int[num], ur_vec_int[num], vr_vec_int[num];
+  PetscReal      sn_vec_int[num], cn_vec_int[num];
+  PetscReal      flux_vec_int[num][3], amax_vec_int[num];
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -215,10 +209,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F,
   }
 
   // Call Riemann solver (only Roe currently supported)
-  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm,
-    PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, hl_vec_int, hr_vec_int, ul_vec_int, ur_vec_int,
-    vl_vec_int, vr_vec_int, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
+  PetscCall(ComputeRoeFlux(num, hl_vec_int, hr_vec_int, ul_vec_int, ur_vec_int, vl_vec_int, vr_vec_int, sn_vec_int, cn_vec_int, flux_vec_int,
+                           amax_vec_int));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -274,8 +267,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F,
 }
 
 // computes RHS on boundary edges
-static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F,
-  PetscReal *amax_value) {
+static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *amax_value) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy->mesh;
@@ -289,11 +281,11 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F,
   PetscCall(VecGetArray(rdy->B_local, &b_ptr));
 
   const PetscInt ndof = 3;
-  PetscInt  num  = mesh->num_boundary_edges;
-  PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
-  PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
-  PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
-  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
+  PetscInt       num  = mesh->num_boundary_edges;
+  PetscReal      hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
+  PetscReal      hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
+  PetscReal      sn_vec_bnd[num], cn_vec_bnd[num];
+  PetscReal      flux_vec_bnd[num][3], amax_vec_bnd[num];
 
   const PetscReal tiny_h = rdy->config.tiny_h;
 
@@ -336,10 +328,9 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F,
   }
 
   // Call Riemann solver (only Roe is currently supported)
-  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm,
-    PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd,
-    vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd, amax_vec_bnd));
+  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
+  PetscCall(ComputeRoeFlux(num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
+                           amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
@@ -396,8 +387,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   }
 
   // Compute u/v for cells
-  PetscCall(GetVelocityFromMomentum(N, rdy->config.tiny_h, h_vec, hu_vec,
-    hv_vec, u_vec, v_vec));
+  PetscCall(GetVelocityFromMomentum(N, rdy->config.tiny_h, h_vec, hu_vec, hv_vec, u_vec, v_vec));
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {
