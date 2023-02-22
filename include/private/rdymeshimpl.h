@@ -54,111 +54,127 @@ typedef struct {
 
   /// offsets of first neighbors in neighbor_ids for cells
   PetscInt *neighbor_offsets;
-  /// IDs of neighbors for cells
+  // IDs of neighbors for cells
   PetscInt *neighbor_ids;
 
-  /// cell centroids
+  // cell centroids
   RDyPoint *centroids;
-  /// cell areas
+  // cell areas
   PetscReal *areas;
+
+  // surface x and y slopes
+  PetscReal *dz_dx, *dz_dy;
+
 } RDyCells;
 
-/// A struct of arrays storing information about mesh vertices. The ith element
-/// in each array stores a property for vertex i.
+// A struct of arrays storing information about mesh vertices. The ith element
+// in each array stores a property for vertex i.
 typedef struct {
-  /// local IDs of vertices in local numbering
+  // local IDs of vertices in local numbering
   PetscInt *ids;
-  /// global IDs of vertices in local numbering
+  // global IDs of vertices in local numbering
   PetscInt *global_ids;
 
-  /// PETSC_TRUE iff vertex is attached to a local cell
+  // PETSC_TRUE iff vertex is attached to a local cell
   PetscBool *is_local;
 
-  /// numbers of cells attached to vertices
+  // numbers of cells attached to vertices
   PetscInt *num_cells;
-  /// numbers of edges attached to vertices
+  // numbers of edges attached to vertices
   PetscInt *num_edges;
 
-  /// offsets of first vertex edges in edge_ids
+  // offsets of first vertex edges in edge_ids
   PetscInt *edge_offsets;
-  /// IDs of edges attached to vertices
+  // IDs of edges attached to vertices
   PetscInt *edge_ids;
 
-  /// offsets of first vertex cells in cell_ids
+  // offsets of first vertex cells in cell_ids
   PetscInt *cell_offsets;
-  /// IDs of local cells attached to vertices
+  // IDs of local cells attached to vertices
   PetscInt *cell_ids;
 
-  /// vertex positions
+  // vertex positions
   RDyPoint *points;
 } RDyVertices;
 
-/// A struct of arrays storing information about edges separating mesh cells.
-/// The ith element in each array stores a property for edge i.
+// A struct of arrays storing information about edges separating mesh cells.
+// The ith element in each array stores a property for edge i.
 typedef struct {
-  /// local IDs of edges in local numbering
+  // local IDs of edges in local numbering
   PetscInt *ids;
-  /// global IDs of edges in local numbering
+  // global IDs of edges in local numbering
   PetscInt *global_ids;
+  // local IDs of internal edges
+  PetscInt *internal_edge_ids;
+  // local IDs of boundary edges
+  PetscInt *boundary_edge_ids;
 
-  /// PETSC_TRUE iff edge is shared by locally owned cells, OR
-  /// if it is shared by a local cell c1 and non-local cell c2 such that
-  /// global ID(c1) < global ID(c2).
+  // PETSC_TRUE iff edge is shared by locally owned cells, OR
+  // if it is shared by a local cell c1 and non-local cell c2 such that
+  // global ID(c1) < global ID(c2).
   PetscBool *is_local;
 
-  /// numbers of cells attached to edges
+  // numbers of cells attached to edges
   PetscInt *num_cells;
-  /// numbers of vertices attached to edges
+  // numbers of vertices attached to edges
   PetscInt *vertex_ids;
 
-  /// offsets of first edge cells in cell_ids
+  // offsets of first edge cells in cell_ids
   PetscInt *cell_offsets;
-  /// IDs of cells attached to edges
+  // IDs of cells attached to edges
   PetscInt *cell_ids;
 
-  /// false if the edge is on the domain boundary
+  // false if the edge is on the domain boundary
   PetscBool *is_internal;
 
-  /// unit vector pointing out of one cell into another for each edge
+  // unit vector pointing out of one cell into another for each edge
   RDyVector *normals;
-  /// edge centroids
+  // edge centroids
   RDyPoint *centroids;
-  /// edge lengths
+  // edge lengths
   PetscReal *lengths;
+  // cosine of the angle between edge and y-axis
+  PetscReal *cn;
+  // sine of the angle between edge and y-axis
+  PetscReal *sn;
 } RDyEdges;
 
-/// A mesh representing a computational domain consisting of a set of cells
-/// connected by edges and vertices
+// A mesh representing a computational domain consisting of a set of cells
+// connected by edges and vertices
 typedef struct RDyMesh {
-  /// spatial dimension of the mesh (1, 2, or 3)
+  // spatial dimension of the mesh (1, 2, or 3)
   PetscInt dim;
 
-  /// number of cells in the mesh (across all processes)
+  // number of cells in the mesh (across all processes)
   PetscInt num_cells;
-  /// number of cells in the mesh stored on the local process
+  // number of cells in the mesh stored on the local process
   PetscInt num_cells_local;
-  /// number of edges in the mesh attached to locally stored cells
+  // number of edges in the mesh attached to locally stored cells
   PetscInt num_edges;
-  /// number of vertices in the mesh attached to locally stored cells
+  /// number of edges that are internal (i.e. shared by two cells)
+  PetscInt num_internal_edges;
+  /// number of edges that are on the boundary
+  PetscInt num_boundary_edges;
+  // number of vertices in the mesh attached to locally stored cells
   PetscInt num_vertices;
-  /// number of faces on the domain boundary attached to locally stored cells
+  // number of faces on the domain boundary attached to locally stored cells
   PetscInt num_boundary_faces;
 
-  /// the maximum number of vertices attached to any cell
+  // the maximum number of vertices attached to any cell
   PetscInt max_vertex_cells;
-  /// the maximum number of vertices attached to any face
+  // the maximum number of vertices attached to any face
   PetscInt max_vertex_faces;
 
-  /// cell information
+  // cell information
   RDyCells cells;
-  /// vertex information
+  // vertex information
   RDyVertices vertices;
-  /// edge information
+  // edge information
   RDyEdges edges;
 
-  /// closure sizes and data for locally stored cells
+  // closure sizes and data for locally stored cells
   PetscInt *closureSize, **closure;
-  /// the maximum closure size for any cell (locally stored?)
+  // the maximum closure size for any cell (locally stored?)
   PetscInt maxClosureSize;
 } RDyMesh;
 

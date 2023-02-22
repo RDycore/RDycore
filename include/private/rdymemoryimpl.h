@@ -28,7 +28,7 @@
 // NOTE: produce an "unused value" warning with certain compiler settings if
 // NOTE: the error code is not captured by the caller. Since we use the
 // NOTE: PetscCall(func(args)) convention, this shouldn't be an issue.
-#define RDyFill(type, memory, count, value) \
+#define RDyFill(type, count, memory, value) \
   0;                                        \
   for (size_t i = 0; i < (count); ++i) {    \
     memory[i] = (type)value;                \

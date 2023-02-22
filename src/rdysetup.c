@@ -9,6 +9,9 @@ static PetscErrorCode SetDefaults(RDy rdy) {
 
   rdy->config.log_level = LOG_INFO;
 
+  // set the water depth below which no flow occurs
+  rdy->config.tiny_h = 1e-7;
+
   PetscFunctionReturn(0);
 }
 
@@ -20,7 +23,12 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
     // ѕet a default timestep if needed
     rdy->dt = rdy->config.final_time / rdy->config.max_step;
   }
-  PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL));
+
+  PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
+  {
+    PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL));
+  }
+  PetscOptionsEnd();
 
   PetscFunctionReturn(0);
 }
@@ -47,10 +55,10 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(PetscObjectSetName((PetscObject)rdy->dm, "grid"));
   PetscCall(DMSetFromOptions(rdy->dm));
 
-  // create a section with (h, px, py) as degrees of freedom
+  // create a section with (h, hu, hv) as degrees of freedom
   PetscInt     n_field            = 3;
   PetscInt     n_field_dof[3]     = {1, 1, 1};
-  char         field_names[3][20] = {"height", "x-momentum", "y-momentum"};
+  char         field_names[3][20] = {"height", "x momentum", "y momentum"};
   PetscSection sec;
   PetscCall(PetscSectionCreate(rdy->comm, &sec));
   PetscCall(PetscSectionSetNumFields(sec, n_field));

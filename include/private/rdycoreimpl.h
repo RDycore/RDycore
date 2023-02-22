@@ -125,5 +125,4 @@ PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 PETSC_INTERN PetscErrorCode RHSFunction(TS, PetscReal, Vec, Vec, void*);
 
-
 #endif

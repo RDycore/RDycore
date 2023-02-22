@@ -1,4 +1,5 @@
 #include <petscdmplex.h>
+#include <private/rdymathimpl.h>
 #include <private/rdymemoryimpl.h>
 #include <private/rdymeshimpl.h>
 
@@ -20,35 +21,37 @@ PetscErrorCode RDyCellsCreate(PetscInt num_cells, RDyCells *cells) {
   PetscCall(RDyAlloc(PetscInt, num_cells, &cells->ids));
   PetscCall(RDyAlloc(PetscInt, num_cells, &cells->global_ids));
   PetscCall(RDyAlloc(PetscInt, num_cells, &cells->natural_ids));
-  PetscCall(RDyFill(PetscInt, cells->global_ids, num_cells, -1));
-  PetscCall(RDyFill(PetscInt, cells->natural_ids, num_cells, -1));
+  PetscCall(RDyFill(PetscInt, num_cells, cells->global_ids, -1));
+  PetscCall(RDyFill(PetscInt, num_cells, cells->natural_ids, -1));
 
   PetscCall(RDyAlloc(PetscBool, num_cells, &cells->is_local));
-  PetscCall(RDyFill(PetscInt, cells->is_local, num_cells, PETSC_FALSE));
+  PetscCall(RDyFill(PetscInt, num_cells, cells->is_local, PETSC_FALSE));
 
   PetscCall(RDyAlloc(PetscInt, num_cells, &cells->num_vertices));
   PetscCall(RDyAlloc(PetscInt, num_cells, &cells->num_edges));
   PetscCall(RDyAlloc(PetscInt, num_cells, &cells->num_neighbors));
-  PetscCall(RDyFill(PetscInt, cells->num_vertices, num_cells, -1));
-  PetscCall(RDyFill(PetscInt, cells->num_edges, num_cells, -1));
-  PetscCall(RDyFill(PetscInt, cells->num_neighbors, num_cells, -1));
+  PetscCall(RDyFill(PetscInt, num_cells, cells->num_vertices, -1));
+  PetscCall(RDyFill(PetscInt, num_cells, cells->num_edges, -1));
+  PetscCall(RDyFill(PetscInt, num_cells, cells->num_neighbors, -1));
 
   PetscCall(RDyAlloc(PetscInt, num_cells + 1, &cells->vertex_offsets));
   PetscCall(RDyAlloc(PetscInt, num_cells + 1, &cells->edge_offsets));
   PetscCall(RDyAlloc(PetscInt, num_cells + 1, &cells->neighbor_offsets));
-  PetscCall(RDyFill(PetscInt, cells->vertex_offsets, num_cells + 1, -1));
-  PetscCall(RDyFill(PetscInt, cells->edge_offsets, num_cells + 1, -1));
-  PetscCall(RDyFill(PetscInt, cells->neighbor_offsets, num_cells + 1, -1));
+  PetscCall(RDyFill(PetscInt, num_cells + 1, cells->vertex_offsets, -1));
+  PetscCall(RDyFill(PetscInt, num_cells + 1, cells->edge_offsets, -1));
+  PetscCall(RDyFill(PetscInt, num_cells + 1, cells->neighbor_offsets, -1));
 
   PetscCall(RDyAlloc(PetscInt, num_cells * vertices_per_cell, &cells->vertex_ids));
   PetscCall(RDyAlloc(PetscInt, num_cells * edges_per_cell, &cells->edge_ids));
   PetscCall(RDyAlloc(PetscInt, num_cells * neighbors_per_cell, &cells->neighbor_ids));
-  PetscCall(RDyFill(PetscInt, cells->vertex_ids, num_cells * vertices_per_cell, -1));
-  PetscCall(RDyFill(PetscInt, cells->edge_ids, num_cells * edges_per_cell, -1));
-  PetscCall(RDyFill(PetscInt, cells->neighbor_ids, num_cells * neighbors_per_cell, -1));
+  PetscCall(RDyFill(PetscInt, num_cells * vertices_per_cell, cells->vertex_ids, -1));
+  PetscCall(RDyFill(PetscInt, num_cells * edges_per_cell, cells->edge_ids, -1));
+  PetscCall(RDyFill(PetscInt, num_cells * neighbors_per_cell, cells->neighbor_ids, -1));
 
   PetscCall(RDyAlloc(RDyPoint, num_cells, &cells->centroids));
   PetscCall(RDyAlloc(PetscReal, num_cells, &cells->areas));
+  PetscCall(RDyAlloc(PetscReal, num_cells, &cells->dz_dx));
+  PetscCall(RDyAlloc(PetscReal, num_cells, &cells->dz_dy));
 
   for (PetscInt icell = 0; icell < num_cells; icell++) {
     cells->ids[icell]           = icell;
@@ -77,18 +80,18 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
-  PetscInt cStart, cEnd;
-  PetscInt eStart, eEnd;
-  PetscInt vStart, vEnd;
-  DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);
-  DMPlexGetDepthStratum(dm, 1, &eStart, &eEnd);
-  DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd);
+  PetscInt c_start, c_end;
+  PetscInt e_start, e_end;
+  PetscInt v_start, v_end;
+  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+  DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
+  DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate cell storage
-  PetscCall(RDyCellsCreate(cEnd - cStart, cells));
+  PetscCall(RDyCellsCreate(c_end - c_start, cells));
 
-  for (PetscInt c = cStart; c < cEnd; c++) {
-    PetscInt  icell = c - cStart;
+  for (PetscInt c = c_start; c < c_end; c++) {
+    PetscInt  icell = c - c_start;
     PetscInt  dim   = 2;
     PetscReal centroid[dim], normal[dim];
     DMPlexComputeCellGeometryFVM(dm, c, &cells->areas[icell], &centroid[0], &normal[0]);
@@ -115,15 +118,15 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
 
     PetscCall(DMPlexGetTransitiveClosure(dm, c, use_cone, &pSize, &p));
     for (PetscInt i = 2; i < pSize * 2; i += 2) {
-      if (IsClosureWithinBounds(p[i], eStart, eEnd)) {
+      if (IsClosureWithinBounds(p[i], e_start, e_end)) {
         PetscInt offset        = cells->edge_offsets[icell];
         PetscInt index         = offset + cells->num_edges[icell];
-        cells->edge_ids[index] = p[i] - eStart;
+        cells->edge_ids[index] = p[i] - e_start;
         cells->num_edges[icell]++;
       } else {
         PetscInt offset          = cells->vertex_offsets[icell];
         PetscInt index           = offset + cells->num_vertices[icell];
-        cells->vertex_ids[index] = p[i] - vStart;
+        cells->vertex_ids[index] = p[i] - v_start;
         cells->num_vertices[icell]++;
       }
     }
@@ -155,6 +158,8 @@ PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(RDyFree(cells.neighbor_ids));
   PetscCall(RDyFree(cells.centroids));
   PetscCall(RDyFree(cells.areas));
+  PetscCall(RDyFree(cells.dz_dx));
+  PetscCall(RDyFree(cells.dz_dy));
 
   PetscFunctionReturn(0);
 }
@@ -174,7 +179,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
   PetscCall(RDyAlloc(PetscInt, num_vertices, &vertices->global_ids));
   PetscCall(RDyAlloc(PetscInt, num_vertices, &vertices->num_cells));
   PetscCall(RDyAlloc(PetscInt, num_vertices, &vertices->num_edges));
-  PetscCall(RDyFill(PetscInt, vertices->global_ids, num_vertices, -1));
+  PetscCall(RDyFill(PetscInt, num_vertices, vertices->global_ids, -1));
 
   PetscCall(RDyAlloc(PetscBool, num_vertices, &vertices->is_local));
 
@@ -185,8 +190,8 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 
   PetscCall(RDyAlloc(PetscInt, num_vertices * edges_per_vertex, &vertices->edge_ids));
   PetscCall(RDyAlloc(PetscInt, num_vertices * cells_per_vertex, &vertices->cell_ids));
-  PetscCall(RDyFill(PetscInt, vertices->edge_ids, num_vertices * edges_per_vertex, -1));
-  PetscCall(RDyFill(PetscInt, vertices->cell_ids, num_vertices * cells_per_vertex, -1));
+  PetscCall(RDyFill(PetscInt, num_vertices * edges_per_vertex, vertices->edge_ids, -1));
+  PetscCall(RDyFill(PetscInt, num_vertices * cells_per_vertex, vertices->cell_ids, -1));
 
   for (PetscInt ivertex = 0; ivertex < num_vertices; ivertex++) {
     vertices->ids[ivertex] = ivertex;
@@ -208,15 +213,15 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   PetscFunctionBegin;
 
-  PetscInt cStart, cEnd;
-  PetscInt eStart, eEnd;
-  PetscInt vStart, vEnd;
-  DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);
-  DMPlexGetDepthStratum(dm, 1, &eStart, &eEnd);
-  DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd);
+  PetscInt c_start, c_end;
+  PetscInt e_start, e_end;
+  PetscInt v_start, v_end;
+  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+  DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
+  DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate vertex storage
-  PetscCall(RDyVerticesCreate(vEnd - vStart, vertices));
+  PetscCall(RDyVerticesCreate(v_end - v_start, vertices));
 
   PetscSection coordSection;
   Vec          coordinates;
@@ -225,8 +230,8 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   PetscReal *coords;
   VecGetArray(coordinates, &coords);
 
-  for (PetscInt v = vStart; v < vEnd; v++) {
-    PetscInt  ivertex = v - vStart;
+  for (PetscInt v = v_start; v < v_end; v++) {
+    PetscInt  ivertex = v - v_start;
     PetscInt  pSize;
     PetscInt *p = NULL;
 
@@ -242,15 +247,15 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
     vertices->num_cells[ivertex] = 0;
 
     for (PetscInt i = 2; i < pSize * 2; i += 2) {
-      if (IsClosureWithinBounds(p[i], eStart, eEnd)) {
+      if (IsClosureWithinBounds(p[i], e_start, e_end)) {
         PetscInt offset           = vertices->edge_offsets[ivertex];
         PetscInt index            = offset + vertices->num_edges[ivertex];
-        vertices->edge_ids[index] = p[i] - eStart;
+        vertices->edge_ids[index] = p[i] - e_start;
         vertices->num_edges[ivertex]++;
       } else {
         PetscInt offset           = vertices->cell_offsets[ivertex];
         PetscInt index            = offset + vertices->num_cells[ivertex];
-        vertices->cell_ids[index] = p[i] - cStart;
+        vertices->cell_ids[index] = p[i] - c_start;
         vertices->num_cells[ivertex]++;
       }
     }
@@ -298,20 +303,24 @@ PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->global_ids));
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->num_cells));
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->vertex_ids));
-  PetscCall(RDyFill(PetscInt, edges->global_ids, num_edges, -1));
-  PetscCall(RDyFill(PetscInt, edges->num_cells, num_edges, -1));
-  PetscCall(RDyFill(PetscInt, edges->vertex_ids, num_edges, -1));
+  PetscCall(RDyFill(PetscInt, num_edges, edges->global_ids, -1));
+  PetscCall(RDyFill(PetscInt, num_edges, edges->num_cells, -1));
+  PetscCall(RDyFill(PetscInt, num_edges, edges->vertex_ids, -1));
 
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_local));
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_internal));
 
   PetscCall(RDyAlloc(PetscInt, num_edges + 1, &edges->cell_offsets));
   PetscCall(RDyAlloc(PetscInt, num_edges * cells_per_edge, &edges->cell_ids));
-  PetscCall(RDyFill(PetscInt, edges->cell_ids, num_edges * cells_per_edge, -1));
+  PetscCall(RDyFill(PetscInt, num_edges * cells_per_edge, edges->cell_ids, -1));
 
   PetscCall(RDyAlloc(RDyPoint, num_edges, &edges->centroids));
   PetscCall(RDyAlloc(RDyVector, num_edges, &edges->normals));
   PetscCall(RDyAlloc(PetscReal, num_edges, &edges->lengths));
+  PetscCall(RDyAlloc(PetscReal, num_edges, &edges->cn));
+  PetscCall(RDyAlloc(PetscReal, num_edges, &edges->sn));
+  PetscCall(RDyFill(PetscReal, num_edges, edges->cn, 0.0));
+  PetscCall(RDyFill(PetscReal, num_edges, edges->sn, 0.0));
 
   for (PetscInt iedge = 0; iedge < num_edges; iedge++) {
     edges->ids[iedge] = iedge;
@@ -335,18 +344,18 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
-  PetscInt cStart, cEnd;
-  PetscInt eStart, eEnd;
-  PetscInt vStart, vEnd;
-  DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);
-  DMPlexGetDepthStratum(dm, 1, &eStart, &eEnd);
-  DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd);
+  PetscInt c_start, c_end;
+  PetscInt e_start, e_end;
+  PetscInt v_start, v_end;
+  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+  DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
+  DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate edge storage
-  PetscCall(RDyEdgesCreate(eEnd - eStart, edges));
+  PetscCall(RDyEdgesCreate(e_end - e_start, edges));
 
-  for (PetscInt e = eStart; e < eEnd; e++) {
-    PetscInt  iedge = e - eStart;
+  for (PetscInt e = e_start; e < e_end; e++) {
+    PetscInt  iedge = e - e_start;
     PetscInt  dim   = 2;
     PetscReal centroid[dim], normal[dim];
     DMPlexComputeCellGeometryFVM(dm, e, &edges->lengths[iedge], &centroid[0], &normal[0]);
@@ -363,8 +372,8 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
     PetscCall(DMPlexGetTransitiveClosure(dm, e, use_cone, &pSize, &p));
     PetscAssert(pSize == 3, comm, PETSC_ERR_ARG_SIZ, "Incorrect transitive closure size!");
     PetscInt index               = iedge * 2;
-    edges->vertex_ids[index + 0] = p[2] - vStart;
-    edges->vertex_ids[index + 1] = p[4] - vStart;
+    edges->vertex_ids[index + 0] = p[2] - v_start;
+    edges->vertex_ids[index + 1] = p[4] - v_start;
     PetscCall(DMPlexRestoreTransitiveClosure(dm, e, use_cone, &pSize, &p));
 
     // edge-to-cell
@@ -374,7 +383,7 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
     for (PetscInt i = 2; i < pSize * 2; i += 2) {
       PetscInt offset        = edges->cell_offsets[iedge];
       PetscInt index         = offset + edges->num_cells[iedge];
-      edges->cell_ids[index] = p[i] - cStart;
+      edges->cell_ids[index] = p[i] - c_start;
       edges->num_cells[iedge]++;
     }
     PetscCall(DMPlexRestoreTransitiveClosure(dm, e, PETSC_FALSE, &pSize, &p));
@@ -392,6 +401,8 @@ PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
 
   PetscCall(RDyFree(edges.ids));
   PetscCall(RDyFree(edges.global_ids));
+  PetscCall(RDyFree(edges.internal_edge_ids));
+  PetscCall(RDyFree(edges.boundary_edge_ids));
   PetscCall(RDyFree(edges.is_local));
   PetscCall(RDyFree(edges.num_cells));
   PetscCall(RDyFree(edges.vertex_ids));
@@ -401,6 +412,289 @@ PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(RDyFree(edges.normals));
   PetscCall(RDyFree(edges.centroids));
   PetscCall(RDyFree(edges.lengths));
+  PetscCall(RDyFree(edges.cn));
+  PetscCall(RDyFree(edges.sn));
+
+  PetscFunctionReturn(0);
+}
+
+// computes attributes about edges needed by RDycore.
+static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyEdges    *edges    = &mesh->edges;
+  RDyVertices *vertices = &mesh->vertices;
+
+  PetscInt c_start, c_end;
+  PetscInt e_start, e_end;
+  PetscInt v_start, v_end;
+  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+  DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
+  DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
+
+  for (PetscInt e = e_start; e < e_end; e++) {
+    PetscInt iedge = e - e_start;
+
+    PetscInt cellOffset = edges->cell_offsets[iedge];
+    PetscInt l          = edges->cell_ids[cellOffset];
+    PetscInt r          = edges->cell_ids[cellOffset + 1];
+
+    PetscCheck(l >= 0, comm, PETSC_ERR_USER,
+      "non-internal 'left' edge %d encountered (expected internal edge)", l);
+    PetscBool is_internal_edge = (r >= 0);
+
+    if (is_internal_edge) {
+      mesh->num_internal_edges++;
+    } else {
+      mesh->num_boundary_edges++;
+    }
+
+    /*
+                 Case-1                      Case-2                       Update Case-2
+
+                    v2                         v2                             v1
+                   /|\                        /|\                             |
+                    |                          |                              |
+                    |---> normal               | ----> normal     normal <----|
+                    |                          |                              |
+             L -----|-----> R          R <-----|----- L               R <-----|----- L
+                    |                          |                              |
+                    |                          |                              |
+                    |                          |                             \|/
+                    v1                         v1                             v2
+
+    In DMPlex, the cross product of the normal vector to the edge and vector joining the
+    vertices of the edge (i.e. v1Tov2)  always points in the positive z-direction.
+    However, the vector joining the left and the right cell may not be in the same direction
+    as the normal vector to the edge (Case-2). Thus, the edge information in the Case-2 is
+    updated by spawing the vertex ids and flipping the edge normal.
+    */
+
+    PetscInt v_offset = iedge * 2;
+    PetscInt vid_1    = edges->vertex_ids[v_offset + 0];
+    PetscInt vid_2    = edges->vertex_ids[v_offset + 1];
+
+    RDyVector edge_parallel;  // a vector parallel along the edge in 2D
+    for (PetscInt idim = 0; idim < 2; idim++) {
+      edge_parallel.V[idim] = vertices->points[vid_2].X[idim] - vertices->points[vid_1].X[idim];
+    }
+    edge_parallel.V[2] = 0.0;
+
+    // In case of an internal edge, a vector from the left cell to the right cell.
+    // In case of a boundary edge, a vector from the left cell to edge centroid.
+    // Note: This is a vector in 2D.
+    RDyVector vec_L2RorEC;
+
+    if (is_internal_edge) {
+      for (PetscInt idim = 0; idim < 2; idim++) {
+        vec_L2RorEC.V[idim] = cells->centroids[r].X[idim] - cells->centroids[l].X[idim];
+      }
+
+    } else {
+      for (PetscInt idim = 0; idim < 2; idim++) {
+        vec_L2RorEC.V[idim] = (vertices->points[vid_2].X[idim] + vertices->points[vid_1].X[idim]) / 2.0 - cells->centroids[l].X[idim];
+      }
+    }
+    vec_L2RorEC.V[2] = 0.0;
+
+    // Compute a vector perpendicular to the edge_parallel vector via a clockwise
+    // 90 degree rotation
+    RDyVector edge_perp;
+    edge_perp.V[0] = edge_parallel.V[1];
+    edge_perp.V[1] = -edge_parallel.V[0];
+
+    // Compute the dot product to check if vector joining L-to-R is pointing
+    // in the direction of the vector perpendicular to the edge.
+    PetscReal dot_prod = vec_L2RorEC.V[0] * edge_perp.V[0] + vec_L2RorEC.V[1] * edge_perp.V[1];
+
+    if (dot_prod < 0.0) {
+      // The angle between edge_perp and vec_L2RorEC is greater than 90 deg.
+      // Thus, flip vertex ids and the normal vector
+      edges->vertex_ids[v_offset + 0] = vid_2;
+      edges->vertex_ids[v_offset + 1] = vid_1;
+      for (PetscInt idim = 0; idim < 3; idim++) {
+        edges->normals[iedge].V[idim] *= -1.0;
+      }
+    }
+
+    vid_1 = edges->vertex_ids[v_offset + 0];
+    vid_2 = edges->vertex_ids[v_offset + 1];
+
+    PetscReal x1 = vertices->points[vid_1].X[0];
+    PetscReal y1 = vertices->points[vid_1].X[1];
+    PetscReal x2 = vertices->points[vid_2].X[0];
+    PetscReal y2 = vertices->points[vid_2].X[1];
+
+    PetscReal dx = x2 - x1;
+    PetscReal dy = y2 - y1;
+    PetscReal ds = PetscSqrtReal(Square(dx) + Square(dy));
+
+    edges->sn[iedge] = -dx / ds;
+    edges->cn[iedge] = dy / ds;
+  }
+
+  // allocate memory to save IDs of internal and boundary edges
+  PetscCall(RDyAlloc(PetscInt, mesh->num_internal_edges, &edges->internal_edge_ids));
+  PetscCall(RDyAlloc(PetscInt, mesh->num_boundary_edges, &edges->boundary_edge_ids));
+
+  // now save the IDs
+  mesh->num_internal_edges = 0;
+  mesh->num_boundary_edges = 0;
+
+  for (PetscInt e = e_start; e < e_end; e++) {
+    PetscInt iedge      = e - e_start;
+    PetscInt cellOffset = edges->cell_offsets[iedge];
+    PetscInt l          = edges->cell_ids[cellOffset];
+    PetscInt r          = edges->cell_ids[cellOffset + 1];
+
+    if (r >= 0 && l >= 0) {
+      edges->internal_edge_ids[mesh->num_internal_edges++] = iedge;
+    } else {
+      edges->boundary_edge_ids[mesh->num_boundary_edges++] = iedge;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+// returns true if the vertices forming the triangle are in counter clockwise
+// direction, false otherwise
+// xyz0 - coordinates of the first vertex of the triangle
+// xyz1 - coordinates of the second vertex of the triangle
+// xyz2 - coordinates of the third vertex of the triangle
+static PetscBool AreVerticesOrientedCounterClockwise(PetscReal xyz0[3],
+                                                     PetscReal xyz1[3],
+                                                     PetscReal xyz2[3]) {
+  PetscFunctionBegin;
+
+  PetscBool result = PETSC_TRUE;
+
+  PetscReal x0, y0;
+  PetscReal x1, y1;
+  PetscReal x2, y2;
+
+  x0 = xyz0[0];
+  y0 = xyz0[1];
+  x1 = xyz1[0];
+  y1 = xyz1[1];
+  x2 = xyz2[0];
+  y2 = xyz2[1];
+
+  PetscFunctionReturn((y1 - y0) * (x2 - x1) - (y2 - y1) * (x1 - x0) < 0);
+
+  PetscFunctionReturn(result);
+}
+
+// computes slopes in the x and y directions for a triangle
+// xyz0 - Coordinates of the first vertex of the triangle
+// xyz1 - Coordinates of the second vertex of the triangle
+// xyz2 - Coordinates of the third vertex of the triangle
+// dz_dx - Slope in x-direction
+// dz_dy - Slope in y-direction
+static PetscErrorCode ComputeXYSlopesForTriangle(PetscReal xyz0[3],
+                                                 PetscReal xyz1[3],
+                                                 PetscReal xyz2[3],
+                                                 PetscReal *dz_dx,
+                                                 PetscReal *dz_dy) {
+  PetscFunctionBegin;
+
+  PetscReal x0, y0, z0;
+  PetscReal x1, y1, z1;
+  PetscReal x2, y2, z2;
+
+  x0 = xyz0[0];
+  y0 = xyz0[1];
+  z0 = xyz0[2];
+
+  if (AreVerticesOrientedCounterClockwise(xyz0, xyz1, xyz2)) {
+    x1 = xyz1[0];
+    y1 = xyz1[1];
+    z1 = xyz1[2];
+    x2 = xyz2[0];
+    y2 = xyz2[1];
+    z2 = xyz2[2];
+  } else {
+    x1 = xyz2[0];
+    y1 = xyz2[1];
+    z1 = xyz2[2];
+    x2 = xyz1[0];
+    y2 = xyz1[1];
+    z2 = xyz1[2];
+  }
+
+  PetscReal num, den;
+  num    = (y2 - y0) * (z1 - z0) - (y1 - y0) * (z2 - z0);
+  den    = (y2 - y0) * (x1 - x0) - (y1 - y0) * (x2 - x0);
+  *dz_dx = num / den;
+
+  num    = (x2 - x0) * (z1 - z0) - (x1 - x0) * (z2 - z0);
+  den    = (x2 - x0) * (y1 - y0) - (x1 - x0) * (y2 - y0);
+  *dz_dy = num / den;
+
+  PetscFunctionReturn(0);
+}
+
+// computes geometric attributes about cells needed by RDycore
+static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    PetscInt nverts = cells->num_vertices[icell];
+
+    PetscCheck((nverts == 3) || (nverts == 4), comm, PETSC_ERR_USER,
+      "Cell has %d vertices (must be 3 or 4)", nverts);
+
+    if (nverts == 3) {
+      PetscInt offset = cells->vertex_offsets[icell];
+      PetscInt v0     = cells->vertex_ids[offset + 0];
+      PetscInt v1     = cells->vertex_ids[offset + 1];
+      PetscInt v2     = cells->vertex_ids[offset + 2];
+
+      PetscCall(ComputeXYSlopesForTriangle(vertices->points[v0].X, vertices->points[v1].X, vertices->points[v2].X, &cells->dz_dx[icell],
+                                           &cells->dz_dy[icell]));
+
+    } else { // nverts == 4
+      PetscInt offset = cells->vertex_offsets[icell];
+      PetscInt v0     = cells->vertex_ids[offset + 0];
+      PetscInt v1     = cells->vertex_ids[offset + 1];
+      PetscInt v2     = cells->vertex_ids[offset + 2];
+      PetscInt v3     = cells->vertex_ids[offset + 3];
+
+      PetscInt vertexIDs[4][2];
+      vertexIDs[0][0] = v0;
+      vertexIDs[0][1] = v1;
+      vertexIDs[1][0] = v1;
+      vertexIDs[1][1] = v2;
+      vertexIDs[2][0] = v2;
+      vertexIDs[2][1] = v3;
+      vertexIDs[3][0] = v3;
+      vertexIDs[3][1] = v0;
+
+      PetscReal dz_dx, dz_dy;
+      cells->dz_dx[icell] = 0.0;
+      cells->dz_dy[icell] = 0.0;
+
+      // TODO: Revisit the approach to compute dz/dx and dz/y for quad cells.
+      for (PetscInt ii = 0; ii < 4; ii++) {
+        PetscInt a = vertexIDs[ii][0];
+        PetscInt b = vertexIDs[ii][1];
+
+        PetscCall(ComputeXYSlopesForTriangle(vertices->points[a].X, vertices->points[b].X, cells->centroids[icell].X, &dz_dx, &dz_dy));
+        cells->dz_dx[icell] += 0.5 * dz_dx;
+        cells->dz_dy[icell] += 0.5 * dz_dy;
+      }
+    }
+  }
 
   PetscFunctionReturn(0);
 }
@@ -479,24 +773,26 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   // Determine the number of cells in the mesh
-  PetscInt cStart, cEnd;
-  DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd);
-  mesh->num_cells = cEnd - cStart;
+  PetscInt c_start, c_end;
+  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+  mesh->num_cells = c_end - c_start;
 
   // Determine the number of edges in the mesh
-  PetscInt eStart, eEnd;
-  DMPlexGetDepthStratum(dm, 1, &eStart, &eEnd);
-  mesh->num_edges = eEnd - eStart;
+  PetscInt e_start, e_end;
+  DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
+  mesh->num_edges = e_end - e_start;
 
   // Determine the number of vertices in the mesh
-  PetscInt vStart, vEnd;
-  DMPlexGetDepthStratum(dm, 0, &vStart, &vEnd);
-  mesh->num_vertices = vEnd - vStart;
+  PetscInt v_start, v_end;
+  DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
+  mesh->num_vertices = v_end - v_start;
 
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
   PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices));
+  PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
+  PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
   // Count up local cells.
   mesh->num_cells_local = 0;
