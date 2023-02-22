@@ -8,14 +8,12 @@ static const char* BedFrictionString(RDyBedFriction model) {
   return strings[model];
 }
 
-static PetscErrorCode PrintPhysics(RDy rdy, RDyLogLevel level) {
+static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, level, "-------\n");
-  RDyLog(rdy, level, "Physics\n");
-  RDyLog(rdy, level, "-------\n\n");
-  RDyLog(rdy, level, "Sediment model: %s\n", FlagString(rdy->config.sediment));
-  RDyLog(rdy, level, "Salinity model: %s\n", FlagString(rdy->config.salinity));
-  RDyLog(rdy, level, "Bed friction model: %s\n\n", BedFrictionString(rdy->config.bed_friction));
+  RDyLogDetail(rdy, "Physics:");
+  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.sediment));
+  RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.salinity));
+  RDyLogDetail(rdy, "  Bed friction model: %s", BedFrictionString(rdy->config.bed_friction));
   PetscFunctionReturn(0);
 }
 
@@ -34,14 +32,12 @@ static const char* RiemannString(RDyRiemann solver) {
   return strings[solver];
 }
 
-static PetscErrorCode PrintNumerics(RDy rdy, RDyLogLevel level) {
+static PetscErrorCode PrintNumerics(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, level, "--------\n");
-  RDyLog(rdy, level, "Numerics\n");
-  RDyLog(rdy, level, "--------\n\n");
-  RDyLog(rdy, level, "Spatial discretization: %s\n", SpatialString(rdy->config.spatial));
-  RDyLog(rdy, level, "Temporal discretization: %s\n", TemporalString(rdy->config.temporal));
-  RDyLog(rdy, level, "Riemann solver: %s\n\n", RiemannString(rdy->config.riemann));
+  RDyLogDetail(rdy, "Numerics:");
+  RDyLogDetail(rdy, "  Spatial discretization: %s", SpatialString(rdy->config.spatial));
+  RDyLogDetail(rdy, "  Temporal discretization: %s", TemporalString(rdy->config.temporal));
+  RDyLogDetail(rdy, "  Riemann solver: %s", RiemannString(rdy->config.riemann));
   PetscFunctionReturn(0);
 }
 
@@ -50,56 +46,49 @@ static const char* TimeUnitString(RDyTimeUnit unit) {
   return strings[unit];
 }
 
-static PetscErrorCode PrintTime(RDy rdy, RDyLogLevel level) {
+static PetscErrorCode PrintTime(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, level, "----\n");
-  RDyLog(rdy, level, "Time\n");
-  RDyLog(rdy, level, "----\n\n");
-  RDyLog(rdy, level, "Final time: %g %s\n", rdy->config.final_time, TimeUnitString(rdy->config.time_unit));
-  RDyLog(rdy, level, "\n");
+  RDyLogDetail(rdy, "Time:");
+  RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.final_time, TimeUnitString(rdy->config.time_unit));
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode PrintRestart(RDy rdy, RDyLogLevel level) {
+static PetscErrorCode PrintRestart(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, level, "-------\n");
-  RDyLog(rdy, level, "Restart\n");
-  RDyLog(rdy, level, "-------\n\n");
+  RDyLogDetail(rdy, "Restart:");
   if (rdy->config.restart_frequency > 0) {
-    RDyLog(rdy, level, "Restart file format: %s\n", rdy->config.restart_format);
-    RDyLog(rdy, level, "Restart frequency: %d\n\n", rdy->config.restart_frequency);
+    RDyLogDetail(rdy, "  File format: %s", rdy->config.restart_format);
+    RDyLogDetail(rdy, "  Frequency: %d", rdy->config.restart_frequency);
   } else {
-    RDyLog(rdy, level, "(disabled)\n\n");
+    RDyLogDetail(rdy, "  (disabled)");
   }
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode PrintLogging(RDy rdy, RDyLogLevel level) {
+static PetscErrorCode PrintLogging(RDy rdy) {
   PetscFunctionBegin;
-  RDyLog(rdy, level, "-------\n");
-  RDyLog(rdy, level, "Logging\n");
-  RDyLog(rdy, level, "-------\n\n");
+  RDyLogDetail(rdy, "Logging:");
   if (strlen(rdy->config.log_file)) {
-    RDyLog(rdy, level, "Primary log file: %s\n\n", rdy->config.log_file);
+    RDyLogDetail(rdy, "  Primary log file: %s", rdy->config.log_file);
   } else {
-    RDyLog(rdy, level, "Primary log file: <stdout>\n\n");
+    RDyLogDetail(rdy, "  Primary log file: <stdout>");
   }
   PetscFunctionReturn(0);
 }
 
 // prints config information at the requested log level
-PetscErrorCode PrintConfig(RDy rdy, RDyLogLevel level) {
+PetscErrorCode PrintConfig(RDy rdy) {
   PetscFunctionBegin;
 
-  RDyLog(rdy, level, "==========================================================\n");
-  RDyLog(rdy, level, "RDycore (input read from %s)\n", rdy->config_file);
-  RDyLog(rdy, level, "==========================================================\n\n");
+  RDyLogDetail(rdy, "==========================================================");
+  RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
+  RDyLogDetail(rdy, "==========================================================");
 
-  PetscCall(PrintPhysics(rdy, level));
-  PetscCall(PrintNumerics(rdy, level));
-  PetscCall(PrintTime(rdy, level));
-  PetscCall(PrintLogging(rdy, level));
-  PetscCall(PrintRestart(rdy, level));
+  PetscCall(PrintPhysics(rdy));
+  PetscCall(PrintNumerics(rdy));
+  PetscCall(PrintTime(rdy));
+  PetscCall(PrintLogging(rdy));
+  PetscCall(PrintRestart(rdy));
 
   PetscFunctionReturn(0);
 }
