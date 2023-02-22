@@ -444,6 +444,9 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 
+  // apply any solver-related options supplied on the command line
+  PetscCall(TSSetFromOptions(rdy->ts));
+
   PetscFunctionReturn(0);
 }
 
@@ -451,7 +454,34 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  // FIXME
+  PetscCall(VecZeroEntries(rdy->X));
+  if (strlen(rdy->config.initial_conditions_file)) {  // read from file
+    PetscViewer viewer;
+    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.initial_conditions_file, FILE_MODE_READ, &viewer));
+    Vec natural;
+    PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
+    PetscCall(VecLoad(natural, viewer));
+    PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, rdy->X));
+    PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
+    PetscCall(PetscViewerDestroy(&viewer));
+    PetscCall(VecDestroy(&natural));
+  } else {
+    // we initialize from specified initial conditions by looping over regions
+    // and writing values for corresponding cells
+    PetscScalar *x_ptr;
+    VecGetArray(rdy->X, &x_ptr);
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyRegion    *region = &rdy->regions[r];
+      RDyCondition *ic     = &rdy->initial_conditions[r];
+      for (PetscInt c = 0; c < region->num_cells; ++c) {
+        PetscInt cell_id       = region->cell_ids[c];
+        x_ptr[3 * cell_id]     = ic->flow->height;
+        x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
+        x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+      }
+    }
+    VecRestoreArray(rdy->X, &x_ptr);
+  }
 
   PetscFunctionReturn(0);
 }
