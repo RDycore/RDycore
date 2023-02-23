@@ -113,8 +113,7 @@ struct _p_RDy {
   // time₋stepping solver
   TS ts;
 
-  // solution and source vectors (global and local)
-  Vec B, B_local;
+  // solution vectors (global and local)
   Vec X, X_local;
 
   // residual vector

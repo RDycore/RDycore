@@ -144,10 +144,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
   RDyEdges *edges = &mesh->edges;
 
   // Get pointers to vector data
-  PetscScalar *x_ptr, *f_ptr, *b_ptr;
+  PetscScalar *x_ptr, *f_ptr;
   PetscCall(VecGetArray(rdy->X_local, &x_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
-  PetscCall(VecGetArray(rdy->B_local, &b_ptr));
 
   PetscInt ndof;
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
@@ -165,52 +164,21 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
     PetscInt l     = edges->cell_ids[2 * iedge];
     PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
-    hl_vec_int[ii]  = x_ptr[l * ndof + 0];
-    hul_vec_int[ii] = x_ptr[l * ndof + 1];
-    hvl_vec_int[ii] = x_ptr[l * ndof + 2];
+    if (r != -1) {
+      hl_vec_int[ii]  = x_ptr[l * ndof + 0];
+      hul_vec_int[ii] = x_ptr[l * ndof + 1];
+      hvl_vec_int[ii] = x_ptr[l * ndof + 2];
 
-    hr_vec_int[ii]  = x_ptr[r * ndof + 0];
-    hur_vec_int[ii] = x_ptr[r * ndof + 1];
-    hvr_vec_int[ii] = x_ptr[r * ndof + 2];
+      hr_vec_int[ii]  = x_ptr[r * ndof + 0];
+      hur_vec_int[ii] = x_ptr[r * ndof + 1];
+      hvr_vec_int[ii] = x_ptr[r * ndof + 2];
+    }
   }
 
   // Compute u/v for left and right cells
   const PetscReal tiny_h = rdy->config.tiny_h;
   PetscCall(GetVelocityFromMomentum(num, tiny_h, hl_vec_int, hul_vec_int, hvl_vec_int, ul_vec_int, vl_vec_int));
   PetscCall(GetVelocityFromMomentum(num, tiny_h, hr_vec_int, hur_vec_int, hvr_vec_int, ur_vec_int, vr_vec_int));
-
-  // Update u/v for reflective internal edges
-  for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
-    PetscInt  iedge = edges->internal_edge_ids[ii];
-    PetscInt  l     = edges->cell_ids[2 * iedge];
-    PetscInt  r     = edges->cell_ids[2 * iedge + 1];
-    PetscReal bl    = b_ptr[l];
-    PetscReal br    = b_ptr[r];
-
-    cn_vec_int[ii] = edges->cn[iedge];
-    sn_vec_int[ii] = edges->sn[iedge];
-
-    if (bl == 1 && br == 0) {
-      // Update left values as it is a reflective boundary wall
-      hl_vec_int[ii] = hr_vec_int[ii];
-
-      PetscReal dum1 = Square(sn_vec_int[ii]) - Square(cn_vec_int[ii]);
-      PetscReal dum2 = 2.0 * sn_vec_int[ii] * cn_vec_int[ii];
-
-      ul_vec_int[ii] = ur_vec_int[ii] * dum1 - vr_vec_int[ii] * dum2;
-      vl_vec_int[ii] = -ur_vec_int[ii] * dum2 - vr_vec_int[ii] * dum1;
-
-    } else if (bl == 0 && br == 1) {
-      // Update right values as it is a reflective boundary wall
-      hr_vec_int[ii] = hl_vec_int[ii];
-
-      PetscReal dum1 = Square(sn_vec_int[ii]) - Square(cn_vec_int[ii]);
-      PetscReal dum2 = 2.0 * sn_vec_int[ii] * cn_vec_int[ii];
-
-      ur_vec_int[ii] = ul_vec_int[ii] * dum1 - vl_vec_int[ii] * dum2;
-      vr_vec_int[ii] = -ul_vec_int[ii] * dum2 - vl_vec_int[ii] * dum1;
-    }
-  }
 
   // Call Riemann solver (only Roe currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
@@ -219,44 +187,26 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
-    PetscInt  iedge   = edges->internal_edge_ids[ii];
-    PetscInt  l       = edges->cell_ids[2 * iedge];
-    PetscInt  r       = edges->cell_ids[2 * iedge + 1];
-    PetscReal edgeLen = edges->lengths[iedge];
+    PetscInt iedge = edges->internal_edge_ids[ii];
+    PetscInt l     = edges->cell_ids[2 * iedge];
+    PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
-    PetscReal hl = x_ptr[l * ndof + 0];
-    PetscReal hr = x_ptr[r * ndof + 0];
-    PetscReal bl = b_ptr[l];
-    PetscReal br = b_ptr[r];
+    if (r != -1) {  // internal edge
+      PetscReal edge_len = edges->lengths[iedge];
 
-    *amax_value = fmax(*amax_value, amax_vec_int[ii]);
+      PetscReal hl = x_ptr[l * ndof + 0];
+      PetscReal hr = x_ptr[r * ndof + 0];
 
-    if (bl == 0 && br == 0) {
-      // Both, left and right cells are not reflective boundary walls
+      *amax_value = fmax(*amax_value, amax_vec_int[ii]);
+
       if (!(hr < tiny_h && hl < tiny_h)) {
         PetscReal areal = cells->areas[l];
         PetscReal arear = cells->areas[r];
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
-          if (cells->is_local[l]) f_ptr[l * ndof + idof] -= flux_vec_int[ii][idof] * edgeLen / areal;
-          if (cells->is_local[r]) f_ptr[r * ndof + idof] += flux_vec_int[ii][idof] * edgeLen / arear;
+          if (cells->is_local[l]) f_ptr[l * ndof + idof] -= flux_vec_int[ii][idof] * edge_len / areal;
+          if (cells->is_local[r]) f_ptr[r * ndof + idof] += flux_vec_int[ii][idof] * edge_len / arear;
         }
-      }
-
-    } else if (bl == 1 && br == 0) {
-      // Left cell is a reflective boundary wall and right cell is an internal cell
-
-      PetscReal arear = cells->areas[r];
-      for (PetscInt idof = 0; idof < ndof; idof++) {
-        if (cells->is_local[r]) f_ptr[r * ndof + idof] += flux_vec_int[ii][idof] * edgeLen / arear;
-      }
-
-    } else if (bl == 0 && br == 1) {
-      // Left cell is an internal cell and right cell is a reflective boundary wall
-
-      PetscReal areal = cells->areas[l];
-      for (PetscInt idof = 0; idof < ndof; idof++) {
-        if (cells->is_local[l]) f_ptr[l * ndof + idof] -= flux_vec_int[ii][idof] * edgeLen / areal;
       }
     }
   }
@@ -264,7 +214,6 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
   // Restore vectors
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
-  PetscCall(VecRestoreArray(rdy->B_local, &b_ptr));
 
   PetscFunctionReturn(0);
 }
@@ -281,10 +230,9 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
   RDyEdges *edges = &mesh->edges;
 
   // Get pointers to vector data
-  PetscScalar *x_ptr, *f_ptr, *b_ptr;
+  PetscScalar *x_ptr, *f_ptr;
   PetscCall(VecGetArray(rdy->X_local, &x_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
-  PetscCall(VecGetArray(rdy->B_local, &b_ptr));
 
   PetscInt ndof;
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
@@ -365,7 +313,6 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
   // Restore vectors
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
-  PetscCall(VecRestoreArray(rdy->B_local, &b_ptr));
 
   PetscFunctionReturn(0);
 }

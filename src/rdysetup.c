@@ -418,8 +418,6 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(VecDuplicate(rdy->X, &rdy->R));
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->B));
-  PetscCall(DMCreateLocalVector(rdy->aux_dm, &rdy->B_local));
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));
