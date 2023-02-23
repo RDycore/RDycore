@@ -297,9 +297,8 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
     // skip non-reflecting surfaces
     if (rdy->boundary_conditions[s].flow->type != CONDITION_REFLECTING) continue;
 
-    RDyLogDebug(rdy, "Applying reflecting BC on surface %d", s);
     RDySurface *surface = &rdy->surfaces[s];
-    PetscInt    num = surface->num_edges;
+    PetscInt    num     = surface->num_edges;
 
     PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
     PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];

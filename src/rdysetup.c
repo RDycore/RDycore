@@ -230,8 +230,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       PetscCall(ISGetLocalSize(cell_is, &num_cells));
       if (num_cells > 0) {
         rdy->region_ids[rdy->num_regions] = region_id;
-        ++rdy->num_regions;
-        region->num_cells = num_cells;
+        region->num_cells                 = num_cells;
         PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
       }
       const PetscInt *cell_ids;
@@ -259,6 +258,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
     if (edge_is) {
       RDySurface *surface = &rdy->surfaces[s];
       rdy->surface_ids[s] = surface_id;
+      printf("Surface %d badda bing badda boom\n", surface_id);
       ++s;
 
       PetscInt num_edges;
@@ -385,7 +385,6 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
     // If no flow condition was specified for a boundary, we set it to our
     // reflecting flow condition.
     if (!strlen(bc_spec->flow_name)) {
-      RDyLogDebug(rdy, "Setting reflecting flow condition for surface %d", surface_id);
       bc->flow = reflecting_flow;
     } else {
       PetscInt flow_index;
@@ -424,7 +423,6 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));
-  RDyLogDebug(rdy, "Global degrees of freedom: %d", n_dof);
 
   // set up a TS solver
   PetscCall(TSCreate(rdy->comm, &rdy->ts));

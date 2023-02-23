@@ -34,11 +34,11 @@ static PetscErrorCode DetermineOutputFile(RDy rdy, char *filename) {
   }
   if (p) {
     size_t prefix_len = p - rdy->config_file;
-    size_t n = strlen(output_dir) + prefix_len;
+    size_t n          = strlen(output_dir) + prefix_len;
     snprintf(filename, n, "%s/%s", output_dir, rdy->config_file);
     filename[n] = 0;
   } else {
-    snprintf(filename, PETSC_MAX_PATH_LEN-1, "%s/%s", output_dir, rdy->config_file);
+    snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s", output_dir, rdy->config_file);
   }
 
   // concatenate some config parameters
