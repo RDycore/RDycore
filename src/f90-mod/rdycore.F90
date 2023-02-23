@@ -57,9 +57,11 @@ module rdycore
 contains
 
   subroutine RDyInit(ierr)
+    use petscsys
     implicit none
     integer, intent(out) :: ierr
-    if (.not. RDyInitialized()) ierr = rdyinitfortran_()
+    call PetscInitialize(ierr)
+    if ((ierr == 0) .and. .not. RDyInitialized()) ierr = rdyinitfortran_()
   end subroutine
 
   subroutine RDyFinalize(ierr)

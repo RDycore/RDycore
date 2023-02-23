@@ -28,7 +28,8 @@ PetscErrorCode RDyInitFortran(void) {
     PetscCall(PetscInitialized(&petsc_initialized));
     if (!petsc_initialized) {
       PetscCall(PetscInitializeNoArguments());
-      PetscCall(PetscInitializeFortran());
+      // no need for PetscInitializeFortran because PetscInitialize is
+      // called before this function in the rdycore Fortran module.
     }
     initialized_ = PETSC_TRUE;
   }

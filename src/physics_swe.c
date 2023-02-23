@@ -153,11 +153,11 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt       num  = mesh->num_internal_edges;
-  PetscReal      hl_vec_int[num], hul_vec_int[num], hvl_vec_int[num], ul_vec_int[num], vl_vec_int[num];
-  PetscReal      hr_vec_int[num], hur_vec_int[num], hvr_vec_int[num], ur_vec_int[num], vr_vec_int[num];
-  PetscReal      sn_vec_int[num], cn_vec_int[num];
-  PetscReal      flux_vec_int[num][3], amax_vec_int[num];
+  PetscInt  num = mesh->num_internal_edges;
+  PetscReal hl_vec_int[num], hul_vec_int[num], hvl_vec_int[num], ul_vec_int[num], vl_vec_int[num];
+  PetscReal hr_vec_int[num], hur_vec_int[num], hvr_vec_int[num], ur_vec_int[num], vr_vec_int[num];
+  PetscReal sn_vec_int[num], cn_vec_int[num];
+  PetscReal flux_vec_int[num][3], amax_vec_int[num];
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -293,11 +293,11 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt       num  = mesh->num_boundary_edges;
-  PetscReal      hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
-  PetscReal      hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
-  PetscReal      sn_vec_bnd[num], cn_vec_bnd[num];
-  PetscReal      flux_vec_bnd[num][3], amax_vec_bnd[num];
+  PetscInt  num = mesh->num_boundary_edges;
+  PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
+  PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
+  PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
+  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
   const PetscReal tiny_h = rdy->config.tiny_h;
 
