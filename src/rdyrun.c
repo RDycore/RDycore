@@ -33,11 +33,12 @@ static PetscErrorCode DetermineOutputFile(RDy rdy, char *filename) {
     p = strstr(rdy->config_file, ".yml");
   }
   if (p) {
-    size_t n = p - rdy->config_file;
-    strncpy(filename, rdy->config_file, n);
+    size_t prefix_len = p - rdy->config_file;
+    size_t n = strlen(output_dir) + prefix_len;
+    snprintf(filename, n, "%s/%s", output_dir, rdy->config_file);
     filename[n] = 0;
   } else {
-    strncpy(filename, rdy->config_file, PETSC_MAX_PATH_LEN - 1);
+    snprintf(filename, PETSC_MAX_PATH_LEN-1, "%s/%s", output_dir, rdy->config_file);
   }
 
   // concatenate some config parameters
