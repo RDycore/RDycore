@@ -133,6 +133,9 @@ static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const Pe
 }
 
 // computes RHS on internal edges
+// rdy        - an RDy object
+// F          - a global vector that stores the fluxes between internal edges
+// amax_value - the fastest wave speed encountered
 static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *amax_value) {
   PetscFunctionBeginUser;
 
@@ -146,7 +149,10 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
   PetscCall(VecGetArray(F, &f_ptr));
   PetscCall(VecGetArray(rdy->B_local, &b_ptr));
 
-  const PetscInt ndof = 3;
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
   PetscInt       num  = mesh->num_internal_edges;
   PetscReal      hl_vec_int[num], hul_vec_int[num], hvl_vec_int[num], ul_vec_int[num], vl_vec_int[num];
   PetscReal      hr_vec_int[num], hur_vec_int[num], hvr_vec_int[num], ur_vec_int[num], vr_vec_int[num];
@@ -267,6 +273,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
 }
 
 // computes RHS on boundary edges
+// rdy        - an RDy object
+// F          - a global vector that stores the fluxes between boundary edges
+// amax_value - the fastest wave speed encountered
 static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *amax_value) {
   PetscFunctionBeginUser;
 
@@ -280,7 +289,10 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
   PetscCall(VecGetArray(F, &f_ptr));
   PetscCall(VecGetArray(rdy->B_local, &b_ptr));
 
-  const PetscInt ndof = 3;
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
   PetscInt       num  = mesh->num_boundary_edges;
   PetscReal      hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
   PetscReal      hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
@@ -374,7 +386,9 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCall(VecGetArray(rdy->X_local, &x_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
 
-  const PetscInt ndof = 3;
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   PetscInt  N = mesh->num_cells;
   PetscReal h_vec[N], hu_vec[N], hv_vec[N], u_vec[N], v_vec[N];
@@ -441,14 +455,15 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscFunctionReturn(0);
 }
 
-// This is the right-hand-side function used by our timestepping solver.
+// This is the right-hand-side function used by our timestepping solver for
+// the shallow water equations.
 // Parameters:
 //  ts  - the solver
 //  t   - the simulation time [minutes]
 //  X   - the solution vector at time t
 //  F   - the right hand side vector to be evaluated at time t
 //  ctx - a generic pointer to our RDy object
-PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
+PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscFunctionBegin;
 
   RDy rdy = ctx;
@@ -465,31 +480,6 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscCall(RHSFunctionForInternalEdges(rdy, F, &amax_value));
   PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &amax_value));
   PetscCall(AddSourceTerm(rdy, F));
-
-  /* disable this for now
-  if (rdy->save) {
-    char fname[PETSC_MAX_PATH_LEN];
-    sprintf(fname, "outputs/ex2b_Nx_%d_Ny_%d_dt_%f_%d_np%d.dat", rdy->Nx, rdy->Ny, rdy->dt, rdy->tstep - 1, rdy->comm_size);
-    PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
-
-    Vec natural;
-    PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-    PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, X, natural));
-    PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, X, natural));
-    PetscCall(VecView(natural, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-
-    sprintf(fname, "outputs/ex2b_flux_Nx_%d_Ny_%d_dt_%f_%d_np%d.dat", rdy->Nx, rdy->Ny, rdy->dt, rdy->tstep - 1, rdy->comm_size);
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
-    PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, F, natural));
-    PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, F, natural));
-    PetscCall(VecView(natural, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-
-    PetscCall(VecDestroy(&natural));
-  }
-  */
 
   RDyLogInfo(rdy, "Time step %d: t = %f, CFL = %f", rdy->step, t, amax_value * rdy->dt * 2);
   rdy->step++;

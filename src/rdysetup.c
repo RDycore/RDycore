@@ -442,7 +442,11 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
       break;
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
-  PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunction, rdy));
+
+  PetscCheck(rdy->config.flow_mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER,
+    "Only the 'swe' flow mode is currently supported.");
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
+
   PetscCall(TSSetMaxTime(rdy->ts, rdy->config.final_time));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));

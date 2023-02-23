@@ -123,6 +123,6 @@ struct _p_RDy {
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
-PETSC_INTERN PetscErrorCode RHSFunction(TS, PetscReal, Vec, Vec, void*);
+PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 
 #endif

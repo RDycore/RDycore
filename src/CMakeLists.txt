@@ -2,11 +2,11 @@
 add_library(rdycore
   read_config_file.c
   rdycore.c
+  physics_swe.c
   print_config.c
   rdymesh.c
   rdyrun.c
   rdysetup.c
-  rhs_function.c
 )
 add_dependencies(rdycore yaml)
 
