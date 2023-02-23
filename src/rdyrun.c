@@ -34,9 +34,8 @@ static PetscErrorCode DetermineOutputFile(RDy rdy, char *filename) {
   }
   if (p) {
     size_t prefix_len = p - rdy->config_file;
-    size_t n          = strlen(output_dir) + prefix_len;
-    snprintf(filename, n, "%s/%s", output_dir, rdy->config_file);
-    filename[n] = 0;
+    size_t n          = strlen(output_dir) + 1 + prefix_len;
+    snprintf(filename, n + 1, "%s/%s", output_dir, rdy->config_file);
   } else {
     snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s", output_dir, rdy->config_file);
   }
