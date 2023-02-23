@@ -290,71 +290,74 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt  num = mesh->num_boundary_edges;
-  PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
-  PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
-  PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
-  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
-
   const PetscReal tiny_h = rdy->config.tiny_h;
 
-  // Collect the h/hu/hv for left cells to compute u/v
-  for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
-    PetscInt iedge = edges->boundary_edge_ids[ii];
-    PetscInt l     = edges->cell_ids[2 * iedge];
+  // loop over all surfaces that correspond to reflecting boundary conditions
+  for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
+    // skip non-reflecting surfaces
+    if (rdy->boundary_conditions[s].flow->type != CONDITION_REFLECTING) continue;
 
-    hl_vec_bnd[ii]  = x_ptr[l * ndof + 0];
-    hul_vec_bnd[ii] = x_ptr[l * ndof + 1];
-    hvl_vec_bnd[ii] = x_ptr[l * ndof + 2];
-  }
+    RDyLogDebug(rdy, "Applying reflecting BC on surface %d", s);
+    RDySurface *surface = &rdy->surfaces[s];
+    PetscInt    num = surface->num_edges;
 
-  // Compute u/v for left cells
-  PetscCall(GetVelocityFromMomentum(num, tiny_h, hl_vec_bnd, hul_vec_bnd, hvl_vec_bnd, ul_vec_bnd, vl_vec_bnd));
+    PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
+    PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
+    PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
+    PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
-  // Compute h/u/v for right cells
-  for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
-    PetscInt iedge = edges->boundary_edge_ids[ii];
-    PetscInt l     = edges->cell_ids[2 * iedge];
+    // Collect the h/hu/hv for left cells to compute u/v
+    for (PetscInt e = 0; e < surface->num_edges; ++e) {
+      PetscInt iedge = surface->edge_ids[e];
+      PetscInt icell = edges->cell_ids[2 * iedge];
 
-    cn_vec_bnd[ii] = edges->cn[iedge];
-    sn_vec_bnd[ii] = edges->sn[iedge];
+      hl_vec_bnd[e]  = x_ptr[icell * ndof + 0];
+      hul_vec_bnd[e] = x_ptr[icell * ndof + 1];
+      hvl_vec_bnd[e] = x_ptr[icell * ndof + 2];
+    }
 
-    if (cells->is_local[l] && b_ptr[l] == 0) {
-      // Perform computation for a boundary edge
+    // Compute u/v for left cells
+    PetscCall(GetVelocityFromMomentum(num, tiny_h, hl_vec_bnd, hul_vec_bnd, hvl_vec_bnd, ul_vec_bnd, vl_vec_bnd));
 
-      if (cells->is_local[l] && b_ptr[l] == 0) {
-        hr_vec_bnd[ii] = hl_vec_bnd[ii];
+    // Compute h/u/v for right cells
+    for (PetscInt e = 0; e < surface->num_edges; ++e) {
+      PetscInt iedge = surface->edge_ids[e];
+      PetscInt icell = edges->cell_ids[2 * iedge];
 
-        PetscReal dum1 = Square(sn_vec_bnd[ii]) - Square(cn_vec_bnd[ii]);
-        PetscReal dum2 = 2.0 * sn_vec_bnd[ii] * cn_vec_bnd[ii];
+      cn_vec_bnd[e] = edges->cn[iedge];
+      sn_vec_bnd[e] = edges->sn[iedge];
 
-        ur_vec_bnd[ii] = ul_vec_bnd[ii] * dum1 - vl_vec_bnd[ii] * dum2;
-        vr_vec_bnd[ii] = -ul_vec_bnd[ii] * dum2 - vl_vec_bnd[ii] * dum1;
+      if (cells->is_local[icell]) {
+        hr_vec_bnd[e] = hl_vec_bnd[e];
+
+        PetscReal dum1 = Square(sn_vec_bnd[e]) - Square(cn_vec_bnd[e]);
+        PetscReal dum2 = 2.0 * sn_vec_bnd[e] * cn_vec_bnd[e];
+
+        ur_vec_bnd[e] = ul_vec_bnd[e] * dum1 - vl_vec_bnd[e] * dum2;
+        vr_vec_bnd[e] = -ul_vec_bnd[e] * dum2 - vl_vec_bnd[e] * dum1;
       }
     }
-  }
 
-  // Call Riemann solver (only Roe is currently supported)
-  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
-                           amax_vec_bnd));
+    // Call Riemann solver (only Roe is currently supported)
+    PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
+    PetscCall(ComputeRoeFlux(num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
+                             amax_vec_bnd));
 
-  // Save the flux values in the Vec based by TS
-  for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
-    PetscInt  iedge   = edges->boundary_edge_ids[ii];
-    PetscInt  l       = edges->cell_ids[2 * iedge];
-    PetscReal edgeLen = edges->lengths[iedge];
-    PetscReal areal   = cells->areas[l];
+    // Save the flux values in the Vec based by TS
+    for (PetscInt e = 0; e < surface->num_edges; ++e) {
+      PetscInt  iedge     = surface->edge_ids[e];
+      PetscInt  icell     = edges->cell_ids[2 * iedge];
+      PetscReal edge_len  = edges->lengths[iedge];
+      PetscReal cell_area = cells->areas[icell];
 
-    if (cells->is_local[l] && b_ptr[l] == 0) {
-      // Perform computation for a boundary edge
+      if (cells->is_local[icell]) {
+        PetscReal hl = x_ptr[icell * ndof + 0];
 
-      PetscReal hl = x_ptr[l * ndof + 0];
-
-      if (!(hl < tiny_h)) {
-        *amax_value = fmax(*amax_value, amax_vec_bnd[ii]);
-        for (PetscInt idof = 0; idof < ndof; idof++) {
-          f_ptr[l * ndof + idof] -= flux_vec_bnd[ii][idof] * edgeLen / areal;
+        if (!(hl < tiny_h)) {
+          *amax_value = fmax(*amax_value, amax_vec_bnd[e]);
+          for (PetscInt idof = 0; idof < ndof; idof++) {
+            f_ptr[icell * ndof + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
+          }
         }
       }
     }
