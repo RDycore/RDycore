@@ -161,10 +161,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
-    PetscInt iedge      = edges->internal_edge_ids[ii];
-    PetscInt cellOffset = edges->cell_offsets[iedge];
-    PetscInt l          = edges->cell_ids[cellOffset];
-    PetscInt r          = edges->cell_ids[cellOffset + 1];
+    PetscInt iedge = edges->internal_edge_ids[ii];
+    PetscInt l     = edges->cell_ids[2 * iedge];
+    PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
     hl_vec_int[ii]  = x_ptr[l * ndof + 0];
     hul_vec_int[ii] = x_ptr[l * ndof + 1];
@@ -182,12 +181,11 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Update u/v for reflective internal edges
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
-    PetscInt  iedge      = edges->internal_edge_ids[ii];
-    PetscInt  cellOffset = edges->cell_offsets[iedge];
-    PetscInt  l          = edges->cell_ids[cellOffset];
-    PetscInt  r          = edges->cell_ids[cellOffset + 1];
-    PetscReal bl         = b_ptr[l];
-    PetscReal br         = b_ptr[r];
+    PetscInt  iedge = edges->internal_edge_ids[ii];
+    PetscInt  l     = edges->cell_ids[2 * iedge];
+    PetscInt  r     = edges->cell_ids[2 * iedge + 1];
+    PetscReal bl    = b_ptr[l];
+    PetscReal br    = b_ptr[r];
 
     cn_vec_int[ii] = edges->cn[iedge];
     sn_vec_int[ii] = edges->sn[iedge];
@@ -221,11 +219,10 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
-    PetscInt  iedge      = edges->internal_edge_ids[ii];
-    PetscInt  cellOffset = edges->cell_offsets[iedge];
-    PetscInt  l          = edges->cell_ids[cellOffset];
-    PetscInt  r          = edges->cell_ids[cellOffset + 1];
-    PetscReal edgeLen    = edges->lengths[iedge];
+    PetscInt  iedge   = edges->internal_edge_ids[ii];
+    PetscInt  l       = edges->cell_ids[2 * iedge];
+    PetscInt  r       = edges->cell_ids[2 * iedge + 1];
+    PetscReal edgeLen = edges->lengths[iedge];
 
     PetscReal hl = x_ptr[l * ndof + 0];
     PetscReal hr = x_ptr[r * ndof + 0];
@@ -303,9 +300,8 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Collect the h/hu/hv for left cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
-    PetscInt iedge      = edges->boundary_edge_ids[ii];
-    PetscInt cellOffset = edges->cell_offsets[iedge];
-    PetscInt l          = edges->cell_ids[cellOffset];
+    PetscInt iedge = edges->boundary_edge_ids[ii];
+    PetscInt l     = edges->cell_ids[2 * iedge];
 
     hl_vec_bnd[ii]  = x_ptr[l * ndof + 0];
     hul_vec_bnd[ii] = x_ptr[l * ndof + 1];
@@ -317,9 +313,8 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Compute h/u/v for right cells
   for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
-    PetscInt iedge      = edges->boundary_edge_ids[ii];
-    PetscInt cellOffset = edges->cell_offsets[iedge];
-    PetscInt l          = edges->cell_ids[cellOffset];
+    PetscInt iedge = edges->boundary_edge_ids[ii];
+    PetscInt l     = edges->cell_ids[2 * iedge];
 
     cn_vec_bnd[ii] = edges->cn[iedge];
     sn_vec_bnd[ii] = edges->sn[iedge];
@@ -346,11 +341,10 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_boundary_edges; ii++) {
-    PetscInt  iedge      = edges->boundary_edge_ids[ii];
-    PetscInt  cellOffset = edges->cell_offsets[iedge];
-    PetscInt  l          = edges->cell_ids[cellOffset];
-    PetscReal edgeLen    = edges->lengths[iedge];
-    PetscReal areal      = cells->areas[l];
+    PetscInt  iedge   = edges->boundary_edge_ids[ii];
+    PetscInt  l       = edges->cell_ids[2 * iedge];
+    PetscReal edgeLen = edges->lengths[iedge];
+    PetscReal areal   = cells->areas[l];
 
     if (cells->is_local[l] && b_ptr[l] == 0) {
       // Perform computation for a boundary edge

@@ -114,14 +114,12 @@ typedef struct {
   // global ID(c1) < global ID(c2).
   PetscBool *is_local;
 
-  // numbers of cells attached to edges
-  PetscInt *num_cells;
-  // numbers of vertices attached to edges
+  // IDs of vertices attached to edges
   PetscInt *vertex_ids;
 
-  // offsets of first edge cells in cell_ids
-  PetscInt *cell_offsets;
-  // IDs of cells attached to edges
+  // IDs of cells attached to edges:
+  // * cell_ids[2*i]   is the first cell attached to edge i
+  // * cell_ids[2*i+1] is the second cell attached to edge i (-1 if none)
   PetscInt *cell_ids;
 
   // false if the edge is on the domain boundary

@@ -297,22 +297,17 @@ PetscErrorCode RDyVerticesDestroy(RDyVertices vertices) {
 PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
   PetscFunctionBegin;
 
-  PetscInt cells_per_edge = 2;
-
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->ids));
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->global_ids));
-  PetscCall(RDyAlloc(PetscInt, num_edges, &edges->num_cells));
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->vertex_ids));
   PetscCall(RDyFill(PetscInt, num_edges, edges->global_ids, -1));
-  PetscCall(RDyFill(PetscInt, num_edges, edges->num_cells, -1));
   PetscCall(RDyFill(PetscInt, num_edges, edges->vertex_ids, -1));
 
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_local));
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_internal));
 
-  PetscCall(RDyAlloc(PetscInt, num_edges + 1, &edges->cell_offsets));
-  PetscCall(RDyAlloc(PetscInt, num_edges * cells_per_edge, &edges->cell_ids));
-  PetscCall(RDyFill(PetscInt, num_edges * cells_per_edge, edges->cell_ids, -1));
+  PetscCall(RDyAlloc(PetscInt, 2 * num_edges, &edges->cell_ids));
+  PetscCall(RDyFill(PetscInt, 2 * num_edges, edges->cell_ids, -1));
 
   PetscCall(RDyAlloc(RDyPoint, num_edges, &edges->centroids));
   PetscCall(RDyAlloc(RDyVector, num_edges, &edges->normals));
@@ -324,10 +319,6 @@ PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 
   for (PetscInt iedge = 0; iedge < num_edges; iedge++) {
     edges->ids[iedge] = iedge;
-  }
-
-  for (PetscInt iedge = 0; iedge <= num_edges; iedge++) {
-    edges->cell_offsets[iedge] = iedge * cells_per_edge;
   }
 
   PetscFunctionReturn(0);
@@ -377,14 +368,15 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
     PetscCall(DMPlexRestoreTransitiveClosure(dm, e, use_cone, &pSize, &p));
 
     // edge-to-cell
-    edges->num_cells[iedge] = 0;
     PetscCall(DMPlexGetTransitiveClosure(dm, e, PETSC_FALSE, &pSize, &p));
     PetscAssert(pSize == 2 || pSize == 3, comm, PETSC_ERR_ARG_SIZ, "Incorrect transitive closure size!");
     for (PetscInt i = 2; i < pSize * 2; i += 2) {
-      PetscInt offset        = edges->cell_offsets[iedge];
-      PetscInt index         = offset + edges->num_cells[iedge];
-      edges->cell_ids[index] = p[i] - c_start;
-      edges->num_cells[iedge]++;
+      PetscInt cell_id = p[i] - c_start;
+      if (edges->cell_ids[2 * iedge] != -1) {  // we already have one cell
+        edges->cell_ids[2 * iedge + 1] = cell_id;
+      } else {  // no cells attached yet
+        edges->cell_ids[2 * iedge] = cell_id;
+      }
     }
     PetscCall(DMPlexRestoreTransitiveClosure(dm, e, PETSC_FALSE, &pSize, &p));
   }
@@ -404,9 +396,7 @@ PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(RDyFree(edges.internal_edge_ids));
   PetscCall(RDyFree(edges.boundary_edge_ids));
   PetscCall(RDyFree(edges.is_local));
-  PetscCall(RDyFree(edges.num_cells));
   PetscCall(RDyFree(edges.vertex_ids));
-  PetscCall(RDyFree(edges.cell_offsets));
   PetscCall(RDyFree(edges.cell_ids));
   PetscCall(RDyFree(edges.is_internal));
   PetscCall(RDyFree(edges.normals));
@@ -439,9 +429,8 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
   for (PetscInt e = e_start; e < e_end; e++) {
     PetscInt iedge = e - e_start;
 
-    PetscInt cellOffset = edges->cell_offsets[iedge];
-    PetscInt l          = edges->cell_ids[cellOffset];
-    PetscInt r          = edges->cell_ids[cellOffset + 1];
+    PetscInt l = edges->cell_ids[2 * iedge];
+    PetscInt r = edges->cell_ids[2 * iedge + 1];
 
     PetscCheck(l >= 0, comm, PETSC_ERR_USER, "non-internal 'left' edge %d encountered (expected internal edge)", l);
     PetscBool is_internal_edge = (r >= 0);
@@ -545,10 +534,9 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
   mesh->num_boundary_edges = 0;
 
   for (PetscInt e = e_start; e < e_end; e++) {
-    PetscInt iedge      = e - e_start;
-    PetscInt cellOffset = edges->cell_offsets[iedge];
-    PetscInt l          = edges->cell_ids[cellOffset];
-    PetscInt r          = edges->cell_ids[cellOffset + 1];
+    PetscInt iedge = e - e_start;
+    PetscInt l     = edges->cell_ids[2 * iedge];
+    PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
     if (r >= 0 && l >= 0) {
       edges->internal_edge_ids[mesh->num_internal_edges++] = iedge;
