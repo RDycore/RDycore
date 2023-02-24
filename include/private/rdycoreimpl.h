@@ -72,6 +72,9 @@ struct _p_RDy {
   // PETSc (DMPlex) grid
   DM dm;
 
+  // Auxiliary DM for diagnostics
+  DM aux_dm;
+
   // mesh representing simulation domain
   RDyMesh mesh;
 
@@ -95,22 +98,33 @@ struct _p_RDy {
   RDyCondition *boundary_conditions;
 
   // log file handle
-  FILE       *log;
+  FILE *log;
 
-  //-----------------
-  // Simulation data
-  //-----------------
+  //--------------------------
+  // Solver and solution data
+  //--------------------------
 
   // time step size
   PetscReal dt;
-  // index of current timestep
-  PetscInt tstep;
 
-  PetscInt  dof;
-  Vec       B, localB;
-  Vec       localX;
-  PetscBool debug, save, add_building;
-  PetscBool interpolate;
+  // index of current timestep
+  PetscInt step;
+
+  // time₋stepping solver
+  TS ts;
+
+  // solution vectors (global and local)
+  Vec X, X_local;
+
+  // residual vector
+  Vec R;
 };
+
+PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
+PETSC_INTERN PetscErrorCode PrintConfig(RDy);
+
+// shallow water equations functions
+PETSC_INTERN PetscErrorCode InitSWE(RDy);
+PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 
 #endif

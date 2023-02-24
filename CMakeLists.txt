@@ -28,6 +28,7 @@ set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format-truncation")
 endif()
 
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.

@@ -29,15 +29,16 @@ program rdycore_f90
     ! initialize subsystems
     PetscCallA(RDyInit(ierr))
 
-    ! create rdycore and set it up with the given file
-    PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
-    PetscCallA(RDySetup(rdy_, ierr))
+    if (trim(config_file) /= trim('-help')) then
+      ! create rdycore and set it up with the given file
+      PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
+      PetscCallA(RDySetup(rdy_, ierr))
 
-    ! Run the simulation to completion.
-    PetscCallA(RDyRun(rdy_, ierr))
+      ! Run the simulation to completion and destroy it.
+      PetscCallA(RDyRun(rdy_, ierr))
+      PetscCallA(RDyDestroy(rdy_, ierr));
+    end if
 
-    ! clean up
-    PetscCallA(RDyDestroy(rdy_, ierr));
     PetscCallA(RDyFinalize(ierr));
   end if
 

@@ -111,6 +111,7 @@ typedef struct {
 
   // flow and related parameterization(s)
   RDyFlowMode    flow_mode;
+  PetscReal      tiny_h; // depth below which no flow occurs (hardwired)
   RDyBedFriction bed_friction;
   PetscReal      bed_friction_coef;
 

@@ -19,18 +19,18 @@ int main(int argc, char *argv[]) {
   // initialize subsystems
   PetscCall(RDyInit(argc, argv, help_str));
 
-  // create rdycore and set it up with the given file
-  MPI_Comm comm = PETSC_COMM_WORLD;
-  RDy rdy;
-  PetscCall(RDyCreate(comm, argv[1], &rdy));
-  PetscCall(RDySetup(rdy));
+  if (strcmp(argv[1], "-help")) { // if given a config file
+    // create rdycore and set it up with the given file
+    MPI_Comm comm = PETSC_COMM_WORLD;
+    RDy rdy;
+    PetscCall(RDyCreate(comm, argv[1], &rdy));
+    PetscCall(RDySetup(rdy));
 
-  // Run the simulation to completion.
-  PetscCall(RDyRun(rdy));
+    // Run the simulation to completion and destroy it.
+    PetscCall(RDyRun(rdy));
+    PetscCall(RDyDestroy(&rdy));
+  }
 
-  // clean up
-  PetscCall(RDyDestroy(&rdy));
   PetscCall(RDyFinalize());
-
   return 0;
 }

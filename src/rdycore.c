@@ -28,7 +28,8 @@ PetscErrorCode RDyInitFortran(void) {
     PetscCall(PetscInitialized(&petsc_initialized));
     if (!petsc_initialized) {
       PetscCall(PetscInitializeNoArguments());
-      PetscCall(PetscInitializeFortran());
+      // no need for PetscInitializeFortran because PetscInitialize is
+      // called before this function in the rdycore Fortran module.
     }
     initialized_ = PETSC_TRUE;
   }
@@ -114,11 +115,15 @@ PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rd
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
 
+  // destroy FV mesh
+  if ((*rdy)->mesh.num_cells) RDyMeshDestroy((*rdy)->mesh);
+
+  // destroy conditions
   if ((*rdy)->initial_conditions) RDyFree((*rdy)->initial_conditions);
   if ((*rdy)->sources) RDyFree((*rdy)->sources);
   if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
 
-  // Destroy regions and surfaces.
+  // destroy regions and surfaces
   for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
     if ((*rdy)->regions[i].cell_ids) {
       RDyFree((*rdy)->regions[i].cell_ids);
@@ -135,10 +140,19 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->surface_ids) RDyFree((*rdy)->surface_ids);
   if ((*rdy)->surfaces) RDyFree((*rdy)->surfaces);
 
-  if ((*rdy)->dm) {
-    DMDestroy(&((*rdy)->dm));
-  }
+  // destroy solver
+  if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
+  // destroy vectors
+  if ((*rdy)->R) VecDestroy(&((*rdy)->R));
+  if ((*rdy)->X) VecDestroy(&((*rdy)->X));
+  if ((*rdy)->X_local) VecDestroy(&((*rdy)->X_local));
+
+  // destroy DMs
+  if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
+  if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
+
+  // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
   }

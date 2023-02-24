@@ -3,14 +3,14 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
-extern PetscErrorCode ReadConfigFile(RDy rdy);
-extern PetscErrorCode PrintConfig(RDy rdy);
-
 // sets default parameters
 static PetscErrorCode SetDefaults(RDy rdy) {
   PetscFunctionBegin;
 
   rdy->config.log_level = LOG_INFO;
+
+  // set the water depth below which no flow occurs
+  rdy->config.tiny_h = 1e-7;
 
   PetscFunctionReturn(0);
 }
@@ -19,7 +19,85 @@ static PetscErrorCode SetDefaults(RDy rdy) {
 static PetscErrorCode OverrideParameters(RDy rdy) {
   PetscFunctionBegin;
 
-  // FIXME
+  if (rdy->dt <= 0.0) {
+    // ѕet a default timestep if needed
+    rdy->dt = rdy->config.final_time / rdy->config.max_step;
+  }
+
+  PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
+  { PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL)); }
+  PetscOptionsEnd();
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode CreateDM(RDy rdy) {
+  PetscFunctionBegin;
+
+  // read the grid from a file
+  PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.mesh_file, "grid", PETSC_TRUE, &rdy->dm));
+
+  // interpolate the grid to get more connectivity
+  {
+    DM dm_interp;
+    PetscCall(DMPlexInterpolate(rdy->dm, &dm_interp));
+    PetscCheck(dm_interp, rdy->comm, PETSC_ERR_USER, "Mesh interpolation failed!");
+    PetscCall(DMDestroy(&rdy->dm));
+    rdy->dm = dm_interp;
+  }
+
+  // I'm not sure exactly why we need this here...
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+
+  // name the grid and apply any overrides from the command line
+  PetscCall(PetscObjectSetName((PetscObject)rdy->dm, "grid"));
+  PetscCall(DMSetFromOptions(rdy->dm));
+
+  // create a section with (h, hu, hv) as degrees of freedom
+  PetscInt     n_field            = 3;
+  PetscInt     n_field_dof[3]     = {1, 1, 1};
+  char         field_names[3][20] = {"height", "x momentum", "y momentum"};
+  PetscSection sec;
+  PetscCall(PetscSectionCreate(rdy->comm, &sec));
+  PetscCall(PetscSectionSetNumFields(sec, n_field));
+  PetscInt n_field_dof_tot = 0;
+  for (PetscInt f = 0; f < n_field; ++f) {
+    PetscCall(PetscSectionSetFieldName(sec, f, &field_names[f][0]));
+    PetscCall(PetscSectionSetFieldComponents(sec, f, n_field_dof[f]));
+    n_field_dof_tot += n_field_dof[f];
+  }
+
+  // set the number of degrees of freedom in each cell
+  PetscInt c_start, c_end;  // starting and ending cell points
+  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
+  PetscCall(PetscSectionSetChart(sec, c_start, c_end));
+  for (PetscInt c = c_start; c < c_end; ++c) {
+    for (PetscInt f = 0; f < n_field; ++f) {
+      PetscCall(PetscSectionSetFieldDof(sec, c, f, n_field_dof[f]));
+    }
+    PetscCall(PetscSectionSetDof(sec, c, n_field_dof_tot));
+  }
+
+  // embed the section's data in our grid and toss the section
+  PetscCall(PetscSectionSetUp(sec));
+  PetscCall(DMSetLocalSection(rdy->dm, sec));
+  PetscCall(PetscSectionDestroy(&sec));
+
+  // set grid adacency and create a natural-to-local mapping
+  PetscCall(DMSetBasicAdjacency(rdy->dm, PETSC_TRUE, PETSC_TRUE));
+  PetscCall(DMSetUseNatural(rdy->dm, PETSC_TRUE));
+
+  // distribute the mesh across processes
+  {
+    DM dm_dist;
+    PetscCall(DMPlexDistribute(rdy->dm, 1, NULL, &dm_dist));
+    if (dm_dist) {
+      PetscCall(DMDestroy(&rdy->dm));
+      rdy->dm = dm_dist;
+    }
+  }
+
+  PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
 
   PetscFunctionReturn(0);
 }
@@ -38,6 +116,52 @@ static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *ind
       break;
     }
   }
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(DMClone(rdy->dm, &rdy->aux_dm));
+
+  // create an auxiliary section with a diagnostic parameter.
+  PetscInt     n_aux_field            = 1;
+  PetscInt     n_aux_field_dof[1]     = {1};
+  char         aux_field_names[1][20] = {"Parameter"};
+  PetscSection aux_sec;
+  PetscCall(PetscSectionCreate(rdy->comm, &aux_sec));
+  PetscCall(PetscSectionSetNumFields(aux_sec, n_aux_field));
+  PetscInt n_aux_field_dof_tot = 0;
+  for (PetscInt f = 0; f < n_aux_field; ++f) {
+    PetscCall(PetscSectionSetFieldName(aux_sec, f, &aux_field_names[f][0]));
+    PetscCall(PetscSectionSetFieldComponents(aux_sec, f, n_aux_field_dof[f]));
+    n_aux_field_dof_tot += n_aux_field_dof[f];
+  }
+
+  // set the number of auxiliary degrees of freedom in each cell
+  PetscInt c_start, c_end;  // starting and ending cell points
+  DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end);
+  PetscCall(PetscSectionSetChart(aux_sec, c_start, c_end));
+  for (PetscInt c = c_start; c < c_end; ++c) {
+    for (PetscInt f = 0; f < n_aux_field; ++f) {
+      PetscCall(PetscSectionSetFieldDof(aux_sec, c, f, n_aux_field_dof[f]));
+    }
+    PetscCall(PetscSectionSetDof(aux_sec, c, n_aux_field_dof_tot));
+  }
+
+  // embed the section's data in the auxiliary DM and toss the section
+  PetscCall(PetscSectionSetUp(aux_sec));
+  PetscCall(DMSetLocalSection(rdy->aux_dm, aux_sec));
+  PetscCall(PetscSectionViewFromOptions(aux_sec, NULL, "-aux_layout_view"));
+  PetscCall(PetscSectionDestroy(&aux_sec));
+
+  // copy adjacency info from the primary DM
+  PetscSF sf_migration, sf_natural;
+  DMPlexGetMigrationSF(rdy->dm, &sf_migration);
+  DMPlexCreateGlobalToNaturalSF(rdy->aux_dm, aux_sec, sf_migration, &sf_natural);
+  DMPlexSetGlobalToNaturalSF(rdy->aux_dm, sf_natural);
+  PetscSFDestroy(&sf_natural);
 
   PetscFunctionReturn(0);
 }
@@ -83,6 +207,8 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscFunctionBegin;
 
   // Count and fetch regions.
+  PetscInt c_start, c_end;  // starting and ending cell points
+  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
   for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
@@ -106,19 +232,22 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       PetscCall(ISGetLocalSize(cell_is, &num_cells));
       if (num_cells > 0) {
         rdy->region_ids[rdy->num_regions] = region_id;
-        ++rdy->num_regions;
-        region->num_cells = num_cells;
+        region->num_cells                 = num_cells;
         PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
       }
       const PetscInt *cell_ids;
       PetscCall(ISGetIndices(cell_is, &cell_ids));
-      memcpy(region->cell_ids, cell_ids, sizeof(PetscInt) * num_cells);
+      for (PetscInt i = 0; i < num_cells; ++i) {
+        region->cell_ids[i] = cell_ids[i] - c_start;
+      }
       PetscCall(ISRestoreIndices(cell_is, &cell_ids));
       PetscCall(ISDestroy(&cell_is));
     }
   }
 
   // Count and fetch surfaces.
+  PetscInt e_start, e_end;  // starting and ending edge points
+  DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
     IS edge_is;
@@ -145,7 +274,9 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       }
       const PetscInt *edge_ids;
       PetscCall(ISGetIndices(edge_is, &edge_ids));
-      memcpy(surface->edge_ids, edge_ids, sizeof(PetscInt) * num_edges);
+      for (PetscInt i = 0; i < num_edges; ++i) {
+        surface->edge_ids[i] = edge_ids[i] - e_start;
+      }
       PetscCall(ISRestoreIndices(edge_is, &edge_ids));
       PetscCall(ISDestroy(&edge_is));
     }
@@ -261,7 +392,6 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
     // If no flow condition was specified for a boundary, we set it to our
     // reflecting flow condition.
     if (!strlen(bc_spec->flow_name)) {
-      RDyLogDebug(rdy, "Setting reflecting flow condition for surface %d\n", surface_id);
       bc->flow = reflecting_flow;
     } else {
       PetscInt flow_index;
@@ -286,11 +416,88 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// Configures bookkeeping data structures for the simulation
-static PetscErrorCode InitSimulationData(RDy rdy) {
+// create solvers and vectors
+static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscFunctionBegin;
 
-  // FIXME
+  // set up vectors
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
+  PetscCall(VecDuplicate(rdy->X, &rdy->R));
+  PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
+  PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
+
+  PetscInt n_dof;
+  PetscCall(VecGetSize(rdy->X, &n_dof));
+
+  // set up a TS solver
+  PetscCall(TSCreate(rdy->comm, &rdy->ts));
+  PetscCall(TSSetProblemType(rdy->ts, TS_NONLINEAR));
+  switch (rdy->config.temporal) {
+    case TEMPORAL_EULER:
+      PetscCall(TSSetType(rdy->ts, TSEULER));
+      break;
+    case TEMPORAL_RK4:
+      PetscCall(TSSetType(rdy->ts, TSRK));
+      PetscCall(TSRKSetType(rdy->ts, TSRK4));
+      break;
+    case TEMPORAL_BEULER:
+      PetscCall(TSSetType(rdy->ts, TSBEULER));
+      break;
+  }
+  PetscCall(TSSetDM(rdy->ts, rdy->dm));
+
+  PetscCheck(rdy->config.flow_mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCall(InitSWE(rdy));  // initialize SWE physics
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
+
+  PetscCall(TSSetMaxTime(rdy->ts, rdy->config.final_time));
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
+  PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+
+  // apply any solver-related options supplied on the command line
+  PetscCall(TSSetFromOptions(rdy->ts));
+  PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
+
+  PetscFunctionReturn(0);
+}
+
+// initializes solution vector data
+static PetscErrorCode InitSolution(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(VecZeroEntries(rdy->X));
+  if (strlen(rdy->config.initial_conditions_file)) {  // read from file
+    PetscViewer viewer;
+    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.initial_conditions_file, FILE_MODE_READ, &viewer));
+    Vec natural;
+    PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
+    PetscCall(VecLoad(natural, viewer));
+    PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, rdy->X));
+    PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
+    PetscCall(PetscViewerDestroy(&viewer));
+    PetscCall(VecDestroy(&natural));
+  } else {
+    // we initialize from specified initial conditions by looping over regions
+    // and writing values for corresponding cells
+    PetscInt n_local;
+    PetscCall(VecGetLocalSize(rdy->X, &n_local));
+    PetscScalar *x_ptr;
+    PetscCall(VecGetArray(rdy->X, &x_ptr));
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyRegion    *region = &rdy->regions[r];
+      RDyCondition *ic     = &rdy->initial_conditions[r];
+      for (PetscInt c = 0; c < region->num_cells; ++c) {
+        PetscInt cell_id = region->cell_ids[c];
+        if (3 * cell_id < n_local) {  // skip ghost cells
+          x_ptr[3 * cell_id]     = ic->flow->height;
+          x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
+          x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+        }
+      }
+    }
+    PetscCall(VecRestoreArray(rdy->X, &x_ptr));
+  }
 
   PetscFunctionReturn(0);
 }
@@ -316,23 +523,26 @@ PetscErrorCode RDySetup(RDy rdy) {
   // print configuration info
   PetscCall(PrintConfig(rdy));
 
-  // create the grid from the given file and distribute it amongst processes.
-  PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.mesh_file, "grid", PETSC_TRUE, &rdy->dm));
-  DM dm_dist;
-  PetscCall(DMPlexDistribute(rdy->dm, 1, NULL, &dm_dist));
-  if (dm_dist) {
-    PetscCall(DMDestroy(&rdy->dm));
-    rdy->dm = dm_dist;
-  }
+  RDyLogDebug(rdy, "Creating DMs...");
+  PetscCall(CreateDM(rdy));           // for mesh and solution vector
+  PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
 
-  // set up mesh regions and surfaces, reading them from our DMPlex object
+  RDyLogDebug(rdy, "Initializing regions and surfaces...");
   PetscCall(InitRegionsAndSurfaces(rdy));
 
-  // set up initial/boundary conditions and sources
+  RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
   PetscCall(InitConditionsAndSources(rdy));
 
-  // set up bookkeeping data structures
-  PetscCall(InitSimulationData(rdy));
+  RDyLogDebug(rdy, "Creating solvers and vectors...");
+  PetscCall(CreateSolvers(rdy));
+
+  RDyLogDebug(rdy, "Creating FV mesh...");
+  // note: this must be done after global vectors are created so a global
+  // note: section exists for the DM
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
+  RDyLogDebug(rdy, "Initializing solution data...");
+  PetscCall(InitSolution(rdy));
 
   PetscFunctionReturn(0);
 }

@@ -145,4 +145,4 @@ Physical Surface("downstream", 2) = {2, 4, 5, 7};
 // integer IDs.
 Physical Curve("boundary", 1) = {1, 5, 6, 7, 8, 9, 13, 14, 15, 16};
 Physical Curve("top_wall", 2) = {2, 3, 4};
-Physical Curve("bottom_wall", 3) = {2, 3, 4};
+Physical Curve("bottom_wall", 3) = {10, 11, 12};
