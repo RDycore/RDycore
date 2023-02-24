@@ -467,6 +467,13 @@ static PetscErrorCode ParseGrid(yaml_event_t *event, YamlParserState *state, RDy
 static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
+  // initial_conditions:
+  //   <region>: # id of a region (eg 1, 2)
+  //     flow: <flow-condition-name>
+  //     sediment: <sediment-condition-name> # (if physics.sediment = true)
+  //     salinity: <salinity-condition-name> # (if physics.salinity = true)
+  //   ...
+
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in initial_conditions section!");
   const char *value = (const char *)(event->data.scalar.value);
@@ -517,6 +524,13 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
 static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
+  // boundary_conditions:
+  //   <surface>: # id of a surface (eg 1, 2)
+  //     flow: <flow-condition-name>
+  //     sediment: <sediment-condition-name> # (if physics.sediment = true)
+  //     salinity: <salinity-condition-name> # (if physics.salinity = true)
+  //   ...
+
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in boundary_conditions section!");
   const char *value = (const char *)(event->data.scalar.value);
@@ -557,6 +571,13 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserSta
 
 static PetscErrorCode ParseSources(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
+
+  // sources:
+  //   <region>: # id of a region (eg 1, 2)
+  //     flow: <flow-condition-name>
+  //     sediment: <sediment-condition-name> # (if physics.sediment = true)
+  //     salinity: <salinity-condition-name> # (if physics.salinity = true)
+  //   ...
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in sources section!");
   const char *value = (const char *)(event->data.scalar.value);
