@@ -516,8 +516,10 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   // write out debugging info for maximum wave speed
   if (rdy->config.log_level >= LOG_DEBUG) {
     MPI_Allreduce(MPI_IN_PLACE, &amax_diags, 1, amax_diags_type, amax_diags_op, rdy->comm);
+    PetscReal dt;
+    PetscCall(TSGetTimeStep(ts, &dt));
     RDyLogDebug(rdy, "Max wave speed %g encountered at edge %d (Courant number = %f)", amax_diags.max_wave_speed, amax_diags.global_edge_id,
-                amax_diags.max_wave_speed * rdy->dt * 2);
+                amax_diags.max_wave_speed * dt * 2);
   }
   rdy->step++;
 

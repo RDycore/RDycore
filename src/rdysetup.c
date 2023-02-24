@@ -449,6 +449,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 
   // apply any solver-related options supplied on the command line
   PetscCall(TSSetFromOptions(rdy->ts));
+  PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
 
   PetscFunctionReturn(0);
 }
