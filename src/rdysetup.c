@@ -207,6 +207,8 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscFunctionBegin;
 
   // Count and fetch regions.
+  PetscInt c_start, c_end;  // starting and ending cell points
+  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
   for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
@@ -235,13 +237,17 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       }
       const PetscInt *cell_ids;
       PetscCall(ISGetIndices(cell_is, &cell_ids));
-      memcpy(region->cell_ids, cell_ids, sizeof(PetscInt) * num_cells);
+      for (PetscInt i = 0; i < num_cells; ++i) {
+        region->cell_ids[i] = cell_ids[i] - c_start;
+      }
       PetscCall(ISRestoreIndices(cell_is, &cell_ids));
       PetscCall(ISDestroy(&cell_is));
     }
   }
 
   // Count and fetch surfaces.
+  PetscInt e_start, e_end;  // starting and ending edge points
+  DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
     IS edge_is;
@@ -268,7 +274,9 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       }
       const PetscInt *edge_ids;
       PetscCall(ISGetIndices(edge_is, &edge_ids));
-      memcpy(surface->edge_ids, edge_ids, sizeof(PetscInt) * num_edges);
+      for (PetscInt i = 0; i < num_edges; ++i) {
+        surface->edge_ids[i] = edge_ids[i] - e_start;
+      }
       PetscCall(ISRestoreIndices(edge_is, &edge_ids));
       PetscCall(ISDestroy(&edge_is));
     }
