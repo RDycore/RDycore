@@ -468,11 +468,12 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   PetscFunctionBegin;
 
   // initial_conditions:
-  //   <region>: # id of a region (eg 1, 2)
+  //   <region1>: # id of a region (eg 1, 2)
   //     flow: <flow-condition-name>
   //     sediment: <sediment-condition-name> # (if physics.sediment = true)
   //     salinity: <salinity-condition-name> # (if physics.salinity = true)
-  //   ...
+  //   <region2>:
+  //     ...
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in initial_conditions section!");
@@ -525,11 +526,12 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserSta
   PetscFunctionBegin;
 
   // boundary_conditions:
-  //   <surface>: # id of a surface (eg 1, 2)
+  //   <surface1>: # id of a surface (eg 1, 2)
   //     flow: <flow-condition-name>
   //     sediment: <sediment-condition-name> # (if physics.sediment = true)
   //     salinity: <salinity-condition-name> # (if physics.salinity = true)
-  //   ...
+  //   <surface2>:
+  //     ...
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in boundary_conditions section!");
@@ -573,11 +575,12 @@ static PetscErrorCode ParseSources(yaml_event_t *event, YamlParserState *state, 
   PetscFunctionBegin;
 
   // sources:
-  //   <region>: # id of a region (eg 1, 2)
+  //   <region1>: # id of a region (eg 1, 2)
   //     flow: <flow-condition-name>
   //     sediment: <sediment-condition-name> # (if physics.sediment = true)
   //     salinity: <salinity-condition-name> # (if physics.salinity = true)
-  //   ...
+  //   <region2>:
+  //     ...
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in sources section!");
   const char *value = (const char *)(event->data.scalar.value);
@@ -618,6 +621,14 @@ static PetscErrorCode ParseSources(yaml_event_t *event, YamlParserState *state, 
 
 static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
+
+  // flow_conditions:
+  //   <condition1-name>:       # name of condition (e.g. dam_top_ic)
+  //     type: <condition-type> # (e.g. dirichlet, neumann)
+  //     height: <h>            # value of water height
+  //     momentum: [<hu>, <hv>] # components of water momentum
+  //   <condition2-name>:
+  //     ...
 
   if (event->type == YAML_SCALAR_EVENT) {
     const char *value = (const char *)(event->data.scalar.value);
@@ -679,6 +690,13 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *
 static PetscErrorCode ParseSedimentConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
+  // sediment_conditions:
+  //   <condition1-name>:       # name of condition (e.g. dam_top_ic)
+  //     type: <condition-type> # (e.g. dirichlet, neumann)
+  //     concentration: <c>     # value of sediment concentration
+  //   <condition2-name>:
+  //     ...
+
   const char *value = (const char *)(event->data.scalar.value);
 
   // if we're not in a subsection, our parameter is the name of the subsection
@@ -715,6 +733,13 @@ static PetscErrorCode ParseSedimentConditions(yaml_event_t *event, YamlParserSta
 
 static PetscErrorCode ParseSalinityConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
+
+  // salinity_conditions:
+  //   <condition1-name>:       # name of condition (e.g. dam_top_ic)
+  //     type: <condition-type> # (e.g. dirichlet, neumann)
+  //     concentration: <c>     # value of salinity concentration
+  //   <condition2-name>:
+  //     ...
 
   const char *value = (const char *)(event->data.scalar.value);
 
