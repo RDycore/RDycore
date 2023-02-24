@@ -122,6 +122,9 @@ struct _p_RDy {
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
+
+// shallow water equations functions
+PETSC_INTERN PetscErrorCode InitSWE(RDy);
 PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 
 #endif

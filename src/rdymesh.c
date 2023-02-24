@@ -80,6 +80,9 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
+  PetscInt dim;
+  PetscCall(DMGetCoordinateDim(dm, &dim));
+
   PetscInt c_start, c_end;
   PetscInt e_start, e_end;
   PetscInt v_start, v_end;
@@ -88,11 +91,11 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate cell storage
-  PetscCall(RDyCellsCreate(c_end - c_start, cells));
+  PetscInt num_cells = c_end - c_start;
+  PetscCall(RDyCellsCreate(num_cells, cells));
 
   for (PetscInt c = c_start; c < c_end; c++) {
     PetscInt  icell = c - c_start;
-    PetscInt  dim   = 2;
     PetscReal centroid[dim], normal[dim];
     DMPlexComputeCellGeometryFVM(dm, c, &cells->areas[icell], &centroid[0], &normal[0]);
 
@@ -132,6 +135,11 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
     }
     PetscCall(DMPlexRestoreTransitiveClosure(dm, c, use_cone, &pSize, &p));
   }
+
+  // fetch global cell IDs.
+  ISLocalToGlobalMapping map;
+  PetscCall(DMGetLocalToGlobalMapping(dm, &map));
+  PetscCall(ISLocalToGlobalMappingApply(map, num_cells, cells->ids, cells->global_ids));
 
   PetscFunctionReturn(0);
 }
@@ -213,6 +221,9 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   PetscFunctionBegin;
 
+  PetscInt dim;
+  PetscCall(DMGetCoordinateDim(dm, &dim));
+
   PetscInt c_start, c_end;
   PetscInt e_start, e_end;
   PetscInt v_start, v_end;
@@ -221,7 +232,8 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate vertex storage
-  PetscCall(RDyVerticesCreate(v_end - v_start, vertices));
+  PetscInt num_vertices = v_end - v_start;
+  PetscCall(RDyVerticesCreate(num_vertices, vertices));
 
   PetscSection coordSection;
   Vec          coordinates;
@@ -236,9 +248,9 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
     PetscInt *p = NULL;
 
     PetscCall(DMPlexGetTransitiveClosure(dm, v, PETSC_FALSE, &pSize, &p));
-
-    PetscInt coordOffset, dim = 2;
+    PetscInt coordOffset;
     PetscSectionGetOffset(coordSection, v, &coordOffset);
+
     for (PetscInt idim = 0; idim < dim; idim++) {
       vertices->points[ivertex].X[idim] = coords[coordOffset + idim];
     }
@@ -264,6 +276,11 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   }
 
   VecRestoreArray(coordinates, &coords);
+
+  // fetch global vertex IDs.
+  ISLocalToGlobalMapping map;
+  PetscCall(DMGetLocalToGlobalMapping(dm, &map));
+  PetscCall(ISLocalToGlobalMappingApply(map, num_vertices, vertices->ids, vertices->global_ids));
 
   PetscFunctionReturn(0);
 }
@@ -335,6 +352,9 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
+  PetscInt dim;
+  PetscCall(DMGetCoordinateDim(dm, &dim));
+
   PetscInt c_start, c_end;
   PetscInt e_start, e_end;
   PetscInt v_start, v_end;
@@ -343,11 +363,11 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate edge storage
-  PetscCall(RDyEdgesCreate(e_end - e_start, edges));
+  PetscInt num_edges = e_end - e_start;
+  PetscCall(RDyEdgesCreate(num_edges, edges));
 
   for (PetscInt e = e_start; e < e_end; e++) {
     PetscInt  iedge = e - e_start;
-    PetscInt  dim   = 2;
     PetscReal centroid[dim], normal[dim];
     DMPlexComputeCellGeometryFVM(dm, e, &edges->lengths[iedge], &centroid[0], &normal[0]);
 
@@ -380,6 +400,11 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
     }
     PetscCall(DMPlexRestoreTransitiveClosure(dm, e, PETSC_FALSE, &pSize, &p));
   }
+
+  // fetch global edge IDs.
+  ISLocalToGlobalMapping map;
+  PetscCall(DMGetLocalToGlobalMapping(dm, &map));
+  PetscCall(ISLocalToGlobalMappingApply(map, num_edges, edges->ids, edges->global_ids));
 
   PetscFunctionReturn(0);
 }

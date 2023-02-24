@@ -258,7 +258,6 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
     if (edge_is) {
       RDySurface *surface = &rdy->surfaces[s];
       rdy->surface_ids[s] = surface_id;
-      printf("Surface %d badda bing badda boom\n", surface_id);
       ++s;
 
       PetscInt num_edges;
@@ -440,6 +439,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
 
   PetscCheck(rdy->config.flow_mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCall(InitSWE(rdy));  // initialize SWE physics
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
 
   PetscCall(TSSetMaxTime(rdy->ts, rdy->config.final_time));

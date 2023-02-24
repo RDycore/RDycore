@@ -1,8 +1,75 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdymathimpl.h>
+#include <stddef.h>  // for offsetof
 
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
+
+//-----------------------
+// Debugging diagnostics
+//-----------------------
+
+// Diagnostic structure that captures information about the conditions under
+// which the maximum wave speed is encountered. If you change this struct,
+// update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
+typedef struct {
+  PetscReal max_wave_speed;  // maximum wave speed encountered
+  PetscInt  global_edge_id;  // edge at which the max wave speed was encountered
+} AMaxDiagnostics;
+
+// MPI datatype corresponding to AMaxDiagnostics. Created during InitSWE.
+static MPI_Datatype amax_diags_type;
+
+// MPI operator used to determine the prevailing diagnostics for the maximum
+// wave speed on all processes. Created during InitSWE.
+static MPI_Op amax_diags_op;
+
+// function backing the above MPI operator
+static void FindAMaxDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
+  AMaxDiagnostics *in_diags     = in_vec;
+  AMaxDiagnostics *result_diags = result_vec;
+
+  // select the item with the maximum wave speed
+  for (int i = 0; i < *len; ++i) {
+    if (in_diags[i].max_wave_speed > result_diags[i].max_wave_speed) {
+      result_diags[i] = in_diags[i];
+    }
+  }
+}
+
+// this function destroys the MPI type and operator associated with AMaxDiagnostics
+static void DestroyAMaxDiagnostics(void) {
+  MPI_Op_free(&amax_diags_op);
+  MPI_Type_free(&amax_diags_type);
+}
+
+// this function is called by InitSWE to initialize the above type(s) and op(s).
+static PetscErrorCode InitMPITypesAndOps(void) {
+  PetscFunctionBegin;
+
+  // create an MPI data type for the AMaxDiagnostics struct
+  const int      num_blocks             = 2;
+  const int      block_lengths[2]       = {1, 1};
+  const MPI_Aint block_displacements[2] = {
+      offsetof(AMaxDiagnostics, max_wave_speed),
+      offsetof(AMaxDiagnostics, global_edge_id),
+  };
+  MPI_Datatype block_types[2] = {MPI_DOUBLE, MPI_INT};
+  MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &amax_diags_type);
+  MPI_Type_commit(&amax_diags_type);
+
+  // create a corresponding reduction operator for the new type
+  MPI_Op_create(FindAMaxDiagnostics, 1, &amax_diags_op);
+
+  // make sure the operator and the type are destroyed upon exit
+  PetscCall(RDyOnFinalize(DestroyAMaxDiagnostics));
+
+  PetscFunctionReturn(0);
+}
+
+//---------------------------
+// End debugging diagnostics
+//---------------------------
 
 // computes velocities in x and y-dir based on momentum in x and y-dir
 // N - Size of the array
@@ -135,8 +202,8 @@ static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const Pe
 // computes RHS on internal edges
 // rdy        - an RDy object
 // F          - a global vector that stores the fluxes between internal edges
-// amax_value - the fastest wave speed encountered
-static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *amax_value) {
+// amax_diags - diagnostics struct for tracking maximum wave speed
+static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, AMaxDiagnostics *amax_diags) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy->mesh;
@@ -172,6 +239,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
       hr_vec_int[ii]  = x_ptr[r * ndof + 0];
       hur_vec_int[ii] = x_ptr[r * ndof + 1];
       hvr_vec_int[ii] = x_ptr[r * ndof + 2];
+
+      cn_vec_int[ii] = edges->cn[iedge];
+      sn_vec_int[ii] = edges->sn[iedge];
     }
   }
 
@@ -197,7 +267,10 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
       PetscReal hl = x_ptr[l * ndof + 0];
       PetscReal hr = x_ptr[r * ndof + 0];
 
-      *amax_value = fmax(*amax_value, amax_vec_int[ii]);
+      if (amax_vec_int[ii] > amax_diags->max_wave_speed) {
+        amax_diags->max_wave_speed = amax_vec_int[ii];
+        amax_diags->global_edge_id = edges->global_ids[ii];
+      }
 
       if (!(hr < tiny_h && hl < tiny_h)) {
         PetscReal areal = cells->areas[l];
@@ -221,8 +294,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, PetscReal *ama
 // computes RHS on boundary edges
 // rdy        - an RDy object
 // F          - a global vector that stores the fluxes between boundary edges
-// amax_value - the fastest wave speed encountered
-static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *amax_value) {
+// amax_diags - diagnostics struct for tracking maximum wave speed
+static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostics *amax_diags) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy->mesh;
@@ -301,7 +374,10 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, PetscReal *ama
         PetscReal hl = x_ptr[icell * ndof + 0];
 
         if (!(hl < tiny_h)) {
-          *amax_value = fmax(*amax_value, amax_vec_bnd[e]);
+          if (amax_vec_bnd[e] > amax_diags->max_wave_speed) {
+            amax_diags->max_wave_speed = amax_vec_bnd[e];
+            amax_diags->global_edge_id = edges->global_ids[e];
+          }
           for (PetscInt idof = 0; idof < ndof; idof++) {
             f_ptr[icell * ndof + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
           }
@@ -398,6 +474,16 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscFunctionReturn(0);
 }
 
+// This function initializes SWE physics for the given dycore.
+PetscErrorCode InitSWE(RDy rdy) {
+  PetscFunctionBeginUser;
+
+  // set up MPI types and operators used by SWE physics
+  PetscCall(InitMPITypesAndOps());
+
+  PetscFunctionReturn(0);
+}
+
 // This is the right-hand-side function used by our timestepping solver for
 // the shallow water equations.
 // Parameters:
@@ -419,12 +505,20 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscCall(DMGlobalToLocalEnd(dm, X, INSERT_VALUES, rdy->X_local));
 
   // compute the right hand side
-  PetscReal amax_value = 0.0;
-  PetscCall(RHSFunctionForInternalEdges(rdy, F, &amax_value));
-  PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &amax_value));
+  AMaxDiagnostics amax_diags = {
+      .max_wave_speed = 0.0,
+      .global_edge_id = -1,
+  };
+  PetscCall(RHSFunctionForInternalEdges(rdy, F, &amax_diags));
+  PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &amax_diags));
   PetscCall(AddSourceTerm(rdy, F));
 
-  RDyLogInfo(rdy, "Time step %d: t = %f, CFL = %f", rdy->step, t, amax_value * rdy->dt * 2);
+  // write out debugging info for maximum wave speed
+  if (rdy->config.log_level >= LOG_DEBUG) {
+    MPI_Allreduce(MPI_IN_PLACE, &amax_diags, 1, amax_diags_type, amax_diags_op, rdy->comm);
+    RDyLogDebug(rdy, "Max wave speed %g encountered at edge %d (Courant number = %f)", amax_diags.max_wave_speed, amax_diags.global_edge_id,
+                amax_diags.max_wave_speed * rdy->dt * 2);
+  }
   rdy->step++;
 
   PetscFunctionReturn(0);
