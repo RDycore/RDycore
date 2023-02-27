@@ -245,6 +245,12 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
         PetscCall(ISDestroy(&cell_is));
       }
     }
+  } else {
+    // If we didn't find any regions, we'd better have a file from which to
+    // read initial conditions.
+    PetscCheck(strlen(rdy->config.initial_conditions_file), rdy->comm, PETSC_ERR_USER,
+               "No regions (cell sets) found in grid, and no initial conditions file given! "
+               "Cannot assign initial conditions for the given grid.");
   }
 
   // Count and fetch surfaces.
