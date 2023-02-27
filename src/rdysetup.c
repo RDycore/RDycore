@@ -97,6 +97,14 @@ static PetscErrorCode CreateDM(RDy rdy) {
     }
   }
 
+  // mark boundary edges so we can enforce reflecting BCs on them if needed
+  {
+    DMLabel boundary_edges;
+    PetscCall(DMCreateLabel(rdy->dm, "boundary_edges"));
+    PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edges));
+    PetscCall(DMPlexMarkBoundaryFaces(rdy->dm, 1, boundary_edges));
+  }
+
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
 
   PetscFunctionReturn(0);
@@ -253,44 +261,90 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
                "Cannot assign initial conditions for the given grid.");
   }
 
-  // Count and fetch surfaces.
+  // Extract edges on the domain boundary.
+  DMLabel boundary_edge_label;
+  PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
+  IS boundary_edge_is;
+  PetscCall(DMLabelGetValueIS(boundary_edge_label, &boundary_edge_is));
+
+  // Keep track of whether edges on the domain boundary have been assigned.
+  IS unassigned_edges_is;
+  ISDuplicate(boundary_edge_is, &unassigned_edges_is);
+  PetscInt unassigned_edge_surface_id = 0;  // surface ID for unassigned edges
+
+  // Count and fetch surfaces. We rely on face sets in our grids to express
+  // boundary conditions. All edges on the domain boundary not assigned to other
+  // surfaces are assigned to a special surface to which we apply reflecting
+  // boundary conditions.
   PetscInt e_start, e_end;  // starting and ending edge points
   DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
-  // For now, we rely on face sets in our grids to express boundary conditions
-  PetscCheck(label, rdy->comm, PETSC_ERR_USER, "No face sets found in grid!");
-  for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
-    IS edge_is;
-    PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
-    if (edge_is) ++rdy->num_surfaces;
-    PetscCall(ISDestroy(&edge_is));
-  }
-  PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
-  PetscCall(RDyAlloc(RDySurface, rdy->num_surfaces, &rdy->surfaces));
-  PetscInt s = 0;
-  for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
-    IS edge_is;  // edge index space
-    PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
-    if (edge_is) {
-      RDySurface *surface = &rdy->surfaces[s];
-      rdy->surface_ids[s] = surface_id;
-      ++s;
+  if (label) {  // found face sets!
+    for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
+      IS edge_is;
+      PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
+      if (edge_is) {
+        // we can't use this surface ID for unassigned edges
+        if (unassigned_edge_surface_id == surface_id) ++unassigned_edge_surface_id;
 
-      PetscInt num_edges;
-      PetscCall(ISGetLocalSize(edge_is, &num_edges));
-      if (num_edges > 0) {
-        surface->num_edges = num_edges;
-        PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
+        // intersect this IS with our domain boundary IS to produce the edges
+        // to subtract from our unassigned edge IS.
+        IS assigned_edges_is, new_unassigned_edges_is;
+        PetscCall(ISIntersect(edge_is, boundary_edge_is, &assigned_edges_is));
+        PetscCall(ISDifference(unassigned_edges_is, assigned_edges_is, &new_unassigned_edges_is));
+        ISDestroy(&assigned_edges_is);
+        ISDestroy(&unassigned_edges_is);
+        unassigned_edges_is = new_unassigned_edges_is;
+
+        ++rdy->num_surfaces;
       }
-      const PetscInt *edge_ids;
-      PetscCall(ISGetIndices(edge_is, &edge_ids));
-      for (PetscInt i = 0; i < num_edges; ++i) {
-        surface->edge_ids[i] = edge_ids[i] - e_start;
-      }
-      PetscCall(ISRestoreIndices(edge_is, &edge_ids));
       PetscCall(ISDestroy(&edge_is));
     }
+    PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
+    PetscCall(RDyAlloc(RDySurface, rdy->num_surfaces, &rdy->surfaces));
+    PetscInt s = 0;
+    for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
+      IS edge_is;  // edge index space
+      PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
+      if (edge_is) {
+        RDySurface *surface = &rdy->surfaces[s];
+        rdy->surface_ids[s] = surface_id;
+        ++s;
+
+        // find the number of edges for this surface
+        PetscInt num_edges;
+        PetscCall(ISGetLocalSize(edge_is, &num_edges));
+        if (num_edges > 0) {
+          surface->num_edges = num_edges;
+          PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
+        }
+
+        // extract edge IDs
+        const PetscInt *edge_ids;
+        PetscCall(ISGetIndices(edge_is, &edge_ids));
+        for (PetscInt i = 0; i < num_edges; ++i) {
+          surface->edge_ids[i] = edge_ids[i] - e_start;
+        }
+        PetscCall(ISRestoreIndices(edge_is, &edge_ids));
+        PetscCall(ISDestroy(&edge_is));
+      }
+    }
   }
+
+  // Assign unassigned edges on the domain boundary to an additional surface.
+  RDySurface *surface                     = &rdy->surfaces[rdy->num_surfaces - 1];
+  rdy->surface_ids[rdy->num_surfaces - 1] = unassigned_edge_surface_id;
+  PetscInt num_unassigned_edges;
+  PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
+  if (num_unassigned_edges > 0) {
+    const PetscInt *edge_ids;
+    for (PetscInt i = 0; i < num_unassigned_edges; ++i) {
+      surface->edge_ids[i] = edge_ids[i] - e_start;
+    }
+    PetscCall(ISGetIndices(unassigned_edges_is, &edge_ids));
+    PetscCall(ISRestoreIndices(unassigned_edges_is, &edge_ids));
+  }
+  PetscCall(ISDestroy(&unassigned_edges_is));
 
   // make sure we have at least one region and surface
   PetscCheck(rdy->num_regions > 0, rdy->comm, PETSC_ERR_USER, "No regions were found in the grid!");
