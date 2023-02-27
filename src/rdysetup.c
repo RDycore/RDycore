@@ -211,37 +211,39 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
-  for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
-    IS cell_is;
-    PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
-    if (cell_is) ++rdy->num_regions;
-    PetscCall(ISDestroy(&cell_is));
-  }
-  PetscCall(RDyAlloc(PetscInt, rdy->num_regions, &rdy->region_ids));
-  PetscCall(RDyAlloc(RDyRegion, rdy->num_regions, &rdy->regions));
-  PetscInt r = 0;
-  for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
-    IS cell_is;  // cell index space
-    PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
-    if (cell_is) {
-      RDyRegion *region  = &rdy->regions[r];
-      rdy->region_ids[r] = region_id;
-      ++r;
-
-      PetscInt num_cells;
-      PetscCall(ISGetLocalSize(cell_is, &num_cells));
-      if (num_cells > 0) {
-        rdy->region_ids[rdy->num_regions] = region_id;
-        region->num_cells                 = num_cells;
-        PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
-      }
-      const PetscInt *cell_ids;
-      PetscCall(ISGetIndices(cell_is, &cell_ids));
-      for (PetscInt i = 0; i < num_cells; ++i) {
-        region->cell_ids[i] = cell_ids[i] - c_start;
-      }
-      PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+  if (label) {  // found regions (cell sets) in the grid
+    for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
+      IS cell_is;
+      PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
+      if (cell_is) ++rdy->num_regions;
       PetscCall(ISDestroy(&cell_is));
+    }
+    PetscCall(RDyAlloc(PetscInt, rdy->num_regions, &rdy->region_ids));
+    PetscCall(RDyAlloc(RDyRegion, rdy->num_regions, &rdy->regions));
+    PetscInt r = 0;
+    for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
+      IS cell_is;  // cell index space
+      PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
+      if (cell_is) {
+        RDyRegion *region  = &rdy->regions[r];
+        rdy->region_ids[r] = region_id;
+        ++r;
+
+        PetscInt num_cells;
+        PetscCall(ISGetLocalSize(cell_is, &num_cells));
+        if (num_cells > 0) {
+          rdy->region_ids[rdy->num_regions] = region_id;
+          region->num_cells                 = num_cells;
+          PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
+        }
+        const PetscInt *cell_ids;
+        PetscCall(ISGetIndices(cell_is, &cell_ids));
+        for (PetscInt i = 0; i < num_cells; ++i) {
+          region->cell_ids[i] = cell_ids[i] - c_start;
+        }
+        PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+        PetscCall(ISDestroy(&cell_is));
+      }
     }
   }
 
@@ -249,6 +251,8 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   PetscInt e_start, e_end;  // starting and ending edge points
   DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
+  // For now, we rely on face sets in our grids to express boundary conditions
+  PetscCheck(label, rdy->comm, PETSC_ERR_USER, "No face sets found in grid!");
   for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
     IS edge_is;
     PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
@@ -293,7 +297,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
 static PetscErrorCode InitConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
 
-  if (!strlen(rdy->config.initial_conditions_file)) {
+  if (!strlen(rdy->config.initial_conditions_file)) {  // no IC file given
     // Allocate storage for initial conditions.
     PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->initial_conditions));
 
