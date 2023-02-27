@@ -272,7 +272,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   ISDuplicate(boundary_edge_is, &unassigned_edges_is);
   PetscInt unassigned_edge_surface_id = 0;  // surface ID for unassigned edges
 
-  // Count and fetch surfaces. We rely on face sets in our grids to express
+  // Count surfaces. We rely on face sets in our grids to express
   // boundary conditions. All edges on the domain boundary not assigned to other
   // surfaces are assigned to a special surface to which we apply reflecting
   // boundary conditions.
@@ -300,8 +300,19 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       }
       PetscCall(ISDestroy(&edge_is));
     }
-    PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
-    PetscCall(RDyAlloc(RDySurface, rdy->num_surfaces, &rdy->surfaces));
+  }
+
+  // add an additional surface for unassigned boundary edges if needed
+  PetscInt num_unassigned_edges;
+  PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
+  if (num_unassigned_edges > 0) ++rdy->num_surfaces;
+
+  // allocate resources for surfaces
+  PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
+  PetscCall(RDyAlloc(RDySurface, rdy->num_surfaces, &rdy->surfaces));
+
+  // now fetch surface edge IDs
+  if (label) {
     PetscInt s = 0;
     for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
       IS edge_is;  // edge index space
@@ -332,16 +343,16 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   }
 
   // Assign unassigned edges on the domain boundary to an additional surface.
-  RDySurface *surface                     = &rdy->surfaces[rdy->num_surfaces - 1];
-  rdy->surface_ids[rdy->num_surfaces - 1] = unassigned_edge_surface_id;
-  PetscInt num_unassigned_edges;
-  PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
   if (num_unassigned_edges > 0) {
+    RDySurface *surface = &rdy->surfaces[rdy->num_surfaces - 1];
+    surface->num_edges  = num_unassigned_edges;
+    PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
+    rdy->surface_ids[rdy->num_surfaces - 1] = unassigned_edge_surface_id;
     const PetscInt *edge_ids;
+    PetscCall(ISGetIndices(unassigned_edges_is, &edge_ids));
     for (PetscInt i = 0; i < num_unassigned_edges; ++i) {
       surface->edge_ids[i] = edge_ids[i] - e_start;
     }
-    PetscCall(ISGetIndices(unassigned_edges_is, &edge_ids));
     PetscCall(ISRestoreIndices(unassigned_edges_is, &edge_ids));
   }
   PetscCall(ISDestroy(&unassigned_edges_is));
