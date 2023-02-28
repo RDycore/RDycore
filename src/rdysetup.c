@@ -210,8 +210,8 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
   PetscFunctionReturn(0);
 }
 
-// initializes mesh region/surface data
-static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
+// initializes mesh region data
+static PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionBegin;
 
   // Count and fetch regions.
@@ -261,6 +261,13 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
                "Cannot assign initial conditions for the given grid.");
   }
 
+  PetscFunctionReturn(0);
+}
+
+// initializes mesh surface data
+static PetscErrorCode InitSurfaces(RDy rdy) {
+  PetscFunctionBegin;
+
   // Extract edges on the domain boundary.
   DMLabel boundary_edge_label;
   PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
@@ -278,6 +285,7 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   // boundary conditions.
   PetscInt e_start, e_end;  // starting and ending edge points
   DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
+  DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   if (label) {  // found face sets!
     for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
@@ -303,9 +311,16 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   }
 
   // add an additional surface for unassigned boundary edges if needed
-  PetscInt num_unassigned_edges;
+  PetscInt num_unassigned_edges, num_global_unassigned_edges;
   PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
-  if (num_unassigned_edges > 0) {
+  MPI_Allreduce(&num_unassigned_edges, &num_global_unassigned_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
+  if (num_global_unassigned_edges > 0) {
+    RDyLogDebug(rdy, "Adding surface %d for unassigned boundary edges", unassigned_edge_surface_id);
+    if (!label) {
+      // create a "Face Sets" label if one doesn't already exist
+      PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
+      PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
+    }
     // Add these edges to a new surface with the given ID.
     PetscCall(DMLabelSetStratumIS(label, unassigned_edge_surface_id, unassigned_edges_is));
     ++rdy->num_surfaces;
@@ -347,7 +362,6 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   }
 
   // make sure we have at least one region and surface
-  PetscCheck(rdy->num_regions > 0, rdy->comm, PETSC_ERR_USER, "No regions were found in the grid!");
   PetscCheck(rdy->num_surfaces > 0, rdy->comm, PETSC_ERR_USER, "No surfaces were found in the grid!");
 
   PetscFunctionReturn(0);
@@ -592,7 +606,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
 
   RDyLogDebug(rdy, "Initializing regions and surfaces...");
-  PetscCall(InitRegionsAndSurfaces(rdy));
+  PetscCall(InitRegions(rdy));
+  PetscCall(InitSurfaces(rdy));
 
   RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
   PetscCall(InitConditionsAndSources(rdy));
