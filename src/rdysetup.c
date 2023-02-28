@@ -103,6 +103,9 @@ static PetscErrorCode CreateDM(RDy rdy) {
     PetscCall(DMCreateLabel(rdy->dm, "boundary_edges"));
     PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edges));
     PetscCall(DMPlexMarkBoundaryFaces(rdy->dm, 1, boundary_edges));
+    // FIXME: It looks like this boundary edge set includes z edges, since we're
+    // FIXME: embedding a 2D mesh in 3D. We should probably remove these z edges
+    // FIXME: from this set.
   }
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
@@ -272,7 +275,7 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
   DMLabel boundary_edge_label;
   PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
   IS boundary_edge_is;
-  PetscCall(DMLabelGetValueIS(boundary_edge_label, &boundary_edge_is));
+  PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
 
   // Keep track of whether edges on the domain boundary have been assigned.
   IS unassigned_edges_is;
@@ -296,7 +299,7 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
         if (unassigned_edge_surface_id == surface_id) ++unassigned_edge_surface_id;
 
         // intersect this IS with our domain boundary IS to produce the edges
-        // to subtract from our unassigned edge IS.
+        // to subtract from our unassigned edge IS
         IS assigned_edges_is, new_unassigned_edges_is;
         PetscCall(ISIntersect(edge_is, boundary_edge_is, &assigned_edges_is));
         PetscCall(ISDifference(unassigned_edges_is, assigned_edges_is, &new_unassigned_edges_is));
@@ -321,10 +324,12 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
       PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
       PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
     }
-    // Add these edges to a new surface with the given ID.
+    // add these edges to a new surface with the given ID
     PetscCall(DMLabelSetStratumIS(label, unassigned_edge_surface_id, unassigned_edges_is));
     ++rdy->num_surfaces;
   }
+  PetscCall(ISDestroy(&boundary_edge_is));
+  PetscCall(ISDestroy(&unassigned_edges_is));
 
   // allocate resources for surfaces
   PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
