@@ -103,9 +103,8 @@ static PetscErrorCode CreateDM(RDy rdy) {
     PetscCall(DMCreateLabel(rdy->dm, "boundary_edges"));
     PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edges));
     PetscCall(DMPlexMarkBoundaryFaces(rdy->dm, 1, boundary_edges));
-    // FIXME: It looks like this boundary edge set includes z edges, since we're
-    // FIXME: embedding a 2D mesh in 3D. We should probably remove these z edges
-    // FIXME: from this set.
+    // FIXME: I'm not convinced that I understand the set of edges marked by
+    // FIXME: the above call.
   }
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
@@ -318,7 +317,7 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
   PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
   MPI_Allreduce(&num_unassigned_edges, &num_global_unassigned_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
   if (num_global_unassigned_edges > 0) {
-    RDyLogDebug(rdy, "Adding surface %d for unassigned boundary edges", unassigned_edge_surface_id);
+    RDyLogDebug(rdy, "Adding surface %d for %d unassigned boundary edges", unassigned_edge_surface_id, num_global_unassigned_edges);
     if (!label) {
       // create a "Face Sets" label if one doesn't already exist
       PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
