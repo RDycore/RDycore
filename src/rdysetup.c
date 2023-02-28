@@ -305,7 +305,11 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
   // add an additional surface for unassigned boundary edges if needed
   PetscInt num_unassigned_edges;
   PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
-  if (num_unassigned_edges > 0) ++rdy->num_surfaces;
+  if (num_unassigned_edges > 0) {
+    // Add these edges to a new surface with the given ID.
+    PetscCall(DMLabelSetStratumIS(label, unassigned_edge_surface_id, unassigned_edges_is));
+    ++rdy->num_surfaces;
+  }
 
   // allocate resources for surfaces
   PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
@@ -341,21 +345,6 @@ static PetscErrorCode InitRegionsAndSurfaces(RDy rdy) {
       }
     }
   }
-
-  // Assign unassigned edges on the domain boundary to an additional surface.
-  if (num_unassigned_edges > 0) {
-    RDySurface *surface = &rdy->surfaces[rdy->num_surfaces - 1];
-    surface->num_edges  = num_unassigned_edges;
-    PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
-    rdy->surface_ids[rdy->num_surfaces - 1] = unassigned_edge_surface_id;
-    const PetscInt *edge_ids;
-    PetscCall(ISGetIndices(unassigned_edges_is, &edge_ids));
-    for (PetscInt i = 0; i < num_unassigned_edges; ++i) {
-      surface->edge_ids[i] = edge_ids[i] - e_start;
-    }
-    PetscCall(ISRestoreIndices(unassigned_edges_is, &edge_ids));
-  }
-  PetscCall(ISDestroy(&unassigned_edges_is));
 
   // make sure we have at least one region and surface
   PetscCheck(rdy->num_regions > 0, rdy->comm, PETSC_ERR_USER, "No regions were found in the grid!");
