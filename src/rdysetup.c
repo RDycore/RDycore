@@ -87,6 +87,14 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMSetBasicAdjacency(rdy->dm, PETSC_TRUE, PETSC_TRUE));
   PetscCall(DMSetUseNatural(rdy->dm, PETSC_TRUE));
 
+  // mark boundary edges so we can enforce reflecting BCs on them if needed
+  {
+    DMLabel boundary_edges;
+    PetscCall(DMCreateLabel(rdy->dm, "boundary_edges"));
+    PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edges));
+    PetscCall(DMPlexMarkBoundaryFaces(rdy->dm, 1, boundary_edges));
+  }
+
   // distribute the mesh across processes
   {
     DM dm_dist;
@@ -95,16 +103,6 @@ static PetscErrorCode CreateDM(RDy rdy) {
       PetscCall(DMDestroy(&rdy->dm));
       rdy->dm = dm_dist;
     }
-  }
-
-  // mark boundary edges so we can enforce reflecting BCs on them if needed
-  {
-    DMLabel boundary_edges;
-    PetscCall(DMCreateLabel(rdy->dm, "boundary_edges"));
-    PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edges));
-    PetscCall(DMPlexMarkBoundaryFaces(rdy->dm, 1, boundary_edges));
-    // FIXME: I'm not convinced that I understand the set of edges marked by
-    // FIXME: the above call.
   }
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
