@@ -240,8 +240,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
         PetscInt num_cells;
         PetscCall(ISGetLocalSize(cell_is, &num_cells));
         if (num_cells > 0) {
-          rdy->region_ids[rdy->num_regions] = region_id;
-          region->num_cells                 = num_cells;
+          region->num_cells = num_cells;
           PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
         }
         const PetscInt *cell_ids;
