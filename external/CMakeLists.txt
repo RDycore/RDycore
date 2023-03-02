@@ -4,6 +4,9 @@
 
 include(ExternalProject)
 
+# we need this for some finicky library installation paths
+include(GNUInstallDirs)
+
 #----------------------------------------
 # Build libyaml, a YAML parsing library.
 #----------------------------------------
@@ -56,9 +59,9 @@ if (ENABLE_TESTS)
                       LOG_CONFIGURE TRUE
                       LOG_BUILD TRUE
                       LOG_INSTALL TRUE
-                      BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/${CMOCKA_LIB_NAME})
+                      BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/${CMOCKA_LIB_NAME})
   add_library(cmocka STATIC IMPORTED GLOBAL)
   set_target_properties(cmocka PROPERTIES
-    IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${CMOCKA_LIB_NAME})
+    IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/${CMOCKA_LIB_NAME})
   add_dependencies(cmocka cmocka_proj)
 endif()
