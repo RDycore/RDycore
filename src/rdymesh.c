@@ -777,19 +777,21 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) 
 PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
+  PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
+
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
-  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
   mesh->num_cells = c_end - c_start;
 
   // Determine the number of edges in the mesh
   PetscInt e_start, e_end;
-  DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
+  PetscCall(DMPlexGetDepthStratum(dm, 1, &e_start, &e_end));
   mesh->num_edges = e_end - e_start;
 
   // Determine the number of vertices in the mesh
   PetscInt v_start, v_end;
-  DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
+  PetscCall(DMPlexGetDepthStratum(dm, 0, &v_start, &v_end));
   mesh->num_vertices = v_end - v_start;
 
   // Create mesh elements from the DM
