@@ -435,7 +435,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
       PetscReal bedy = dz_dy * GRAVITY * h;
 
       PetscReal u = u_vec[icell];
-      PetscReal v = u_vec[icell];
+      PetscReal v = v_vec[icell];
 
       PetscReal Fsum_x = f_ptr[icell * ndof + 1];
       PetscReal Fsum_y = f_ptr[icell * ndof + 2];
@@ -444,8 +444,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
 
       if (h >= rdy->config.tiny_h) {
         // Manning's coefficient
-        PetscReal Uniform_roughness = 0.015;
-        PetscReal N_mannings        = GRAVITY * Uniform_roughness * Uniform_roughness;
+        PetscReal N_mannings = 0.015;
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
