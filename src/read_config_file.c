@@ -474,6 +474,11 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   //     salinity: <salinity-condition-name> # (if physics.salinity = true)
   //   <region2>:
   //     ...
+  //
+  // OR
+  //
+  // initial_conditions:
+  //   file: <filename>    # reads all initial state from the given file
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in initial_conditions section!");
@@ -482,14 +487,15 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   // if we're not in a subsection, our parameter could be a single filename or
   // the name of a subsection
   if (!strlen(state->subsection)) {
-    if (strlen(state->parameter)) {
-      PetscCheck(!strcmp(value, "file"), state->comm, PETSC_ERR_USER, "Invalid initial_conditions parameter: %s", state->parameter);
-      strcpy(state->parameter, value);
+    if (!strlen(state->parameter)) {
+      if (!strcmp(value, "file")) {  // initial conditions file supplied
+        strcpy(state->parameter, value);
+      } else {  // proceed to initial conditions subsection
+        strncpy(state->subsection, value, YAML_MAX_LEN);
+      }
     } else if (!strcmp(state->parameter, "file")) {
       strncpy(config->initial_conditions_file, value, YAML_MAX_LEN);
       state->parameter[0] = 0;  // clear parameter name
-    } else {                    // proceed to initial conditions subsection
-      strncpy(state->subsection, value, YAML_MAX_LEN);
     }
   } else {
     // we should be inside a subsection that identifies a region.
