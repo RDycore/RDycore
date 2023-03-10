@@ -313,13 +313,13 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostic
 
   const PetscReal tiny_h = rdy->config.tiny_h;
 
-  // loop over all surfaces that correspond to reflecting boundary conditions
-  for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
-    // skip non-reflecting surfaces
+  // loop over all boundaries that correspond to reflecting boundary conditions
+  for (PetscInt s = 0; s < rdy->num_boundaries; ++s) {
+    // skip non-reflecting boundaries
     if (rdy->boundary_conditions[s].flow->type != CONDITION_REFLECTING) continue;
 
-    RDySurface *surface = &rdy->surfaces[s];
-    PetscInt    num     = surface->num_edges;
+    RDyBoundary *boundary = &rdy->boundaries[s];
+    PetscInt     num     = boundary->num_edges;
 
     PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
     PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
@@ -327,8 +327,8 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostic
     PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
     // Collect the h/hu/hv for left cells to compute u/v
-    for (PetscInt e = 0; e < surface->num_edges; ++e) {
-      PetscInt iedge = surface->edge_ids[e];
+    for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+      PetscInt iedge = boundary->edge_ids[e];
       PetscInt icell = edges->cell_ids[2 * iedge];
 
       hl_vec_bnd[e]  = x_ptr[icell * ndof + 0];
@@ -340,8 +340,8 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostic
     PetscCall(GetVelocityFromMomentum(num, tiny_h, hl_vec_bnd, hul_vec_bnd, hvl_vec_bnd, ul_vec_bnd, vl_vec_bnd));
 
     // Compute h/u/v for right cells
-    for (PetscInt e = 0; e < surface->num_edges; ++e) {
-      PetscInt iedge = surface->edge_ids[e];
+    for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+      PetscInt iedge = boundary->edge_ids[e];
       PetscInt icell = edges->cell_ids[2 * iedge];
 
       cn_vec_bnd[e] = edges->cn[iedge];
@@ -364,8 +364,8 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostic
                              amax_vec_bnd));
 
     // Save the flux values in the Vec based by TS
-    for (PetscInt e = 0; e < surface->num_edges; ++e) {
-      PetscInt  iedge     = surface->edge_ids[e];
+    for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+      PetscInt  iedge     = boundary->edge_ids[e];
       PetscInt  icell     = edges->cell_ids[2 * iedge];
       PetscReal edge_len  = edges->lengths[iedge];
       PetscReal cell_area = cells->areas[icell];

@@ -123,7 +123,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->sources) RDyFree((*rdy)->sources);
   if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
 
-  // destroy regions and surfaces
+  // destroy regions and boundaries
   for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
     if ((*rdy)->regions[i].cell_ids) {
       RDyFree((*rdy)->regions[i].cell_ids);
@@ -132,13 +132,13 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->region_ids) RDyFree((*rdy)->region_ids);
   if ((*rdy)->regions) RDyFree((*rdy)->regions);
 
-  for (PetscInt i = 0; i < (*rdy)->num_surfaces; ++i) {
-    if ((*rdy)->surfaces[i].edge_ids) {
-      RDyFree((*rdy)->surfaces[i].edge_ids);
+  for (PetscInt i = 0; i < (*rdy)->num_boundaries; ++i) {
+    if ((*rdy)->boundaries[i].edge_ids) {
+      RDyFree((*rdy)->boundaries[i].edge_ids);
     }
   }
-  if ((*rdy)->surface_ids) RDyFree((*rdy)->surface_ids);
-  if ((*rdy)->surfaces) RDyFree((*rdy)->surfaces);
+  if ((*rdy)->boundary_ids) RDyFree((*rdy)->boundary_ids);
+  if ((*rdy)->boundaries) RDyFree((*rdy)->boundaries);
 
   // destroy solver
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));

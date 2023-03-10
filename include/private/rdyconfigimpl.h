@@ -12,8 +12,8 @@
 // the maximum region ID that can be defined on a domain
 #define MAX_REGION_ID 32
 
-// the maximum surface ID that can be defined on a domain
-#define MAX_SURFACE_ID 32
+// the maximum boundary ID that can be defined on a domain
+#define MAX_BOUNDARY_ID 32
 
 // the maximum flow/sediment/salinity condition ID that can be defined for a
 // simulation
@@ -65,7 +65,7 @@ typedef enum {
 } RDyTimeUnit;
 
 // This type specifies a "kind" of condition that indicates how that condition
-// is to be enforced on a region or surface.
+// is to be enforced on a region or boundary.
 typedef enum {
   CONDITION_DIRICHLET = 0, // Dirichlet condition (value is specified)
   CONDITION_NEUMANN,       // Neumann condition (derivative is specified)
@@ -148,9 +148,9 @@ typedef struct {
   PetscInt         num_sources;
   RDyConditionSpec sources[1+MAX_REGION_ID];
 
-  // table of boundary conditions mapping surface IDs to names of conditions
+  // table of boundary conditions mapping boundary IDs to names of conditions
   PetscInt         num_boundary_conditions;
-  RDyConditionSpec boundary_conditions[1+MAX_SURFACE_ID];
+  RDyConditionSpec boundary_conditions[1+MAX_BOUNDARY_ID];
 
   // tables of named sets of flow, sediment, and salinity conditions
   PetscInt             num_flow_conditions;

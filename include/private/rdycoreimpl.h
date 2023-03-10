@@ -15,16 +15,16 @@ typedef struct {
   PetscInt    num_cells;
 } RDyRegion;
 
-// This type defines a surface consisting of edges identified by their local
+// This type defines a boundary consisting of edges identified by their local
 // indices.
 typedef struct {
   PetscInt   *edge_ids;
   PetscInt    num_edges;
-} RDySurface;
+} RDyBoundary;
 
 // This type defines a "condition" representing
 // * an initial condition or source/sink associated with a region
-// * a boundary condition associated with a surface
+// * a boundary condition associated with a boundary
 typedef struct {
   // flow, sediment, salinity conditions (NULL for none)
   RDyFlowCondition     *flow;
@@ -83,10 +83,10 @@ struct _p_RDy {
   PetscInt  *region_ids;
   RDyRegion *regions;
 
-  // mesh surfaces
-  PetscInt    num_surfaces;
-  PetscInt   *surface_ids;
-  RDySurface *surfaces;
+  // mesh boundaries
+  PetscInt     num_boundaries;
+  PetscInt    *boundary_ids;
+  RDyBoundary *boundaries;
 
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;
@@ -94,7 +94,7 @@ struct _p_RDy {
   // sources (and sinks) associated with mesh regions (1 per region)
   RDyCondition *sources;
 
-  // boundary conditions associated with mesh surfaces (1 per surface)
+  // boundary conditions associated with mesh boundaries (1 per boundary)
   RDyCondition *boundary_conditions;
 
   // log file handle

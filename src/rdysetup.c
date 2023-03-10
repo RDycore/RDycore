@@ -263,8 +263,8 @@ static PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// initializes mesh surface data
-static PetscErrorCode InitSurfaces(RDy rdy) {
+// initializes mesh boundary data
+static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionBegin;
 
   // Extract edges on the domain boundary.
@@ -276,23 +276,23 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
   // Keep track of whether edges on the domain boundary have been assigned.
   IS unassigned_edges_is;
   ISDuplicate(boundary_edge_is, &unassigned_edges_is);
-  PetscInt unassigned_edge_surface_id = 0;  // surface ID for unassigned edges
+  PetscInt unassigned_edge_boundary_id = 0;  // boundary ID for unassigned edges
 
-  // Count surfaces. We rely on face sets in our grids to express
+  // Count boundaries. We rely on face sets in our grids to express
   // boundary conditions. All edges on the domain boundary not assigned to other
-  // surfaces are assigned to a special surface to which we apply reflecting
+  // boundaries are assigned to a special boundary to which we apply reflecting
   // boundary conditions.
   PetscInt e_start, e_end;  // starting and ending edge points
   DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   if (label) {  // found face sets!
-    for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
+    for (PetscInt boundary_id = 0; boundary_id <= MAX_BOUNDARY_ID; ++boundary_id) {
       IS edge_is;
-      PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
+      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
-        // we can't use this surface ID for unassigned edges
-        if (unassigned_edge_surface_id == surface_id) ++unassigned_edge_surface_id;
+        // we can't use this boundary ID for unassigned edges
+        if (unassigned_edge_boundary_id == boundary_id) ++unassigned_edge_boundary_id;
 
         // intersect this IS with our domain boundary IS to produce the edges
         // to subtract from our unassigned edge IS
@@ -303,58 +303,58 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
         ISDestroy(&unassigned_edges_is);
         unassigned_edges_is = new_unassigned_edges_is;
 
-        ++rdy->num_surfaces;
+        ++rdy->num_boundaries;
       }
       PetscCall(ISDestroy(&edge_is));
     }
   }
 
-  // add an additional surface for unassigned boundary edges if needed
+  // add an additional boundary for unassigned boundary edges if needed
   PetscInt num_unassigned_edges, num_global_unassigned_edges;
   PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
   MPI_Allreduce(&num_unassigned_edges, &num_global_unassigned_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
   if (num_global_unassigned_edges > 0) {
-    RDyLogDebug(rdy, "Adding surface %d for %d unassigned boundary edges", unassigned_edge_surface_id, num_global_unassigned_edges);
+    RDyLogDebug(rdy, "Adding boundary %d for %d unassigned boundary edges", unassigned_edge_boundary_id, num_global_unassigned_edges);
     if (!label) {
       // create a "Face Sets" label if one doesn't already exist
       PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
       PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
     }
-    // add these edges to a new surface with the given ID
-    PetscCall(DMLabelSetStratumIS(label, unassigned_edge_surface_id, unassigned_edges_is));
-    ++rdy->num_surfaces;
+    // add these edges to a new boundary with the given ID
+    PetscCall(DMLabelSetStratumIS(label, unassigned_edge_boundary_id, unassigned_edges_is));
+    ++rdy->num_boundaries;
   }
   PetscCall(ISDestroy(&boundary_edge_is));
   PetscCall(ISDestroy(&unassigned_edges_is));
 
-  // allocate resources for surfaces
-  PetscCall(RDyAlloc(PetscInt, rdy->num_surfaces, &rdy->surface_ids));
-  PetscCall(RDyAlloc(RDySurface, rdy->num_surfaces, &rdy->surfaces));
+  // allocate resources for boundaries
+  PetscCall(RDyAlloc(PetscInt, rdy->num_boundaries, &rdy->boundary_ids));
+  PetscCall(RDyAlloc(RDyBoundary, rdy->num_boundaries, &rdy->boundaries));
 
-  // now fetch surface edge IDs
+  // now fetch boundary edge IDs
   if (label) {
     PetscInt s = 0;
-    for (PetscInt surface_id = 0; surface_id <= MAX_SURFACE_ID; ++surface_id) {
+    for (PetscInt boundary_id = 0; boundary_id <= MAX_BOUNDARY_ID; ++boundary_id) {
       IS edge_is;  // edge index space
-      PetscCall(DMLabelGetStratumIS(label, surface_id, &edge_is));
+      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
-        RDySurface *surface = &rdy->surfaces[s];
-        rdy->surface_ids[s] = surface_id;
+        RDyBoundary *boundary = &rdy->boundaries[s];
+        rdy->boundary_ids[s] = boundary_id;
         ++s;
 
-        // find the number of edges for this surface
+        // find the number of edges for this boundary
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
         if (num_edges > 0) {
-          surface->num_edges = num_edges;
-          PetscCall(RDyAlloc(PetscInt, surface->num_edges, &surface->edge_ids));
+          boundary->num_edges = num_edges;
+          PetscCall(RDyAlloc(PetscInt, boundary->num_edges, &boundary->edge_ids));
         }
 
         // extract edge IDs
         const PetscInt *edge_ids;
         PetscCall(ISGetIndices(edge_is, &edge_ids));
         for (PetscInt i = 0; i < num_edges; ++i) {
-          surface->edge_ids[i] = edge_ids[i] - e_start;
+          boundary->edge_ids[i] = edge_ids[i] - e_start;
         }
         PetscCall(ISRestoreIndices(edge_is, &edge_ids));
         PetscCall(ISDestroy(&edge_is));
@@ -362,8 +362,8 @@ static PetscErrorCode InitSurfaces(RDy rdy) {
     }
   }
 
-  // make sure we have at least one region and surface
-  PetscCheck(rdy->num_surfaces > 0, rdy->comm, PETSC_ERR_USER, "No surfaces were found in the grid!");
+  // make sure we have at least one region and boundary
+  PetscCheck(rdy->num_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
 
   PetscFunctionReturn(0);
 }
@@ -449,7 +449,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
   // Set up a reflecting flow boundary condition.
   RDyFlowCondition *reflecting_flow = NULL;
-  for (PetscInt s = 0; s <= MAX_SURFACE_ID; ++s) {
+  for (PetscInt s = 0; s <= MAX_BOUNDARY_ID; ++s) {
     if (!strlen(rdy->config.flow_conditions[s].name)) {
       reflecting_flow = &rdy->config.flow_conditions[s];
       strcpy((char *)reflecting_flow->name, "reflecting");
@@ -457,16 +457,16 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       break;
     }
   }
-  PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER, "Could not allocate a reflecting flow condition! Please increase MAX_SURFACE_ID.");
+  PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER, "Could not allocate a reflecting flow condition! Please increase MAX_BOUNDARY_ID.");
 
   // Allocate storage for boundary conditions.
-  PetscCall(RDyAlloc(RDyCondition, rdy->num_surfaces, &rdy->boundary_conditions));
+  PetscCall(RDyAlloc(RDyCondition, rdy->num_boundaries, &rdy->boundary_conditions));
 
-  // Assign a boundary condition to each surface.
-  for (PetscInt s = 0; s < rdy->num_surfaces; ++s) {
-    RDyCondition     *bc         = &rdy->boundary_conditions[s];
-    PetscInt          surface_id = rdy->surface_ids[s];
-    RDyConditionSpec *bc_spec    = &rdy->config.boundary_conditions[surface_id];
+  // Assign a boundary condition to each boundary.
+  for (PetscInt s = 0; s < rdy->num_boundaries; ++s) {
+    RDyCondition     *bc          = &rdy->boundary_conditions[s];
+    PetscInt          boundary_id = rdy->boundary_ids[s];
+    RDyConditionSpec *bc_spec     = &rdy->config.boundary_conditions[boundary_id];
 
     // If no flow condition was specified for a boundary, we set it to our
     // reflecting flow condition.
@@ -479,13 +479,13 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
     }
 
     if (rdy->config.sediment) {
-      PetscCheck(strlen(bc_spec->sediment_name), rdy->comm, PETSC_ERR_USER, "Surface %d has no sediment boundary condition!", surface_id);
+      PetscCheck(strlen(bc_spec->sediment_name), rdy->comm, PETSC_ERR_USER, "Boundary %d has no sediment boundary condition!", boundary_id);
       PetscInt sed_index;
       PetscCall(FindSedimentCondition(rdy, bc_spec->sediment_name, &sed_index));
       bc->sediment = &rdy->config.sediment_conditions[sed_index];
     }
     if (rdy->config.salinity) {
-      PetscCheck(strlen(bc_spec->salinity_name), rdy->comm, PETSC_ERR_USER, "Surface %d has no salinity boundary condition!", surface_id);
+      PetscCheck(strlen(bc_spec->salinity_name), rdy->comm, PETSC_ERR_USER, "Boundary %d has no salinity boundary condition!", boundary_id);
       PetscInt sal_index;
       PetscCall(FindSalinityCondition(rdy, bc_spec->salinity_name, &sal_index));
       bc->salinity = &rdy->config.salinity_conditions[sal_index];
@@ -606,9 +606,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
 
-  RDyLogDebug(rdy, "Initializing regions and surfaces...");
+  RDyLogDebug(rdy, "Initializing regions and boundaries...");
   PetscCall(InitRegions(rdy));
-  PetscCall(InitSurfaces(rdy));
+  PetscCall(InitBoundaries(rdy));
 
   RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
   PetscCall(InitConditionsAndSources(rdy));
