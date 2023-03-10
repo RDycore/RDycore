@@ -1,0 +1,26 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses a file
+# to specify the initial conditions (and a corresponding Exodus mesh).
+
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  final_time: 0.005
+  unit: hours
+  max_step: 1000
+
+grid:
+  file: DamBreak_grid5x10.exo
+
+initial_conditions:
+  file: DamBreak_grid5x10_wetdownstream.IC
+
