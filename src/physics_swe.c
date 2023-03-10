@@ -319,7 +319,7 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostic
     if (rdy->boundary_conditions[s].flow->type != CONDITION_REFLECTING) continue;
 
     RDyBoundary *boundary = &rdy->boundaries[s];
-    PetscInt     num     = boundary->num_edges;
+    PetscInt     num      = boundary->num_edges;
 
     PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
     PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];

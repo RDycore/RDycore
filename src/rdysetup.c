@@ -339,7 +339,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
       PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[s];
-        rdy->boundary_ids[s] = boundary_id;
+        rdy->boundary_ids[s]  = boundary_id;
         ++s;
 
         // find the number of edges for this boundary
