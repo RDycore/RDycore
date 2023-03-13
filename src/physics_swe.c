@@ -379,7 +379,7 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
         PetscReal hl = x_ptr[icell * ndof + 0];
 
         if (!(hl < tiny_h)) {
-          PetscReal cnum = amax_vec_bnd[icell] * edge_len / cell_area * rdy->dt;
+          PetscReal cnum = amax_vec_bnd[e] * edge_len / cell_area * rdy->dt;
           if (cnum > courant_num_diags->max_courant_num) {
             courant_num_diags->max_courant_num = cnum;
             courant_num_diags->global_edge_id  = edges->global_ids[e];
