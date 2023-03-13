@@ -15,6 +15,7 @@ static const PetscReal GRAVITY = 9.806;
 typedef struct {
   PetscReal max_courant_num;  // maximum courant number
   PetscInt  global_edge_id;   // edge at which the max courant number was encountered
+  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
 } CourantNumberDiagnostics;
 
 // MPI datatype corresponding to CourantNumberDiagnostics. Created during InitSWE.
@@ -48,13 +49,14 @@ static PetscErrorCode InitMPITypesAndOps(void) {
   PetscFunctionBegin;
 
   // create an MPI data type for the CourantNumberDiagnostics struct
-  const int      num_blocks             = 2;
-  const int      block_lengths[2]       = {1, 1};
-  const MPI_Aint block_displacements[2] = {
+  const int      num_blocks             = 3;
+  const int      block_lengths[3]       = {1, 1, 1};
+  const MPI_Aint block_displacements[3] = {
       offsetof(CourantNumberDiagnostics, max_courant_num),
       offsetof(CourantNumberDiagnostics, global_edge_id),
+      offsetof(CourantNumberDiagnostics, global_cell_id),
   };
-  MPI_Datatype block_types[2] = {MPI_DOUBLE, MPI_INT};
+  MPI_Datatype block_types[3] = {MPI_DOUBLE, MPI_INT, MPI_INT};
   MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
   MPI_Type_commit(&courant_num_diags_type);
 
@@ -275,6 +277,11 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
           courant_num_diags->global_edge_id  = edges->global_ids[ii];
+          if (areal < arear) {
+            courant_num_diags->global_cell_id  = cells->global_ids[l];
+          } else {
+            courant_num_diags->global_cell_id  = cells->global_ids[r];
+          }
         }
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
@@ -379,6 +386,7 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
           if (cnum > courant_num_diags->max_courant_num) {
             courant_num_diags->max_courant_num = cnum;
             courant_num_diags->global_edge_id  = edges->global_ids[e];
+            courant_num_diags->global_cell_id  = cells->global_ids[icell];
           }
 
           for (PetscInt idof = 0; idof < ndof; idof++) {
@@ -510,6 +518,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   CourantNumberDiagnostics courant_num_diags = {
       .max_courant_num = 0.0,
       .global_edge_id  = -1,
+      .global_cell_id  = -1,
   };
   PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
   PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
@@ -520,8 +529,8 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     MPI_Allreduce(MPI_IN_PLACE, &courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal dt;
     PetscCall(TSGetTimeStep(ts, &dt));
-    RDyLogDebug(rdy, "Max courant number %g encountered at edge %d (Courant number = %f)", courant_num_diags.max_courant_num,
-                courant_num_diags.global_edge_id, courant_num_diags.max_courant_num);
+    RDyLogDebug(rdy, "Max courant number %g encountered at edge %d of cell %d (Courant number = %f)", courant_num_diags.max_courant_num,
+                courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
   }
   rdy->step++;
 
