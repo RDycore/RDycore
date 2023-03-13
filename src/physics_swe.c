@@ -495,7 +495,7 @@ PetscErrorCode InitSWE(RDy rdy) {
 // the shallow water equations.
 // Parameters:
 //  ts  - the solver
-//  t   - the simulation time [minutes]
+//  t   - the simulation time [seconds]
 //  X   - the solution vector at time t
 //  F   - the right hand side vector to be evaluated at time t
 //  ctx - a generic pointer to our RDy object

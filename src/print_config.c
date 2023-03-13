@@ -42,7 +42,7 @@ static PetscErrorCode PrintNumerics(RDy rdy) {
 }
 
 static const char* TimeUnitString(RDyTimeUnit unit) {
-  static const char* strings[5] = {"minutes", "hours", "days", "months", "years"};
+  static const char* strings[5] = {"seconds","minutes", "hours", "days", "months", "years"};
   return strings[unit];
 }
 
