@@ -10,18 +10,18 @@ static const PetscReal GRAVITY = 9.806;
 //-----------------------
 
 // Diagnostic structure that captures information about the conditions under
-// which the maximum wave speed is encountered. If you change this struct,
+// which the maximum courant number is encountered. If you change this struct,
 // update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
 typedef struct {
-  PetscReal max_courant_num;  // maximum wave speed encountered
-  PetscInt  global_edge_id;   // edge at which the max wave speed was encountered
+  PetscReal max_courant_num;  // maximum courant number
+  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
 } CourantNumberDiagnostics;
 
 // MPI datatype corresponding to CourantNumberDiagnostics. Created during InitSWE.
 static MPI_Datatype courant_num_diags_type;
 
 // MPI operator used to determine the prevailing diagnostics for the maximum
-// wave speed on all processes. Created during InitSWE.
+// courant number on all processes. Created during InitSWE.
 static MPI_Op courant_num_diags_op;
 
 // function backing the above MPI operator
@@ -29,7 +29,7 @@ static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *le
   CourantNumberDiagnostics *in_diags     = in_vec;
   CourantNumberDiagnostics *result_diags = result_vec;
 
-  // select the item with the maximum wave speed
+  // select the item with the maximum courant number
   for (int i = 0; i < *len; ++i) {
     if (in_diags[i].max_courant_num > result_diags[i].max_courant_num) {
       result_diags[i] = in_diags[i];
@@ -107,7 +107,7 @@ static PetscErrorCode GetVelocityFromMomentum(PetscInt N, PetscReal tiny_h, cons
 // sn   - sine of the angle between edge and y-axis
 // cn   - cosine of the angle between edge and y-axis
 // fij  - flux
-// amax - maximum wave speed
+// amax - maximum courant number
 static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N],
                                      const PetscReal vl[N], const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3],
                                      PetscReal amax[N]) {
@@ -200,9 +200,9 @@ static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const Pe
 }
 
 // computes RHS on internal edges
-// rdy        - an RDy object
-// F          - a global vector that stores the fluxes between internal edges
-// courant_num_diags - diagnostics struct for tracking maximum wave speed
+// rdy               - an RDy object
+// F                 - a global vector that stores the fluxes between internal edges
+// courant_num_diags - diagnostics struct for tracking maximum courant number
 static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags) {
   PetscFunctionBeginUser;
 
@@ -293,9 +293,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 }
 
 // computes RHS on boundary edges
-// rdy        - an RDy object
-// F          - a global vector that stores the fluxes between boundary edges
-// courant_num_diags - diagnostics struct for tracking maximum wave speed
+// rdy               - an RDy object
+// F                 - a global vector that stores the fluxes between boundary edges
+// courant_num_diags - diagnostics struct for tracking maximum courant number
 static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags) {
   PetscFunctionBeginUser;
 
@@ -515,13 +515,13 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
   PetscCall(AddSourceTerm(rdy, F));
 
-  // write out debugging info for maximum wave speed
+  // write out debugging info for maximum courant number
   if (rdy->config.log_level >= LOG_DEBUG) {
     MPI_Allreduce(MPI_IN_PLACE, &courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal dt;
     PetscCall(TSGetTimeStep(ts, &dt));
-    RDyLogDebug(rdy, "Max wave speed %g encountered at edge %d (Courant number = %f)", courant_num_diags.max_courant_num,
-                courant_num_diags.global_edge_id, courant_num_diags.max_courant_num * dt * 2);
+    RDyLogDebug(rdy, "Max courant number %g encountered at edge %d (Courant number = %f)", courant_num_diags.max_courant_num,
+                courant_num_diags.global_edge_id, courant_num_diags.max_courant_num);
   }
   rdy->step++;
 
