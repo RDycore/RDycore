@@ -5,6 +5,23 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/* restart logic stubs -- not yet implemented
+// writes a restart file
+static PetscErrorCode WriteRestart(RDy rdy) {
+  PetscFunctionBegin;
+  // TODO
+  PetscFunctionReturn(0);
+}
+
+// TS monitoring routine used to write restart files
+static PetscErrorCode WriteRestartFiles(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
+  RDY rdy = ctx;
+  if (step % rdy->config.restart_frequency == 0) {
+    WriteRestart(rdy);
+  }
+}
+*/
+
 // output directory name (relative to current working directory)
 static const char *output_dir = "output";
 
@@ -40,14 +57,22 @@ static PetscErrorCode DetermineOutputFile(RDy rdy, char *filename) {
     snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s", output_dir, rdy->config_file);
   }
 
+  char suffix[4];
+  if (rdy->config.output_format == PETSC_VIEWER_HDF5_XDMF) {
+    strcpy(suffix, "h5");
+  } else { // native binary format
+    strcpy(suffix, "dat");
+  }
+
   // concatenate some config parameters
-  char suffix[PETSC_MAX_PATH_LEN];
-  snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.dat", rdy->dt, rdy->config.max_step, rdy->nproc);
-  strncat(filename, suffix, PETSC_MAX_PATH_LEN - 1 - strlen(filename));
+  char addendum[PETSC_MAX_PATH_LEN];
+  snprintf(addendum, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.%s", rdy->dt, rdy->config.max_step, rdy->nproc, suffix);
+  strncat(filename, addendum, PETSC_MAX_PATH_LEN - 1 - strlen(filename));
 
   PetscFunctionReturn(0);
 }
 
+// writes an output file
 static PetscErrorCode WriteOutput(RDy rdy) {
   PetscFunctionBegin;
 
@@ -57,6 +82,9 @@ static PetscErrorCode WriteOutput(RDy rdy) {
 
   PetscViewer viewer;
   PetscCall(PetscViewerBinaryOpen(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
+  PetscCall(PetscViewerPushFormat(viewer, rdy->config.output_format));
+  // TODO: break up our solution vector into (h, hu, hv) for output
+  // TODO: (this constrains our file-based initial conditions)
   Vec natural;
   PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
   PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->X, natural));
@@ -68,19 +96,33 @@ static PetscErrorCode WriteOutput(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// TS monitoring routine used to write output files
+static PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
+  RDY rdy = ctx;
+  if ((rdy->config.output_frequency == -1) || // last step (interpolated)
+      (time >= rdy->config.final_time) ||     // last step without interpolation
+      (step % rdy->config.output_frequency == 0)) {
+    WriteOutput(rdy);
+  }
+}
+
 PetscErrorCode RDyRun(RDy rdy) {
   PetscFunctionBegin;
 
   RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
   PetscCall(CreateOutputDir(rdy));
 
+  // set up monitoring functions for handling restarts and outputs
+//  if (rdy->config.restart_frequency) {
+//    PetscCall(TSMonitorSet(rdy->tѕ, WriteRestartFiles, rdy, NULL));
+//  }
+  if (rdy->config.output_frequency) {
+    PetscCall(TSMonitorSet(rdy->tѕ, WriteOutputFiles, rdy, NULL));
+  }
+
   // do the thing!
   RDyLogDebug(rdy, "Running simulation...");
   PetscCall(TSSolve(rdy->ts, rdy->X));
-
-  // write output at the end of the simulation
-  RDyLogDebug(rdy, "Writing simulation output...");
-  PetscCall(WriteOutput(rdy));
 
   PetscFunctionReturn(0);
 }

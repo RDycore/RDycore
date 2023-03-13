@@ -186,9 +186,18 @@ typedef struct {
   //----------
 
   // Restart file format
-  char restart_format[MAX_NAME_LEN+1];
+  PetscViewerFormat restart_format;
   // Restart frequency (in steps)
   PetscInt restart_frequency;
+
+  //--------
+  // Output
+  //--------
+
+  // Output file format
+  PetscViewerFormat output_format;
+  // Output frequency (in steps)
+  PetscInt output_frequency;
 
   //---------
   // Logging

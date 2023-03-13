@@ -31,6 +31,7 @@ typedef enum {
   NUMERICS_SECTION,
   TIME_SECTION,
   RESTART_SECTION,
+  OUTPUT_SECTION,
   LOGGING_SECTION,
   GRID_SECTION,
   INITIAL_CONDITIONS_SECTION,
@@ -171,6 +172,8 @@ static PetscErrorCode ParseTopLevel(yaml_event_t *event, YamlParserState *state,
     state->section = TIME_SECTION;
   } else if (!strcmp(value, "restart")) {
     state->section = RESTART_SECTION;
+  } else if (!strcmp(value, "output")) {
+    state->section = OUTPUT_SECTION;
   } else if (!strcmp(value, "logging")) {
     state->section = LOGGING_SECTION;
   } else if (!strcmp(value, "grid")) {
@@ -403,10 +406,48 @@ static PetscErrorCode ParseRestart(yaml_event_t *event, YamlParserState *state, 
       PetscInt selection;
       SelectItem(value, 2, (const char *[2]){"bin", "h5"}, (PetscInt[2]){0, 1}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid restart.format: %s", value);
-      strncpy(config->restart_format, value, MAX_NAME_LEN);
+      if (!strcmp(value, "bin")) {
+        config->restart_format = PETSC_VIEWER_NATIVE;
+      } else {
+        config->restart_format = PETSC_VIEWER_HDF5_PETSC;
+      }
     } else {  // frequency
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->restart_frequency));
       PetscCheck((config->restart_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid restart.frequency: %d\n", config->restart_frequency);
+    }
+    state->parameter[0] = 0;  // clear parameter name
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
+  PetscFunctionBegin;
+
+  // output:
+  //   format: <bin|xdmf>
+  //   frequency: <value>
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
+  const char *value = (const char *)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) {  // parameter not set
+    PetscInt selection;
+    SelectItem(value, 2, (const char *[2]){"format", "frequency"}, (PetscInt[2]){0, 1}, &selection);
+    PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in restart: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else {  // parameter set, get value
+    if (!strcmp(state->parameter, "format")) {
+      PetscInt selection;
+      SelectItem(value, 2, (const char *[2]){"bin", "xdmf"}, (PetscInt[2]){0, 1}, &selection);
+      PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid output.format: %s", value);
+      if (!strcmp(value, "bin")) {
+        config->output_format = PETSC_VIEWER_NATIVE;
+      } else {
+        config->output_format = PETSC_VIEWER_HDF5_XDMF;
+      }
+    } else {  // frequency
+      PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->output_frequency));
+      PetscCheck((config->output_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid output.frequency: %d\n", config->restart_frequency);
     }
     state->parameter[0] = 0;  // clear parameter name
   }
@@ -854,6 +895,9 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event, YamlParserState *stat
         break;
       case RESTART_SECTION:
         PetscCall(ParseRestart(event, state, config));
+        break;
+      case OUTPUT_SECTION:
+        PetscCall(ParseOutput(event, state, config));
         break;
       case LOGGING_SECTION:
         PetscCall(ParseLogging(event, state, config));
