@@ -277,11 +277,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
           courant_num_diags->global_edge_id  = edges->global_ids[ii];
-          if (areal < arear) {
-            courant_num_diags->global_cell_id  = cells->global_ids[l];
-          } else {
-            courant_num_diags->global_cell_id  = cells->global_ids[r];
-          }
+          if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[l];
+          else courant_num_diags->global_cell_id = cells->global_ids[r];
         }
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
