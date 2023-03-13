@@ -13,56 +13,56 @@ static const PetscReal GRAVITY = 9.806;
 // which the maximum wave speed is encountered. If you change this struct,
 // update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
 typedef struct {
-  PetscReal max_wave_speed;  // maximum wave speed encountered
-  PetscInt  global_edge_id;  // edge at which the max wave speed was encountered
-} AMaxDiagnostics;
+  PetscReal max_courant_num;  // maximum wave speed encountered
+  PetscInt  global_edge_id;   // edge at which the max wave speed was encountered
+} CourantNumberDiagnostics;
 
-// MPI datatype corresponding to AMaxDiagnostics. Created during InitSWE.
-static MPI_Datatype amax_diags_type;
+// MPI datatype corresponding to CourantNumberDiagnostics. Created during InitSWE.
+static MPI_Datatype courant_num_diags_type;
 
 // MPI operator used to determine the prevailing diagnostics for the maximum
 // wave speed on all processes. Created during InitSWE.
-static MPI_Op amax_diags_op;
+static MPI_Op courant_num_diags_op;
 
 // function backing the above MPI operator
-static void FindAMaxDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
-  AMaxDiagnostics *in_diags     = in_vec;
-  AMaxDiagnostics *result_diags = result_vec;
+static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
+  CourantNumberDiagnostics *in_diags     = in_vec;
+  CourantNumberDiagnostics *result_diags = result_vec;
 
   // select the item with the maximum wave speed
   for (int i = 0; i < *len; ++i) {
-    if (in_diags[i].max_wave_speed > result_diags[i].max_wave_speed) {
+    if (in_diags[i].max_courant_num > result_diags[i].max_courant_num) {
       result_diags[i] = in_diags[i];
     }
   }
 }
 
-// this function destroys the MPI type and operator associated with AMaxDiagnostics
-static void DestroyAMaxDiagnostics(void) {
-  MPI_Op_free(&amax_diags_op);
-  MPI_Type_free(&amax_diags_type);
+// this function destroys the MPI type and operator associated with CourantNumberDiagnostics
+static void DestroyCourantNumberDiagnostics(void) {
+  MPI_Op_free(&courant_num_diags_op);
+  MPI_Type_free(&courant_num_diags_type);
 }
 
 // this function is called by InitSWE to initialize the above type(s) and op(s).
 static PetscErrorCode InitMPITypesAndOps(void) {
   PetscFunctionBegin;
 
-  // create an MPI data type for the AMaxDiagnostics struct
+  // create an MPI data type for the CourantNumberDiagnostics struct
   const int      num_blocks             = 2;
   const int      block_lengths[2]       = {1, 1};
   const MPI_Aint block_displacements[2] = {
-      offsetof(AMaxDiagnostics, max_wave_speed),
-      offsetof(AMaxDiagnostics, global_edge_id),
+      offsetof(CourantNumberDiagnostics, max_courant_num),
+      offsetof(CourantNumberDiagnostics, global_edge_id),
   };
   MPI_Datatype block_types[2] = {MPI_DOUBLE, MPI_INT};
-  MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &amax_diags_type);
-  MPI_Type_commit(&amax_diags_type);
+  MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
+  MPI_Type_commit(&courant_num_diags_type);
 
   // create a corresponding reduction operator for the new type
-  MPI_Op_create(FindAMaxDiagnostics, 1, &amax_diags_op);
+  MPI_Op_create(FindCourantNumberDiagnostics, 1, &courant_num_diags_op);
 
   // make sure the operator and the type are destroyed upon exit
-  PetscCall(RDyOnFinalize(DestroyAMaxDiagnostics));
+  PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
 
   PetscFunctionReturn(0);
 }
@@ -202,8 +202,8 @@ static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const Pe
 // computes RHS on internal edges
 // rdy        - an RDy object
 // F          - a global vector that stores the fluxes between internal edges
-// amax_diags - diagnostics struct for tracking maximum wave speed
-static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, AMaxDiagnostics *amax_diags) {
+// courant_num_diags - diagnostics struct for tracking maximum wave speed
+static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy->mesh;
@@ -267,14 +267,15 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, AMaxDiagnostic
       PetscReal hl = x_ptr[l * ndof + 0];
       PetscReal hr = x_ptr[r * ndof + 0];
 
-      if (amax_vec_int[ii] > amax_diags->max_wave_speed) {
-        amax_diags->max_wave_speed = amax_vec_int[ii];
-        amax_diags->global_edge_id = edges->global_ids[ii];
-      }
-
       if (!(hr < tiny_h && hl < tiny_h)) {
         PetscReal areal = cells->areas[l];
         PetscReal arear = cells->areas[r];
+
+        PetscReal cnum = amax_vec_int[ii] * edge_len / fmin(areal, arear) * rdy->dt;
+        if (cnum > courant_num_diags->max_courant_num) {
+          courant_num_diags->max_courant_num = cnum;
+          courant_num_diags->global_edge_id  = edges->global_ids[ii];
+        }
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
           if (cells->is_local[l]) f_ptr[l * ndof + idof] -= flux_vec_int[ii][idof] * edge_len / areal;
@@ -294,8 +295,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, AMaxDiagnostic
 // computes RHS on boundary edges
 // rdy        - an RDy object
 // F          - a global vector that stores the fluxes between boundary edges
-// amax_diags - diagnostics struct for tracking maximum wave speed
-static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostics *amax_diags) {
+// courant_num_diags - diagnostics struct for tracking maximum wave speed
+static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy->mesh;
@@ -374,10 +375,12 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, AMaxDiagnostic
         PetscReal hl = x_ptr[icell * ndof + 0];
 
         if (!(hl < tiny_h)) {
-          if (amax_vec_bnd[e] > amax_diags->max_wave_speed) {
-            amax_diags->max_wave_speed = amax_vec_bnd[e];
-            amax_diags->global_edge_id = edges->global_ids[e];
+          PetscReal cnum = amax_vec_bnd[icell] * edge_len / cell_area * rdy->dt;
+          if (cnum > courant_num_diags->max_courant_num) {
+            courant_num_diags->max_courant_num = cnum;
+            courant_num_diags->global_edge_id  = edges->global_ids[e];
           }
+
           for (PetscInt idof = 0; idof < ndof; idof++) {
             f_ptr[icell * ndof + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
           }
@@ -504,21 +507,21 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscCall(DMGlobalToLocalEnd(dm, X, INSERT_VALUES, rdy->X_local));
 
   // compute the right hand side
-  AMaxDiagnostics amax_diags = {
-      .max_wave_speed = 0.0,
-      .global_edge_id = -1,
+  CourantNumberDiagnostics courant_num_diags = {
+      .max_courant_num = 0.0,
+      .global_edge_id  = -1,
   };
-  PetscCall(RHSFunctionForInternalEdges(rdy, F, &amax_diags));
-  PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &amax_diags));
+  PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
+  PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
   PetscCall(AddSourceTerm(rdy, F));
 
   // write out debugging info for maximum wave speed
   if (rdy->config.log_level >= LOG_DEBUG) {
-    MPI_Allreduce(MPI_IN_PLACE, &amax_diags, 1, amax_diags_type, amax_diags_op, rdy->comm);
+    MPI_Allreduce(MPI_IN_PLACE, &courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal dt;
     PetscCall(TSGetTimeStep(ts, &dt));
-    RDyLogDebug(rdy, "Max wave speed %g encountered at edge %d (Courant number = %f)", amax_diags.max_wave_speed, amax_diags.global_edge_id,
-                amax_diags.max_wave_speed * dt * 2);
+    RDyLogDebug(rdy, "Max wave speed %g encountered at edge %d (Courant number = %f)", courant_num_diags.max_courant_num,
+                courant_num_diags.global_edge_id, courant_num_diags.max_courant_num * dt * 2);
   }
   rdy->step++;
 
