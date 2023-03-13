@@ -529,7 +529,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     MPI_Allreduce(MPI_IN_PLACE, &courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal dt;
     PetscCall(TSGetTimeStep(ts, &dt));
-    RDyLogDebug(rdy, "Max courant number %g encountered at edge %d of cell %d (Courant number = %f)", courant_num_diags.max_courant_num,
+    RDyLogDebug(rdy, "Max courant number %g encountered at edge %d of cell %d is %f", courant_num_diags.max_courant_num,
                 courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
   }
   rdy->step++;
