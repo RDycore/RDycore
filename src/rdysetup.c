@@ -3,6 +3,45 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
+static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
+
+  PetscFunctionBegin;
+
+  PetscReal time_in_sec;
+  PetscReal sec_in_min = 60.0;
+  PetscReal min_in_hr  = 60.0;
+  PetscReal hr_in_day  = 24.0;
+  PetscReal day_in_mon = 30.0;
+  PetscReal mon_in_yr  = 12.0;
+
+  switch (time_unit) {
+    case TIME_SECONDS:
+      printf("TIME_SECONDS\n");
+      time_in_sec = time;
+      break;
+    case TIME_MINUTES:
+      time_in_sec = time * sec_in_min;
+      break;
+    case TIME_HOURS:
+      time_in_sec = time * min_in_hr * sec_in_min;
+      break;
+    case TIME_DAYS:
+      time_in_sec = time * hr_in_day * min_in_hr * sec_in_min;
+      break;
+    case TIME_MONTHS:
+      time_in_sec = time * day_in_mon * hr_in_day * min_in_hr * sec_in_min;
+      break;
+    case TIME_YEARS:
+      time_in_sec = time * mon_in_yr * day_in_mon * hr_in_day * min_in_hr * sec_in_min;
+      break;
+    default:
+      PetscCall(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
+      break;
+  }
+
+  PetscFunctionReturn(time_in_sec);
+}
+
 // sets default parameters
 static PetscErrorCode SetDefaults(RDy rdy) {
   PetscFunctionBegin;
@@ -529,7 +568,8 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(InitSWE(rdy));  // initialize SWE physics
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
 
-  PetscCall(TSSetMaxTime(rdy->ts, rdy->config.final_time));
+  PetscReal final_time_in_sec = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit);
+  PetscCall(TSSetMaxTime(rdy->ts, final_time_in_sec));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
