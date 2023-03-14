@@ -7,30 +7,30 @@ static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
   PetscFunctionBegin;
 
   PetscReal time_in_sec;
-  PetscReal sec_in_min = 60.0;
-  PetscReal min_in_hr  = 60.0;
-  PetscReal hr_in_day  = 24.0;
-  PetscReal day_in_mon = 30.0;
-  PetscReal mon_in_yr  = 12.0;
+  PetscReal secs_in_min = 60.0;
+  PetscReal mins_in_hr  = 60.0;
+  PetscReal hrs_in_day  = 24.0;
+  PetscReal days_in_mon = 30.0;
+  PetscReal days_in_yr  = 365.0;
 
   switch (time_unit) {
     case TIME_SECONDS:
       time_in_sec = time;
       break;
     case TIME_MINUTES:
-      time_in_sec = time * sec_in_min;
+      time_in_sec = time * secs_in_min;
       break;
     case TIME_HOURS:
-      time_in_sec = time * min_in_hr * sec_in_min;
+      time_in_sec = time * mins_in_hr * secs_in_min;
       break;
     case TIME_DAYS:
-      time_in_sec = time * hr_in_day * min_in_hr * sec_in_min;
+      time_in_sec = time * hrs_in_day * mins_in_hr * secs_in_min;
       break;
     case TIME_MONTHS:
-      time_in_sec = time * day_in_mon * hr_in_day * min_in_hr * sec_in_min;
+      time_in_sec = time * days_in_mon * hrs_in_day * mins_in_hr * secs_in_min;
       break;
     case TIME_YEARS:
-      time_in_sec = time * mon_in_yr * day_in_mon * hr_in_day * min_in_hr * sec_in_min;
+      time_in_sec = time * days_in_yr * hrs_in_day * mins_in_hr * secs_in_min;
       break;
     default:
       PetscCall(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
