@@ -15,7 +15,6 @@ static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
 
   switch (time_unit) {
     case TIME_SECONDS:
-      printf("TIME_SECONDS\n");
       time_in_sec = time;
       break;
     case TIME_MINUTES:
@@ -34,7 +33,7 @@ static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
       time_in_sec = time * mon_in_yr * day_in_mon * hr_in_day * min_in_hr * sec_in_min;
       break;
     default:
-      PetscCall(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
+      PetscCall(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
       break;
   }
 
