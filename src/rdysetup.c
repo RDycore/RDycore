@@ -33,7 +33,7 @@ static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
       time_in_sec = time * days_in_yr * hrs_in_day * mins_in_hr * secs_in_min;
       break;
     default:
-      PetscCall(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
+      SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
       break;
   }
 
