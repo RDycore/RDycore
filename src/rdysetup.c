@@ -60,11 +60,11 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
 
   if (rdy->dt <= 0.0) {
     // ѕet a default timestep if needed
-    rdy->dt = rdy->config.final_time / rdy->config.max_step;
+    rdy->dt = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit) / rdy->config.max_step;
   }
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
-  { PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL)); }
+  { PetscCall(PetscOptionsReal("-dt", "dt (seconds)", "", rdy->dt, &rdy->dt, NULL)); }
   PetscOptionsEnd();
 
   PetscFunctionReturn(0);
