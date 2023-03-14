@@ -352,7 +352,7 @@ static PetscErrorCode ParseTime(yaml_event_t *event, YamlParserState *state, RDy
 
   // time:
   //   final_time: <value>
-  //   unit: <nsteps|nseconds|nminutes|nhours|ndays|nmonths|nyears>
+  //   unit: <seconds|minutes|hours|days|months|years>
   //   max_step: <value>
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in time section!");
