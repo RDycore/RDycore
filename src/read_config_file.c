@@ -369,8 +369,8 @@ static PetscErrorCode ParseTime(yaml_event_t *event, YamlParserState *state, RDy
       PetscCheck((config->final_time > 0.0), state->comm, PETSC_ERR_USER, "invalid time.final_time: %g\n", config->final_time);
     } else if (!strcmp(state->parameter, "unit")) {
       PetscInt selection;
-      SelectItem(value, 5, (const char *[5]){"seconds", "minutes", "hours", "days", "months", "years"},
-                 (PetscInt[5]){TIME_SECONDS, TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS}, &selection);
+      SelectItem(value, 6, (const char *[6]){"seconds", "minutes", "hours", "days", "months", "years"},
+                 (PetscInt[6]){TIME_SECONDS, TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid time.unit: %s", value);
       config->time_unit = selection;
     } else {  // max_step
