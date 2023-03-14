@@ -4,7 +4,6 @@
 #include <rdycore.h>
 
 static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
-
   PetscFunctionBegin;
 
   PetscReal time_in_sec;
