@@ -352,7 +352,7 @@ static PetscErrorCode ParseTime(yaml_event_t *event, YamlParserState *state, RDy
 
   // time:
   //   final_time: <value>
-  //   unit: <nsteps|nminutes|nhours|ndays|nmonths|nyears>
+  //   unit: <seconds|minutes|hours|days|months|years>
   //   max_step: <value>
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in time section!");
@@ -369,8 +369,8 @@ static PetscErrorCode ParseTime(yaml_event_t *event, YamlParserState *state, RDy
       PetscCheck((config->final_time > 0.0), state->comm, PETSC_ERR_USER, "invalid time.final_time: %g\n", config->final_time);
     } else if (!strcmp(state->parameter, "unit")) {
       PetscInt selection;
-      SelectItem(value, 5, (const char *[5]){"minutes", "hours", "days", "months", "years"},
-                 (PetscInt[5]){TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS}, &selection);
+      SelectItem(value, 6, (const char *[6]){"seconds", "minutes", "hours", "days", "months", "years"},
+                 (PetscInt[6]){TIME_SECONDS, TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid time.unit: %s", value);
       config->time_unit = selection;
     } else {  // max_step

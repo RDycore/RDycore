@@ -57,7 +57,8 @@ typedef enum {
 
 // This type identifies a time unit.
 typedef enum {
-  TIME_MINUTES = 0,
+  TIME_SECONDS = 0,
+  TIME_MINUTES,
   TIME_HOURS,
   TIME_DAYS,
   TIME_MONTHS,

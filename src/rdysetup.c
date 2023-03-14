@@ -3,6 +3,43 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
+static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
+  PetscFunctionBegin;
+
+  PetscReal time_in_sec;
+  PetscReal secs_in_min = 60.0;
+  PetscReal mins_in_hr  = 60.0;
+  PetscReal hrs_in_day  = 24.0;
+  PetscReal days_in_mon = 30.0;
+  PetscReal days_in_yr  = 365.0;
+
+  switch (time_unit) {
+    case TIME_SECONDS:
+      time_in_sec = time;
+      break;
+    case TIME_MINUTES:
+      time_in_sec = time * secs_in_min;
+      break;
+    case TIME_HOURS:
+      time_in_sec = time * mins_in_hr * secs_in_min;
+      break;
+    case TIME_DAYS:
+      time_in_sec = time * hrs_in_day * mins_in_hr * secs_in_min;
+      break;
+    case TIME_MONTHS:
+      time_in_sec = time * days_in_mon * hrs_in_day * mins_in_hr * secs_in_min;
+      break;
+    case TIME_YEARS:
+      time_in_sec = time * days_in_yr * hrs_in_day * mins_in_hr * secs_in_min;
+      break;
+    default:
+      SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
+      break;
+  }
+
+  PetscFunctionReturn(time_in_sec);
+}
+
 // sets default parameters
 static PetscErrorCode SetDefaults(RDy rdy) {
   PetscFunctionBegin;
@@ -21,11 +58,11 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
 
   if (rdy->dt <= 0.0) {
     // ѕet a default timestep if needed
-    rdy->dt = rdy->config.final_time / rdy->config.max_step;
+    rdy->dt = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit) / rdy->config.max_step;
   }
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
-  { PetscCall(PetscOptionsReal("-dt", "dt", "", rdy->dt, &rdy->dt, NULL)); }
+  { PetscCall(PetscOptionsReal("-dt", "dt (seconds)", "", rdy->dt, &rdy->dt, NULL)); }
   PetscOptionsEnd();
 
   PetscFunctionReturn(0);
@@ -529,7 +566,8 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(InitSWE(rdy));  // initialize SWE physics
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
 
-  PetscCall(TSSetMaxTime(rdy->ts, rdy->config.final_time));
+  PetscReal final_time_in_sec = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit);
+  PetscCall(TSSetMaxTime(rdy->ts, final_time_in_sec));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
