@@ -84,7 +84,7 @@ static void TestFullSpec(void **state) {
       "  file: rdycore.log\n"
       "  level: detail\n\n"
       "restart:\n"
-      "  format: h5\n"
+      "  format: hdf5\n"
       "  frequency: 10\n\n"
       "grid:\n"
       "  file: planar_dam_10x5.msh\n\n"

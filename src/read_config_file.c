@@ -404,13 +404,9 @@ static PetscErrorCode ParseRestart(yaml_event_t *event, YamlParserState *state, 
   } else {  // parameter set, get value
     if (!strcmp(state->parameter, "format")) {
       PetscInt selection;
-      SelectItem(value, 2, (const char *[2]){"bin", "h5"}, (PetscInt[2]){0, 1}, &selection);
+      SelectItem(value, 2, (const char *[2]){"binary", "hdf5"}, (PetscInt[2]){PETSC_VIEWER_NATIVE, PETSC_VIEWER_HDF5_PETSC}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid restart.format: %s", value);
-      if (!strcmp(value, "bin")) {
-        config->restart_format = PETSC_VIEWER_NATIVE;
-      } else {
-        config->restart_format = PETSC_VIEWER_HDF5_PETSC;
-      }
+      config->restart_format = selection;
     } else {  // frequency
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->restart_frequency));
       PetscCheck((config->restart_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid restart.frequency: %d\n", config->restart_frequency);
@@ -424,7 +420,7 @@ static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, R
   PetscFunctionBegin;
 
   // output:
-  //   format: <bin|xdmf>
+  //   format: <binary|xdmf>
   //   frequency: <value>
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
@@ -438,13 +434,9 @@ static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, R
   } else {  // parameter set, get value
     if (!strcmp(state->parameter, "format")) {
       PetscInt selection;
-      SelectItem(value, 2, (const char *[2]){"bin", "xdmf"}, (PetscInt[2]){0, 1}, &selection);
+      SelectItem(value, 2, (const char *[2]){"binary", "xdmf"}, (PetscInt[2]){PETSC_VIEWER_NATIVE, PETSC_VIEWER_HDF5_XDMF}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid output.format: %s", value);
-      if (!strcmp(value, "bin")) {
-        config->output_format = PETSC_VIEWER_NATIVE;
-      } else {
-        config->output_format = PETSC_VIEWER_HDF5_XDMF;
-      }
+      config->output_format = selection;
     } else {  // frequency
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->output_frequency));
       PetscCheck((config->output_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid output.frequency: %d\n", config->restart_frequency);

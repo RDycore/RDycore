@@ -17,6 +17,10 @@ time:
   unit: hours
   max_step: 1000
 
+output:
+  format: xdmf
+  frequency: 100
+
 grid:
   file: planar_dam_10x5.msh
 
