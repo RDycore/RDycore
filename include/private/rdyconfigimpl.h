@@ -139,7 +139,8 @@ typedef struct {
   char mesh_file[PETSC_MAX_PATH_LEN];
 
   // initial conditions file (if given)
-  char initial_conditions_file[PETSC_MAX_PATH_LEN];
+  char              initial_conditions_file[PETSC_MAX_PATH_LEN];
+  PetscViewerFormat initial_conditions_format;
 
   // IDs of all regions mentioned in an input file
   PetscInt num_regions;

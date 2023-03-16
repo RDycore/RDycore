@@ -390,7 +390,7 @@ static PetscErrorCode ParseRestart(yaml_event_t *event, YamlParserState *state, 
   PetscFunctionBegin;
 
   // restart:
-  //   format: <bin|h5>
+  //   format: <binary|hdf5>
   //   frequency: <value>
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
@@ -511,7 +511,8 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   // OR
   //
   // initial_conditions:
-  //   file: <filename>    # reads all initial state from the given file
+  //   file: <filename>      # reads all initial state from the given file
+  //   format: <binary|hdf5> # file format
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in initial_conditions section!");
@@ -520,14 +521,23 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   // if we're not in a subsection, our parameter could be a single filename or
   // the name of a subsection
   if (!strlen(state->subsection)) {
-    if (!strlen(state->parameter)) {
-      if (!strcmp(value, "file")) {  // initial conditions file supplied
+    if (!strlen(state->parameter)) {  // parameter name not set
+      PetscInt selection;
+      SelectItem(value, 2, (const char *[2]){"format", "file"}, (PetscInt[2]){0, 1}, &selection);
+      if (selection != -1) {
         strcpy(state->parameter, value);
-      } else {  // proceed to initial conditions subsection
+      } else {  // proceed to subsection
         strncpy(state->subsection, value, YAML_MAX_LEN);
       }
-    } else if (!strcmp(state->parameter, "file")) {
-      strncpy(config->initial_conditions_file, value, YAML_MAX_LEN);
+    } else {
+      if (!strcmp(state->parameter, "file")) {
+        strncpy(config->initial_conditions_file, value, YAML_MAX_LEN);
+      } else {  // format
+        PetscInt selection;
+        SelectItem(value, 2, (const char *[2]){"binary", "xdmf"}, (PetscInt[2]){PETSC_VIEWER_NATIVE, PETSC_VIEWER_HDF5_XDMF}, &selection);
+        PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid initial_conditions.format: %s", value);
+        config->initial_conditions_format = selection;
+      }
       state->parameter[0] = 0;  // clear parameter name
     }
   } else {
