@@ -65,6 +65,13 @@ typedef enum {
   TIME_YEARS
 } RDyTimeUnit;
 
+// This type identifies a format for output files.
+typedef enum {
+  OUTPUT_BINARY = 0,
+  OUTPUT_XDMF,
+  OUTPUT_CGNS
+} RDyOutputFormat;
+
 // This type specifies a "kind" of condition that indicates how that condition
 // is to be enforced on a region or boundary.
 typedef enum {
@@ -196,7 +203,7 @@ typedef struct {
   //--------
 
   // Output file format
-  PetscViewerFormat output_format;
+  RDyOutputFormat output_format;
   // Output frequency (in steps)
   PetscInt output_frequency;
 

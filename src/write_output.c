@@ -64,7 +64,10 @@ static PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time
 
   // encode specific information into the filename based on its format
   char suffix[PETSC_MAX_PATH_LEN];
-  if (rdy->config.output_format == PETSC_VIEWER_HDF5_XDMF) {
+  if (rdy->config.output_format == OUTPUT_XDMF) {
+    snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.h5", rdy->dt, rdy->config.max_step, rdy->nproc);
+  } else if (rdy->config.output_format == OUTPUT_CGNS) {
+    // can't find anything on CGNS filename conventions, so just use .h5, I guess!
     snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.h5", rdy->dt, rdy->config.max_step, rdy->nproc);
   } else {  // native binary format
     snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_%d_np%d.dat", rdy->dt, rdy->config.max_step, step, rdy->nproc);
@@ -87,7 +90,7 @@ static PetscErrorCode WriteBinaryOutput(RDy rdy, PetscInt step, PetscReal time) 
 
   PetscViewer viewer;
   PetscCall(PetscViewerBinaryOpen(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
-  PetscCall(PetscViewerPushFormat(viewer, rdy->config.output_format));
+  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_NATIVE));
 
   // dump the solution vector in natural ordering
   Vec natural;
@@ -116,11 +119,11 @@ static PetscErrorCode WriteXDMFOutput(RDy rdy, PetscInt step, PetscReal time) {
   // write the grid if we're on the first step
   if (step == 0) {
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
-    PetscCall(PetscViewerPushFormat(viewer, rdy->config.output_format));
+    PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
     PetscCall(DMView(rdy->dm, viewer));
   } else {
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_APPEND, &viewer));
-    PetscCall(PetscViewerPushFormat(viewer, rdy->config.output_format));
+    PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
   }
 
   // write solution data to a new GROUP with components in separate datasets
@@ -171,6 +174,18 @@ static PetscErrorCode WriteXDMFOutput(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode WriteCGNSOutput(RDy rdy, PetscInt step, PetscReal time) {
+  PetscFunctionBegin;
+
+  /* FIXME: need an example of how this is actually done
+  PetscCall(PetscViewerCreate(rdy->comm, &viewer));
+  PetscCall(PetscViewerSetType(viewer, PETSCVIEWERCGNS));
+  PetscCall(PetscViewerFileSetMode(viewer, FILE_MODE_WRITE));
+  PetscCall(PetscViewerFileSetName(viewer, fname));*/
+
+  PetscFunctionReturn(0);
+}
+
 // TS monitoring routine used to write output files
 PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
@@ -179,9 +194,11 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
   if ((rdy->config.output_frequency == -1) ||  // last step (interpolated)
       (time >= rdy->config.final_time) ||      // last step without interpolation
       (step % rdy->config.output_frequency == 0)) {
-    if (rdy->config.output_format == PETSC_VIEWER_HDF5_XDMF) {
+    if (rdy->config.output_format == OUTPUT_XDMF) {
       PetscCall(WriteXDMFOutput(rdy, step, time));
-    } else {
+    } else if (rdy->config.output_format == OUTPUT_CGNS) {
+      PetscCall(WriteCGNSOutput(rdy, step, time));
+    } else { // binary
       PetscCall(WriteBinaryOutput(rdy, step, time));
     }
   }
@@ -191,7 +208,7 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
 PetscErrorCode PostprocessOutput(RDy rdy) {
   PetscFunctionBegin;
 
-  if (rdy->config.output_format == PETSC_VIEWER_HDF5_XDMF) {
+  if (rdy->config.output_format == OUTPUT_XDMF) {
     // FIXME: write XML file here!
   }
 

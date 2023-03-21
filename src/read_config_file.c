@@ -420,7 +420,7 @@ static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, R
   PetscFunctionBegin;
 
   // output:
-  //   format: <binary|xdmf>
+  //   format: <binary|xdmf|cgns>
   //   frequency: <value>
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
@@ -434,7 +434,7 @@ static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, R
   } else {  // parameter set, get value
     if (!strcmp(state->parameter, "format")) {
       PetscInt selection;
-      SelectItem(value, 2, (const char *[2]){"binary", "xdmf"}, (PetscInt[2]){PETSC_VIEWER_NATIVE, PETSC_VIEWER_HDF5_XDMF}, &selection);
+      SelectItem(value, 3, (const char *[3]){"binary", "xdmf", "cgns"}, (PetscInt[3]){OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid output.format: %s", value);
       config->output_format = selection;
     } else {  // frequency
