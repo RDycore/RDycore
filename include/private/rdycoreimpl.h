@@ -127,4 +127,9 @@ PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 PETSC_INTERN PetscErrorCode InitSWE(RDy);
 PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 
+// output functions
+PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
+PETSC_INTERN PetscErrorCode WriteOutputFiles(TS, PetscInt, PetscReal, Vec, void*);
+PETSC_INTERN PetscErrorCode PostprocessOutput(RDy);
+
 #endif
