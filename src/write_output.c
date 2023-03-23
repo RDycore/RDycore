@@ -6,25 +6,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-/* restart logic stubs -- not yet implemented
-// writes a restart file
-static PetscErrorCode WriteRestart(RDy rdy) {
-  PetscFunctionBegin;
-  // TODO
-  PetscFunctionReturn(0);
-}
-
-// TS monitoring routine used to write restart files
-static PetscErrorCode WriteRestartFiles(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
-  PetscFunctionBegin;
-  RDY rdy = ctx;
-  if (step % rdy->config.restart_frequency == 0) {
-    PetscCall(WriteRestart(rdy));
-  }
-  PetscFunctionReturn(0);
-}
-*/
-
 // output directory name (relative to current working directory)
 static const char *output_dir = "output";
 
@@ -47,7 +28,7 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, char *filename) {
+static PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
   PetscFunctionBegin;
 
   char *p = strstr(rdy->config_file, ".yaml");
@@ -63,18 +44,15 @@ static PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time
   }
 
   // encode specific information into the filename based on its format
-  char suffix[PETSC_MAX_PATH_LEN];
-  if (rdy->config.output_format == OUTPUT_XDMF) {
-    snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.h5", rdy->dt, rdy->config.max_step, rdy->nproc);
-  } else if (rdy->config.output_format == OUTPUT_CGNS) {
-    // can't find anything on CGNS filename conventions, so just use .h5, I guess!
-    snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.h5", rdy->dt, rdy->config.max_step, rdy->nproc);
-  } else {  // native binary format
-    snprintf(suffix, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_%d_np%d.dat", rdy->dt, rdy->config.max_step, step, rdy->nproc);
+  char ending[PETSC_MAX_PATH_LEN];
+  if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
+    snprintf(ending, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_%d_np%d.%s", rdy->dt, rdy->config.max_step, step, rdy->nproc, suffix);
+  } else {
+    snprintf(ending, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.%s", rdy->dt, rdy->config.max_step, rdy->nproc, suffix);
   }
 
   // concatenate some config parameters
-  strncat(filename, suffix, PETSC_MAX_PATH_LEN - 1 - strlen(filename));
+  strncat(filename, ending, PETSC_MAX_PATH_LEN - 1 - strlen(filename));
   RDyLogDetail(rdy, "Step %d: writing output to %s", step, filename);
 
   PetscFunctionReturn(0);
@@ -86,7 +64,7 @@ static PetscErrorCode WriteBinaryOutput(RDy rdy, PetscInt step, PetscReal time) 
 
   // Determine the output file name.
   char fname[PETSC_MAX_PATH_LEN];
-  PetscCall(DetermineOutputFile(rdy, step, time, fname));
+  PetscCall(DetermineOutputFile(rdy, step, time, "dat", fname));
 
   PetscViewer viewer;
   PetscCall(PetscViewerBinaryOpen(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
@@ -106,15 +84,15 @@ static PetscErrorCode WriteBinaryOutput(RDy rdy, PetscInt step, PetscReal time) 
   PetscFunctionReturn(0);
 }
 
-// writes output in XDMF format
-static PetscErrorCode WriteXDMFOutput(RDy rdy, PetscInt step, PetscReal time) {
+// writes a XDMF "heavy data" to an HDF5 file
+static PetscErrorCode WriteXDMFHeavyData(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
 
   // Determine the output file name.
   char fname[PETSC_MAX_PATH_LEN];
-  PetscCall(DetermineOutputFile(rdy, step, time, fname));
+  PetscCall(DetermineOutputFile(rdy, step, time, "h5", fname));
 
   // write the grid if we're on the first step
   if (step == 0) {
@@ -174,6 +152,113 @@ static PetscErrorCode WriteXDMFOutput(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionReturn(0);
 }
 
+// generates an XMDF "light data" file (.xmf)
+static PetscErrorCode WriteXDMFLightData(RDy rdy) {
+  PetscFunctionBegin;
+
+  // data (HDF5) paths
+  const char *geom_path = "/geometry";
+  const char *topo_path = "/viz/topology";
+
+  // mesh metadata
+  int num_cells;
+  int num_corners;
+  int num_vertices;
+  int cell_dim = 2, space_dim = 2;
+
+  // time-stepping metadata
+  int num_steps, num_times;
+
+  char h5_name[PETSC_MAX_PATH_LEN], xmf_name[PETSC_MAX_PATH_LEN];
+  PetscCall(DetermineOutputFile(rdy, 0, 0.0, "h5", h5_name));
+  PetscCall(DetermineOutputFile(rdy, 0, 0.0, "xmf", xmf_name));
+  RDyLogDetail(rdy, "Writing XDMF light data to %s...", xmf_name);
+  FILE *fp;
+  PetscCall(PetscFOpen(rdy->comm, xmf_name, "w", &fp));
+
+  // write header
+  PetscCall(PetscFPrintf(rdy->comm, fp,
+                         "<?xml version=\"1.0\" ?>\n"
+                         "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" [\n"
+                         "<!ENTITY HeavyData \"%s\">\n"
+                         "]>\n\n"
+                         "<Xdmf>\n  <Domain Name=\"domain\">\n",
+                         h5_name));
+
+  // write cell metadata
+  PetscCall(PetscFPrintf(rdy->comm, fp,
+                         "    <DataItem Name=\"cells\"\n"
+                         "              ItemType=\"Uniform\"\n"
+                         "              Format=\"HDF\"\n"
+                         "              NumberType=\"Float\" Precision=\"8\"\n"
+                         "              Dimensions=\"%d %d\">\n"
+                         "      &HeavyData;:/%s/cells\n"
+                         "    </DataItem>\n",
+                         num_cells, num_corners, topo_path));
+
+  // write vertex metadata
+  PetscCall(PetscFPrintf(rdy->comm, fp,
+                         "    <DataItem Name=\"vertices\"\n"
+                         "              Format=\"HDF\"\n"
+                         "              Dimensions=\"%d %d\">\n"
+                         "      &HeavyData;:/%s/vertices\n"
+                         "    </DataItem>\n",
+                         num_vertices, space_dim, geom_path));
+
+  // write time grid header
+  PetscCall(PetscFPrintf(rdy->comm, fp,
+                         "    <Grid Name=\"TimeSeries\" GridType=\"Collection\" CollectionType=\"Temporal\">\n"
+                         "      <Time TimeType=\"List\">\n"
+                         "        <DataItem Format=\"XML\" NumberType=\"Float\" Dimensions=\"%d\">\n",
+                         "          ", num_times));
+  for (int n = 0; n < num_times; ++n) {
+    PetscReal tn = n * rdy->dt;
+    PetscCall(PetscFPrintf(rdy->comm, fp, "%g ", tn));
+  }
+  PetscCall(PetscFPrintf(rdy->comm, fp,
+                         "        </DataItem>\n"
+                         "      </Time>\n"));
+
+  // write field data for each time
+  for (int n = 0; n < num_times; ++n) {
+    // write space grid header
+    const char *topo_type[5] = {"Invalid", "Invalid", "Invalid", "Triangle", "Quadrilateral"};
+    PetscCall(PetscFPrintf(rdy->comm, fp,
+                           "      <Grid Name=\"domain\" GridType=\"Uniform\">\n"
+                           "        <Topology\n"
+                           "           TopologyType=\"%s\"\n"
+                           "           NumberOfElements=\"%d\">\n"
+                           "          <DataItem Reference=\"XML\">\n"
+                           "            /Xdmf/Domain/DataItem[@Name=\"cells\"]\n"
+                           "          </DataItem>\n"
+                           "        </Topology>\n"
+                           "        <Geometry GeometryType=\"XY\">\n"
+                           "          <DataItem Reference=\"XML\">\n"
+                           "            /Xdmf/Domain/DataItem[@Name=\"vertices\"]\n"
+                           "          </DataItem>\n"
+                           "        </Geometry>\n",
+                           topo_type[num_corners], num_cells));
+
+    // write vertex field metadata
+    // (none so far!)
+
+    // write cell field metadata
+
+    // write space grid footer
+    PetscCall(PetscFPrintf(rdy->comm, fp, "      </Grid>\n"));
+  }
+
+  // write time grid footer
+  PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
+
+  // write footer
+  PetscCall(PetscFPrintf(rdy->comm, fp, "  </Domain>\n</Xdmf>\n"));
+
+  PetscCall(PetscFClose(rdy->comm, fp));
+
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode WriteCGNSOutput(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
@@ -191,14 +276,15 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
   PetscFunctionBegin;
   RDy rdy = ctx;
 
-  if ((rdy->config.output_frequency == -1) ||  // last step (interpolated)
-      (time >= rdy->config.final_time) ||      // last step without interpolation
-      (step % rdy->config.output_frequency == 0)) {
+  PetscReal final_time = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit);
+  if ((step == -1) ||          // last step (interpolated)
+      (time >= final_time) ||  // last step without interpolation
+      ((step % rdy->config.output_frequency) == 0)) {
     if (rdy->config.output_format == OUTPUT_XDMF) {
-      PetscCall(WriteXDMFOutput(rdy, step, time));
+      PetscCall(WriteXDMFHeavyData(rdy, step, time));
     } else if (rdy->config.output_format == OUTPUT_CGNS) {
       PetscCall(WriteCGNSOutput(rdy, step, time));
-    } else { // binary
+    } else {  // binary
       PetscCall(WriteBinaryOutput(rdy, step, time));
     }
   }
@@ -209,7 +295,7 @@ PetscErrorCode PostprocessOutput(RDy rdy) {
   PetscFunctionBegin;
 
   if (rdy->config.output_format == OUTPUT_XDMF) {
-    // FIXME: write XML file here!
+    PetscCall(WriteXDMFLightData(rdy));
   }
 
   PetscFunctionReturn(0);

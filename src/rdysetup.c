@@ -3,7 +3,7 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
-static PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
+PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
   PetscFunctionBegin;
 
   PetscReal time_in_sec;
@@ -59,6 +59,9 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
   if (rdy->dt <= 0.0) {
     // ѕet a default timestep if needed
     rdy->dt = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit) / rdy->config.max_step;
+  } else {
+    // convert dt to seconds in any case
+    rdy->dt = ConvertTimeToSeconds(rdy->dt, rdy->config.time_unit);
   }
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");

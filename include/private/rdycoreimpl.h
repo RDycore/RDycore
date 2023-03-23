@@ -132,4 +132,7 @@ PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
 PETSC_INTERN PetscErrorCode WriteOutputFiles(TS, PetscInt, PetscReal, Vec, void*);
 PETSC_INTERN PetscErrorCode PostprocessOutput(RDy);
 
+// utility functions
+PETSC_INTERN PetscReal ConvertTimeToSeconds(PetscReal, RDyTimeUnit);
+
 #endif
