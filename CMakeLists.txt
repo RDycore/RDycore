@@ -21,6 +21,9 @@ set(PETSC_DIR $ENV{PETSC_DIR})
 set(PETSC_ARCH $ENV{PETSC_ARCH})
 find_package(PETSc COMPONENTS C)
 
+include(FindPkgConfig)
+pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
+
 # Use PETSc's compiler config.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_COMPILER ${PETSC_COMPILER})
@@ -90,6 +93,7 @@ message(STATUS "Installation prefix is ${CMAKE_INSTALL_PREFIX}")
 
 # We look for headers in these directories.
 include_directories(${PETSC_INCLUDES})
+include_directories(${CEED_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
@@ -101,7 +105,7 @@ configure_file(
 )
 
 # Inherit libraries from PETSc.
-set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
+set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES} PkgConfig::CEED)
 
 if (ENABLE_TESTS)
   include(CTest)

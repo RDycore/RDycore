@@ -107,7 +107,11 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
   }
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
-  { PetscCall(PetscOptionsReal("-dt", "dt (seconds)", "", rdy->dt, &rdy->dt, NULL)); }
+  {
+    PetscCall(PetscOptionsReal("-dt", "dt (seconds)", "", rdy->dt, &rdy->dt, NULL));
+    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed_resource, rdy->ceed_resource,
+                                 sizeof rdy->ceed_resource, NULL));
+  }
   PetscOptionsEnd();
 
   PetscFunctionReturn(0);

@@ -3,6 +3,8 @@
 #include <private/rdymemoryimpl.h>
 #include <stddef.h>  // for offsetof
 
+#include "swe-flux.h"
+
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
 
@@ -637,8 +639,110 @@ PetscErrorCode InitSWE(RDy rdy) {
 
   // set up MPI types and operators used by SWE physics
   PetscCall(InitMPITypesAndOps());
-
   PetscFunctionReturn(0);
+}
+
+static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
+  PetscFunctionBeginUser;
+  if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op) {
+    Ceed          ceed;
+    CeedQFunction qf;
+    CeedInit(rdy->ceed_resource, &ceed);
+    CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, &qf);
+    CeedQFunctionAddInput(qf, "geom", 4, CEED_EVAL_NONE);
+    CeedQFunctionAddInput(qf, "q_left", 3, CEED_EVAL_NONE);
+    CeedQFunctionAddInput(qf, "q_right", 3, CEED_EVAL_NONE);
+    CeedQFunctionAddOutput(qf, "cell_left", 3, CEED_EVAL_NONE);
+    CeedQFunctionAddOutput(qf, "cell_right", 3, CEED_EVAL_NONE);
+
+    CeedElemRestriction restrict_l, restrict_r, restrict_geom;
+    CeedVector          geom;
+    {  // Create element restrictions for state
+      RDyMesh  *mesh  = &rdy->mesh;
+      RDyCells *cells = &mesh->cells;
+      RDyEdges *edges = &mesh->edges;
+      CeedInt  *offset_l, *offset_r;
+      CeedScalar(*g)[4];
+      CeedInt num_edges = mesh->num_internal_edges, num_comp = 3, num_comp_geom = 4;
+      CeedInt strides[] = {num_comp_geom, 1, num_comp_geom};
+      CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, strides, &restrict_geom);
+      CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
+      CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
+      PetscCall(PetscMalloc2(num_edges, &offset_l, num_edges, &offset_r));
+      CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
+      for (CeedInt e = 0; e < num_edges; e++) {
+        PetscInt iedge = edges->internal_edge_ids[e];
+        PetscInt l     = edges->cell_ids[2 * iedge];
+        PetscInt r     = edges->cell_ids[2 * iedge + 1];
+        offset_l[e]    = l * num_comp;
+        offset_r[e]    = r * num_comp;
+
+        g[e][0] = edges->sn[iedge];
+        g[e][1] = edges->cn[iedge];
+        g[e][2] = -edges->lengths[iedge] / cells->areas[l];
+        g[e][3] = edges->lengths[iedge] / cells->areas[r];
+      }
+      CeedVectorRestoreArray(geom, (CeedScalar **)&g);
+      CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells_local * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
+                                &restrict_l);
+      CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells_local * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_r,
+                                &restrict_r);
+      PetscCall(PetscFree2(offset_l, offset_r));
+      CeedElemRestrictionView(restrict_l, stdout);
+      CeedElemRestrictionView(restrict_r, stdout);
+
+      CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.x_ceed);
+      CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.y_ceed);
+    }
+
+    {
+      CeedOperator op;
+      CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
+      CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
+      CeedOperatorSetField(op, "q_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+      CeedOperatorSetField(op, "q_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+      CeedOperatorSetField(op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+      CeedOperatorSetField(op, "cell_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+      CeedOperatorSetNumQuadraturePoints(op, 1);
+      rdy->ceed_rhs.op = op;
+    }
+    CeedElemRestrictionDestroy(&restrict_geom);
+    CeedElemRestrictionDestroy(&restrict_l);
+    CeedElemRestrictionDestroy(&restrict_r);
+    CeedVectorDestroy(&geom);
+
+    CeedOperatorView(rdy->ceed_rhs.op, stdout);
+  }
+  PetscFunctionReturn(0);
+}
+
+static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
+
+static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
+  PetscScalar *u, *f;
+  PetscMemType mem_type;
+  Vec          F_local;
+  PetscFunctionBeginUser;
+  PetscCall(RDyCeedOperatorSetUp(rdy));
+  CeedVector u_ceed = rdy->ceed_rhs.x_ceed;
+  CeedVector f_ceed = rdy->ceed_rhs.y_ceed;
+  PetscCall(DMGetLocalVector(rdy->dm, &F_local));
+  PetscCall(VecZeroEntries(F_local));
+  PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
+  CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u);
+  PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
+  CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
+
+  CeedOperatorApply(rdy->ceed_rhs.op, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+
+  CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
+  PetscCall(VecRestoreArrayAndMemType(U_local, &u));
+  CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f);
+  PetscCall(VecRestoreArrayAndMemType(F_local, &f));
+  PetscCall(VecZeroEntries(F));
+  PetscCall(DMLocalToGlobal(rdy->dm, F_local, INSERT_VALUES, F));
+  PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // This is the right-hand-side function used by our timestepping solver for
@@ -667,7 +771,11 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       .global_edge_id  = -1,
       .global_cell_id  = -1,
   };
-  PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
+  if (rdy->ceed_resource[0]) {
+    PetscCall(RDyCeedOperatorApply(rdy, rdy->X_local, F));
+  } else {
+    PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
+  }
   PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
   PetscCall(AddSourceTerm(rdy, F));
 
