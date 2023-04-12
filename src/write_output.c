@@ -153,7 +153,7 @@ static PetscErrorCode WriteXDMFHeavyData(RDy rdy, PetscInt step, PetscReal time)
 }
 
 // generates an XMDF "light data" file (.xmf)
-static PetscErrorCode WriteXDMFLightData(RDy rdy) {
+static PetscErrorCode WriteXDMFLightData(RDy rdy, PetscInt num_files) {
   PetscFunctionBegin;
 
   // data (HDF5) paths
@@ -161,13 +161,13 @@ static PetscErrorCode WriteXDMFLightData(RDy rdy) {
   const char *topo_path = "/viz/topology";
 
   // mesh metadata
-  int num_cells;
-  int num_corners;
-  int num_vertices;
-  int cell_dim = 2, space_dim = 2;
+  PetscInt num_cells = rdy->mesh.num_cells;
+  PetscInt num_corners;
+  PetscInt num_vertices = rdy->mesh.num_vertices;
+  PetscInt cell_dim = 2, space_dim = 2;
 
   // time-stepping metadata
-  int num_steps, num_times;
+  PetscInt num_times = num_files;
 
   char h5_name[PETSC_MAX_PATH_LEN], xmf_name[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineOutputFile(rdy, 0, 0.0, "h5", h5_name));
@@ -209,8 +209,9 @@ static PetscErrorCode WriteXDMFLightData(RDy rdy) {
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "    <Grid Name=\"TimeSeries\" GridType=\"Collection\" CollectionType=\"Temporal\">\n"
                          "      <Time TimeType=\"List\">\n"
-                         "        <DataItem Format=\"XML\" NumberType=\"Float\" Dimensions=\"%d\">\n",
-                         "          ", num_times));
+                         "        <DataItem Format=\"XML\" NumberType=\"Float\" Dimensions=\"%d\">\n"
+                         "          ",
+                         num_times));
   for (int n = 0; n < num_times; ++n) {
     PetscReal tn = n * rdy->dt;
     PetscCall(PetscFPrintf(rdy->comm, fp, "%g ", tn));
@@ -243,9 +244,20 @@ static PetscErrorCode WriteXDMFLightData(RDy rdy) {
     // (none so far!)
 
     // write cell field metadata
+    PetscReal   tn                  = n * rdy->dt;
+    const char *cell_field_names[3] = {"Water_Height", "X_Momentum", "Y_Momentum"};
+    for (int f = 0; f < 3; ++f) {
+      PetscCall(PetscFPrintf(rdy->comm, fp,
+                             "        <Attribute Name=\"%s\" Center=\"Cell\">\n"
+                             "          <DataItem DataType=\"Float\" Precision=\"8\" Dimensions=\"%d\" Format=\"HDF\">\n"
+                             "            &HeavyData;:/%d %.7E d/%s\n"
+                             "          </DataItem>\n"
+                             "        </Attribute>\n",
+                             cell_field_names[f], num_cells, n, tn, cell_field_names[f]));
 
-    // write space grid footer
-    PetscCall(PetscFPrintf(rdy->comm, fp, "      </Grid>\n"));
+      // write space grid footer
+      PetscCall(PetscFPrintf(rdy->comm, fp, "      </Grid>\n"));
+    }
   }
 
   // write time grid footer
@@ -255,18 +267,6 @@ static PetscErrorCode WriteXDMFLightData(RDy rdy) {
   PetscCall(PetscFPrintf(rdy->comm, fp, "  </Domain>\n</Xdmf>\n"));
 
   PetscCall(PetscFClose(rdy->comm, fp));
-
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode WriteCGNSOutput(RDy rdy, PetscInt step, PetscReal time) {
-  PetscFunctionBegin;
-
-  /* FIXME: need an example of how this is actually done
-  PetscCall(PetscViewerCreate(rdy->comm, &viewer));
-  PetscCall(PetscViewerSetType(viewer, PETSCVIEWERCGNS));
-  PetscCall(PetscViewerFileSetMode(viewer, FILE_MODE_WRITE));
-  PetscCall(PetscViewerFileSetName(viewer, fname));*/
 
   PetscFunctionReturn(0);
 }
@@ -282,8 +282,6 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
       ((step % rdy->config.output_frequency) == 0)) {
     if (rdy->config.output_format == OUTPUT_XDMF) {
       PetscCall(WriteXDMFHeavyData(rdy, step, time));
-    } else if (rdy->config.output_format == OUTPUT_CGNS) {
-      PetscCall(WriteCGNSOutput(rdy, step, time));
     } else {  // binary
       PetscCall(WriteBinaryOutput(rdy, step, time));
     }
@@ -294,8 +292,10 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
 PetscErrorCode PostprocessOutput(RDy rdy) {
   PetscFunctionBegin;
 
+  PetscReal final_time = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit);
+  PetscInt  num_files  = (int)(final_time / rdy->dt);
   if (rdy->config.output_format == OUTPUT_XDMF) {
-    PetscCall(WriteXDMFLightData(rdy));
+    PetscCall(WriteXDMFLightData(rdy, num_files));
   }
 
   PetscFunctionReturn(0);
