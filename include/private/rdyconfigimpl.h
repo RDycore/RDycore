@@ -140,16 +140,24 @@ typedef struct {
   // initial conditions file (if given)
   char initial_conditions_file[PETSC_MAX_PATH_LEN];
 
-  // table of initial conditions mapping region IDs to names of conditions
+  // IDs of all regions mentioned in an input file
+  PetscInt num_regions;
+  PetscInt region_ids[MAX_NUM_REGIONS];
+
+  // IDs of all boundaries mentioned in an input file
+  PetscInt num_boundaries;
+  PetscInt boundary_ids[MAX_NUM_BOUNDARIES];
+
+  // table of initial conditions mapping regions to names of conditions
   // (unless file above is given)
   PetscInt         num_initial_conditions;
   RDyConditionSpec initial_conditions[MAX_NUM_REGIONS];
 
-  // table of sources/sinks mapping region IDs to names of conditions
+  // table of sources/sinks mapping regions to names of conditions
   PetscInt         num_sources;
   RDyConditionSpec sources[MAX_NUM_REGIONS];
 
-  // table of boundary conditions mapping boundary IDs to names of conditions
+  // table of boundary conditions mapping boundaries to names of conditions
   PetscInt         num_boundary_conditions;
   RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 

@@ -464,6 +464,24 @@ static PetscErrorCode ParseGrid(yaml_event_t *event, YamlParserState *state, RDy
   PetscFunctionReturn(0);
 }
 
+// this helper finds the index of a region ID, adding one if it doesn't already exist
+static PetscErrorCode FindRegionIndex(MPI_Comm comm, RDyConfig *config, PetscInt id, PetscInt *index) {
+  PetscFunctionBegin;
+
+  for (PetscInt r = 0; r < config->num_regions; ++r) {
+    if (config->region_ids[r] == id) {
+      *index = r;
+      PetscFunctionReturn(0);
+    }
+  }
+  PetscCheck(config->num_regions < MAX_NUM_REGIONS, comm, PETSC_ERR_USER, "Maximum number of regions (%d) exceeded in input file", MAX_NUM_REGIONS);
+
+  *index                     = config->num_regions;
+  config->region_ids[*index] = id;
+  config->num_regions++;
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
@@ -501,10 +519,12 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
     // we should be inside a subsection that identifies a region.
     PetscCheck(state->inside_subsection, state->comm, PETSC_ERR_USER, "Invalid YAML in initial_conditions.%s", state->subsection);
 
-    // What is the region's index?
+    // What is the region's ID?
+    PetscInt region_id;
+    PetscCall(ConvertToInt(state->comm, "region", state->subsection, &region_id));
+    PetscCheck(region_id != -1, state->comm, PETSC_ERR_USER, "Invalid region in initial_conditions: %s", state->subsection);
     PetscInt region_index;
-    PetscCall(ConvertToInt(state->comm, "region", state->subsection, &region_index));
-    PetscCheck(region_index != -1, state->comm, PETSC_ERR_USER, "Invalid region in initial_conditions: %s", state->subsection);
+    PetscCall(FindRegionIndex(state->comm, config, region_id, &region_index));
 
     RDyConditionSpec *ic_spec = &config->initial_conditions[region_index];
     if (!strlen(state->parameter)) {  // parameter name not set
@@ -528,15 +548,34 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   PetscFunctionReturn(0);
 }
 
+// this helper finds the index of a boundary ID, adding one if it doesn't already exist
+static PetscErrorCode FindBoundaryIndex(MPI_Comm comm, RDyConfig *config, PetscInt id, PetscInt *index) {
+  PetscFunctionBegin;
+
+  for (PetscInt b = 0; b < config->num_boundaries; ++b) {
+    if (config->boundary_ids[b] == id) {
+      *index = b;
+      PetscFunctionReturn(0);
+    }
+  }
+  PetscCheck(config->num_boundaries < MAX_NUM_BOUNDARIES, comm, PETSC_ERR_USER, "Maximum number of boundaries (%d) exceeded in input file",
+             MAX_NUM_BOUNDARIES);
+
+  *index                       = config->num_boundaries;
+  config->boundary_ids[*index] = id;
+  config->num_boundaries++;
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
   // boundary_conditions:
-  //   <surface1>: # id of a surface (eg 1, 2)
+  //   <boundary1>: # id of a boundary (eg 1, 2)
   //     flow: <flow-condition-name>
   //     sediment: <sediment-condition-name> # (if physics.sediment = true)
   //     salinity: <salinity-condition-name> # (if physics.salinity = true)
-  //   <surface2>:
+  //   <boundary2>:
   //     ...
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
@@ -547,15 +586,17 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserSta
   if (!strlen(state->subsection)) {
     strncpy(state->subsection, value, YAML_MAX_LEN);
   } else {
-    // we should be inside a subsection that identifies a surface.
+    // we should be inside a subsection that identifies a boundary.
     PetscCheck(state->inside_subsection, state->comm, PETSC_ERR_USER, "Invalid YAML in boundary_conditions.%s", state->subsection);
 
-    // What is the surface's index?
-    PetscInt surface_index;
-    PetscCall(ConvertToInt(state->comm, "surface", state->subsection, &surface_index));
-    PetscCheck(surface_index != -1, state->comm, PETSC_ERR_USER, "Invalid surface in boundary_conditions: %s", state->subsection);
+    // What is the boundary's ID?
+    PetscInt boundary_id;
+    PetscCall(ConvertToInt(state->comm, "boundary", state->subsection, &boundary_id));
+    PetscCheck(boundary_id != -1, state->comm, PETSC_ERR_USER, "Invalid boundary in boundary_conditions: %s", state->subsection);
+    PetscInt boundary_index;
+    PetscCall(FindBoundaryIndex(state->comm, config, boundary_id, &boundary_index));
 
-    RDyConditionSpec *bc_spec = &config->boundary_conditions[surface_index];
+    RDyConditionSpec *bc_spec = &config->boundary_conditions[boundary_index];
     if (!strlen(state->parameter)) {  // parameter name not set
       PetscInt selection;
       SelectItem(value, 3, (const char *[3]){"flow", "sediment", "salinity"}, (PetscInt[3]){0, 1, 2}, &selection);
@@ -598,10 +639,12 @@ static PetscErrorCode ParseSources(yaml_event_t *event, YamlParserState *state, 
     // we should be inside a subsection that identifies a region.
     PetscCheck(state->inside_subsection, state->comm, PETSC_ERR_USER, "Invalid YAML in sources.%s", state->subsection);
 
-    // What is the region's index?
+    // What is the region's ID?
+    PetscInt region_id;
+    PetscCall(ConvertToInt(state->comm, "region", state->subsection, &region_id));
+    PetscCheck(region_id != -1, state->comm, PETSC_ERR_USER, "Invalid region in sources: %s", state->subsection);
     PetscInt region_index;
-    PetscCall(ConvertToInt(state->comm, "region", state->subsection, &region_index));
-    PetscCheck(region_index != -1, state->comm, PETSC_ERR_USER, "Invalid region in sources: %s", state->subsection);
+    PetscCall(FindRegionIndex(state->comm, config, region_id, &region_index));
 
     RDyConditionSpec *src_spec = &config->sources[region_index];
     if (!strlen(state->parameter)) {  // parameter name not set
