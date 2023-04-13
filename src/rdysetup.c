@@ -257,26 +257,31 @@ static PetscErrorCode InitRegions(RDy rdy) {
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
   if (label) {  // found regions (cell sets) in the grid
-    for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
-      IS cell_is;
-      PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
-      if (cell_is) ++rdy->num_regions;
-      PetscCall(ISDestroy(&cell_is));
-    }
+    PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
+    PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER, "Number of regions in mesh (%d) exceeds MAX_NUM_REGIONS (%d)",
+               rdy->num_regions, MAX_NUM_REGIONS);
+
+    // fetch region IDs
+    IS region_id_is;
+    PetscCall(DMLabelGetValueIS(label, &region_id_is));
+    const PetscInt *region_ids;
+    PetscCall(ISGetIndices(region_id_is, &region_ids));
+
+    // allocate and set region data
     PetscCall(RDyAlloc(PetscInt, rdy->num_regions, &rdy->region_ids));
     PetscCall(RDyAlloc(RDyRegion, rdy->num_regions, &rdy->regions));
-    PetscInt r = 0;
-    for (PetscInt region_id = 0; region_id <= MAX_REGION_ID; ++region_id) {
-      IS cell_is;  // cell index space
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      PetscInt region_id = region_ids[r];
+      IS       cell_is;  // cell index space
       PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
       if (cell_is) {
         RDyRegion *region  = &rdy->regions[r];
         rdy->region_ids[r] = region_id;
-        ++r;
 
         PetscInt num_cells;
         PetscCall(ISGetLocalSize(cell_is, &num_cells));
         if (num_cells > 0) {
+          RDyLogDebug(rdy, "  Found region %d (%d cells)", region_id, num_cells);
           region->num_cells = num_cells;
           PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
         }
@@ -289,6 +294,8 @@ static PetscErrorCode InitRegions(RDy rdy) {
         PetscCall(ISDestroy(&cell_is));
       }
     }
+    PetscCall(ISRestoreIndices(region_id_is, &region_ids));
+    PetscCall(ISDestroy(&region_id_is));
   } else {
     // If we didn't find any regions, we'd better have a file from which to
     // read initial conditions.
@@ -323,9 +330,21 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
+  PetscInt        num_boundaries = 0;
+  IS              boundary_id_is;
+  const PetscInt *boundary_ids;
   if (label) {  // found face sets!
-    for (PetscInt boundary_id = 0; boundary_id <= MAX_BOUNDARY_ID; ++boundary_id) {
-      IS edge_is;
+    PetscCall(DMLabelGetNumValues(label, &num_boundaries));
+    PetscCheck(num_boundaries <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER, "Number of boundaries in mesh (%d) exceeds MAX_NUM_BOUNDARIES (%d)",
+               num_boundaries, MAX_NUM_BOUNDARIES);
+
+    // fetch boundary IDs
+    PetscCall(DMLabelGetValueIS(label, &boundary_id_is));
+    PetscCall(ISGetIndices(boundary_id_is, &boundary_ids));
+
+    for (PetscInt b = 0; b < num_boundaries; ++b) {
+      PetscInt boundary_id = boundary_ids[b];
+      IS       edge_is;
       PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
         // we can't use this boundary ID for unassigned edges
@@ -371,8 +390,9 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   // now fetch boundary edge IDs
   if (label) {
     PetscInt s = 0;
-    for (PetscInt boundary_id = 0; boundary_id <= MAX_BOUNDARY_ID; ++boundary_id) {
-      IS edge_is;  // edge index space
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      PetscInt boundary_id = (b < num_boundaries) ? boundary_ids[b] : unassigned_edge_boundary_id;
+      IS       edge_is;  // edge index space
       PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[s];
@@ -383,6 +403,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
         if (num_edges > 0) {
+          RDyLogDebug(rdy, "  Found boundary %d (%d edges)", boundary_id, num_edges);
           boundary->num_edges = num_edges;
           PetscCall(RDyAlloc(PetscInt, boundary->num_edges, &boundary->edge_ids));
         }
@@ -397,6 +418,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         PetscCall(ISDestroy(&edge_is));
       }
     }
+    PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
+    PetscCall(ISDestroy(&boundary_id_is));
   }
 
   // make sure we have at least one region and boundary
@@ -486,9 +509,9 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
   // Set up a reflecting flow boundary condition.
   RDyFlowCondition *reflecting_flow = NULL;
-  for (PetscInt s = 0; s <= MAX_BOUNDARY_ID; ++s) {
-    if (!strlen(rdy->config.flow_conditions[s].name)) {
-      reflecting_flow = &rdy->config.flow_conditions[s];
+  for (PetscInt c = 0; c <= MAX_NUM_CONDITIONS; ++c) {
+    if (!strlen(rdy->config.flow_conditions[c].name)) {
+      reflecting_flow = &rdy->config.flow_conditions[c];
       strcpy((char *)reflecting_flow->name, "reflecting");
       reflecting_flow->type = CONDITION_REFLECTING;
       break;

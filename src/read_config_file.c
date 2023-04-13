@@ -126,16 +126,16 @@ static PetscErrorCode CloseSection(YamlParserState *state, RDyConfig *config) {
     // handle some special cases in conditions sections first
     if (state->section == FLOW_CONDITIONS_SECTION) {
       config->num_flow_conditions++;
-      PetscCheck(config->num_flow_conditions <= MAX_CONDITION_ID, state->comm, PETSC_ERR_USER,
-                 "Maximum flow condition ID (%d) exceeded (increase MAX_CONDITION_ID)", MAX_CONDITION_ID);
+      PetscCheck(config->num_flow_conditions <= MAX_NUM_CONDITIONS, state->comm, PETSC_ERR_USER,
+                 "Maximum number of flow conditions (%d) exceeded (increase MAX_NUM_CONDITIONS)", MAX_NUM_CONDITIONS);
     } else if (state->section == SEDIMENT_CONDITIONS_SECTION) {
       config->num_sediment_conditions++;
-      PetscCheck(config->num_sediment_conditions <= MAX_CONDITION_ID, state->comm, PETSC_ERR_USER,
-                 "Maximum number of sediment condition ID (%d) exceeded (increase (MAX_CONDITION_ID)", MAX_CONDITION_ID);
+      PetscCheck(config->num_sediment_conditions <= MAX_NUM_CONDITIONS, state->comm, PETSC_ERR_USER,
+                 "Maximum number of sediment conditions (%d) exceeded (increase (MAX_NUM_CONDITIONS)", MAX_NUM_CONDITIONS);
     } else if (state->section == SALINITY_CONDITIONS_SECTION) {
       config->num_salinity_conditions++;
-      PetscCheck(config->num_salinity_conditions <= MAX_CONDITION_ID, state->comm, PETSC_ERR_USER,
-                 "Maximum number of salinity condition ID (%d) exceeded (increase MAX_CONDITION_ID)", MAX_CONDITION_ID);
+      PetscCheck(config->num_salinity_conditions <= MAX_NUM_CONDITIONS, state->comm, PETSC_ERR_USER,
+                 "Maximum number of salinity conditions (%d) exceeded (increase MAX_NUM_CONDITIONS)", MAX_NUM_CONDITIONS);
     }
     state->inside_subsection = PETSC_FALSE;
     state->subsection[0]     = 0;
