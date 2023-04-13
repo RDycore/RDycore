@@ -9,15 +9,15 @@
 // https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
 //
 
-// the maximum region ID that can be defined on a domain
-#define MAX_REGION_ID 32
+// the maximum number of regions that can be defined on a domain
+#define MAX_NUM_REGIONS 32
 
-// the maximum boundary ID that can be defined on a domain
-#define MAX_BOUNDARY_ID 32
+// the maximum number of boundaries that can be defined on a domain
+#define MAX_NUM_BOUNDARIES 32
 
-// the maximum flow/sediment/salinity condition ID that can be defined for a
+// the maximum number of flow/sediment/salinity conditions that can be defined for a
 // simulation
-#define MAX_CONDITION_ID 32
+#define MAX_NUM_CONDITIONS 32
 
 // the maximum length of a string referring to a name in the config file
 #define MAX_NAME_LEN 128
@@ -140,26 +140,34 @@ typedef struct {
   // initial conditions file (if given)
   char initial_conditions_file[PETSC_MAX_PATH_LEN];
 
-  // table of initial conditions mapping region IDs to names of conditions
+  // IDs of all regions mentioned in an input file
+  PetscInt num_regions;
+  PetscInt region_ids[MAX_NUM_REGIONS];
+
+  // IDs of all boundaries mentioned in an input file
+  PetscInt num_boundaries;
+  PetscInt boundary_ids[MAX_NUM_BOUNDARIES];
+
+  // table of initial conditions mapping regions to names of conditions
   // (unless file above is given)
   PetscInt         num_initial_conditions;
-  RDyConditionSpec initial_conditions[1+MAX_REGION_ID];
+  RDyConditionSpec initial_conditions[MAX_NUM_REGIONS];
 
-  // table of sources/sinks mapping region IDs to names of conditions
+  // table of sources/sinks mapping regions to names of conditions
   PetscInt         num_sources;
-  RDyConditionSpec sources[1+MAX_REGION_ID];
+  RDyConditionSpec sources[MAX_NUM_REGIONS];
 
-  // table of boundary conditions mapping boundary IDs to names of conditions
+  // table of boundary conditions mapping boundaries to names of conditions
   PetscInt         num_boundary_conditions;
-  RDyConditionSpec boundary_conditions[1+MAX_BOUNDARY_ID];
+  RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 
   // tables of named sets of flow, sediment, and salinity conditions
   PetscInt             num_flow_conditions;
-  RDyFlowCondition     flow_conditions[1+MAX_CONDITION_ID];
+  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_sediment_conditions;
-  RDySedimentCondition sediment_conditions[1+MAX_CONDITION_ID];
+  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_salinity_conditions;
-  RDySalinityCondition salinity_conditions[1+MAX_CONDITION_ID];
+  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
   //--------------
   // Timestepping
@@ -191,6 +199,10 @@ typedef struct {
   RDyLogLevel log_level;
 
 } RDyConfig;
+
+PETSC_INTERN PetscErrorCode RDyConfigFindRegion(RDyConfig*, PetscInt, PetscInt*);
+PETSC_INTERN PetscErrorCode RDyConfigFindBoundary(RDyConfig*, PetscInt, PetscInt*);
+
 
 #endif
 
