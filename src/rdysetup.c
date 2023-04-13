@@ -513,7 +513,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
   // Set up a reflecting flow boundary condition.
   RDyFlowCondition *reflecting_flow = NULL;
-  for (PetscInt c = 0; c <= MAX_NUM_CONDITIONS; ++c) {
+  for (PetscInt c = 0; c < MAX_NUM_CONDITIONS; ++c) {
     if (!strlen(rdy->config.flow_conditions[c].name)) {
       reflecting_flow = &rdy->config.flow_conditions[c];
       strcpy((char *)reflecting_flow->name, "reflecting");
