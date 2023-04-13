@@ -432,36 +432,6 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// this helper finds the index of a region ID within a configuration, setting it
-// to -1 if not found
-static PetscErrorCode FindRegionIndex(MPI_Comm comm, RDyConfig *config, PetscInt id, PetscInt *index) {
-  PetscFunctionBegin;
-
-  *index = -1;
-  for (PetscInt r = 0; r < config->num_regions; ++r) {
-    if (config->region_ids[r] == id) {
-      *index = r;
-      break;
-    }
-  }
-  PetscFunctionReturn(0);
-}
-
-// this helper finds the index of a region ID within a configuration, setting it
-// to -1 if not found
-static PetscErrorCode FindBoundaryIndex(MPI_Comm comm, RDyConfig *config, PetscInt id, PetscInt *index) {
-  PetscFunctionBegin;
-
-  *index = -1;
-  for (PetscInt b = 0; b < config->num_boundaries; ++b) {
-    if (config->boundary_ids[b] == id) {
-      *index = b;
-      break;
-    }
-  }
-  PetscFunctionReturn(0);
-}
-
 // checks the validity of initial/boundary conditions and sources
 static PetscErrorCode InitConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
@@ -475,7 +445,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       RDyCondition *ic        = &rdy->initial_conditions[r];
       PetscInt      region_id = rdy->region_ids[r];
       PetscInt      ic_region_index;
-      PetscCall(FindRegionIndex(rdy->comm, &rdy->config, region_id, &ic_region_index));
+      PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &ic_region_index));
       PetscCheck(ic_region_index != -1, rdy->comm, PETSC_ERR_USER, "Region %d has no initial conditions!", region_id);
 
       RDyConditionSpec *ic_spec = &rdy->config.initial_conditions[ic_region_index];
@@ -517,7 +487,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       RDyCondition *src       = &rdy->sources[r];
       PetscInt      region_id = rdy->region_ids[r];
       PetscInt      src_region_index;
-      PetscCall(FindRegionIndex(rdy->comm, &rdy->config, region_id, &src_region_index));
+      PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &src_region_index));
       if (src_region_index != -1) {
         RDyConditionSpec *src_spec = &rdy->config.sources[src_region_index];
         if (strlen(src_spec->flow_name)) {
@@ -569,7 +539,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
     RDyCondition *bc          = &rdy->boundary_conditions[b];
     PetscInt      boundary_id = rdy->boundary_ids[b];
     PetscInt      bc_boundary_index;
-    PetscCall(FindBoundaryIndex(rdy->comm, &rdy->config, boundary_id, &bc_boundary_index));
+    PetscCall(RDyConfigFindBoundary(&rdy->config, boundary_id, &bc_boundary_index));
     if (bc_boundary_index != -1) {
       RDyConditionSpec *bc_spec = &rdy->config.boundary_conditions[bc_boundary_index];
 

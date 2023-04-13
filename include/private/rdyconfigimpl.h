@@ -200,5 +200,9 @@ typedef struct {
 
 } RDyConfig;
 
+PETSC_INTERN PetscErrorCode RDyConfigFindRegion(RDyConfig*, PetscInt, PetscInt*);
+PETSC_INTERN PetscErrorCode RDyConfigFindBoundary(RDyConfig*, PetscInt, PetscInt*);
+
+
 #endif
 

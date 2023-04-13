@@ -464,24 +464,6 @@ static PetscErrorCode ParseGrid(yaml_event_t *event, YamlParserState *state, RDy
   PetscFunctionReturn(0);
 }
 
-// this helper finds the index of a region ID, adding one if it doesn't already exist
-static PetscErrorCode FindRegionIndex(MPI_Comm comm, RDyConfig *config, PetscInt id, PetscInt *index) {
-  PetscFunctionBegin;
-
-  for (PetscInt r = 0; r < config->num_regions; ++r) {
-    if (config->region_ids[r] == id) {
-      *index = r;
-      PetscFunctionReturn(0);
-    }
-  }
-  PetscCheck(config->num_regions < MAX_NUM_REGIONS, comm, PETSC_ERR_USER, "Maximum number of regions (%d) exceeded in input file", MAX_NUM_REGIONS);
-
-  *index                     = config->num_regions;
-  config->region_ids[*index] = id;
-  config->num_regions++;
-  PetscFunctionReturn(0);
-}
-
 static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
   PetscFunctionBegin;
 
@@ -523,8 +505,18 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
     PetscInt region_id;
     PetscCall(ConvertToInt(state->comm, "region", state->subsection, &region_id));
     PetscCheck(region_id != -1, state->comm, PETSC_ERR_USER, "Invalid region in initial_conditions: %s", state->subsection);
+
+    // Find the index of the region within our own books, adding a new one if
+    // necessary.
     PetscInt region_index;
-    PetscCall(FindRegionIndex(state->comm, config, region_id, &region_index));
+    PetscCall(RDyConfigFindRegion(config, region_id, &region_index));
+    if (region_index == -1) {
+      PetscCheck(config->num_regions < MAX_NUM_REGIONS, state->comm, PETSC_ERR_USER, "Maximum number of regions (%d) exceeded in input file",
+                 MAX_NUM_REGIONS);
+      region_index                     = config->num_regions;
+      config->region_ids[region_index] = region_id;
+      config->num_regions++;
+    }
 
     RDyConditionSpec *ic_spec = &config->initial_conditions[region_index];
     if (!strlen(state->parameter)) {  // parameter name not set
@@ -545,25 +537,6 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
     }
   }
 
-  PetscFunctionReturn(0);
-}
-
-// this helper finds the index of a boundary ID, adding one if it doesn't already exist
-static PetscErrorCode FindBoundaryIndex(MPI_Comm comm, RDyConfig *config, PetscInt id, PetscInt *index) {
-  PetscFunctionBegin;
-
-  for (PetscInt b = 0; b < config->num_boundaries; ++b) {
-    if (config->boundary_ids[b] == id) {
-      *index = b;
-      PetscFunctionReturn(0);
-    }
-  }
-  PetscCheck(config->num_boundaries < MAX_NUM_BOUNDARIES, comm, PETSC_ERR_USER, "Maximum number of boundaries (%d) exceeded in input file",
-             MAX_NUM_BOUNDARIES);
-
-  *index                       = config->num_boundaries;
-  config->boundary_ids[*index] = id;
-  config->num_boundaries++;
   PetscFunctionReturn(0);
 }
 
@@ -593,8 +566,18 @@ static PetscErrorCode ParseBoundaryConditions(yaml_event_t *event, YamlParserSta
     PetscInt boundary_id;
     PetscCall(ConvertToInt(state->comm, "boundary", state->subsection, &boundary_id));
     PetscCheck(boundary_id != -1, state->comm, PETSC_ERR_USER, "Invalid boundary in boundary_conditions: %s", state->subsection);
+
+    // Find the index of the boundary within our own books, adding a new one if
+    // necessary.
     PetscInt boundary_index;
-    PetscCall(FindBoundaryIndex(state->comm, config, boundary_id, &boundary_index));
+    PetscCall(RDyConfigFindBoundary(config, boundary_id, &boundary_index));
+    if (boundary_index == -1) {
+      PetscCheck(config->num_boundaries < MAX_NUM_BOUNDARIES, state->comm, PETSC_ERR_USER, "Maximum number of boundaries (%d) exceeded in input file",
+                 MAX_NUM_BOUNDARIES);
+      boundary_index                       = config->num_boundaries;
+      config->boundary_ids[boundary_index] = boundary_id;
+      config->num_boundaries++;
+    }
 
     RDyConditionSpec *bc_spec = &config->boundary_conditions[boundary_index];
     if (!strlen(state->parameter)) {  // parameter name not set
@@ -643,8 +626,18 @@ static PetscErrorCode ParseSources(yaml_event_t *event, YamlParserState *state, 
     PetscInt region_id;
     PetscCall(ConvertToInt(state->comm, "region", state->subsection, &region_id));
     PetscCheck(region_id != -1, state->comm, PETSC_ERR_USER, "Invalid region in sources: %s", state->subsection);
+
+    // Find the index of the region within our own books, adding a new one if
+    // necessary.
     PetscInt region_index;
-    PetscCall(FindRegionIndex(state->comm, config, region_id, &region_index));
+    PetscCall(RDyConfigFindRegion(config, region_id, &region_index));
+    if (region_index == -1) {
+      PetscCheck(config->num_regions < MAX_NUM_REGIONS, state->comm, PETSC_ERR_USER, "Maximum number of regions (%d) exceeded in input file",
+                 MAX_NUM_REGIONS);
+      region_index                     = config->num_regions;
+      config->region_ids[region_index] = region_id;
+      config->num_regions++;
+    }
 
     RDyConditionSpec *src_spec = &config->sources[region_index];
     if (!strlen(state->parameter)) {  // parameter name not set
@@ -1006,5 +999,35 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // Clean up.
   RDyFree(config_str);
 
+  PetscFunctionReturn(0);
+}
+
+// this helper finds the index of a region ID within a configuration, setting it
+// to -1 if not found
+PetscErrorCode RDyConfigFindRegion(RDyConfig *config, PetscInt id, PetscInt *index) {
+  PetscFunctionBegin;
+
+  *index = -1;
+  for (PetscInt r = 0; r < config->num_regions; ++r) {
+    if (config->region_ids[r] == id) {
+      *index = r;
+      break;
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+// this helper finds the index of a region ID within a configuration, setting it
+// to -1 if not found
+PetscErrorCode RDyConfigFindBoundary(RDyConfig *config, PetscInt id, PetscInt *index) {
+  PetscFunctionBegin;
+
+  *index = -1;
+  for (PetscInt b = 0; b < config->num_boundaries; ++b) {
+    if (config->boundary_ids[b] == id) {
+      *index = b;
+      break;
+    }
+  }
   PetscFunctionReturn(0);
 }
