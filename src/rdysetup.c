@@ -331,7 +331,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   PetscInt        num_boundaries = 0;
-  IS              boundary_id_is;
+  IS              boundary_id_is = NULL;
   const PetscInt *boundary_ids;
   if (label) {  // found face sets!
     PetscCall(DMLabelGetNumValues(label, &num_boundaries));
@@ -403,7 +403,9 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
         if (num_edges > 0) {
-          RDyLogDebug(rdy, "  Found boundary %d (%d edges)", boundary_id, num_edges);
+          if (boundary_id != unassigned_edge_boundary_id) {
+            RDyLogDebug(rdy, "  Found boundary %d (%d edges)", boundary_id, num_edges);
+          }
           boundary->num_edges = num_edges;
           PetscCall(RDyAlloc(PetscInt, boundary->num_edges, &boundary->edge_ids));
         }
@@ -418,8 +420,10 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         PetscCall(ISDestroy(&edge_is));
       }
     }
-    PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
-    PetscCall(ISDestroy(&boundary_id_is));
+    if (boundary_id_is) {
+      PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
+      PetscCall(ISDestroy(&boundary_id_is));
+    }
   }
 
   // make sure we have at least one region and boundary
