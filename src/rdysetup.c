@@ -317,7 +317,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   IS boundary_edge_is;
   PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
 
-  // Keep track of whether edges on the domain boundary have been assigned.
+  // Keep track of whether edges on the domain boundary have been assigned to
+  // any boundaries.
   IS unassigned_edges_is;
   ISDuplicate(boundary_edge_is, &unassigned_edges_is);
   PetscInt unassigned_edge_boundary_id = 0;  // boundary ID for unassigned edges
@@ -330,23 +331,27 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
-  PetscInt        num_boundaries = 0;
-  IS              boundary_id_is = NULL;
+  PetscInt        num_boundaries_in_file = 0;
+  IS              boundary_id_is;
   const PetscInt *boundary_ids;
   if (label) {  // found face sets!
-    PetscCall(DMLabelGetNumValues(label, &num_boundaries));
-    PetscCheck(num_boundaries <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER, "Number of boundaries in mesh (%d) exceeds MAX_NUM_BOUNDARIES (%d)",
-               num_boundaries, MAX_NUM_BOUNDARIES);
+    PetscCall(DMLabelGetNumValues(label, &num_boundaries_in_file));
+    PetscCheck(num_boundaries_in_file <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER,
+               "Number of boundaries in mesh (%d) exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file, MAX_NUM_BOUNDARIES);
 
     // fetch boundary IDs
     PetscCall(DMLabelGetValueIS(label, &boundary_id_is));
     PetscCall(ISGetIndices(boundary_id_is, &boundary_ids));
 
-    for (PetscInt b = 0; b < num_boundaries; ++b) {
+    for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
       PetscInt boundary_id = boundary_ids[b];
       IS       edge_is;
       PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
+        PetscInt num_edges;
+        PetscCall(ISGetLocalSize(edge_is, &num_edges));
+        RDyLogDebug(rdy, "  Found boundary %d (%d edges)", boundary_id, num_edges);
+
         // we can't use this boundary ID for unassigned edges
         if (unassigned_edge_boundary_id == boundary_id) ++unassigned_edge_boundary_id;
 
@@ -363,6 +368,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
       }
       PetscCall(ISDestroy(&edge_is));
     }
+    PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
+    PetscCall(ISDestroy(&boundary_id_is));
   }
 
   // add an additional boundary for unassigned boundary edges if needed
@@ -389,23 +396,22 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 
   // now fetch boundary edge IDs
   if (label) {
-    PetscInt s = 0;
+    // fetch boundary IDs once again
+    PetscCall(DMLabelGetValueIS(label, &boundary_id_is));
+    PetscCall(ISGetIndices(boundary_id_is, &boundary_ids));
+
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-      PetscInt boundary_id = (b < num_boundaries) ? boundary_ids[b] : unassigned_edge_boundary_id;
+      PetscInt boundary_id = (b < num_boundaries_in_file) ? boundary_ids[b] : unassigned_edge_boundary_id;
       IS       edge_is;  // edge index space
       PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
-        RDyBoundary *boundary = &rdy->boundaries[s];
-        rdy->boundary_ids[s]  = boundary_id;
-        ++s;
+        RDyBoundary *boundary = &rdy->boundaries[b];
+        rdy->boundary_ids[b]  = boundary_id;
 
         // find the number of edges for this boundary
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
         if (num_edges > 0) {
-          if (boundary_id != unassigned_edge_boundary_id) {
-            RDyLogDebug(rdy, "  Found boundary %d (%d edges)", boundary_id, num_edges);
-          }
           boundary->num_edges = num_edges;
           PetscCall(RDyAlloc(PetscInt, boundary->num_edges, &boundary->edge_ids));
         }
@@ -420,10 +426,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         PetscCall(ISDestroy(&edge_is));
       }
     }
-    if (boundary_id_is) {
-      PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
-      PetscCall(ISDestroy(&boundary_id_is));
-    }
+    PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
+    PetscCall(ISDestroy(&boundary_id_is));
   }
 
   // make sure we have at least one region and boundary
