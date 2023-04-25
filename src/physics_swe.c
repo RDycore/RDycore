@@ -300,7 +300,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 // (i) extracting h/hu/hv from the solution vector X, and
 // (ii) compute velocities (u/v) from momentum (hu/hv).
 static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, PetscReal hl[N], PetscReal ul[N],
-                                                 PetscReal vl[N], PetscReal *X) {
+                                                 PetscReal vl[N], PetscReal cn[N], PetscReal sn[N], PetscReal *X) {
   PetscFunctionBeginUser;
 
   RDyEdges *edges = &rdy->mesh.edges;
@@ -315,6 +315,10 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
     hl[e]  = X[3 * icell + 0];
     hul[e] = X[3 * icell + 1];
     hvl[e] = X[3 * icell + 2];
+
+    cn[e] = edges->cn[iedge];
+    sn[e] = edges->sn[iedge];
+
   }
 
   // Compute u/v for left cells
@@ -385,15 +389,12 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, X));
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
     PetscInt iedge = boundary->edge_ids[e];
     PetscInt icell = edges->cell_ids[2 * iedge];
-
-    cn_vec_bnd[e] = edges->cn[iedge];
-    sn_vec_bnd[e] = edges->sn[iedge];
 
     if (cells->is_local[icell]) {
       hr_vec_bnd[e] = hl_vec_bnd[e];
@@ -427,15 +428,12 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, X));
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
     PetscInt iedge = boundary->edge_ids[e];
     PetscInt icell = edges->cell_ids[2 * iedge];
-
-    cn_vec_bnd[e] = edges->cn[iedge];
-    sn_vec_bnd[e] = edges->sn[iedge];
 
     if (cells->is_local[icell]) {
       PetscReal uperp = ul_vec_bnd[e] * cn_vec_bnd[e] + vl_vec_bnd[e] * sn_vec_bnd[e];
