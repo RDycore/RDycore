@@ -373,7 +373,6 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
   PetscFunctionReturn(0);
 }
 
-
 // applies a reflecting boundary condition on the given boundary, computing
 // fluxes F for the solution vector components X
 static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *X,
@@ -418,6 +417,52 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   PetscFunctionReturn(0);
 }
 
+// applies a critical outflow boundary condition, computing
+// fluxes F for the solution vector components X
+static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *X,
+                                        PetscReal *F) {
+  PetscFunctionBeginUser;
+
+  RDyCells *cells = &rdy->mesh.cells;
+  RDyEdges *edges = &rdy->mesh.edges;
+
+  PetscInt num = boundary->num_edges;
+
+  PetscReal hl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
+  PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
+  PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
+  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
+
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, X));
+
+  // Compute h/u/v for right cells
+  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+    PetscInt iedge = boundary->edge_ids[e];
+    PetscInt icell = edges->cell_ids[2 * iedge];
+
+    cn_vec_bnd[e] = edges->cn[iedge];
+    sn_vec_bnd[e] = edges->sn[iedge];
+
+    if (cells->is_local[icell]) {
+
+      PetscReal uperp = ul_vec_bnd[e] * cn_vec_bnd[e] + vl_vec_bnd[e] * sn_vec_bnd[e];
+      PetscReal q     = hl_vec_bnd[e] * fabs(uperp);
+
+      hr_vec_bnd[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
+
+      PetscReal velocity       = PetscPowReal(GRAVITY * hr_vec_bnd[e], 0.5);
+      ur_vec_bnd[e] = velocity * cn_vec_bnd[e];
+      vr_vec_bnd[e] = velocity * sn_vec_bnd[e];
+    }
+  }
+
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags,
+                      num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
+                      amax_vec_bnd, X, F));
+
+  PetscFunctionReturn(0);
+}
+
 // computes RHS on boundary edges
 // rdy               - an RDy object
 // F                 - a global vector that stores the fluxes between boundary edges
@@ -442,6 +487,9 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
     switch (rdy->boundary_conditions[b].flow->type) {
       case CONDITION_REFLECTING:
         PetscCall(ApplyReflectingBC(rdy, boundary, tiny_h, courant_num_diags, x_ptr, f_ptr));
+        break;
+      case CONDITION_CRITICAL_OUTFLOW:
+        PetscCall(ApplyCriticalOutflowBC(rdy, boundary, tiny_h, courant_num_diags, x_ptr, f_ptr));
         break;
       default:
         PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", rdy->boundary_ids[b]);

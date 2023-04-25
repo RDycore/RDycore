@@ -68,9 +68,10 @@ typedef enum {
 // This type specifies a "kind" of condition that indicates how that condition
 // is to be enforced on a region or boundary.
 typedef enum {
-  CONDITION_DIRICHLET = 0, // Dirichlet condition (value is specified)
-  CONDITION_NEUMANN,       // Neumann condition (derivative is specified)
-  CONDITION_REFLECTING     // Reflecting condition
+  CONDITION_DIRICHLET = 0,    // Dirichlet condition (value is specified)
+  CONDITION_NEUMANN,          // Neumann condition (derivative is specified)
+  CONDITION_REFLECTING,       // Reflecting condition
+  CONDITION_CRITICAL_OUTFLOW  // Critical flow
 } RDyConditionType;
 
 // This type defines an initial/boundary condition and/or source/sink with named
