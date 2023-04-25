@@ -327,7 +327,7 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
 // compute the fluxes and add contribution in the F vector.
 static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscInt N,
                                 const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N], const PetscReal vl[N],
-                                const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3], PetscReal amax[N],
+                                const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N],
                                 PetscReal *X, PetscReal *F) {
   PetscFunctionBeginUser;
 
@@ -384,7 +384,6 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   PetscReal hl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
   PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
-  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
   PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, X));
 
@@ -408,7 +407,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   }
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd,
-                      sn_vec_bnd, cn_vec_bnd, flux_vec_bnd, amax_vec_bnd, X, F));
+                      sn_vec_bnd, cn_vec_bnd, X, F));
 
   PetscFunctionReturn(0);
 }
@@ -427,7 +426,6 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   PetscReal hl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
   PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
-  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
   PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, X));
 
@@ -452,7 +450,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   }
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd,
-                      sn_vec_bnd, cn_vec_bnd, flux_vec_bnd, amax_vec_bnd, X, F));
+                      sn_vec_bnd, cn_vec_bnd, X, F));
 
   PetscFunctionReturn(0);
 }
