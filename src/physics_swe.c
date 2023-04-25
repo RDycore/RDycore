@@ -296,6 +296,34 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   PetscFunctionReturn(0);
 }
 
+// Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
+// (i) extracting h/hu/hv from the solution vector X, and
+// (ii) compute velocities (u/v) from momentum (hu/hv).
+static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h,
+                                                 PetscInt N, PetscReal hl[N], PetscReal ul[N], PetscReal vl[N], PetscReal *X) {
+
+  PetscFunctionBeginUser;
+
+  RDyEdges *edges = &rdy->mesh.edges;
+
+  PetscReal hul[N], hvl[N];
+
+  // Collect the h/hu/hv for left cells to compute u/v
+  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+    PetscInt iedge = boundary->edge_ids[e];
+    PetscInt icell = edges->cell_ids[2 * iedge];
+
+    hl[e]  = X[3 * icell + 0];
+    hul[e] = X[3 * icell + 1];
+    hvl[e] = X[3 * icell + 2];
+  }
+
+  // Compute u/v for left cells
+  PetscCall(GetVelocityFromMomentum(N, tiny_h, hl, hul, hvl, ul, vl));
+
+  PetscFunctionReturn(0);
+}
+
 // After the right values (hr/ur/vr) have been computed based on the different type of BCs,
 // compute the fluxes and add contribution in the F vector.
 static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, 
@@ -357,23 +385,12 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
 
   PetscInt num = boundary->num_edges;
 
-  PetscReal hl_vec_bnd[num], hul_vec_bnd[num], hvl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
+  PetscReal hl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
   PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
   PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
-  // Collect the h/hu/hv for left cells to compute u/v
-  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-    PetscInt iedge = boundary->edge_ids[e];
-    PetscInt icell = edges->cell_ids[2 * iedge];
-
-    hl_vec_bnd[e]  = X[3 * icell + 0];
-    hul_vec_bnd[e] = X[3 * icell + 1];
-    hvl_vec_bnd[e] = X[3 * icell + 2];
-  }
-
-  // Compute u/v for left cells
-  PetscCall(GetVelocityFromMomentum(num, tiny_h, hl_vec_bnd, hul_vec_bnd, hvl_vec_bnd, ul_vec_bnd, vl_vec_bnd));
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -395,8 +412,8 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   }
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags,
-                          num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
-                           amax_vec_bnd, X, F));
+                      num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
+                      amax_vec_bnd, X, F));
 
   PetscFunctionReturn(0);
 }
