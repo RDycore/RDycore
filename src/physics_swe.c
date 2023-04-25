@@ -296,6 +296,56 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   PetscFunctionReturn(0);
 }
 
+// After the right values (hr/ur/vr) have been computed based on the different type of BCs,
+// compute the fluxes and add contribution in the F vector.
+static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, 
+                                PetscInt N, const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N],
+                                const PetscReal vl[N], const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3],
+                                PetscReal amax[N], PetscReal *X, PetscReal *F) {
+
+  PetscFunctionBeginUser;
+
+  RDyCells *cells = &rdy->mesh.cells;
+  RDyEdges *edges = &rdy->mesh.edges;
+
+  PetscInt num = boundary->num_edges;
+
+  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
+
+  // Call Riemann solver (only Roe is currently supported)
+  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
+  PetscCall(ComputeRoeFlux(num, hl, hr, ul, ur, vl, vr, sn, cn, flux_vec_bnd,
+                           amax_vec_bnd));
+
+  // Save the flux values in the Vec based by TS
+  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+    PetscInt  iedge     = boundary->edge_ids[e];
+    PetscInt  icell     = edges->cell_ids[2 * iedge];
+    PetscReal edge_len  = edges->lengths[iedge];
+    PetscReal cell_area = cells->areas[icell];
+
+    if (cells->is_local[icell]) {
+      PetscReal hl = X[3 * icell + 0];
+
+      if (!(hl < tiny_h)) {
+        PetscReal cnum = amax_vec_bnd[e] * edge_len / cell_area * rdy->dt;
+        if (cnum > courant_num_diags->max_courant_num) {
+          courant_num_diags->max_courant_num = cnum;
+          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_cell_id  = cells->global_ids[icell];
+        }
+
+        for (PetscInt idof = 0; idof < 3; idof++) {
+          F[3 * icell + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
+        }
+      }
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
+
 // applies a reflecting boundary condition on the given boundary, computing
 // fluxes F for the solution vector components X
 static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *X,
@@ -344,35 +394,9 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
     }
   }
 
-  // Call Riemann solver (only Roe is currently supported)
-  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
-                           amax_vec_bnd));
-
-  // Save the flux values in the Vec based by TS
-  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-    PetscInt  iedge     = boundary->edge_ids[e];
-    PetscInt  icell     = edges->cell_ids[2 * iedge];
-    PetscReal edge_len  = edges->lengths[iedge];
-    PetscReal cell_area = cells->areas[icell];
-
-    if (cells->is_local[icell]) {
-      PetscReal hl = X[3 * icell + 0];
-
-      if (!(hl < tiny_h)) {
-        PetscReal cnum = amax_vec_bnd[e] * edge_len / cell_area * rdy->dt;
-        if (cnum > courant_num_diags->max_courant_num) {
-          courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
-          courant_num_diags->global_cell_id  = cells->global_ids[icell];
-        }
-
-        for (PetscInt idof = 0; idof < 3; idof++) {
-          F[3 * icell + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
-        }
-      }
-    }
-  }
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags,
+                          num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
+                           amax_vec_bnd, X, F));
 
   PetscFunctionReturn(0);
 }
