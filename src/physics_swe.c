@@ -318,7 +318,6 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
 
     cn[e] = edges->cn[iedge];
     sn[e] = edges->sn[iedge];
-
   }
 
   // Compute u/v for left cells
@@ -331,8 +330,7 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
 // compute the fluxes and add contribution in the F vector.
 static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscInt N,
                                 const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N], const PetscReal vl[N],
-                                const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N],
-                                PetscReal *X, PetscReal *F) {
+                                const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal *X, PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;
