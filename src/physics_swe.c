@@ -299,9 +299,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 // Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
 // (i) extracting h/hu/hv from the solution vector X, and
 // (ii) compute velocities (u/v) from momentum (hu/hv).
-static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h,
-                                                 PetscInt N, PetscReal hl[N], PetscReal ul[N], PetscReal vl[N], PetscReal *X) {
-
+static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, PetscReal hl[N], PetscReal ul[N],
+                                                 PetscReal vl[N], PetscReal *X) {
   PetscFunctionBeginUser;
 
   RDyEdges *edges = &rdy->mesh.edges;
@@ -326,11 +325,10 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
 
 // After the right values (hr/ur/vr) have been computed based on the different type of BCs,
 // compute the fluxes and add contribution in the F vector.
-static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, 
-                                PetscInt N, const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N],
-                                const PetscReal vl[N], const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3],
-                                PetscReal amax[N], PetscReal *X, PetscReal *F) {
-
+static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscInt N,
+                                const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N], const PetscReal vl[N],
+                                const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3], PetscReal amax[N],
+                                PetscReal *X, PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;
@@ -342,8 +340,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
 
   // Call Riemann solver (only Roe is currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, hl, hr, ul, ur, vl, vr, sn, cn, flux_vec_bnd,
-                           amax_vec_bnd));
+  PetscCall(ComputeRoeFlux(num, hl, hr, ul, ur, vl, vr, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -410,17 +407,16 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
     }
   }
 
-  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags,
-                      num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
-                      amax_vec_bnd, X, F));
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd,
+                      sn_vec_bnd, cn_vec_bnd, flux_vec_bnd, amax_vec_bnd, X, F));
 
   PetscFunctionReturn(0);
 }
 
 // applies a critical outflow boundary condition, computing
 // fluxes F for the solution vector components X
-static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *X,
-                                        PetscReal *F) {
+static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags,
+                                             PetscReal *X, PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;
@@ -444,21 +440,19 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
     sn_vec_bnd[e] = edges->sn[iedge];
 
     if (cells->is_local[icell]) {
-
       PetscReal uperp = ul_vec_bnd[e] * cn_vec_bnd[e] + vl_vec_bnd[e] * sn_vec_bnd[e];
       PetscReal q     = hl_vec_bnd[e] * fabs(uperp);
 
       hr_vec_bnd[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
 
-      PetscReal velocity       = PetscPowReal(GRAVITY * hr_vec_bnd[e], 0.5);
-      ur_vec_bnd[e] = velocity * cn_vec_bnd[e];
-      vr_vec_bnd[e] = velocity * sn_vec_bnd[e];
+      PetscReal velocity = PetscPowReal(GRAVITY * hr_vec_bnd[e], 0.5);
+      ur_vec_bnd[e]      = velocity * cn_vec_bnd[e];
+      vr_vec_bnd[e]      = velocity * sn_vec_bnd[e];
     }
   }
 
-  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags,
-                      num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd, sn_vec_bnd, cn_vec_bnd, flux_vec_bnd,
-                      amax_vec_bnd, X, F));
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd,
+                      sn_vec_bnd, cn_vec_bnd, flux_vec_bnd, amax_vec_bnd, X, F));
 
   PetscFunctionReturn(0);
 }
