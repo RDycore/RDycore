@@ -671,6 +671,11 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *
   //     momentum: [<hu>, <hv>] # components of water momentum
   //   <condition2-name>:
   //     ...
+  //
+  // Some flow conditions (like the reflecting condition) don't need values for
+  // height and momentum, since those values are determined by the condition
+  // itself. For conditions that do require height and momentum values, an error
+  // is emitted if they are not specified.
 
   if (event->type == YAML_SCALAR_EVENT) {
     const char *value = (const char *)(event->data.scalar.value);
@@ -694,7 +699,8 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *
       } else {
         if (!strcmp(state->parameter, "type")) {
           PetscInt selection;
-          SelectItem(value, 2, (const char *[2]){"dirichlet", "neumann"}, (PetscInt[2]){CONDITION_DIRICHLET, CONDITION_NEUMANN}, &selection);
+          SelectItem(value, 3, (const char *[3]){"dirichlet", "neumann", "reflecting"},
+                     (PetscInt[3]){CONDITION_DIRICHLET, CONDITION_NEUMANN, CONDITION_REFLECTING}, &selection);
           PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid flow condition %s.type: %s", flow_cond->name, value);
           flow_cond->type     = selection;
           state->parameter[0] = 0;  // clear parameter name
@@ -712,17 +718,6 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *
           }
         }
       }
-    }
-  } else {
-    RDyFlowCondition *flow_cond = &config->flow_conditions[config->num_flow_conditions];
-    if (event->type == YAML_SEQUENCE_START_EVENT) {
-      PetscCheck(!strcmp(state->parameter, "momentum"), state->comm, PETSC_ERR_USER, "Invalid sequence encountered in flow_conditions.%s",
-                 state->parameter);
-      // Set momentum components to magic numbers.
-      flow_cond->momentum[0] = flow_cond->momentum[1] = -FLT_MAX;
-    } else if (event->type == YAML_SEQUENCE_END_EVENT) {
-      PetscCheck((flow_cond->momentum[0] != -FLT_MAX) && (flow_cond->momentum[1] != -FLT_MAX), state->comm, PETSC_ERR_USER,
-                 "Incomplete momentum specification for flow_conditions.%s", state->parameter);
     }
   }
 
@@ -931,8 +926,37 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
   PetscFunctionReturn(0);
 }
 
+// initializes the configuration before parsing
+static PetscErrorCode InitConfig(RDyConfig *config) {
+  PetscFunctionBegin;
+
+  // Currently, RDycore only reads one config file once, so when this is called,
+  // RDyConfig is zero-initialized because it's embedded in the PETSc-managed
+  // RDy struct. So all we need to do is initialize anything that shouldn't be
+  // zero.
+
+  // initialize boundary conditions so we can determine whether they are
+  // properly set after parsing
+  for (PetscInt i = 0; i < MAX_NUM_CONDITIONS; ++i) {
+    RDyFlowCondition *flow_cond = &config->flow_conditions[i];
+    flow_cond->type             = -1;                            // invalid flow condition type
+    flow_cond->height           = -FLT_MAX;                      // invalid flow height
+    flow_cond->momentum[0] = flow_cond->momentum[1] = -FLT_MAX;  // invalid momentum
+
+    RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
+    sed_cond->type                 = -1;        // invalid sediment condition type
+    sed_cond->concentration        = -FLT_MAX;  // invalid concentration
+
+    RDySalinityCondition *sal_cond = &config->salinity_conditions[i];
+    sal_cond->type                 = -1;        // invalid salinity condition type
+    sal_cond->concentration        = -FLT_MAX;  // invalid concentration
+  }
+
+  PetscFunctionReturn(0);
+}
+
 // checks config for any invalid or omitted parameters
-PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
+static PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
   PetscFunctionBegin;
 
   // currently, only certain methods are implemented
@@ -948,13 +972,40 @@ PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
 
   PetscCheck(strlen(config->mesh_file), comm, PETSC_ERR_USER, "grid.file not specified!");
 
-  // We can accept an initial conditions file OR a set of initial conditions,
-  // but not both.
+  // we can accept an initial conditions file OR a set of initial conditions,
+  // but not both
   PetscCheck((strlen(config->initial_conditions_file) && !config->num_initial_conditions) ||
                  (!strlen(config->initial_conditions_file) && config->num_initial_conditions),
              comm, PETSC_ERR_USER,
              "Invalid initial_conditions! A file was specified, so no further "
              "parameters are allowed.");
+
+  // validate our flow conditions
+  for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
+    const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
+    PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
+    if (flow_cond->type != CONDITION_REFLECTING) {
+      PetscCheck(flow_cond->height != -FLT_MAX, comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s", flow_cond->name);
+      PetscCheck((flow_cond->momentum[0] != -FLT_MAX) && (flow_cond->momentum[1] != -FLT_MAX), comm, PETSC_ERR_USER,
+                 "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
+    }
+  }
+
+  // validate sediment conditions
+  for (PetscInt i = 0; i < config->num_sediment_conditions; ++i) {
+    const RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
+    PetscCheck(sed_cond->type >= 0, comm, PETSC_ERR_USER, "Sediment condition type not set in sediment_conditions.%s", sed_cond->name);
+    PetscCheck(sed_cond->concentration != -FLT_MAX, comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s",
+               sed_cond->name);
+  }
+
+  // validate salinity conditions
+  for (PetscInt i = 0; i < config->num_salinity_conditions; ++i) {
+    const RDySalinityCondition *sal_cond = &config->salinity_conditions[i];
+    PetscCheck(sal_cond->type >= 0, comm, PETSC_ERR_USER, "Salinity condition type not set in salinity_conditions.%s", sal_cond->name);
+    PetscCheck(sal_cond->concentration != -FLT_MAX, comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s",
+               sal_cond->name);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -992,11 +1043,14 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
   }
 
-  // Parse the YAML config file into our config struct and validate it.
+  // initialize the configuration
+  PetscCall(InitConfig(&rdy->config));
+
+  // parse the YAML config file into our config struct and validate it
   PetscCall(ParseYaml(rdy->comm, config_str, &rdy->config));
   PetscCall(ValidateConfig(rdy->comm, &rdy->config));
 
-  // Clean up.
+  // clean up
   RDyFree(config_str);
 
   PetscFunctionReturn(0);

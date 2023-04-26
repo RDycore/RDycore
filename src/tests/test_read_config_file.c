@@ -134,6 +134,45 @@ static void TestFullSpec(void **state) {
   assert_int_equal(0, RDyDestroy(&rdy));
 }
 
+static void TestBadFlowBCSpec(void **state) {
+  static const char *config_string =
+      "physics:\n"
+      "  flow:\n"
+      "    mode: swe\n\n"
+      "numerics:\n"
+      "  spatial: fv\n"
+      "  temporal: euler\n"
+      "  riemann: roe\n\n"
+      "time:\n"
+      "  final_time: 1\n"
+      "  unit: years\n"
+      "  max_step: 1000\n\n"
+      "grid:\n"
+      "  file: planar_dam_10x5.msh\n\n"
+      "initial_conditions:\n"
+      "  1:\n"
+      "    flow: dam_top_ic\n"
+      "  2:\n"
+      "    flow: dam_bottom_ic\n\n"
+      "boundary_conditions:\n"
+      "  1:\n"
+      "    flow: dam_top_ic\n\n"
+      "sources:\n"
+      "  1:\n"
+      "    flow: dam_bottom_src\n\n"
+      "flow_conditions:\n"
+      "  dam_top_ic:\n"
+      "    type: dirichlet\n"
+      "  dam_bottom_ic:\n"
+      "    height: 5\n\n";
+
+  RDy rdy;
+  assert_int_equal(0, RDyCreate(PETSC_COMM_WORLD, "bad_flow_bc_spec", &rdy));
+  assert_int_not_equal(0, ReadConfigString(state, rdy, config_string));  // fail!
+
+  assert_int_equal(0, RDyDestroy(&rdy));
+}
+
 int main(int argc, char *argv[]) {
   // Stash command line arguments for usage in tests.
   argc_ = argc;
@@ -142,6 +181,7 @@ int main(int argc, char *argv[]) {
   // Define our set of unit tests.
   const struct CMUnitTest tests[] = {
       cmocka_unit_test(TestFullSpec),
+      cmocka_unit_test(TestBadFlowBCSpec),
   };
 
   return cmocka_run_group_tests(tests, Setup, Teardown);
