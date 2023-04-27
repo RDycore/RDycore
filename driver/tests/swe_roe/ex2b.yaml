@@ -26,8 +26,14 @@ initial_conditions:
   2: # downstream region
     flow: dam_bottom_ic
 
-# NOTE: We use reflecting boundary conditions for the boundary, top_wall, and
-# NOTE: bottom_wall surfaces
+# We use reflecting boundary conditions for the boundary, top_wall, and
+# bottom_wall surfaces. Reflecting conditions are applied automatically
+# to all boundaries for which no BCs are specified, but we explicitly
+# specify a reflecting BC on top_wall to make sure things work in a
+# non-trivial setting.
+boundary_conditions:
+  2: # top_wall
+    flow: reflecting_bc
 
 flow_conditions:
   dam_top_ic:
@@ -38,4 +44,6 @@ flow_conditions:
     type: dirichlet
     height: 5
     momentum: [0, 0]
+  reflecting_bc:
+    type: reflecting
 
