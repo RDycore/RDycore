@@ -7,9 +7,9 @@
 static const PetscReal GRAVITY = 9.806;
 
 typedef struct {
-  PetscInt N;             // number of data values
-  PetscReal *h, *hu, *hv; // prognostic SWE variables
-  PetscReal *u, *v;       // diagnostic variables
+  PetscInt   N;            // number of data values
+  PetscReal *h, *hu, *hv;  // prognostic SWE variables
+  PetscReal *u, *v;        // diagnostic variables
 } RiemannDataSWE;
 
 static PetscErrorCode RiemannDataSWECreate(PetscInt N, RiemannDataSWE *data) {
@@ -294,8 +294,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 
   // Call Riemann solver (only Roe currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v, sn_vec_int, cn_vec_int, flux_vec_int,
-                           amax_vec_int));
+  PetscCall(ComputeRoeFlux(num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -342,8 +341,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 // Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
 // (i) extracting h/hu/hv from the solution vector X, and
 // (ii) compute velocities (u/v) from momentum (hu/hv).
-static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *data,
-                                                 PetscReal cn[N], PetscReal sn[N], PetscReal *X) {
+static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *data, PetscReal cn[N],
+                                                 PetscReal sn[N], PetscReal *X) {
   PetscFunctionBeginUser;
 
   RDyEdges *edges = &rdy->mesh.edges;
@@ -421,7 +420,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   RDyCells *cells = &rdy->mesh.cells;
   RDyEdges *edges = &rdy->mesh.edges;
 
-  PetscInt num = boundary->num_edges;
+  PetscInt  num = boundary->num_edges;
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
   RiemannDataSWE datal, datar;
@@ -463,7 +462,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   RDyCells *cells = &rdy->mesh.cells;
   RDyEdges *edges = &rdy->mesh.edges;
 
-  PetscInt num = boundary->num_edges;
+  PetscInt  num = boundary->num_edges;
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
   RiemannDataSWE datal, datar;
@@ -484,8 +483,8 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
       datar.h[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
 
       PetscReal velocity = PetscPowReal(GRAVITY * datar.h[e], 0.5);
-      datar.u[e]      = velocity * cn_vec_bnd[e];
-      datar.v[e]      = velocity * sn_vec_bnd[e];
+      datar.u[e]         = velocity * cn_vec_bnd[e];
+      datar.v[e]         = velocity * sn_vec_bnd[e];
     }
   }
 
@@ -553,7 +552,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt  N = mesh->num_cells;
+  PetscInt       N = mesh->num_cells;
   RiemannDataSWE data;
   PetscCall(RiemannDataSWECreate(N, &data));
 
