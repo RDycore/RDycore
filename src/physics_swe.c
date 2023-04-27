@@ -120,17 +120,16 @@ static PetscErrorCode InitMPITypesAndOps(void) {
 // hv - Momentum in y-dir
 // u - Velocity in x-dir
 // v - Velocity in y-dir
-static PetscErrorCode GetVelocityFromMomentum(PetscInt N, PetscReal tiny_h, const PetscReal h[N], const PetscReal hu[N], const PetscReal hv[N],
-                                              PetscReal u[N], PetscReal v[N]) {
+static PetscErrorCode GetVelocityFromMomentum(PetscReal tiny_h, RiemannDataSWE *data) {
   PetscFunctionBeginUser;
 
-  for (PetscInt n = 0; n < N; n++) {
-    if (h[n] < tiny_h) {
-      u[n] = 0.0;
-      v[n] = 0.0;
+  for (PetscInt n = 0; n < data->N; n++) {
+    if (data->h[n] < tiny_h) {
+      data->u[n] = 0.0;
+      data->v[n] = 0.0;
     } else {
-      u[n] = hu[n] / h[n];
-      v[n] = hv[n] / h[n];
+      data->u[n] = data->hu[n] / data->h[n];
+      data->v[n] = data->hv[n] / data->h[n];
     }
   }
 
@@ -290,8 +289,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 
   // Compute u/v for left and right cells
   const PetscReal tiny_h = rdy->config.tiny_h;
-  PetscCall(GetVelocityFromMomentum(num, tiny_h, datal.h, datal.hu, datal.hv, datal.u, datal.v));
-  PetscCall(GetVelocityFromMomentum(num, tiny_h, datar.h, datar.hu, datar.hv, datar.u, datar.v));
+  PetscCall(GetVelocityFromMomentum(tiny_h, &datal));
+  PetscCall(GetVelocityFromMomentum(tiny_h, &datar));
 
   // Call Riemann solver (only Roe currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
@@ -363,7 +362,7 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
   }
 
   // Compute u/v for left cells
-  PetscCall(GetVelocityFromMomentum(N, tiny_h, data->h, data->hu, data->hv, data->u, data->v));
+  PetscCall(GetVelocityFromMomentum(tiny_h, data));
 
   PetscFunctionReturn(0);
 }
@@ -567,7 +566,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   }
 
   // Compute u/v for cells
-  PetscCall(GetVelocityFromMomentum(N, rdy->config.tiny_h, data.h, data.hu, data.hv, data.u, data.v));
+  PetscCall(GetVelocityFromMomentum(rdy->config.tiny_h, &data));
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {
