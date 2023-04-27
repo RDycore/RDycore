@@ -552,23 +552,24 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   PetscInt  N = mesh->num_cells;
-  PetscReal h_vec[N], hu_vec[N], hv_vec[N], u_vec[N], v_vec[N];
+  RiemannDataSWE data;
+  PetscCall(RiemannDataSWECreate(N, &data));
 
   // Collect the h/hu/hv for cells to compute u/v
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    h_vec[icell]  = x_ptr[icell * ndof + 0];
-    hu_vec[icell] = x_ptr[icell * ndof + 1];
-    hv_vec[icell] = x_ptr[icell * ndof + 2];
+    data.h[icell]  = x_ptr[icell * ndof + 0];
+    data.hu[icell] = x_ptr[icell * ndof + 1];
+    data.hv[icell] = x_ptr[icell * ndof + 2];
   }
 
   // Compute u/v for cells
-  PetscCall(GetVelocityFromMomentum(N, rdy->config.tiny_h, h_vec, hu_vec, hv_vec, u_vec, v_vec));
+  PetscCall(GetVelocityFromMomentum(N, rdy->config.tiny_h, data.h, data.hu, data.hv, data.u, data.v));
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {
-      PetscReal h  = h_vec[icell];
-      PetscReal hu = hu_vec[icell];
-      PetscReal hv = hv_vec[icell];
+      PetscReal h  = data.h[icell];
+      PetscReal hu = data.hu[icell];
+      PetscReal hv = data.hv[icell];
 
       PetscReal dz_dx = cells->dz_dx[icell];
       PetscReal dz_dy = cells->dz_dy[icell];
@@ -576,8 +577,8 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
       PetscReal bedx = dz_dx * GRAVITY * h;
       PetscReal bedy = dz_dy * GRAVITY * h;
 
-      PetscReal u = u_vec[icell];
-      PetscReal v = v_vec[icell];
+      PetscReal u = data.u[icell];
+      PetscReal v = data.v[icell];
 
       PetscReal Fsum_x = f_ptr[icell * ndof + 1];
       PetscReal Fsum_y = f_ptr[icell * ndof + 2];
@@ -611,6 +612,8 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   // Restore vectors
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
+
+  PetscCall(RiemannDataSWEDestroy(data));
 
   PetscFunctionReturn(0);
 }
