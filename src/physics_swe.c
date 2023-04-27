@@ -373,8 +373,7 @@ static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary,
 // After the right values (hr/ur/vr) have been computed based on the different type of BCs,
 // compute the fluxes and add contribution in the F vector.
 static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscInt N,
-                                const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N], const PetscReal vl[N],
-                                const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal *X, PetscReal *F) {
+                                RiemannDataSWE *datal, RiemannDataSWE *datar, const PetscReal sn[N], const PetscReal cn[N], PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;
@@ -386,7 +385,8 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
 
   // Call Riemann solver (only Roe is currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, hl, hr, ul, ur, vl, vr, sn, cn, flux_vec_bnd, amax_vec_bnd));
+  //PetscCall(ComputeRoeFlux(num, hl, hr, ul, ur, vl, vr, sn, cn, flux_vec_bnd, amax_vec_bnd));
+  PetscCall(ComputeRoeFlux(num, datal->h, datar->h, datal->u, datar->u, datal->v, datar->v, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -396,7 +396,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
     PetscReal cell_area = cells->areas[icell];
 
     if (cells->is_local[icell]) {
-      PetscReal hl = X[3 * icell + 0];
+      PetscReal hl = datal->h[e];
 
       if (!(hl < tiny_h)) {
         PetscReal cnum = amax_vec_bnd[e] * edge_len / cell_area * rdy->dt;
@@ -450,8 +450,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
     }
   }
 
-  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v,
-                      sn_vec_bnd, cn_vec_bnd, X, F));
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, &datal, &datar, sn_vec_bnd, cn_vec_bnd, F));
 
   PetscCall(RiemannDataSWEDestroy(datal));
   PetscCall(RiemannDataSWEDestroy(datar));
@@ -494,8 +493,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
     }
   }
 
-  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v,
-                      sn_vec_bnd, cn_vec_bnd, X, F));
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, &datal, &datar, sn_vec_bnd, cn_vec_bnd, F));
 
   PetscCall(RiemannDataSWEDestroy(datal));
   PetscCall(RiemannDataSWEDestroy(datar));
