@@ -382,7 +382,6 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
 
   // Call Riemann solver (only Roe is currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  //PetscCall(ComputeRoeFlux(num, hl, hr, ul, ur, vl, vr, sn, cn, flux_vec_bnd, amax_vec_bnd));
   PetscCall(ComputeRoeFlux(num, datal->h, datar->h, datal->u, datar->u, datal->v, datar->v, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
