@@ -134,11 +134,14 @@ static PetscErrorCode CreateDM(RDy rdy) {
 
   // distribute the mesh across processes
   {
-    DM dm_dist;
-    PetscCall(DMPlexDistribute(rdy->dm, 1, NULL, &dm_dist));
+    DM      dm_dist;
+    PetscSF sfMigration;
+    PetscCall(DMPlexDistribute(rdy->dm, 1, &sfMigration, &dm_dist));
     if (dm_dist) {
       PetscCall(DMDestroy(&rdy->dm));
       rdy->dm = dm_dist;
+      PetscCall(DMPlexSetMigrationSF(rdy->dm, sfMigration));
+      PetscCall(PetscSFDestroy(&sfMigration));
     }
   }
 
