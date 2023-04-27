@@ -426,12 +426,13 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   RDyEdges *edges = &rdy->mesh.edges;
 
   PetscInt num = boundary->num_edges;
-
-  PetscReal hl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
-  PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, cn_vec_bnd, sn_vec_bnd, X));
+  RiemannDataSWE datal, datar;
+  PetscCall(RiemannDataSWECreate(num, &datal));
+  PetscCall(RiemannDataSWECreate(num, &datar));
+
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, datal.h, datal.u, datal.v, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -439,18 +440,21 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
     PetscInt icell = edges->cell_ids[2 * iedge];
 
     if (cells->is_local[icell]) {
-      hr_vec_bnd[e] = hl_vec_bnd[e];
+      datar.h[e] = datal.h[e];
 
       PetscReal dum1 = Square(sn_vec_bnd[e]) - Square(cn_vec_bnd[e]);
       PetscReal dum2 = 2.0 * sn_vec_bnd[e] * cn_vec_bnd[e];
 
-      ur_vec_bnd[e] = ul_vec_bnd[e] * dum1 - vl_vec_bnd[e] * dum2;
-      vr_vec_bnd[e] = -ul_vec_bnd[e] * dum2 - vl_vec_bnd[e] * dum1;
+      datar.u[e] = datal.u[e] * dum1 - datal.v[e] * dum2;
+      datar.v[e] = -datal.u[e] * dum2 - datal.v[e] * dum1;
     }
   }
 
-  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd,
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v,
                       sn_vec_bnd, cn_vec_bnd, X, F));
+
+  PetscCall(RiemannDataSWEDestroy(datal));
+  PetscCall(RiemannDataSWEDestroy(datar));
 
   PetscFunctionReturn(0);
 }
@@ -465,12 +469,13 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   RDyEdges *edges = &rdy->mesh.edges;
 
   PetscInt num = boundary->num_edges;
-
-  PetscReal hl_vec_bnd[num], ul_vec_bnd[num], vl_vec_bnd[num];
-  PetscReal hr_vec_bnd[num], ur_vec_bnd[num], vr_vec_bnd[num];
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, hl_vec_bnd, ul_vec_bnd, vl_vec_bnd, cn_vec_bnd, sn_vec_bnd, X));
+  RiemannDataSWE datal, datar;
+  PetscCall(RiemannDataSWECreate(num, &datal));
+  PetscCall(RiemannDataSWECreate(num, &datar));
+
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, datal.h, datal.u, datal.v, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -478,19 +483,22 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
     PetscInt icell = edges->cell_ids[2 * iedge];
 
     if (cells->is_local[icell]) {
-      PetscReal uperp = ul_vec_bnd[e] * cn_vec_bnd[e] + vl_vec_bnd[e] * sn_vec_bnd[e];
-      PetscReal q     = hl_vec_bnd[e] * fabs(uperp);
+      PetscReal uperp = datal.u[e] * cn_vec_bnd[e] + datal.v[e] * sn_vec_bnd[e];
+      PetscReal q     = datal.h[e] * fabs(uperp);
 
-      hr_vec_bnd[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
+      datar.h[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
 
-      PetscReal velocity = PetscPowReal(GRAVITY * hr_vec_bnd[e], 0.5);
-      ur_vec_bnd[e]      = velocity * cn_vec_bnd[e];
-      vr_vec_bnd[e]      = velocity * sn_vec_bnd[e];
+      PetscReal velocity = PetscPowReal(GRAVITY * datar.h[e], 0.5);
+      datar.u[e]      = velocity * cn_vec_bnd[e];
+      datar.v[e]      = velocity * sn_vec_bnd[e];
     }
   }
 
-  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, hl_vec_bnd, hr_vec_bnd, ul_vec_bnd, ur_vec_bnd, vl_vec_bnd, vr_vec_bnd,
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v,
                       sn_vec_bnd, cn_vec_bnd, X, F));
+
+  PetscCall(RiemannDataSWEDestroy(datal));
+  PetscCall(RiemannDataSWEDestroy(datar));
 
   PetscFunctionReturn(0);
 }
