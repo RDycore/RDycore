@@ -343,29 +343,27 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 // Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
 // (i) extracting h/hu/hv from the solution vector X, and
 // (ii) compute velocities (u/v) from momentum (hu/hv).
-static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, PetscReal hl[N], PetscReal ul[N],
-                                                 PetscReal vl[N], PetscReal cn[N], PetscReal sn[N], PetscReal *X) {
+static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *data,
+                                                 PetscReal cn[N], PetscReal sn[N], PetscReal *X) {
   PetscFunctionBeginUser;
 
   RDyEdges *edges = &rdy->mesh.edges;
-
-  PetscReal hul[N], hvl[N];
 
   // Collect the h/hu/hv for left cells to compute u/v
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
     PetscInt iedge = boundary->edge_ids[e];
     PetscInt icell = edges->cell_ids[2 * iedge];
 
-    hl[e]  = X[3 * icell + 0];
-    hul[e] = X[3 * icell + 1];
-    hvl[e] = X[3 * icell + 2];
+    data->h[e]  = X[3 * icell + 0];
+    data->hu[e] = X[3 * icell + 1];
+    data->hv[e] = X[3 * icell + 2];
 
     cn[e] = edges->cn[iedge];
     sn[e] = edges->sn[iedge];
   }
 
   // Compute u/v for left cells
-  PetscCall(GetVelocityFromMomentum(N, tiny_h, hl, hul, hvl, ul, vl));
+  PetscCall(GetVelocityFromMomentum(N, tiny_h, data->h, data->hu, data->hv, data->u, data->v));
 
   PetscFunctionReturn(0);
 }
@@ -432,7 +430,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   PetscCall(RiemannDataSWECreate(num, &datal));
   PetscCall(RiemannDataSWECreate(num, &datar));
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, datal.h, datal.u, datal.v, cn_vec_bnd, sn_vec_bnd, X));
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, &datal, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -474,7 +472,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   PetscCall(RiemannDataSWECreate(num, &datal));
   PetscCall(RiemannDataSWECreate(num, &datar));
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, datal.h, datal.u, datal.v, cn_vec_bnd, sn_vec_bnd, X));
+  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, &datal, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
