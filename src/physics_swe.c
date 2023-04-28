@@ -136,22 +136,29 @@ static PetscErrorCode GetVelocityFromMomentum(PetscReal tiny_h, RiemannDataSWE *
   PetscFunctionReturn(0);
 }
 
-// Computes flux based on Roe solver
-// N    - Size of the array
-// hl   - Height left of the edge
-// hr   - Height right of the edge
-// ul   - Velocity in x-dir left of the edge
-// ur   - Velocity in x-dir right of the edge
-// vl   - Velocity in y-dir left of the edge
-// vr   - Velocity in y-dir right of the edge
-// sn   - sine of the angle between edge and y-axis
-// cn   - cosine of the angle between edge and y-axis
-// fij  - flux
-// amax - maximum courant number
-static PetscErrorCode ComputeRoeFlux(PetscInt N, const PetscReal hl[N], const PetscReal hr[N], const PetscReal ul[N], const PetscReal ur[N],
-                                     const PetscReal vl[N], const PetscReal vr[N], const PetscReal sn[N], const PetscReal cn[N], PetscReal fij[N][3],
-                                     PetscReal amax[N]) {
+/// Computes flux based on Roe solver
+/// @param [in] N Size of the array
+/// @param [in] *datal A RiemannDataSWE for values left of the edges
+/// @param [in] *datar A RiemannDataSWE for values right of the edges
+/// @param [in] sn Sine of the angle between edge and y-axis
+/// @param [in] cn Cosine of the angle between edge and y-axis
+/// @param [out] fij Flux through the edges
+/// @param [out] amax Maximum courant number
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode ComputeRoeFlux(PetscInt N, RiemannDataSWE *datal, RiemannDataSWE *datar, const PetscReal sn[N], const PetscReal cn[N],
+                                     PetscReal fij[N][3], PetscReal amax[N]) {
   PetscFunctionBeginUser;
+
+  PetscReal *hl = datal->h;
+  PetscReal *ul = datal->u;
+  PetscReal *vl = datal->v;
+
+  PetscReal *hr = datar->h;
+  PetscReal *ur = datar->u;
+  PetscReal *vr = datar->v;
+
+  PetscAssert(datal->N == datar->N, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
+  PetscAssert(N == datal->N, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left/right of edges is not the same as sn/cn");
 
   for (PetscInt n = 0; n < N; n++) {
     // Compute Roe averages
@@ -294,7 +301,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 
   // Call Riemann solver (only Roe currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, datal.h, datar.h, datal.u, datar.u, datal.v, datar.v, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+  PetscCall(ComputeRoeFlux(num, &datal, &datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -381,7 +388,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
 
   // Call Riemann solver (only Roe is currently supported)
   PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, datal->h, datar->h, datal->u, datar->u, datal->v, datar->v, sn, cn, flux_vec_bnd, amax_vec_bnd));
+  PetscCall(ComputeRoeFlux(num, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
