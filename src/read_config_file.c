@@ -699,8 +699,8 @@ static PetscErrorCode ParseFlowConditions(yaml_event_t *event, YamlParserState *
       } else {
         if (!strcmp(state->parameter, "type")) {
           PetscInt selection;
-          SelectItem(value, 3, (const char *[3]){"dirichlet", "neumann", "reflecting"},
-                     (PetscInt[3]){CONDITION_DIRICHLET, CONDITION_NEUMANN, CONDITION_REFLECTING}, &selection);
+          SelectItem(value, 4, (const char *[4]){"dirichlet", "neumann", "reflecting", "critical-outflow"},
+                     (PetscInt[4]){CONDITION_DIRICHLET, CONDITION_NEUMANN, CONDITION_REFLECTING, CONDITION_CRITICAL_OUTFLOW}, &selection);
           PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid flow condition %s.type: %s", flow_cond->name, value);
           flow_cond->type     = selection;
           state->parameter[0] = 0;  // clear parameter name
@@ -984,7 +984,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
-    if (flow_cond->type != CONDITION_REFLECTING) {
+    if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
       PetscCheck(flow_cond->height != -FLT_MAX, comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s", flow_cond->name);
       PetscCheck((flow_cond->momentum[0] != -FLT_MAX) && (flow_cond->momentum[1] != -FLT_MAX), comm, PETSC_ERR_USER,
                  "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);

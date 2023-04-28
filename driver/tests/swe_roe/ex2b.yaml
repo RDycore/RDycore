@@ -26,14 +26,20 @@ initial_conditions:
   2: # downstream region
     flow: dam_bottom_ic
 
-# We use reflecting boundary conditions for the boundary, top_wall, and
-# bottom_wall surfaces. Reflecting conditions are applied automatically
-# to all boundaries for which no BCs are specified, but we explicitly
-# specify a reflecting BC on top_wall to make sure things work in a
-# non-trivial setting.
+# The mesh contains three boundaries on which following BCs are being
+# applied:
+# 1. "boundary"    : Reflecting wall BC
+# 2. "top_wall"    : Reflecting wall BC
+# 3. "bottom_wall" : Critical outflow BC
+#
+# Below we define BCs for "top_wall" and "bottom_wall", but do not specify
+# the BC for "boundary". If no BC is specified for a boundary, the reflecting
+# wall BC is assumed.
 boundary_conditions:
   2: # top_wall
     flow: reflecting_bc
+  3: # bottom_wall
+    flow: outflow_bc
 
 flow_conditions:
   dam_top_ic:
@@ -46,4 +52,6 @@ flow_conditions:
     momentum: [0, 0]
   reflecting_bc:
     type: reflecting
+  outflow_bc:
+    type: critical-outflow
 
