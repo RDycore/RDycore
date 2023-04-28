@@ -270,6 +270,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   PetscReal sn_vec_int[num], cn_vec_int[num];
   PetscReal flux_vec_int[num][3], amax_vec_int[num];
 
+  // TODO: Preallocate datal/datar during model initialization
   RiemannDataSWE datal, datar;
   PetscCall(RiemannDataSWECreate(num, &datal));
   PetscCall(RiemannDataSWECreate(num, &datar));
@@ -348,7 +349,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 // Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
 // (i) extracting h/hu/hv from the solution vector X, and
 // (ii) compute velocities (u/v) from momentum (hu/hv).
-static PetscErrorCode PerformPreComputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *data, PetscReal cn[N],
+static PetscErrorCode PerformPrecomputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *data, PetscReal cn[N],
                                                  PetscReal sn[N], PetscReal *X) {
   PetscFunctionBeginUser;
 
@@ -430,11 +431,12 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, PetscRea
   PetscInt  num = boundary->num_edges;
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
+  // TODO: Preallocate datal/datar during model initialization
   RiemannDataSWE datal, datar;
   PetscCall(RiemannDataSWECreate(num, &datal));
   PetscCall(RiemannDataSWECreate(num, &datar));
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, &datal, cn_vec_bnd, sn_vec_bnd, X));
+  PetscCall(PerformPrecomputationForBC(rdy, boundary, tiny_h, num, &datal, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -472,11 +474,12 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Pet
   PetscInt  num = boundary->num_edges;
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
+  // TODO: Preallocate datal/datar during model initialization
   RiemannDataSWE datal, datar;
   PetscCall(RiemannDataSWECreate(num, &datal));
   PetscCall(RiemannDataSWECreate(num, &datar));
 
-  PetscCall(PerformPreComputationForBC(rdy, boundary, tiny_h, num, &datal, cn_vec_bnd, sn_vec_bnd, X));
+  PetscCall(PerformPrecomputationForBC(rdy, boundary, tiny_h, num, &datal, cn_vec_bnd, sn_vec_bnd, X));
 
   // Compute h/u/v for right cells
   for (PetscInt e = 0; e < boundary->num_edges; ++e) {
@@ -559,7 +562,9 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt       N = mesh->num_cells;
+  PetscInt N = mesh->num_cells;
+
+  // TODO: Preallocate data during model initialization
   RiemannDataSWE data;
   PetscCall(RiemannDataSWECreate(N, &data));
 
