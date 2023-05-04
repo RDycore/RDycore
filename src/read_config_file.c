@@ -1052,6 +1052,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
     PetscCheck(sal_cond->concentration != -FLT_MAX, comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s",
                sal_cond->name);
   }
+
+  // validate output options
+  PetscCheck(config->output_format != OUTPUT_CGNS, comm, PETSC_ERR_USER, "CGNS output is not yet supported!");
   PetscFunctionReturn(0);
 }
 
