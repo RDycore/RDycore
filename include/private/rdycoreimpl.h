@@ -129,6 +129,11 @@ PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 
 // output functions
 PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
+PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char*, char*);
+PETSC_INTERN PetscErrorCode WriteBinaryOutput(RDy, PetscInt, PetscReal);
+PETSC_INTERN PetscErrorCode WriteXDMFHeavyData(RDy, PetscInt, PetscReal);
+PETSC_INTERN PetscErrorCode WriteXDMFLightData(RDy);
+PETSC_INTERN PetscErrorCode WriteCGNSOutput(RDy, PetscInt, PetscReal);
 PETSC_INTERN PetscErrorCode WriteOutputFiles(TS, PetscInt, PetscReal, Vec, void*);
 PETSC_INTERN PetscErrorCode PostprocessOutput(RDy);
 
