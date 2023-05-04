@@ -313,6 +313,39 @@ static PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// from Jed's commit (fd7c843):
+//
+// -dm_refine evidently completes boundary labels as a side-effect (so
+// "Face Label" is applied also to vertices). I borrowed a utility from
+// plexceed.c that we'll be able to delete later (by letting PETSc do all
+// this setup).
+// from plexceed.c
+static PetscErrorCode DMGetPoints_Private(DM dm, DMLabel domainLabel, PetscInt labelVal, PetscInt height, IS *pointIS) {
+  PetscInt depth;
+  DMLabel  depthLabel;
+  IS       depthIS;
+
+  PetscFunctionBegin;
+  PetscCall(DMPlexGetDepth(dm, &depth));
+  PetscCall(DMPlexGetDepthLabel(dm, &depthLabel));
+  PetscCall(DMLabelGetStratumIS(depthLabel, depth - height, &depthIS));
+  if (domainLabel) {
+    IS domainIS;
+
+    PetscCall(DMLabelGetStratumIS(domainLabel, labelVal, &domainIS));
+    if (domainIS) {  // domainIS is non-empty
+      PetscCall(ISIntersect(depthIS, domainIS, pointIS));
+      PetscCall(ISDestroy(&domainIS));
+    } else {  // domainIS is NULL (empty)
+      *pointIS = NULL;
+    }
+    PetscCall(ISDestroy(&depthIS));
+  } else {
+    *pointIS = depthIS;
+  }
+  PetscFunctionReturn(0);
+}
+
 // initializes mesh boundary data
 static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionBegin;
@@ -321,7 +354,10 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   DMLabel boundary_edge_label;
   PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
   IS boundary_edge_is;
-  PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
+  // FIXME: uncomment this line and delete the following one when PETSc's -dm_refine
+  // FIXME: option has been updated
+  // PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
+  PetscCall(DMGetPoints_Private(rdy->dm, boundary_edge_label, 1, 1, &boundary_edge_is));
   PetscBool boundary_edge_present = (boundary_edge_is != NULL);
 
   // Keep track of whether edges on the domain boundary have been assigned to
@@ -355,7 +391,10 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
       PetscInt boundary_id = boundary_ids[b];
       IS       edge_is;
-      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
+      // FIXME: uncomment this line and delete the following one when PETSc's -dm_refine
+      // FIXME: option has been updated
+      // PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
+      PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
       if (edge_is) {
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
@@ -414,8 +453,11 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       PetscInt boundary_id = (b < num_boundaries_in_file) ? boundary_ids[b] : unassigned_edge_boundary_id;
-      IS       edge_is;  // edge index space
-      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
+      IS       edge_is;  // edge index space//
+      // FIXME: uncomment this line and delete the following one when PETSc's -dm_refine
+      // FIXME: option has been updated
+      // PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
+      PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[b];
         rdy->boundary_ids[b]  = boundary_id;
