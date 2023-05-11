@@ -3,16 +3,34 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
+// time conversion factors
+static const PetscReal secs_in_min = 60.0;
+static const PetscReal mins_in_hr  = 60.0;
+static const PetscReal hrs_in_day  = 24.0;
+static const PetscReal days_in_mon = 30.0;
+static const PetscReal days_in_yr  = 365.0;
+
+/// Returns a string corresponding to the given time unit
+const char *TimeUnitAsString(RDyTimeUnit time_unit) {
+  static const char *time_unit_strings[6] = {
+      "sec",  // seconds
+      "min",  // minutes
+      "hr",   // hours
+      "day",  // days
+      "mon",  // months
+      "yr",   // years
+  };
+  PetscFunctionBegin;
+  PetscFunctionReturn(time_unit_strings[time_unit]);
+}
+
+/// Converts the given time (expressed in the given units) to seconds.
+/// @param [in] time the time as expressed in the given units
+/// @param [in] time_unit the units in which the time is expressed
 PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
   PetscFunctionBegin;
 
   PetscReal time_in_sec;
-  PetscReal secs_in_min = 60.0;
-  PetscReal mins_in_hr  = 60.0;
-  PetscReal hrs_in_day  = 24.0;
-  PetscReal days_in_mon = 30.0;
-  PetscReal days_in_yr  = 365.0;
-
   switch (time_unit) {
     case TIME_SECONDS:
       time_in_sec = time;
@@ -38,6 +56,39 @@ PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
   }
 
   PetscFunctionReturn(time_in_sec);
+}
+
+/// Converts the given time (expressed in seconds) to the given units.
+/// @param [in] time the time as expressed in seconds
+/// @param [in] time_unit the units to which the time is to be converted
+PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit) {
+  PetscFunctionBegin;
+  PetscReal time_in_units;
+  switch (time_unit) {
+    case TIME_SECONDS:
+      time_in_units = time;
+      break;
+    case TIME_MINUTES:
+      time_in_units = time / secs_in_min;
+      break;
+    case TIME_HOURS:
+      time_in_units = time / mins_in_hr / secs_in_min;
+      break;
+    case TIME_DAYS:
+      time_in_units = time / hrs_in_day / mins_in_hr / secs_in_min;
+      break;
+    case TIME_MONTHS:
+      time_in_units = time / days_in_mon / hrs_in_day / mins_in_hr / secs_in_min;
+      break;
+    case TIME_YEARS:
+      time_in_units = time / days_in_yr / hrs_in_day / mins_in_hr / secs_in_min;
+      break;
+    default:
+      SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported time unit");
+      break;
+  }
+
+  PetscFunctionReturn(time_in_units);
 }
 
 // sets default parameters

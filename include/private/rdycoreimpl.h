@@ -131,13 +131,15 @@ PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
 PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char*, char*);
 PETSC_INTERN PetscErrorCode WriteBinaryOutput(RDy, PetscInt, PetscReal);
-PETSC_INTERN PetscErrorCode WriteXDMFHeavyData(RDy, PetscInt, PetscReal);
-PETSC_INTERN PetscErrorCode WriteXDMFLightData(RDy);
+PETSC_INTERN PetscErrorCode WriteXDMFHDF5Data(RDy, PetscInt, PetscReal);
+PETSC_INTERN PetscErrorCode WriteXDMFXMFData(RDy, PetscInt, PetscReal);
 PETSC_INTERN PetscErrorCode WriteCGNSOutput(RDy, PetscInt, PetscReal);
 PETSC_INTERN PetscErrorCode WriteOutputFiles(TS, PetscInt, PetscReal, Vec, void*);
 PETSC_INTERN PetscErrorCode PostprocessOutput(RDy);
 
 // utility functions
+PETSC_INTERN const char* TimeUnitAsString(RDyTimeUnit);
 PETSC_INTERN PetscReal ConvertTimeToSeconds(PetscReal, RDyTimeUnit);
+PETSC_INTERN PetscReal ConvertTimeFromSeconds(PetscReal, RDyTimeUnit);
 
 #endif

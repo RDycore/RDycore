@@ -92,12 +92,14 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
   if ((step == -1) ||          // last step (interpolated)
       (time >= final_time) ||  // last step without interpolation
       ((step % rdy->config.output_frequency) == 0)) {
+    PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time_unit);
     if (rdy->config.output_format == OUTPUT_XDMF) {
-      PetscCall(WriteXDMFHeavyData(rdy, step, time));
+      PetscCall(WriteXDMFHDF5Data(rdy, step, t));
+      PetscCall(WriteXDMFXMFData(rdy, step, t));
     } else if (rdy->config.output_format == OUTPUT_CGNS) {
-      PetscCall(WriteCGNSOutput(rdy, step, time));
+      PetscCall(WriteCGNSOutput(rdy, step, t));
     } else {  // binary
-      PetscCall(WriteBinaryOutput(rdy, step, time));
+      PetscCall(WriteBinaryOutput(rdy, step, t));
     }
   }
   PetscFunctionReturn(0);
@@ -105,10 +107,5 @@ PetscErrorCode WriteOutputFiles(TS ts, PetscInt step, PetscReal time, Vec X, voi
 
 PetscErrorCode PostprocessOutput(RDy rdy) {
   PetscFunctionBegin;
-
-  if (rdy->config.output_format == OUTPUT_XDMF) {
-    PetscCall(WriteXDMFLightData(rdy));
-  }
-
   PetscFunctionReturn(0);
 }
