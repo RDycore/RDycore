@@ -27,6 +27,10 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+/// Determines the appropriate output file name based on
+/// * the desired file format as specified by rdy->config.output_format
+/// * the time step index and simulation time
+/// * the specified suffix
 PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
   PetscFunctionBegin;
 
@@ -45,9 +49,22 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   // encode specific information into the filename based on its format
   char ending[PETSC_MAX_PATH_LEN];
   if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
-    snprintf(ending, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_%d_np%d.%s", rdy->dt, rdy->config.max_step, step, rdy->nproc, suffix);
+    snprintf(ending, PETSC_MAX_PATH_LEN - 1, ".%s", suffix);
+  } else if (rdy->config.output_format == OUTPUT_XDMF) {
+    if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
+      // for now we assume all output data goes into a single HDF5 file
+      snprintf(ending, PETSC_MAX_PATH_LEN - 1, ".%s", suffix);
+    } else {  // XDMF "light" data?
+      PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
+      // encode the step into the filename with zero-padding based on the
+      // maximum step number
+      int  num_digits = (int)(log10((double)rdy->config.max_step)) + 1;
+      char fmt[16]    = {0};
+      snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
+      snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, step, suffix);
+    }
   } else {
-    snprintf(ending, PETSC_MAX_PATH_LEN - 1, "_dt_%f_%d_np%d.%s", rdy->dt, rdy->config.max_step, rdy->nproc, suffix);
+    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported output format specified.");
   }
 
   // concatenate some config parameters

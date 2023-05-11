@@ -166,8 +166,8 @@ PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   PetscInt num_vertices = rdy->mesh.num_vertices;
 
   char h5_name[PETSC_MAX_PATH_LEN], xmf_name[PETSC_MAX_PATH_LEN];
-  PetscCall(DetermineOutputFile(rdy, 0, 0.0, "h5", h5_name));
-  PetscCall(DetermineOutputFile(rdy, 0, 0.0, "xmf", xmf_name));
+  PetscCall(DetermineOutputFile(rdy, step, time, "h5", h5_name));
+  PetscCall(DetermineOutputFile(rdy, step, time, "xmf", xmf_name));
   const char *units = TimeUnitAsString(rdy->config.time_unit);
   RDyLogDetail(rdy, "Step %d: writing XDMF XMF output at t = %g %s to %s", step, time, units, xmf_name);
 
