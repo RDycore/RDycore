@@ -164,6 +164,9 @@ PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 
   // mesh metadata
   PetscInt num_vertices = rdy->mesh.num_vertices;
+  PetscInt coord_dim;
+  PetscCall(DMGetCoordinateDim(rdy->dm, &coord_dim));
+  const char *geom_types[4] = {NULL, NULL, "XY", "XYZ"};  // use geom_types[coord_dim]
 
   char h5_name[PETSC_MAX_PATH_LEN], xmf_name[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineOutputFile(rdy, step, time, "h5", h5_name));
@@ -217,12 +220,12 @@ PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                            "      </Topology>\n",
                            topo_type[num_corners], num_cells, num_cells, num_corners, h5_basename, h5_topo_group));
     PetscCall(PetscFPrintf(rdy->comm, fp,
-                           "      <Geometry GeometryType=\"XY\">\n"
-                           "        <DataItem Format=\"HDF\" Dimensions=\"%d 2\">\n"
+                           "      <Geometry GeometryType=\"%s\">\n"
+                           "        <DataItem Format=\"HDF\" Dimensions=\"%d %d\">\n"
                            "          %s:%s/vertices\n"
                            "        </DataItem>\n"
                            "      </Geometry>\n",
-                           num_vertices, h5_basename, h5_geom_group));
+                           geom_types[coord_dim], num_vertices, coord_dim, h5_basename, h5_geom_group));
 
     // write vertex field metadata
     // (none so far!)

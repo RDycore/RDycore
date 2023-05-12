@@ -18,6 +18,10 @@ time:
   unit: hours
   max_step: 1000
 
+output:
+  format: xdmf
+  frequency: 100
+
 grid:
   file: DamBreak_grid5x10.exo
 
