@@ -17,6 +17,8 @@ enable_language(Fortran)
 project(rdycore)
 
 # Find PETSc (must be placed after the project command)
+set(PETSC_DIR $ENV{PETSC_DIR})
+set(PETSC_ARCH $ENV{PETSC_ARCH})
 find_package(PETSc COMPONENTS C)
 
 # Use PETSc's compiler config.
