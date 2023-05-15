@@ -319,11 +319,14 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
   IS boundary_edge_is;
   PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
+  PetscBool boundary_edge_present = (boundary_edge_is != NULL);
 
   // Keep track of whether edges on the domain boundary have been assigned to
   // any boundaries.
   IS unassigned_edges_is;
-  ISDuplicate(boundary_edge_is, &unassigned_edges_is);
+  if (boundary_edge_present) {
+    ISDuplicate(boundary_edge_is, &unassigned_edges_is);
+  }
   PetscInt unassigned_edge_boundary_id = 0;  // boundary ID for unassigned edges
 
   // Count boundaries. We rely on face sets in our grids to express
@@ -376,11 +379,12 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   }
 
   // add an additional boundary for unassigned boundary edges if needed
-  PetscInt num_unassigned_edges, num_global_unassigned_edges;
-  PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
-  MPI_Allreduce(&num_unassigned_edges, &num_global_unassigned_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
-  if (num_global_unassigned_edges > 0) {
-    RDyLogDebug(rdy, "Adding boundary %d for %d unassigned boundary edges", unassigned_edge_boundary_id, num_global_unassigned_edges);
+  PetscInt num_unassigned_edges = 0;
+  if (boundary_edge_present) {
+    PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
+  }
+  if (num_unassigned_edges > 0) {
+    RDyLogDebug(rdy, "Adding boundary %d for %d unassigned boundary edges", unassigned_edge_boundary_id, num_unassigned_edges);
     if (!label) {
       // create a "Face Sets" label if one doesn't already exist
       PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
@@ -390,8 +394,10 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     PetscCall(DMLabelSetStratumIS(label, unassigned_edge_boundary_id, unassigned_edges_is));
     ++rdy->num_boundaries;
   }
-  PetscCall(ISDestroy(&boundary_edge_is));
-  PetscCall(ISDestroy(&unassigned_edges_is));
+  if (boundary_edge_present) {
+    PetscCall(ISDestroy(&boundary_edge_is));
+    PetscCall(ISDestroy(&unassigned_edges_is));
+  }
 
   // allocate resources for boundaries
   PetscCall(RDyAlloc(PetscInt, rdy->num_boundaries, &rdy->boundary_ids));
@@ -433,8 +439,10 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     PetscCall(ISDestroy(&boundary_id_is));
   }
 
-  // make sure we have at least one region and boundary
-  PetscCheck(rdy->num_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
+  // make sure we have at least one region and boundary across all mpi ranks
+  PetscInt num_global_boundaries = 0;
+  MPI_Allreduce(&rdy->num_boundaries, &num_global_boundaries, 1, MPI_INT, MPI_SUM, rdy->comm);
+  PetscCheck(num_global_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
 
   PetscFunctionReturn(0);
 }
