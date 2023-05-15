@@ -379,13 +379,12 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   }
 
   // add an additional boundary for unassigned boundary edges if needed
-  PetscInt num_unassigned_edges = 0, num_global_unassigned_edges;
+  PetscInt num_unassigned_edges = 0;
   if (boundary_edge_present) {
     PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
   }
-  MPI_Allreduce(&num_unassigned_edges, &num_global_unassigned_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
-  if (num_global_unassigned_edges > 0) {
-    RDyLogDebug(rdy, "Adding boundary %d for %d unassigned boundary edges", unassigned_edge_boundary_id, num_global_unassigned_edges);
+  if (num_unassigned_edges > 0) {
+    RDyLogDebug(rdy, "Adding boundary %d for %d unassigned boundary edges", unassigned_edge_boundary_id, num_unassigned_edges);
     if (!label) {
       // create a "Face Sets" label if one doesn't already exist
       PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
