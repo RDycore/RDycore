@@ -427,14 +427,15 @@ static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, R
   // output:
   //   format: <binary|xdmf|cgns>
   //   frequency: <value>
+  //   batch_size: <value>  <-- optional (default: 1)
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
   const char *value = (const char *)(event->data.scalar.value);
 
   if (!strlen(state->parameter)) {  // parameter not set
     PetscInt selection;
-    SelectItem(value, 2, (const char *[2]){"format", "frequency"}, (PetscInt[2]){0, 1}, &selection);
-    PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in restart: %s", value);
+    SelectItem(value, 3, (const char *[3]){"format", "frequency", "batch_size"}, (PetscInt[3]){0, 1, 2}, &selection);
+    PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in output: %s", value);
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else {  // parameter set, get value
     if (!strcmp(state->parameter, "format")) {
@@ -442,9 +443,12 @@ static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, R
       SelectItem(value, 3, (const char *[3]){"binary", "xdmf", "cgns"}, (PetscInt[3]){OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid output.format: %s", value);
       config->output_format = selection;
-    } else {  // frequency
+    } else if (!strcmp(state->parameter, "frequency")) {
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->output_frequency));
-      PetscCheck((config->output_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid output.frequency: %d\n", config->restart_frequency);
+      PetscCheck((config->output_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid output.frequency: %d\n", config->output_frequency);
+    } else {  // batch_size
+      PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->output_batch_size));
+      PetscCheck((config->output_batch_size > 0), state->comm, PETSC_ERR_USER, "Invalid output.batch_size: %d\n", config->output_batch_size);
     }
     state->parameter[0] = 0;  // clear parameter name
   }
@@ -1083,7 +1087,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   }
 
   // validate output options
-  PetscCheck(config->output_format != OUTPUT_CGNS, comm, PETSC_ERR_USER, "CGNS output is not yet supported!");
+  PetscCheck((config->output_batch_size == 0) || (config->output_format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
+             "Binary output does not support output batching");
   PetscFunctionReturn(0);
 }
 

@@ -100,6 +100,9 @@ static PetscErrorCode SetDefaults(RDy rdy) {
   // set the water depth below which no flow occurs
   rdy->config.tiny_h = 1e-7;
 
+  // output parameters
+  rdy->config.output_batch_size = 1;  // 1 timestep per output file
+
   PetscFunctionReturn(0);
 }
 
