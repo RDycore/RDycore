@@ -295,6 +295,10 @@ int main(int argc,char *argv[]) {
   if (petsc_works_minimal)
     message (STATUS "Minimal PETSc includes and libraries work.  This probably means we are building with shared libs.")
     set (petsc_includes_needed "${petsc_includes_minimal}")
+    # NOTE: We like to link against the external libraries in any case, to provide direct
+    # NOTE: access to their functionality.
+    resolve_libraries (petsc_libraries_external "${petsc_libs_external}")
+    list(APPEND PETSC_LIBRARIES_ALL ${petsc_libraries_external})
   else (petsc_works_minimal)     # Minimal includes fail, see if just adding full includes fixes it
     petsc_test_runs ("${petsc_includes_all}" "${PETSC_LIBRARIES_TS}" petsc_works_allincludes)
     if (petsc_works_allincludes) # It does, we just need all the includes (

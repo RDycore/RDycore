@@ -7,6 +7,9 @@ add_library(rdycore
   rdymesh.c
   rdyrun.c
   rdysetup.c
+  write_output.c
+  xdmf_output.c
+  cgns_output.c
 )
 add_dependencies(rdycore yaml)
 

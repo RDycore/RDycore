@@ -31,6 +31,7 @@ typedef enum {
   NUMERICS_SECTION,
   TIME_SECTION,
   RESTART_SECTION,
+  OUTPUT_SECTION,
   LOGGING_SECTION,
   GRID_SECTION,
   INITIAL_CONDITIONS_SECTION,
@@ -171,6 +172,8 @@ static PetscErrorCode ParseTopLevel(yaml_event_t *event, YamlParserState *state,
     state->section = TIME_SECTION;
   } else if (!strcmp(value, "restart")) {
     state->section = RESTART_SECTION;
+  } else if (!strcmp(value, "output")) {
+    state->section = OUTPUT_SECTION;
   } else if (!strcmp(value, "logging")) {
     state->section = LOGGING_SECTION;
   } else if (!strcmp(value, "grid")) {
@@ -387,7 +390,7 @@ static PetscErrorCode ParseRestart(yaml_event_t *event, YamlParserState *state, 
   PetscFunctionBegin;
 
   // restart:
-  //   format: <bin|h5>
+  //   format: <binary|hdf5>
   //   frequency: <value>
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
@@ -401,12 +404,42 @@ static PetscErrorCode ParseRestart(yaml_event_t *event, YamlParserState *state, 
   } else {  // parameter set, get value
     if (!strcmp(state->parameter, "format")) {
       PetscInt selection;
-      SelectItem(value, 2, (const char *[2]){"bin", "h5"}, (PetscInt[2]){0, 1}, &selection);
+      SelectItem(value, 2, (const char *[2]){"binary", "hdf5"}, (PetscInt[2]){PETSC_VIEWER_NATIVE, PETSC_VIEWER_HDF5_PETSC}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid restart.format: %s", value);
-      strncpy(config->restart_format, value, MAX_NAME_LEN);
+      config->restart_format = selection;
     } else {  // frequency
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->restart_frequency));
       PetscCheck((config->restart_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid restart.frequency: %d\n", config->restart_frequency);
+    }
+    state->parameter[0] = 0;  // clear parameter name
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ParseOutput(yaml_event_t *event, YamlParserState *state, RDyConfig *config) {
+  PetscFunctionBegin;
+
+  // output:
+  //   format: <binary|xdmf|cgns>
+  //   frequency: <value>
+
+  PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER, "Invalid YAML (non-scalar value encountered in restart section!");
+  const char *value = (const char *)(event->data.scalar.value);
+
+  if (!strlen(state->parameter)) {  // parameter not set
+    PetscInt selection;
+    SelectItem(value, 2, (const char *[2]){"format", "frequency"}, (PetscInt[2]){0, 1}, &selection);
+    PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in restart: %s", value);
+    strncpy(state->parameter, value, YAML_MAX_LEN);
+  } else {  // parameter set, get value
+    if (!strcmp(state->parameter, "format")) {
+      PetscInt selection;
+      SelectItem(value, 3, (const char *[3]){"binary", "xdmf", "cgns"}, (PetscInt[3]){OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS}, &selection);
+      PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid output.format: %s", value);
+      config->output_format = selection;
+    } else {  // frequency
+      PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->output_frequency));
+      PetscCheck((config->output_frequency > 0), state->comm, PETSC_ERR_USER, "Invalid output.frequency: %d\n", config->restart_frequency);
     }
     state->parameter[0] = 0;  // clear parameter name
   }
@@ -478,7 +511,8 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   // OR
   //
   // initial_conditions:
-  //   file: <filename>    # reads all initial state from the given file
+  //   file: <filename>      # reads all initial state from the given file
+  //   format: <binary|hdf5> # file format
 
   PetscCheck(event->type == YAML_SCALAR_EVENT, state->comm, PETSC_ERR_USER,
              "Invalid YAML (non-scalar value encountered in initial_conditions section!");
@@ -487,14 +521,23 @@ static PetscErrorCode ParseInitialConditions(yaml_event_t *event, YamlParserStat
   // if we're not in a subsection, our parameter could be a single filename or
   // the name of a subsection
   if (!strlen(state->subsection)) {
-    if (!strlen(state->parameter)) {
-      if (!strcmp(value, "file")) {  // initial conditions file supplied
+    if (!strlen(state->parameter)) {  // parameter name not set
+      PetscInt selection;
+      SelectItem(value, 2, (const char *[2]){"format", "file"}, (PetscInt[2]){0, 1}, &selection);
+      if (selection != -1) {
         strcpy(state->parameter, value);
-      } else {  // proceed to initial conditions subsection
+      } else {  // proceed to subsection
         strncpy(state->subsection, value, YAML_MAX_LEN);
       }
-    } else if (!strcmp(state->parameter, "file")) {
-      strncpy(config->initial_conditions_file, value, YAML_MAX_LEN);
+    } else {
+      if (!strcmp(state->parameter, "file")) {
+        strncpy(config->initial_conditions_file, value, YAML_MAX_LEN);
+      } else {  // format
+        PetscInt selection;
+        SelectItem(value, 2, (const char *[2]){"binary", "xdmf"}, (PetscInt[2]){PETSC_VIEWER_NATIVE, PETSC_VIEWER_HDF5_XDMF}, &selection);
+        PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid initial_conditions.format: %s", value);
+        config->initial_conditions_format = selection;
+      }
       state->parameter[0] = 0;  // clear parameter name
     }
   } else {
@@ -855,6 +898,9 @@ static PetscErrorCode HandleYamlEvent(yaml_event_t *event, YamlParserState *stat
       case RESTART_SECTION:
         PetscCall(ParseRestart(event, state, config));
         break;
+      case OUTPUT_SECTION:
+        PetscCall(ParseOutput(event, state, config));
+        break;
       case LOGGING_SECTION:
         PetscCall(ParseLogging(event, state, config));
         break;
@@ -1006,6 +1052,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
     PetscCheck(sal_cond->concentration != -FLT_MAX, comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s",
                sal_cond->name);
   }
+
+  // validate output options
+  PetscCheck(config->output_format != OUTPUT_CGNS, comm, PETSC_ERR_USER, "CGNS output is not yet supported!");
   PetscFunctionReturn(0);
 }
 

@@ -65,6 +65,13 @@ typedef enum {
   TIME_YEARS
 } RDyTimeUnit;
 
+// This type identifies a format for output files.
+typedef enum {
+  OUTPUT_BINARY = 0,
+  OUTPUT_XDMF,
+  OUTPUT_CGNS
+} RDyOutputFormat;
+
 // This type specifies a "kind" of condition that indicates how that condition
 // is to be enforced on a region or boundary.
 typedef enum {
@@ -139,7 +146,8 @@ typedef struct {
   char mesh_file[PETSC_MAX_PATH_LEN];
 
   // initial conditions file (if given)
-  char initial_conditions_file[PETSC_MAX_PATH_LEN];
+  char              initial_conditions_file[PETSC_MAX_PATH_LEN];
+  PetscViewerFormat initial_conditions_format;
 
   // IDs of all regions mentioned in an input file
   PetscInt num_regions;
@@ -186,9 +194,18 @@ typedef struct {
   //----------
 
   // Restart file format
-  char restart_format[MAX_NAME_LEN+1];
+  PetscViewerFormat restart_format;
   // Restart frequency (in steps)
   PetscInt restart_frequency;
+
+  //--------
+  // Output
+  //--------
+
+  // Output file format
+  RDyOutputFormat output_format;
+  // Output frequency (in steps)
+  PetscInt output_frequency;
 
   //---------
   // Logging
