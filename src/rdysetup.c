@@ -722,7 +722,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscReal final_time_in_sec = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit);
   PetscCall(TSSetMaxTime(rdy->ts, final_time_in_sec));
   PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.max_step));
-  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 

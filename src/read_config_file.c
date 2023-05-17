@@ -20,6 +20,8 @@
 //
 // the maximum length of an identifier or value in the YAML file
 #define YAML_MAX_LEN 1024
+#define UNINITIALIZED_REAL -999.0
+#define UNINITIALIZED_INT -999
 
 // This enum defines the different sections in our configuration file.
 typedef enum {
@@ -363,7 +365,7 @@ static PetscErrorCode ParseTime(yaml_event_t *event, YamlParserState *state, RDy
 
   if (!strlen(state->parameter)) {  // parameter not set
     PetscInt selection;
-    SelectItem(value, 3, (const char *[3]){"final_time", "unit", "max_step"}, (PetscInt[3]){0, 1, 2}, &selection);
+    SelectItem(value, 4, (const char *[4]){"final_time", "unit", "max_step", "dtime"}, (PetscInt[4]){0, 1, 2, 3}, &selection);
     PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid parameter in time: %s", value);
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else {  // parameter set, get value
@@ -376,9 +378,12 @@ static PetscErrorCode ParseTime(yaml_event_t *event, YamlParserState *state, RDy
                  (PetscInt[6]){TIME_SECONDS, TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS}, &selection);
       PetscCheck(selection != -1, state->comm, PETSC_ERR_USER, "Invalid time.unit: %s", value);
       config->time_unit = selection;
-    } else {  // max_step
+    } else if (!strcmp(state->parameter, "max_step")) {
       PetscCall(ConvertToInt(state->comm, state->parameter, value, &config->max_step));
       PetscCheck((config->max_step >= 0), state->comm, PETSC_ERR_USER, "invalid time.max_step: %d\n", config->max_step);
+    } else if (!strcmp(state->parameter, "dtime")) {
+      PetscCall(ConvertToReal(state->comm, state->parameter, value, &config->dtime));
+      PetscCheck((config->dtime > 0.0), state->comm, PETSC_ERR_USER, "invalid time.dtime: %g\n", config->dtime);
     }
     state->parameter[0] = 0;  // clear parameter name
   }
@@ -981,6 +986,10 @@ static PetscErrorCode InitConfig(RDyConfig *config) {
   // RDy struct. So all we need to do is initialize anything that shouldn't be
   // zero.
 
+  config->final_time = UNINITIALIZED_REAL;
+  config->dtime      = UNINITIALIZED_REAL;
+  config->max_step   = UNINITIALIZED_INT;
+
   // initialize boundary conditions so we can determine whether they are
   // properly set after parsing
   for (PetscInt i = 0; i < MAX_NUM_CONDITIONS; ++i) {
@@ -1002,10 +1011,10 @@ static PetscErrorCode InitConfig(RDyConfig *config) {
 }
 
 // checks config for any invalid or omitted parameters
-static PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
+static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionBegin;
 
-  // currently, only certain methods are implemented
+  // check 'Numerics' settings
   if (config->spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
   }
@@ -1017,6 +1026,26 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, const RDyConfig *config) {
   }
 
   PetscCheck(strlen(config->mesh_file), comm, PETSC_ERR_USER, "grid.file not specified!");
+
+  // check 'Timestepping' settings
+  // 'final_time', 'max_step', 'dtime': Only two of the three values can be specified in the .yaml file.
+  if (config->final_time == UNINITIALIZED_REAL) {
+    if (!(config->max_step != UNINITIALIZED_INT && config->dtime != UNINITIALIZED_REAL)) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                 "time.final_time could be determined.\n  - time.final_time was not specified, and\n  - both time.final_time and time.max_step were "
+                 "also not specified");
+    }
+    config->final_time = config->max_step * config->dtime;
+  } else {
+    if (config->max_step != UNINITIALIZED_INT && config->dtime != UNINITIALIZED_REAL) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Can only specify time.final_time or time.max_step in the .yaml file");
+    }
+    if (config->max_step == UNINITIALIZED_INT && config->dtime == UNINITIALIZED_REAL) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Need to specify time.final_time or time.max_step in the .yaml file");
+    }
+    if (config->max_step == UNINITIALIZED_INT) config->max_step = (PetscInt)(config->final_time / config->dtime);
+    if (config->dtime == UNINITIALIZED_REAL) config->dtime = config->final_time / config->max_step;
+  }
 
   // we can accept an initial conditions file OR a set of initial conditions,
   // but not both

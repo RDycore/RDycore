@@ -188,6 +188,8 @@ typedef struct {
   RDyTimeUnit time_unit;
   // Maximum number of time steps
   PetscInt max_step;
+  // Time step
+  PetscReal dtime;
 
   //----------
   // Restarts
