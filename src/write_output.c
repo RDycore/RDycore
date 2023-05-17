@@ -49,7 +49,10 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   // encode specific information into the filename based on its format
   char ending[PETSC_MAX_PATH_LEN];
   if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
-    snprintf(ending, PETSC_MAX_PATH_LEN - 1, ".%s", suffix);
+    int  num_digits = (int)(log10((double)rdy->config.max_step)) + 1;
+    char fmt[16]    = {0};
+    snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
+    snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, step, suffix);
   } else if (rdy->config.output_format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       // for now we assume all output data goes into a single HDF5 file
