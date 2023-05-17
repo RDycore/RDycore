@@ -52,6 +52,12 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_Fortran_FLAGS "-ffree-line-length-none")
 endif()
 
+# By default, we build a Debug configuration.
+if (NOT CMAKE_BUILD_TYPE)
+  message(STATUS "CMAKE_BUILD_TYPE not specified. Building Debug configuration.")
+  set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
 message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")
 message(STATUS "Generating project files in build directory: ${PROJECT_BINARY_DIR}")
 message(STATUS "C compiler is ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION})")
