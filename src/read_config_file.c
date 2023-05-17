@@ -1038,7 +1038,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
     config->final_time = config->max_step * config->dtime;
   } else {
     if (config->max_step != UNINITIALIZED_INT && config->dtime != UNINITIALIZED_REAL) {
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Can only spcicify time.final_time or time.max_step in the .yaml file");
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Can only specify time.final_time or time.max_step in the .yaml file");
     }
     if (config->max_step == UNINITIALIZED_INT && config->dtime == UNINITIALIZED_REAL) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Need to spcicify time.final_time or time.max_step in the .yaml file");
