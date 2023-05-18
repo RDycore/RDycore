@@ -1092,6 +1092,53 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionReturn(0);
 }
 
+// adds entries to PETSc's options database based on parsed config info
+// (necessary because not all functionality is exposed via PETSc's C API)
+static PetscErrorCode SetAdditionalOptions(RDy rdy) {
+#define VALUE_LEN 128
+  PetscFunctionBegin;
+  PetscBool has_param;
+  char      value[VALUE_LEN+1] = {0};
+
+  //--------
+  // Output
+  //--------
+
+  // set the solution monitoring interval
+  if (rdy->config.output_frequency > 0) {
+    PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
+    if (!has_param) {
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output_frequency);
+      PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
+    }
+  }
+
+  // the CGNS viewer's options aren't exposed at all by the C API, so we have
+  // to set them here
+  if (rdy->config.output_format == OUTPUT_CGNS) {
+    // configure timestep monitoring parameters
+    PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution", &has_param));
+    if (!has_param) {
+      char file_pattern[PETSC_MAX_PATH_LEN];
+      PetscCall(DetermineOutputFile(rdy, 0, 0.0, "cgns", file_pattern));
+        snprintf(value, VALUE_LEN, "cgns:%s", file_pattern);
+        PetscOptionsSetValue(NULL, "-ts_monitor_solution", value);
+    }
+
+    // adjust the output batch size if needed
+    if (rdy->config.output_batch_size > 1) {
+      PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
+      if (!has_param) {
+        snprintf(value, VALUE_LEN, "%d", rdy->config.output_batch_size);
+        PetscOptionsSetValue(NULL, "-viewer_cgns_batch_size", value);
+      }
+    }
+  }
+
+  PetscFunctionReturn(0);
+#undef VALUE_LEN
+}
+
 // reads the config file on process 0, broadcasts it as a string to all other
 // processes, and parses the string into rdy->config
 PetscErrorCode ReadConfigFile(RDy rdy) {
@@ -1132,6 +1179,9 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // parse the YAML config file into our config struct and validate it
   PetscCall(ParseYaml(rdy->comm, config_str, &rdy->config));
   PetscCall(ValidateConfig(rdy->comm, &rdy->config));
+
+  // set any additional options needed in PETSc's options database
+  PetscCall(SetAdditionalOptions(rdy));
 
   // clean up
   RDyFree(config_str);

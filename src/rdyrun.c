@@ -52,6 +52,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
 
   size_t config_len = strlen(rdy->config_file);
   char prefix[config_len+1];
+  memset(prefix, 0, sizeof(char)*(config_len+1));
   char *p = strstr(rdy->config_file, ".yaml");
   if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
     p = strstr(rdy->config_file, ".yml");
@@ -122,21 +123,11 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
   PetscFunctionBegin;
 
   PetscViewerFormat format = PETSC_VIEWER_DEFAULT;
-  char              param[24];
-  char              filename[PETSC_MAX_PATH_LEN];
   if (rdy->config.output_frequency) {
     RDyLogDebug(rdy, "Writing output every %d timestep(s)", rdy->config.output_frequency);
-    PetscBool has_param;
     switch (rdy->config.output_format) {
       case OUTPUT_CGNS:
-        PetscCall(PetscViewerCreate_CGNS(viz->viewer));
-        PetscCall(DetermineOutputFile(rdy, 0, 0.0, "cgns", filename));
-        PetscCall(PetscViewerFileSetName(viz->viewer, filename));
-        PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
-        if (!has_param) {
-          snprintf(param, 23, "%d", rdy->config.output_batch_size);
-          PetscOptionsSetValue(NULL, "-viewer_cgns_batch_size", param);
-        }
+        // we've already configured this viewer in SetAdditionalOptions (see read_config_file.c)
         break;
       case OUTPUT_XDMF:
         // we don't actually use this viewer, so maybe this doesn't matter?
@@ -153,18 +144,19 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
     PetscCall(PetscViewerSetFromOptions(viz->viewer));
     PetscCall(PetscViewerAndFormatCreate(viz->viewer, format, &viz->vf));
 
+    /*
     // set monitoring interval option if not given on the command line
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
       viz->vf->view_interval = rdy->config.output_frequency;
     }
+    */
 
     // set up solution monitoring
     if (rdy->config.output_format == OUTPUT_XDMF) {
       // we do our own special thing for XDMF
       PetscCall(TSMonitorSet(rdy->ts, WriteXDMFOutput, rdy, NULL));
-    } else if (rdy->config.output_format == OUTPUT_CGNS) {
-    } else {  // PETSc can handle all other formats
+    } else if (rdy->config.output_format != OUTPUT_CGNS) { // everything else (except CGNS)
       PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, viz->vf, NULL));
     }
   }
