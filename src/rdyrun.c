@@ -34,7 +34,7 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
 // * and the given suffix
 static PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix, char *filename) {
   PetscFunctionBegin;
-  int      num_digits = (int)(log10((double)(max_index_val / index))) + 1;
+  int      num_digits = (int)(log10((double)max_index_val)) + 1;
   char     fmt[16]    = {0};
   snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
   char ending[PETSC_MAX_PATH_LEN];
@@ -68,10 +68,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
     PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.max_step, suffix, filename));
   } else if (rdy->config.output_format == OUTPUT_XDMF) {
-    if (!strcasecmp(suffix, "cgns")) {  // CGNS data
-      // the CGNS viewer handles its own batching and only needs a format string
-      snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%%d.%s", output_dir, prefix, suffix);
-    } else if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data or CGNS
+    if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data or CGNS
       if (rdy->config.output_batch_size == 1) {
         // all output data goes into a single file
         snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.%s", output_dir, prefix, suffix);
@@ -91,6 +88,9 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
+  } else if (rdy->config.output_format == OUTPUT_CGNS) {
+    // the CGNS viewer handles its own batching and only needs a format string
+    snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%%d.%s", output_dir, prefix, suffix);
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported output format specified.");
   }
