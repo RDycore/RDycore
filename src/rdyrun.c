@@ -28,6 +28,21 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// generates a filename in the output directory
+// * with the given prefix
+// * with the given zero-padded index (padded to the given max index value)
+// * and the given suffix
+static PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix, char *filename) {
+  PetscFunctionBegin;
+  int      num_digits = (int)(log10((double)(max_index_val / index))) + 1;
+  char     fmt[16]    = {0};
+  snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
+  char ending[PETSC_MAX_PATH_LEN];
+  snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
+  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s%s", output_dir, prefix, ending);
+  PetscFunctionReturn(0);
+}
+
 /// Determines the appropriate output file name based on
 /// * the desired file format as specified by rdy->config.output_format
 /// * the time step index and simulation time
@@ -35,57 +50,49 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
 PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
   PetscFunctionBegin;
 
+  size_t config_len = strlen(rdy->config_file);
+  char prefix[config_len+1];
   char *p = strstr(rdy->config_file, ".yaml");
   if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
     p = strstr(rdy->config_file, ".yml");
   }
   if (p) {
     size_t prefix_len = p - rdy->config_file;
-    size_t n          = strlen(output_dir) + 1 + prefix_len;
-    snprintf(filename, n + 1, "%s/%s", output_dir, rdy->config_file);
+    strncpy(prefix, rdy->config_file, prefix_len);
   } else {
-    snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s", output_dir, rdy->config_file);
+    strcpy(prefix, rdy->config_file);
   }
 
   // encode specific information into the filename based on its format
-  char ending[PETSC_MAX_PATH_LEN];
   if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
-    snprintf(ending, PETSC_MAX_PATH_LEN - 1, ".%s", suffix);
+    PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.max_step, suffix, filename));
   } else if (rdy->config.output_format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "cgns")) {  // CGNS data
       // the CGNS viewer handles its own batching and only needs a format string
-      snprintf(ending, PETSC_MAX_PATH_LEN - 1, "-%%d.%s", suffix);
+      snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%%d.%s", output_dir, prefix, suffix);
     } else if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data or CGNS
       if (rdy->config.output_batch_size == 1) {
         // all output data goes into a single file
-        snprintf(ending, PETSC_MAX_PATH_LEN - 1, ".%s", suffix);
+        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.%s", output_dir, prefix, suffix);
       } else {
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size = rdy->config.output_batch_size;
         PetscInt freq       = rdy->config.output_frequency;
         PetscInt batch      = step / freq / batch_size;
-        int      num_digits = (int)(log10((double)(rdy->config.max_step / freq / batch_size))) + 1;
-        char     fmt[16]    = {0};
-        snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
-        snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, batch, suffix);
+        PetscInt max_batch = rdy->config.max_step / freq / batch_size;
+        PetscCall(GenerateIndexedFilename(prefix, batch, max_batch, suffix, filename));
       }
     } else if (!strcasecmp(suffix, "xmf")) {  // XDMF "light" data
       PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
       // encode the step into the filename with zero-padding based on the
       // maximum step number
-      int  num_digits = (int)(log10((double)rdy->config.max_step)) + 1;
-      char fmt[16]    = {0};
-      snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
-      snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, step, suffix);
+      PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.max_step, suffix, filename));
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported output format specified.");
   }
-
-  // concatenate some config parameters
-  strncat(filename, ending, PETSC_MAX_PATH_LEN - 1 - strlen(filename));
 
   PetscFunctionReturn(0);
 }
