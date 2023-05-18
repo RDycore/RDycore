@@ -141,8 +141,10 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
     }
 
     // apply any command-line option overrides
-    PetscCall(PetscViewerSetFromOptions(viz->viewer));
-    PetscCall(PetscViewerAndFormatCreate(viz->viewer, format, &viz->vf));
+    if (viz->viewer) {
+      PetscCall(PetscViewerSetFromOptions(viz->viewer));
+      PetscCall(PetscViewerAndFormatCreate(viz->viewer, format, &viz->vf));
+    }
 
     /*
     // set monitoring interval option if not given on the command line
@@ -175,7 +177,7 @@ PetscErrorCode RDyRun(RDy rdy) {
   //  }
 
   // create a viewer with the proper format for visualization output
-  ViewerContext viz;
+  ViewerContext viz = {0};
   PetscCall(CreateVizViewerContext(rdy, &viz));
 
   // do the thing!
