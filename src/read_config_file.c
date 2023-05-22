@@ -1098,14 +1098,14 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
 #define VALUE_LEN 128
   PetscFunctionBegin;
   PetscBool has_param;
-  char      value[VALUE_LEN+1] = {0};
+  char      value[VALUE_LEN + 1] = {0};
 
   //--------
   // Output
   //--------
 
-  // set the solution monitoring interval
-  if (rdy->config.output_frequency > 0) {
+  // set the solution monitoring interval (except for XDMF, which does its own thing)
+  if ((rdy->config.output_frequency > 0) && (rdy->config.output_format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
       snprintf(value, VALUE_LEN, "%d", rdy->config.output_frequency);
@@ -1121,8 +1121,8 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
     if (!has_param) {
       char file_pattern[PETSC_MAX_PATH_LEN];
       PetscCall(DetermineOutputFile(rdy, 0, 0.0, "cgns", file_pattern));
-        snprintf(value, VALUE_LEN, "cgns:%s", file_pattern);
-        PetscOptionsSetValue(NULL, "-ts_monitor_solution", value);
+      snprintf(value, VALUE_LEN, "cgns:%s", file_pattern);
+      PetscOptionsSetValue(NULL, "-ts_monitor_solution", value);
     }
 
     // adjust the output batch size if needed

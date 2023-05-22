@@ -34,8 +34,8 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
 // * and the given suffix
 static PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix, char *filename) {
   PetscFunctionBegin;
-  int      num_digits = (int)(log10((double)max_index_val)) + 1;
-  char     fmt[16]    = {0};
+  int  num_digits = (int)(log10((double)max_index_val)) + 1;
+  char fmt[16]    = {0};
   snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
   char ending[PETSC_MAX_PATH_LEN];
   snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
@@ -51,8 +51,8 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscFunctionBegin;
 
   size_t config_len = strlen(rdy->config_file);
-  char prefix[config_len+1];
-  memset(prefix, 0, sizeof(char)*(config_len+1));
+  char   prefix[config_len + 1];
+  memset(prefix, 0, sizeof(char) * (config_len + 1));
   char *p = strstr(rdy->config_file, ".yaml");
   if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
     p = strstr(rdy->config_file, ".yml");
@@ -77,7 +77,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
         PetscInt batch_size = rdy->config.output_batch_size;
         PetscInt freq       = rdy->config.output_frequency;
         PetscInt batch      = step / freq / batch_size;
-        PetscInt max_batch = rdy->config.max_step / freq / batch_size;
+        PetscInt max_batch  = rdy->config.max_step / freq / batch_size;
         PetscCall(GenerateIndexedFilename(prefix, batch, max_batch, suffix, filename));
       }
     } else if (!strcasecmp(suffix, "xmf")) {  // XDMF "light" data
@@ -158,7 +158,7 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
     if (rdy->config.output_format == OUTPUT_XDMF) {
       // we do our own special thing for XDMF
       PetscCall(TSMonitorSet(rdy->ts, WriteXDMFOutput, rdy, NULL));
-    } else if (rdy->config.output_format != OUTPUT_CGNS) { // everything else (except CGNS)
+    } else if (rdy->config.output_format != OUTPUT_CGNS) {  // everything else (except CGNS)
       PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, viz->vf, NULL));
     }
   }
