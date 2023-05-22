@@ -1126,12 +1126,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
     }
 
     // adjust the output batch size if needed
-    if (rdy->config.output_batch_size > 1) {
-      PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
-      if (!has_param) {
-        snprintf(value, VALUE_LEN, "%d", rdy->config.output_batch_size);
-        PetscOptionsSetValue(NULL, "-viewer_cgns_batch_size", value);
-      }
+    PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
+    if (!has_param) {
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output_batch_size);
+      PetscOptionsSetValue(NULL, "-viewer_cgns_batch_size", value);
     }
   }
 

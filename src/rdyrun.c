@@ -70,8 +70,8 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   } else if (rdy->config.output_format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data or CGNS
       if (rdy->config.output_batch_size == 1) {
-        // all output data goes into a single file
-        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.%s", output_dir, prefix, suffix);
+        // output from each step gets its own HDF5 file
+        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%d.%s", output_dir, prefix, step, suffix);
       } else {
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size = rdy->config.output_batch_size;
