@@ -4,4 +4,5 @@ coverage:
     project:
       default:
         target: 90%
+    patch: off # we can enable this if we figure out a reasonable policy
 
