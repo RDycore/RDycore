@@ -10,7 +10,7 @@ numerics:
   riemann: roe
 
 logging:
-  level: debug
+  level: detail
 
 time:
   final_time: 0.005
