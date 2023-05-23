@@ -78,6 +78,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
         PetscInt freq       = rdy->config.output_frequency;
         PetscInt batch      = step / freq / batch_size;
         PetscInt max_batch  = rdy->config.max_step / freq / batch_size;
+        if (max_batch < 1) max_batch = 1;
         PetscCall(GenerateIndexedFilename(prefix, batch, max_batch, suffix, filename));
       }
     } else if (!strcasecmp(suffix, "xmf")) {  // XDMF "light" data
