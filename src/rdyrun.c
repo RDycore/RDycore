@@ -99,13 +99,13 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscFunctionReturn(0);
 }
 
-// This struct holds contextual data for a viewer.
+// this struct holds contextual data for a viewer
 typedef struct {
   PetscViewer           viewer;
   PetscViewerAndFormat *vf;
 } ViewerContext;
 
-// Destroys a ViewerContext.
+// destroys a ViewerContext
 static PetscErrorCode ViewerContextDestroy(ViewerContext vc) {
   PetscFunctionBegin;
   if (vc.vf) PetscCall(PetscViewerAndFormatDestroy(&vc.vf));
@@ -113,8 +113,22 @@ static PetscErrorCode ViewerContextDestroy(ViewerContext vc) {
   PetscFunctionReturn(0);
 }
 
-// needed to construct a CGNS viewer
-extern PetscErrorCode PetscViewerCreate_CGNS(PetscViewer);
+// this writes a log message for output at the proper frequency
+PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
+  PetscFunctionBegin;
+  RDy rdy = ctx;
+  if (step % rdy->config.output_frequency == 0) {
+    static const char *formats[3]  = {"binary", "XDMF", "CGNS"};
+    static const char *suffixes[3] = {"bin", "h5", "cgns"};
+    const char        *format      = formats[rdy->config.output_format];
+    const char        *suffix      = suffixes[rdy->config.output_format];
+    char               fname[PETSC_MAX_PATH_LEN];
+    PetscCall(DetermineOutputFile(rdy, step, time, suffix, fname));
+    const char *units = TimeUnitAsString(rdy->config.time_unit);
+    RDyLogDetail(rdy, "Step %d: writing %s output at t = %g %s to %s", step, format, time, units, fname);
+  }
+  PetscFunctionReturn(0);
+}
 
 // Creates a ViewerContext for visualization and sets up visualization
 // monitoring. This function handles a lot of the disparities between what's
@@ -151,8 +165,16 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
     if (rdy->config.output_format == OUTPUT_XDMF) {
       // we do our own special thing for XDMF
       PetscCall(TSMonitorSet(rdy->ts, WriteXDMFOutput, rdy, NULL));
-    } else if (rdy->config.output_format != OUTPUT_CGNS) {  // everything else (except CGNS)
-      PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, viz->vf, NULL));
+    } else {
+      // enable DETAIL logging for non-XDMF output
+      if (rdy->config.log_level >= LOG_DETAIL) {
+        PetscCall(TSMonitorSet(rdy->ts, WriteOutputLogMessage, rdy, NULL));
+      }
+      // CGNS output is handled via the Options database. We need to set monitoring
+      // for all formats that aren't XDMF or CGNS.
+      if (rdy->config.output_format != OUTPUT_CGNS) {
+        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, viz->vf, NULL));
+      }
     }
   }
 
