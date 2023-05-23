@@ -10,6 +10,13 @@ foreach(np 1 2) # test on 1, 2 processes
   add_test(swe_roe_ex2b_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml)
 endforeach()
 
+# Additional tests for CGNS output
+foreach(np 1 2) # test on 1, 2 processes
+  set(cgns_output_args -ts_monitor_solution cgns:output/ex2b-%d.cgns -viewer_cgns_batch_size 20 -ts_monitor_solution_interval 100)
+  add_test(swe_roe_ex2b_cgns_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${cgns_output_args})
+  add_test(swe_roe_ex2b_cgns_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml ${cgns_output_args})
+endforeach()
+
 # ex2b with ICs specified by a file
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_ic_file.yaml

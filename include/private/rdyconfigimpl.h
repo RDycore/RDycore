@@ -208,6 +208,8 @@ typedef struct {
   RDyOutputFormat output_format;
   // Output frequency (in steps)
   PetscInt output_frequency;
+  // Number of timesteps per output file (available only in certain formats)
+  PetscInt output_batch_size;
 
   //---------
   // Logging

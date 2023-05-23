@@ -118,6 +118,12 @@ struct _p_RDy {
 
   // residual vector
   Vec R;
+
+  //-------------------
+  // Simulatіon output
+  //-------------------
+  PetscViewer output_viewer;
+  PetscViewerAndFormat *output_vf;
 };
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
@@ -130,12 +136,7 @@ PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
 // output functions
 PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
 PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char*, char*);
-PETSC_INTERN PetscErrorCode WriteBinaryOutput(RDy, PetscInt, PetscReal);
-PETSC_INTERN PetscErrorCode WriteXDMFHDF5Data(RDy, PetscInt, PetscReal);
-PETSC_INTERN PetscErrorCode WriteXDMFXMFData(RDy, PetscInt, PetscReal);
-PETSC_INTERN PetscErrorCode WriteCGNSOutput(RDy, PetscInt, PetscReal);
-PETSC_INTERN PetscErrorCode WriteOutputFiles(TS, PetscInt, PetscReal, Vec, void*);
-PETSC_INTERN PetscErrorCode PostprocessOutput(RDy);
+PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void*);
 
 // utility functions
 PETSC_INTERN const char* TimeUnitAsString(RDyTimeUnit);

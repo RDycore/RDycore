@@ -10,7 +10,7 @@ numerics:
   riemann: roe
 
 logging:
-  level: debug
+  level: detail
 
 time:
   final_time: 0.005
@@ -20,6 +20,7 @@ time:
 output:
   format: xdmf
   frequency: 100
+  batch_size: 20
 
 grid:
   file: planar_dam_10x5.msh

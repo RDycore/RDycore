@@ -11,7 +11,7 @@ numerics:
   riemann: roe
 
 logging:
-  level: debug
+  level: detail
 
 time:
   dtime: 0.005

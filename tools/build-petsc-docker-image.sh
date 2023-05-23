@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # This script builds a Docker image that contains an installation of PETSc
-# configured specifically for RDycore. PETSc is installed in /opt/haero,
+# configured specifically for RDycore. PETSc is installed in /usr/local/petsc,
 # on top of a recent Ubuntu image. Run it like so:
 #
 # ./build-petsc-docker-image.sh [petsc-hash]

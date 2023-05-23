@@ -16,7 +16,7 @@ static const char *h5_topo_group = "/viz/topology";
 
 // Writes a XDMF "heavy data" to an HDF5 file. The time is expressed in the
 // units given in the configuration file.
-PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
+static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -27,8 +27,8 @@ PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
   const char *units = TimeUnitAsString(rdy->config.time_unit);
   RDyLogDetail(rdy, "Step %d: writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
 
-  // write the grid if we're on the first step
-  if (step == 0) {
+  // write the grid if we're the first step in a batch.
+  if (step % rdy->config.output_batch_size == 0) {
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
     PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
     PetscCall(DMView(rdy->dm, viewer));
@@ -52,9 +52,9 @@ PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
   // FIXME: This setup is specific to the shallow water equations. We can
   // FIXME: generalize it later.
   const char *comp_names[3] = {
-      "Water_Height",
-      "X_Momentum",
-      "Y_Momentum",
+      "Height",
+      "MomentumX",
+      "MomentumY",
   };
   Vec      comp;  // single-component natural vector
   PetscInt n, N, bs;
@@ -157,7 +157,7 @@ static PetscErrorCode ExtractGridTopologies(MPI_Comm comm, hid_t h5_file, GridTo
 
 /// Generates an XMDF "light data" file (.xmf) for the given step and time. The
 /// time is expressed in the units specified in the .yaml input file.
-PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
+static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
   GridTopology topologies[MAX_NUM_TOPOLOGIES];
@@ -231,7 +231,7 @@ PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
     // (none so far!)
 
     // write cell field metadata
-    const char *cell_field_names[3] = {"Water_Height", "X_Momentum", "Y_Momentum"};
+    const char *cell_field_names[3] = {"Height", "MomentumX", "MomentumY"};
     for (int f = 0; f < 3; ++f) {
       PetscCall(PetscFPrintf(rdy->comm, fp,
                              "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
@@ -248,5 +248,18 @@ PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   // write footer and close the file
   PetscCall(PetscFPrintf(rdy->comm, fp, "  </Domain>\n</Xdmf>\n"));
   PetscCall(PetscFClose(rdy->comm, fp));
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
+  PetscFunctionBegin;
+  RDy rdy = ctx;
+  if (step % rdy->config.output_frequency == 0) {
+    PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time_unit);
+    if (rdy->config.output_format == OUTPUT_XDMF) {
+      PetscCall(WriteXDMFHDF5Data(rdy, step, t));
+      PetscCall(WriteXDMFXMFData(rdy, step, t));
+    }
+  }
   PetscFunctionReturn(0);
 }
