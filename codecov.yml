@@ -1,0 +1,7 @@
+# This file configures CodeCov, our code coverage service.
+coverage:
+  status:
+    project:
+      default:
+        target: 90%
+
