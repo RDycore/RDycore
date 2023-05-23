@@ -118,14 +118,10 @@ PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X
   PetscFunctionBegin;
   RDy rdy = ctx;
   if (step % rdy->config.output_frequency == 0) {
-    static const char *formats[3]  = {"binary", "XDMF", "CGNS"};
-    static const char *suffixes[3] = {"bin", "h5", "cgns"};
-    const char        *format      = formats[rdy->config.output_format];
-    const char        *suffix      = suffixes[rdy->config.output_format];
-    char               fname[PETSC_MAX_PATH_LEN];
-    PetscCall(DetermineOutputFile(rdy, step, time, suffix, fname));
-    const char *units = TimeUnitAsString(rdy->config.time_unit);
-    RDyLogDetail(rdy, "Step %d: writing %s output at t = %g %s to %s", step, format, time, units, fname);
+    static const char *formats[3] = {"binary", "XDMF", "CGNS"};
+    const char        *format     = formats[rdy->config.output_format];
+    const char        *units      = TimeUnitAsString(rdy->config.time_unit);
+    RDyLogDetail(rdy, "Step %d: writing %s output at t = %g %s", step, format, time, units);
   }
   PetscFunctionReturn(0);
 }
