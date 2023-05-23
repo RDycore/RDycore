@@ -1113,19 +1113,33 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
     }
   }
 
-  // the CGNS viewer's options aren't exposed at all by the C API, so we have
-  // to set them here
-  if (rdy->config.output_format == OUTPUT_CGNS) {
-    // configure timestep monitoring parameters
-    PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution", &has_param));
-    if (!has_param) {
+  // allow the user to override our output format
+  PetscBool ts_monitor = PETSC_FALSE;
+  char      ts_monitor_opt[128];
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-ts_monitor_solution", ts_monitor_opt, 128, &ts_monitor));
+  if (ts_monitor) {
+    // which is it?
+    if (strstr(ts_monitor_opt, "cgns")) {
+      rdy->config.output_format = OUTPUT_CGNS;
+    } else if (strstr(ts_monitor_opt, "xdmf")) {
+      rdy->config.output_format = OUTPUT_XDMF;
+    } else if (strstr(ts_monitor_opt, "binary")) {
+      rdy->config.output_format = OUTPUT_BINARY;
+    }
+  } else {  // TS monitoring not set on command line
+    // the CGNS viewer's options aren't exposed at all by the C API, so we have
+    // to set them here
+    if (rdy->config.output_format == OUTPUT_CGNS) {
+      // configure timestep monitoring parameters
       char file_pattern[PETSC_MAX_PATH_LEN];
       PetscCall(DetermineOutputFile(rdy, 0, 0.0, "cgns", file_pattern));
       snprintf(value, VALUE_LEN, "cgns:%s", file_pattern);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution", value);
     }
+  }
 
-    // adjust the output batch size if needed
+  // adjust the CGNS output batch size if needed
+  if (rdy->config.output_format == OUTPUT_CGNS) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
     if (!has_param) {
       snprintf(value, VALUE_LEN, "%d", rdy->config.output_batch_size);

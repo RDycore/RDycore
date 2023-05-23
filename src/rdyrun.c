@@ -68,7 +68,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
     PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.max_step, suffix, filename));
   } else if (rdy->config.output_format == OUTPUT_XDMF) {
-    if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data or CGNS
+    if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output_batch_size == 1) {
         // output from each step gets its own HDF5 file
         snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%d.%s", output_dir, prefix, step, suffix);
@@ -145,14 +145,6 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
       PetscCall(PetscViewerSetFromOptions(viz->viewer));
       PetscCall(PetscViewerAndFormatCreate(viz->viewer, format, &viz->vf));
     }
-
-    /*
-    // set monitoring interval option if not given on the command line
-    PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
-    if (!has_param) {
-      viz->vf->view_interval = rdy->config.output_frequency;
-    }
-    */
 
     // set up solution monitoring
     if (rdy->config.output_format == OUTPUT_XDMF) {
