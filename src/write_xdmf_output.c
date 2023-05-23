@@ -231,7 +231,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
     // (none so far!)
 
     // write cell field metadata
-    const char *cell_field_names[3] = {"Water_Height", "X_Momentum", "Y_Momentum"};
+    const char *cell_field_names[3] = {"Height", "MomentumX", "MomentumY"};
     for (int f = 0; f < 3; ++f) {
       PetscCall(PetscFPrintf(rdy->comm, fp,
                              "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
