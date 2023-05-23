@@ -3,6 +3,9 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
+// Maximum length of the name of a prognostic or diagnostic field component
+#define MAX_COMP_NAME_LENGTH 20
+
 // time conversion factors
 static const PetscReal secs_in_min = 60.0;
 static const PetscReal mins_in_hr  = 60.0;
@@ -148,17 +151,22 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMSetFromOptions(rdy->dm));
 
   // create a section with (h, hu, hv) as degrees of freedom
-  PetscInt     n_field            = 3;
-  PetscInt     n_field_dof[3]     = {1, 1, 1};
-  char         field_names[3][20] = {"height", "x momentum", "y momentum"};
+  PetscInt n_field                             = 1;
+  PetscInt n_field_comps[1]                    = {3};
+  char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
+          "Height",
+          "MomentumX",
+          "MomentumY",
+  };
   PetscSection sec;
   PetscCall(PetscSectionCreate(rdy->comm, &sec));
   PetscCall(PetscSectionSetNumFields(sec, n_field));
   PetscInt n_field_dof_tot = 0;
   for (PetscInt f = 0; f < n_field; ++f) {
-    PetscCall(PetscSectionSetFieldName(sec, f, &field_names[f][0]));
-    PetscCall(PetscSectionSetFieldComponents(sec, f, n_field_dof[f]));
-    n_field_dof_tot += n_field_dof[f];
+    PetscCall(PetscSectionSetFieldComponents(sec, f, n_field_comps[f]));
+    for (PetscInt c = 0; c < n_field_comps[f]; ++c, ++n_field_dof_tot) {
+      PetscCall(PetscSectionSetComponentName(sec, f, c, comp_names[c]));
+    }
   }
 
   // set the number of degrees of freedom in each cell
@@ -167,7 +175,7 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(PetscSectionSetChart(sec, c_start, c_end));
   for (PetscInt c = c_start; c < c_end; ++c) {
     for (PetscInt f = 0; f < n_field; ++f) {
-      PetscCall(PetscSectionSetFieldDof(sec, c, f, n_field_dof[f]));
+      PetscCall(PetscSectionSetFieldDof(sec, c, f, n_field_comps[f]));
     }
     PetscCall(PetscSectionSetDof(sec, c, n_field_dof_tot));
   }

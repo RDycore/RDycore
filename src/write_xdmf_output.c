@@ -52,9 +52,9 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   // FIXME: This setup is specific to the shallow water equations. We can
   // FIXME: generalize it later.
   const char *comp_names[3] = {
-      "Water_Height",
-      "X_Momentum",
-      "Y_Momentum",
+      "Height",
+      "MomentumX",
+      "MomentumY",
   };
   Vec      comp;  // single-component natural vector
   PetscInt n, N, bs;
