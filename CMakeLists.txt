@@ -36,6 +36,11 @@ elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
 endif()
 
+# Set linker flags where appropriate
+if (APPLE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_compact_unwind")
+endif()
+
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.
 # If we find a space in this variable, we break things up into PETSC_MPIEXEC
 # and PETSC_MPIEXEC_FLAGS.
