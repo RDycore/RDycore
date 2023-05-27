@@ -9,7 +9,7 @@ add_library(rdycore
   rdysetup.c
   write_xdmf_output.c
 )
-add_dependencies(rdycore yaml)
+add_dependencies(rdycore cyaml yaml)
 
 install(
   TARGETS rdycore

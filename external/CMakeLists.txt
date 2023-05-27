@@ -32,6 +32,29 @@ set_target_properties(yaml PROPERTIES
   IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${LIBYAML_LIB_NAME})
 add_dependencies(yaml yaml_proj)
 
+#---------------------------------------------------------------------
+# Build libcyaml, a schema-based YAML parser built on top of libyaml.
+#---------------------------------------------------------------------
+string(TOLOWER ${CMAKE_BUILD_TYPE} LIBCYAML_VARIANT)
+set(LIBCYAML_LIB_NAME libcyaml${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(LIBCYAML_YAML_CFLAGS "-I${PROJECT_BINARY_DIR}/include")# ${LIBYAML_C_FLAGS}")
+set(LIBCYAML_YAML_LDFLAGS "-L${PROJECT_BINARY_DIR}/lib -lyaml")
+ExternalProject_Add(cyaml_proj
+                    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/libcyaml
+                    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libcyaml
+                    BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/libcyaml
+                    INSTALL_DIR ${PROJECT_BINARY_DIR}
+                    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libcyaml ${CMAKE_CURRENT_BINARY_DIR}/libcyaml
+                    BUILD_COMMAND env PREFIX=${PROJECT_BINARY_DIR} CFLAGS=${LIBCYAML_YAML_CFLAGS} LDFLAGS=${LIBCYAML_YAML_LDFLAGS} make all VARIANT=${LIBCYAML_VARIANT}
+                    INSTALL_COMMAND make install
+                    LOG_BUILD TRUE
+                    LOG_INSTALL TRUE
+                    BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME})
+add_library(cyaml SHARED IMPORTED GLOBAL)
+set_target_properties(cyaml PROPERTIES
+  IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${LIBYAML_LIB_NAME})
+add_dependencies(cyaml cyaml_proj)
+
 if (ENABLE_TESTS)
   #----------------------------------------
   # Build cmocka, a C unit testing library.
