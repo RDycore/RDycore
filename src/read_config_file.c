@@ -2,7 +2,7 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymemoryimpl.h>
-#include <yaml.h>
+#include <cyaml/cyaml.h>
 
 // =============
 //  YAML Parser
@@ -13,16 +13,389 @@
 // item one wants to retrieve. This puts a large restriction on the types of
 // YAML files that can be parsed, so we've rolled our own.
 //
-// Here we've implemented a parser (using libyaml) to handle the RDycore
+// Here we've implemented a parser (using libcyaml) to handle the RDycore
 // configuration file whose specification can be found at
 //
 // https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
 //
+// In the style of libcyaml (https://github.com/tlsa/libcyaml/blob/main/docs/guide.md),
+// this parser defines a schema for each section and populates the appropriate struct(s)
+// within RDyConfig (include/private/rdyconfigimpl.h) accordingly. The schema for each
+// section appears below and must remain consistent with the data structures in rdyconfigimpl.h.
+
 // the maximum length of an identifier or value in the YAML file
 #define YAML_MAX_LEN 1024
 #define UNINITIALIZED_REAL -999.0
 #define UNINITIALIZED_INT -999
 
+// ====================
+//  Schema definitions
+// ====================
+
+// ---------------
+// physics section
+// ---------------
+// physics:
+//   flow:
+//     mode: <swe|diffusion> # swe by default
+//     bed_friction: <true|false> # off by default
+//   sediment: <true|false> # off by default
+//   salinity: <true|false> # off by default
+
+// mapping of strings to physics flow types
+static const cyaml_strval_t physics_flow_modes[] = {
+  {"swe", FLOW_SWE},
+  {"diffusion", FLOW_DIFFUSION},
+};
+
+// mapping of physics.flow fields to members of RDyPhysicsFlow
+static const cyaml_schema_field_t physics_flow_fields_schema[] = {
+  CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
+  CYAML_FIELD_BOOL("bed_friction", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, bed_friction),
+  CYAML_FIELD_END
+};
+
+// mapping of physics fields to members of RDyPhysicsSection
+static const cyaml_schema_field_t physics_fields_schema[] = {
+  CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
+  CYAML_FIELD_BOOL("sediment", CYAML_FLAG_DEFAULT, RDyPhysicsSection, sediment),
+  CYAML_FIELD_BOOL("salinity", CYAML_FLAG_DEFAULT, RDyPhysicsSection, salinity),
+  CYAML_FIELD_END
+};
+
+// ----------------
+// numerics section
+// ----------------
+// numerics:
+//   spatial: <fv|fe>                 # To begin with, we will only have FV method
+//   temporal: <euler,rk4,beuler,...> # These should map on PETSc -ts_type
+//   riemann: <roe|hllc>              # To begin with, we will only have Roe
+
+// mapping of strings to numerics spatial types
+static const cyaml_strval_t numerics_spatial_types[] = {
+  {"fv", SPATIAL_FV},
+  {"fe", SPATIAL_FE},
+};
+
+// mapping of strings to numerics temporal types
+static const cyaml_strval_t numerics_temporal_types[] = {
+  {"euler", TEMPORAL_EULER},
+  {"rk4", TEMPORAL_RK4},
+  {"beuler", TEMPORAL_BEULER},
+};
+
+// mapping of strings to numerics riemann solver types
+static const cyaml_strval_t numerics_riemann_types[] = {
+  {"roe", RIEMANN_ROE},
+  {"hllc", RIEMANN_HLLC},
+};
+
+// mapping of numerics fields to members of RDyNumericsSection
+static const cyaml_schema_field_t numerics_fields_schema[] = {
+  CYAML_FIELD_ENUM("spatial", CYAML_FLAG_DEFAULT, RDyNumericsSection, spatial, numerics_spatial_types, CYAML_ARRAY_LEN(numerics_spatial_types)),
+  CYAML_FIELD_ENUM("temporal", CYAML_FLAG_DEFAULT, RDyNumericsSection, temporal, numerics_temporal_types, CYAML_ARRAY_LEN(numerics_temporal_types)),
+  CYAML_FIELD_ENUM("riemann", CYAML_FLAG_DEFAULT, RDyNumericsSection, riemann, numerics_riemann_types, CYAML_ARRAY_LEN(numerics_riemann_types)),
+  CYAML_FIELD_END
+};
+
+// ------------
+// time section
+// ------------
+// time:
+//   final_time: <value>
+//   unit: <seconds|minutes|hours|days|months|years> # applies to final_time (stored internally in seconds)
+//   max_step: <value>
+//   dtime: <value>
+
+// mapping of strings to time units
+static const cyaml_strval_t time_units[] = {
+  {"seconds", TIME_SECONDS},
+  {"minutes", TIME_MINUTES},
+  {"hours", TIME_HOURS},
+  {"days", TIME_DAYS},
+  {"months", TIME_MONTHS},
+  {"years", TIME_YEARS},
+};
+
+// mapping of time fields to members of RDyTimeSection
+static const cyaml_schema_field_t time_fields_schema[] = {
+  CYAML_FIELD_FLOAT("final_time", CYAML_FLAG_DEFAULT, RDyTimeSection, final_time),
+  CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
+  CYAML_FIELD_INT("max_step", CYAML_FLAG_DEFAULT, RDyTimeSection, max_step),
+  CYAML_FIELD_FLOAT("dtime", CYAML_FLAG_DEFAULT, RDyTimeSection, dtime),
+  CYAML_FIELD_END
+};
+
+// ---------------
+// logging section
+// ---------------
+// logging:
+//   file: <path> # default: stdout
+//   level: <none|warning|info|detail|debug> # <-- increasing levels of logging (default: info)
+
+// mapping of strings to log levels
+static const cyaml_strval_t logging_levels[] = {
+  {"none", LOG_NONE},
+  {"warning", LOG_WARNING},
+  {"info", LOG_INFO},
+  {"detail", LOG_DETAIL},
+  {"debug", LOG_DEBUG},
+};
+
+// mapping of logging fields to members of RDyLoggingSection
+static const cyaml_schema_field_t logging_fields_schema[] = {
+  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyLoggingSection, file, 0),
+  CYAML_FIELD_ENUM("level", CYAML_FLAG_DEFAULT, RDyLoggingSection, level, logging_levels, CYAML_ARRAY_LEN(logging_levels)),
+  CYAML_FIELD_END
+};
+
+// ---------------
+// restart section
+// ---------------
+// restart:
+//   format: <binary|hdf5>
+//   frequency: <value-in-steps>  # default: 0 (no restarts)
+
+// mapping of strings to file formats
+static const cyaml_strval_t restart_file_formats[] = {
+  {"binary", PETSC_VIEWER_NATIVE},
+  {"hdf5", PETSC_VIEWER_HDF5_PETSC},
+};
+
+// mapping of restart fields to members of RDyRestartSection
+static const cyaml_schema_field_t restart_fields_schema[] = {
+  CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyRestartSection, format, restart_file_formats, CYAML_ARRAY_LEN(restart_file_formats)),
+  CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyRestartSection, frequency),
+  CYAML_FIELD_END
+};
+
+// ---------------
+// output section
+// ---------------
+// output:
+//   format: <binary|xdmf|cgns>
+//   frequency: <number-of-steps-between-output-dumps> # default: 0 (no output)
+//   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
+
+// mapping of strings to file formats
+static const cyaml_strval_t output_file_formats[] = {
+  {"binary", OUTPUT_BINARY},
+  {"xdmf", OUTPUT_XDMF},
+  {"cgns", OUTPUT_CGNS},
+};
+
+// mapping of output fields to members of RDyOutputSection
+static const cyaml_schema_field_t output_fields_schema[] = {
+  CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
+  CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyOutputSection, frequency),
+  CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
+  CYAML_FIELD_END
+};
+
+// ------------
+// grid section
+// ------------
+// grid:
+//   file: <path-to-file/mesh.{msh,h5,exo}>
+
+// mapping of grid fields to members of RDyGridSection
+static const cyaml_schema_field_t grid_fields_schema[] = {
+  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 0),
+  CYAML_FIELD_END
+};
+
+// ---------------------------------------------------------
+// initial_conditions and sources sections
+// ---------------------------------------------------------
+// initial_conditions/sources:
+//   domain: # optional, specifies initial conditions/sources for entire domain
+//     file: <path-to-file/ic.{bin,h5,etc}>
+//     format: <bin|h5|etc>
+//   regions: # optional, specifies conditions on a per-region obasis
+//     - id: <region-id>
+//       flow: <name-of-a-flow-condition>
+//       sediment: <name-of-a-sediment-condition> # used if physics.sediment = true above
+//       salinity: <name-of-a-salinity-condition> # used if physics.salinity = true above
+//     - id: <region-id>
+//       flow: <name-of-a-flow-condition>
+//       sediment: <name-of-a-sediment-condition> # used only if physics.sediment = true above
+//       salinity: <name-of-a-salinity-condition> # used only if physics.salinity = true above
+// ...
+
+// mapping of strings to domain-conditions-related file formats
+static const cyaml_strval_t domain_file_formats[] = {
+  {"binary", PETSC_VIEWER_NATIVE},
+  {"hdf5", PETSC_VIEWER_HDF5_PETSC},
+};
+
+// mapping of domain fields to members of RDyDomainConditions
+static const cyaml_schema_field_t domain_fields_schema[] = {
+  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyDomainConditions, file, 0),
+  CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
+  CYAML_FIELD_END
+};
+
+// mapping of conditions fields to members of RDyConditionSpec
+static const cyaml_schema_field_t condition_spec_fields_schema[] = {
+  CYAML_FIELD_INT("id", CYAML_FLAG_DEFAULT, RDyConditionSpec, id),
+  CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyConditionSpec, flow, 0),
+  CYAML_FIELD_STRING("sediment", CYAML_FLAG_DEFAULT, RDyConditionSpec, sediment, 0),
+  CYAML_FIELD_STRING("salinity", CYAML_FLAG_DEFAULT, RDyConditionSpec, salinity, 0),
+  CYAML_FIELD_END
+};
+
+// a single conditionspec entry
+static const cyaml_schema_value_t condition_spec_entry = {
+  CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyConditionSpec, condition_spec_fields_schema),
+};
+
+// mapping of initial_conditions fields to RDyInitialConditionsSection
+static const cyaml_schema_field_t initial_conditions_fields_schema = {
+  CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, domain, domain_fields_schema),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, conditions, num_conditions, condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_END
+};
+
+// mapping of sources fields to RDySources
+static const cyaml_schema_field_t sources_fields_schema_fields_schema = {
+  CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySourcesSection, domain, domain_fields_schema),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, conditions, num_conditions, condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_END
+};
+
+// ---------------------------------------------------------
+// boundary_conditions section
+// ---------------------------------------------------------
+// boundary_conditions:
+//   - id: <boundary-id>
+//     flow: <name-of-a-flow-condition>
+//     sediment: <name-of-a-sediment-condition> # used if physics.sediment = true above
+//     salinity: <name-of-a-salinity-condition> # used if physics.salinity = true above
+//   - id: <boundary-id>
+//     flow: <name-of-a-flow-condition>
+//     sediment: <name-of-a-sediment-condition> # used only if physics.sediment = true above
+//     salinity: <name-of-a-salinity-condition> # used only if physics.salinity = true above
+// ...
+
+// The above is just a sequence of condition specs, so we don't need any other
+// definitions.
+
+// -----------------------
+// flow_conditions section
+// -----------------------
+// - name: <name-of-flow-condition-1>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   height: <value>
+//   momentum: <px, py>
+// - name: <name-of-flow-condition-2>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   height: <value>
+//   momentum: <px, py>
+//   ...
+
+// mapping of strings to types of conditions
+static const cyaml_strval_t condition_types[] = {
+  {"dirichlet", CONDITION_DIRICHLET},
+  {"neumann", CONDITION_NEUMANN},
+  {"reflecting", CONDITION_REFLECTING},
+  {"critical", CONDITION_CRITICAL_OUTFLOW},
+};
+
+// schema for momentum component (as specified in a 2-item sequence)
+static const cyaml_schema_value_t momentum_component = {
+  CYAML_VALUE_FLOAT(CYAML_FLAG_DEFAULT, PetscReal),
+};
+
+// schema for flow condition fields
+static const cyaml_schema_field_t flow_condition_fields_schema[] = {
+  CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 0),
+  CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
+  CYAML_FIELD_FLOAT("height", CYAML_FLAG_DEFAULT, RDyFlowCondition, height),
+  CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_DEFAULT, RDyFlowCondition, momentum, momentum_component, 2),
+  CYAML_FIELD_END
+}
+
+// a single flow_conditions entry
+static const cyaml_schema_value_t flow_conditions_entry = {
+  CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyFlowCondition, flow_condition_fields_schema),
+};
+
+// ---------------------------
+// sediment_conditions section
+// ---------------------------
+// - name: <name-of-sediment-condition-1>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   concentration: <value>
+// - name: <name-of-sediment-condition-2>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   concentration: <value>
+//   ...
+
+// schema for sediment_condition fields
+static const cyaml_schema_field_t sediment_condition_fields_schema[] = {
+  CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 0),
+  CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySedimentCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
+  CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySedimentCondition, concentration),
+  CYAML_FIELD_END
+}
+
+// a single sediment_conditions entry
+static const cyaml_schema_value_t sediment_conditions_entry = {
+  CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySedimentCondition, sediment_condition_fields_schema),
+};
+
+// ---------------------------
+// salinity_conditions section
+// ---------------------------
+// - name: <name-of-salinity-condition-1>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   concentration: <value>
+// - name: <name-of-salinity-condition-2>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   concentration: <value>
+//   ...
+
+// schema for salinity fields
+static const cyaml_schema_field_t salinity_condition_fields_schema[] = {
+  CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 0),
+  CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySalinityCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
+  CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySalinityCondition, concentration),
+  CYAML_FIELD_END
+}
+
+// a single salinity_conditions entry
+static const cyaml_schema_value_t salinity_conditions_entry = {
+  CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySalinityCondition, salinity_condition_fields_schema),
+};
+
+// ----------------
+// top-level schema
+// ----------------
+
+// schema for top-level configuration fields
+static const cyaml_schema_field_t config_fields_schema[] = {
+  CYAML_FIELD_MAPPING("physics", CYAML_FLAG_DEFAULT, RDyConfig, physics, physics_fields_schema),
+  CYAML_FIELD_MAPPING("numerics", CYAML_FLAG_DEFAULT, RDyConfig, numerics, numerics_fields_schema),
+  CYAML_FIELD_MAPPING("time", CYAML_FLAG_DEFAULT, RDyConfig, time, time_fields_schema),
+  CYAML_FIELD_MAPPING("logging", CYAML_FLAG_OPTIONAL, RDyConfig, logging, logging_fields_schema),
+  CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
+  CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
+  CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
+  CYAML_FIELD_MAPPING("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, initial_conditions_fields_schema),
+  CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions, boundary_condition_entry, 0, MAX_NUM_BOUNDARIES),
+  CYAML_FIELD_MAPPING("sources", CYAML_FLAG_DEFAULT, RDyConfig, sources, sources_fields_schema),
+  CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, flow_conditions, num_flow_conditions, flow_condition_entry, 0, MAX_NUM_CONDITIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions, sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions, salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+  CYAML_FIELD_END
+};
+
+// schema for top-level configuration datum itself
+static const cyaml_schema_value_t config_schema = {
+  CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyConfig, config_fields_schema),
+};
+
+#if 0
 // This enum defines the different sections in our configuration file.
 typedef enum {
   NO_SECTION = 0,
@@ -977,6 +1350,21 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
     yaml_event_delete(&event);
   } while (event_type != YAML_STREAM_END_EVENT);
   yaml_parser_delete(&parser);
+
+  PetscFunctionReturn(0);
+}
+#endif
+
+// Parses the given YAML string into the given config representation
+static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *config) {
+  PetscFunctionBegin;
+
+  cyaml_config_t config = {
+  };
+
+  uint8_t *yaml_data = yaml_str;
+  size_t yaml_data_len = strlen(yaml_str);
+  cyaml_err_t err = cyaml_load_data(yaml_data, yaml_data_len, &config, 
 
   PetscFunctionReturn(0);
 }
