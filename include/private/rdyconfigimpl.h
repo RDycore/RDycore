@@ -251,8 +251,10 @@ typedef struct {
   RDyGridSection grid;
 
   RDyInitialConditionsSection initial_conditions;
-  RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
   RDySourcesSection sources;
+
+  PetscInt num_boundary_conditions;
+  RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 
   PetscInt num_flow_conditions;
   RDyFlowCondition flow_conditions[MAX_NUM_CONDITIONS];

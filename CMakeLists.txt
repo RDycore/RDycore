@@ -28,10 +28,12 @@ set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 
 # Add some compiler flags of our own.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fmax-errors=10") # works for GCC and Clang
 if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fmax-errors=10")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format-truncation")
+elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
 endif()
 
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.

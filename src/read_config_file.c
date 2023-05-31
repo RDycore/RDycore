@@ -250,16 +250,16 @@ static const cyaml_schema_value_t condition_spec_entry = {
 };
 
 // mapping of initial_conditions fields to RDyInitialConditionsSection
-static const cyaml_schema_field_t initial_conditions_fields_schema = {
+static const cyaml_schema_field_t initial_conditions_fields_schema[] = {
   CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, domain, domain_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, conditions, num_conditions, condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, conditions, num_conditions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
   CYAML_FIELD_END
 };
 
 // mapping of sources fields to RDySources
-static const cyaml_schema_field_t sources_fields_schema_fields_schema = {
+static const cyaml_schema_field_t sources_fields_schema[] = {
   CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySourcesSection, domain, domain_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, conditions, num_conditions, condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, conditions, num_conditions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
   CYAML_FIELD_END
 };
 
@@ -311,12 +311,12 @@ static const cyaml_schema_field_t flow_condition_fields_schema[] = {
   CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 0),
   CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
   CYAML_FIELD_FLOAT("height", CYAML_FLAG_DEFAULT, RDyFlowCondition, height),
-  CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_DEFAULT, RDyFlowCondition, momentum, momentum_component, 2),
+  CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_DEFAULT, RDyFlowCondition, momentum, &momentum_component, 2),
   CYAML_FIELD_END
-}
+};
 
 // a single flow_conditions entry
-static const cyaml_schema_value_t flow_conditions_entry = {
+static const cyaml_schema_value_t flow_condition_entry = {
   CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyFlowCondition, flow_condition_fields_schema),
 };
 
@@ -337,10 +337,10 @@ static const cyaml_schema_field_t sediment_condition_fields_schema[] = {
   CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySedimentCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
   CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySedimentCondition, concentration),
   CYAML_FIELD_END
-}
+};
 
 // a single sediment_conditions entry
-static const cyaml_schema_value_t sediment_conditions_entry = {
+static const cyaml_schema_value_t sediment_condition_entry = {
   CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySedimentCondition, sediment_condition_fields_schema),
 };
 
@@ -361,10 +361,10 @@ static const cyaml_schema_field_t salinity_condition_fields_schema[] = {
   CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySalinityCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
   CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySalinityCondition, concentration),
   CYAML_FIELD_END
-}
+};
 
 // a single salinity_conditions entry
-static const cyaml_schema_value_t salinity_conditions_entry = {
+static const cyaml_schema_value_t salinity_condition_entry = {
   CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySalinityCondition, salinity_condition_fields_schema),
 };
 
@@ -382,11 +382,11 @@ static const cyaml_schema_field_t config_fields_schema[] = {
   CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
   CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
   CYAML_FIELD_MAPPING("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, initial_conditions_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions, boundary_condition_entry, 0, MAX_NUM_BOUNDARIES),
+  CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions, &condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
   CYAML_FIELD_MAPPING("sources", CYAML_FLAG_DEFAULT, RDyConfig, sources, sources_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, flow_conditions, num_flow_conditions, flow_condition_entry, 0, MAX_NUM_CONDITIONS),
-  CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions, sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
-  CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions, salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0, MAX_NUM_CONDITIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions, &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions, &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
   CYAML_FIELD_END
 };
 
@@ -872,7 +872,7 @@ static PetscErrorCode ParseGrid(yaml_event_t *event, YamlParserState *state, RDy
     strncpy(state->parameter, value, YAML_MAX_LEN);
   } else {
     // Easy peasy--we just record the mesh file and leave.
-    strncpy(config->mesh_file, value, PETSC_MAX_PATH_LEN);
+    strncpy(config->grid.file, value, PETSC_MAX_PATH_LEN);
     state->parameter[0] = 0;  // clear parameter name
   }
 
@@ -1359,12 +1359,15 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
 static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *config) {
   PetscFunctionBegin;
 
-  cyaml_config_t config = {
+  cyaml_config_t yaml_config = {
   };
 
-  uint8_t *yaml_data = yaml_str;
+  const uint8_t *yaml_data = (const uint8_t*)yaml_str;
   size_t yaml_data_len = strlen(yaml_str);
-  cyaml_err_t err = cyaml_load_data(yaml_data, yaml_data_len, &config, 
+  cyaml_err_t err = cyaml_load_data(yaml_data, yaml_data_len, &yaml_config,
+    &config_schema, (void**)&config, NULL);
+  PetscCheck(err == CYAML_OK, comm, PETSC_ERR_USER, "Error parsing config file: %s",
+             cyaml_strerror(err));
 
   PetscFunctionReturn(0);
 }
@@ -1378,9 +1381,9 @@ static PetscErrorCode InitConfig(RDyConfig *config) {
   // RDy struct. So all we need to do is initialize anything that shouldn't be
   // zero.
 
-  config->final_time = UNINITIALIZED_REAL;
-  config->dtime      = UNINITIALIZED_REAL;
-  config->max_step   = UNINITIALIZED_INT;
+  config->time.final_time = UNINITIALIZED_REAL;
+  config->time.dtime      = UNINITIALIZED_REAL;
+  config->time.max_step   = UNINITIALIZED_INT;
 
   // initialize boundary conditions so we can determine whether they are
   // properly set after parsing
@@ -1406,46 +1409,44 @@ static PetscErrorCode InitConfig(RDyConfig *config) {
 static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionBegin;
 
-  // check 'Numerics' settings
-  if (config->spatial != SPATIAL_FV) {
+  // check numerics settings
+  if (config->numerics.spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
   }
-  if (config->temporal != TEMPORAL_EULER) {
+  if (config->numerics.temporal != TEMPORAL_EULER) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the forward euler temporal method (EULER) is currently implemented.");
   }
-  if (config->riemann != RIEMANN_ROE) {
+  if (config->numerics.riemann != RIEMANN_ROE) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) is currently implemented.");
   }
 
-  PetscCheck(strlen(config->mesh_file), comm, PETSC_ERR_USER, "grid.file not specified!");
+  PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");
 
   // check 'Timestepping' settings
   // 'final_time', 'max_step', 'dtime': Only two of the three values can be specified in the .yaml file.
-  if (config->final_time == UNINITIALIZED_REAL) {
-    if (!(config->max_step != UNINITIALIZED_INT && config->dtime != UNINITIALIZED_REAL)) {
+  if (config->time.final_time == UNINITIALIZED_REAL) {
+    if (!(config->time.max_step != UNINITIALIZED_INT && config->time.dtime != UNINITIALIZED_REAL)) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
                  "time.final_time could be determined.\n  - time.final_time was not specified, and\n  - both time.final_time and time.max_step were "
                  "also not specified");
     }
-    config->final_time = config->max_step * config->dtime;
+    config->time.final_time = config->time.max_step * config->time.dtime;
   } else {
-    if (config->max_step != UNINITIALIZED_INT && config->dtime != UNINITIALIZED_REAL) {
+    if (config->time.max_step != UNINITIALIZED_INT && config->time.dtime != UNINITIALIZED_REAL) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Can only specify time.final_time or time.max_step in the .yaml file");
     }
-    if (config->max_step == UNINITIALIZED_INT && config->dtime == UNINITIALIZED_REAL) {
+    if (config->time.max_step == UNINITIALIZED_INT && config->time.dtime == UNINITIALIZED_REAL) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Need to specify time.final_time or time.max_step in the .yaml file");
     }
-    if (config->max_step == UNINITIALIZED_INT) config->max_step = (PetscInt)(config->final_time / config->dtime);
-    if (config->dtime == UNINITIALIZED_REAL) config->dtime = config->final_time / config->max_step;
+    if (config->time.max_step == UNINITIALIZED_INT) config->time.max_step = (PetscInt)(config->time.final_time / config->time.dtime);
+    if (config->time.dtime == UNINITIALIZED_REAL) config->time.dtime = config->time.final_time / config->time.max_step;
   }
 
   // we can accept an initial conditions file OR a set of initial conditions,
   // but not both
-  PetscCheck((strlen(config->initial_conditions_file) && !config->num_initial_conditions) ||
-                 (!strlen(config->initial_conditions_file) && config->num_initial_conditions),
+  PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_conditions > 0),
              comm, PETSC_ERR_USER,
-             "Invalid initial_conditions! A file was specified, so no further "
-             "parameters are allowed.");
+             "Invalid initial_conditions! No domain or per-region conditions given.");
 
   // validate our flow conditions
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
@@ -1475,7 +1476,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   }
 
   // validate output options
-  PetscCheck((config->output_batch_size == 0) || (config->output_format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
+  PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
              "Binary output does not support output batching");
   PetscFunctionReturn(0);
 }
@@ -1493,10 +1494,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   //--------
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output_frequency > 0) && (rdy->config.output_format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.frequency > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%d", rdy->config.output_frequency);
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output.frequency);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
@@ -1508,16 +1509,16 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   if (ts_monitor) {
     // which is it?
     if (strstr(ts_monitor_opt, "cgns")) {
-      rdy->config.output_format = OUTPUT_CGNS;
+      rdy->config.output.format = OUTPUT_CGNS;
     } else if (strstr(ts_monitor_opt, "xdmf")) {
-      rdy->config.output_format = OUTPUT_XDMF;
+      rdy->config.output.format = OUTPUT_XDMF;
     } else if (strstr(ts_monitor_opt, "binary")) {
-      rdy->config.output_format = OUTPUT_BINARY;
+      rdy->config.output.format = OUTPUT_BINARY;
     }
   } else {  // TS monitoring not set on command line
     // the CGNS viewer's options aren't exposed at all by the C API, so we have
     // to set them here
-    if (rdy->config.output_format == OUTPUT_CGNS) {
+    if (rdy->config.output.format == OUTPUT_CGNS) {
       // configure timestep monitoring parameters
       char file_pattern[PETSC_MAX_PATH_LEN];
       PetscCall(DetermineOutputFile(rdy, 0, 0.0, "cgns", file_pattern));
@@ -1527,10 +1528,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   }
 
   // adjust the CGNS output batch size if needed
-  if (rdy->config.output_format == OUTPUT_CGNS) {
+  if (rdy->config.output.format == OUTPUT_CGNS) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%d", rdy->config.output_batch_size);
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output.batch_size);
       PetscOptionsSetValue(NULL, "-viewer_cgns_batch_size", value);
     }
   }
