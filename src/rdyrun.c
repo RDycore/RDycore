@@ -76,8 +76,8 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size = rdy->config.output.batch_size;
         PetscInt freq       = rdy->config.output.frequency;
-        PetscInt batch     = step / freq / batch_size;
-        PetscInt max_batch = rdy->config.time.max_step / freq / batch_size;
+        PetscInt batch      = step / freq / batch_size;
+        PetscInt max_batch  = rdy->config.time.max_step / freq / batch_size;
         if (max_batch < 1) max_batch = 1;
         PetscCall(GenerateIndexedFilename(prefix, batch, max_batch, suffix, filename));
       }
