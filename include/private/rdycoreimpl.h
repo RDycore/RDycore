@@ -1,25 +1,24 @@
 #ifndef RDYCOREIMPL_H
 #define RDYCOREIMPL_H
 
-#include <rdycore.h>
+#include <petsc/private/petscimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
-
-#include <petsc/private/petscimpl.h>
+#include <rdycore.h>
 
 // This type defines a region consisting of cells identified by their local
 // indices.
 typedef struct {
-  PetscInt   *cell_ids;
-  PetscInt    num_cells;
+  PetscInt *cell_ids;
+  PetscInt  num_cells;
 } RDyRegion;
 
 // This type defines a boundary consisting of edges identified by their local
 // indices.
 typedef struct {
-  PetscInt   *edge_ids;
-  PetscInt    num_edges;
+  PetscInt *edge_ids;
+  PetscInt  num_edges;
 } RDyBoundary;
 
 // This type defines a "condition" representing
@@ -41,9 +40,9 @@ typedef struct _RDyOps *RDyOps;
 struct _RDyOps {
   // Called by RDyCreate to allocate implementation-specific resources, storing
   // the result in the given context pointer.
-  PetscErrorCode (*create)(void**);
+  PetscErrorCode (*create)(void **);
   // Called by RDyDestroy to free implementation-specific resources.
-  PetscErrorCode (*destroy)(void*);
+  PetscErrorCode (*destroy)(void *);
 };
 
 // an application context that stores data relevant to a simulation
@@ -122,7 +121,7 @@ struct _p_RDy {
   //-------------------
   // Simulatіon output
   //-------------------
-  PetscViewer output_viewer;
+  PetscViewer           output_viewer;
   PetscViewerAndFormat *output_vf;
 };
 
@@ -131,16 +130,16 @@ PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 
 // shallow water equations functions
 PETSC_INTERN PetscErrorCode InitSWE(RDy);
-PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void*);
+PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 
 // output functions
 PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
-PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char*, char*);
-PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void*);
+PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char *, char *);
+PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *);
 
 // utility functions
-PETSC_INTERN const char* TimeUnitAsString(RDyTimeUnit);
-PETSC_INTERN PetscReal ConvertTimeToSeconds(PetscReal, RDyTimeUnit);
-PETSC_INTERN PetscReal ConvertTimeFromSeconds(PetscReal, RDyTimeUnit);
+PETSC_INTERN const char *TimeUnitAsString(RDyTimeUnit);
+PETSC_INTERN PetscReal   ConvertTimeToSeconds(PetscReal, RDyTimeUnit);
+PETSC_INTERN PetscReal   ConvertTimeFromSeconds(PetscReal, RDyTimeUnit);
 
 #endif

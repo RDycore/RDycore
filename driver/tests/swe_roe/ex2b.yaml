@@ -26,10 +26,11 @@ grid:
   file: planar_dam_10x5.msh
 
 initial_conditions:
-  1: # upstream region
-    flow: dam_top_ic
-  2: # downstream region
-    flow: dam_bottom_ic
+  regions:
+    - id: 1 # upstream region
+      flow: dam_top_ic
+    - id: 2 # downstream region
+      flow: dam_bottom_ic
 
 # The mesh contains three boundaries on which following BCs are being
 # applied:
@@ -41,22 +42,21 @@ initial_conditions:
 # the BC for "boundary". If no BC is specified for a boundary, the reflecting
 # wall BC is assumed.
 boundary_conditions:
-  2: # top_wall
+  - id: 2 # top_wall
     flow: reflecting_bc
-  3: # bottom_wall
+  - id: 3 # bottom_wall
     flow: outflow_bc
 
 flow_conditions:
-  dam_top_ic:
+  - name: dam_top_ic
     type: dirichlet
     height: 10
     momentum: [0, 0]
-  dam_bottom_ic:
+  - name: dam_bottom_ic
     type: dirichlet
     height: 5
     momentum: [0, 0]
-  reflecting_bc:
+  - name: reflecting_bc
     type: reflecting
-  outflow_bc:
+  - name: outflow_bc
     type: critical-outflow
-

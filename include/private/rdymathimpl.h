@@ -2,7 +2,7 @@
 #define RDYMATHIMPL_H
 
 // some useful math macros
-#define Square(x) ((x)*(x))
-#define Cube(x)   ((x)*(x)*(x))
+#define Square(x) ((x) * (x))
+#define Cube(x) ((x) * (x) * (x))
 
 #endif

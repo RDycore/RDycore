@@ -567,8 +567,8 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
     PetscInt      region_id = rdy->region_ids[r];
     PetscInt      ic_region_index;
     PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &ic_region_index));
-    PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file),
-      rdy->comm, PETSC_ERR_USER, "Region %d has no initial conditions!", region_id);
+    PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
+               "Region %d has no initial conditions!", region_id);
 
     if (ic_region_index != -1) {
       RDyConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
@@ -584,11 +584,11 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       if (rdy->config.physics.sediment) {
         PetscCheck(strlen(ic_spec->sediment), rdy->comm, PETSC_ERR_USER, "Region %d has no initial sediment condition!", region_id);
         PetscInt sed_index;
-          PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
-          RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
-          PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "initial sediment condition %s for region %d is not of dirichlet type!", sed_cond->name, region_id);
-          ic->sediment = sed_cond;
+        PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
+        RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
+        PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                   "initial sediment condition %s for region %d is not of dirichlet type!", sed_cond->name, region_id);
+        ic->sediment = sed_cond;
       }
       if (rdy->config.physics.salinity) {
         PetscCheck(strlen(ic_spec->salinity), rdy->comm, PETSC_ERR_USER, "Region %d has no initial salinity condition!", region_id);

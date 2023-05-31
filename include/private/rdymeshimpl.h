@@ -1,10 +1,9 @@
 #ifndef RDYMESHIMPL_H
 #define RDYMESHIMPL_H
 
-#include <rdycore.h>
-
 #include <petsc.h>
 #include <petsc/private/petscimpl.h>
+#include <rdycore.h>
 
 /// a point in R^3
 typedef struct {
@@ -176,19 +175,19 @@ typedef struct RDyMesh {
   PetscInt maxClosureSize;
 } RDyMesh;
 
-PETSC_INTERN PetscErrorCode RDyCellsCreate(PetscInt, RDyCells*);
-PETSC_INTERN PetscErrorCode RDyCellsCreateFromDM(DM, RDyCells*);
+PETSC_INTERN PetscErrorCode RDyCellsCreate(PetscInt, RDyCells *);
+PETSC_INTERN PetscErrorCode RDyCellsCreateFromDM(DM, RDyCells *);
 PETSC_INTERN PetscErrorCode RDyCellsDestroy(RDyCells);
 
-PETSC_INTERN PetscErrorCode RDyVerticesCreate(PetscInt, RDyVertices*);
-PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices*);
+PETSC_INTERN PetscErrorCode RDyVerticesCreate(PetscInt, RDyVertices *);
+PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices *);
 PETSC_INTERN PetscErrorCode RDyVerticesDestroy(RDyVertices);
 
-PETSC_INTERN PetscErrorCode RDyEdgesCreate(PetscInt, RDyEdges*);
-PETSC_INTERN PetscErrorCode RDyEdgesCreateFromDM(DM, RDyEdges*);
+PETSC_INTERN PetscErrorCode RDyEdgesCreate(PetscInt, RDyEdges *);
+PETSC_INTERN PetscErrorCode RDyEdgesCreateFromDM(DM, RDyEdges *);
 PETSC_INTERN PetscErrorCode RDyEdgesDestroy(RDyEdges);
 
-PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, RDyMesh*);
+PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, RDyMesh *);
 PETSC_INTERN PetscErrorCode RDyMeshDestroy(RDyMesh);
 
 #endif
