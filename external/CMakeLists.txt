@@ -52,7 +52,7 @@ ExternalProject_Add(cyaml_proj
                     BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME})
 add_library(cyaml SHARED IMPORTED GLOBAL)
 set_target_properties(cyaml PROPERTIES
-  IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${LIBYAML_LIB_NAME})
+  IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME})
 add_dependencies(cyaml cyaml_proj)
 
 if (ENABLE_TESTS)

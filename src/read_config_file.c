@@ -254,14 +254,14 @@ static const cyaml_schema_value_t condition_spec_entry = {
 // mapping of initial_conditions fields to RDyInitialConditionsSection
 static const cyaml_schema_field_t initial_conditions_fields_schema[] = {
   CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, domain, domain_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, by_region, num_conditions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, by_region, num_regions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
   CYAML_FIELD_END
 };
 
 // mapping of sources fields to RDySources
 static const cyaml_schema_field_t sources_fields_schema[] = {
   CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySourcesSection, domain, domain_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, conditions, num_conditions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, by_region, num_regions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
   CYAML_FIELD_END
 };
 
@@ -1446,7 +1446,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
 
   // we can accept an initial conditions file OR a set of initial conditions,
   // but not both
-  PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_conditions > 0),
+  PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_regions > 0),
              comm, PETSC_ERR_USER,
              "Invalid initial_conditions! No domain or per-region conditions given.");
 

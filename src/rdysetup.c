@@ -572,27 +572,27 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
       RDyConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
 
-      PetscCheck(strlen(ic_spec->flow_name), rdy->comm, PETSC_ERR_USER, "Region %d has no initial flow condition!", region_id);
+      PetscCheck(strlen(ic_spec->flow), rdy->comm, PETSC_ERR_USER, "Region %d has no initial flow condition!", region_id);
       PetscInt flow_index;
-      PetscCall(FindFlowCondition(rdy, ic_spec->flow_name, &flow_index));
+      PetscCall(FindFlowCondition(rdy, ic_spec->flow, &flow_index));
       RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
       PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                  "initial flow condition %s for region %d is not of dirichlet type!", flow_cond->name, region_id);
       ic->flow = flow_cond;
 
-      if (rdy->config.sediment) {
-        PetscCheck(strlen(ic_spec->sediment_name), rdy->comm, PETSC_ERR_USER, "Region %d has no initial sediment condition!", region_id);
+      if (rdy->config.physics.sediment) {
+        PetscCheck(strlen(ic_spec->sediment), rdy->comm, PETSC_ERR_USER, "Region %d has no initial sediment condition!", region_id);
         PetscInt sed_index;
-        PetscCall(FindSedimentCondition(rdy, ic_spec->sediment_name, &sed_index));
+        PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
         RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
         PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                    "initial sediment condition %s for region %d is not of dirichlet type!", sed_cond->name, region_id);
         ic->sediment = sed_cond;
       }
-      if (rdy->config.salinity) {
-        PetscCheck(strlen(ic_spec->salinity_name), rdy->comm, PETSC_ERR_USER, "Region %d has no initial salinity condition!", region_id);
+      if (rdy->config.physics.salinity) {
+        PetscCheck(strlen(ic_spec->salinity), rdy->comm, PETSC_ERR_USER, "Region %d has no initial salinity condition!", region_id);
         PetscInt sal_index;
-        PetscCall(FindSalinityCondition(rdy, ic_spec->salinity_name, &sal_index));
+        PetscCall(FindSalinityCondition(rdy, ic_spec->salinity, &sal_index));
         RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
         PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                    "initial salinity condition %s for region %d is not of dirichlet type!", sal_cond->name, region_id);
@@ -600,7 +600,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       }
     }
   }
-  if (rdy->config.num_sources > 0) {
+  if (rdy->config.sources.num_regions > 0) {
     // Allocate storage for sources
     PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->sources));
 
@@ -611,27 +611,27 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       PetscInt      src_region_index;
       PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &src_region_index));
       if (src_region_index != -1) {
-        RDyConditionSpec *src_spec = &rdy->config.sources[src_region_index];
-        if (strlen(src_spec->flow_name)) {
+        RDyConditionSpec *src_spec = &rdy->config.sources.by_region[src_region_index];
+        if (strlen(src_spec->flow)) {
           PetscInt flow_index;
-          PetscCall(FindFlowCondition(rdy, src_spec->flow_name, &flow_index));
+          PetscCall(FindFlowCondition(rdy, src_spec->flow, &flow_index));
           RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
           PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "flow source %s for region %d is not of dirichlet type!",
                      flow_cond->name, region_id);
           src->flow = flow_cond;
         }
 
-        if (rdy->config.sediment && strlen(src_spec->sediment_name)) {
+        if (rdy->config.physics.sediment && strlen(src_spec->sediment)) {
           PetscInt sed_index;
-          PetscCall(FindSedimentCondition(rdy, src_spec->sediment_name, &sed_index));
+          PetscCall(FindSedimentCondition(rdy, src_spec->sediment, &sed_index));
           RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
           PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "sediment source %s for region %d is not of dirichlet type!",
                      sed_cond->name, region_id);
           src->sediment = sed_cond;
         }
-        if (rdy->config.salinity && strlen(src_spec->salinity_name)) {
+        if (rdy->config.physics.salinity && strlen(src_spec->salinity)) {
           PetscInt sal_index;
-          PetscCall(FindSalinityCondition(rdy, src_spec->salinity_name, &sal_index));
+          PetscCall(FindSalinityCondition(rdy, src_spec->salinity, &sal_index));
           RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
           PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                      "initial salinity condition %s for region %d is not of dirichlet type!", sal_cond->name, region_id);
@@ -667,24 +667,24 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
       // If no flow condition was specified for a boundary, we set it to our
       // reflecting flow condition.
-      if (!strlen(bc_spec->flow_name)) {
+      if (!strlen(bc_spec->flow)) {
         bc->flow = reflecting_flow;
       } else {
         PetscInt flow_index;
-        PetscCall(FindFlowCondition(rdy, bc_spec->flow_name, &flow_index));
+        PetscCall(FindFlowCondition(rdy, bc_spec->flow, &flow_index));
         bc->flow = &rdy->config.flow_conditions[flow_index];
       }
 
-      if (rdy->config.sediment) {
-        PetscCheck(strlen(bc_spec->sediment_name), rdy->comm, PETSC_ERR_USER, "Boundary %d has no sediment boundary condition!", boundary_id);
+      if (rdy->config.physics.sediment) {
+        PetscCheck(strlen(bc_spec->sediment), rdy->comm, PETSC_ERR_USER, "Boundary %d has no sediment boundary condition!", boundary_id);
         PetscInt sed_index;
-        PetscCall(FindSedimentCondition(rdy, bc_spec->sediment_name, &sed_index));
+        PetscCall(FindSedimentCondition(rdy, bc_spec->sediment, &sed_index));
         bc->sediment = &rdy->config.sediment_conditions[sed_index];
       }
-      if (rdy->config.salinity) {
-        PetscCheck(strlen(bc_spec->salinity_name), rdy->comm, PETSC_ERR_USER, "Boundary %d has no salinity boundary condition!", boundary_id);
+      if (rdy->config.physics.salinity) {
+        PetscCheck(strlen(bc_spec->salinity), rdy->comm, PETSC_ERR_USER, "Boundary %d has no salinity boundary condition!", boundary_id);
         PetscInt sal_index;
-        PetscCall(FindSalinityCondition(rdy, bc_spec->salinity_name, &sal_index));
+        PetscCall(FindSalinityCondition(rdy, bc_spec->salinity, &sal_index));
         bc->salinity = &rdy->config.salinity_conditions[sal_index];
       }
     } else {
@@ -712,7 +712,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   // set up a TS solver
   PetscCall(TSCreate(rdy->comm, &rdy->ts));
   PetscCall(TSSetProblemType(rdy->ts, TS_NONLINEAR));
-  switch (rdy->config.temporal) {
+  switch (rdy->config.numerics.temporal) {
     case TEMPORAL_EULER:
       PetscCall(TSSetType(rdy->ts, TSEULER));
       break;
@@ -726,13 +726,13 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
 
-  PetscCheck(rdy->config.flow_mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(InitSWE(rdy));  // initialize SWE physics
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
 
-  PetscReal final_time_in_sec = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit);
+  PetscReal final_time_in_sec = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
   PetscCall(TSSetMaxTime(rdy->ts, final_time_in_sec));
-  PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.max_step));
+  PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
@@ -793,8 +793,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(ReadConfigFile(rdy));
 
   // open the primary log file
-  if (strlen(rdy->config.log_file)) {
-    PetscCall(PetscFOpen(rdy->comm, rdy->config.log_file, "w", &rdy->log));
+  if (strlen(rdy->config.logging.file)) {
+    PetscCall(PetscFOpen(rdy->comm, rdy->config.logging.file, "w", &rdy->log));
   } else {
     rdy->log = stdout;
   }

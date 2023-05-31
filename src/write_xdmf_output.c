@@ -24,11 +24,11 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   // Determine the output file name.
   char fname[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineOutputFile(rdy, step, time, "h5", fname));
-  const char *units = TimeUnitAsString(rdy->config.time_unit);
+  const char *units = TimeUnitAsString(rdy->config.time.unit);
   RDyLogDetail(rdy, "Step %d: writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
 
   // write the grid if we're the first step in a batch.
-  if (step % rdy->config.output_batch_size == 0) {
+  if (step % rdy->config.output.batch_size == 0) {
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
     PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
     PetscCall(DMView(rdy->dm, viewer));
@@ -171,7 +171,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   char h5_name[PETSC_MAX_PATH_LEN], xmf_name[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineOutputFile(rdy, step, time, "h5", h5_name));
   PetscCall(DetermineOutputFile(rdy, step, time, "xmf", xmf_name));
-  const char *units = TimeUnitAsString(rdy->config.time_unit);
+  const char *units = TimeUnitAsString(rdy->config.time.unit);
   RDyLogDetail(rdy, "Step %d: writing XDMF XMF output at t = %g %s to %s", step, time, units, xmf_name);
 
   FILE *fp;
@@ -254,9 +254,9 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
-  if (step % rdy->config.output_frequency == 0) {
-    PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time_unit);
-    if (rdy->config.output_format == OUTPUT_XDMF) {
+  if (step % rdy->config.output.frequency == 0) {
+    PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
+    if (rdy->config.output.format == OUTPUT_XDMF) {
       PetscCall(WriteXDMFHDF5Data(rdy, step, t));
       PetscCall(WriteXDMFXMFData(rdy, step, t));
     }
