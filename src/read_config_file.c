@@ -23,8 +23,6 @@
 // within RDyConfig (include/private/rdyconfigimpl.h) accordingly. The schema for each
 // section appears below and must remain consistent with the data structures in rdyconfigimpl.h.
 
-// the maximum length of an identifier or value in the YAML file
-#define YAML_MAX_LEN 1024
 #define UNINITIALIZED_REAL -999.0
 #define UNINITIALIZED_INT -999
 
@@ -628,35 +626,5 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // clean up
   RDyFree(config_str);
 
-  PetscFunctionReturn(0);
-}
-
-// this helper finds the index of a region ID within a configuration, setting it
-// to -1 if not found
-PetscErrorCode RDyConfigFindRegion(RDyConfig *config, PetscInt id, PetscInt *index) {
-  PetscFunctionBegin;
-
-  *index = -1;
-  for (PetscInt r = 0; r < config->num_regions; ++r) {
-    if (config->region_ids[r] == id) {
-      *index = r;
-      break;
-    }
-  }
-  PetscFunctionReturn(0);
-}
-
-// this helper finds the index of a region ID within a configuration, setting it
-// to -1 if not found
-PetscErrorCode RDyConfigFindBoundary(RDyConfig *config, PetscInt id, PetscInt *index) {
-  PetscFunctionBegin;
-
-  *index = -1;
-  for (PetscInt b = 0; b < config->num_boundaries; ++b) {
-    if (config->boundary_ids[b] == id) {
-      *index = b;
-      break;
-    }
-  }
   PetscFunctionReturn(0);
 }

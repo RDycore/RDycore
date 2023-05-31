@@ -1,6 +1,7 @@
 #ifndef RDYCONFIG_H
 #define RDYCONFIG_H
 
+#include <petscviewer.h>
 #include <private/rdylogimpl.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
@@ -252,16 +253,6 @@ typedef struct {
   PetscInt             num_salinity_conditions;
   RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
-  // IDs of all regions mentioned in the input file
-  PetscInt num_regions;
-  PetscInt region_ids[MAX_NUM_REGIONS];
-
-  // IDs of all boundaries encountered in the input file
-  PetscInt num_boundaries;
-  PetscInt boundary_ids[MAX_NUM_BOUNDARIES];
 } RDyConfig;
-
-PETSC_INTERN PetscErrorCode RDyConfigFindRegion(RDyConfig*, PetscInt, PetscInt*);
-PETSC_INTERN PetscErrorCode RDyConfigFindBoundary(RDyConfig*, PetscInt, PetscInt*);
 
 #endif

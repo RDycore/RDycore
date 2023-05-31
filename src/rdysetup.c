@@ -558,15 +558,20 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 static PetscErrorCode InitConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
 
-  // Allocate storage for by-region initial conditions.
+  // allocate storage for by-region initial conditions
   PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->initial_conditions));
 
-  // Assign іnitial conditions to each region.
+  // assign іnitial conditions to each region as indicated in our config
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyCondition *ic        = &rdy->initial_conditions[r];
-    PetscInt      region_id = rdy->region_ids[r];
-    PetscInt      ic_region_index;
-    PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &ic_region_index));
+    RDyCondition *ic              = &rdy->initial_conditions[r];
+    PetscInt      region_id       = rdy->region_ids[r];
+    PetscInt      ic_region_index = -1;
+    for (PetscInt ic = 0; ic < rdy->config.initial_conditions.num_regions; ++ic) {
+      if (rdy->config.initial_conditions.by_region[ic].id == region_id) {
+        ic_region_index = ic;
+        break;
+      }
+    }
     PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
                "Region %d has no initial conditions!", region_id);
 
@@ -607,10 +612,15 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
     // Assign sources to each region as needed.
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyCondition *src       = &rdy->sources[r];
-      PetscInt      region_id = rdy->region_ids[r];
-      PetscInt      src_region_index;
-      PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &src_region_index));
+      RDyCondition *src              = &rdy->sources[r];
+      PetscInt      region_id        = rdy->region_ids[r];
+      PetscInt      src_region_index = -1;
+      for (PetscInt isrc = 0; isrc < rdy->config.sources.num_regions; ++isrc) {
+        if (rdy->config.sources.by_region[isrc].id == region_id) {
+          src_region_index = isrc;
+          break;
+        }
+      }
       if (src_region_index != -1) {
         RDyConditionSpec *src_spec = &rdy->config.sources.by_region[src_region_index];
         if (strlen(src_spec->flow)) {
@@ -659,10 +669,15 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
 
   // Assign a boundary condition to each boundary.
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    RDyCondition *bc          = &rdy->boundary_conditions[b];
-    PetscInt      boundary_id = rdy->boundary_ids[b];
-    PetscInt      bc_boundary_index;
-    PetscCall(RDyConfigFindBoundary(&rdy->config, boundary_id, &bc_boundary_index));
+    RDyCondition *bc                = &rdy->boundary_conditions[b];
+    PetscInt      boundary_id       = rdy->boundary_ids[b];
+    PetscInt      bc_boundary_index = -1;
+    for (PetscInt ib = 0; ib < rdy->config.num_boundary_conditions; ++ib) {
+      if (rdy->config.boundary_conditions[ib].id == boundary_id) {
+        bc_boundary_index = ib;
+        break;
+      }
+    }
     if (bc_boundary_index != -1) {
       RDyConditionSpec *bc_spec = &rdy->config.boundary_conditions[bc_boundary_index];
 
@@ -771,12 +786,14 @@ static PetscErrorCode InitSolution(RDy rdy) {
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion    *region = &rdy->regions[r];
     RDyCondition *ic     = &rdy->initial_conditions[r];
-    for (PetscInt c = 0; c < region->num_cells; ++c) {
-      PetscInt cell_id = region->cell_ids[c];
-      if (3 * cell_id < n_local) {  // skip ghost cells
-        x_ptr[3 * cell_id]     = ic->flow->height;
-        x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
-        x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+    if (ic->flow) {
+      for (PetscInt c = 0; c < region->num_cells; ++c) {
+        PetscInt cell_id = region->cell_ids[c];
+        if (3 * cell_id < n_local) {  // skip ghost cells
+          x_ptr[3 * cell_id]     = ic->flow->height;
+          x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
+          x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+        }
       }
     }
   }
