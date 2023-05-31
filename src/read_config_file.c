@@ -484,8 +484,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
     if (config->time.dtime == UNINITIALIZED_REAL) config->time.dtime = config->time.final_time / config->time.max_step;
   }
 
-  // we can accept an initial conditions file OR a set of initial conditions,
-  // but not both
+  // we need either a domain initial condition or region-by-region conditions
   PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_regions > 0),
              comm, PETSC_ERR_USER,
              "Invalid initial_conditions! No domain or per-region conditions given.");

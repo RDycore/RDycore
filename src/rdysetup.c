@@ -558,18 +558,19 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 static PetscErrorCode InitConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
 
-  if (!strlen(rdy->config.initial_conditions.domain.file)) {  // no IC file given
-    // Allocate storage for initial conditions.
-    PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->initial_conditions));
+  // Allocate storage for by-region initial conditions.
+  PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->initial_conditions));
 
-    // Assign іnitial conditions to each region.
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyCondition *ic        = &rdy->initial_conditions[r];
-      PetscInt      region_id = rdy->region_ids[r];
-      PetscInt      ic_region_index;
-      PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &ic_region_index));
-      PetscCheck(ic_region_index != -1, rdy->comm, PETSC_ERR_USER, "Region %d has no initial conditions!", region_id);
+  // Assign іnitial conditions to each region.
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyCondition *ic        = &rdy->initial_conditions[r];
+    PetscInt      region_id = rdy->region_ids[r];
+    PetscInt      ic_region_index;
+    PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &ic_region_index));
+    PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file),
+      rdy->comm, PETSC_ERR_USER, "Region %d has no initial conditions!", region_id);
 
+    if (ic_region_index != -1) {
       RDyConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
 
       PetscCheck(strlen(ic_spec->flow), rdy->comm, PETSC_ERR_USER, "Region %d has no initial flow condition!", region_id);
@@ -583,11 +584,11 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       if (rdy->config.physics.sediment) {
         PetscCheck(strlen(ic_spec->sediment), rdy->comm, PETSC_ERR_USER, "Region %d has no initial sediment condition!", region_id);
         PetscInt sed_index;
-        PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
-        RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
-        PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial sediment condition %s for region %d is not of dirichlet type!", sed_cond->name, region_id);
-        ic->sediment = sed_cond;
+          PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
+          RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
+          PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                     "initial sediment condition %s for region %d is not of dirichlet type!", sed_cond->name, region_id);
+          ic->sediment = sed_cond;
       }
       if (rdy->config.physics.salinity) {
         PetscCheck(strlen(ic_spec->salinity), rdy->comm, PETSC_ERR_USER, "Region %d has no initial salinity condition!", region_id);
@@ -759,27 +760,27 @@ static PetscErrorCode InitSolution(RDy rdy) {
     PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
     PetscCall(PetscViewerDestroy(&viewer));
     PetscCall(VecDestroy(&natural));
-  } else {
-    // we initialize from specified initial conditions by looping over regions
-    // and writing values for corresponding cells
-    PetscInt n_local;
-    PetscCall(VecGetLocalSize(rdy->X, &n_local));
-    PetscScalar *x_ptr;
-    PetscCall(VecGetArray(rdy->X, &x_ptr));
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyRegion    *region = &rdy->regions[r];
-      RDyCondition *ic     = &rdy->initial_conditions[r];
-      for (PetscInt c = 0; c < region->num_cells; ++c) {
-        PetscInt cell_id = region->cell_ids[c];
-        if (3 * cell_id < n_local) {  // skip ghost cells
-          x_ptr[3 * cell_id]     = ic->flow->height;
-          x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
-          x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
-        }
+  }
+
+  // now initialize or override initial conditions by looping over regions
+  // and writing values for corresponding cells
+  PetscInt n_local;
+  PetscCall(VecGetLocalSize(rdy->X, &n_local));
+  PetscScalar *x_ptr;
+  PetscCall(VecGetArray(rdy->X, &x_ptr));
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion    *region = &rdy->regions[r];
+    RDyCondition *ic     = &rdy->initial_conditions[r];
+    for (PetscInt c = 0; c < region->num_cells; ++c) {
+      PetscInt cell_id = region->cell_ids[c];
+      if (3 * cell_id < n_local) {  // skip ghost cells
+        x_ptr[3 * cell_id]     = ic->flow->height;
+        x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
+        x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
       }
     }
-    PetscCall(VecRestoreArray(rdy->X, &x_ptr));
   }
+  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
 
   PetscFunctionReturn(0);
 }
