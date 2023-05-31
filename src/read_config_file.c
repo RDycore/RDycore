@@ -39,6 +39,7 @@
 //   flow:
 //     mode: <swe|diffusion> # swe by default
 //     bed_friction: <true|false> # off by default
+//     tiny_h: <value> # 1e-7 by default
 //   sediment: <true|false> # off by default
 //   salinity: <true|false> # off by default
 
@@ -52,6 +53,7 @@ static const cyaml_strval_t physics_flow_modes[] = {
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
   CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
   CYAML_FIELD_BOOL("bed_friction", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, bed_friction),
+  CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
   CYAML_FIELD_END
 };
 
@@ -252,7 +254,7 @@ static const cyaml_schema_value_t condition_spec_entry = {
 // mapping of initial_conditions fields to RDyInitialConditionsSection
 static const cyaml_schema_field_t initial_conditions_fields_schema[] = {
   CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, domain, domain_fields_schema),
-  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, conditions, num_conditions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
+  CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, by_region, num_conditions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
   CYAML_FIELD_END
 };
 

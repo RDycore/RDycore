@@ -65,19 +65,19 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   }
 
   // encode specific information into the filename based on its format
-  if (rdy->config.output_format == OUTPUT_BINARY) {  // PETSc native binary format
-    PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.max_step, suffix, filename));
-  } else if (rdy->config.output_format == OUTPUT_XDMF) {
+  if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
+    PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.time.max_step, suffix, filename));
+  } else if (rdy->config.output.format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
-      if (rdy->config.output_batch_size == 1) {
+      if (rdy->config.output.batch_size == 1) {
         // output from each step gets its own HDF5 file
         snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%d.%s", output_dir, prefix, step, suffix);
       } else {
         // output data is grouped into batches of a fixed number of time steps
-        PetscInt batch_size = rdy->config.output_batch_size;
-        PetscInt freq       = rdy->config.output_frequency;
+        PetscInt batch_size = rdy->config.output.batch_size;
+        PetscInt freq       = rdy->config.output.frequency;
         PetscInt batch      = step / freq / batch_size;
-        PetscInt max_batch  = rdy->config.max_step / freq / batch_size;
+        PetscInt max_batch  = rdy->config.time.max_step / freq / batch_size;
         if (max_batch < 1) max_batch = 1;
         PetscCall(GenerateIndexedFilename(prefix, batch, max_batch, suffix, filename));
       }
@@ -85,11 +85,11 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
       PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
       // encode the step into the filename with zero-padding based on the
       // maximum step number
-      PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.max_step, suffix, filename));
+      PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.time.max_step, suffix, filename));
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
-  } else if (rdy->config.output_format == OUTPUT_CGNS) {
+  } else if (rdy->config.output.format == OUTPUT_CGNS) {
     // the CGNS viewer handles its own batching and only needs a format string
     snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%%d.%s", output_dir, prefix, suffix);
   } else {
@@ -117,10 +117,10 @@ static PetscErrorCode ViewerContextDestroy(ViewerContext vc) {
 PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
-  if (step % rdy->config.output_frequency == 0) {
+  if (step % rdy->config.output.frequency == 0) {
     static const char *formats[3] = {"binary", "XDMF", "CGNS"};
-    const char        *format     = formats[rdy->config.output_format];
-    const char        *units      = TimeUnitAsString(rdy->config.time_unit);
+    const char        *format     = formats[rdy->config.output.format];
+    const char        *units      = TimeUnitAsString(rdy->config.time.unit);
     RDyLogDetail(rdy, "Step %d: writing %s output at t = %g %s", step, format, time, units);
   }
   PetscFunctionReturn(0);
@@ -134,9 +134,9 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
   PetscFunctionBegin;
 
   PetscViewerFormat format = PETSC_VIEWER_DEFAULT;
-  if (rdy->config.output_frequency) {
-    RDyLogDebug(rdy, "Writing output every %d timestep(s)", rdy->config.output_frequency);
-    switch (rdy->config.output_format) {
+  if (rdy->config.output.frequency) {
+    RDyLogDebug(rdy, "Writing output every %d timestep(s)", rdy->config.output.frequency);
+    switch (rdy->config.output.format) {
       case OUTPUT_CGNS:
         // we've already configured this viewer in SetAdditionalOptions (see read_config_file.c)
         break;
@@ -158,17 +158,17 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
     }
 
     // set up solution monitoring
-    if (rdy->config.output_format == OUTPUT_XDMF) {
+    if (rdy->config.output.format == OUTPUT_XDMF) {
       // we do our own special thing for XDMF
       PetscCall(TSMonitorSet(rdy->ts, WriteXDMFOutput, rdy, NULL));
     } else {
       // enable DETAIL logging for non-XDMF output
-      if (rdy->config.log_level >= LOG_DETAIL) {
+      if (rdy->config.logging.level >= LOG_DETAIL) {
         PetscCall(TSMonitorSet(rdy->ts, WriteOutputLogMessage, rdy, NULL));
       }
       // CGNS output is handled via the Options database. We need to set monitoring
       // for all formats that aren't XDMF or CGNS.
-      if (rdy->config.output_format != OUTPUT_CGNS) {
+      if (rdy->config.output.format != OUTPUT_CGNS) {
         PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, viz->vf, NULL));
       }
     }

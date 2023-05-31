@@ -98,13 +98,13 @@ PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit) {
 static PetscErrorCode SetDefaults(RDy rdy) {
   PetscFunctionBegin;
 
-  rdy->config.log_level = LOG_INFO;
+  rdy->config.logging.level = LOG_INFO;
 
   // set the water depth below which no flow occurs
-  rdy->config.tiny_h = 1e-7;
+  rdy->config.physics.flow.tiny_h = 1e-7;
 
   // output parameters
-  rdy->config.output_batch_size = 1;  // 1 timestep per output file
+  rdy->config.output.batch_size = 1;  // 1 timestep per output file
 
   PetscFunctionReturn(0);
 }
@@ -115,10 +115,10 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
 
   if (rdy->dt <= 0.0) {
     // ѕet a default timestep if needed
-    rdy->dt = ConvertTimeToSeconds(rdy->config.final_time, rdy->config.time_unit) / rdy->config.max_step;
+    rdy->dt = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit) / rdy->config.time.max_step;
   } else {
     // convert dt to seconds in any case
-    rdy->dt = ConvertTimeToSeconds(rdy->dt, rdy->config.time_unit);
+    rdy->dt = ConvertTimeToSeconds(rdy->dt, rdy->config.time.unit);
   }
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
@@ -132,7 +132,7 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionBegin;
 
   // read the grid from a file
-  PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.mesh_file, "grid", PETSC_TRUE, &rdy->dm));
+  PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.grid.file, "grid", PETSC_TRUE, &rdy->dm));
 
   // interpolate the grid to get more connectivity
   {
@@ -367,7 +367,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
   } else {
     // If we didn't find any regions, we'd better have a file from which to
     // read initial conditions.
-    PetscCheck(strlen(rdy->config.initial_conditions_file), rdy->comm, PETSC_ERR_USER,
+    PetscCheck(strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
                "No regions (cell sets) found in grid, and no initial conditions file given! "
                "Cannot assign initial conditions for the given grid.");
   }
@@ -558,7 +558,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 static PetscErrorCode InitConditionsAndSources(RDy rdy) {
   PetscFunctionBegin;
 
-  if (!strlen(rdy->config.initial_conditions_file)) {  // no IC file given
+  if (!strlen(rdy->config.initial_conditions.domain.file)) {  // no IC file given
     // Allocate storage for initial conditions.
     PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->initial_conditions));
 
@@ -570,7 +570,7 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       PetscCall(RDyConfigFindRegion(&rdy->config, region_id, &ic_region_index));
       PetscCheck(ic_region_index != -1, rdy->comm, PETSC_ERR_USER, "Region %d has no initial conditions!", region_id);
 
-      RDyConditionSpec *ic_spec = &rdy->config.initial_conditions[ic_region_index];
+      RDyConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
 
       PetscCheck(strlen(ic_spec->flow_name), rdy->comm, PETSC_ERR_USER, "Region %d has no initial flow condition!", region_id);
       PetscInt flow_index;
@@ -749,9 +749,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(VecZeroEntries(rdy->X));
-  if (strlen(rdy->config.initial_conditions_file)) {  // read from file
+  if (strlen(rdy->config.initial_conditions.domain.file)) {  // read from file
     PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.initial_conditions_file, FILE_MODE_READ, &viewer));
+    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.initial_conditions.domain.file, FILE_MODE_READ, &viewer));
     Vec natural;
     PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
     PetscCall(VecLoad(natural, viewer));

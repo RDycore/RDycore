@@ -296,12 +296,12 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   }
 
   // Compute u/v for left and right cells
-  const PetscReal tiny_h = rdy->config.physics.tiny_h;
+  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
   PetscCall(GetVelocityFromMomentum(tiny_h, &datal));
   PetscCall(GetVelocityFromMomentum(tiny_h, &datar));
 
   // Call Riemann solver (only Roe currently supported)
-  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
+  PetscCheck(rdy->config.numerics.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
   PetscCall(ComputeRoeFlux(num, &datal, &datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
 
   // Save the flux values in the Vec based by TS
@@ -388,7 +388,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
   PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
 
   // Call Riemann solver (only Roe is currently supported)
-  PetscCheck(rdy->config.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
+  PetscCheck(rdy->config.numerics.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
   PetscCall(ComputeRoeFlux(num, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
@@ -522,7 +522,7 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  const PetscReal tiny_h = rdy->config.physics.tiny_h;
+  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
 
   // loop over all boundaries and apply boundary conditions
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -576,7 +576,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   }
 
   // Compute u/v for cells
-  PetscCall(GetVelocityFromMomentum(rdy->config.physics.tiny_h, &data));
+  PetscCall(GetVelocityFromMomentum(rdy->config.physics.flow.tiny_h, &data));
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {
@@ -598,7 +598,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
 
       PetscReal tbx = 0.0, tby = 0.0;
 
-      if (h >= rdy->config.tiny_h) {
+      if (h >= rdy->config.physics.flow.tiny_h) {
         // Manning's coefficient
         PetscReal N_mannings = 0.015;
 
@@ -672,7 +672,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscCall(AddSourceTerm(rdy, F));
 
   // write out debugging info for maximum courant number
-  if (rdy->config.log_level >= LOG_DEBUG) {
+  if (rdy->config.logging.level >= LOG_DEBUG) {
     MPI_Allreduce(MPI_IN_PLACE, &courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal time;
     PetscInt  stepnum;

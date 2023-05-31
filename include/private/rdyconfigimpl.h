@@ -42,6 +42,7 @@ typedef enum {
 typedef struct {
   RDyPhysicsFlowMode mode; // flow mode
   PetscBool bed_friction; // bed friction enabled?
+  PetscReal tiny_h; // depth below which no flow occurs
 } RDyPhysicsFlow;
 
 // all physics parameters
@@ -185,8 +186,8 @@ typedef struct {
 // all initial conditions
 typedef struct {
   RDyDomainConditions domain; // domain-wide conditions
-  PetscInt         num_conditions; // number of per-region conditions defined
-  RDyConditionSpec conditions[MAX_NUM_REGIONS]; // names of types of conditions
+  PetscInt         num_regions; // number of per-region conditions defined
+  RDyConditionSpec by_region[MAX_NUM_REGIONS]; // names of types of conditions
 } RDyInitialConditionsSection;
 
 // ---------------------------
