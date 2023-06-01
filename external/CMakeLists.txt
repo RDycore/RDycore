@@ -10,11 +10,9 @@ include(GNUInstallDirs)
 #----------------------------------------
 # Build libyaml, a YAML parsing library.
 #----------------------------------------
-set(LIBYAML_C_FLAGS ${CMAKE_C_FLAGS})
 set(LIBYAML_CMAKE_OPTS
   -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR}
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${LIBYAML_C_FLAGS}
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER})
 set(LIBYAML_LIB_NAME libyaml${CMAKE_STATIC_LIBRARY_SUFFIX})
 ExternalProject_Add(yaml_proj
@@ -38,7 +36,7 @@ add_dependencies(yaml yaml_proj)
 #---------------------------------------------------------------------
 string(TOLOWER ${CMAKE_BUILD_TYPE} LIBCYAML_VARIANT)
 set(LIBCYAML_LIB_NAME libcyaml${CMAKE_STATIC_LIBRARY_SUFFIX})
-set(LIBCYAML_YAML_CFLAGS "-I${PROJECT_BINARY_DIR}/include")# ${LIBYAML_C_FLAGS}")
+set(LIBCYAML_YAML_CFLAGS "-I${PROJECT_BINARY_DIR}/include")
 set(LIBCYAML_YAML_LDFLAGS "-L${PROJECT_BINARY_DIR}/lib -lyaml")
 ExternalProject_Add(cyaml_proj
                     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/libcyaml
