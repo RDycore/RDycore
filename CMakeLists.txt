@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.12.0)
+cmake_minimum_required (VERSION 3.14.0)
 
 # Configurable options
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
