@@ -47,6 +47,7 @@ ExternalProject_Add(cyaml_proj
                     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/libcyaml ${CMAKE_CURRENT_BINARY_DIR}/libcyaml
                     BUILD_COMMAND env PREFIX=${PROJECT_BINARY_DIR} CFLAGS=${LIBCYAML_YAML_CFLAGS} LDFLAGS=${LIBCYAML_YAML_LDFLAGS} make all VARIANT=${LIBCYAML_VARIANT}
                     INSTALL_COMMAND env PREFIX=${PROJECT_BINARY_DIR} make install VARIANT=${LIBCYAML_VARIANT}
+                    DEPENDS yaml
                     LOG_BUILD TRUE
                     LOG_INSTALL TRUE
                     BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME})

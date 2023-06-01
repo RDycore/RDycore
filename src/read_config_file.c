@@ -41,7 +41,7 @@
 //
 // Take a look at the examples below to get a feel for this.
 
-//clang-format off
+// clang-format off
 
 // ---------------
 // physics section
@@ -64,17 +64,13 @@ static const cyaml_strval_t physics_flow_modes[] = {
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
     CYAML_FIELD(BOOL, "bed_friction", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, bed_friction, {.missing = false}),
-    CYAML_FIELD(FLOAT, "tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h, {.missing = 1e-7}),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD(FLOAT, "tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h, {.missing = 1e-7}), CYAML_FIELD_END};
 
 // mapping of physics fields to members of RDyPhysicsSection
 static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
     CYAML_FIELD(BOOL, "sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, {.missing = false}),
-    CYAML_FIELD(BOOL, "salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity, {.missing = false}),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD(BOOL, "salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity, {.missing = false}), CYAML_FIELD_END};
 
 // ----------------
 // numerics section
@@ -108,8 +104,7 @@ static const cyaml_schema_field_t numerics_fields_schema[] = {
     CYAML_FIELD_ENUM("spatial", CYAML_FLAG_DEFAULT, RDyNumericsSection, spatial, numerics_spatial_types, CYAML_ARRAY_LEN(numerics_spatial_types)),
     CYAML_FIELD_ENUM("temporal", CYAML_FLAG_DEFAULT, RDyNumericsSection, temporal, numerics_temporal_types, CYAML_ARRAY_LEN(numerics_temporal_types)),
     CYAML_FIELD_ENUM("riemann", CYAML_FLAG_DEFAULT, RDyNumericsSection, riemann, numerics_riemann_types, CYAML_ARRAY_LEN(numerics_riemann_types)),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_END};
 
 // ------------
 // time section
@@ -135,9 +130,7 @@ static const cyaml_schema_field_t time_fields_schema[] = {
     CYAML_FIELD(FLOAT, "final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time, {.missing = UNINITIALIZED_REAL}),
     CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD(INT, "max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step, {.missing = UNINITIALIZED_INT}),
-    CYAML_FIELD(FLOAT, "dtime", CYAML_FLAG_OPTIONAL, RDyTimeSection, dtime, {.missing = UNINITIALIZED_REAL}),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD(FLOAT, "dtime", CYAML_FLAG_OPTIONAL, RDyTimeSection, dtime, {.missing = UNINITIALIZED_REAL}), CYAML_FIELD_END};
 
 // ---------------
 // logging section
@@ -158,9 +151,7 @@ static const cyaml_strval_t logging_levels[] = {
 // mapping of logging fields to members of RDyLoggingSection
 static const cyaml_schema_field_t logging_fields_schema[] = {
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyLoggingSection, file, 0),
-    CYAML_FIELD_ENUM("level", CYAML_FLAG_OPTIONAL, RDyLoggingSection, level, logging_levels, CYAML_ARRAY_LEN(logging_levels)),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_ENUM("level", CYAML_FLAG_OPTIONAL, RDyLoggingSection, level, logging_levels, CYAML_ARRAY_LEN(logging_levels)), CYAML_FIELD_END};
 
 // ---------------
 // restart section
@@ -178,9 +169,7 @@ static const cyaml_strval_t restart_file_formats[] = {
 // mapping of restart fields to members of RDyRestartSection
 static const cyaml_schema_field_t restart_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyRestartSection, format, restart_file_formats, CYAML_ARRAY_LEN(restart_file_formats)),
-    CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyRestartSection, frequency),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyRestartSection, frequency), CYAML_FIELD_END};
 
 // ---------------
 // output section
@@ -201,9 +190,7 @@ static const cyaml_strval_t output_file_formats[] = {
 static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyOutputSection, frequency),
-    CYAML_FIELD(INT, "batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size, {.missing = 1}),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD(INT, "batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size, {.missing = 1}), CYAML_FIELD_END};
 
 // ------------
 // grid section
@@ -212,10 +199,7 @@ static const cyaml_schema_field_t output_fields_schema[] = {
 //   file: <path-to-file/mesh.{msh,h5,exo}>
 
 // mapping of grid fields to members of RDyGridSection
-static const cyaml_schema_field_t grid_fields_schema[] = {
-  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 0),
-  CYAML_FIELD_END
-};
+static const cyaml_schema_field_t grid_fields_schema[] = {CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 0), CYAML_FIELD_END};
 
 // ---------------------------------------------------------
 // initial_conditions and sources sections
@@ -245,8 +229,7 @@ static const cyaml_strval_t domain_file_formats[] = {
 static const cyaml_schema_field_t domain_fields_schema[] = {
     CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyDomainConditions, file, 0),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_END};
 
 // mapping of conditions fields to members of RDyConditionSpec
 static const cyaml_schema_field_t condition_spec_fields_schema[] = {
@@ -272,8 +255,7 @@ static const cyaml_schema_field_t initial_conditions_fields_schema[] = {
 static const cyaml_schema_field_t sources_fields_schema[] = {
     CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySourcesSection, domain, domain_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, by_region, num_regions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_END};
 
 // ---------------------------------------------------------
 // boundary_conditions section
@@ -323,9 +305,7 @@ static const cyaml_schema_field_t flow_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 0),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
     CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = -FLT_MAX}),
-    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component, 2),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component, 2), CYAML_FIELD_END};
 
 // a single flow_conditions entry
 static const cyaml_schema_value_t flow_condition_entry = {
@@ -403,15 +383,14 @@ static const cyaml_schema_field_t config_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
-    CYAML_FIELD_END
-};
+    CYAML_FIELD_END};
 
 // schema for top-level configuration datum itself
 static const cyaml_schema_value_t config_schema = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_POINTER, RDyConfig, config_fields_schema),
 };
 
-//clang-format on
+// clang-format on
 
 // CYAML log function (of type cyaml_log_fn_t)
 static void YamlLog(cyaml_log_t level, void *ctx, const char *fmt, va_list args) {
