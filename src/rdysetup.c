@@ -94,21 +94,6 @@ PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit) {
   PetscFunctionReturn(time_in_units);
 }
 
-// sets default parameters
-static PetscErrorCode SetDefaults(RDy rdy) {
-  PetscFunctionBegin;
-
-  rdy->config.logging.level = LOG_INFO;
-
-  // set the water depth below which no flow occurs
-  rdy->config.physics.flow.tiny_h = 1e-7;
-
-  // output parameters
-  rdy->config.output.batch_size = 1;  // 1 timestep per output file
-
-  PetscFunctionReturn(0);
-}
-
 // overrides parameters with command line arguments
 static PetscErrorCode OverrideParameters(RDy rdy) {
   PetscFunctionBegin;
@@ -807,7 +792,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(SetDefaults(rdy));
+  // note: default config values are specified in the YAML input schema!
   PetscCall(ReadConfigFile(rdy));
 
   // open the primary log file
