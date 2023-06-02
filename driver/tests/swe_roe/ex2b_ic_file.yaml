@@ -26,6 +26,6 @@ grid:
   file: DamBreak_grid5x10.exo
 
 initial_conditions:
-  format: binary
-  file: DamBreak_grid5x10_wetdownstream.IC
-
+  domain:
+    format: binary
+    file: DamBreak_grid5x10_wetdownstream.IC

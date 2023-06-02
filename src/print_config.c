@@ -3,31 +3,27 @@
 
 static const char* FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
 
-static const char* BedFrictionString(RDyBedFriction model) {
-  static const char* strings[3] = {"disabled", "Chezy", "Manning"};
-  return strings[model];
-}
-
 static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Physics:");
-  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.sediment));
-  RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.salinity));
-  RDyLogDetail(rdy, "  Bed friction model: %s", BedFrictionString(rdy->config.bed_friction));
+  RDyLogDetail(rdy, "  Flow:");
+  RDyLogDetail(rdy, "    Bed friction: %s", FlagString(rdy->config.physics.flow.bed_friction));
+  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment));
+  RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
   PetscFunctionReturn(0);
 }
 
-static const char* SpatialString(RDySpatial method) {
+static const char* SpatialString(RDyNumericsSpatial method) {
   static const char* strings[2] = {"finite volume (FV)", "finite element (FE)"};
   return strings[method];
 }
 
-static const char* TemporalString(RDyTemporal method) {
+static const char* TemporalString(RDyNumericsTemporal method) {
   static const char* strings[3] = {"forward euler", "4th-order Runge-Kutta", "backward euler"};
   return strings[method];
 }
 
-static const char* RiemannString(RDyRiemann solver) {
+static const char* RiemannString(RDyNumericsRiemann solver) {
   static const char* strings[2] = {"roe", "hllc"};
   return strings[solver];
 }
@@ -35,9 +31,9 @@ static const char* RiemannString(RDyRiemann solver) {
 static PetscErrorCode PrintNumerics(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Numerics:");
-  RDyLogDetail(rdy, "  Spatial discretization: %s", SpatialString(rdy->config.spatial));
-  RDyLogDetail(rdy, "  Temporal discretization: %s", TemporalString(rdy->config.temporal));
-  RDyLogDetail(rdy, "  Riemann solver: %s", RiemannString(rdy->config.riemann));
+  RDyLogDetail(rdy, "  Spatial discretization: %s", SpatialString(rdy->config.numerics.spatial));
+  RDyLogDetail(rdy, "  Temporal discretization: %s", TemporalString(rdy->config.numerics.temporal));
+  RDyLogDetail(rdy, "  Riemann solver: %s", RiemannString(rdy->config.numerics.riemann));
   PetscFunctionReturn(0);
 }
 
@@ -49,22 +45,22 @@ static const char* TimeUnitString(RDyTimeUnit unit) {
 static PetscErrorCode PrintTime(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Time:");
-  RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.final_time, TimeUnitString(rdy->config.time_unit));
+  RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.time.final_time, TimeUnitString(rdy->config.time.unit));
   PetscFunctionReturn(0);
 }
 
 static PetscErrorCode PrintRestart(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Restart:");
-  if (rdy->config.restart_frequency > 0) {
+  if (rdy->config.restart.frequency > 0) {
     char format[12];
-    if (rdy->config.restart_format == PETSC_VIEWER_NATIVE) {
+    if (rdy->config.restart.format == PETSC_VIEWER_NATIVE) {
       strcpy(format, "binary");
     } else {
       strcpy(format, "hdf5");
     }
     RDyLogDetail(rdy, "  File format: %s", format);
-    RDyLogDetail(rdy, "  Frequency: %d", rdy->config.restart_frequency);
+    RDyLogDetail(rdy, "  Frequency: %d", rdy->config.restart.frequency);
   } else {
     RDyLogDetail(rdy, "  (disabled)");
   }
@@ -74,8 +70,8 @@ static PetscErrorCode PrintRestart(RDy rdy) {
 static PetscErrorCode PrintLogging(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Logging:");
-  if (strlen(rdy->config.log_file)) {
-    RDyLogDetail(rdy, "  Primary log file: %s", rdy->config.log_file);
+  if (strlen(rdy->config.logging.file)) {
+    RDyLogDetail(rdy, "  Primary log file: %s", rdy->config.logging.file);
   } else {
     RDyLogDetail(rdy, "  Primary log file: <stdout>");
   }

@@ -15,7 +15,7 @@
 // @param [in] type The data type for which storage is resized
 // @param [in] count The number of elements in the requested re-allocation
 // @param [inout] memory A pointer to a previously allocated memory block.
-#define RDyRealloc(type, count, memory) PetscRealloc(sizeof(type)*count, memory)
+#define RDyRealloc(type, count, memory) PetscRealloc(sizeof(type) * count, memory)
 
 // Frees a block of memory allocated by RDyAlloc. Returns a PetscErrorCode.
 // @param [inout] memory A pointer to a previously allocated memory block.

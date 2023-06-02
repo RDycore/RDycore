@@ -1,6 +1,7 @@
 #ifndef RDYCONFIG_H
 #define RDYCONFIG_H
 
+#include <petscviewer.h>
 #include <private/rdylogimpl.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
@@ -22,58 +23,130 @@
 // the maximum length of a string referring to a name in the config file
 #define MAX_NAME_LEN 128
 
-// This type identifies available spatial discretization methods.
-typedef enum {
-  SPATIAL_FV = 0, // finite volume method
-  SPATIAL_FE      // finite element method
-} RDySpatial;
+// The data structures below are intermediate representations of the sections
+// in the YAML configuration file. We parse this file with a YAML parser that
+// populates these data structures using a YAML schema. The parser is implemented
+// in src/real_config_file.c. Any changes to these data structures must be
+// reflected in the corresponding schema in that file.
 
-// This type identifies available temporal discretization methods.
-typedef enum {
-  TEMPORAL_EULER = 0, // forward euler method
-  TEMPORAL_RK4,       // 4th-order Runge-Kutta method
-  TEMPORAL_BEULER     // backward euler method
-} RDyTemporal;
+// ---------------
+// physics section
+// ---------------
 
-// This type identifies available Riemann solvers for horizontal flow.
+// physics flow modes
 typedef enum {
-  RIEMANN_ROE = 0, // Roe solver
-  RIEMANN_HLLC     // Harten, Lax, van Leer Contact solver
-} RDyRiemann;
+  FLOW_SWE = 0,   // shallow water equations
+  FLOW_DIFFUSION  // diffusion equation
+} RDyPhysicsFlowMode;
 
-// This type identifies available physics flow modes.
+// physics flow parameters
+typedef struct {
+  RDyPhysicsFlowMode mode;          // flow mode
+  PetscBool          bed_friction;  // bed friction enabled?
+  PetscReal          tiny_h;        // depth below which no flow occurs
+} RDyPhysicsFlow;
+
+// all physics parameters
+typedef struct {
+  RDyPhysicsFlow flow;      // flow parameters
+  PetscBool      sediment;  // sediment effects enabled?
+  PetscBool      salinity;  // salinity effects enabled?
+} RDyPhysicsSection;
+
+// ----------------
+// numerics section
+// ----------------
+
+// spatial discretization methods
 typedef enum {
-  FLOW_SWE = 0,
-  FLOW_DIFFUSION
-} RDyFlowMode;
+  SPATIAL_FV = 0,  // finite volume method
+  SPATIAL_FE       // finite element method
+} RDyNumericsSpatial;
 
-// This type identifies available bed friction models.
+// temporal discretization methods
 typedef enum {
-  BED_FRICTION_NOT_SET = 0,
-  BED_FRICTION_NONE,
-  BED_FRICTION_CHEZY,
-  BED_FRICTION_MANNING
-} RDyBedFriction;
+  TEMPORAL_EULER = 0,  // forward euler method
+  TEMPORAL_RK4,        // 4th-order Runge-Kutta method
+  TEMPORAL_BEULER      // backward euler method
+} RDyNumericsTemporal;
 
-// This type identifies a time unit.
+// riemann solvers for horizontal flow
 typedef enum {
-  TIME_SECONDS = 0,
-  TIME_MINUTES,
-  TIME_HOURS,
-  TIME_DAYS,
-  TIME_MONTHS,
-  TIME_YEARS
-} RDyTimeUnit;
+  RIEMANN_ROE = 0,  // Roe solver
+  RIEMANN_HLLC      // Harten, Lax, van Leer Contact solver
+} RDyNumericsRiemann;
 
-// This type identifies a format for output files.
-typedef enum {
-  OUTPUT_BINARY = 0,
-  OUTPUT_XDMF,
-  OUTPUT_CGNS
-} RDyOutputFormat;
+// all numerics parmeters
+typedef struct {
+  RDyNumericsSpatial  spatial;
+  RDyNumericsTemporal temporal;
+  RDyNumericsRiemann  riemann;
+} RDyNumericsSection;
 
-// This type specifies a "kind" of condition that indicates how that condition
-// is to be enforced on a region or boundary.
+// ------------
+// time section
+// ------------
+
+// time units
+typedef enum { TIME_SECONDS = 0, TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS } RDyTimeUnit;
+
+// all time parameters
+typedef struct {
+  PetscReal   final_time;  // final simulation time [unit]
+  RDyTimeUnit unit;        // unit in which time is expressed
+  PetscInt    max_step;    // maximum number of simulation time steps
+  PetscReal   dtime;       // time step [unit]
+} RDyTimeSection;
+
+// ---------------
+// logging section
+// ---------------
+
+// all logging parameters
+typedef struct {
+  char        file[PETSC_MAX_PATH_LEN];  // log filename
+  RDyLogLevel level;                     // selected log level
+} RDyLoggingSection;
+
+// ---------------
+// restart section
+// ---------------
+
+// all restart parameters
+typedef struct {
+  PetscViewerFormat format;     // file format
+  PetscInt          frequency;  // number of steps between restart dumps
+} RDyRestartSection;
+
+// ---------------
+// output section
+// ---------------
+
+// output file formats
+typedef enum { OUTPUT_BINARY = 0, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
+
+// all output parameters
+typedef struct {
+  RDyOutputFormat format;      // file format
+  PetscInt        frequency;   // frequency of output [steps]
+  PetscInt        batch_size;  // number of timesteps per output file (if available)
+} RDyOutputSection;
+
+// ------------
+// grid section
+// ------------
+
+// all grid parameters
+typedef struct {
+  char file[PETSC_MAX_PATH_LEN];  // mesh file
+} RDyGridSection;
+
+// ---------------------------------------
+// initial, boundary and source conditions
+// ---------------------------------------
+// The following data structures are used in several sections.
+
+// "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {
   CONDITION_DIRICHLET = 0,    // Dirichlet condition (value is specified)
   CONDITION_NEUMANN,          // Neumann condition (derivative is specified)
@@ -84,93 +157,95 @@ typedef enum {
 // This type defines an initial/boundary condition and/or source/sink with named
 // flow, sediment, and salinity conditions.
 typedef struct {
-  char flow_name[MAX_NAME_LEN+1];     // name of related flow condition
-  char sediment_name[MAX_NAME_LEN+1]; // name of related sediment condition
-  char salinity_name[MAX_NAME_LEN+1]; // name of related salinity condition
+  PetscInt id;                          // ID of region or boundary for related condition
+  char     flow[MAX_NAME_LEN + 1];      // name of related flow condition
+  char     sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
+  char     salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
 } RDyConditionSpec;
 
-// This type defines a flow-related condition.
+// domain-wide condition specifications via files
 typedef struct {
-  char             name[MAX_NAME_LEN+1];
+  char              file[PETSC_MAX_PATH_LEN];  // file specifying domain-wide conditions
+  PetscViewerFormat format;                    // format of file
+} RDyDomainConditions;
+
+// --------------------------
+// initial_conditions section
+// --------------------------
+
+// all initial conditions
+typedef struct {
+  RDyDomainConditions domain;                      // domain-wide conditions
+  PetscInt            num_regions;                 // number of per-region conditions defined
+  RDyConditionSpec    by_region[MAX_NUM_REGIONS];  // names of types of conditions
+} RDyInitialConditionsSection;
+
+// ---------------------------
+// boundary_conditions section
+// ---------------------------
+
+// (nothing needed here aside from what's provided in initial_conditions)
+
+// ---------------
+// sources section
+// ---------------
+
+// all source conditions (identical to initial conditions in structure)
+typedef RDyInitialConditionsSection RDySourcesSection;
+
+// -----------------------
+// flow_conditions section
+// -----------------------
+
+// flow-related condition data
+typedef struct {
+  char             name[MAX_NAME_LEN + 1];
   RDyConditionType type;
   PetscReal        height;
   PetscReal        momentum[2];
 } RDyFlowCondition;
 
-// This type defines a sediment-related condition.
+// ---------------------------
+// sediment_conditions section
+// ---------------------------
+
+// sediment-related condition data
 typedef struct {
-  char             name[MAX_NAME_LEN+1];
+  char             name[MAX_NAME_LEN + 1];
   RDyConditionType type;
   PetscReal        concentration;
 } RDySedimentCondition;
 
-// This type defines a salinity-related condition.
+// ---------------------------
+// salinity_conditions section
+// ---------------------------
+
+// salinity-related condition data
 typedef struct {
-  char             name[MAX_NAME_LEN+1];
+  char             name[MAX_NAME_LEN + 1];
   RDyConditionType type;
   PetscReal        concentration;
 } RDySalinityCondition;
 
-// This type is a representation of the config file itself.
+// a representation of the config file itself
 typedef struct {
+  // Each of these fields represents a section of the YAML config file.
+  RDyPhysicsSection  physics;
+  RDyNumericsSection numerics;
+  RDyTimeSection     time;
 
-  //---------
-  // Physics
-  //---------
+  RDyLoggingSection logging;
+  RDyRestartSection restart;
+  RDyOutputSection  output;
 
-  // flow and related parameterization(s)
-  RDyFlowMode    flow_mode;
-  PetscReal      tiny_h; // depth below which no flow occurs (hardwired)
-  RDyBedFriction bed_friction;
-  PetscReal      bed_friction_coef;
+  RDyGridSection grid;
 
-  // sediment
-  PetscBool sediment;
+  RDyInitialConditionsSection initial_conditions;
+  RDySourcesSection           sources;
 
-  // salinity
-  PetscBool salinity;
-
-  //----------
-  // Numerics
-  //----------
-
-  RDySpatial spatial;
-  RDyTemporal temporal;
-  RDyRiemann riemann;
-
-  //------------------------
-  // Spatial discretization
-  //------------------------
-
-  // mesh file
-  char mesh_file[PETSC_MAX_PATH_LEN];
-
-  // initial conditions file (if given)
-  char              initial_conditions_file[PETSC_MAX_PATH_LEN];
-  PetscViewerFormat initial_conditions_format;
-
-  // IDs of all regions mentioned in an input file
-  PetscInt num_regions;
-  PetscInt region_ids[MAX_NUM_REGIONS];
-
-  // IDs of all boundaries mentioned in an input file
-  PetscInt num_boundaries;
-  PetscInt boundary_ids[MAX_NUM_BOUNDARIES];
-
-  // table of initial conditions mapping regions to names of conditions
-  // (unless file above is given)
-  PetscInt         num_initial_conditions;
-  RDyConditionSpec initial_conditions[MAX_NUM_REGIONS];
-
-  // table of sources/sinks mapping regions to names of conditions
-  PetscInt         num_sources;
-  RDyConditionSpec sources[MAX_NUM_REGIONS];
-
-  // table of boundary conditions mapping boundaries to names of conditions
   PetscInt         num_boundary_conditions;
   RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 
-  // tables of named sets of flow, sediment, and salinity conditions
   PetscInt             num_flow_conditions;
   RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_sediment_conditions;
@@ -178,53 +253,6 @@ typedef struct {
   PetscInt             num_salinity_conditions;
   RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
-  //--------------
-  // Timestepping
-  //--------------
-
-  // simulation time at which to end
-  PetscReal final_time;
-  // Units in which final_time is expressed
-  RDyTimeUnit time_unit;
-  // Maximum number of time steps
-  PetscInt max_step;
-  // Time step
-  PetscReal dtime;
-
-  //----------
-  // Restarts
-  //----------
-
-  // Restart file format
-  PetscViewerFormat restart_format;
-  // Restart frequency (in steps)
-  PetscInt restart_frequency;
-
-  //--------
-  // Output
-  //--------
-
-  // Output file format
-  RDyOutputFormat output_format;
-  // Output frequency (in steps)
-  PetscInt output_frequency;
-  // Number of timesteps per output file (available only in certain formats)
-  PetscInt output_batch_size;
-
-  //---------
-  // Logging
-  //---------
-
-  // log filename
-  char        log_file[PETSC_MAX_PATH_LEN];
-  // selected log level
-  RDyLogLevel log_level;
-
 } RDyConfig;
 
-PETSC_INTERN PetscErrorCode RDyConfigFindRegion(RDyConfig*, PetscInt, PetscInt*);
-PETSC_INTERN PetscErrorCode RDyConfigFindBoundary(RDyConfig*, PetscInt, PetscInt*);
-
-
 #endif
-

@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.12.0)
+cmake_minimum_required (VERSION 3.14.0)
 
 # Configurable options
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
@@ -29,8 +29,16 @@ set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
 # Add some compiler flags of our own.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fmax-errors=10")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format-truncation")
+elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
+endif()
+
+# Set linker flags where appropriate
+if (APPLE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_compact_unwind")
 endif()
 
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.
