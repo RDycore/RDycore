@@ -91,9 +91,7 @@ static void TestFullSpec(void **state) {
       "      material: smooth\n"
       "materials:\n"
       "  - name: smooth\n"
-      "    properties:\n"
-      "      - name: manning\n"
-      "        value: 0.018\n"
+      "    manning: 0.018\n\n"
       "initial_conditions:\n"
       "  regions:\n"
       "    - id: 1\n"
@@ -172,7 +170,7 @@ static void TestBadFlowBCSpec(void **state) {
       "  dam_top_ic:\n"
       "    type: dirichlet\n"
       "  dam_bottom_ic:\n"
-      "    height: 5\n\n";
+      "    height: 5\n";
 
   RDy rdy;
   assert_int_equal(0, RDyCreate(PETSC_COMM_WORLD, "bad_flow_bc_spec", &rdy));

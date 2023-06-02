@@ -200,6 +200,24 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// retrieves the index of a material using its name
+static PetscErrorCode FindMaterial(RDy rdy, const char *name, PetscInt *index) {
+  PetscFunctionBegin;
+
+  // Currently, we do a linear search on the name of the material, which is O(N)
+  // for N regions. If this is too slow, we can sort the conditions by name and
+  // use binary search, which is O(log2 N).
+  *index = -1;
+  for (PetscInt i = 0; i < rdy->config.num_materials; ++i) {
+    if (!strcmp(rdy->config.materials[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
 // retrieves the index of a flow condition using its name
 static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
@@ -539,8 +557,39 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// checks the validity of initial/boundary conditions and sources
-static PetscErrorCode InitConditionsAndSources(RDy rdy) {
+// sets up materials
+static PetscErrorCode InitMaterials(RDy rdy) {
+  PetscFunctionBegin;
+  if (rdy->config.surface_composition.num_regions > 0) {
+    // Allocate storage for materials
+    PetscCall(RDyAlloc(RDyMaterial, rdy->num_regions, &rdy->materials));
+
+    // Assign materials to each region as needed.
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyMaterial *material          = &rdy->materials[r];
+      PetscInt      region_id        = rdy->region_ids[r];
+      PetscInt      mat_region_index = -1;
+      for (PetscInt imat = 0; imat < rdy->config.surface_composition.num_regions; ++imat) {
+        if (rdy->config.surface_composition.by_region[imat].id == region_id) {
+          mat_region_index = imat;
+          break;
+        }
+      }
+      if (mat_region_index != -1) {
+        RDyMaterialSpec *mat_spec = &rdy->config.surface_composition.by_region[mat_region_index];
+        PetscInt mat_index;
+        PetscCall(FindMaterial(rdy, mat_spec->material, &mat_index));
+        RDyMaterial *mat = &rdy->config.materials[mat_index];
+        *material = *mat;
+      }
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+
+// sets up initial conditions
+static PetscErrorCode InitInitialConditions(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate storage for by-region initial conditions
@@ -591,6 +640,12 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       }
     }
   }
+  PetscFunctionReturn(0);
+}
+
+// sets up sources
+static PetscErrorCode InitSources(RDy rdy) {
+  PetscFunctionBegin;
   if (rdy->config.sources.num_regions > 0) {
     // Allocate storage for sources
     PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->sources));
@@ -636,7 +691,12 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       }
     }
   }
+  PetscFunctionReturn(0);
+}
 
+// sets up boundary conditions
+static PetscErrorCode InitBoundaryConditions(RDy rdy) {
+  PetscFunctionBegin;
   // Set up a reflecting flow boundary condition.
   RDyFlowCondition *reflecting_flow = NULL;
   for (PetscInt c = 0; c < MAX_NUM_CONDITIONS; ++c) {
@@ -816,8 +876,13 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitRegions(rdy));
   PetscCall(InitBoundaries(rdy));
 
+  RDyLogDebug(rdy, "Initializing materials...");
+  PetscCall(InitMaterials(rdy));
+
   RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
-  PetscCall(InitConditionsAndSources(rdy));
+  PetscCall(InitInitialConditions(rdy));
+  PetscCall(InitSources(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Creating solvers and vectors...");
   PetscCall(CreateSolvers(rdy));

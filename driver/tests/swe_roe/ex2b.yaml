@@ -25,6 +25,17 @@ output:
 grid:
   file: planar_dam_10x5.msh
 
+surface_composition:
+  regions:
+    - id: 1 # upstream region
+      material: smooth
+    - id: 2 # downstream region
+      material: smooth
+
+materials:
+  - name: smooth
+    manning: 0.015
+
 initial_conditions:
   regions:
     - id: 1 # upstream region

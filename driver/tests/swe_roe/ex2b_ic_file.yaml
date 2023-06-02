@@ -25,6 +25,17 @@ output:
 grid:
   file: DamBreak_grid5x10.exo
 
+surface_composition:
+  regions:
+    - id: 1 # upstream region
+      material: smooth
+    - id: 2 # downstream region
+      material: smooth
+
+materials:
+  - name: smooth
+    manning: 0.015
+
 initial_conditions:
   domain:
     format: binary

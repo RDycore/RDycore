@@ -23,9 +23,6 @@
 // within RDyConfig (include/private/rdyconfigimpl.h) accordingly. The schema for each
 // section appears below and must remain consistent with the data structures in rdyconfigimpl.h.
 
-#define UNINITIALIZED_REAL -999.0
-#define UNINITIALIZED_INT -999
-
 // ====================
 //  Schema definitions
 // ====================
@@ -132,10 +129,10 @@ static const cyaml_strval_t time_units[] = {
 
 // mapping of time fields to members of RDyTimeSection
 static const cyaml_schema_field_t time_fields_schema[] = {
-    CYAML_FIELD(FLOAT, "final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time, {.missing = UNINITIALIZED_REAL}),
+    CYAML_FIELD(FLOAT, "final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time, {.missing = INVALID_REAL}),
     CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
-    CYAML_FIELD(INT, "max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step, {.missing = UNINITIALIZED_INT}),
-    CYAML_FIELD(FLOAT, "dtime", CYAML_FLAG_OPTIONAL, RDyTimeSection, dtime, {.missing = UNINITIALIZED_REAL}),
+    CYAML_FIELD(INT, "max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step, {.missing = INVALID_INT}),
+    CYAML_FIELD(FLOAT, "dtime", CYAML_FLAG_OPTIONAL, RDyTimeSection, dtime, {.missing = INVALID_REAL}),
     CYAML_FIELD_END
 };
 
@@ -258,23 +255,10 @@ static const cyaml_schema_field_t surface_composition_fields_schema[] = {
 // materials section
 // -----------------
 
-// mapping of material property fields to RDyMaterialProperty
-static const cyaml_schema_field_t material_property_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterialProperty, name, 0),
-    CYAML_FIELD_FLOAT("value", CYAML_FLAG_DEFAULT, RDyMaterialProperty, value),
-    CYAML_FIELD_END
-};
-
-// a single material property entry
-static const cyaml_schema_value_t material_property_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialProperty, material_property_fields_schema),
-};
-
 // mapping of material fields to RDyMaterial
 static const cyaml_schema_field_t material_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterial, name, 0),
-    CYAML_FIELD_SEQUENCE_COUNT("properties", CYAML_FLAG_DEFAULT, RDyMaterial, properties, num_properties, &material_property_entry, 0,
-                               MAX_NUM_MATERIAL_PROPERTIES),
+    CYAML_FIELD(FLOAT, "manning", CYAML_FLAG_OPTIONAL, RDyMaterial, manning, {.missing = INVALID_REAL}),
     CYAML_FIELD_END
 };
 
@@ -371,14 +355,14 @@ static const cyaml_strval_t condition_types[] = {
 
 // schema for momentum component (as specified in a 2-item sequence)
 static const cyaml_schema_value_t momentum_component = {
-    CYAML_VALUE(FLOAT, CYAML_FLAG_DEFAULT, PetscReal, {.missing = -FLT_MAX}),
+    CYAML_VALUE(FLOAT, CYAML_FLAG_DEFAULT, PetscReal, {.missing = INVALID_REAL}),
 };
 
 // schema for flow condition fields
 static const cyaml_schema_field_t flow_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 0),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = -FLT_MAX}),
+    CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = INVALID_REAL}),
     CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component, 2),
     CYAML_FIELD_END
 };
@@ -491,7 +475,7 @@ static void *YamlAlloc(void *ctx, void *ptr, size_t size) {
   }
 }
 
-// Parses the given YAML string into the given config representation
+// parses the given YAML string into the given config representation
 static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig **config) {
   PetscFunctionBegin;
 
@@ -531,17 +515,17 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   // check 'Timestepping' settings
   // 'final_time', 'max_step', 'dtime': exactly two of these three can be specified in the .yaml file.
   PetscInt num_time_settings = 0;
-  if (config->time.final_time != UNINITIALIZED_REAL) ++num_time_settings;
-  if (config->time.max_step != UNINITIALIZED_REAL) ++num_time_settings;
-  if (config->time.dtime != UNINITIALIZED_REAL) ++num_time_settings;
+  if (config->time.final_time != INVALID_REAL) ++num_time_settings;
+  if (config->time.max_step != INVALID_REAL) ++num_time_settings;
+  if (config->time.dtime != INVALID_REAL) ++num_time_settings;
   PetscCheck(num_time_settings, comm, PETSC_ERR_USER, "Exactly 2 of time.final_time, time.max_step, time.dtime must be specified (%d given)",
              num_time_settings);
 
-  if (config->time.final_time == UNINITIALIZED_REAL) {
+  if (config->time.final_time == INVALID_REAL) {
     config->time.final_time = config->time.max_step * config->time.dtime;
-  } else if (config->time.max_step == UNINITIALIZED_INT) {
+  } else if (config->time.max_step == INVALID_INT) {
     config->time.max_step = (PetscInt)(config->time.final_time / config->time.dtime);
-  } else {  // config->time.dtime == UNINITIALIZED_REAL
+  } else {  // config->time.dtime == INVALID_REAL
     config->time.dtime = config->time.final_time / config->time.max_step;
   }
 
@@ -549,13 +533,20 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_regions > 0), comm, PETSC_ERR_USER,
              "Invalid initial_conditions! No domain or per-region conditions given.");
 
+  // validate our materials
+  for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
+    const RDyMaterial *material = &config->materials[i];
+    // at the moment, we need Manning's coefficient
+    PetscCheck(material->manning != INVALID_REAL, comm, PETSC_ERR_USER, "Missing Manning's coefficient in materials.%s", material->name);
+  }
+
   // validate our flow conditions
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
-      PetscCheck(flow_cond->height != -FLT_MAX, comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s", flow_cond->name);
-      PetscCheck((flow_cond->momentum[0] != -FLT_MAX) && (flow_cond->momentum[1] != -FLT_MAX), comm, PETSC_ERR_USER,
+      PetscCheck(flow_cond->height != INVALID_REAL, comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s", flow_cond->name);
+      PetscCheck((flow_cond->momentum[0] != INVALID_REAL) && (flow_cond->momentum[1] != INVALID_REAL), comm, PETSC_ERR_USER,
                  "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }
   }
@@ -564,7 +555,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   for (PetscInt i = 0; i < config->num_sediment_conditions; ++i) {
     const RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
     PetscCheck(sed_cond->type >= 0, comm, PETSC_ERR_USER, "Sediment condition type not set in sediment_conditions.%s", sed_cond->name);
-    PetscCheck(sed_cond->concentration != -FLT_MAX, comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s",
+    PetscCheck(sed_cond->concentration != INVALID_REAL, comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s",
                sed_cond->name);
   }
 
@@ -572,7 +563,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   for (PetscInt i = 0; i < config->num_salinity_conditions; ++i) {
     const RDySalinityCondition *sal_cond = &config->salinity_conditions[i];
     PetscCheck(sal_cond->type >= 0, comm, PETSC_ERR_USER, "Salinity condition type not set in salinity_conditions.%s", sal_cond->name);
-    PetscCheck(sal_cond->concentration != -FLT_MAX, comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s",
+    PetscCheck(sal_cond->concentration != INVALID_REAL, comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s",
                sal_cond->name);
   }
 

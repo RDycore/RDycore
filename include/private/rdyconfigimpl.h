@@ -4,11 +4,18 @@
 #include <petscviewer.h>
 #include <private/rdylogimpl.h>
 
+#include <float.h>
+#include <limits.h>
+
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
 //
 // https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
 //
+
+// sentinel values for uninitialized/invalid data
+#define INVALID_REAL -DBL_MAX
+#define INVALID_INT -INT_MAX
 
 // the maximum number of regions that can be defined on a domain
 #define MAX_NUM_REGIONS 32
@@ -18,10 +25,6 @@
 
 // the maximum number of materials that can be defined for a simulation
 #define MAX_NUM_MATERIALS 32
-
-// the maximum number of material properties that can be associated with a
-// single material
-#define MAX_NUM_MATERIAL_PROPERTIES 32
 
 // the maximum number of flow/sediment/salinity conditions that can be defined for a
 // simulation
@@ -175,17 +178,11 @@ typedef struct {
 // materials section
 // -----------------------
 
-// a single material property
+// a material with specific properties
+// (undefined properties are set to INVALID_INT/INVALID_REAL)
 typedef struct {
   char name[MAX_NAME_LEN+1];
-  PetscReal value; // scalar property (we can generalize to tensors if needed)
-} RDyMaterialProperty;
-
-// a material definition
-typedef struct {
-  char name[MAX_NAME_LEN+1];
-  PetscInt num_properties;
-  RDyMaterialProperty properties[MAX_NUM_MATERIAL_PROPERTIES];
+  PetscReal manning; // Manning's coefficient [s/m**(1/3)]
 } RDyMaterial;
 
 // ---------------------------------------
