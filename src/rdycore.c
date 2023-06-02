@@ -161,3 +161,13 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   *rdy = NULL;
   PetscFunctionReturn(0);
 }
+
+/// Retrieves the material properties for the given cell.
+/// @param rdy [in] the RDy object for which material properties are fetched
+/// @param cell [in] the (natural) index of the cell for which material properties are fetched
+/// @param material [out] a pointer to an RDyMaterial that stores the given material properties
+PetscErrorCode GetMaterial(RDy rdy, PetscInt cell, RDyMaterial *material) {
+  PetscFunctionBegin;
+  // FIXME
+  PetscFunctionReturn(0);
+}

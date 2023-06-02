@@ -121,6 +121,9 @@ struct _p_RDy {
   // residual vector
   Vec R;
 
+  // material properties vector
+  Vec M;
+
   //-------------------
   // Simulatіon output
   //-------------------
@@ -130,6 +133,9 @@ struct _p_RDy {
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
+
+// material property functions
+PETSC_INTERN PetscErrorCode GetMaterial(RDy, PetscInt, RDyMaterial*);
 
 // shallow water equations functions
 PETSC_INTERN PetscErrorCode InitSWE(RDy);
