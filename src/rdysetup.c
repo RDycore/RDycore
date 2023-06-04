@@ -569,6 +569,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
     PetscViewer viewer;
     PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.surface_composition.domain.file, FILE_MODE_READ, &viewer));
     // FIXME: we should decide how we want to read/write material properties
+    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Domain material properties not yet supported!");
     PetscCall(PetscViewerDestroy(&viewer));
   }
 
