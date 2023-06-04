@@ -12,10 +12,10 @@ macro(add_formatting_targets)
     if (NOT ${CF_VERSION} MATCHES ${CLANG_FORMAT_VERSION})
       add_custom_target(format-c
         echo "You have clang-format version ${CF_VERSION}, but ${CLANG_FORMAT_VERSION} is required."
-        "Please make sure this version appears in your path and rerun config.sh.")
+        "Please make sure this version appears in your path and rerun cmake.")
       add_custom_target(format-c-check
         echo "You have clang-format version ${CF_VERSION}, but ${CLANG_FORMAT_VERSION} is required."
-        "Please make sure this version appears in your path and rerun config.sh.")
+        "Please make sure this version appears in your path and rerun cmake.")
     else()
       add_custom_target(format-c
         find ${PROJECT_SOURCE_DIR}/include -name "*.h" -exec ${CLANG_FORMAT} -i {} \+;

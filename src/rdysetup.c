@@ -580,9 +580,9 @@ static PetscErrorCode InitMaterials(RDy rdy) {
 
     // assign materials to each region as needed
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyMaterial *material          = &rdy->materials[r];
-      PetscInt     region_id         = rdy->region_ids[r];
-      PetscInt     mat_region_index  = -1;
+      RDyMaterial *material         = &rdy->materials[r];
+      PetscInt     region_id        = rdy->region_ids[r];
+      PetscInt     mat_region_index = -1;
       for (PetscInt imat = 0; imat < rdy->config.surface_composition.num_regions; ++imat) {
         if (rdy->config.surface_composition.by_region[imat].id == region_id) {
           mat_region_index = imat;
@@ -592,7 +592,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
       if (mat_region_index != -1) {
         // retrieve the material object for this region
         RDyMaterialSpec *mat_spec = &rdy->config.surface_composition.by_region[mat_region_index];
-        PetscInt mat_index;
+        PetscInt         mat_index;
         PetscCall(FindMaterial(rdy, mat_spec->material, &mat_index));
         RDyMaterial *mat = &rdy->config.materials[mat_index];
 
@@ -602,7 +602,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
         // set the material properties for all cells in the region
         RDyRegion *region = &rdy->regions[r];
         for (PetscInt c = 0; c < region->num_cells; ++c) {
-          PetscInt cell = region->cell_ids[c];
+          PetscInt cell                = region->cell_ids[c];
           rdy->materials_by_cell[cell] = *mat;
         }
       }
@@ -610,7 +610,6 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   }
   PetscFunctionReturn(0);
 }
-
 
 // sets up initial conditions
 static PetscErrorCode InitInitialConditions(RDy rdy) {
