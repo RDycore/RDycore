@@ -124,7 +124,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
 
   // destroy materials
-  if ((*rdy)->materials_by_cell) VecDestroy(&((*rdy)->materials_by_cell));
+  if ((*rdy)->materials_by_cell) RDyFree((*rdy)->materials_by_cell);
   if ((*rdy)->materials) RDyFree((*rdy)->materials);
 
   // destroy regions and boundaries

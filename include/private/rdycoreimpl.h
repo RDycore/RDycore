@@ -89,9 +89,8 @@ struct _p_RDy {
 
   // materials associated with mesh regions (1 per region)
   RDyMaterial *materials;
-
-  // materials associated with individual cells
-  Vec materials_by_cell;
+  // materials associated with individual (local) cells
+  RDyMaterial *materials_by_cell;
 
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;
@@ -133,10 +132,6 @@ struct _p_RDy {
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
-
-// material property functions
-PETSC_INTERN PetscErrorCode SetMaterial(RDy, PetscInt, RDyMaterial*);
-PETSC_INTERN PetscErrorCode GetMaterial(RDy, PetscInt, RDyMaterial*);
 
 // shallow water equations functions
 PETSC_INTERN PetscErrorCode InitSWE(RDy);

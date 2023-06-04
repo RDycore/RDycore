@@ -562,14 +562,14 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate storage for materials for cells
-  PetscCall(DMCreateLocalVector(rdy->dm, &rdy->materials_by_cell));
-  if (strlen(rdy->config.surface_composition.domain.file)) { // read from file
-    /* something like this vvvvv
+  PetscCall(RDyAlloc(RDyMaterial, rdy->mesh.num_cells, &rdy->materials_by_cell));
+
+  // read material properties for the entire domain from a file if given
+  if (strlen(rdy->config.surface_composition.domain.file)) {
     PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.initial_conditions.domain.file, FILE_MODE_READ, &viewer));
-    PetscCall(VecLoad(rdy->materials_by_cell, viewer));
+    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.surface_composition.domain.file, FILE_MODE_READ, &viewer));
+    // FIXME: we should decide how we want to read/write material properties
     PetscCall(PetscViewerDestroy(&viewer));
-    */
   }
 
   // set up region-wise material and override cell-wise materials if needed
@@ -589,18 +589,20 @@ static PetscErrorCode InitMaterials(RDy rdy) {
         }
       }
       if (mat_region_index != -1) {
-        // set the region's material
+        // retrieve the material object for this region
         RDyMaterialSpec *mat_spec = &rdy->config.surface_composition.by_region[mat_region_index];
         PetscInt mat_index;
         PetscCall(FindMaterial(rdy, mat_spec->material, &mat_index));
         RDyMaterial *mat = &rdy->config.materials[mat_index];
+
+        // set the region's material properties
         *material = *mat;
 
-        // assign this material to all cells in the region
+        // set the material properties for all cells in the region
         RDyRegion *region = &rdy->regions[r];
         for (PetscInt c = 0; c < region->num_cells; ++c) {
           PetscInt cell = region->cell_ids[c];
-          PetscCall(SetMaterial(rdy, cell, mat));
+          rdy->materials_by_cell[cell] = *mat;
         }
       }
     }
@@ -897,9 +899,6 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitRegions(rdy));
   PetscCall(InitBoundaries(rdy));
 
-  RDyLogDebug(rdy, "Initializing materials...");
-  PetscCall(InitMaterials(rdy));
-
   RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
   PetscCall(InitInitialConditions(rdy));
   PetscCall(InitSources(rdy));
@@ -913,28 +912,11 @@ PetscErrorCode RDySetup(RDy rdy) {
   // note: section exists for the DM
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
+  RDyLogDebug(rdy, "Initializing materials...");
+  PetscCall(InitMaterials(rdy));
+
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  PetscFunctionReturn(0);
-}
-
-/// Set the material properties for the given cell.
-/// @param rdy [in] the RDy object for which material properties are set
-/// @param cell [in] the (natural) index of the cell for which material properties are set
-/// @param material [in] a pointer to an RDyMaterial that stores the given material properties
-PetscErrorCode SetMaterial(RDy rdy, PetscInt cell, RDyMaterial *material) {
-  PetscFunctionBegin;
-  // FIXME
-  PetscFunctionReturn(0);
-}
-
-/// Retrieves the material properties for the given cell.
-/// @param rdy [in] the RDy object for which material properties are fetched
-/// @param cell [in] the (natural) index of the cell for which material properties are fetched
-/// @param material [out] a pointer to an RDyMaterial that stores the given material properties
-PetscErrorCode GetMaterial(RDy rdy, PetscInt cell, RDyMaterial *material) {
-  PetscFunctionBegin;
-  // FIXME
   PetscFunctionReturn(0);
 }

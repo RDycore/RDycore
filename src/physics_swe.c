@@ -600,7 +600,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
 
       if (h >= rdy->config.physics.flow.tiny_h) {
         // Manning's coefficient
-        PetscReal N_mannings = 0.015;
+        PetscReal N_mannings = rdy->materials_by_cell[icell].manning;
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
