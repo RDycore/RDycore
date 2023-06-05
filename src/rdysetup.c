@@ -568,9 +568,29 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   if (strlen(rdy->config.surface_composition.domain.file)) {
     PetscViewer viewer;
     PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.surface_composition.domain.file, FILE_MODE_READ, &viewer));
-    // FIXME: we should decide how we want to read/write material properties
-    PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Domain material properties not yet supported!");
+
+    // create a naturally-ordered vector with a stride equal to the number of
+    // material properties
+    Vec natural;
+    PetscCall(VecCreate(rdy->comm, &natural));
+    VecType vec_type;
+    PetscCall(VecGetType(rdy->X, &vec_type));
+    PetscCall(VecSetType(natural, vec_type));
+    // below, we assume the RDyMaterial struct contains only PetscReal fields
+    PetscInt num_properties = sizeof(RDyMaterial) / sizeof(PetscReal);
+    PetscInt num_cells      = rdy->mesh.num_cells;
+    PetscCall(VecSetSizes(natural, num_properties * num_cells, PETSC_DECIDE));
+
+    // load the properties into the vector and copy them into place
+    PetscCall(VecLoad(natural, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
+    PetscInt indices[num_properties * num_cells];
+    for (PetscInt c = 0; c < num_cells; ++c) {
+      for (PetscInt p = 0; p < num_properties; ++p) {
+        indices[num_properties * c + p] = num_properties * rdy->mesh.cells.natural_ids[c] + p;
+      }
+    }
+    PetscCall(VecGetValues(natural, num_properties * num_cells, indices, (PetscReal *)rdy->materials_by_cell));
   }
 
   // set up region-wise material and override cell-wise materials if needed
