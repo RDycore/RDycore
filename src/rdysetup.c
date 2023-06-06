@@ -599,11 +599,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   // read material properties for the entire domain from a file if given
   if (strlen(rdy->config.surface_composition.domain.files.manning)) {
     Vec local;
-    if (rdy->config.surface_composition.domain.format == OUTPUT_BINARY) {
-      PetscCall(ReadOneDOFBinaryVec(rdy, rdy->config.surface_composition.domain.files.manning, &local));
-    } else {
-      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Only binary data format is support for reading Manning value");
-    }
+    PetscCall(ReadOneDOFBinaryVec(rdy, rdy->config.surface_composition.domain.files.manning, &local));
 
     PetscScalar *x_ptr;
     PetscCall(VecGetArray(local, &x_ptr));
