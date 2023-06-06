@@ -557,6 +557,38 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// read an auxillar data of 1 DOF from a PETSc Vec
+static PetscErrorCode ReadOneDOFBinaryVec(RDy rdy, const char filename[], Vec *local) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+
+  // create a naturally-ordered vector with a stride equal to the number of
+  Vec natural, global;
+
+  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
+  PetscCall(DMCreateLocalVector(rdy->aux_dm, local));
+
+  // load the properties into the vector and copy them into place
+  PetscCall(VecLoad(natural, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  // scatter natural-to-global
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, global));
+
+  // scatter global-to-local
+  PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, *local));
+
+  PetscCall(VecDestroy(&natural));
+  PetscCall(VecDestroy(&global));
+
+PetscFunctionReturn(0);
+}
+
 // sets up materials
 static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
@@ -566,25 +598,13 @@ static PetscErrorCode InitMaterials(RDy rdy) {
 
   // read material properties for the entire domain from a file if given
   if (strlen(rdy->config.surface_composition.domain.files.manning)) {
-    PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.surface_composition.domain.files.manning, FILE_MODE_READ, &viewer));
 
-    // create a naturally-ordered vector with a stride equal to the number of
-    // material properties
-    Vec natural, global, local;
-
-    PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
-    PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
-    PetscCall(DMCreateLocalVector(rdy->aux_dm, &local));
-
-    // load the properties into the vector and copy them into place
-    PetscCall(VecLoad(natural, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-
-    PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, global));
-    PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, global));
-    PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, local));
-    PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, local));
+    Vec local;
+    if (rdy->config.surface_composition.domain.format == OUTPUT_BINARY) {
+      PetscCall(ReadOneDOFBinaryVec(rdy,rdy->config.surface_composition.domain.files.manning, &local));
+    } else {
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Only binary data format is support for reading Manning value");
+    }
 
     PetscScalar *x_ptr;
     PetscCall(VecGetArray(local, &x_ptr));
@@ -593,8 +613,6 @@ static PetscErrorCode InitMaterials(RDy rdy) {
     }
     PetscCall(VecRestoreArray(local, &x_ptr));
 
-    PetscCall(VecDestroy(&natural));
-    PetscCall(VecDestroy(&global));
     PetscCall(VecDestroy(&local));
   }
 
