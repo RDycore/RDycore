@@ -241,7 +241,6 @@ static const cyaml_schema_field_t material_spec_fields_schema[] = {
 // a single material specification entry
 static const cyaml_schema_value_t material_spec_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialSpec, material_spec_fields_schema),
-    CYAML_FIELD_END
 };
 
 static const cyaml_schema_field_t surface_composition_domain_files_fields_schema[] = {
