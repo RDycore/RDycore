@@ -166,11 +166,21 @@ typedef struct {
   char     material[MAX_NAME_LEN + 1];  // name of related material
 } RDyMaterialSpec;
 
+typedef struct {
+  char manning[PETSC_MAX_PATH_LEN];
+} RDySurfaceCompositionFiles;
+
+typedef struct {
+  PetscViewerFormat format;
+  RDySurfaceCompositionFiles files;
+} RDySurfaceCompositionDomain;
+
+
 // all surface composition data
 typedef struct {
-  RDyDomainConditions domain;                        // domain-wide material properties
-  PetscInt            num_regions;                   // number of per-region materials
-  RDyMaterialSpec     by_region[MAX_NUM_MATERIALS];  // materials by region
+  RDySurfaceCompositionDomain domain;                        // domain-wide material properties
+  PetscInt                    num_regions;                   // number of per-region materials
+  RDyMaterialSpec             by_region[MAX_NUM_MATERIALS];  // materials by region
 } RDySurfaceCompositionSection;
 
 // -----------------------

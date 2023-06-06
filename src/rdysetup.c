@@ -565,32 +565,37 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   PetscCall(RDyAlloc(RDyMaterial, rdy->mesh.num_cells, &rdy->materials_by_cell));
 
   // read material properties for the entire domain from a file if given
-  if (strlen(rdy->config.surface_composition.domain.file)) {
+  if (strlen(rdy->config.surface_composition.domain.files.manning)) {
     PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.surface_composition.domain.file, FILE_MODE_READ, &viewer));
+    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.surface_composition.domain.files.manning, FILE_MODE_READ, &viewer));
 
     // create a naturally-ordered vector with a stride equal to the number of
     // material properties
-    Vec natural;
-    PetscCall(VecCreate(rdy->comm, &natural));
-    VecType vec_type;
-    PetscCall(VecGetType(rdy->X, &vec_type));
-    PetscCall(VecSetType(natural, vec_type));
-    // below, we assume the RDyMaterial struct contains only PetscReal fields
-    PetscInt num_properties = sizeof(RDyMaterial) / sizeof(PetscReal);
-    PetscInt num_cells      = rdy->mesh.num_cells;
-    PetscCall(VecSetSizes(natural, num_properties * num_cells, PETSC_DECIDE));
+    Vec natural, global, local;
+
+    PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+    PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
+    PetscCall(DMCreateLocalVector(rdy->aux_dm, &local));
 
     // load the properties into the vector and copy them into place
     PetscCall(VecLoad(natural, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
-    PetscInt indices[num_properties * num_cells];
-    for (PetscInt c = 0; c < num_cells; ++c) {
-      for (PetscInt p = 0; p < num_properties; ++p) {
-        indices[num_properties * c + p] = num_properties * rdy->mesh.cells.natural_ids[c] + p;
-      }
+
+    PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, global));
+    PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, global));
+    PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, local));
+    PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, local));
+
+    PetscScalar *x_ptr;
+    PetscCall(VecGetArray(local, &x_ptr));
+    for (PetscInt icell = 0; icell < rdy->mesh.num_cells; icell++) {
+      rdy->materials_by_cell[icell].manning = x_ptr[icell];
     }
-    PetscCall(VecGetValues(natural, num_properties * num_cells, indices, (PetscReal *)rdy->materials_by_cell));
+    PetscCall(VecRestoreArray(local, &x_ptr));
+
+    PetscCall(VecDestroy(&natural));
+    PetscCall(VecDestroy(&global));
+    PetscCall(VecDestroy(&local));
   }
 
   // set up region-wise material and override cell-wise materials if needed

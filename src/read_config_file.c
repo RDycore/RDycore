@@ -241,11 +241,23 @@ static const cyaml_schema_field_t material_spec_fields_schema[] = {
 // a single material specification entry
 static const cyaml_schema_value_t material_spec_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialSpec, material_spec_fields_schema),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t surface_composition_domain_files_fields_schema[] = {
+    CYAML_FIELD_STRING("manning", CYAML_FLAG_DEFAULT, RDySurfaceCompositionFiles, manning, 0),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t surface_composition_domain_fields_schema[] = {
+    CYAML_FIELD_MAPPING("files", CYAML_FLAG_DEFAULT, RDySurfaceCompositionDomain, files, surface_composition_domain_files_fields_schema),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
+    CYAML_FIELD_END
 };
 
 // mapping of surface_composition fields to RDyInitialConditionsSection
 static const cyaml_schema_field_t surface_composition_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, domain, domain_fields_schema),
+    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, domain, surface_composition_domain_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, by_region, num_regions, &material_spec_entry, 0,
                                MAX_NUM_REGIONS),
     CYAML_FIELD_END
