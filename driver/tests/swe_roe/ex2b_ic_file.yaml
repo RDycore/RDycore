@@ -25,6 +25,12 @@ output:
 grid:
   file: DamBreak_grid5x10.exo
 
+surface_composition:
+  domain:
+    format: binary
+    files:
+      manning: manning_grid5x10.bin
+
 initial_conditions:
   domain:
     format: binary

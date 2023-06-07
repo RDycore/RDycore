@@ -87,6 +87,11 @@ struct _p_RDy {
   PetscInt    *boundary_ids;
   RDyBoundary *boundaries;
 
+  // materials associated with mesh regions (1 per region)
+  RDyMaterial *materials;
+  // materials associated with individual (local) cells
+  RDyMaterial *materials_by_cell;
+
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;
 

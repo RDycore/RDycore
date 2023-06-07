@@ -82,6 +82,17 @@ static void TestFullSpec(void **state) {
       "  frequency: 10\n\n"
       "grid:\n"
       "  file: planar_dam_10x5.msh\n\n"
+      "surface_composition:\n"
+      "  domain:\n"
+      "    files: \n"
+      "      manning: manning.h5\n"
+      "    format: hdf5\n"
+      "  regions:\n"
+      "    - id: 1\n"
+      "      material: smooth\n"
+      "materials:\n"
+      "  - name: smooth\n"
+      "    manning: 0.018\n\n"
       "initial_conditions:\n"
       "  regions:\n"
       "    - id: 1\n"
@@ -121,7 +132,7 @@ static void TestFullSpec(void **state) {
       "    concentration: 0.5\n"
       "  - name: dam_bottom_ic\n"
       "    type: dirichlet\n"
-      "    concentration: 0.25\n\n";
+      "    concentration: 0.25\n";
 
   RDy rdy;
   assert_int_equal(0, RDyCreate(PETSC_COMM_WORLD, "full_spec", &rdy));
@@ -160,7 +171,7 @@ static void TestBadFlowBCSpec(void **state) {
       "  dam_top_ic:\n"
       "    type: dirichlet\n"
       "  dam_bottom_ic:\n"
-      "    height: 5\n\n";
+      "    height: 5\n";
 
   RDy rdy;
   assert_int_equal(0, RDyCreate(PETSC_COMM_WORLD, "bad_flow_bc_spec", &rdy));

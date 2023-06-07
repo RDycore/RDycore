@@ -1,6 +1,8 @@
 #ifndef RDYCONFIG_H
 #define RDYCONFIG_H
 
+#include <float.h>
+#include <limits.h>
 #include <petscviewer.h>
 #include <private/rdylogimpl.h>
 
@@ -10,11 +12,18 @@
 // https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
 //
 
+// sentinel values for uninitialized/invalid data
+#define INVALID_REAL -DBL_MAX
+#define INVALID_INT -INT_MAX
+
 // the maximum number of regions that can be defined on a domain
 #define MAX_NUM_REGIONS 32
 
 // the maximum number of boundaries that can be defined on a domain
 #define MAX_NUM_BOUNDARIES 32
+
+// the maximum number of materials that can be defined for a simulation
+#define MAX_NUM_MATERIALS 32
 
 // the maximum number of flow/sediment/salinity conditions that can be defined for a
 // simulation
@@ -141,6 +150,49 @@ typedef struct {
   char file[PETSC_MAX_PATH_LEN];  // mesh file
 } RDyGridSection;
 
+// file-based domain-wide condition/material specifications
+typedef struct {
+  char              file[PETSC_MAX_PATH_LEN];  // file specifying domain-wide conditions
+  PetscViewerFormat format;                    // format of file
+} RDyDomainConditions;
+
+// ---------------------------
+// surface_composition section
+// ---------------------------
+
+// a named regional material specification
+typedef struct {
+  PetscInt id;                          // ID of region for related material
+  char     material[MAX_NAME_LEN + 1];  // name of related material
+} RDyMaterialSpec;
+
+typedef struct {
+  char manning[PETSC_MAX_PATH_LEN];
+} RDySurfaceCompositionFiles;
+
+typedef struct {
+  PetscViewerFormat          format;
+  RDySurfaceCompositionFiles files;
+} RDySurfaceCompositionDomain;
+
+// all surface composition data
+typedef struct {
+  RDySurfaceCompositionDomain domain;                        // domain-wide material properties
+  PetscInt                    num_regions;                   // number of per-region materials
+  RDyMaterialSpec             by_region[MAX_NUM_MATERIALS];  // materials by region
+} RDySurfaceCompositionSection;
+
+// -----------------------
+// materials section
+// -----------------------
+
+// a material with specific properties
+// (undefined properties are set to INVALID_INT/INVALID_REAL)
+typedef struct {
+  char      name[MAX_NAME_LEN + 1];
+  PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
+} RDyMaterial;
+
 // ---------------------------------------
 // initial, boundary and source conditions
 // ---------------------------------------
@@ -162,12 +214,6 @@ typedef struct {
   char     sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
   char     salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
 } RDyConditionSpec;
-
-// domain-wide condition specifications via files
-typedef struct {
-  char              file[PETSC_MAX_PATH_LEN];  // file specifying domain-wide conditions
-  PetscViewerFormat format;                    // format of file
-} RDyDomainConditions;
 
 // --------------------------
 // initial_conditions section
@@ -239,6 +285,10 @@ typedef struct {
   RDyOutputSection  output;
 
   RDyGridSection grid;
+
+  RDySurfaceCompositionSection surface_composition;
+  PetscInt                     num_materials;
+  RDyMaterial                  materials[MAX_NUM_MATERIALS];
 
   RDyInitialConditionsSection initial_conditions;
   RDySourcesSection           sources;

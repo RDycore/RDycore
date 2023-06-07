@@ -200,6 +200,24 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// retrieves the index of a material using its name
+static PetscErrorCode FindMaterial(RDy rdy, const char *name, PetscInt *index) {
+  PetscFunctionBegin;
+
+  // Currently, we do a linear search on the name of the material, which is O(N)
+  // for N regions. If this is too slow, we can sort the conditions by name and
+  // use binary search, which is O(log2 N).
+  *index = -1;
+  for (PetscInt i = 0; i < rdy->config.num_materials; ++i) {
+    if (!strcmp(rdy->config.materials[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(0);
+}
+
 // retrieves the index of a flow condition using its name
 static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
@@ -539,8 +557,101 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// checks the validity of initial/boundary conditions and sources
-static PetscErrorCode InitConditionsAndSources(RDy rdy) {
+// reads data for a single DOF from a binary file into a Vec
+static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec *local) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+
+  // create a naturally-ordered vector with a stride equal to the number of
+  Vec natural, global;
+
+  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
+  PetscCall(DMCreateLocalVector(rdy->aux_dm, local));
+
+  // load the properties into the vector and copy them into place
+  PetscCall(VecLoad(natural, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  // scatter natural-to-global
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, global));
+
+  // scatter global-to-local
+  PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, *local));
+
+  PetscCall(VecDestroy(&natural));
+  PetscCall(VecDestroy(&global));
+
+  PetscFunctionReturn(0);
+}
+
+#define READ_MATERIAL_PROPERTY_FROM_FILE(rdy, property)                                                   \
+  if (strlen(rdy->config.surface_composition.domain.files.property)) {                                    \
+    Vec local;                                                                                            \
+    PetscCall(ReadOneDOFVecFromFile(rdy, rdy->config.surface_composition.domain.files.property, &local)); \
+    PetscScalar *x_ptr;                                                                                   \
+    PetscCall(VecGetArray(local, &x_ptr));                                                                \
+    for (PetscInt icell = 0; icell < rdy->mesh.num_cells; icell++) {                                      \
+      rdy->materials_by_cell[icell].property = x_ptr[icell];                                              \
+    }                                                                                                     \
+    PetscCall(VecRestoreArray(local, &x_ptr));                                                            \
+    PetscCall(VecDestroy(&local));                                                                        \
+  }
+
+// sets up materials
+static PetscErrorCode InitMaterials(RDy rdy) {
+  PetscFunctionBegin;
+
+  // allocate storage for materials for cells
+  PetscCall(RDyAlloc(RDyMaterial, rdy->mesh.num_cells, &rdy->materials_by_cell));
+
+  // read material properties for the entire domain from files if given
+  READ_MATERIAL_PROPERTY_FROM_FILE(rdy, manning);
+
+  // set up region-wise material and override cell-wise materials if needed
+  if (rdy->config.surface_composition.num_regions > 0) {
+    // allocate storage for regional materials
+    PetscCall(RDyAlloc(RDyMaterial, rdy->num_regions, &rdy->materials));
+
+    // assign materials to each region as needed
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyMaterial *material         = &rdy->materials[r];
+      PetscInt     region_id        = rdy->region_ids[r];
+      PetscInt     mat_region_index = -1;
+      for (PetscInt imat = 0; imat < rdy->config.surface_composition.num_regions; ++imat) {
+        if (rdy->config.surface_composition.by_region[imat].id == region_id) {
+          mat_region_index = imat;
+          break;
+        }
+      }
+      if (mat_region_index != -1) {
+        // retrieve the material object for this region
+        RDyMaterialSpec *mat_spec = &rdy->config.surface_composition.by_region[mat_region_index];
+        PetscInt         mat_index;
+        PetscCall(FindMaterial(rdy, mat_spec->material, &mat_index));
+        RDyMaterial *mat = &rdy->config.materials[mat_index];
+
+        // set the region's material properties
+        *material = *mat;
+
+        // set the material properties for all cells in the region
+        RDyRegion *region = &rdy->regions[r];
+        for (PetscInt c = 0; c < region->num_cells; ++c) {
+          PetscInt cell                = region->cell_ids[c];
+          rdy->materials_by_cell[cell] = *mat;
+        }
+      }
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+// sets up initial conditions
+static PetscErrorCode InitInitialConditions(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate storage for by-region initial conditions
@@ -591,6 +702,12 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       }
     }
   }
+  PetscFunctionReturn(0);
+}
+
+// sets up sources
+static PetscErrorCode InitSources(RDy rdy) {
+  PetscFunctionBegin;
   if (rdy->config.sources.num_regions > 0) {
     // Allocate storage for sources
     PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->sources));
@@ -636,7 +753,12 @@ static PetscErrorCode InitConditionsAndSources(RDy rdy) {
       }
     }
   }
+  PetscFunctionReturn(0);
+}
 
+// sets up boundary conditions
+static PetscErrorCode InitBoundaryConditions(RDy rdy) {
+  PetscFunctionBegin;
   // Set up a reflecting flow boundary condition.
   RDyFlowCondition *reflecting_flow = NULL;
   for (PetscInt c = 0; c < MAX_NUM_CONDITIONS; ++c) {
@@ -817,7 +939,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
 
   RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
-  PetscCall(InitConditionsAndSources(rdy));
+  PetscCall(InitInitialConditions(rdy));
+  PetscCall(InitSources(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Creating solvers and vectors...");
   PetscCall(CreateSolvers(rdy));
@@ -826,6 +950,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
+  RDyLogDebug(rdy, "Initializing materials...");
+  PetscCall(InitMaterials(rdy));
 
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
