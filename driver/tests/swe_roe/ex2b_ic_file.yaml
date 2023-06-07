@@ -31,10 +31,6 @@ surface_composition:
     files:
       manning: manning_grid5x10.bin
 
-materials:
-  - name: smooth
-    manning: 0.015
-
 initial_conditions:
   domain:
     format: binary

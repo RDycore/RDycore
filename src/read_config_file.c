@@ -445,7 +445,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
     CYAML_FIELD_MAPPING("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, surface_composition_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_DEFAULT, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
     CYAML_FIELD_MAPPING("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, initial_conditions_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
                                &condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
