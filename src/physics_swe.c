@@ -3,7 +3,7 @@
 #include <private/rdymemoryimpl.h>
 #include <stddef.h>  // for offsetof
 
-#include "swe-flux.h"
+#include "swe_flux.h"
 
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
@@ -736,7 +736,6 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   PetscCall(VecRestoreArrayAndMemType(U_local, &u));
   CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f);
   PetscCall(VecRestoreArrayAndMemType(F_local, &f));
-  PetscCall(VecZeroEntries(F));
   PetscCall(DMLocalToGlobal(rdy->dm, F_local, INSERT_VALUES, F));
   PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
   PetscFunctionReturn(PETSC_SUCCESS);
