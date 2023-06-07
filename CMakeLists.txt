@@ -96,7 +96,6 @@ message(STATUS "Installation prefix is ${CMAKE_INSTALL_PREFIX}")
 
 # We look for headers in these directories.
 include_directories(${PETSC_INCLUDES})
-include_directories(${CEED_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
