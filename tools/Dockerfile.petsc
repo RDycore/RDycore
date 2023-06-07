@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   locales \
   m4 \
   make \
+  patch \
   pkg-config \
   python3-distutils \
   zlib1g-dev \
@@ -38,13 +39,14 @@ WORKDIR /build
 
 ARG PETSC_HASH=HEAD
 ENV PETSC_HASH=$PETSC_HASH
-ENV PETSC_DIR=/usr/local/petsc/mpich-int32-real-opt
+ENV PETSC_DIR=/build/petsc
+ENV PETSC_ARCH=mpich-int32-real-opt
 RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
   cd petsc && \
   git reset --hard $PETSC_HASH && \
-  PETSC_INSTALL_PREFIX=$PETSC_DIR; unset PETSC_DIR; \
+  curl -L https://gist.githubusercontent.com/jeff-cohere/2390d5af0134ee02b0e73383681cc218/raw > libceed.patch && \
+  patch config/BuildSystem/config/packages/libceed.py libceed.patch && \
   python3 configure \
-    --prefix=$PETSC_INSTALL_PREFIX \
     --with-cc=mpicc \
     --with-cxx=mpic++ \
     --with-fc=mpif90 \
@@ -63,13 +65,8 @@ RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
     --download-pnetcdf \
     --with-zlib \
     && \
-  make all -j; \
-  cat configure.log && \
-  make install && \
-  export PETSC_DIR=$PETSC_INSTALL_PREFIX && \
-  unset PETSC_INSTALL_PREFIX && \
-  cd /build && \
-  rm -rf /build/petsc
+  make all PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH -j; \
+  cat configure.log
 
 # Change the default shell to bash.
 SHELL ["/bin/bash", "-c"]
