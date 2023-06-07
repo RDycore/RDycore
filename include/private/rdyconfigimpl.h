@@ -171,10 +171,9 @@ typedef struct {
 } RDySurfaceCompositionFiles;
 
 typedef struct {
-  PetscViewerFormat format;
+  PetscViewerFormat          format;
   RDySurfaceCompositionFiles files;
 } RDySurfaceCompositionDomain;
-
 
 // all surface composition data
 typedef struct {

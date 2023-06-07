@@ -557,8 +557,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// read an auxillar data of 1 DOF from a PETSc Vec
-static PetscErrorCode ReadOneDOFBinaryVec(RDy rdy, const char filename[], Vec *local) {
+// reads data for a single DOF from a binary file into a Vec
+static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec *local) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -589,6 +589,19 @@ static PetscErrorCode ReadOneDOFBinaryVec(RDy rdy, const char filename[], Vec *l
   PetscFunctionReturn(0);
 }
 
+#define READ_MATERIAL_PROPERTY_FROM_FILE(rdy, property)                                                   \
+  if (strlen(rdy->config.surface_composition.domain.files.property)) {                                    \
+    Vec local;                                                                                            \
+    PetscCall(ReadOneDOFVecFromFile(rdy, rdy->config.surface_composition.domain.files.property, &local)); \
+    PetscScalar *x_ptr;                                                                                   \
+    PetscCall(VecGetArray(local, &x_ptr));                                                                \
+    for (PetscInt icell = 0; icell < rdy->mesh.num_cells; icell++) {                                      \
+      rdy->materials_by_cell[icell].property = x_ptr[icell];                                              \
+    }                                                                                                     \
+    PetscCall(VecRestoreArray(local, &x_ptr));                                                            \
+    PetscCall(VecDestroy(&local));                                                                        \
+  }
+
 // sets up materials
 static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
@@ -596,20 +609,8 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   // allocate storage for materials for cells
   PetscCall(RDyAlloc(RDyMaterial, rdy->mesh.num_cells, &rdy->materials_by_cell));
 
-  // read material properties for the entire domain from a file if given
-  if (strlen(rdy->config.surface_composition.domain.files.manning)) {
-    Vec local;
-    PetscCall(ReadOneDOFBinaryVec(rdy, rdy->config.surface_composition.domain.files.manning, &local));
-
-    PetscScalar *x_ptr;
-    PetscCall(VecGetArray(local, &x_ptr));
-    for (PetscInt icell = 0; icell < rdy->mesh.num_cells; icell++) {
-      rdy->materials_by_cell[icell].manning = x_ptr[icell];
-    }
-    PetscCall(VecRestoreArray(local, &x_ptr));
-
-    PetscCall(VecDestroy(&local));
-  }
+  // read material properties for the entire domain from files if given
+  READ_MATERIAL_PROPERTY_FROM_FILE(rdy, manning);
 
   // set up region-wise material and override cell-wise materials if needed
   if (rdy->config.surface_composition.num_regions > 0) {
