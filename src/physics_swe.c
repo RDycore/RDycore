@@ -683,16 +683,14 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         g[e][3] = edges->lengths[iedge] / cells->areas[r];
       }
       CeedVectorRestoreArray(geom, (CeedScalar **)&g);
-      CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells_local * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
-                                &restrict_l);
-      CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells_local * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_r,
-                                &restrict_r);
+      CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l, &restrict_l);
+      CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_r, &restrict_r);
       PetscCall(PetscFree2(offset_l, offset_r));
       CeedElemRestrictionView(restrict_l, stdout);
       CeedElemRestrictionView(restrict_r, stdout);
 
-      CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.x_ceed);
-      CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.y_ceed);
+      CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.x_ceed);
+      CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.y_ceed);
     }
 
     {
@@ -727,7 +725,6 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   CeedVector u_ceed = rdy->ceed_rhs.x_ceed;
   CeedVector f_ceed = rdy->ceed_rhs.y_ceed;
   PetscCall(DMGetLocalVector(rdy->dm, &F_local));
-  PetscCall(VecZeroEntries(F_local));
   PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
   CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u);
   PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
