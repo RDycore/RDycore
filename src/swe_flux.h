@@ -3,6 +3,8 @@
 
 #include <ceed/types.h>
 
+#define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
+
 struct SWEState_ {
   CeedScalar h, hu, hv;
 };
@@ -11,8 +13,10 @@ typedef struct SWEState_ SWEState;
 CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(SWEState qL, SWEState qR, CeedScalar sn, CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar GRAVITY      = 9.806;
   const CeedScalar SQRT_GRAVITY = sqrt(GRAVITY);
+  const CeedScalar tiny_h       = 1e-7;
   const CeedScalar hl = qL.h, hr = qR.h;
-  const CeedScalar ul = qL.hu / hl, vl = qL.hv / hl, ur = qR.hu / hr, vr = qR.hv / hr;
+  const CeedScalar ul = SafeDiv(qL.hu, hl, tiny_h), vl = SafeDiv(qL.hv, hl, tiny_h);
+  const CeedScalar ur = SafeDiv(qR.hu, hr, tiny_h), vr = SafeDiv(qR.hv, hr, tiny_h);
   CeedScalar       duml  = sqrt(hl);
   CeedScalar       dumr  = sqrt(hr);
   CeedScalar       cl    = SQRT_GRAVITY * duml;
@@ -103,6 +107,46 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
     for (CeedInt j = 0; j < 3; j++) {
       cell_L[j][i] = geom[2][i] * flux[j];
       cell_R[j][i] = geom[3][i] * flux[j];
+    }
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  CeedScalar(*cell_L)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  for (CeedInt i = 0; i < Q; i++) {
+    CeedScalar sn = geom[0][i], cn = geom[1][i];
+    SWEState   qL   = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    CeedScalar dum1 = sn * sn - cn * cn;
+    CeedScalar dum2 = 2.0 * sn * cn;
+    SWEState   qR   = {qL.h, qL.hu * dum1 - qL.hv * dum2, -qL.hu * dum2 - qL.hv * dum1};
+    CeedScalar flux[3], amax;
+    SWERiemannFlux_Roe(qL, qR, sn, cn, flux, &amax);
+    for (CeedInt j = 0; j < 3; j++) {
+      cell_L[j][i] = geom[2][i] * flux[j];
+    }
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar GRAVITY            = 9.806;
+  const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  CeedScalar(*cell_L)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  for (CeedInt i = 0; i < Q; i++) {
+    CeedScalar sn = geom[0][i], cn = geom[1][i];
+    SWEState   qL    = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    CeedScalar q     = fabs(qL.hu * cn + qL.hv * sn);
+    CeedScalar hR    = pow(q * q / GRAVITY, 1.0 / 3.0);
+    CeedScalar speed = sqrt(GRAVITY * hR);
+    SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
+    CeedScalar flux[3], amax;
+    SWERiemannFlux_Roe(qL, qR, sn, cn, flux, &amax);
+    for (CeedInt j = 0; j < 3; j++) {
+      cell_L[j][i] = geom[2][i] * flux[j];
     }
   }
   return 0;
