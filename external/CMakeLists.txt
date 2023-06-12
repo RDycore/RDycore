@@ -7,6 +7,8 @@ include(ExternalProject)
 # we need this for some finicky library installation paths
 include(GNUInstallDirs)
 
+find_package(Patch REQUIRED)
+
 #----------------------------------------
 # Build libyaml, a YAML parsing library.
 #----------------------------------------
@@ -51,6 +53,12 @@ ExternalProject_Add(cyaml_proj
                     LOG_INSTALL TRUE
                     LOG_OUTPUT_ON_FAILURE TRUE
                     BUILD_BYPRODUCTS ${PROJECT_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME})
+ExternalProject_Add_Step(cyaml_proj patch_makefile
+                         COMMAND ${Patch_EXECUTABLE} Makefile ${CMAKE_CURRENT_SOURCE_DIR}/libcyaml.Makefile.patch
+                         COMMENT "Patching libcyaml/Makefile to bypass shared objects..."
+                         DEPENDEES configure
+			 DEPENDERS build
+                         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libcyaml)
 add_library(cyaml SHARED IMPORTED GLOBAL)
 set_target_properties(cyaml PROPERTIES
   IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME})
