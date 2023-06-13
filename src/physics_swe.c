@@ -667,24 +667,26 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       {  // Create element restrictions for state
         CeedInt *offset_l, *offset_r;
         CeedScalar(*g)[4];
-        CeedInt num_edges = mesh->num_internal_edges;
+        CeedInt num_edges = mesh->num_owned_internal_edges;
         CeedInt strides[] = {num_comp_geom, 1, num_comp_geom};
         CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, strides, &restrict_geom);
         CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
         CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
         PetscCall(PetscMalloc2(num_edges, &offset_l, num_edges, &offset_r));
         CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
-        for (CeedInt e = 0; e < num_edges; e++) {
+        for (CeedInt e = 0, oe = 0; e < mesh->num_internal_edges; e++) {
           PetscInt iedge = edges->internal_edge_ids[e];
-          PetscInt l     = edges->cell_ids[2 * iedge];
-          PetscInt r     = edges->cell_ids[2 * iedge + 1];
-          offset_l[e]    = l * num_comp;
-          offset_r[e]    = r * num_comp;
+          if (!edges->is_owned[iedge]) continue;
+          PetscInt l   = edges->cell_ids[2 * iedge];
+          PetscInt r   = edges->cell_ids[2 * iedge + 1];
+          offset_l[oe] = l * num_comp;
+          offset_r[oe] = r * num_comp;
 
-          g[e][0] = edges->sn[iedge];
-          g[e][1] = edges->cn[iedge];
-          g[e][2] = -edges->lengths[iedge] / cells->areas[l];
-          g[e][3] = edges->lengths[iedge] / cells->areas[r];
+          g[oe][0] = edges->sn[iedge];
+          g[oe][1] = edges->cn[iedge];
+          g[oe][2] = -edges->lengths[iedge] / cells->areas[l];
+          g[oe][3] = edges->lengths[iedge] / cells->areas[r];
+          oe++;
         }
         CeedVectorRestoreArray(geom, (CeedScalar **)&g);
         CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
@@ -744,24 +746,30 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       {  // Create element restrictions for state
         CeedInt *offset_l;
         CeedScalar(*g)[3];
-        CeedInt num_edges = boundary->num_edges;
+        CeedInt num_edges = boundary->num_edges, num_owned_edges = 0;
         CeedInt strides[] = {num_comp_geom, 1, num_comp_geom};
-        CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, strides, &restrict_geom);
+        for (CeedInt e = 0; e < boundary->num_edges; e++) {
+          PetscInt iedge = boundary->edge_ids[e];
+          if (edges->is_owned[iedge]) num_owned_edges++;
+        }
+        CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp_geom, num_edges * num_comp_geom, strides, &restrict_geom);
         CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
         CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
         PetscCall(PetscMalloc1(num_edges, &offset_l));
         CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
-        for (CeedInt e = 0; e < num_edges; e++) {
+        for (CeedInt e = 0, oe = 0; e < num_edges; e++) {
           PetscInt iedge = boundary->edge_ids[e];
-          PetscInt l     = edges->cell_ids[2 * iedge];
-          offset_l[e]    = l * num_comp;
+          if (!edges->is_owned[iedge]) continue;
+          PetscInt l   = edges->cell_ids[2 * iedge];
+          offset_l[oe] = l * num_comp;
 
-          g[e][0] = edges->sn[iedge];
-          g[e][1] = edges->cn[iedge];
-          g[e][2] = -edges->lengths[iedge] / cells->areas[l];
+          g[oe][0] = edges->sn[iedge];
+          g[oe][1] = edges->cn[iedge];
+          g[oe][2] = -edges->lengths[iedge] / cells->areas[l];
+          oe++;
         }
         CeedVectorRestoreArray(geom, (CeedScalar **)&g);
-        CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
+        CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
                                   &restrict_l);
         PetscCall(PetscFree(offset_l));
         CeedElemRestrictionView(restrict_l, stdout);
@@ -808,7 +816,8 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   PetscCall(VecRestoreArrayAndMemType(U_local, &u));
   CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f);
   PetscCall(VecRestoreArrayAndMemType(F_local, &f));
-  PetscCall(DMLocalToGlobal(rdy->dm, F_local, INSERT_VALUES, F));
+  PetscCall(VecZeroEntries(F));
+  PetscCall(DMLocalToGlobal(rdy->dm, F_local, ADD_VALUES, F));
   PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
