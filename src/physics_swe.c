@@ -6,6 +6,9 @@
 #include "swe_flux_ceed.h"
 #include "swe_flux_petsc.h"
 
+PetscClassId  RDY_CLASSID;
+PetscLogEvent RDY_CeedOperatorApply;
+
 //-----------------------
 // Debugging diagnostics
 //-----------------------
@@ -71,6 +74,9 @@ PetscErrorCode InitSWE(RDy rdy) {
 
   // set up MPI types and operators used by SWE physics
   PetscCall(InitMPITypesAndOps());
+
+  PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
+  PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply));
   PetscFunctionReturn(0);
 }
 
@@ -242,7 +248,11 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
   CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
 
+  PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
+  PetscCall(PetscLogGpuTimeBegin());
   CeedOperatorApply(rdy->ceed_rhs.op, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+  PetscCall(PetscLogGpuTimeEnd());
+  PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
   CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
   PetscCall(VecRestoreArrayAndMemType(U_local, &u));
