@@ -192,6 +192,9 @@ static PetscErrorCode CreateDM(RDy rdy) {
     PetscSF sfMigration;
     PetscCall(DMPlexDistribute(rdy->dm, 1, &sfMigration, &dm_dist));
     if (dm_dist) {
+      VecType vec_type;
+      PetscCall(DMGetVecType(rdy->dm, &vec_type));
+      PetscCall(DMSetVecType(dm_dist, vec_type));
       PetscCall(DMDestroy(&rdy->dm));
       rdy->dm = dm_dist;
       PetscCall(DMPlexSetMigrationSF(rdy->dm, sfMigration));
