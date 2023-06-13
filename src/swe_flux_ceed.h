@@ -1,5 +1,5 @@
-#ifndef swe_flux_h
-#define swe_flux_h
+#ifndef swe_flux_ceed_h
+#define swe_flux_ceed_h
 
 #include <ceed/types.h>
 
@@ -152,4 +152,4 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   return 0;
 }
 
-#endif  // swe_flux_h
+#endif  // swe_flux_ceed_h
