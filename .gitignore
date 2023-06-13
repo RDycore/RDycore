@@ -4,3 +4,4 @@ build-*/
 *.code-workspace
 compile_commands.json
 .cache/
+*.cgns
