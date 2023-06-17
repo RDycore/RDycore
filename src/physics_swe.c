@@ -132,8 +132,10 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_r,
                                   &restrict_r);
         PetscCall(PetscFree2(offset_l, offset_r));
-        CeedElemRestrictionView(restrict_l, stdout);
-        CeedElemRestrictionView(restrict_r, stdout);
+        if (0) {
+          CeedElemRestrictionView(restrict_l, stdout);
+          CeedElemRestrictionView(restrict_r, stdout);
+        }
 
         CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.x_ceed);
         CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.y_ceed);
@@ -210,7 +212,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
                                   &restrict_l);
         PetscCall(PetscFree(offset_l));
-        CeedElemRestrictionView(restrict_l, stdout);
+        if (0) CeedElemRestrictionView(restrict_l, stdout);
       }
 
       {
@@ -227,7 +229,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedElemRestrictionDestroy(&restrict_l);
       CeedVectorDestroy(&geom);
     }
-    CeedOperatorView(rdy->ceed_rhs.op, stdout);
+    if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
   }
   PetscFunctionReturn(0);
 }
