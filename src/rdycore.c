@@ -156,6 +156,11 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
+  // destroy libCEED parts if they exist
+  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op);
+  CeedVectorDestroy(&(*rdy)->ceed_rhs.x_ceed);
+  CeedVectorDestroy(&(*rdy)->ceed_rhs.y_ceed);
+
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));

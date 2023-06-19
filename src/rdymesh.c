@@ -322,6 +322,7 @@ PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_local));
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_internal));
+  PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_owned));
 
   PetscCall(RDyAlloc(PetscInt, 2 * num_edges, &edges->cell_ids));
   PetscCall(RDyFill(PetscInt, 2 * num_edges, edges->cell_ids, -1));
@@ -424,6 +425,7 @@ PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(RDyFree(edges.vertex_ids));
   PetscCall(RDyFree(edges.cell_ids));
   PetscCall(RDyFree(edges.is_internal));
+  PetscCall(RDyFree(edges.is_owned));
   PetscCall(RDyFree(edges.normals));
   PetscCall(RDyFree(edges.centroids));
   PetscCall(RDyFree(edges.lengths));
@@ -451,6 +453,25 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
   DMPlexGetDepthStratum(dm, 1, &e_start, &e_end);
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
+  PetscSF     point_sf;
+  PetscInt   *leaf_owner = NULL;
+  PetscMPIInt rank;
+  PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)dm), &rank));
+  PetscCall(DMGetPointSF(dm, &point_sf));
+  {
+    PetscInt nroots, nleaves;
+    PetscCall(PetscSFGetGraph(point_sf, &nroots, &nleaves, NULL, NULL));
+    if (nroots >= 0) {  // graph has been set
+      PetscInt *root_owner;
+      PetscCall(PetscMalloc1(nroots, &root_owner));
+      PetscCall(PetscMalloc1(nroots, &leaf_owner));
+      for (PetscInt i = 0; i < nroots; i++) leaf_owner[i] = root_owner[i] = rank;
+      PetscCall(PetscSFBcastBegin(point_sf, MPIU_INT, root_owner, leaf_owner, MPI_REPLACE));
+      PetscCall(PetscSFBcastEnd(point_sf, MPIU_INT, root_owner, leaf_owner, MPI_REPLACE));
+      PetscCall(PetscFree(root_owner));
+    }
+  }
+
   for (PetscInt e = e_start; e < e_end; e++) {
     PetscInt iedge = e - e_start;
 
@@ -460,8 +481,10 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
     PetscCheck(l >= 0, comm, PETSC_ERR_USER, "non-internal 'left' edge %d encountered (expected internal edge)", l);
     PetscBool is_internal_edge = (r >= 0);
 
+    edges->is_owned[iedge] = !leaf_owner || leaf_owner[e] == rank;
     if (is_internal_edge) {
       mesh->num_internal_edges++;
+      if (edges->is_owned[iedge]) mesh->num_owned_internal_edges++;
     } else {
       mesh->num_boundary_edges++;
     }
@@ -549,6 +572,7 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
     edges->sn[iedge] = -dx / ds;
     edges->cn[iedge] = dy / ds;
   }
+  PetscCall(PetscFree(leaf_owner));
 
   // allocate memory to save IDs of internal and boundary edges
   PetscCall(RDyAlloc(PetscInt, mesh->num_internal_edges, &edges->internal_edge_ids));

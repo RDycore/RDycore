@@ -124,6 +124,9 @@ typedef struct {
   // false if the edge is on the domain boundary
   PetscBool *is_internal;
 
+  // true if edge is owned
+  PetscBool *is_owned;
+
   // unit vector pointing out of one cell into another for each edge
   RDyVector *normals;
   // edge centroids
@@ -142,14 +145,16 @@ typedef struct RDyMesh {
   // spatial dimension of the mesh (1, 2, or 3)
   PetscInt dim;
 
-  // number of cells in the mesh (across all processes)
+  // number of cells in the mesh (across ghost cells owned by other processes)
   PetscInt num_cells;
-  // number of cells in the mesh stored on the local process
+  // number of cells in the mesh owned by the local process
   PetscInt num_cells_local;
   // number of edges in the mesh attached to locally stored cells
   PetscInt num_edges;
   /// number of edges that are internal (i.e. shared by two cells)
   PetscInt num_internal_edges;
+  /// number of owned internal edges
+  PetscInt num_owned_internal_edges;
   /// number of edges that are on the boundary
   PetscInt num_boundary_edges;
   // number of vertices in the mesh attached to locally stored cells

@@ -1,6 +1,7 @@
 #ifndef RDYCOREIMPL_H
 #define RDYCOREIMPL_H
 
+#include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
@@ -128,6 +129,13 @@ struct _p_RDy {
   //-------------------
   PetscViewer           output_viewer;
   PetscViewerAndFormat *output_vf;
+
+  char ceed_resource[PETSC_MAX_PATH_LEN];
+  // RHS operator (optional)
+  struct {
+    CeedOperator op;
+    CeedVector   x_ceed, y_ceed;
+  } ceed_rhs;
 };
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);

@@ -20,6 +20,11 @@ project(rdycore)
 set(PETSC_DIR $ENV{PETSC_DIR})
 set(PETSC_ARCH $ENV{PETSC_ARCH})
 find_package(PETSc COMPONENTS C)
+set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${PETSC_DIR}/${PETSC_ARCH}/lib/pkgconfig")
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
+include_directories(${CEED_INCLUDE_DIRS})
 
 # Use PETSc's compiler config.
 set(CMAKE_C_STANDARD 11)
@@ -101,7 +106,7 @@ configure_file(
 )
 
 # Inherit libraries from PETSc.
-set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES})
+set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES} PkgConfig::CEED)
 
 if (ENABLE_TESTS)
   include(CTest)
