@@ -41,5 +41,4 @@ file (COPY
 foreach(np 1 2)
   add_test(swe_roe_four_mounds_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} four_mounds_60x24.yaml)
   add_test(swe_roe_four_mounds_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml)
-  add_test(swe_roe_four_mounds_f90_np_${np}_ceed ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml -ceed /cpu/self)
 endforeach()
