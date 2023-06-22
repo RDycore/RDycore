@@ -30,3 +30,15 @@ foreach(np 1 2) # test on 1, 2 processes
   add_test(swe_roe_ex2b_ic_file_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_ic_file.yaml)
   add_test(swe_roe_ex2b_ic_file_f90_np_${np}_ceed ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_ic_file.yaml -ceed /cpu/self)
 endforeach()
+
+# four_mounds_60x24
+file (COPY
+      ${CMAKE_CURRENT_SOURCE_DIR}/four_mounds_60x24.yaml
+      ${MESH_DIR}/four_mounds_60x24.exo
+      ${IC_DIR}/four_mounds_60x24.ic
+      ${MATERIALS_DIR}/manning_four_mound_60x24.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  add_test(swe_roe_four_mounds_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} four_mounds_60x24.yaml)
+  add_test(swe_roe_four_mounds_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml)
+endforeach()
