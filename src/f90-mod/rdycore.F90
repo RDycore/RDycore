@@ -8,7 +8,9 @@ module rdycore
   implicit none
 
   public :: RDy, RDyInit, RDyFinalize, RDyInitialized, &
-            RDyCreate, RDySetup, RDyRun, RDyDestroy
+            RDyCreate, RDySetup, RDyRun, RDyDestroy, &
+            RDyGetNumLocalCells, RDyGetHeight, &
+            RDyGetXVelocity, RDyGetYVelocity
 
   type :: RDy
     ! C pointer to RDy type
@@ -40,6 +42,30 @@ module rdycore
     integer(c_int) function rdysetup_(rdy) bind(c, name="RDySetup")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    integer(c_int) function rdygetnumlocalcells_(rdy, num_cells) bind(c, name="RDyGetNumLocalCells")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int),        intent(out) :: num_cells
+    end function
+
+    integer(c_int) function rdygetheight(rdy, h) bind(c, name="RDyGetHeight")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in)    :: rdy
+      type(c_ptr), value, intent(inout) :: h
+    end function
+
+    integer(c_int) function rdygetxvelocity(rdy, vx) bind(c, name="RDyGetXVelocity")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in)    :: rdy
+      type(c_ptr), value, intent(inout) :: vx
+    end function
+
+    integer(c_int) function rdygetyvelocity(rdy, h) bind(c, name="RDyGetYVelocity")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in)    :: rdy
+      type(c_ptr), value, intent(inout) :: vy
     end function
 
     integer(c_int) function rdyrun_(rdy) bind(c, name="RDyRun")
@@ -93,6 +119,34 @@ contains
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
     ierr = rdysetup_(rdy_%c_rdy)
+  end subroutine
+
+  subroutine RDyGetNumLocalCells(rdy_, num_cells, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(out)   :: num_cells
+    integer,   intent(out)   :: ierr
+    ierr = rdygetnumlocalcells_(rdy_%c_rdy, num_cells)
+  end subroutine
+
+  subroutine RDyGetHeight(rdy_, h, ierr)
+    type(RDy),          intent(inout) :: rdy_
+    real,      pointer, intent(inout) :: h
+    integer,            intent(out)   :: ierr
+    ierr = rdygetheight(rdy_%c_rdy, c_loc(h))
+  end subroutine
+
+  subroutine RDyGetXVelocity(rdy_, vx, ierr)
+    type(RDy),          intent(inout) :: rdy_
+    real,      pointer, intent(inout) :: vx
+    integer,            intent(out)   :: ierr
+    ierr = rdygetxvelocity(rdy_%c_rdy, c_loc(vx))
+  end subroutine
+
+  subroutine RDyGetYVelocity(rdy_, vy, ierr)
+    type(RDy),          intent(inout) :: rdy_
+    real,      pointer, intent(inout) :: vy
+    integer,            intent(out)   :: ierr
+    ierr = rdygetyvelocity(rdy_%c_rdy, c_loc(vy))
   end subroutine
 
   subroutine RDyRun(rdy_, ierr)

@@ -4,6 +4,7 @@ add_library(rdycore
   rdycore.c
   physics_swe.c
   print_config.c
+  rdydata.c
   rdymesh.c
   rdyrun.c
   rdysetup.c
