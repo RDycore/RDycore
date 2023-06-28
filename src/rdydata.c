@@ -1,13 +1,13 @@
 #include <private/rdycoreimpl.h>
 #include <rdycore.h>
 
-PetscErrorCode RDyGetNumLocalCells(RDy *rdy, PetscInt *num_cells) {
+PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
   *num_cells = rdy->mesh.num_cells_local;
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetHeight(RDy *rdy, PetscReal *h) {
+PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
   PetscFunctionBegin;
 
   PetscReal *x;
@@ -15,11 +15,11 @@ PetscErrorCode RDyGetHeight(RDy *rdy, PetscReal *h) {
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
     h[i] = x[3*i];
   }
-  PetscCall(VecRestoreArray(rdy->X, &x);
+  PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetXVelocity(RDy *rdy, PetscReal *vx) {
+PetscErrorCode RDyGetXVelocity(RDy rdy, PetscReal *vx) {
   PetscFunctionBegin;
 
   PetscReal *x;
@@ -27,11 +27,11 @@ PetscErrorCode RDyGetXVelocity(RDy *rdy, PetscReal *vx) {
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
     vx[i] = x[3*i+1];
   }
-  PetscCall(VecRestoreArray(rdy->X, &x);
+  PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetYVelocity(RDy *rdy, PetscReal *vy) {
+PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
   PetscFunctionBegin;
 
   PetscReal *x;
@@ -39,6 +39,6 @@ PetscErrorCode RDyGetYVelocity(RDy *rdy, PetscReal *vy) {
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
     vy[i] = x[3*i+2];
   }
-  PetscCall(VecRestoreArray(rdy->X, &x);
+  PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
 }

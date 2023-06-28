@@ -33,9 +33,9 @@ PETSC_EXTERN PetscErrorCode RDyRun(RDy);
 PETSC_EXTERN PetscErrorCode RDyDestroy(RDy*);
 
 // Accessing data
-PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy*, PetscInt*);
-PETSC_EXTERN PetscErrorCode RDyGetHeight(RDy*, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetXVelocity(RDy*, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetYVelocity(RDy*, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetHeight(RDy, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetXVelocity(RDy, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetYVelocity(RDy, PetscReal*);
 
 #endif
