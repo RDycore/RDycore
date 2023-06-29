@@ -26,13 +26,17 @@ PETSC_EXTERN PetscErrorCode RDyOnFinalize(void (*)(void));
 PETSC_EXTERN PetscErrorCode RDyFinalize(void);
 PETSC_EXTERN PetscBool RDyInitialized(void);
 
-// RDycore setup/run/breakdown
+// RDycore setup/step/breakdown
 PETSC_EXTERN PetscErrorCode RDyCreate(MPI_Comm, const char*, RDy*);
 PETSC_EXTERN PetscErrorCode RDySetup(RDy);
-PETSC_EXTERN PetscErrorCode RDyRun(RDy);
+PETSC_EXTERN PetscErrorCode RDyAdvance(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyDestroy(RDy*);
 
 // Accessing data
+PETSC_EXTERN PetscBool      RDyFinished(RDy);
+PETSC_EXTERN PetscErrorCode RDyGetTime(RDy, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetTimeStep(RDy, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetStep(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetHeight(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetXVelocity(RDy, PetscReal*);

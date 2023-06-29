@@ -112,8 +112,9 @@ struct _p_RDy {
   // time step size
   PetscReal dt;
 
-  // index of current timestep
-  PetscInt step;
+  // time and index of current timestep
+  PetscReal t;
+  PetscInt  step;
 
   // time₋stepping solver
   TS ts;

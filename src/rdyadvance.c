@@ -8,6 +8,8 @@
 // output directory name (relative to current working directory)
 static const char *output_dir = "output";
 
+extern PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit);
+
 /// Creates the output directory if it doesn't exist.
 PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionBegin;
@@ -99,17 +101,10 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscFunctionReturn(0);
 }
 
-// this struct holds contextual data for a viewer
-typedef struct {
-  PetscViewer           viewer;
-  PetscViewerAndFormat *vf;
-} ViewerContext;
-
-// destroys a ViewerContext
-static PetscErrorCode ViewerContextDestroy(ViewerContext vc) {
+static PetscErrorCode DestroyOutputViewer(RDy rdy) {
   PetscFunctionBegin;
-  if (vc.vf) PetscCall(PetscViewerAndFormatDestroy(&vc.vf));
-  if (vc.viewer) PetscCall(PetscViewerDestroy(&vc.viewer));
+  if (rdy->output_vf) PetscCall(PetscViewerAndFormatDestroy(&rdy->output_vf));
+  if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
   PetscFunctionReturn(0);
 }
 
@@ -126,11 +121,11 @@ PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X
   PetscFunctionReturn(0);
 }
 
-// Creates a ViewerContext for visualization and sets up visualization
-// monitoring. This function handles a lot of the disparities between what's
-// available in PETSc's command line options and what exists in the API. We need
-// this to be able to encode all of our settings in a single input file for reproducibility.
-static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
+// Creates a Viewer for visualization and sets up visualization monitoring.
+// This function handles a lot of the disparities between what's available in
+// PETSc's command line options and what exists in the API. We need this to be
+// able to encode all of our settings in a single input file for reproducibility.
+static PetscErrorCode CreateOutputViewer(RDy rdy) {
   PetscFunctionBegin;
 
   PetscViewerFormat format = PETSC_VIEWER_DEFAULT;
@@ -142,19 +137,19 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
         break;
       case OUTPUT_XDMF:
         // we don't actually use this viewer, so maybe this doesn't matter?
-        PetscCall(PetscViewerCreate(rdy->comm, &viz->viewer));
-        PetscCall(PetscViewerSetType(viz->viewer, PETSCVIEWERHDF5));
+        PetscCall(PetscViewerCreate(rdy->comm, &rdy->output_viewer));
+        PetscCall(PetscViewerSetType(rdy->output_viewer, PETSCVIEWERHDF5));
         format = PETSC_VIEWER_HDF5_XDMF;
         break;
       case OUTPUT_BINARY:
-        PetscCall(PetscViewerCreate(rdy->comm, &viz->viewer));
-        PetscCall(PetscViewerSetType(viz->viewer, PETSCVIEWERBINARY));
+        PetscCall(PetscViewerCreate(rdy->comm, &rdy->output_viewer));
+        PetscCall(PetscViewerSetType(rdy->output_viewer, PETSCVIEWERBINARY));
     }
 
     // apply any command-line option overrides
-    if (viz->viewer) {
-      PetscCall(PetscViewerSetFromOptions(viz->viewer));
-      PetscCall(PetscViewerAndFormatCreate(viz->viewer, format, &viz->vf));
+    if (rdy->output_viewer) {
+      PetscCall(PetscViewerSetFromOptions(rdy->output_viewer));
+      PetscCall(PetscViewerAndFormatCreate(rdy->output_viewer, format, &rdy->output_vf));
     }
 
     // set up solution monitoring
@@ -169,7 +164,9 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
       // CGNS output is handled via the Options database. We need to set monitoring
       // for all formats that aren't XDMF or CGNS.
       if (rdy->config.output.format != OUTPUT_CGNS) {
-        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, viz->vf, NULL));
+        PetscCall(TSMonitorSet(rdy->ts,
+          (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution,
+          rdy->output_vf, NULL));
       }
     }
   }
@@ -177,26 +174,107 @@ static PetscErrorCode CreateVizViewerContext(RDy rdy, ViewerContext *viz) {
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyRun(RDy rdy) {
+// this is called when -preload is set so we can get more accurate timings
+// for the solver we're using
+static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateOutputDir(rdy));
+  // create a "preload" solution so we can advance one step
+  Vec X_preload;
+  PetscCall(VecDuplicate(rdy->X, &X_preload));
+  PetscCall(VecCopy(rdy->X, X_preload));
 
-  // set up monitoring functions for handling restarts and outputs
-  //  if (rdy->config.restart_frequency) {
-  //    PetscCall(TSMonitorSet(rdy->ts, WriteRestartFiles, rdy, NULL));
-  //  }
+  // set tolerances to make the calibration step cheaper
+  SNES      snes;
+  PetscReal r_tol;
+  PetscCall(TSGetSNES(rdy->ts, &snes));
+  PetscCall(SNESGetTolerances(snes, NULL, &r_tol, NULL, NULL, NULL));
+  PetscCall(SNESSetTolerances(snes, PETSC_DEFAULT, .99, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
 
-  // create a viewer with the proper format for visualization output
-  ViewerContext viz = {0};
-  PetscCall(CreateVizViewerContext(rdy, &viz));
+  // take the step
+  PetscCall(TSSetSolution(rdy->ts, X_preload));
+  PetscCall(TSStep(rdy->ts));
 
-  // do the thing!
-  RDyLogDebug(rdy, "Running simulation...");
-  PetscCall(TSSolve(rdy->ts, rdy->X));
+  // reset the tolerances and clean up
+  PetscCall(SNESSetTolerances(snes, PETSC_DEFAULT, r_tol, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
+  PetscCall(VecDestroy(&X_preload));
 
-  // clean up
-  PetscCall(ViewerContextDestroy(viz));
+  PetscFunctionReturn(0);
+}
 
+/// Runs the dycore to the given time as expressed in units specified in the
+/// input configuration.
+PetscErrorCode RDyAdvance(RDy rdy) {
+  PetscFunctionBegin;
+
+  // if we're at the start of the simulation, set up monitoring
+  if (rdy->step == 0) {
+    PetscCall(CreateOutputDir(rdy));
+
+    // set up monitoring functions for handling restarts and outputs
+    // if (rdy->config.restart_frequency) {
+    //   PetscCall(TSMonitorSet(rdy->ts, WriteRestartFiles, rdy, NULL));
+    // }
+
+    // create a viewer with the proper format for visualization output
+    PetscCall(CreateOutputViewer(rdy));
+
+    RDyLogDebug(rdy, "Running simulation...");
+  }
+
+  // advance the solution to the specified time
+  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve"); // <-- enable with -preload true
+  PetscCall(TSSetTime(rdy->ts, rdy->t));
+  PetscCall(TSSetMaxTime(rdy->ts, rdy->t + rdy->dt));
+  PetscCall(TSSetStepNumber(rdy->ts, rdy->step));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+  PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  if (PetscPreLoadingOn) {
+    PetscCall(CalibrateSolverTimers(rdy));
+  } else {
+    PetscCall(TSSolve(rdy->ts, rdy->X));
+  }
+  PetscPreLoadEnd();
+
+  PetscCall(TSGetTime(rdy->ts, &rdy->t));
+  PetscCall(TSGetStepNumber(rdy->ts, &rdy->step));
+
+  // Are we finished?
+  PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
+  if (rdy->t >= final_time) {
+    // if we've overstepped the final time, interpolate backward
+    if (rdy->t > final_time) {
+      PetscCall(TSInterpolate(rdy->ts, final_time, rdy->X));
+      PetscCall(TSSetTime(rdy->ts, final_time));
+      PetscCall(TSMonitor(rdy->ts, -1, final_time, rdy->X));
+    }
+
+    // clean up
+    PetscCall(DestroyOutputViewer(rdy));
+  }
+
+  PetscFunctionReturn(0);
+}
+
+PetscBool RDyFinished(RDy rdy) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(rdy->t >= rdy->config.time.final_time);
+}
+
+PetscErrorCode RDyGetTime(RDy rdy, PetscReal *time) {
+  PetscFunctionBegin;
+  *time = rdy->t;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RDyGetTimeStep(RDy rdy, PetscReal *time) {
+  PetscFunctionBegin;
+  *time = rdy->t;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
+  PetscFunctionBegin;
+  *step = rdy->step;
   PetscFunctionReturn(0);
 }
