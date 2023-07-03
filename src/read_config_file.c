@@ -115,7 +115,8 @@ static const cyaml_schema_field_t numerics_fields_schema[] = {
 //   final_time: <value>
 //   unit: <seconds|minutes|hours|days|months|years> # applies to final_time (stored internally in seconds)
 //   max_step: <value>
-//   dtime: <value> # optional
+//   time_step: <value> # optional
+//   coupling_interval: <value> # optional
 
 // mapping of strings to time units
 static const cyaml_strval_t time_units[] = {
@@ -132,7 +133,8 @@ static const cyaml_schema_field_t time_fields_schema[] = {
     CYAML_FIELD(FLOAT, "final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time, {.missing = INVALID_REAL}),
     CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD(INT, "max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step, {.missing = INVALID_INT}),
-    CYAML_FIELD(FLOAT, "dtime", CYAML_FLAG_OPTIONAL, RDyTimeSection, dtime, {.missing = INVALID_REAL}),
+    CYAML_FIELD(FLOAT, "time_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, time_step, {.missing = INVALID_REAL}),
+    CYAML_FIELD(FLOAT, "coupling_interval", CYAML_FLAG_OPTIONAL, RDyTimeSection, coupling_interval, {.missing = INVALID_REAL}),
     CYAML_FIELD_END
 };
 
@@ -523,21 +525,33 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
 
   PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");
 
-  // check 'Timestepping' settings
-  // 'final_time', 'max_step', 'dtime': exactly two of these three can be specified in the .yaml file.
+  // check time settings
+  // 'final_time', 'max_step', 'time_step': exactly two of these three can be specified in the .yaml file.
   PetscInt num_time_settings = 0;
   if (config->time.final_time != INVALID_REAL) ++num_time_settings;
   if (config->time.max_step != INVALID_REAL) ++num_time_settings;
-  if (config->time.dtime != INVALID_REAL) ++num_time_settings;
-  PetscCheck(num_time_settings, comm, PETSC_ERR_USER, "Exactly 2 of time.final_time, time.max_step, time.dtime must be specified (%d given)",
+  if (config->time.time_step != INVALID_REAL) ++num_time_settings;
+  PetscCheck(num_time_settings, comm, PETSC_ERR_USER, "Exactly 2 of time.final_time, time.max_step, time.time_step must be specified (%d given)",
              num_time_settings);
 
+  // set the third parameter based on the two that are given
   if (config->time.final_time == INVALID_REAL) {
-    config->time.final_time = config->time.max_step * config->time.dtime;
+    config->time.final_time = config->time.max_step * config->time.time_step;
   } else if (config->time.max_step == INVALID_INT) {
-    config->time.max_step = (PetscInt)(config->time.final_time / config->time.dtime);
-  } else {  // config->time.dtime == INVALID_REAL
-    config->time.dtime = config->time.final_time / config->time.max_step;
+    config->time.max_step = (PetscInt)(config->time.final_time / config->time.time_step);
+  } else {  // config->time.time_step == INVALID_REAL
+    config->time.time_step = config->time.final_time / config->time.max_step;
+  }
+
+  // by default, the coupling interval is set to the final time (but in any case,
+  // it shouldn't be greater!)
+  if (config->time.coupling_interval == INVALID_REAL) {
+    config->time.coupling_interval = config->time.final_time;
+  } else {
+    PetscCheck(config->time.coupling_interval > 0.0,
+      comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
+    PetscCheck(config->time.coupling_interval <= config->time.final_time,
+      comm, PETSC_ERR_USER, "time.coupling_interval must not exceed time.final_time");
   }
 
   // we need either a domain initial condition or region-by-region conditions

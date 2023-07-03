@@ -14,7 +14,7 @@ logging:
   level: detail
 
 time:
-  dtime: 0.005
+  time_step: 0.005
   unit: hours
   max_step: 1000
 

@@ -9,6 +9,7 @@
 static const char *output_dir = "output";
 
 extern PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit);
+extern PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit);
 
 /// Creates the output directory if it doesn't exist.
 PetscErrorCode CreateOutputDir(RDy rdy) {
@@ -202,8 +203,8 @@ static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-/// Runs the dycore to the given time as expressed in units specified in the
-/// input configuration.
+/// Advances the solution by the coupling interval specified in the input
+/// configuration.
 PetscErrorCode RDyAdvance(RDy rdy) {
   PetscFunctionBegin;
 
@@ -256,25 +257,44 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+/// Returns true if RDycore has satisfied its simulation termination criteria
+/// (i.e. the simulation time exceeds the requeѕted final time or the maximum
+///  number of time steps has been reached), false otherwise.
 PetscBool RDyFinished(RDy rdy) {
   PetscFunctionBegin;
-  PetscFunctionReturn(rdy->t >= rdy->config.time.final_time);
+  PetscBool finished = PETSC_FALSE;
+  PetscReal t = ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit);
+  if ((t >= rdy->config.time.final_time) || (rdy->step >= rdy->config.time.max_step)) {
+    finished = PETSC_TRUE;
+  }
+  PetscFunctionReturn(finished);
 }
 
+/// Stores the simulation time (in config-specified units) in time.
 PetscErrorCode RDyGetTime(RDy rdy, PetscReal *time) {
   PetscFunctionBegin;
-  *time = rdy->t;
+  *time = ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit);
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetTimeStep(RDy rdy, PetscReal *time) {
+/// Stores the internal time step size (in config-specified units) in time_step.
+PetscErrorCode RDyGetTimeStep(RDy rdy, PetscReal *time_step) {
   PetscFunctionBegin;
-  *time = rdy->t;
+  *time_step = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
   PetscFunctionReturn(0);
 }
 
+/// Stores the step index in step.
 PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
   PetscFunctionBegin;
   *step = rdy->step;
   PetscFunctionReturn(0);
 }
+
+/// Stores the coupling interval (in config-specified units) in interval.
+PetscErrorCode RDyGetCouplingInterval(RDy rdy, PetscReal *interval) {
+  PetscFunctionBegin;
+  *interval = rdy->config.time.coupling_interval;
+  PetscFunctionReturn(0);
+}
+

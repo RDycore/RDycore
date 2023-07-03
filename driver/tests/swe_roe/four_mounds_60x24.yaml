@@ -16,7 +16,7 @@ logging:
 time:
   final_time: 0.5
   unit: seconds
-  dtime: 0.020
+  time_step: 0.020
 
 grid:
   file: four_mounds_60x24.exo

@@ -19,8 +19,9 @@ program rdycore_f90
   character(len=1024) :: config_file
   type(RDy)           :: rdy_
   PetscErrorCode      :: ierr
-  PetscInt            :: n
+  PetscInt            :: n, step
   PetscReal, pointer  :: h(:), vx(:), vy(:)
+  PetscReal           :: time, time_step, prev_time, coupling_interval
 
   if (command_argument_count() < 1) then
     call usage()
@@ -37,21 +38,32 @@ program rdycore_f90
       PetscCallA(RDySetup(rdy_, ierr))
 
       ! allocate arrays for inspecting simulation data
-      PetscCallA(RDyGetNumLocalCells(rdy, n, ierr))
+      PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
       allocate(h(n), vx(n), vy(n))
 
       ! run the simulation to completion using the time parameters in the
       ! config file
-      do while (.not. RDyFinished(rdy_))
+      PetscCallA(RDyGetTime(rdy_, prev_time, ierr))
+      PetscCallA(RDyGetCouplingInterval(rdy_, coupling_interval, ierr))
+      do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
+        ! advance the solution by the coupling interval specified in the config file
         PetscCallA(RDyAdvance(rdy_, ierr))
 
-        PetscCallA(RDyGetHeight(rdy, h));
-        PetscCallA(RDyGetXVelocity(rdy, vx));
-        PetscCallA(RDyGetYVelocity(rdy, vy));
+        ! the following just check that RDycore is doing the right thing
+        PetscCallA(RDyGetTime(rdy_, time, ierr))
+        PetscCallA(RDyGetTimeStep(rdy_, time_step, ierr))
+
+        prev_time = prev_time + coupling_interval
+
+        PetscCallA(RDyGetStep(rdy_, step, ierr));
+
+        PetscCallA(RDyGetHeight(rdy_, h, ierr))
+        PetscCallA(RDyGetXVelocity(rdy_, vx, ierr))
+        PetscCallA(RDyGetYVelocity(rdy_, vy, ierr))
       end do
 
       deallocate(h, vx, vy)
-      PetscCallA(RDyDestroy(rdy_, ierr));
+      PetscCallA(RDyDestroy(rdy_, ierr))
     end if
 
     PetscCallA(RDyFinalize(ierr));

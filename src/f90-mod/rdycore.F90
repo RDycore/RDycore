@@ -7,10 +7,13 @@ module rdycore
 
   implicit none
 
-  public :: RDy, RDyInit, RDyFinalize, RDyInitialized, &
+  public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyGetNumLocalCells, RDyGetHeight, &
             RDyGetXVelocity, RDyGetYVelocity
+
+  ! RDycore uses double-precision floating point numbers
+  integer, parameter :: RDyDouble = selected_real_kind(12)
 
   type :: RDy
     ! C pointer to RDy type
@@ -68,6 +71,12 @@ module rdycore
       integer(c_int),        intent(out) :: step
     end function
 
+    integer(c_int) function rdygetcouplinginterval_(rdy, interval) bind(c, name="RDyGetCouplingInterval")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)  :: rdy
+      real(c_double),        intent(out) :: interval
+    end function
+
     integer(c_int) function rdygetheight_(rdy, h) bind(c, name="RDyGetHeight")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
@@ -88,6 +97,11 @@ module rdycore
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
       use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    logical(c_bool) function rdyfinished_(rdy) bind(c, name="RDyFinished")
+      use iso_c_binding, only: c_bool, c_ptr
       type(c_ptr), value, intent(in) :: rdy
     end function
 
@@ -147,17 +161,24 @@ contains
   end subroutine
 
   subroutine RDyGetTime(rdy_, time, ierr)
-    type(RDy),      intent(inout) :: rdy_
-    real(c_double), intent(out)   :: time
-    integer,        intent(out)   :: ierr
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(out)   :: time
+    integer,         intent(out)   :: ierr
     ierr = rdygettime_(rdy_%c_rdy, time)
   end subroutine
 
   subroutine RDyGetTimeStep(rdy_, timestep, ierr)
-    type(RDy),      intent(inout) :: rdy_
-    real(c_double), intent(out)   :: timestep
-    integer,        intent(out)   :: ierr
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(out)   :: timestep
+    integer,         intent(out)   :: ierr
     ierr = rdygettimestep_(rdy_%c_rdy, timestep)
+  end subroutine
+
+  subroutine RDyGetCouplingInterval(rdy_, interval, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(out)   :: interval
+    integer,         intent(out)   :: ierr
+    ierr = rdygetcouplinginterval_(rdy_%c_rdy, interval)
   end subroutine
 
   subroutine RDyGetStep(rdy_, step, ierr)
@@ -168,23 +189,23 @@ contains
   end subroutine
 
   subroutine RDyGetHeight(rdy_, h, ierr)
-    type(RDy),          intent(inout) :: rdy_
-    real,      pointer, intent(inout) :: h
-    integer,            intent(out)   :: ierr
+    type(RDy),       intent(inout)          :: rdy_
+    real(RDyDouble), pointer, intent(inout) :: h(:)
+    integer,         intent(out)            :: ierr
     ierr = rdygetheight_(rdy_%c_rdy, c_loc(h))
   end subroutine
 
   subroutine RDyGetXVelocity(rdy_, vx, ierr)
-    type(RDy),          intent(inout) :: rdy_
-    real,      pointer, intent(inout) :: vx
-    integer,            intent(out)   :: ierr
+    type(RDy),       intent(inout)          :: rdy_
+    real(RDyDouble), pointer, intent(inout) :: vx(:)
+    integer,         intent(out)            :: ierr
     ierr = rdygetxvelocity_(rdy_%c_rdy, c_loc(vx))
   end subroutine
 
   subroutine RDyGetYVelocity(rdy_, vy, ierr)
-    type(RDy),          intent(inout) :: rdy_
-    real,      pointer, intent(inout) :: vy
-    integer,            intent(out)   :: ierr
+    type(RDy),       intent(inout)          :: rdy_
+    real(RDyDouble), pointer, intent(inout) :: vy(:)
+    integer,         intent(out)            :: ierr
     ierr = rdygetyvelocity_(rdy_%c_rdy, c_loc(vy))
   end subroutine
 
@@ -193,6 +214,12 @@ contains
     integer,   intent(out)   :: ierr
     ierr = rdyadvance_(rdy_%c_rdy)
   end subroutine
+
+  function RDyFinished(rdy_)
+    type(RDy), intent(inout) :: rdy_
+    logical :: RDyFinished
+    RDyFinished = rdyfinished_(rdy_%c_rdy)
+  end function
 
   subroutine RDyDestroy(rdy_, ierr)
     type(RDy), intent(inout) :: rdy_

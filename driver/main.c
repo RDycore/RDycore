@@ -36,19 +36,26 @@ int main(int argc, char *argv[]) {
     PetscCalloc1(n * sizeof(PetscReal), &vx);
     PetscCalloc1(n * sizeof(PetscReal), &vy);
 
-    // run the simulation to completion with 3-hour advances
-    PetscReal t0 = 0.0;
-    while (!RDyFinished(rdy)) {
-      // NOTE: you can get the simulation time, timestep, and step index with
-      // NOTE: RDyGetTime(), RDyGetTimeStep() and RDyGetStep()
+    // run the simulation to completion using the time parameters in the
+    // config file
+    PetscReal prev_time, coupling_interval;
+    RDyGetTime(rdy, &prev_time);
+    RDyGetCouplingInterval(rdy, &coupling_interval);
+    while (!RDyFinished(rdy)) { // returns true based on stopping criteria
+      // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
 
-      PetscReal t, dt;
-      PetscCall(RDyGetTime(rdy, &t));
-      PetscCall(RDyGetTimeStep(rdy, &dt));
-      PetscCheck(t > t0, comm, PETSC_ERR_USER, "Non-increasing time!");
-      PetscCheck(dt > 0.0, comm, PETSC_ERR_USER, "Non-positive time step!");
-      t0 += dt;
+      // the following just check that RDycore is doing the right thing
+
+      PetscReal time, time_step;
+      PetscCall(RDyGetTime(rdy, &time));
+      PetscCall(RDyGetTimeStep(rdy, &time_step));
+      PetscCheck(time > prev_time, comm, PETSC_ERR_USER, "Non-increasing time!");
+      PetscCheck(time_step > 0.0, comm, PETSC_ERR_USER, "Non-positive time step!");
+
+      PetscCheck(fabs(time - prev_time + coupling_interval) < 1e-12, comm, PETSC_ERR_USER,
+        "RDyAdvance advanced time improperly!");
+      prev_time += coupling_interval;
 
       PetscInt step;
       PetscCall(RDyGetStep(rdy, &step));
