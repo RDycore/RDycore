@@ -548,10 +548,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   if (config->time.coupling_interval == INVALID_REAL) {
     config->time.coupling_interval = config->time.final_time;
   } else {
-    PetscCheck(config->time.coupling_interval > 0.0,
-      comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
-    PetscCheck(config->time.coupling_interval <= config->time.final_time,
-      comm, PETSC_ERR_USER, "time.coupling_interval must not exceed time.final_time");
+    PetscCheck(config->time.coupling_interval > 0.0, comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
+    PetscCheck(config->time.coupling_interval <= config->time.final_time, comm, PETSC_ERR_USER,
+               "time.coupling_interval must not exceed time.final_time");
   }
 
   // we need either a domain initial condition or region-by-region conditions

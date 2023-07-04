@@ -165,9 +165,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
       // CGNS output is handled via the Options database. We need to set monitoring
       // for all formats that aren't XDMF or CGNS.
       if (rdy->config.output.format != OUTPUT_CGNS) {
-        PetscCall(TSMonitorSet(rdy->ts,
-          (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution,
-          rdy->output_vf, NULL));
+        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, rdy->output_vf, NULL));
       }
     }
   }
@@ -224,9 +222,12 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   }
 
   // advance the solution to the specified time
-  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve"); // <-- enable with -preload true
+  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");  // <-- enable with -preload true
   PetscCall(TSSetTime(rdy->ts, rdy->t));
-  PetscCall(TSSetMaxTime(rdy->ts, rdy->t + rdy->dt));
+  PetscReal interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
+  RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit),
+               ConvertTimeFromSeconds(rdy->t + interval, rdy->config.time.unit));
+  PetscCall(TSSetMaxTime(rdy->ts, rdy->t + interval));
   PetscCall(TSSetStepNumber(rdy->ts, rdy->step));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
@@ -263,7 +264,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 PetscBool RDyFinished(RDy rdy) {
   PetscFunctionBegin;
   PetscBool finished = PETSC_FALSE;
-  PetscReal t = ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit);
+  PetscReal t        = ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit);
   if ((t >= rdy->config.time.final_time) || (rdy->step >= rdy->config.time.max_step)) {
     finished = PETSC_TRUE;
   }
@@ -297,4 +298,3 @@ PetscErrorCode RDyGetCouplingInterval(RDy rdy, PetscReal *interval) {
   *interval = rdy->config.time.coupling_interval;
   PetscFunctionReturn(0);
 }
-

@@ -13,7 +13,7 @@ PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
   PetscReal *x;
   PetscCall(VecGetArray(rdy->X, &x));
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    h[i] = x[3*i];
+    h[i] = x[3 * i];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
@@ -25,7 +25,7 @@ PetscErrorCode RDyGetXVelocity(RDy rdy, PetscReal *vx) {
   PetscReal *x;
   PetscCall(VecGetArray(rdy->X, &x));
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    vx[i] = x[3*i+1];
+    vx[i] = x[3 * i + 1];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
@@ -37,7 +37,7 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
   PetscReal *x;
   PetscCall(VecGetArray(rdy->X, &x));
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    vy[i] = x[3*i+2];
+    vy[i] = x[3 * i + 2];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
