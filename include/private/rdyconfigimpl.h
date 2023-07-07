@@ -105,7 +105,7 @@ typedef struct {
   RDyTimeUnit unit;               // unit in which time is expressed
   PetscInt    max_step;           // maximum number of simulation time steps
   PetscReal   time_step;          // minimum internal time step [unit]
-  PetscReal   coupling_interval;  // time interval spanned by RDyAdvance
+  PetscReal   coupling_interval;  // time interval spanned by RDyAdvance [unit]
 } RDyTimeSection;
 
 // ---------------

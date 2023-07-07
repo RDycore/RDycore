@@ -298,3 +298,10 @@ PetscErrorCode RDyGetCouplingInterval(RDy rdy, PetscReal *interval) {
   *interval = rdy->config.time.coupling_interval;
   PetscFunctionReturn(0);
 }
+
+/// Sets the coupling interval (in config-specified units).
+PetscErrorCode RDySetCouplingInterval(RDy rdy, PetscReal interval) {
+  PetscFunctionBegin;
+  rdy->config.time.coupling_interval = interval;
+  PetscFunctionReturn(0);
+}
