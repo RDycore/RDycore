@@ -863,6 +863,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 
   // apply any solver-related options supplied on the command line

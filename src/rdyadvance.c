@@ -200,7 +200,9 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscFunctionBegin;
 
   // if we're at the start of the simulation, set up monitoring
-  if (rdy->step == 0) {
+  PetscInt step;
+  PetscCall(TSGetStepNumber(rdy->ts, &step));
+  if (step == 0) {
     PetscCall(CreateOutputDir(rdy));
 
     // set up monitoring functions for handling restarts and outputs
@@ -214,31 +216,30 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     RDyLogDebug(rdy, "Running simulation...");
   }
 
+  PetscReal time;
+  PetscCall(TSGetTime(rdy->ts, &time));
+
   // advance the solution to the specified time
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");  // <-- enable with -preload true
-  PetscCall(TSSetTime(rdy->ts, rdy->t));
   PetscReal interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
-  PetscCall(TSSetMaxTime(rdy->ts, rdy->t + interval));
-  PetscCall(TSSetStepNumber(rdy->ts, rdy->step));
+  PetscCall(TSSetMaxTime(rdy->ts, time + interval));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   if (PetscPreLoadingOn) {
     PetscCall(CalibrateSolverTimers(rdy));
   } else {
-    RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit),
-                 ConvertTimeFromSeconds(rdy->t + interval, rdy->config.time.unit));
+    RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
+                 ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
   PetscPreLoadEnd();
 
-  PetscCall(TSGetTime(rdy->ts, &rdy->t));
-  PetscCall(TSGetStepNumber(rdy->ts, &rdy->step));
-
   // Are we finished?
+  PetscCall(TSGetTime(rdy->ts, &time));
   PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
-  if (rdy->t >= final_time) {
+  if (time >= final_time) {
     // if we've overstepped the final time, interpolate backward
-    if (rdy->t > final_time) {
+    if (time > final_time) {
       PetscCall(TSInterpolate(rdy->ts, final_time, rdy->X));
       PetscCall(TSSetTime(rdy->ts, final_time));
       PetscCall(TSMonitor(rdy->ts, -1, final_time, rdy->X));
@@ -257,8 +258,12 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 PetscBool RDyFinished(RDy rdy) {
   PetscFunctionBegin;
   PetscBool finished = PETSC_FALSE;
-  PetscReal t        = ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit);
-  if ((t >= rdy->config.time.final_time) || (rdy->step >= rdy->config.time.max_step)) {
+  PetscReal time;
+  PetscCall(TSGetTime(rdy->ts, &time));
+  PetscReal time_in_unit = ConvertTimeFromSeconds(time, rdy->config.time.unit);
+  PetscInt  step;
+  PetscCall(TSGetStepNumber(rdy->ts, &step));
+  if ((time_in_unit >= rdy->config.time.final_time) || (step >= rdy->config.time.max_step)) {
     finished = PETSC_TRUE;
   }
   PetscFunctionReturn(finished);
@@ -267,7 +272,9 @@ PetscBool RDyFinished(RDy rdy) {
 /// Stores the simulation time (in config-specified units) in time.
 PetscErrorCode RDyGetTime(RDy rdy, PetscReal *time) {
   PetscFunctionBegin;
-  *time = ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit);
+  PetscReal t;
+  PetscCall(TSGetTime(rdy->ts, &t));
+  *time = ConvertTimeFromSeconds(t, rdy->config.time.unit);
   PetscFunctionReturn(0);
 }
 
@@ -281,7 +288,7 @@ PetscErrorCode RDyGetTimeStep(RDy rdy, PetscReal *time_step) {
 /// Stores the step index in step.
 PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
   PetscFunctionBegin;
-  *step = rdy->step;
+  PetscCall(TSGetStepNumber(rdy->ts, step));
   PetscFunctionReturn(0);
 }
 
