@@ -51,11 +51,23 @@ program rdycore_f90
 
         ! the following just check that RDycore is doing the right thing
         PetscCallA(RDyGetTime(rdy_, time, ierr))
+        if (time <= prev_time) then
+          SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-increasing time!")
+        end if
         PetscCallA(RDyGetTimeStep(rdy_, time_step, ierr))
+        if (time_step <= 0.0) then
+          SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive time step!")
+        end if
 
+        if (abs(time - prev_time - coupling_interval) >= 1e-12) then
+          SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "RDyAdvance advanced time improperly!")
+        end if
         prev_time = prev_time + coupling_interval
 
         PetscCallA(RDyGetStep(rdy_, step, ierr));
+        if (step <= 0) then
+          SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive step index!")
+        end if
 
         PetscCallA(RDyGetHeight(rdy_, h, ierr))
         PetscCallA(RDyGetXVelocity(rdy_, vx, ierr))
