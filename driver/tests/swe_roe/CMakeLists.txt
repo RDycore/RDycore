@@ -5,17 +5,25 @@
 # ex2b
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+# arguments for specific configurations ("basic" config has no options)
+set(ceed_args -ceed /cpu/self)
+set(preload_args -preload)
+
 foreach(np 1 2) # test on 1, 2 processes
-  add_test(swe_roe_ex2b_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml)
-  add_test(swe_roe_ex2b_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml)
+  foreach(config basic ceed preload)
+    add_test(swe_roe_ex2b_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${${config}_args})
+    add_test(swe_roe_ex2b_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml ${${config}_args})
+  endforeach()
 endforeach()
 
 # Additional tests for CGNS output
 foreach(np 1 2) # test on 1, 2 processes
   set(cgns_output_args -ts_monitor_solution cgns:output/ex2b-%d.cgns -viewer_cgns_batch_size 20 -ts_monitor_solution_interval 100)
-  add_test(swe_roe_ex2b_cgns_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${cgns_output_args})
-  add_test(swe_roe_ex2b_cgns_c_np_${np}_ceed ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${cgns_output_args} -ceed /cpu/self)
-  add_test(swe_roe_ex2b_cgns_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml ${cgns_output_args})
+  foreach(config basic ceed preload)
+    add_test(swe_roe_ex2b_cgns_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${cgns_output_args} ${${config}_args})
+    add_test(swe_roe_ex2b_cgns_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml ${cgns_output_args} ${${config}_args})
+  endforeach()
 endforeach()
 
 # ex2b with ICs specified by a file
@@ -26,9 +34,10 @@ file(COPY
      ${MATERIALS_DIR}/manning_grid5x10.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
-  add_test(swe_roe_ex2b_ic_file_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b_ic_file.yaml)
-  add_test(swe_roe_ex2b_ic_file_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_ic_file.yaml)
-  add_test(swe_roe_ex2b_ic_file_f90_np_${np}_ceed ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_ic_file.yaml -ceed /cpu/self)
+  foreach(config basic ceed preload)
+    add_test(swe_roe_ex2b_ic_file_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b_ic_file.yaml ${${config}_args})
+    add_test(swe_roe_ex2b_ic_file_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_ic_file.yaml ${${config}_args})
+  endforeach()
 endforeach()
 
 # four_mounds_60x24
@@ -39,6 +48,8 @@ file (COPY
       ${MATERIALS_DIR}/manning_four_mound_60x24.bin
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
-  add_test(swe_roe_four_mounds_c_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} four_mounds_60x24.yaml)
-  add_test(swe_roe_four_mounds_f90_np_${np} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml)
+  foreach(config basic ceed preload)
+    add_test(swe_roe_four_mounds_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} four_mounds_60x24.yaml ${${config}_args})
+    add_test(swe_roe_four_mounds_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml ${${config}_args})
+  endforeach()
 endforeach()

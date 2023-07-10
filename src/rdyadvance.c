@@ -177,25 +177,18 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
 // for the solver we're using
 static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   PetscFunctionBegin;
+  RDyLogDebug(rdy, "Performing preload calibration...");
 
   // create a "preload" solution so we can advance one step
   Vec X_preload;
   PetscCall(VecDuplicate(rdy->X, &X_preload));
   PetscCall(VecCopy(rdy->X, X_preload));
 
-  // set tolerances to make the calibration step cheaper
-  SNES      snes;
-  PetscReal r_tol;
-  PetscCall(TSGetSNES(rdy->ts, &snes));
-  PetscCall(SNESGetTolerances(snes, NULL, &r_tol, NULL, NULL, NULL));
-  PetscCall(SNESSetTolerances(snes, PETSC_DEFAULT, .99, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
-
-  // take the step
+  // take a single internal step to warm up the cache
   PetscCall(TSSetSolution(rdy->ts, X_preload));
   PetscCall(TSStep(rdy->ts));
 
-  // reset the tolerances and clean up
-  PetscCall(SNESSetTolerances(snes, PETSC_DEFAULT, r_tol, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
+  // clean up
   PetscCall(VecDestroy(&X_preload));
 
   PetscFunctionReturn(0);
@@ -225,8 +218,6 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");  // <-- enable with -preload true
   PetscCall(TSSetTime(rdy->ts, rdy->t));
   PetscReal interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
-  RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit),
-               ConvertTimeFromSeconds(rdy->t + interval, rdy->config.time.unit));
   PetscCall(TSSetMaxTime(rdy->ts, rdy->t + interval));
   PetscCall(TSSetStepNumber(rdy->ts, rdy->step));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
@@ -234,6 +225,8 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   if (PetscPreLoadingOn) {
     PetscCall(CalibrateSolverTimers(rdy));
   } else {
+    RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(rdy->t, rdy->config.time.unit),
+                 ConvertTimeFromSeconds(rdy->t + interval, rdy->config.time.unit));
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
   PetscPreLoadEnd();
