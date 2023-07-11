@@ -310,7 +310,6 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     RDyLogDebug(rdy, "[%d] Time = %f Max courant number %g encountered at edge %d of cell %d is %f", stepnum, time, courant_num_diags.max_courant_num,
                 courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
   }
-  rdy->step++;
 
   PetscFunctionReturn(0);
 }

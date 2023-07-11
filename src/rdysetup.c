@@ -860,11 +860,10 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(InitSWE(rdy));  // initialize SWE physics
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
 
-  PetscReal final_time_in_sec = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
-  PetscCall(TSSetMaxTime(rdy->ts, final_time_in_sec));
   PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 
   // apply any solver-related options supplied on the command line

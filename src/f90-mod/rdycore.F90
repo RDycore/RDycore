@@ -7,8 +7,13 @@ module rdycore
 
   implicit none
 
-  public :: RDy, RDyInit, RDyFinalize, RDyInitialized, &
-            RDyCreate, RDySetup, RDyRun, RDyDestroy
+  public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
+            RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
+            RDyGetNumLocalCells, RDyGetHeight, &
+            RDyGetXVelocity, RDyGetYVelocity
+
+  ! RDycore uses double-precision floating point numbers
+  integer, parameter :: RDyDouble = selected_real_kind(12)
 
   type :: RDy
     ! C pointer to RDy type
@@ -42,8 +47,61 @@ module rdycore
       type(c_ptr), value, intent(in) :: rdy
     end function
 
-    integer(c_int) function rdyrun_(rdy) bind(c, name="RDyRun")
+    integer(c_int) function rdygetnumlocalcells_(rdy, num_cells) bind(c, name="RDyGetNumLocalCells")
       use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int),        intent(out) :: num_cells
+    end function
+
+    integer(c_int) function rdygettime_(rdy, time) bind(c, name="RDyGetTime")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)  :: rdy
+      real(c_double),        intent(out) :: time
+    end function
+
+    integer(c_int) function rdygettimestep_(rdy, dt) bind(c, name="RDyGetTimeStep")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)  :: rdy
+      real(c_double),        intent(out) :: dt
+    end function
+
+    integer(c_int) function rdygetstep_(rdy, step) bind(c, name="RDyGetStep")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int),        intent(out) :: step
+    end function
+
+    integer(c_int) function rdygetcouplinginterval_(rdy, interval) bind(c, name="RDyGetCouplingInterval")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)  :: rdy
+      real(c_double),        intent(out) :: interval
+    end function
+
+    integer(c_int) function rdygetheight_(rdy, h) bind(c, name="RDyGetHeight")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: h
+    end function
+
+    integer(c_int) function rdygetxvelocity_(rdy, vx) bind(c, name="RDyGetXVelocity")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: vx
+    end function
+
+    integer(c_int) function rdygetyvelocity_(rdy, vy) bind(c, name="RDyGetYVelocity")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: vy
+    end function
+
+    integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    logical(c_bool) function rdyfinished_(rdy) bind(c, name="RDyFinished")
+      use iso_c_binding, only: c_bool, c_ptr
       type(c_ptr), value, intent(in) :: rdy
     end function
 
@@ -95,11 +153,73 @@ contains
     ierr = rdysetup_(rdy_%c_rdy)
   end subroutine
 
-  subroutine RDyRun(rdy_, ierr)
+  subroutine RDyGetNumLocalCells(rdy_, num_cells, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(out)   :: num_cells
+    integer,   intent(out)   :: ierr
+    ierr = rdygetnumlocalcells_(rdy_%c_rdy, num_cells)
+  end subroutine
+
+  subroutine RDyGetTime(rdy_, time, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(out)   :: time
+    integer,         intent(out)   :: ierr
+    ierr = rdygettime_(rdy_%c_rdy, time)
+  end subroutine
+
+  subroutine RDyGetTimeStep(rdy_, timestep, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(out)   :: timestep
+    integer,         intent(out)   :: ierr
+    ierr = rdygettimestep_(rdy_%c_rdy, timestep)
+  end subroutine
+
+  subroutine RDyGetCouplingInterval(rdy_, interval, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(out)   :: interval
+    integer,         intent(out)   :: ierr
+    ierr = rdygetcouplinginterval_(rdy_%c_rdy, interval)
+  end subroutine
+
+  subroutine RDyGetStep(rdy_, step, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(out)   :: step
+    integer,   intent(out)   :: ierr
+    ierr = rdygetstep_(rdy_%c_rdy, step)
+  end subroutine
+
+  subroutine RDyGetHeight(rdy_, h, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    real(RDyDouble), pointer, intent(inout) :: h(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetheight_(rdy_%c_rdy, c_loc(h))
+  end subroutine
+
+  subroutine RDyGetXVelocity(rdy_, vx, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    real(RDyDouble), pointer, intent(inout) :: vx(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetxvelocity_(rdy_%c_rdy, c_loc(vx))
+  end subroutine
+
+  subroutine RDyGetYVelocity(rdy_, vy, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    real(RDyDouble), pointer, intent(inout) :: vy(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetyvelocity_(rdy_%c_rdy, c_loc(vy))
+  end subroutine
+
+  subroutine RDyAdvance(rdy_, ierr)
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
-    ierr = rdyrun_(rdy_%c_rdy)
+    ierr = rdyadvance_(rdy_%c_rdy)
   end subroutine
+
+  function RDyFinished(rdy_)
+    type(RDy), intent(inout) :: rdy_
+    logical :: RDyFinished
+    RDyFinished = rdyfinished_(rdy_%c_rdy)
+  end function
 
   subroutine RDyDestroy(rdy_, ierr)
     type(RDy), intent(inout) :: rdy_
