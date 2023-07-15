@@ -833,6 +833,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   // set up vectors
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
   PetscCall(VecDuplicate(rdy->X, &rdy->R));
+  PetscCall(VecDuplicate(rdy->X, &rdy->S));
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 

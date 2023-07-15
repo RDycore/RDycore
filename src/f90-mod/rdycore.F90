@@ -95,6 +95,12 @@ module rdycore
       type(c_ptr), value, intent(in) :: vy
     end function
 
+    integer(c_int) function rdysetwatersource_(rdy, watsrc) bind(c, name="RDySetWaterSource")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: watsrc
+    end function
+
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
@@ -207,6 +213,13 @@ contains
     real(RDyDouble), pointer, intent(inout) :: vy(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetyvelocity_(rdy_%c_rdy, c_loc(vy))
+  end subroutine
+
+  subroutine RDySetWaterSource(rdy_, watsrc, ierr)
+    type(RDy),       intent(inout)       :: rdy_
+    real(RDyDouble), pointer, intent(in) :: watsrc(:)
+    integer,         intent(out)         :: ierr
+    ierr = rdysetwatersource_(rdy_%c_rdy, c_loc(watsrc))
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

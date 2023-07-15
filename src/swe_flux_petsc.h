@@ -495,8 +495,9 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   RDyCells *cells = &mesh->cells;
 
   // Get access to Vec
-  PetscScalar *x_ptr, *f_ptr;
+  PetscScalar *x_ptr, *f_ptr, *s_ptr;
   PetscCall(VecGetArray(rdy->X_local, &x_ptr));
+  PetscCall(VecGetArray(rdy->S, &s_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
 
   PetscInt ndof;
@@ -557,7 +558,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
         tby = (hv + dt * Fsum_y - dt * bedy) * factor;
       }
 
-      f_ptr[icell * ndof + 0] += 0.0;
+      f_ptr[icell * ndof + 0] += s_ptr[icell * ndof];
       f_ptr[icell * ndof + 1] += -bedx - tbx;
       f_ptr[icell * ndof + 2] += -bedy - tby;
     }
@@ -565,6 +566,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
 
   // Restore vectors
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->S, &s_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
   PetscCall(RiemannDataSWEDestroy(data));

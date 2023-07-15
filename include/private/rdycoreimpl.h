@@ -121,6 +121,9 @@ struct _p_RDy {
   // residual vector
   Vec R;
 
+  // source-sink vector
+  Vec S;
+
   //-------------------
   // Simulatіon output
   //-------------------

@@ -42,3 +42,15 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
   PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(0);
 }
+
+PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
+  PetscFunctionBegin;
+
+  PetscReal *s;
+  PetscCall(VecGetArray(rdy->S, &s));
+  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+    s[3 * i] = watsrc[i];
+  }
+  PetscCall(VecRestoreArray(rdy->S, &s));
+  PetscFunctionReturn(0);
+}
