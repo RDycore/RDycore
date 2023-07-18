@@ -219,20 +219,31 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscReal time;
   PetscCall(TSGetTime(rdy->ts, &time));
 
-  // advance the solution to the specified time
-  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");  // <-- enable with -preload true
   PetscReal interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
   PetscCall(TSSetMaxTime(rdy->ts, time + interval));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
-  if (PetscPreLoadingOn) {
-    PetscCall(CalibrateSolverTimers(rdy));
+
+  // advance the solution to the specified time (handling preloading if requested)
+  static PetscBool already_preloaded = PETSC_FALSE;
+  PetscBool        preload;
+  PetscCall(PetscOptionsHasName(NULL, NULL, "-preload", &preload));
+  if (preload && !already_preloaded) {
+    PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
+    if (PetscPreLoadingOn) {
+      PetscCall(CalibrateSolverTimers(rdy));
+    } else {
+      RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
+                   ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
+      PetscCall(TSSolve(rdy->ts, rdy->X));
+    }
+    already_preloaded = PETSC_TRUE;
+    PetscPreLoadEnd();
   } else {
     RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
                  ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
-  PetscPreLoadEnd();
 
   // Are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
