@@ -122,7 +122,7 @@ struct _p_RDy {
   Vec R;
 
   // source-sink vector
-  Vec S;
+  Vec WaterSrc;
 
   //-------------------
   // Simulatіon output
