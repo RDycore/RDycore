@@ -20,7 +20,7 @@ program rdycore_f90
   type(RDy)           :: rdy_
   PetscErrorCode      :: ierr
   PetscInt            :: n, step
-  PetscReal, pointer  :: h(:), vx(:), vy(:)
+  PetscReal, pointer  :: h(:), vx(:), vy(:), rain(:)
   PetscReal           :: time, time_step, prev_time, coupling_interval
 
   if (command_argument_count() < 1) then
@@ -39,13 +39,18 @@ program rdycore_f90
 
       ! allocate arrays for inspecting simulation data
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
-      allocate(h(n), vx(n), vy(n))
+      allocate(h(n), vx(n), vy(n), rain(n))
 
       ! run the simulation to completion using the time parameters in the
       ! config file
       PetscCallA(RDyGetTime(rdy_, prev_time, ierr))
       PetscCallA(RDyGetCouplingInterval(rdy_, coupling_interval, ierr))
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
+
+        ! apply a 1 mm/hr rain over the entire domain 
+        rain(:) = 1.d0/3600.d0/1000.d0
+        PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
+
         ! advance the solution by the coupling interval specified in the config file
         PetscCallA(RDyAdvance(rdy_, ierr))
 
@@ -74,7 +79,7 @@ program rdycore_f90
         PetscCallA(RDyGetYVelocity(rdy_, vy, ierr))
       end do
 
-      deallocate(h, vx, vy)
+      deallocate(h, vx, vy, rain)
       PetscCallA(RDyDestroy(rdy_, ierr))
     end if
 

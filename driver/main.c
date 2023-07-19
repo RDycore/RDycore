@@ -31,10 +31,11 @@ int main(int argc, char *argv[]) {
     // allocate arrays for inspecting simulation data
     PetscInt n;
     PetscCall(RDyGetNumLocalCells(rdy, &n));
-    PetscReal *h, *vx, *vy;
+    PetscReal *h, *vx, *vy, *rain;
     PetscCalloc1(n * sizeof(PetscReal), &h);
     PetscCalloc1(n * sizeof(PetscReal), &vx);
     PetscCalloc1(n * sizeof(PetscReal), &vy);
+    PetscCalloc1(n * sizeof(PetscReal), &rain);
 
     // run the simulation to completion using the time parameters in the
     // config file
@@ -42,6 +43,11 @@ int main(int argc, char *argv[]) {
     RDyGetTime(rdy, &prev_time);
     RDyGetCouplingInterval(rdy, &coupling_interval);
     while (!RDyFinished(rdy)) { // returns true based on stopping criteria
+
+      // apply a 1 mm/hr rain over the entire domain
+      for (PetscInt icell=0; icell < n; icell++) rain[icell] = 1.0/3600.0/1000.0; // mm/hr --> m/s
+      PetscCall(RDySetWaterSource(rdy, rain));
+
       // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
 
@@ -70,6 +76,7 @@ int main(int argc, char *argv[]) {
     PetscFree(h);
     PetscFree(vx);
     PetscFree(vy);
+    PetscFree(rain);
     PetscCall(RDyDestroy(&rdy));
   }
 
