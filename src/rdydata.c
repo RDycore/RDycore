@@ -47,10 +47,10 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
   PetscFunctionBegin;
 
   PetscReal *s;
-  PetscCall(VecGetArray(rdy->WaterSrc, &s));
+  PetscCall(VecGetArray(rdy->water_src, &s));
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
     s[i] = watsrc[i];
   }
-  PetscCall(VecRestoreArray(rdy->WaterSrc, &s));
+  PetscCall(VecRestoreArray(rdy->water_src, &s));
   PetscFunctionReturn(0);
 }
