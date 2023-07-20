@@ -836,6 +836,8 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
+
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));
 
