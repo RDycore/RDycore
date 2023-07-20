@@ -353,9 +353,11 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
         for (PetscInt idof = 0; idof < 3; idof++) {
           F[3 * icell + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
         }
+        if (boundary->num_edges == 2) printf("%f ",flux_vec_bnd[e][0] * edge_len);
       }
     }
   }
+  if (boundary->num_edges == 2) printf("\n");
 
   PetscFunctionReturn(0);
 }
