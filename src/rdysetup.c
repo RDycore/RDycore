@@ -121,11 +121,13 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionBegin;
 
   // read the grid from a file
+  RDyLogDetail(rdy, "    DMPlexCreateFromFile...");
   PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.grid.file, "grid", PETSC_TRUE, &rdy->dm));
 
   // interpolate the grid to get more connectivity
   {
     DM dm_interp;
+    RDyLogDetail(rdy, "    DMPlexInterpolate...");
     PetscCall(DMPlexInterpolate(rdy->dm, &dm_interp));
     PetscCheck(dm_interp, rdy->comm, PETSC_ERR_USER, "Mesh interpolation failed!");
     PetscCall(DMDestroy(&rdy->dm));
@@ -133,6 +135,7 @@ static PetscErrorCode CreateDM(RDy rdy) {
   }
 
   // I'm not sure exactly why we need this here...
+  RDyLogDetail(rdy, "    DMPlexDistributeSetDefault...");
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
 
   // name the grid and apply any overrides from the command line
@@ -938,31 +941,33 @@ PetscErrorCode RDySetup(RDy rdy) {
   // print configuration info
   PetscCall(PrintConfig(rdy));
 
-  RDyLogDebug(rdy, "Creating DMs...");
+  RDyLogDetail(rdy, "Creating DMs...");
+  RDyLogDetail(rdy, "  CreateDM()...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
+  RDyLogDetail(rdy, "  CreateAuxiliaryDM...");
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
 
-  RDyLogDebug(rdy, "Initializing regions and boundaries...");
+  RDyLogDetail(rdy, "Initializing regions and boundaries...");
   PetscCall(InitRegions(rdy));
   PetscCall(InitBoundaries(rdy));
 
-  RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
+  RDyLogDetail(rdy, "Initializing initial/boundary conditions and sources...");
   PetscCall(InitInitialConditions(rdy));
   PetscCall(InitSources(rdy));
   PetscCall(InitBoundaryConditions(rdy));
 
-  RDyLogDebug(rdy, "Creating solvers and vectors...");
+  RDyLogDetail(rdy, "Creating solvers and vectors...");
   PetscCall(CreateSolvers(rdy));
 
-  RDyLogDebug(rdy, "Creating FV mesh...");
+  RDyLogDetail(rdy, "Creating FV mesh...");
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
-  RDyLogDebug(rdy, "Initializing materials...");
+  RDyLogDetail(rdy, "Initializing materials...");
   PetscCall(InitMaterials(rdy));
 
-  RDyLogDebug(rdy, "Initializing solution data...");
+  RDyLogDetail(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
   PetscFunctionReturn(0);
