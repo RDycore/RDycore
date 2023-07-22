@@ -52,7 +52,7 @@ static PetscErrorCode PrintTime(RDy rdy) {
 static PetscErrorCode PrintRestart(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Restart:");
-  if (rdy->config.restart.frequency > 0) {
+  if (rdy->config.restart.interval > 0) {
     char format[12];
     if (rdy->config.restart.format == PETSC_VIEWER_NATIVE) {
       strcpy(format, "binary");
@@ -60,7 +60,7 @@ static PetscErrorCode PrintRestart(RDy rdy) {
       strcpy(format, "hdf5");
     }
     RDyLogDetail(rdy, "  File format: %s", format);
-    RDyLogDetail(rdy, "  Frequency: %d", rdy->config.restart.frequency);
+    RDyLogDetail(rdy, "  interval: %d", rdy->config.restart.interval);
   } else {
     RDyLogDetail(rdy, "  (disabled)");
   }

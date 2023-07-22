@@ -28,7 +28,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   RDyLogDetail(rdy, "Step %d: writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
 
   // write the grid if we're the first step in a batch.
-  PetscInt dataset = step / rdy->config.output.frequency;
+  PetscInt dataset = step / rdy->config.output.interval;
   if (dataset % rdy->config.output.batch_size == 0) {
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
     PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
@@ -255,7 +255,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
-  if (step % rdy->config.output.frequency == 0) {
+  if (step % rdy->config.output.interval == 0) {
     PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
     if (rdy->config.output.format == OUTPUT_XDMF) {
       PetscCall(WriteXDMFHDF5Data(rdy, step, t));
