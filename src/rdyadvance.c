@@ -11,6 +11,13 @@ static const char *output_dir = "output";
 extern PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit);
 extern PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit);
 
+/// Returns the name of the output directory.
+PetscErrorCode GetOutputDir(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
+  PetscFunctionBegin;
+  strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);
+  PetscFunctionReturn(0);
+}
+
 /// Creates the output directory if it doesn't exist.
 PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionBegin;
@@ -213,6 +220,9 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     // create a viewer with the proper format for visualization output
     PetscCall(CreateOutputViewer(rdy));
 
+    // initialize time series data
+    PetscCall(InitTimeSeries(rdy));
+
     RDyLogDebug(rdy, "Running simulation...");
   }
 
@@ -225,6 +235,8 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
 
   // advance the solution to the specified time (handling preloading if requested)
+  RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
+               ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
   static PetscBool already_preloaded = PETSC_FALSE;
   PetscBool        preload;
   PetscCall(PetscOptionsHasName(NULL, NULL, "-preload", &preload));
@@ -233,15 +245,11 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     if (PetscPreLoadingOn) {
       PetscCall(CalibrateSolverTimers(rdy));
     } else {
-      RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
-                   ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
       PetscCall(TSSolve(rdy->ts, rdy->X));
     }
     already_preloaded = PETSC_TRUE;
     PetscPreLoadEnd();
   } else {
-    RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
-                 ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
 

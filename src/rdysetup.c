@@ -818,8 +818,10 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
         bc->salinity = &rdy->config.salinity_conditions[sal_index];
       }
     } else {
-      // set a reflecting BC on this boundary
-      bc->flow = reflecting_flow;
+      // this boundary wasn't explicitly requested, so set up an auto-generated
+      // reflecting BC
+      bc->flow           = reflecting_flow;
+      bc->auto_generated = PETSC_TRUE;
     }
   }
 
