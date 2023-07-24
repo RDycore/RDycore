@@ -178,7 +178,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     // of edges, and to gather global flux metadata/data
     MPI_Gather(&num_local_edges, 1, MPI_INT, NULL, 1, MPI_INT, 0, rdy->comm);
     MPI_Gatherv(local_flux_md, 3 * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm);
-    MPI_Gatherv(local_flux_data, 5 * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm);
+    MPI_Gatherv(local_flux_data, 5 * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm);
   }
 
   // zero the boundary fluxes so they can begin reaccumulating
