@@ -42,11 +42,19 @@ typedef struct {
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {
+  // fluxes on boundary edges
   struct {
-    PetscReal water_mass;
-    PetscReal x_momentum;
-    PetscReal y_momentum;
-  } * boundary_fluxes;
+    // numbers of local and global boundary edges on which fluxes are computed
+    PetscInt num_local_edges, num_global_edges;
+    // array of per-boundary offsets in local fluxes array below
+    PetscInt *offsets;
+    // local array of boundary fluxes
+    struct {
+      PetscReal water_mass;
+      PetscReal x_momentum;
+      PetscReal y_momentum;
+    } * fluxes;
+  } boundary_fluxes;
 } RDyTimeSeriesData;
 
 // This type serves as a "virtual table" containing function pointers that
@@ -173,6 +181,7 @@ PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *
 
 // time series
 PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);
+PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary *, PetscInt ne, PetscReal[ne][3]);
 PETSC_INTERN PetscErrorCode WriteTimeSeries(TS, PetscInt, PetscReal, Vec, void *);
 PETSC_INTERN PetscErrorCode DestroyTimeSeries(RDy);
 

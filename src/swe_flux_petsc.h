@@ -357,6 +357,9 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
     }
   }
 
+  // accumulate boundary fluxes if we are asked to track time series
+  PetscCall(AccumulateBoundaryFluxes(rdy, boundary, boundary->num_edges, flux_vec_bnd));
+
   PetscFunctionReturn(0);
 }
 

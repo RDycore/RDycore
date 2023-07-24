@@ -154,7 +154,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->X_local) VecDestroy(&((*rdy)->X_local));
 
   // destroy time series
-  PetscCall(DestroyTimeSeries(rdy));
+  PetscCall(DestroyTimeSeries(*rdy));
 
   // destroy DMs
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
