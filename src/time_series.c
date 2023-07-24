@@ -52,20 +52,20 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary *boundary, PetscInt
   RDyTimeSeriesData *time_series = &rdy->time_series;
   if (time_series->boundary_fluxes.fluxes) {
     // figure out whether this boundary has an auto-generated BC
-    PetscBool auto_generated = PETSC_FALSE;
     PetscInt  b              = boundary - rdy->boundaries;
-    auto_generated           = rdy->boundary_conditions[b].auto_generated;
+    PetscBool auto_generated = rdy->boundary_conditions[b].auto_generated;
 
     // if not, accumulate fluxes locally
     if (!auto_generated) {
       PetscInt n = rdy->time_series.boundary_fluxes.offsets[b];
-      for (PetscInt e = 0; e < boundary->num_edges; ++e, ++n) {
+      for (PetscInt e = 0; e < boundary->num_edges; ++e) {
         PetscInt edge_id = boundary->edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
-          time_series->boundary_fluxes.fluxes[n].water_mass += fluxes[n][0];
-          time_series->boundary_fluxes.fluxes[n].x_momentum += fluxes[n][1];
-          time_series->boundary_fluxes.fluxes[n].y_momentum += fluxes[n][2];
+          time_series->boundary_fluxes.fluxes[n].water_mass += fluxes[e][0];
+          time_series->boundary_fluxes.fluxes[n].x_momentum += fluxes[e][1];
+          time_series->boundary_fluxes.fluxes[n].y_momentum += fluxes[e][2];
+          ++n;
         }
       }
     }
@@ -73,7 +73,7 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary *boundary, PetscInt
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscReal time) {
+static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
   PetscInt num_local_edges  = rdy->time_series.boundary_fluxes.num_local_edges;
@@ -91,7 +91,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscReal time) {
     RDyCondition bc = rdy->boundary_conditions[b];
     if (!bc.auto_generated) {  // exclude auto-generated boundary conditions
       RDyBoundary *boundary = &rdy->boundaries[b];
-      for (PetscInt e = 0; e < boundary->num_edges; ++e, ++n) {
+      for (PetscInt e = 0; e < boundary->num_edges; ++e) {
         PetscInt edge_id = boundary->edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
@@ -104,7 +104,8 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscReal time) {
           local_flux_data[5 * n + 2] = rdy->time_series.boundary_fluxes.fluxes[n].y_momentum;
           RDyVector edge_normal      = rdy->mesh.edges.normals[edge_id];
           local_flux_data[5 * n + 3] = edge_normal.V[0];
-          local_flux_data[5 * n + 3] = edge_normal.V[1];
+          local_flux_data[5 * n + 4] = edge_normal.V[1];
+          ++n;
         }
       }
     }
@@ -117,24 +118,24 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscReal time) {
     // counts and displacements to pass to MPI_Gatherv below
     PetscInt n_local_edges[rdy->nproc];
     MPI_Gather(&num_local_edges, 1, MPI_INT, n_local_edges, 1, MPI_INT, 0, rdy->comm);
+    PetscInt n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
+    n_recv_displs[0] = 0;
 
     // local -> global flux metadata
-    PetscInt n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc];
-    n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
-      n_recv_counts[p] = 3 * n_local_edges[p];
-      if (p < rdy->nproc - 1) n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
+      n_recv_counts[p]     = 3 * n_local_edges[p];
+      n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
     PetscInt global_flux_md[3 * num_global_edges];
     MPI_Gatherv(local_flux_md, 3 * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm);
 
     // local -> global flux data
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
-      n_recv_counts[p] = 3 * n_local_edges[p];
-      if (p < rdy->nproc - 1) n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
+      n_recv_counts[p]     = 5 * n_local_edges[p];
+      n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
     PetscReal global_flux_data[5 * num_global_edges];
-    MPI_Gatherv(local_flux_data, 5 * num_local_edges, MPI_INT, global_flux_data, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm);
+    MPI_Gatherv(local_flux_data, 5 * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0, rdy->comm);
 
     // write the data to the end of the boundary fluxes file
     char dir[PETSC_MAX_PATH_LEN];
@@ -143,6 +144,10 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscReal time) {
     snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/boundary_fluxes.dat", dir);
     FILE *fp;
     PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));  // append to end of file
+    if (step == 0) {                                   // write a header on the first step
+      PetscCall(PetscFPrintf(rdy->comm, fp,
+                             "#time\tedge_id\tboundary_id\tbc_type\twater_mass_flux\tx_momentum_flux\ty_momentum_flux\tnormal_x\tnormal_y\t\n"));
+    }
     for (PetscInt e = 0; e < num_global_edges; ++e) {
       PetscInt  global_edge_id = global_flux_md[3 * e];
       PetscInt  boundary_id    = global_flux_md[3 * e + 1];
@@ -152,6 +157,17 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscReal time) {
       PetscReal y_momentum     = global_flux_data[5 * e + 2];
       PetscReal x_normal       = global_flux_data[5 * e + 3];
       PetscReal y_normal       = global_flux_data[5 * e + 4];
+      /*
+          for (PetscInt e = 0; e < num_local_edges; ++e) {
+            PetscInt  global_edge_id = local_flux_md[3 * e];
+            PetscInt  boundary_id    = local_flux_md[3 * e + 1];
+            PetscInt  bc_type        = local_flux_md[3 * e + 2];
+            PetscReal water_mass     = local_flux_data[5 * e];
+            PetscReal x_momentum     = local_flux_data[5 * e + 1];
+            PetscReal y_momentum     = local_flux_data[5 * e + 2];
+            PetscReal x_normal       = local_flux_data[5 * e + 3];
+            PetscReal y_normal       = local_flux_data[5 * e + 4];
+      */
 
       PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%d\t%d\t%d\t%e\t%e\t%e\t%e\t%e\n", time, global_edge_id, boundary_id, bc_type, water_mass,
                              x_momentum, y_momentum, x_normal, y_normal));
@@ -176,8 +192,8 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   PetscFunctionBegin;
 
   RDy rdy = ctx;
-  if (step % rdy->config.output.time_series.boundary_fluxes == 0) {
-    PetscCall(WriteBoundaryFluxes(rdy, time));
+  if (rdy->time_series.boundary_fluxes.fluxes && (step % rdy->config.output.time_series.boundary_fluxes == 0)) {
+    PetscCall(WriteBoundaryFluxes(rdy, step, time));
   }
 
   PetscFunctionReturn(0);
