@@ -4,8 +4,14 @@
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
-  // Allocate per-boundary flux offsets
+  // allocate per-boundary flux offsets
   PetscCall(RDyAlloc(PetscInt, rdy->num_boundaries + 1, &(rdy->time_series.boundary_fluxes.offsets)));
+
+  // make sure the number of degrees of freedom is the same as the number of
+  // boundary fluxes
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCheck(rdy->comm, ndof == 3, PETSC_ERR_USER, "ndof must be the same as # of boundary fluxes (3)");
 
   // count the number of global boundary edges (excluding those for
   // auto-generated boundary conditions and those not locally owned)
@@ -21,7 +27,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
         if (rdy->mesh.cells.is_local[cell_id]) ++num_boundary_edges;
       }
     }
-    rdy->time_series.boundary_fluxes.offsets[b + 1] = 3 * num_boundary_edges;
+    rdy->time_series.boundary_fluxes.offsets[b + 1] = ndof * num_boundary_edges;
   }
   rdy->time_series.boundary_fluxes.num_local_edges = num_boundary_edges;
 
