@@ -33,7 +33,29 @@ typedef struct {
 
   // value(s) associated with the condition
   PetscReal value;
+
+  // was this boundary condition automatically generated and not explicitly
+  // requested in the config file?
+  PetscBool auto_generated;
 } RDyCondition;
+
+// This type keeps track of accumulated time series data appended periodically
+// to files.
+typedef struct {
+  // fluxes on boundary edges
+  struct {
+    // numbers of local and global boundary edges on which fluxes are computed
+    PetscInt num_local_edges, num_global_edges;
+    // array of per-boundary offsets in local fluxes array below
+    PetscInt *offsets;
+    // local array of boundary fluxes
+    struct {
+      PetscReal water_mass;
+      PetscReal x_momentum;
+      PetscReal y_momentum;
+    } * fluxes;
+  } boundary_fluxes;
+} RDyTimeSeriesData;
 
 // This type serves as a "virtual table" containing function pointers that
 // define the behavior of the dycore.
@@ -124,12 +146,18 @@ struct _p_RDy {
   // source-sink vector
   Vec water_src;
 
+  // time series bookkeeping
+  RDyTimeSeriesData time_series;
+
   //-------------------
   // Simulatіon output
   //-------------------
   PetscViewer           output_viewer;
   PetscViewerAndFormat *output_vf;
 
+  //--------------
+  // CEED support
+  //--------------
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {
@@ -147,8 +175,15 @@ PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 
 // output functions
 PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
+PETSC_INTERN PetscErrorCode GetOutputDir(RDy, char dir[PETSC_MAX_PATH_LEN]);
 PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char *, char *);
 PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *);
+
+// time series
+PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);
+PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary *, PetscInt ne, PetscReal[ne][3]);
+PETSC_INTERN PetscErrorCode WriteTimeSeries(TS, PetscInt, PetscReal, Vec, void *);
+PETSC_INTERN PetscErrorCode DestroyTimeSeries(RDy);
 
 // utility functions
 PETSC_INTERN const char *TimeUnitAsString(RDyTimeUnit);

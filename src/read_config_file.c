@@ -166,7 +166,7 @@ static const cyaml_schema_field_t logging_fields_schema[] = {
 // ---------------
 // restart:
 //   format: <binary|hdf5>
-//   frequency: <value-in-steps>  # default: 0 (no restarts)
+//   interval: <value-in-steps>  # default: 0 (no restarts)
 
 // mapping of strings to file formats
 static const cyaml_strval_t restart_file_formats[] = {
@@ -177,7 +177,7 @@ static const cyaml_strval_t restart_file_formats[] = {
 // mapping of restart fields to members of RDyRestartSection
 static const cyaml_schema_field_t restart_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyRestartSection, format, restart_file_formats, CYAML_ARRAY_LEN(restart_file_formats)),
-    CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyRestartSection, frequency),
+    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyRestartSection, interval),
     CYAML_FIELD_END
 };
 
@@ -186,7 +186,7 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 // ---------------
 // output:
 //   format: <binary|xdmf|cgns>
-//   frequency: <number-of-steps-between-output-dumps> # default: 0 (no output)
+//   interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
 
 // mapping of strings to file formats
@@ -196,11 +196,18 @@ static const cyaml_strval_t output_file_formats[] = {
     {"cgns",   OUTPUT_CGNS  },
 };
 
+// mapping of time_series fields to members of RDyTimeSeries
+static const cyaml_schema_field_t output_time_series_fields_schema[] = {
+    CYAML_FIELD_INT("boundary_fluxes", CYAML_FLAG_DEFAULT, RDyTimeSeries, boundary_fluxes),
+    CYAML_FIELD_END
+};
+
 // mapping of output fields to members of RDyOutputSection
 static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
-    CYAML_FIELD_INT("frequency", CYAML_FLAG_DEFAULT, RDyOutputSection, frequency),
+    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyOutputSection, interval),
     CYAML_FIELD(INT, "batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size, {.missing = 1}),
+    CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -610,10 +617,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   //--------
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.frequency > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%d", rdy->config.output.frequency);
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output.interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }

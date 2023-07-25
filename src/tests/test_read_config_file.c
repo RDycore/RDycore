@@ -79,7 +79,7 @@ static void TestFullSpec(void **state) {
       "  level: detail\n\n"
       "restart:\n"
       "  format: hdf5\n"
-      "  frequency: 10\n\n"
+      "  interval: 10\n\n"
       "grid:\n"
       "  file: planar_dam_10x5.msh\n\n"
       "surface_composition:\n"

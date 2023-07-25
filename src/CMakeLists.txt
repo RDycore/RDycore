@@ -8,6 +8,7 @@ add_library(rdycore
   rdymesh.c
   rdyadvance.c
   rdysetup.c
+  time_series.c
   write_xdmf_output.c
 )
 add_dependencies(rdycore cyaml yaml)

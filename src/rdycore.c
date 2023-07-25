@@ -148,9 +148,13 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
   // destroy vectors
+  if ((*rdy)->water_src) VecDestroy(&((*rdy)->water_src));
   if ((*rdy)->R) VecDestroy(&((*rdy)->R));
   if ((*rdy)->X) VecDestroy(&((*rdy)->X));
   if ((*rdy)->X_local) VecDestroy(&((*rdy)->X_local));
+
+  // destroy time series
+  PetscCall(DestroyTimeSeries(*rdy));
 
   // destroy DMs
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));

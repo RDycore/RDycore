@@ -124,8 +124,8 @@ typedef struct {
 
 // all restart parameters
 typedef struct {
-  PetscViewerFormat format;     // file format
-  PetscInt          frequency;  // number of steps between restart dumps
+  PetscViewerFormat format;    // file format
+  PetscInt          interval;  // number of steps between restart dumps [steps]
 } RDyRestartSection;
 
 // ---------------
@@ -135,11 +135,17 @@ typedef struct {
 // output file formats
 typedef enum { OUTPUT_BINARY = 0, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
 
+// time series output interval parameters appended to files
+typedef struct {
+  PetscInt boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+} RDyTimeSeries;
+
 // all output parameters
 typedef struct {
-  RDyOutputFormat format;      // file format
-  PetscInt        frequency;   // frequency of output [steps]
-  PetscInt        batch_size;  // number of timesteps per output file (if available)
+  RDyOutputFormat format;       // file format
+  PetscInt        interval;     // output interval [steps between outputs]
+  PetscInt        batch_size;   // number of timesteps per output file (if available)
+  RDyTimeSeries   time_series;  // time series appended to text (.dat) files
 } RDyOutputSection;
 
 // ------------
