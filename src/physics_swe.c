@@ -229,6 +229,62 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedElemRestrictionDestroy(&restrict_l);
       CeedVectorDestroy(&geom);
     }
+
+    {
+      // source term
+      CeedQFunction qf;
+      CeedInt num_comp_geom = 2;
+      CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
+      CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
+      CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
+      CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
+
+      CeedElemRestriction restrict_c, restrict_geom;
+      CeedVector          geom;
+      {  // Create element restrictions for state
+        CeedInt *offset_c;
+        CeedScalar(*g)[num_comp_geom];
+        CeedInt num_cells = mesh->num_cells, num_owned_cells = mesh->num_cells_local;
+        CeedInt strides[] = {num_comp_geom, 1, num_comp_geom};
+
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_cells * num_comp_geom, strides, &restrict_geom);
+        CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
+        CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
+        PetscCall(PetscMalloc1(num_cells, &offset_c));
+        CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
+        for (CeedInt c = 0, oc = 0; c < num_cells; c++) {
+
+          if (!cells->is_local[c]) continue;
+
+          offset_c[oc] = c * num_comp;
+
+          g[oc][0] = cells->dz_dx[c];
+          g[oc][1] = cells->dz_dy[c];
+          oc++;
+        }
+        CeedVectorRestoreArray(geom, (CeedScalar **)&g);
+        CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_c,
+                                  &restrict_c);
+        PetscCall(PetscFree(offset_c));
+        if (0) CeedElemRestrictionView(restrict_c, stdout);
+      }
+
+      {
+        CeedOperator op;
+        CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
+        CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
+        CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+        CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+        CeedOperatorSetNumQuadraturePoints(op, 1);
+        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        CeedOperatorDestroy(&op);
+      }
+      CeedElemRestrictionDestroy(&restrict_geom);
+      CeedElemRestrictionDestroy(&restrict_c);
+      CeedVectorDestroy(&geom);
+
+    }
+
     if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
   }
   PetscFunctionReturn(0);
