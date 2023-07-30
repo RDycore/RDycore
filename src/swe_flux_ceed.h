@@ -165,7 +165,7 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   for (CeedInt i = 0; i < Q; i++) {
     // The contribution of bed slope is only added to momentum terms
     for (CeedInt j = 1; j < 3; j++) {
-      cell[j][i] = geom[j-1][i] * GRAVITY * q[0][i];
+      cell[j][i] = -geom[j-1][i] * GRAVITY * q[0][i];
     }
   }
   return 0;
