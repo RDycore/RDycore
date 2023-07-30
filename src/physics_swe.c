@@ -233,7 +233,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
     {
       // source term
       CeedQFunction qf;
-      CeedInt num_comp_geom = 2;
+      CeedInt       num_comp_geom = 2;
       CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
       CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
@@ -253,7 +253,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         PetscCall(PetscMalloc1(num_cells, &offset_c));
         CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
         for (CeedInt c = 0, oc = 0; c < num_cells; c++) {
-
           if (!cells->is_local[c]) continue;
 
           offset_c[oc] = c * num_comp;
@@ -282,7 +281,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedElemRestrictionDestroy(&restrict_geom);
       CeedElemRestrictionDestroy(&restrict_c);
       CeedVectorDestroy(&geom);
-
     }
 
     if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
