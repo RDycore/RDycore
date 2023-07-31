@@ -285,6 +285,39 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
 
     if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
   }
+
+  PetscInt num_sub_ops;
+  CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op, &num_sub_ops);
+  printf("num_sub_ops = %d\n",num_sub_ops);
+
+  CeedOperator *sub_ops;
+  CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op, &sub_ops);
+
+  for (PetscInt isub = 0; isub < num_sub_ops; isub++) {
+    printf(" isub = %d\n",isub);
+
+    CeedInt            num_input_fields, num_output_fields;
+    CeedOperatorField *input_fields, *output_fields;
+    char              *name;
+    CeedOperatorGetFields(sub_ops[isub], &num_input_fields, &input_fields, &num_output_fields, &output_fields);
+    printf("  num_input_fields = %d\n",num_input_fields);
+    for (PetscInt ifield = 0; ifield < num_input_fields; ifield++) {
+      CeedOperatorFieldGetName(input_fields[ifield], &name);
+      printf("    input_field[%d] = %s\n",ifield, name);
+
+      CeedContextFieldLabel label;
+      CeedOperatorGetContextFieldLabel(sub_ops[isub], name, &label);
+
+      /*
+      size_t             num_elements;
+      const PetscScalar *label_values;
+      CeedOperatorGetContextDoubleRead(sub_ops[isub], label, &num_elements, &label_values);
+      */
+    }
+
+
+  }
+
   PetscFunctionReturn(0);
 }
 
