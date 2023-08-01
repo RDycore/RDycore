@@ -15,7 +15,7 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(SWEState qL, SWEState qR, CeedScal
   const CeedScalar SQRT_GRAVITY = sqrt(GRAVITY);
   const CeedScalar tiny_h       = 1e-7;
   const CeedScalar hl = qL.h, hr = qR.h;
-  if (hl < tiny_h & hr < tiny_h) {
+  if (hl < tiny_h && hr < tiny_h) {
     for (PetscInt i = 0; i < 3; i++) flux[i] = 0.0;
     *amax = 0.0;
   } else {
