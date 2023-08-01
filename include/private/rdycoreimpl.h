@@ -147,6 +147,7 @@ struct _p_RDy {
 
   // source-sink vector
   Vec water_src;
+  PetscBool ceed_water_src_updated;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
