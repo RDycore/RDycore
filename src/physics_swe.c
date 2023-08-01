@@ -82,6 +82,9 @@ PetscErrorCode InitSWE(RDy rdy) {
 
 static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   PetscFunctionBeginUser;
+
+  PetscInt op_id = -1;
+
   if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op) {
     Ceed ceed;
     CeedInit(rdy->ceed_resource, &ceed);
@@ -151,6 +154,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorSetField(op, "cell_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        op_id++;
         CeedOperatorDestroy(&op);
       }
       CeedElemRestrictionDestroy(&restrict_geom);
@@ -223,6 +227,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorSetField(op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        op_id++;
         CeedOperatorDestroy(&op);
       }
       CeedElemRestrictionDestroy(&restrict_geom);
@@ -286,6 +291,8 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        op_id++;
+        rdy->ceed_water_src_op_id = op_id;
         CeedOperatorDestroy(&op);
       }
       CeedElemRestrictionDestroy(&restrict_geom);
@@ -313,7 +320,7 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op, &sub_ops);
 
-    PetscInt          source_op_id = 2;  //
+    PetscInt          source_op_id = rdy->ceed_water_src_op_id;
     CeedOperatorField water_src_field;
     CeedOperatorGetFieldByName(sub_ops[source_op_id], "water_src", &water_src_field);
     CeedVector water_src;
