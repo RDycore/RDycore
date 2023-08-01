@@ -254,7 +254,8 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
 
         CeedInt strides_water_src[] = {num_comp_water_src, 1, num_comp_water_src};
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_cells * num_comp_water_src, strides_water_src, &restrict_water_src);
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_cells * num_comp_water_src, strides_water_src,
+                                         &restrict_water_src);
         CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
         CeedVectorSetValue(water_src, 0.0);  // initialize to ensure the arrays is allocated
 
@@ -306,16 +307,15 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
   PetscFunctionBeginUser;
 
   if (!rdy->ceed_water_src_updated) {
-
     PetscInt num_sub_ops;
     CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op, &num_sub_ops);
 
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op, &sub_ops);
 
-    PetscInt source_op_id = 2;
+    PetscInt          source_op_id = 2;  //
     CeedOperatorField water_src_field;
-    CeedOperatorGetFieldByName(sub_ops[source_op_id],"water_src",&water_src_field);
+    CeedOperatorGetFieldByName(sub_ops[source_op_id], "water_src", &water_src_field);
     CeedVector water_src;
     CeedOperatorFieldGetVector(water_src_field, &water_src);
 
@@ -328,7 +328,7 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
     for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
       wat_src_ceed[i][0] = wat_src_p[i];
     }
-  
+
     CeedVectorRestoreArray(water_src, (CeedScalar **)&wat_src_ceed);
     PetscCall(VecRestoreArray(rdy->water_src, &wat_src_p));
 

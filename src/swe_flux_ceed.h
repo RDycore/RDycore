@@ -164,7 +164,6 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
   for (CeedInt i = 0; i < Q; i++) {
-
     cell[0][i] = water_src[0][i];
 
     // The contribution of bed slope is only added to momentum terms
