@@ -233,23 +233,31 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
     {
       // source term
       CeedQFunction qf;
-      CeedInt       num_comp_geom = 2;
+      CeedInt       num_comp_geom = 2, num_comp_water_src = 1;
       CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
       CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
+      CeedQFunctionAddInput(qf, "water_src", num_comp_water_src, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
 
-      CeedElemRestriction restrict_c, restrict_geom;
+      CeedElemRestriction restrict_c, restrict_geom, restrict_water_src;
       CeedVector          geom;
+      CeedVector          water_src;
       {  // Create element restrictions for state
         CeedInt *offset_c;
         CeedScalar(*g)[num_comp_geom];
         CeedInt num_cells = mesh->num_cells, num_owned_cells = mesh->num_cells_local;
-        CeedInt strides[] = {num_comp_geom, 1, num_comp_geom};
 
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_cells * num_comp_geom, strides, &restrict_geom);
+        CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_cells * num_comp_geom, strides_geom, &restrict_geom);
         CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
         CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
+
+        CeedInt strides_water_src[] = {num_comp_water_src, 1, num_comp_water_src};
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_cells * num_comp_water_src, strides_water_src, &restrict_water_src);
+        CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
+        CeedVectorSetValue(water_src, 0.0);  // initialize to ensure the arrays is allocated
+
         PetscCall(PetscMalloc1(num_cells, &offset_c));
         CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
         for (CeedInt c = 0, oc = 0; c < num_cells; c++) {
@@ -272,6 +280,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperator op;
         CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
         CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
+        CeedOperatorSetField(op, "water_src", restrict_water_src, CEED_BASIS_COLLOCATED, water_src);
         CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
@@ -286,36 +295,44 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
     if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
   }
 
-  PetscInt num_sub_ops;
-  CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op, &num_sub_ops);
-  printf("num_sub_ops = %d\n",num_sub_ops);
+  PetscFunctionReturn(0);
+}
 
-  CeedOperator *sub_ops;
-  CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op, &sub_ops);
+/// If the source term was updated, copy new values for libCEED
+/// @param [inout] rdy A RDy struc
+///
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
+  PetscFunctionBeginUser;
 
-  for (PetscInt isub = 0; isub < num_sub_ops; isub++) {
-    printf(" isub = %d\n",isub);
+  if (!rdy->ceed_water_src_updated) {
 
-    CeedInt            num_input_fields, num_output_fields;
-    CeedOperatorField *input_fields, *output_fields;
-    char              *name;
-    CeedOperatorGetFields(sub_ops[isub], &num_input_fields, &input_fields, &num_output_fields, &output_fields);
-    printf("  num_input_fields = %d\n",num_input_fields);
-    for (PetscInt ifield = 0; ifield < num_input_fields; ifield++) {
-      CeedOperatorFieldGetName(input_fields[ifield], &name);
-      printf("    input_field[%d] = %s\n",ifield, name);
+    PetscInt num_sub_ops;
+    CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op, &num_sub_ops);
 
-      CeedContextFieldLabel label;
-      CeedOperatorGetContextFieldLabel(sub_ops[isub], name, &label);
+    CeedOperator *sub_ops;
+    CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op, &sub_ops);
 
-      /*
-      size_t             num_elements;
-      const PetscScalar *label_values;
-      CeedOperatorGetContextDoubleRead(sub_ops[isub], label, &num_elements, &label_values);
-      */
+    PetscInt source_op_id = 2;
+    CeedOperatorField water_src_field;
+    CeedOperatorGetFieldByName(sub_ops[source_op_id],"water_src",&water_src_field);
+    CeedVector water_src;
+    CeedOperatorFieldGetVector(water_src_field, &water_src);
+
+    PetscInt num_comp_water_src = 1;
+    CeedScalar(*wat_src_ceed)[num_comp_water_src];
+    CeedVectorGetArray(water_src, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
+    PetscScalar *wat_src_p;
+    PetscCall(VecGetArray(rdy->water_src, &wat_src_p));
+
+    for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+      wat_src_ceed[i][0] = wat_src_p[i];
     }
+  
+    CeedVectorRestoreArray(water_src, (CeedScalar **)&wat_src_ceed);
+    PetscCall(VecRestoreArray(rdy->water_src, &wat_src_p));
 
-
+    rdy->ceed_water_src_updated = PETSC_TRUE;
   }
 
   PetscFunctionReturn(0);
@@ -329,6 +346,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   Vec          F_local;
   PetscFunctionBeginUser;
   PetscCall(RDyCeedOperatorSetUp(rdy));
+  PetscCall(RDyCeedUpdateSourceTerm(rdy));
   CeedVector u_ceed = rdy->ceed_rhs.x_ceed;
   CeedVector f_ceed = rdy->ceed_rhs.y_ceed;
   PetscCall(DMGetLocalVector(rdy->dm, &F_local));

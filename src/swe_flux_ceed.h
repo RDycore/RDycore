@@ -158,11 +158,15 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
 }
 
 CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  const CeedScalar GRAVITY            = 9.806;
-  const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
-  const CeedScalar(*q)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  CeedScalar(*cell)[CEED_Q_VLA]       = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const CeedScalar GRAVITY                 = 9.806;
+  const CeedScalar(*geom)[CEED_Q_VLA]      = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
+  const CeedScalar(*water_src)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // rain rate
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
   for (CeedInt i = 0; i < Q; i++) {
+
+    cell[0][i] = water_src[0][i];
+
     // The contribution of bed slope is only added to momentum terms
     for (CeedInt j = 1; j < 3; j++) {
       cell[j][i] = -geom[j - 1][i] * GRAVITY * q[0][i];
