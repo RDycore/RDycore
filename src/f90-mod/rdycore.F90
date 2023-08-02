@@ -80,7 +80,7 @@ module rdycore
     integer(c_int) function rdysetcouplinginterval_(rdy, interval) bind(c, name="RDySetCouplingInterval")
       use iso_c_binding, only: c_int, c_ptr, c_double
       type(c_ptr),    value, intent(in) :: rdy
-      real(c_double),        intent(in) :: interval
+      real(c_double), value, intent(in) :: interval
     end function
 
     integer(c_int) function rdygetheight_(rdy, h) bind(c, name="RDyGetHeight")
