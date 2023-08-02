@@ -77,6 +77,12 @@ module rdycore
       real(c_double),        intent(out) :: interval
     end function
 
+    integer(c_int) function rdysetcouplinginterval_(rdy, interval) bind(c, name="RDySetCouplingInterval")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in) :: rdy
+      real(c_double), value, intent(in) :: interval
+    end function
+
     integer(c_int) function rdygetheight_(rdy, h) bind(c, name="RDyGetHeight")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
@@ -185,6 +191,13 @@ contains
     real(RDyDouble), intent(out)   :: interval
     integer,         intent(out)   :: ierr
     ierr = rdygetcouplinginterval_(rdy_%c_rdy, interval)
+  end subroutine
+
+  subroutine RDySetCouplingInterval(rdy_, interval, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(in)    :: interval
+    integer,         intent(out)   :: ierr
+    ierr = rdysetcouplinginterval_(rdy_%c_rdy, interval)
   end subroutine
 
   subroutine RDyGetStep(rdy_, step, ierr)

@@ -42,6 +42,8 @@ int main(int argc, char *argv[]) {
     PetscReal prev_time, coupling_interval;
     RDyGetTime(rdy, &prev_time);
     RDyGetCouplingInterval(rdy, &coupling_interval);
+    RDySetCouplingInterval(rdy, coupling_interval);
+
     while (!RDyFinished(rdy)) { // returns true based on stopping criteria
 
       // apply a 1 mm/hr rain over the entire domain

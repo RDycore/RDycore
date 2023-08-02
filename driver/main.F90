@@ -45,6 +45,8 @@ program rdycore_f90
       ! config file
       PetscCallA(RDyGetTime(rdy_, prev_time, ierr))
       PetscCallA(RDyGetCouplingInterval(rdy_, coupling_interval, ierr))
+      PetscCallA(RDySetCouplingInterval(rdy_, coupling_interval, ierr))
+
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
 
         ! apply a 1 mm/hr rain over the entire domain 
