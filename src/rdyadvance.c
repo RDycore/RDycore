@@ -231,6 +231,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
   PetscReal interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
   PetscCall(TSSetMaxTime(rdy->ts, time + interval));
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
 
@@ -253,17 +254,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
 
-  // Are we finished?
+  // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
   PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
   if (time >= final_time) {
-    // if we've overstepped the final time, interpolate backward
-    if (time > final_time) {
-      PetscCall(TSInterpolate(rdy->ts, final_time, rdy->X));
-      PetscCall(TSSetTime(rdy->ts, final_time));
-      PetscCall(TSMonitor(rdy->ts, -1, final_time, rdy->X));
-    }
-
     // clean up
     PetscCall(DestroyOutputViewer(rdy));
   }

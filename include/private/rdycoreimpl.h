@@ -42,6 +42,8 @@ typedef struct {
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {
+  // last step for which time series data was written
+  PetscInt last_step;
   // fluxes on boundary edges
   struct {
     // numbers of local and global boundary edges on which fluxes are computed
