@@ -43,7 +43,8 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 // Initializes time series data storage.
 PetscErrorCode InitTimeSeries(RDy rdy) {
   PetscFunctionBegin;
-  rdy->time_series = (RDyTimeSeriesData){0};
+  rdy->time_series           = (RDyTimeSeriesData){0};
+  rdy->time_series.last_step = -1;
   if (rdy->config.output.time_series.boundary_fluxes > 0) {
     InitBoundaryFluxes(rdy);
     PetscCall(TSMonitorSet(rdy->ts, WriteTimeSeries, rdy, NULL));
@@ -145,16 +146,19 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     PetscReal global_flux_data[num_data * num_global_edges];
     MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0, rdy->comm);
 
-    // write the data to the end of the boundary fluxes file
+    // append the data to the boundary fluxes file (or, if this is our first
+    // step, overwrite the existing file)
     char dir[PETSC_MAX_PATH_LEN];
     PetscCall(GetOutputDir(rdy, dir));
     char path[PETSC_MAX_PATH_LEN];
     snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/boundary_fluxes.dat", dir);
-    FILE *fp;
-    PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));  // append to end of file
-    if (step == 0) {                                   // write a header on the first step
+    FILE *fp = NULL;
+    if (step == 0) {  // write a header on the first step
+      PetscCall(PetscFOpen(rdy->comm, path, "w", &fp));
       PetscCall(PetscFPrintf(rdy->comm, fp,
                              "#time\tedge_id\tboundary_id\tbc_type\twater_mass_flux\tx_momentum_flux\ty_momentum_flux\tnormal_x\tnormal_y\t\n"));
+    } else {
+      PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));
     }
     for (PetscInt e = 0; e < num_global_edges; ++e) {
       PetscInt  global_edge_id = global_flux_md[num_md * e];
@@ -189,8 +193,10 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   PetscFunctionBegin;
 
   RDy rdy = ctx;
-  if (rdy->time_series.boundary_fluxes.fluxes && (step % rdy->config.output.time_series.boundary_fluxes == 0)) {
+  if (rdy->time_series.boundary_fluxes.fluxes && (step % rdy->config.output.time_series.boundary_fluxes == 0) &&
+      (step > rdy->time_series.last_step)) {
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
+    rdy->time_series.last_step = step;
   }
 
   PetscFunctionReturn(0);
