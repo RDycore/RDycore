@@ -408,7 +408,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     PetscCall(VecView(F_local,viewer));
     PetscCall(PetscViewerDestroy(&viewer));
 
-    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F.bin", FILE_MODE_WRITE, &viewer));
+    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_ceed_0.bin", FILE_MODE_WRITE, &viewer));
     PetscCall(VecView(F,viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   }
@@ -444,7 +444,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
 
     PetscCall(PetscLogGpuTimeBegin());
-    CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+    CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, s_ceed, CEED_REQUEST_IMMEDIATE);
     PetscCall(PetscLogGpuTimeEnd());
 
     CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
@@ -456,6 +456,12 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
 
   }
 
+  {
+    PetscViewer viewer;
+    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_ceed_1.bin", FILE_MODE_WRITE, &viewer));
+    PetscCall(VecView(F,viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -492,6 +498,11 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
     PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
     PetscCall(AddSourceTerm(rdy, F));  // TODO: move source term to use libCEED
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_petsc.bin", FILE_MODE_WRITE, &viewer));
+    PetscCall(VecView(F,viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
   }
 
   // write out debugging info for maximum courant number
