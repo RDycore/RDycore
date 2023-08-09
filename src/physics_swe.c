@@ -252,21 +252,24 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
     {
       // source term
       CeedQFunction qf;
-      CeedInt       num_comp_geom = 2, num_comp_water_src = 1;
+      CeedInt       num_comp_geom = 2, num_comp_water_src = 1, num_comp_mannings_n = 1;
       CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
       CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "water_src", num_comp_water_src, CEED_EVAL_NONE);
+      CeedQFunctionAddInput(qf, "mannings_n", num_comp_mannings_n, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
 
-      CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_riemannf;
+      CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_mannings_n, restrict_riemannf;
       CeedVector          geom;
       CeedVector          water_src;
+      CeedVector          mannings_n;
       CeedVector          riemannf;
       {  // Create element restrictions for state
         CeedInt *offset_c;
         CeedScalar(*g)[num_comp_geom];
+        CeedScalar(*n)[num_comp_mannings_n];
         CeedInt num_owned_cells = mesh->num_cells_local;
 
         CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
@@ -280,6 +283,11 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
         CeedVectorSetValue(water_src, 0.0);  // initialize to ensure the arrays is allocated
 
+        CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n, strides_mannings_n, &restrict_mannings_n);
+        CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL);
+        CeedVectorSetValue(mannings_n, 0.0);  // initialize to ensure the arrays is allocated
+
         CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
         CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf,
                                          &restrict_riemannf);
@@ -288,6 +296,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
 
         PetscCall(PetscMalloc1(num_owned_cells, &offset_c));
         CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
+        CeedVectorGetArray(mannings_n, CEED_MEM_HOST, (CeedScalar **)&n);
         for (CeedInt c = 0, oc = 0; c < mesh->num_cells; c++) {
           if (!cells->is_local[c]) continue;
 
@@ -295,9 +304,13 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
 
           g[oc][0] = cells->dz_dx[c];
           g[oc][1] = cells->dz_dy[c];
+
+          n[oc][0] = rdy->materials_by_cell[c].manning;
+
           oc++;
         }
         CeedVectorRestoreArray(geom, (CeedScalar **)&g);
+        CeedVectorRestoreArray(mannings_n, (CeedScalar **)&n);
         CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_c,
                                   &restrict_c);
         PetscCall(PetscFree(offset_c));
@@ -309,6 +322,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
         CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
         CeedOperatorSetField(op, "water_src", restrict_water_src, CEED_BASIS_COLLOCATED, water_src);
+        CeedOperatorSetField(op, "mannings_n", restrict_water_src, CEED_BASIS_COLLOCATED, mannings_n);
         CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
         CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
@@ -319,6 +333,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorDestroy(&op);
       }
       CeedElemRestrictionDestroy(&restrict_geom);
+      CeedElemRestrictionDestroy(&restrict_mannings_n);
       CeedElemRestrictionDestroy(&restrict_c);
       CeedVectorDestroy(&geom);
     }
