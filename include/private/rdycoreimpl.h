@@ -166,7 +166,8 @@ struct _p_RDy {
   // RHS operator (optional)
   struct {
     CeedOperator op;
-    CeedVector   x_ceed, y_ceed;
+    CeedOperator op_src;
+    CeedVector   x_ceed, y_ceed, s_ceed;
   } ceed_rhs;
 };
 

@@ -233,7 +233,21 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedElemRestrictionDestroy(&restrict_geom);
       CeedElemRestrictionDestroy(&restrict_l);
       CeedVectorDestroy(&geom);
+
     }
+
+    if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
+  }
+
+  op_id = -1;
+  if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op_src) {
+    Ceed ceed;
+    CeedInit(rdy->ceed_resource, &ceed);
+    CeedCompositeOperatorCreate(ceed, &rdy->ceed_rhs.op_src);
+    CeedInt   num_comp = 3;
+    RDyMesh  *mesh     = &rdy->mesh;
+    RDyCells *cells    = &mesh->cells;
+    RDyEdges *edges    = &mesh->edges;
 
     {
       // source term
@@ -242,31 +256,39 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
       CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "water_src", num_comp_water_src, CEED_EVAL_NONE);
+      CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
 
-      CeedElemRestriction restrict_c, restrict_geom, restrict_water_src;
+      CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_riemannf;
       CeedVector          geom;
       CeedVector          water_src;
+      CeedVector          riemannf;
       {  // Create element restrictions for state
         CeedInt *offset_c;
         CeedScalar(*g)[num_comp_geom];
-        CeedInt num_cells = mesh->num_cells, num_owned_cells = mesh->num_cells_local;
+        CeedInt num_owned_cells = mesh->num_cells_local;
 
         CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_cells * num_comp_geom, strides_geom, &restrict_geom);
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_owned_cells * num_comp_geom, strides_geom, &restrict_geom);
         CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
         CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
 
         CeedInt strides_water_src[] = {num_comp_water_src, 1, num_comp_water_src};
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_cells * num_comp_water_src, strides_water_src,
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_owned_cells * num_comp_water_src, strides_water_src,
                                          &restrict_water_src);
         CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
         CeedVectorSetValue(water_src, 0.0);  // initialize to ensure the arrays is allocated
 
-        PetscCall(PetscMalloc1(num_cells, &offset_c));
+        CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf,
+                                         &restrict_riemannf);
+        CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL);
+        CeedVectorSetValue(riemannf, 0.0);  // initialize to ensure the arrays is allocated
+
+        PetscCall(PetscMalloc1(num_owned_cells, &offset_c));
         CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
-        for (CeedInt c = 0, oc = 0; c < num_cells; c++) {
+        for (CeedInt c = 0, oc = 0; c < mesh->num_cells; c++) {
           if (!cells->is_local[c]) continue;
 
           offset_c[oc] = c * num_comp;
@@ -276,7 +298,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
           oc++;
         }
         CeedVectorRestoreArray(geom, (CeedScalar **)&g);
-        CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_c,
+        CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_c,
                                   &restrict_c);
         PetscCall(PetscFree(offset_c));
         if (0) CeedElemRestrictionView(restrict_c, stdout);
@@ -287,10 +309,11 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
         CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
         CeedOperatorSetField(op, "water_src", restrict_water_src, CEED_BASIS_COLLOCATED, water_src);
+        CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
         CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
-        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_src, op);
         op_id++;
         rdy->ceed_water_src_op_id = op_id;
         CeedOperatorDestroy(&op);
@@ -300,9 +323,10 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedVectorDestroy(&geom);
     }
 
-    if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
-  }
+    CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed);
 
+    if (1) CeedOperatorView(rdy->ceed_rhs.op_src, stdout);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -315,10 +339,10 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
 
   if (!rdy->ceed_water_src_updated) {
     PetscInt num_sub_ops;
-    CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op, &num_sub_ops);
+    CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op_src, &num_sub_ops);
 
     CeedOperator *sub_ops;
-    CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op, &sub_ops);
+    CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
 
     PetscInt          source_op_id = rdy->ceed_water_src_op_id;
     CeedOperatorField water_src_field;
@@ -374,7 +398,65 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   PetscCall(VecRestoreArrayAndMemType(F_local, &f));
   PetscCall(VecZeroEntries(F));
   PetscCall(DMLocalToGlobal(rdy->dm, F_local, ADD_VALUES, F));
+  {
+    PetscViewer viewer;
+    if (rdy->rank == 0) {
+      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, "F_local0.bin", FILE_MODE_WRITE, &viewer));
+    } else {
+      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, "F_local1.bin", FILE_MODE_WRITE, &viewer));
+    }
+    PetscCall(VecView(F_local,viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+
+    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F.bin", FILE_MODE_WRITE, &viewer));
+    PetscCall(VecView(F,viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
   PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
+
+  {
+    CeedOperator *sub_ops;
+    CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
+
+    PetscInt          source_op_id = rdy->ceed_water_src_op_id;
+
+    CeedOperatorField riemannf_field;
+    CeedOperatorGetFieldByName(sub_ops[source_op_id], "riemannf", &riemannf_field);
+
+    CeedVector riemannf_ceed;
+    CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed);
+
+    PetscScalar *u, *f, *f_dup;
+    PetscMemType mem_type;
+    CeedVector   u_ceed = rdy->ceed_rhs.x_ceed;
+    CeedVector   s_ceed = rdy->ceed_rhs.s_ceed;
+
+    PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
+    CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u);
+
+    Vec F_dup;
+    PetscCall(VecDuplicate(F, &F_dup));
+    PetscCall(VecCopy(F, F_dup));
+    PetscCall(VecGetArrayAndMemType(F_dup, &f_dup, &mem_type));
+    CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f_dup);
+
+    PetscCall(VecGetArrayAndMemType(F, &f, &mem_type));
+    CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
+
+    PetscCall(PetscLogGpuTimeBegin());
+    CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+    PetscCall(PetscLogGpuTimeEnd());
+
+    CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
+    PetscCall(VecRestoreArrayAndMemType(U_local, &u));
+    CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &f_dup);
+    CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f);
+    PetscCall(VecRestoreArrayAndMemType(F, &f));
+    PetscCall(VecDestroy(&F_dup));
+
+  }
+
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
