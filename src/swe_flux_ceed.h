@@ -108,7 +108,6 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   PetscInt nproc, myrank;
   MPI_Comm_rank(PETSC_COMM_WORLD, &myrank);
   MPI_Comm_size(PETSC_COMM_WORLD, &nproc);  
-//  if (!myrank) printf("rank = %d; Q = %d\n",myrank,Q);
 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
@@ -116,8 +115,8 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
     CeedScalar flux[3], amax;
     SWERiemannFlux_Roe(qL, qR, geom[0][i], geom[1][i], flux, &amax);
     for (CeedInt j = 0; j < 3; j++) {
-      cell_L[j][i] = geom[2][i] * flux[j];
-      cell_R[j][i] = geom[3][i] * flux[j];
+      cell_L[j][i] = flux[j] * geom[2][i];
+      cell_R[j][i] = flux[j] * geom[3][i];
     }
   }
   return 0;
@@ -136,7 +135,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
     CeedScalar flux[3], amax;
     SWERiemannFlux_Roe(qL, qR, sn, cn, flux, &amax);
     for (CeedInt j = 0; j < 3; j++) {
-      cell_L[j][i] = geom[2][i] * flux[j];
+      cell_L[j][i] = flux[j] * geom[2][i];
     }
   }
   return 0;
@@ -157,7 +156,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
     CeedScalar flux[3], amax;
     SWERiemannFlux_Roe(qL, qR, sn, cn, flux, &amax);
     for (CeedInt j = 0; j < 3; j++) {
-      cell_L[j][i] = geom[2][i] * flux[j];
+      cell_L[j][i] = flux[j] * geom[2][i];
     }
   }
   return 0;
@@ -171,13 +170,48 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[3];
   CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
 
-  for (CeedInt i = 0; i < Q; i++) {
-    cell[0][i] = water_src[0][i];
+  const CeedScalar tiny_h       = 1e-7;
 
-    // The contribution of bed slope is only added to momentum terms
-    for (CeedInt j = 1; j < 3; j++) {
-      cell[j][i] = -geom[j - 1][i] * GRAVITY * q[0][i];
+  for (CeedInt i = 0; i < Q; i++) {
+
+    SWEState state = {q[0][i], q[1][i], q[2][i]};
+    const CeedScalar h = state.h;
+    const CeedScalar hu = state.hu;
+    const CeedScalar hv = state.hv;
+
+    const CeedScalar u = SafeDiv(state.hu, h, tiny_h);
+    const CeedScalar v = SafeDiv(state.hv, h, tiny_h);
+
+    const CeedScalar dz_dx = geom[0][i];
+    const CeedScalar dz_dy = geom[1][i];
+
+    const CeedScalar bedx = dz_dx * GRAVITY * h;
+    const CeedScalar bedy = dz_dy * GRAVITY * h;
+
+    const CeedScalar Fsum_x = riemannf[1][i];
+    const CeedScalar Fsum_y = riemannf[2][i];
+
+    CeedScalar tbx = 0.0, tby = 0.0;
+    if (h > tiny_h) {
+      const CeedScalar manning = 0.015;
+
+      const CeedScalar Cd = GRAVITY * Square (manning) * pow (h, -1.0/3.0);
+
+      const CeedScalar velocity = sqrt(Square(u) + Square (v));
+
+      const CeedScalar tb = Cd * velocity / h;
+
+      const CeedScalar dt = 0.02;
+      const CeedScalar factor = tb / (1.0 + h);
+
+      tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
+      tby = (hv + dt * Fsum_y - dt * bedy) * factor;
     }
+
+    cell[0][i] = riemannf[0][i] + water_src[0][i];
+    cell[1][i] = riemannf[1][i] - bedx - tbx;
+    cell[2][i] = riemannf[2][i] - bedy - tby;
+
   }
   return 0;
 }
