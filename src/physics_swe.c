@@ -130,6 +130,11 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedQFunctionAddOutput(qf, "cell_left", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell_right", num_comp, CEED_EVAL_NONE);
 
+      CeedQFunctionContext qf_context;
+      CreateQFunctionContextForSWE(rdy, ceed, &qf_context);
+      if (0) CeedQFunctionContextView(qf_context, stdout);
+      CeedQFunctionSetContext(qf, qf_context);
+
       CeedElemRestriction restrict_l, restrict_r, restrict_geom;
       CeedVector          geom;
       {  // Create element restrictions for state
@@ -211,6 +216,11 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
       CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell_left", num_comp, CEED_EVAL_NONE);
+
+      CeedQFunctionContext qf_context;
+      CreateQFunctionContextForSWE(rdy, ceed, &qf_context);
+      if (0) CeedQFunctionContextView(qf_context, stdout);
+      CeedQFunctionSetContext(qf, qf_context);
 
       CeedElemRestriction restrict_l, restrict_geom;
       CeedVector          geom;
