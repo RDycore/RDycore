@@ -87,10 +87,9 @@ int FreeContextPetsc(void *data) {
 }
 
 static PetscErrorCode CreateQFunctionContextForSWE(RDy rdy, Ceed ceed, CeedQFunctionContext *qf_context) {
-
   PetscFunctionBeginUser;
 
-  SWEContext           swe_ctx;
+  SWEContext swe_ctx;
   PetscCall(PetscCalloc1(1, &swe_ctx));
 
   swe_ctx->dtime   = 0.0;
@@ -101,7 +100,8 @@ static PetscErrorCode CreateQFunctionContextForSWE(RDy rdy, Ceed ceed, CeedQFunc
   CeedQFunctionContextSetData(*qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx);
   CeedQFunctionContextSetDataDestroy(*qf_context, CEED_MEM_HOST, FreeContextPetsc);
   CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct SWEContext_, dtime), 1, "Time step of TS");
-  CeedQFunctionContextRegisterDouble(*qf_context, "samll h value", offsetof(struct SWEContext_, tiny_h), 1, "Height threshold below which dry condition is assumed");
+  CeedQFunctionContextRegisterDouble(*qf_context, "samll h value", offsetof(struct SWEContext_, tiny_h), 1,
+                                     "Height threshold below which dry condition is assumed");
   CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SWEContext_, gravity), 1, "Accelaration due to gravity");
 
   PetscFunctionReturn(0);

@@ -11,7 +11,8 @@ struct SWEState_ {
 };
 typedef struct SWEState_ SWEState;
 
-CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SWEState qL, SWEState qR, CeedScalar sn, CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
+CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SWEState qL, SWEState qR, CeedScalar sn,
+                                              CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar sqrt_gravity = sqrt(gravity);
   const CeedScalar hl = qL.h, hr = qR.h;
 
@@ -130,7 +131,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
 
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
-    SWEState   qL   = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar dum1 = sn * sn - cn * cn;
       CeedScalar dum2 = 2.0 * sn * cn;
@@ -146,7 +147,6 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
 }
 
 CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  //const CeedScalar gravity            = 9.806;
   const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[0];
