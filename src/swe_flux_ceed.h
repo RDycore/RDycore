@@ -1,8 +1,8 @@
 #ifndef swe_flux_ceed_h
 #define swe_flux_ceed_h
 
-#include <private/rdycoreimpl.h>
 #include <ceed/types.h>
+#include <private/rdycoreimpl.h>
 
 #define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
 
@@ -108,7 +108,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
 
   PetscInt nproc, myrank;
   MPI_Comm_rank(PETSC_COMM_WORLD, &myrank);
-  MPI_Comm_size(PETSC_COMM_WORLD, &nproc);  
+  MPI_Comm_size(PETSC_COMM_WORLD, &nproc);
 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
@@ -173,16 +173,15 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   const SWEContext context                  = (SWEContext)ctx;
 
-  const CeedScalar tiny_h       = 1e-7;
+  const CeedScalar tiny_h = 1e-7;
 
-  const CeedScalar dt       = context->dtime;
+  const CeedScalar dt = context->dtime;
 
   for (CeedInt i = 0; i < Q; i++) {
-
-    SWEState state = {q[0][i], q[1][i], q[2][i]};
-    const CeedScalar h = state.h;
-    const CeedScalar hu = state.hu;
-    const CeedScalar hv = state.hv;
+    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    const CeedScalar h     = state.h;
+    const CeedScalar hu    = state.hu;
+    const CeedScalar hv    = state.hv;
 
     const CeedScalar u = SafeDiv(state.hu, h, tiny_h);
     const CeedScalar v = SafeDiv(state.hv, h, tiny_h);
@@ -198,9 +197,9 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
 
     CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
-      const CeedScalar Cd = GRAVITY * Square (mannings_n[0][i]) * pow (h, -1.0/3.0);
+      const CeedScalar Cd = GRAVITY * Square(mannings_n[0][i]) * pow(h, -1.0 / 3.0);
 
-      const CeedScalar velocity = sqrt(Square(u) + Square (v));
+      const CeedScalar velocity = sqrt(Square(u) + Square(v));
 
       const CeedScalar tb = Cd * velocity / h;
 
@@ -213,7 +212,6 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
     cell[0][i] = riemannf[0][i] + water_src[0][i];
     cell[1][i] = riemannf[1][i] - bedx - tbx;
     cell[2][i] = riemannf[2][i] - bedy - tby;
-
   }
   return 0;
 }

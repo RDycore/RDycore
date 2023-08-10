@@ -239,7 +239,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedElemRestrictionDestroy(&restrict_geom);
       CeedElemRestrictionDestroy(&restrict_l);
       CeedVectorDestroy(&geom);
-
     }
 
     if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
@@ -267,11 +266,11 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
 
-      SWEContext            swe_ctx;
+      SWEContext           swe_ctx;
       CeedQFunctionContext qf_context;
       PetscCall(PetscCalloc1(1, &swe_ctx));
 
-      swe_ctx->dtime        = 0.0;
+      swe_ctx->dtime = 0.0;
 
       CeedQFunctionContextCreate(ceed, &qf_context);
       CeedQFunctionContextSetData(qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx);
@@ -303,13 +302,13 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedVectorSetValue(water_src, 0.0);  // initialize to ensure the arrays is allocated
 
         CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n, strides_mannings_n, &restrict_mannings_n);
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n, strides_mannings_n,
+                                         &restrict_mannings_n);
         CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL);
         CeedVectorSetValue(mannings_n, 0.0);  // initialize to ensure the arrays is allocated
 
         CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf,
-                                         &restrict_riemannf);
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf, &restrict_riemannf);
         CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL);
         CeedVectorSetValue(riemannf, 0.0);  // initialize to ensure the arrays is allocated
 
@@ -363,21 +362,20 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   }
 
   if (rdy->ceed_resource[0]) {
-    size_t             num_elements;
-    const PetscScalar *label_values;
+    size_t                num_elements;
+    const PetscScalar    *label_values;
     CeedContextFieldLabel label;
-    PetscScalar label_value;
+    PetscScalar           label_value;
 
     CeedInt result;
     result = CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
     CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &rdy->dt);
 
     CeedOperatorGetContextDoubleRead(rdy->ceed_rhs.op_src, label, &num_elements, &label_values);
-    PetscCheck(num_elements == 1, PETSC_COMM_WORLD, PETSC_ERR_SUP, "%s does not support labels with more than 1 value. Label has %zu values", __func__,
-               num_elements);
+    PetscCheck(num_elements == 1, PETSC_COMM_WORLD, PETSC_ERR_SUP, "%s does not support labels with more than 1 value. Label has %zu values",
+               __func__, num_elements);
     label_value = *label_values;
     CeedOperatorRestoreContextDoubleRead(rdy->ceed_rhs.op_src, label, &label_values);
-
   }
 
   PetscFunctionReturn(0);
@@ -458,11 +456,11 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     } else {
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, "F_local1.bin", FILE_MODE_WRITE, &viewer));
     }
-    PetscCall(VecView(F_local,viewer));
+    PetscCall(VecView(F_local, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
 
     PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_ceed_0.bin", FILE_MODE_WRITE, &viewer));
-    PetscCall(VecView(F,viewer));
+    PetscCall(VecView(F, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   }
   PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
@@ -471,7 +469,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
 
-    PetscInt          source_op_id = rdy->ceed_water_src_op_id;
+    PetscInt source_op_id = rdy->ceed_water_src_op_id;
 
     CeedOperatorField riemannf_field;
     CeedOperatorGetFieldByName(sub_ops[source_op_id], "riemannf", &riemannf_field);
@@ -506,13 +504,12 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f);
     PetscCall(VecRestoreArrayAndMemType(F, &f));
     PetscCall(VecDestroy(&F_dup));
-
   }
 
   {
     PetscViewer viewer;
     PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_ceed_1.bin", FILE_MODE_WRITE, &viewer));
-    PetscCall(VecView(F,viewer));
+    PetscCall(VecView(F, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   }
 
@@ -557,7 +554,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
     PetscViewer viewer;
     PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_petsc.bin", FILE_MODE_WRITE, &viewer));
-    PetscCall(VecView(F,viewer));
+    PetscCall(VecView(F, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   }
 
