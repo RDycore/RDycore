@@ -458,7 +458,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     Vec          F_local;
 
     CeedVector u_local_ceed = rdy->ceed_rhs.u_local_ceed;
-    CeedVector f_ceed = rdy->ceed_rhs.f_ceed;
+    CeedVector f_ceed       = rdy->ceed_rhs.f_ceed;
 
     PetscCall(VecGetArrayAndMemType(U_local, &u_local, &mem_type));
     CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local);
