@@ -473,20 +473,6 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
   PetscCall(VecRestoreArrayAndMemType(F_local, &f));
   PetscCall(VecZeroEntries(F));
   PetscCall(DMLocalToGlobal(rdy->dm, F_local, ADD_VALUES, F));
-  {
-    PetscViewer viewer;
-    if (rdy->rank == 0) {
-      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, "F_local0.bin", FILE_MODE_WRITE, &viewer));
-    } else {
-      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, "F_local1.bin", FILE_MODE_WRITE, &viewer));
-    }
-    PetscCall(VecView(F_local, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-
-    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_ceed_0.bin", FILE_MODE_WRITE, &viewer));
-    PetscCall(VecView(F, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-  }
   PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
 
   {
@@ -530,13 +516,6 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     PetscCall(VecDestroy(&F_dup));
   }
 
-  {
-    PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_ceed_1.bin", FILE_MODE_WRITE, &viewer));
-    PetscCall(VecView(F, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-  }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -569,6 +548,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       .global_edge_id  = -1,
       .global_cell_id  = -1,
   };
+
   if (rdy->ceed_resource[0]) {
     PetscCall(VecCopy(X, rdy->Soln));
     PetscCall(RDyCeedOperatorApply(rdy, rdy->X_local, F));
@@ -576,11 +556,6 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
     PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
     PetscCall(AddSourceTerm(rdy, F));  // TODO: move source term to use libCEED
-
-    PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, "F_petsc.bin", FILE_MODE_WRITE, &viewer));
-    PetscCall(VecView(F, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
   }
 
   // write out debugging info for maximum courant number
