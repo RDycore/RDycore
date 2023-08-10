@@ -43,7 +43,6 @@ endforeach()
 # four_mounds_60x24
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/four_mounds_60x24.yaml
-      ${CMAKE_CURRENT_SOURCE_DIR}/four_mounds_60x24_no_friction.yaml
       ${MESH_DIR}/four_mounds_60x24.exo
       ${IC_DIR}/four_mounds_60x24.ic
       ${MATERIALS_DIR}/manning_four_mound_60x24.bin
