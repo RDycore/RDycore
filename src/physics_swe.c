@@ -172,8 +172,8 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
           CeedElemRestrictionView(restrict_r, stdout);
         }
 
-        CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.x_ceed);
-        CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.y_ceed);
+        CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed);
+        CeedVectorCreate(ceed, mesh->num_cells * num_comp, &rdy->ceed_rhs.f_ceed);
       }
 
       {
@@ -447,33 +447,42 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
 static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
-  PetscScalar *u, *f;
-  PetscMemType mem_type;
-  Vec          F_local;
   PetscFunctionBeginUser;
+
   PetscCall(RDyCeedOperatorSetUp(rdy));
   PetscCall(RDyCeedUpdateSourceTerm(rdy));
-  CeedVector u_ceed = rdy->ceed_rhs.x_ceed;
-  CeedVector f_ceed = rdy->ceed_rhs.y_ceed;
-  PetscCall(DMGetLocalVector(rdy->dm, &F_local));
-  PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
-  CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u);
-  PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
-  CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
 
-  PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
-  PetscCall(PetscLogGpuTimeBegin());
-  CeedOperatorApply(rdy->ceed_rhs.op_edges, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
-  PetscCall(PetscLogGpuTimeEnd());
-  PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
+  {
+    PetscScalar *u_local, *f;
+    PetscMemType mem_type;
+    Vec          F_local;
 
-  CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
-  PetscCall(VecRestoreArrayAndMemType(U_local, &u));
-  CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f);
-  PetscCall(VecRestoreArrayAndMemType(F_local, &f));
-  PetscCall(VecZeroEntries(F));
-  PetscCall(DMLocalToGlobal(rdy->dm, F_local, ADD_VALUES, F));
-  PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
+    CeedVector u_local_ceed = rdy->ceed_rhs.u_local_ceed;
+    CeedVector f_ceed = rdy->ceed_rhs.f_ceed;
+
+    PetscCall(VecGetArrayAndMemType(U_local, &u_local, &mem_type));
+    CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local);
+
+    PetscCall(DMGetLocalVector(rdy->dm, &F_local));
+    PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
+    CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
+
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
+    PetscCall(PetscLogGpuTimeBegin());
+    CeedOperatorApply(rdy->ceed_rhs.op_edges, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+    PetscCall(PetscLogGpuTimeEnd());
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
+
+    CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u_local);
+    PetscCall(VecRestoreArrayAndMemType(U_local, &u_local));
+
+    CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f);
+    PetscCall(VecRestoreArrayAndMemType(F_local, &f));
+
+    PetscCall(VecZeroEntries(F));
+    PetscCall(DMLocalToGlobal(rdy->dm, F_local, ADD_VALUES, F));
+    PetscCall(DMRestoreLocalVector(rdy->dm, &F_local));
+  }
 
   {
     CeedOperator *sub_ops;

@@ -175,8 +175,8 @@ struct _p_RDy {
   struct {
     CeedOperator         op_edges;
     CeedOperator         op_src;
-    CeedVector           x_ceed, y_ceed;
-    CeedVector           u_ceed, s_ceed;
+    CeedVector           u_local_ceed, u_ceed;
+    CeedVector           f_ceed, s_ceed;
     CeedQFunctionContext src_context;
     CeedScalar           dt;
   } ceed_rhs;
