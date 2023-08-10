@@ -80,6 +80,12 @@ PetscErrorCode InitSWE(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+// Free a plain data context that was allocated using PETSc; returning libCEED error codes
+int FreeContextPetsc(void *data) {
+  if (PetscFree(data)) return CeedError(NULL, CEED_ERROR_ACCESS, "PetscFree failed");
+  return CEED_ERROR_SUCCESS;
+}
+
 static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   PetscFunctionBeginUser;
 
@@ -261,6 +267,19 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
 
+      SWEContext            swe_ctx;
+      CeedQFunctionContext qf_context;
+      PetscCall(PetscCalloc1(1, &swe_ctx));
+
+      swe_ctx->dtime        = 0.0;
+
+      CeedQFunctionContextCreate(ceed, &qf_context);
+      CeedQFunctionContextSetData(qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx);
+      CeedQFunctionContextSetDataDestroy(qf_context, CEED_MEM_HOST, FreeContextPetsc);
+      CeedQFunctionContextRegisterDouble(qf_context, "time step", offsetof(struct SWEContext_, dtime), 1, "Time step of TS");
+
+      CeedQFunctionSetContext(qf, qf_context);
+
       CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_mannings_n, restrict_riemannf;
       CeedVector          geom;
       CeedVector          water_src;
@@ -340,8 +359,27 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
 
     CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed);
 
-    if (1) CeedOperatorView(rdy->ceed_rhs.op_src, stdout);
+    if (0) CeedOperatorView(rdy->ceed_rhs.op_src, stdout);
   }
+
+  if (rdy->ceed_resource[0]) {
+    size_t             num_elements;
+    const PetscScalar *label_values;
+    CeedContextFieldLabel label;
+    PetscScalar label_value;
+
+    CeedInt result;
+    result = CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
+    CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &rdy->dt);
+
+    CeedOperatorGetContextDoubleRead(rdy->ceed_rhs.op_src, label, &num_elements, &label_values);
+    PetscCheck(num_elements == 1, PETSC_COMM_WORLD, PETSC_ERR_SUP, "%s does not support labels with more than 1 value. Label has %zu values", __func__,
+               num_elements);
+    label_value = *label_values;
+    CeedOperatorRestoreContextDoubleRead(rdy->ceed_rhs.op_src, label, &label_values);
+
+  }
+
   PetscFunctionReturn(0);
 }
 
@@ -494,6 +532,9 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   RDy rdy = ctx;
   DM  dm  = rdy->dm;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &(rdy->ceed_rhs.dt)));
 
   PetscCall(VecZeroEntries(F));
 

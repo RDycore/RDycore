@@ -70,6 +70,11 @@ struct _RDyOps {
   PetscErrorCode (*destroy)(void *);
 };
 
+typedef struct SWEContext_ *SWEContext;
+struct SWEContext_ {
+  CeedScalar dtime;
+};
+
 // an application context that stores data relevant to a simulation
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);
@@ -165,9 +170,11 @@ struct _p_RDy {
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {
-    CeedOperator op;
-    CeedOperator op_src;
-    CeedVector   x_ceed, y_ceed, s_ceed;
+    CeedOperator         op;
+    CeedOperator         op_src;
+    CeedVector           x_ceed, y_ceed, s_ceed;
+    CeedQFunctionContext src_context;
+    CeedScalar           dt;
   } ceed_rhs;
 };
 

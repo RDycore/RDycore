@@ -1,6 +1,7 @@
 #ifndef swe_flux_ceed_h
 #define swe_flux_ceed_h
 
+#include <private/rdycoreimpl.h>
 #include <ceed/types.h>
 
 #define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
@@ -169,9 +170,12 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
   const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
   const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
-  CeedScalar(*cell)[CEED_Q_VLA]             =  (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SWEContext context                  = (SWEContext)ctx;
 
   const CeedScalar tiny_h       = 1e-7;
+
+  const CeedScalar dt       = context->dtime;
 
   for (CeedInt i = 0; i < Q; i++) {
 
@@ -200,7 +204,6 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
 
       const CeedScalar tb = Cd * velocity / h;
 
-      const CeedScalar dt = 0.02;
       const CeedScalar factor = tb / (1.0 + h);
 
       tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
