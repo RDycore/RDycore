@@ -86,6 +86,27 @@ int FreeContextPetsc(void *data) {
   return CEED_ERROR_SUCCESS;
 }
 
+static PetscErrorCode CreateQFunctionContextForSWE(RDy rdy, Ceed ceed, CeedQFunctionContext *qf_context) {
+
+  PetscFunctionBeginUser;
+
+  SWEContext           swe_ctx;
+  PetscCall(PetscCalloc1(1, &swe_ctx));
+
+  swe_ctx->dtime   = 0.0;
+  swe_ctx->tiny_h  = rdy->config.physics.flow.tiny_h;
+  swe_ctx->gravity = 9.806;
+
+  CeedQFunctionContextCreate(ceed, qf_context);
+  CeedQFunctionContextSetData(*qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx);
+  CeedQFunctionContextSetDataDestroy(*qf_context, CEED_MEM_HOST, FreeContextPetsc);
+  CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct SWEContext_, dtime), 1, "Time step of TS");
+  CeedQFunctionContextRegisterDouble(*qf_context, "samll h value", offsetof(struct SWEContext_, tiny_h), 1, "Height threshold below which dry condition is assumed");
+  CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SWEContext_, gravity), 1, "Accelaration due to gravity");
+
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   PetscFunctionBeginUser;
 
@@ -266,17 +287,9 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
       CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE);
 
-      SWEContext           swe_ctx;
       CeedQFunctionContext qf_context;
-      PetscCall(PetscCalloc1(1, &swe_ctx));
-
-      swe_ctx->dtime = 0.0;
-
-      CeedQFunctionContextCreate(ceed, &qf_context);
-      CeedQFunctionContextSetData(qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx);
-      CeedQFunctionContextSetDataDestroy(qf_context, CEED_MEM_HOST, FreeContextPetsc);
-      CeedQFunctionContextRegisterDouble(qf_context, "time step", offsetof(struct SWEContext_, dtime), 1, "Time step of TS");
-
+      CreateQFunctionContextForSWE(rdy, ceed, &qf_context);
+      if (0) CeedQFunctionContextView(qf_context, stdout);
       CeedQFunctionSetContext(qf, qf_context);
 
       CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_mannings_n, restrict_riemannf;

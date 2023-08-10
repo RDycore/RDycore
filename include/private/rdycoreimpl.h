@@ -73,6 +73,8 @@ struct _RDyOps {
 typedef struct SWEContext_ *SWEContext;
 struct SWEContext_ {
   CeedScalar dtime;
+  CeedScalar tiny_h;
+  CeedScalar gravity;
 };
 
 // an application context that stores data relevant to a simulation

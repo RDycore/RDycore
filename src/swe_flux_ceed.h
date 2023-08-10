@@ -164,7 +164,6 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
 }
 
 CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  const CeedScalar GRAVITY                  = 9.806;
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
   const CeedScalar(*water_src)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // rain rate
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
@@ -173,9 +172,9 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   const SWEContext context                  = (SWEContext)ctx;
 
-  const CeedScalar tiny_h = 1e-7;
-
-  const CeedScalar dt = context->dtime;
+  const CeedScalar dt      = context->dtime;
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar GRAVITY = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState         state = {q[0][i], q[1][i], q[2][i]};
