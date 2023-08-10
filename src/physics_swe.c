@@ -112,10 +112,10 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
 
   PetscInt op_id = -1;
 
-  if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op) {
+  if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op_edges) {
     Ceed ceed;
     CeedInit(rdy->ceed_resource, &ceed);
-    CeedCompositeOperatorCreate(ceed, &rdy->ceed_rhs.op);
+    CeedCompositeOperatorCreate(ceed, &rdy->ceed_rhs.op_edges);
     CeedInt   num_comp = 3;
     RDyMesh  *mesh     = &rdy->mesh;
     RDyCells *cells    = &mesh->cells;
@@ -185,7 +185,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorSetField(op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
-        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_edges, op);
         op_id++;
         CeedOperatorDestroy(&op);
       }
@@ -263,7 +263,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
         CeedOperatorSetField(op, "q_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetNumQuadraturePoints(op, 1);
-        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op, op);
+        CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_edges, op);
         op_id++;
         CeedOperatorDestroy(&op);
       }
@@ -272,7 +272,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
       CeedVectorDestroy(&geom);
     }
 
-    if (0) CeedOperatorView(rdy->ceed_rhs.op, stdout);
+    if (0) CeedOperatorView(rdy->ceed_rhs.op_edges, stdout);
   }
 
   op_id = -1;
@@ -463,7 +463,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
 
   PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
   PetscCall(PetscLogGpuTimeBegin());
-  CeedOperatorApply(rdy->ceed_rhs.op, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+  CeedOperatorApply(rdy->ceed_rhs.op_edges, u_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
   PetscCall(PetscLogGpuTimeEnd());
   PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 

@@ -173,7 +173,7 @@ struct _p_RDy {
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {
-    CeedOperator         op;
+    CeedOperator         op_edges;
     CeedOperator         op_src;
     CeedVector           x_ceed, y_ceed;
     CeedVector           u_ceed, s_ceed;

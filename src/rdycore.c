@@ -162,7 +162,8 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy libCEED parts if they exist
-  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op);
+  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_edges);
+  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_src);
   CeedVectorDestroy(&(*rdy)->ceed_rhs.x_ceed);
   CeedVectorDestroy(&(*rdy)->ceed_rhs.y_ceed);
   CeedVectorDestroy(&(*rdy)->ceed_rhs.u_ceed);
