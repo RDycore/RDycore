@@ -146,6 +146,7 @@ struct _p_RDy {
 
   // solution vectors (global and local)
   Vec X, X_local;
+  Vec Soln;
 
   // residual vector
   Vec R;
@@ -172,7 +173,8 @@ struct _p_RDy {
   struct {
     CeedOperator         op;
     CeedOperator         op_src;
-    CeedVector           x_ceed, y_ceed, s_ceed;
+    CeedVector           x_ceed, y_ceed;
+    CeedVector           u_ceed, s_ceed;
     CeedQFunctionContext src_context;
     CeedScalar           dt;
   } ceed_rhs;

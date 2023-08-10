@@ -357,6 +357,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
     }
 
     CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed);
+    CeedVectorCreate(ceed, mesh->num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed);
 
     if (0) CeedOperatorView(rdy->ceed_rhs.op_src, stdout);
   }
@@ -479,10 +480,10 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
 
     PetscScalar *u, *f, *f_dup;
     PetscMemType mem_type;
-    CeedVector   u_ceed = rdy->ceed_rhs.x_ceed;
+    CeedVector   u_ceed = rdy->ceed_rhs.u_ceed;
     CeedVector   s_ceed = rdy->ceed_rhs.s_ceed;
 
-    PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
+    PetscCall(VecGetArrayAndMemType(rdy->Soln, &u, &mem_type));
     CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u);
 
     Vec F_dup;
@@ -499,7 +500,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
     PetscCall(PetscLogGpuTimeEnd());
 
     CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
-    PetscCall(VecRestoreArrayAndMemType(U_local, &u));
+    PetscCall(VecRestoreArrayAndMemType(rdy->Soln, &u));
     CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &f_dup);
     CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f);
     PetscCall(VecRestoreArrayAndMemType(F, &f));
@@ -546,6 +547,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       .global_cell_id  = -1,
   };
   if (rdy->ceed_resource[0]) {
+    PetscCall(VecCopy(X, rdy->Soln));
     PetscCall(RDyCeedOperatorApply(rdy, rdy->X_local, F));
   } else {
     PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
