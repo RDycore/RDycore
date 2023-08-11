@@ -386,20 +386,14 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   }
 
   if (rdy->ceed_resource[0]) {
-    size_t                num_elements;
-    const PetscScalar    *label_values;
     CeedContextFieldLabel label;
-    PetscScalar           label_value;
 
-    CeedInt result;
-    result = CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
+    CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_edges, "time step", &label);
+    CeedOperatorSetContextDouble(rdy->ceed_rhs.op_edges, label, &rdy->dt);
+
+    CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
     CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &rdy->dt);
 
-    CeedOperatorGetContextDoubleRead(rdy->ceed_rhs.op_src, label, &num_elements, &label_values);
-    PetscCheck(num_elements == 1, PETSC_COMM_WORLD, PETSC_ERR_SUP, "%s does not support labels with more than 1 value. Label has %zu values",
-               __func__, num_elements);
-    label_value = *label_values;
-    CeedOperatorRestoreContextDoubleRead(rdy->ceed_rhs.op_src, label, &label_values);
   }
 
   PetscFunctionReturn(0);
