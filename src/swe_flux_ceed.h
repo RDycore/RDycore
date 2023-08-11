@@ -212,7 +212,7 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
 
       const CeedScalar tb = Cd * velocity / h;
 
-      const CeedScalar factor = tb / (1.0 + h);
+      const CeedScalar factor = tb / (1.0 + dt * tb);
 
       tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
       tby = (hv + dt * Fsum_y - dt * bedy) * factor;
