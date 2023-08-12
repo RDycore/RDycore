@@ -107,12 +107,15 @@ static PetscErrorCode CreateQFunctionContextForSWE(RDy rdy, Ceed ceed, CeedQFunc
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
+static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
   PetscFunctionBeginUser;
 
   PetscInt op_id = -1;
 
   if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op_edges) {
+
+    rdy->ceed_rhs.dt = 0.0;
+
     Ceed ceed;
     CeedInit(rdy->ceed_resource, &ceed);
     CeedCompositeOperatorCreate(ceed, &rdy->ceed_rhs.op_edges);
@@ -386,13 +389,18 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   }
 
   if (rdy->ceed_resource[0]) {
-    CeedContextFieldLabel label;
 
-    CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_edges, "time step", &label);
-    CeedOperatorSetContextDouble(rdy->ceed_rhs.op_edges, label, &rdy->dt);
+    if (rdy->ceed_rhs.dt != dt) {
+      rdy->ceed_rhs.dt = dt;
 
-    CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
-    CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &rdy->dt);
+      CeedContextFieldLabel label;
+
+      CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_edges, "time step", &label);
+      CeedOperatorSetContextDouble(rdy->ceed_rhs.op_edges, label, &dt);
+
+      CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
+      CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &dt);
+    }
 
   }
 
@@ -440,10 +448,10 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
 
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
-static PetscErrorCode RDyCeedOperatorApply(RDy rdy, Vec U_local, Vec F) {
+static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, Vec F) {
   PetscFunctionBeginUser;
 
-  PetscCall(RDyCeedOperatorSetUp(rdy));
+  PetscCall(RDyCeedOperatorSetUp(rdy, dt));
   PetscCall(RDyCeedUpdateSourceTerm(rdy));
 
   {
@@ -537,7 +545,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   DM  dm  = rdy->dm;
 
   PetscScalar dt;
-  PetscCall(TSGetTimeStep(ts, &(rdy->ceed_rhs.dt)));
+  PetscCall(TSGetTimeStep(ts, &dt));
 
   PetscCall(VecZeroEntries(F));
 
@@ -554,7 +562,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   if (rdy->ceed_resource[0]) {
     PetscCall(VecCopy(X, rdy->Soln));
-    PetscCall(RDyCeedOperatorApply(rdy, rdy->X_local, F));
+    PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->X_local, F));
     if (0) {
       PetscInt nstep;
       PetscCall(TSGetStepNumber(ts, &nstep));
