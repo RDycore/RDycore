@@ -555,10 +555,34 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   if (rdy->ceed_resource[0]) {
     PetscCall(VecCopy(X, rdy->Soln));
     PetscCall(RDyCeedOperatorApply(rdy, rdy->X_local, F));
+    if (0) {
+      PetscInt nstep;
+      PetscCall(TSGetStepNumber(ts, &nstep));
+
+      char file[PETSC_MAX_PATH_LEN];
+      sprintf(file,"F_ceed_nstep%d_N%d.bin",nstep,rdy->nproc);
+
+      PetscViewer viewer;
+      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
+      PetscCall(VecView(F, viewer));
+      PetscCall(PetscViewerDestroy(&viewer));
+    }
   } else {
     PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
     PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
     PetscCall(AddSourceTerm(rdy, F));  // TODO: move source term to use libCEED
+    if (0) {
+      PetscInt nstep;
+      PetscCall(TSGetStepNumber(ts, &nstep));
+
+      char file[PETSC_MAX_PATH_LEN];
+      sprintf(file,"F_petsc_nstep%d_N%d.bin",nstep,rdy->nproc);
+
+      PetscViewer viewer;
+      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
+      PetscCall(VecView(F, viewer));
+      PetscCall(PetscViewerDestroy(&viewer));
+    }
   }
 
   // write out debugging info for maximum courant number
