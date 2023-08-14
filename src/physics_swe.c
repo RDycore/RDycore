@@ -113,7 +113,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
   PetscInt op_id = -1;
 
   if (rdy->ceed_resource[0] && !rdy->ceed_rhs.op_edges) {
-
     rdy->ceed_rhs.dt = 0.0;
 
     Ceed ceed;
@@ -389,7 +388,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
   }
 
   if (rdy->ceed_resource[0]) {
-
     if (rdy->ceed_rhs.dt != dt) {
       rdy->ceed_rhs.dt = dt;
 
@@ -401,7 +399,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
       CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
       CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &dt);
     }
-
   }
 
   PetscFunctionReturn(0);
@@ -568,7 +565,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(TSGetStepNumber(ts, &nstep));
 
       char file[PETSC_MAX_PATH_LEN];
-      sprintf(file,"F_ceed_nstep%d_N%d.bin",nstep,rdy->nproc);
+      sprintf(file, "F_ceed_nstep%d_N%d.bin", nstep, rdy->nproc);
 
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
@@ -584,7 +581,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(TSGetStepNumber(ts, &nstep));
 
       char file[PETSC_MAX_PATH_LEN];
-      sprintf(file,"F_petsc_nstep%d_N%d.bin",nstep,rdy->nproc);
+      sprintf(file, "F_petsc_nstep%d_N%d.bin", nstep, rdy->nproc);
 
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
