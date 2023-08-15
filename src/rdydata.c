@@ -52,6 +52,6 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
     s[i] = watsrc[i];
   }
   PetscCall(VecRestoreArray(rdy->water_src, &s));
-  rdy->ceed_water_src_updated = PETSC_FALSE;
+  rdy->ceed_rhs.water_src_updated = PETSC_FALSE;
   PetscFunctionReturn(0);
 }

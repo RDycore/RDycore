@@ -841,8 +841,8 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
   PetscCall(VecZeroEntries(rdy->water_src));
-  rdy->ceed_water_src_updated = PETSC_TRUE;
-  rdy->ceed_water_src_op_id   = -1;
+  rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
+  rdy->ceed_rhs.water_src_op_id   = -1;
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));

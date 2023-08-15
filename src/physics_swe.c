@@ -374,7 +374,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
         CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_src, op);
         op_id++;
-        rdy->ceed_water_src_op_id = op_id;
+        rdy->ceed_rhs.water_src_op_id = op_id;
         CeedOperatorDestroy(&op);
       }
       CeedElemRestrictionDestroy(&restrict_geom);
@@ -413,14 +413,14 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
 static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
   PetscFunctionBeginUser;
 
-  if (!rdy->ceed_water_src_updated) {
+  if (!rdy->ceed_rhs.water_src_updated) {
     PetscInt num_sub_ops;
     CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op_src, &num_sub_ops);
 
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
 
-    PetscInt          source_op_id = rdy->ceed_water_src_op_id;
+    PetscInt          source_op_id = rdy->ceed_rhs.water_src_op_id;
     CeedOperatorField water_src_field;
     CeedOperatorGetFieldByName(sub_ops[source_op_id], "water_src", &water_src_field);
     CeedVector water_src;
@@ -439,7 +439,7 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
     CeedVectorRestoreArray(water_src, (CeedScalar **)&wat_src_ceed);
     PetscCall(VecRestoreArray(rdy->water_src, &wat_src_p));
 
-    rdy->ceed_water_src_updated = PETSC_TRUE;
+    rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
   }
 
   PetscFunctionReturn(0);
@@ -489,7 +489,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
 
-    PetscInt source_op_id = rdy->ceed_water_src_op_id;
+    PetscInt source_op_id = rdy->ceed_rhs.water_src_op_id;
 
     CeedOperatorField riemannf_field;
     CeedOperatorGetFieldByName(sub_ops[source_op_id], "riemannf", &riemannf_field);

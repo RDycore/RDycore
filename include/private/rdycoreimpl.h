@@ -148,8 +148,6 @@ struct _p_RDy {
 
   // source-sink vector
   Vec water_src;
-  PetscBool ceed_water_src_updated;
-  PetscInt ceed_water_src_op_id;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
@@ -166,12 +164,16 @@ struct _p_RDy {
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {
+    PetscBool water_src_updated;
+    PetscInt  water_src_op_id;
+
     CeedOperator         op_edges;
     CeedOperator         op_src;
     CeedVector           u_local_ceed, u_ceed;
     CeedVector           f_ceed, s_ceed;
     CeedQFunctionContext src_context;
     CeedScalar           dt;
+
   } ceed_rhs;
 };
 
