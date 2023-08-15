@@ -136,6 +136,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
       CreateQFunctionContextForSWE(rdy, ceed, &qf_context);
       if (0) CeedQFunctionContextView(qf_context, stdout);
       CeedQFunctionSetContext(qf, qf_context);
+      CeedQFunctionContextDestroy(&qf_context);
 
       CeedElemRestriction restrict_l, restrict_r, restrict_geom;
       CeedVector          geom;
@@ -223,6 +224,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
       CreateQFunctionContextForSWE(rdy, ceed, &qf_context);
       if (0) CeedQFunctionContextView(qf_context, stdout);
       CeedQFunctionSetContext(qf, qf_context);
+      CeedQFunctionContextDestroy(&qf_context);
 
       CeedElemRestriction restrict_l, restrict_geom;
       CeedVector          geom;
@@ -303,6 +305,7 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
       CreateQFunctionContextForSWE(rdy, ceed, &qf_context);
       if (0) CeedQFunctionContextView(qf_context, stdout);
       CeedQFunctionSetContext(qf, qf_context);
+      CeedQFunctionContextDestroy(&qf_context);
 
       CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_mannings_n, restrict_riemannf;
       CeedVector          geom;
