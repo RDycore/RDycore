@@ -70,13 +70,6 @@ struct _RDyOps {
   PetscErrorCode (*destroy)(void *);
 };
 
-typedef struct SWEContext_ *SWEContext;
-struct SWEContext_ {
-  CeedScalar dtime;
-  CeedScalar tiny_h;
-  CeedScalar gravity;
-};
-
 // an application context that stores data relevant to a simulation
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);

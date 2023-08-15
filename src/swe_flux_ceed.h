@@ -2,9 +2,16 @@
 #define swe_flux_ceed_h
 
 #include <ceed/types.h>
-#include <private/rdycoreimpl.h>
 
+#define Square(x) ((x) * (x))
 #define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
+
+typedef struct SWEContext_ *SWEContext;
+struct SWEContext_ {
+  CeedScalar dtime;
+  CeedScalar tiny_h;
+  CeedScalar gravity;
+};
 
 struct SWEState_ {
   CeedScalar h, hu, hv;
