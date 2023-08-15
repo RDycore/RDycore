@@ -287,7 +287,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
     CeedInt   num_comp = 3;
     RDyMesh  *mesh     = &rdy->mesh;
     RDyCells *cells    = &mesh->cells;
-    RDyEdges *edges    = &mesh->edges;
 
     {
       // source term
