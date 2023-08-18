@@ -514,9 +514,11 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     PetscCall(VecGetArrayAndMemType(F, &f, &mem_type));
     CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
 
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
     CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, s_ceed, CEED_REQUEST_IMMEDIATE);
     PetscCall(PetscLogGpuTimeEnd());
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
     CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
     PetscCall(VecRestoreArrayAndMemType(rdy->Soln, &u));
