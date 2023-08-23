@@ -87,12 +87,16 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscInt num_global_edges = rdy->time_series.boundary_fluxes.num_global_edges;
 
   // flux metadata (global edge ID, boundary ID, BC type)
-  int      num_md = 3;
-  PetscInt local_flux_md[num_md * num_local_edges];
+  // (add a padding byte to the end to prevent a 0-length VLA in case we don't
+  // have any local boundary edges)
+  PetscInt num_md = 3;
+  PetscInt local_flux_md[num_md * num_local_edges + 1];
 
   // flux data itself (mass, x-momentum, y-momentum, edge x normal, edge y normal)
-  int       num_data = 5;
-  PetscReal local_flux_data[num_data * num_local_edges];
+  // (add a padding byte to the end to prevent a 0-length VLA in case we don't
+  // have any local boundary edges)
+  PetscInt  num_data = 5;
+  PetscReal local_flux_data[num_data * num_local_edges + 1];
 
   // gather local metadata/data
   PetscInt n = 0;
@@ -183,7 +187,9 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
 
   // zero the boundary fluxes so they can begin reaccumulating
   // NOTE that there are 3 fluxes (and not 5)
-  memset(rdy->time_series.boundary_fluxes.fluxes, 0, 3 * num_global_edges * sizeof(PetscReal));
+  if (rdy->time_series.boundary_fluxes.fluxes) {
+    memset(rdy->time_series.boundary_fluxes.fluxes, 0, 3 * num_global_edges * sizeof(PetscReal));
+  }
 
   PetscFunctionReturn(0);
 }
@@ -193,8 +199,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   PetscFunctionBegin;
 
   RDy rdy = ctx;
-  if (rdy->time_series.boundary_fluxes.fluxes && (step % rdy->config.output.time_series.boundary_fluxes == 0) &&
-      (step > rdy->time_series.last_step)) {
+  if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
     rdy->time_series.last_step = step;
   }
