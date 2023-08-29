@@ -241,20 +241,23 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   // advance the solution to the specified time (handling preloading if requested)
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
                ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
-  static PetscBool already_preloaded = PETSC_FALSE;
-  PetscBool        preload;
-  PetscCall(PetscOptionsHasName(NULL, NULL, "-preload", &preload));
-  if (preload && !already_preloaded) {
+  static PetscBool already_preloaded = PETSC_FALSE;  // needed because we advance multiple times
+  if (!already_preloaded) {
     PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
     if (PetscPreLoadingOn) {
       PetscCall(CalibrateSolverTimers(rdy));
     } else {
       PetscCall(TSSolve(rdy->ts, rdy->X));
     }
-    already_preloaded = PETSC_TRUE;
     PetscPreLoadEnd();
-  } else {
+    already_preloaded = PETSC_TRUE;
+  } else {  // subsequent call --> RDyAdvance solve log stage already exists
+    PetscLogStage stage_id;
+    PetscCall(PetscLogStageGetId("RDyAdvance solve", &stage_id));
+    PetscCall(PetscLogStageSetActive(stage_id, PETSC_TRUE));  // FIXME: needed?
+    PetscCall(PetscLogStagePush(stage_id));
     PetscCall(TSSolve(rdy->ts, rdy->X));
+    PetscCall(PetscLogStagePop());
   }
 
   // are we finished?
