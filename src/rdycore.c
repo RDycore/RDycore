@@ -152,6 +152,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->R) VecDestroy(&((*rdy)->R));
   if ((*rdy)->X) VecDestroy(&((*rdy)->X));
   if ((*rdy)->X_local) VecDestroy(&((*rdy)->X_local));
+  if ((*rdy)->Soln) VecDestroy(&((*rdy)->Soln));
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));
@@ -161,9 +162,12 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy libCEED parts if they exist
-  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op);
-  CeedVectorDestroy(&(*rdy)->ceed_rhs.x_ceed);
-  CeedVectorDestroy(&(*rdy)->ceed_rhs.y_ceed);
+  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_edges);
+  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_src);
+  CeedVectorDestroy(&(*rdy)->ceed_rhs.u_local_ceed);
+  CeedVectorDestroy(&(*rdy)->ceed_rhs.u_ceed);
+  CeedVectorDestroy(&(*rdy)->ceed_rhs.f_ceed);
+  CeedVectorDestroy(&(*rdy)->ceed_rhs.s_ceed);
 
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {

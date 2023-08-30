@@ -11,7 +11,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   // boundary fluxes
   PetscInt ndof;
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
-  PetscCheck(rdy->comm, ndof == 3, PETSC_ERR_USER, "ndof must be the same as # of boundary fluxes (3)");
+  PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "ndof must be the same as # of boundary fluxes (3)");
 
   // count the number of global boundary edges (excluding those for
   // auto-generated boundary conditions and those not locally owned)

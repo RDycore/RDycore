@@ -141,6 +141,7 @@ struct _p_RDy {
 
   // solution vectors (global and local)
   Vec X, X_local;
+  Vec Soln;
 
   // residual vector
   Vec R;
@@ -163,8 +164,16 @@ struct _p_RDy {
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {
-    CeedOperator op;
-    CeedVector   x_ceed, y_ceed;
+    PetscBool water_src_updated;
+    PetscInt  water_src_op_id;
+
+    CeedOperator         op_edges;
+    CeedOperator         op_src;
+    CeedVector           u_local_ceed, u_ceed;
+    CeedVector           f_ceed, s_ceed;
+    CeedQFunctionContext src_context;
+    CeedScalar           dt;
+
   } ceed_rhs;
 };
 

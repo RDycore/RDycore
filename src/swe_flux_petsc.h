@@ -270,8 +270,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
         }
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
-          if (cells->is_local[l]) f_ptr[l * ndof + idof] -= flux_vec_int[ii][idof] * edge_len / areal;
-          if (cells->is_local[r]) f_ptr[r * ndof + idof] += flux_vec_int[ii][idof] * edge_len / arear;
+          if (cells->is_local[l]) f_ptr[l * ndof + idof] += flux_vec_int[ii][idof] * (-edge_len / areal);
+          if (cells->is_local[r]) f_ptr[r * ndof + idof] += flux_vec_int[ii][idof] * (edge_len / arear);
         }
       }
     }
@@ -351,7 +351,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
         }
 
         for (PetscInt idof = 0; idof < 3; idof++) {
-          F[3 * icell + idof] -= flux_vec_bnd[e][idof] * edge_len / cell_area;
+          F[3 * icell + idof] += flux_vec_bnd[e][idof] * (-edge_len / cell_area);
         }
       }
     }

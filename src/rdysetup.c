@@ -835,10 +835,14 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   // set up vectors
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
   PetscCall(VecDuplicate(rdy->X, &rdy->R));
+  PetscCall(VecDuplicate(rdy->X, &rdy->Soln));
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
+  PetscCall(VecZeroEntries(rdy->water_src));
+  rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
+  rdy->ceed_rhs.water_src_op_id   = -1;
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));
