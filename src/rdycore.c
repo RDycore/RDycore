@@ -4,6 +4,10 @@
 
 static PetscBool initialized_ = PETSC_FALSE;
 
+// for our bespoke preloading (see rdypreloadimpl.h)
+PetscBool RDyPreLoadingUsed = PETSC_FALSE;
+PetscBool RDyPreLoadingOn   = PETSC_FALSE;
+
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
 PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {

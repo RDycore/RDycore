@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdypreloadimpl.h>
 #include <rdycore.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -241,24 +242,13 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   // advance the solution to the specified time (handling preloading if requested)
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
                ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
-  static PetscBool already_preloaded = PETSC_FALSE;  // needed because we advance multiple times
-  if (!already_preloaded) {
-    PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
-    if (PetscPreLoadingOn) {
-      PetscCall(CalibrateSolverTimers(rdy));
-    } else {
-      PetscCall(TSSolve(rdy->ts, rdy->X));
-    }
-    PetscPreLoadEnd();
-    already_preloaded = PETSC_TRUE;
-  } else {  // subsequent call --> RDyAdvance solve log stage already exists
-    PetscLogStage stage_id;
-    PetscCall(PetscLogStageGetId("RDyAdvance solve", &stage_id));
-    PetscCall(PetscLogStageSetActive(stage_id, PETSC_TRUE));  // FIXME: needed?
-    PetscCall(PetscLogStagePush(stage_id));
+  RDyPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
+  if (RDyPreLoadingOn) {
+    PetscCall(CalibrateSolverTimers(rdy));
+  } else {
     PetscCall(TSSolve(rdy->ts, rdy->X));
-    PetscCall(PetscLogStagePop());
   }
+  RDyPreLoadEnd();
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
