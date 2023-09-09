@@ -187,7 +187,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
         CeedOperatorSetField(op, "q_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-        CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_edges, op);
         op_id++;
         CeedOperatorDestroy(&op);
@@ -266,7 +265,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
         CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
         CeedOperatorSetField(op, "q_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-        CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_edges, op);
         op_id++;
         CeedOperatorDestroy(&op);
@@ -371,7 +369,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
         CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
         CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
         CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-        CeedOperatorSetNumQuadraturePoints(op, 1);
         CeedCompositeOperatorAddSub(rdy->ceed_rhs.op_src, op);
         op_id++;
         rdy->ceed_rhs.water_src_op_id = op_id;
