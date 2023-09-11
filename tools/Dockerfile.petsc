@@ -44,7 +44,6 @@ ENV PETSC_ARCH=mpich-int32-real-opt
 RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
   cd petsc && \
   git reset --hard $PETSC_HASH && \
-  curl -L https://gist.githubusercontent.com/jeff-cohere/2390d5af0134ee02b0e73383681cc218/raw > libceed.patch && \
   python3 configure \
     --with-cc=mpicc \
     --with-cxx=mpic++ \
