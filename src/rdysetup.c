@@ -119,11 +119,50 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode CreateDM(RDy rdy) {
-  PetscFunctionBegin;
+static PetscErrorCode CreateSection(RDy rdy, PetscSection *sec)
+{
+  PetscInt n_field                             = 1;
+  PetscInt n_field_comps[1]                    = {3};
+  char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
+          "Height",
+          "MomentumX",
+          "MomentumY",
+  };
 
-  // read the grid from a file
-  PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.grid.file, "grid", PETSC_TRUE, &rdy->dm));
+  PetscFunctionBeginUser;
+  PetscCall(PetscSectionCreate(rdy->comm, sec));
+  PetscCall(PetscSectionSetNumFields(*sec, n_field));
+  PetscInt n_field_dof_tot = 0;
+  for (PetscInt f = 0; f < n_field; ++f) {
+    PetscCall(PetscSectionSetFieldComponents(*sec, f, n_field_comps[f]));
+    for (PetscInt c = 0; c < n_field_comps[f]; ++c, ++n_field_dof_tot) {
+      PetscCall(PetscSectionSetComponentName(*sec, f, c, comp_names[c]));
+    }
+  }
+
+  // set the number of degrees of freedom in each cell
+  PetscInt c_start, c_end;  // starting and ending cell points
+  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
+  PetscCall(PetscSectionSetChart(*sec, c_start, c_end));
+  for (PetscInt c = c_start; c < c_end; ++c) {
+    for (PetscInt f = 0; f < n_field; ++f) {
+      PetscCall(PetscSectionSetFieldDof(*sec, c, f, n_field_comps[f]));
+    }
+    PetscCall(PetscSectionSetDof(*sec, c, n_field_dof_tot));
+  }
+  PetscCall(PetscSectionSetUp(*sec));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode CreateDM(RDy rdy) {
+  PetscSection sec;
+  PetscMPIInt  size;
+
+  PetscFunctionBegin;
+  PetscCallMPI(MPI_Comm_size(rdy->comm, &size));
+
+  PetscCall(DMCreate(rdy->comm, &rdy->dm));
+  PetscCall(DMSetType(rdy->dm, DMPLEX));
 
   // if we're using CEED, set Vec and Mat types based on the selected backend
   if (rdy->ceed_resource[0]) {
@@ -152,60 +191,48 @@ static PetscErrorCode CreateDM(RDy rdy) {
     PetscCall(DMSetMatType(rdy->dm, mat_type));
   }
 
-  // interpolate the grid to get more connectivity
-  {
-    DM dm_interp;
-    PetscCall(DMPlexInterpolate(rdy->dm, &dm_interp));
-    PetscCheck(dm_interp, rdy->comm, PETSC_ERR_USER, "Mesh interpolation failed!");
-    PetscCall(DMDestroy(&rdy->dm));
-    rdy->dm = dm_interp;
-  }
-
-  // I'm not sure exactly why we need this here...
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
-
-  // name the grid and apply any overrides from the command line
-  PetscCall(PetscObjectSetName((PetscObject)rdy->dm, "grid"));
   PetscCall(DMSetFromOptions(rdy->dm));
 
+  // name the grid
+  PetscCall(PetscObjectSetName((PetscObject)rdy->dm, "grid"));
+
+  // NOTE Need to create section before distribution, so that natural map can be created
   // create a section with (h, hu, hv) as degrees of freedom
-  PetscInt n_field                             = 1;
-  PetscInt n_field_comps[1]                    = {3};
-  char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
-          "Height",
-          "MomentumX",
-          "MomentumY",
-  };
-  PetscSection sec;
-  PetscCall(PetscSectionCreate(rdy->comm, &sec));
-  PetscCall(PetscSectionSetNumFields(sec, n_field));
-  PetscInt n_field_dof_tot = 0;
-  for (PetscInt f = 0; f < n_field; ++f) {
-    PetscCall(PetscSectionSetFieldComponents(sec, f, n_field_comps[f]));
-    for (PetscInt c = 0; c < n_field_comps[f]; ++c, ++n_field_dof_tot) {
-      PetscCall(PetscSectionSetComponentName(sec, f, c, comp_names[c]));
-    }
+  if (!rdy->refine) {
+    PetscCall(CreateSection(rdy, &sec));
+    // embed the section's data in our grid and toss the section
+    PetscCall(DMSetLocalSection(rdy->dm, sec));
   }
 
-  // set the number of degrees of freedom in each cell
-  PetscInt c_start, c_end;  // starting and ending cell points
-  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
-  PetscCall(PetscSectionSetChart(sec, c_start, c_end));
-  for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < n_field; ++f) {
-      PetscCall(PetscSectionSetFieldDof(sec, c, f, n_field_comps[f]));
-    }
-    PetscCall(PetscSectionSetDof(sec, c, n_field_dof_tot));
+  // distribution phase
+  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "dist_"));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
+  PetscCall(DMSetFromOptions(rdy->dm));
+  PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+
+  // parallel refinement phase
+  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_"));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+  PetscCall(DMSetFromOptions(rdy->dm));
+  PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+
+  // Overlap meshes after refinement
+  if (size > 1) {
+    DM      dmOverlap;
+    PetscSF sfOverlap, sfMigration, sfMigrationNew;
+
+    PetscCall(DMPlexGetMigrationSF(rdy->dm, &sfMigration));
+    PetscCall(DMPlexDistributeOverlap(rdy->dm, 1, &sfOverlap, &dmOverlap));
+    PetscCall(DMPlexRemapMigrationSF(sfOverlap, sfMigration, &sfMigrationNew));
+    PetscCall(PetscSFDestroy(&sfOverlap));
+    PetscCall(DMPlexSetMigrationSF(dmOverlap, sfMigrationNew));
+    PetscCall(PetscSFDestroy(&sfMigrationNew));
+    PetscCall(DMDestroy(&rdy->dm));
+    rdy->dm = dmOverlap;
   }
-
-  // embed the section's data in our grid and toss the section
-  PetscCall(PetscSectionSetUp(sec));
-  PetscCall(DMSetLocalSection(rdy->dm, sec));
-  PetscCall(PetscSectionDestroy(&sec));
-
-  // set grid adacency and create a natural-to-local mapping
-  PetscCall(DMSetBasicAdjacency(rdy->dm, PETSC_TRUE, PETSC_TRUE));
-  PetscCall(DMSetUseNatural(rdy->dm, PETSC_TRUE));
 
   // mark boundary edges so we can enforce reflecting BCs on them if needed
   {
@@ -215,25 +242,35 @@ static PetscErrorCode CreateDM(RDy rdy) {
     PetscCall(DMPlexMarkBoundaryFaces(rdy->dm, 1, boundary_edges));
   }
 
-  // distribute the mesh across processes
-  {
-    DM      dm_dist;
-    PetscSF sfMigration;
-    PetscCall(DMPlexDistribute(rdy->dm, 1, &sfMigration, &dm_dist));
-    if (dm_dist) {
-      VecType vec_type;
-      PetscCall(DMGetVecType(rdy->dm, &vec_type));
-      PetscCall(DMSetVecType(dm_dist, vec_type));
-      PetscCall(DMDestroy(&rdy->dm));
-      rdy->dm = dm_dist;
-      PetscCall(DMPlexSetMigrationSF(rdy->dm, sfMigration));
-      PetscCall(PetscSFDestroy(&sfMigration));
-    }
+  // create parallel section and global-to-natural mapping
+  if (rdy->refine) {
+    PetscCall(CreateSection(rdy, &sec));
+    PetscCall(DMSetLocalSection(rdy->dm, sec));
+  } else if (size > 1) {
+    PetscSF      sfMigration, sfNatural;
+    PetscSection psec;
+    PetscInt    *remoteOffsets;
+
+    PetscCall(DMPlexGetMigrationSF(rdy->dm, &sfMigration));
+    PetscCall(DMPlexCreateGlobalToNaturalSF(rdy->dm, sec, sfMigration, &sfNatural));
+    PetscCall(DMPlexSetGlobalToNaturalSF(rdy->dm, sfNatural));
+    PetscCall(PetscSFDestroy(&sfNatural));
+
+    PetscCall(PetscSectionCreate(rdy->comm, &psec));
+    PetscCall(PetscSFDistributeSection(sfMigration, sec, &remoteOffsets, psec));
+    PetscCall(DMSetLocalSection(rdy->dm, psec));
+    PetscCall(PetscFree(remoteOffsets));
+    PetscCall(PetscSectionDestroy(&sec));
+    PetscCall(PetscSectionDestroy(&psec));
   }
+  PetscCall(PetscSectionDestroy(&sec));
+
+  // set grid adacency
+  PetscCall(DMSetBasicAdjacency(rdy->dm, PETSC_TRUE, PETSC_TRUE));
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // retrieves the index of a material using its name
@@ -308,12 +345,14 @@ static PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscCall(PetscSectionViewFromOptions(aux_sec, NULL, "-aux_layout_view"));
   PetscCall(PetscSectionDestroy(&aux_sec));
 
-  // copy adjacency info from the primary DM
-  PetscSF sf_migration, sf_natural;
-  DMPlexGetMigrationSF(rdy->dm, &sf_migration);
-  DMPlexCreateGlobalToNaturalSF(rdy->aux_dm, aux_sec, sf_migration, &sf_natural);
-  DMPlexSetGlobalToNaturalSF(rdy->aux_dm, sf_natural);
-  PetscSFDestroy(&sf_natural);
+  if (!rdy->refine) {
+    // copy adjacency info from the primary DM
+    PetscSF sf_migration, sf_natural;
+    PetscCall(DMPlexGetMigrationSF(rdy->dm, &sf_migration));
+    PetscCall(DMPlexCreateGlobalToNaturalSF(rdy->aux_dm, aux_sec, sf_migration, &sf_natural));
+    PetscCall(DMPlexSetGlobalToNaturalSF(rdy->aux_dm, sf_natural));
+    PetscCall(PetscSFDestroy(&sf_natural));
+  }
 
   PetscFunctionReturn(0);
 }
@@ -355,6 +394,7 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
 }
 
 // initializes mesh region data
+//   can be run after refinement
 static PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionBegin;
 
@@ -414,40 +454,8 @@ static PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-// from Jed's commit (fd7c843):
-//
-// -dm_refine evidently completes boundary labels as a side-effect (so
-// "Face Label" is applied also to vertices). I borrowed a utility from
-// plexceed.c that we'll be able to delete later (by letting PETSc do all
-// this setup).
-// from plexceed.c
-static PetscErrorCode DMGetPoints_Private(DM dm, DMLabel domainLabel, PetscInt labelVal, PetscInt height, IS *pointIS) {
-  PetscInt depth;
-  DMLabel  depthLabel;
-  IS       depthIS;
-
-  PetscFunctionBegin;
-  PetscCall(DMPlexGetDepth(dm, &depth));
-  PetscCall(DMPlexGetDepthLabel(dm, &depthLabel));
-  PetscCall(DMLabelGetStratumIS(depthLabel, depth - height, &depthIS));
-  if (domainLabel) {
-    IS domainIS;
-
-    PetscCall(DMLabelGetStratumIS(domainLabel, labelVal, &domainIS));
-    if (domainIS) {  // domainIS is non-empty
-      PetscCall(ISIntersect(depthIS, domainIS, pointIS));
-      PetscCall(ISDestroy(&domainIS));
-    } else {  // domainIS is NULL (empty)
-      *pointIS = NULL;
-    }
-    PetscCall(ISDestroy(&depthIS));
-  } else {
-    *pointIS = depthIS;
-  }
-  PetscFunctionReturn(0);
-}
-
 // initializes mesh boundary data
+//   can be run after refinement
 static PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionBegin;
 
@@ -455,10 +463,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   DMLabel boundary_edge_label;
   PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
   IS boundary_edge_is;
-  // FIXME: uncomment this line and delete the following one when PETSc's -dm_refine
-  // FIXME: option has been updated
-  // PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
-  PetscCall(DMGetPoints_Private(rdy->dm, boundary_edge_label, 1, 1, &boundary_edge_is));
+  PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
   PetscBool boundary_edge_present = (boundary_edge_is != NULL);
 
   // Keep track of whether edges on the domain boundary have been assigned to
@@ -474,7 +479,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   // boundaries are assigned to a special boundary to which we apply reflecting
   // boundary conditions.
   PetscInt e_start, e_end;  // starting and ending edge points
-  DMPlexGetDepthStratum(rdy->dm, 1, &e_start, &e_end);
+  DMPlexGetHeightStratum(rdy->dm, 1, &e_start, &e_end);
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   PetscInt        num_boundaries_in_file = 0;
@@ -492,10 +497,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
       PetscInt boundary_id = boundary_ids[b];
       IS       edge_is;
-      // FIXME: uncomment this line and delete the following one when PETSc's -dm_refine
-      // FIXME: option has been updated
-      // PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
-      PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
+      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
@@ -554,10 +556,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       PetscInt boundary_id = (b < num_boundaries_in_file) ? boundary_ids[b] : unassigned_edge_boundary_id;
       IS       edge_is;  // edge index space//
-      // FIXME: uncomment this line and delete the following one when PETSc's -dm_refine
-      // FIXME: option has been updated
-      // PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
-      PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
+      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[b];
         boundary->id          = boundary_id;
@@ -574,6 +573,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         const PetscInt *edge_ids;
         PetscCall(ISGetIndices(edge_is, &edge_ids));
         for (PetscInt i = 0; i < num_edges; ++i) {
+          PetscCheck(edge_ids[i] >= e_start, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "Mesh point %" PetscInt_FMT " is not an edge. Likely the option -dm_plex_transform_label_match_strata is missing", edge_ids[i]);
           boundary->edge_ids[i] = edge_ids[i] - e_start;
         }
         PetscCall(ISRestoreIndices(edge_is, &edge_ids));
@@ -638,6 +638,7 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
   }
 
 // sets up materials
+//   unsafe for refinement if file is given for surface composition
 static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
 
@@ -686,6 +687,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
 }
 
 // sets up initial conditions
+//   can be run after refinement
 static PetscErrorCode InitInitialConditions(RDy rdy) {
   PetscFunctionBegin;
 
@@ -741,6 +743,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
 }
 
 // sets up sources
+//   can be run after refinement
 static PetscErrorCode InitSources(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->config.sources.num_regions > 0) {
@@ -792,6 +795,7 @@ static PetscErrorCode InitSources(RDy rdy) {
 }
 
 // sets up boundary conditions
+//   can be run after refinement
 static PetscErrorCode InitBoundaryConditions(RDy rdy) {
   PetscFunctionBegin;
   // Set up a reflecting flow boundary condition.
@@ -909,6 +913,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 }
 
 // initializes solution vector data
+//   unsafe for refinement if file is given with initial conditions
 static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
 
