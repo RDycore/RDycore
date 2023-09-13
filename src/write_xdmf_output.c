@@ -43,10 +43,17 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
 
   // create and populate a multi-component natural vector
-  Vec natural;
-  PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-  PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->X, natural));
-  PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, rdy->X, natural));
+  Vec       natural;
+  PetscBool useNatural;
+  PetscCall(DMGetUseNatural(rdy->dm, &useNatural));
+  if (useNatural) {
+    PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
+    PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->X, natural));
+    PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, rdy->X, natural));
+  } else {
+    natural = rdy->X;
+    PetscCall(PetscObjectReference((PetscObject)natural));
+  }
 
   // extract each component into a separate vector and write it to the group
   // FIXME: This setup is specific to the shallow water equations. We can
@@ -56,26 +63,24 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
       "MomentumX",
       "MomentumY",
   };
-  Vec      comp;  // single-component natural vector
+  Vec     *comp;  // single-component natural vector
   PetscInt n, N, bs;
   PetscCall(VecGetLocalSize(natural, &n));
   PetscCall(VecGetSize(natural, &N));
   PetscCall(VecGetBlockSize(natural, &bs));
-  PetscCall(VecCreateMPI(rdy->comm, n / bs, N / bs, &comp));
-  PetscReal *Xi;  // multi-component natural vector data
-  PetscCall(VecGetArray(natural, &Xi));
+  PetscCall(PetscMalloc1(bs, &comp));
   for (PetscInt c = 0; c < bs; ++c) {
-    PetscObjectSetName((PetscObject)comp, comp_names[c]);
-    PetscReal *Xci;  // single-component natural vector data
-    PetscCall(VecGetArray(comp, &Xci));
-    for (PetscInt i = 0; i < n / bs; ++i) Xci[i] = Xi[bs * i + c];
-    PetscCall(VecRestoreArray(comp, &Xci));
-    PetscCall(VecView(comp, viewer));
+    PetscCall(VecCreateMPI(rdy->comm, n / bs, N / bs, &comp[c]));
+    PetscCall(PetscObjectSetName((PetscObject)comp[c], comp_names[c]));
   }
-  PetscCall(VecRestoreArray(natural, &Xi));
+  PetscCall(VecStrideGatherAll(natural, comp, INSERT_VALUES));
+  for (PetscInt c = 0; c < bs; ++c) {
+    PetscCall(VecView(comp[c], viewer));
+    PetscCall(VecDestroy(&comp[c]));
+  }
+  PetscCall(PetscFree(comp));
 
   // clean up
-  PetscCall(VecDestroy(&comp));
   PetscCall(VecDestroy(&natural));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
   PetscCall(PetscViewerPopFormat(viewer));
