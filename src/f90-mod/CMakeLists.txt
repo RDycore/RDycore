@@ -15,3 +15,5 @@ set(RDYCORE_LIBRARIES rdycore_f90;${RDYCORE_LIBRARIES})
 
 # Pass RDYCORE_LIBRARIES to the parent directory.
 set(RDYCORE_LIBRARIES ${RDYCORE_LIBRARIES} PARENT_SCOPE)
+
+add_subdirectory(tests)
