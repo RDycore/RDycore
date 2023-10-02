@@ -26,6 +26,9 @@ PETSC_EXTERN PetscErrorCode RDyOnFinalize(void (*)(void));
 PETSC_EXTERN PetscErrorCode RDyFinalize(void);
 PETSC_EXTERN PetscBool RDyInitialized(void);
 
+// RDycore online configuration
+PETSC_EXTERN PetscErrorCode RDySetLogFile(const char*);
+
 // RDycore setup/breakdown
 PETSC_EXTERN PetscErrorCode RDyCreate(MPI_Comm, const char*, RDy*);
 PETSC_EXTERN PetscErrorCode RDySetup(RDy);
