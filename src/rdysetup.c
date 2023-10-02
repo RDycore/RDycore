@@ -926,13 +926,14 @@ static PetscErrorCode InitSolution(RDy rdy) {
 // the name of the log file set by RDySetLogFile below
 static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 
-/// Sets the name of the log file for RDycore. If this function is called, the
-/// name passed to it overrides any log filename set in the YAML config file.
+/// Sets the name of the log file for RDycore. If this function is called
+/// before RDySetup, the name passed to it overrides any log filename set in
+/// the YAML config file.
 /// @param log_file [in] the name of the log file written by RDycore
 PetscErrorCode RDySetLogFile(const char *filename) {
   PetscFunctionBegin;
-  strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN-1);
-  overridden_logfile_[PETSC_MAX_PATH_LEN-1] = '\0';
+  strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
+  overridden_logfile_[PETSC_MAX_PATH_LEN - 1] = '\0';
   PetscFunctionReturn(0);
 }
 
