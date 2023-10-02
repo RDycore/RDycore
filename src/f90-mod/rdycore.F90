@@ -3,7 +3,7 @@
 
 module rdycore
 
-  use iso_c_binding
+  use iso_c_binding, only: c_ptr, c_int, c_loc
 
   implicit none
 
@@ -18,8 +18,6 @@ module rdycore
   type :: RDy
     ! C pointer to RDy type
     type(c_ptr)                  :: c_rdy
-    ! string containing config filename
-    character(len=1024), pointer :: config_file
   end type RDy
 
   interface
@@ -40,6 +38,12 @@ module rdycore
       integer,            intent(in)  :: comm
       type(c_ptr), value, intent(in)  :: filename
       type(c_ptr),        intent(out) :: rdy
+    end function
+
+    integer(c_int) function rdysetlogfile_(rdy, filename) bind(c, name="RDySetLogFile")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: filename
     end function
 
     integer(c_int) function rdysetup_(rdy) bind(c, name="RDySetup")
@@ -150,13 +154,32 @@ contains
     type(RDy), intent(out) :: rdy_
     integer,   intent(out) :: ierr
 
-    integer :: n
+    integer                      :: n
+    character(len=1024), pointer :: config_file
 
     n = len_trim(filename)
-    allocate(rdy_%config_file)
-    rdy_%config_file(1:n) = filename(1:n)
-    rdy_%config_file(n+1:n+1) = c_null_char
-    ierr = rdycreate_(comm, c_loc(rdy_%config_file), rdy_%c_rdy)
+    allocate(config_file)
+    config_file(1:n) = filename(1:n)
+    config_file(n+1:n+1) = c_null_char
+    ierr = rdycreate_(comm, c_loc(config_file), rdy_%c_rdy)
+    deallocate(config_file)
+  end subroutine
+
+  subroutine RDySetLogFile(rdy_, filename, ierr)
+    use iso_c_binding, only: c_null_char
+    character(len=1024), intent(in)  :: filename
+    type(RDy),           intent(out) :: rdy_
+    integer,             intent(out) :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: log_file
+
+    n = min(len_trim(filename), 1024)
+    allocate(log_file)
+    log_file(1:n) = filename(1:n)
+    log_file(n+1:n+1) = c_null_char
+    ierr = rdysetlogfile_(rdy_%c_rdy, c_loc(log_file))
+    deallocate(log_file)
   end subroutine
 
   subroutine RDySetup(rdy_, ierr)
@@ -251,7 +274,6 @@ contains
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
     ierr = rdydestroy_(rdy_%c_rdy)
-    if (associated(rdy_%config_file)) deallocate(rdy_%config_file)
   end subroutine
 
 end module rdycore
