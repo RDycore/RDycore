@@ -161,6 +161,7 @@ struct _p_RDy {
   //--------------
   // CEED support
   //--------------
+  Ceed ceed;
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {

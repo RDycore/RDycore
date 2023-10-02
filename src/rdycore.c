@@ -1,3 +1,4 @@
+#include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
@@ -162,12 +163,17 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy libCEED parts if they exist
-  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_edges);
-  CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_src);
-  CeedVectorDestroy(&(*rdy)->ceed_rhs.u_local_ceed);
-  CeedVectorDestroy(&(*rdy)->ceed_rhs.u_ceed);
-  CeedVectorDestroy(&(*rdy)->ceed_rhs.f_ceed);
-  CeedVectorDestroy(&(*rdy)->ceed_rhs.s_ceed);
+  PetscCallCEED(CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_edges));
+  PetscCallCEED(CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_src));
+  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.u_local_ceed));
+  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.u_ceed));
+  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.f_ceed));
+  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.s_ceed));
+
+  // clean up CEED if needed
+  if ((*rdy)->ceed_resource[0]) {
+    PetscCallCEED(CeedDestroy(&((*rdy)->ceed)));
+  }
 
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {
