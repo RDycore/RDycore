@@ -930,7 +930,7 @@ static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 /// before RDySetup, the name passed to it overrides any log filename set in
 /// the YAML config file.
 /// @param log_file [in] the name of the log file written by RDycore
-PetscErrorCode RDySetLogFile(const char *filename) {
+PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionBegin;
   strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
   overridden_logfile_[PETSC_MAX_PATH_LEN - 1] = '\0';

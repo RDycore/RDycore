@@ -14,9 +14,6 @@ module rdycoreMod
   type(RDy)          :: rdy_
 
 
-  Vec                :: rain_timeseries
-  PetscInt           :: rain_stride
-  PetscInt           :: rain_nstep
   PetscInt           :: num_cells_owned
   PetscReal, pointer :: rain_data(:)
   PetscReal          :: dtime ! in units expressed within config file
@@ -69,21 +66,6 @@ contains
     PetscCallA(RDyGetNumLocalCells(rdy_, num_cells_owned, ierr))
     allocate(rain_data(num_cells_owned))
 
-    ! Read the rain vector that has the following format:
-    !
-    !  time_1 rain_value_1
-    !  time_2 rain_value_2
-    !
-    PetscCallA(VecCreate(PETSC_COMM_SELF, rain_timeseries, ierr))
-    PetscCallA(PetscViewerBinaryOpen(PETSC_COMM_SELF, 'rain.bin', FILE_MODE_READ, viewer, ierr))
-    PetscCallA(VecLoad(rain_timeseries, viewer, ierr))
-    PetscCallA(PetscViewerDestroy(viewer, ierr))
-
-    ! Determine the number of rain
-    rain_stride = 2
-    PetscCallA(VecGetSize(rain_timeseries, size, ierr))
-    rain_nstep = size/rain_stride
-
   end subroutine rdycore_init
 
   !-----------------------------------------------------------------------
@@ -98,33 +80,12 @@ contains
     PetscScalar, pointer :: rain_p(:)
     PetscInt             :: t
     PetscReal            :: time_dn, time_up, cur_time, cur_rain
-    PetscBool            :: found
     PetscErrorCode       :: ierr
 
     cur_time = (nstep-1)*dtime
 
-    ! Find the current rainfall
-    PetscCallA(VecGetArrayF90(rain_timeseries, rain_p, ierr))
-    found = PETSC_FALSE
-
-    do t = 1, rain_nstep-1
-       time_dn = rain_p((t-1)*rain_stride + 1)
-       time_up = rain_p((t-1)*rain_stride + 3)
-       if (cur_time >= time_dn .and. cur_time < time_up) then
-          found = PETSC_TRUE
-          cur_rain = rain_p((t-1)*rain_stride + 2)
-          exit
-       end if
-    end do
-
-    if (.not.found) then
-       cur_rain = rain_p((nstep-1)*rain_stride + 2)
-    end if
-
-    PetscCallA(VecRestoreArrayF90(rain_timeseries, rain_p, ierr))
-
     ! Set spatially homogeneous rainfall for all grid cells
-    rain_data(:) = cur_rain
+    rain_data(:) = 0.d0
     PetscCallA(RDySetWaterSource(rdy_, rain_data, ierr))
 
     ! Set the coupling time step
@@ -150,7 +111,6 @@ contains
 
     ! deallocate memory for rain data
     deallocate(rain_data)
-    PetscCallA(VecDestroy(rain_timeseries, ierr))
 
     ! destroy RDy object
     PetscCallA(RDyDestroy(rdy_, ierr));
