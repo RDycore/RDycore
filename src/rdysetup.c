@@ -126,11 +126,9 @@ static PetscErrorCode CreateDM(RDy rdy) {
 
   // if we're using CEED, set Vec and Mat types based on the selected backend
   if (rdy->ceed_resource[0]) {
-    VecType vec_type = NULL;
-    MatType mat_type = NULL;
-
     CeedMemType mem_type_backend;
     PetscCallCEED(CeedGetPreferredMemType(rdy->ceed, &mem_type_backend));
+    VecType vec_type = NULL;
     switch (mem_type_backend) {
       case CEED_MEM_HOST:
         vec_type = VECSTANDARD;
@@ -144,8 +142,13 @@ static PetscErrorCode CreateDM(RDy rdy) {
         else vec_type = VECSTANDARD;
       }
     }
-    PetscCall(DMSetMatType(rdy->dm, mat_type));
     PetscCall(DMSetVecType(rdy->dm, vec_type));
+
+    MatType mat_type = NULL;
+    if (strstr(vec_type, VECCUDA)) mat_type = MATAIJCUSPARSE;
+    else if (strstr(vec_type, VECKOKKOS)) mat_type = MATAIJKOKKOS;
+    else mat_type = MATAIJ;
+    PetscCall(DMSetMatType(rdy->dm, mat_type));
   }
 
   // interpolate the grid to get more connectivity
