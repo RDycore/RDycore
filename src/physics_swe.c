@@ -107,7 +107,7 @@ static PetscErrorCode CreateQFunctionContextForSWE(RDy rdy, Ceed ceed, CeedQFunc
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
+static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   PetscFunctionBeginUser;
 
   PetscInt op_id = -1;
@@ -382,6 +382,11 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
     if (0) CeedOperatorView(rdy->ceed_rhs.op_src, stdout);
   }
 
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode RDyCeedOperatorUpdateDt(RDy rdy, PetscReal dt) {
+  PetscFunctionBeginUser;
   if (rdy->ceed_resource[0]) {
     if (rdy->ceed_rhs.dt != dt) {
       rdy->ceed_rhs.dt = dt;
@@ -395,7 +400,6 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy, PetscReal dt) {
       CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &dt);
     }
   }
-
   PetscFunctionReturn(0);
 }
 
@@ -443,7 +447,7 @@ static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTyp
 static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, Vec F) {
   PetscFunctionBeginUser;
 
-  PetscCall(RDyCeedOperatorSetUp(rdy, dt));
+  PetscCall(RDyCeedOperatorUpdateDt(rdy, dt));
   PetscCall(RDyCeedUpdateSourceTerm(rdy));
 
   {
@@ -555,6 +559,11 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   };
 
   if (rdy->ceed_resource[0]) {
+    // if this is the first time we are using the CEED operator, set it up
+    static bool first_time = true;
+    if (first_time) {
+      PetscCall(RDyCeedOperatorSetUp(rdy));
+    }
     PetscCall(VecCopy(X, rdy->Soln));
     PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->X_local, F));
     if (0) {
