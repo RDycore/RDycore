@@ -176,17 +176,17 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
     PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
     if (r != -1) {
-      datal->h[ii]   = datac->h[l];
-      datal->u[ii]   = datac->u[l];
-      datal->v[ii]   = datac->v[l];
-      datal->hu[ii]  = datac->hu[l];
-      datal->hv[ii]  = datac->hv[l];
+      datal->h[ii]  = datac->h[l];
+      datal->u[ii]  = datac->u[l];
+      datal->v[ii]  = datac->v[l];
+      datal->hu[ii] = datac->hu[l];
+      datal->hv[ii] = datac->hv[l];
 
-      datar->h[ii]   = datac->h[r];
-      datar->u[ii]   = datac->u[r];
-      datar->v[ii]   = datac->v[r];
-      datar->hu[ii]  = datac->hu[r];
-      datar->hv[ii]  = datac->hv[r];
+      datar->h[ii]  = datac->h[r];
+      datar->u[ii]  = datac->u[r];
+      datar->v[ii]  = datac->v[r];
+      datar->hu[ii] = datac->hu[r];
+      datar->hv[ii] = datac->hv[r];
 
       cn_vec_int[ii] = edges->cn[iedge];
       sn_vec_int[ii] = edges->sn[iedge];
@@ -242,8 +242,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 // Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
 // (i) extracting h/hu/hv from the solution vector X, and
 // (ii) compute velocities (u/v) from momentum (hu/hv).
-static PetscErrorCode PerformPrecomputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *datal, RiemannDataSWE *datac, PetscReal cn[N],
-                                                 PetscReal sn[N]) {
+static PetscErrorCode PerformPrecomputationForBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h, PetscInt N, RiemannDataSWE *datal,
+                                                 RiemannDataSWE *datac, PetscReal cn[N], PetscReal sn[N]) {
   PetscFunctionBeginUser;
 
   RDyEdges *edges = &rdy->mesh.edges;
@@ -316,8 +316,8 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
 
 // applies a reflecting boundary condition on the given boundary, computing
 // fluxes F for the solution vector components X
-static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac, PetscReal tiny_h,
-                                        CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
+static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac,
+                                        PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;
@@ -351,8 +351,8 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannD
 
 // applies a critical outflow boundary condition, computing
 // fluxes F for the solution vector components X
-static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac, PetscReal tiny_h,
-                                             CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
+static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac,
+                                             PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;
