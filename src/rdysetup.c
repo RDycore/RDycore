@@ -1,3 +1,4 @@
+#include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymemoryimpl.h>
@@ -122,6 +123,33 @@ static PetscErrorCode CreateDM(RDy rdy) {
 
   // read the grid from a file
   PetscCall(DMPlexCreateFromFile(rdy->comm, rdy->config.grid.file, "grid", PETSC_TRUE, &rdy->dm));
+
+  // if we're using CEED, set Vec and Mat types based on the selected backend
+  if (rdy->ceed_resource[0]) {
+    CeedMemType mem_type_backend;
+    PetscCallCEED(CeedGetPreferredMemType(rdy->ceed, &mem_type_backend));
+    VecType vec_type = NULL;
+    switch (mem_type_backend) {
+      case CEED_MEM_HOST:
+        vec_type = VECSTANDARD;
+        break;
+      case CEED_MEM_DEVICE: {
+        const char *resolved;
+        PetscCallCEED(CeedGetResource(rdy->ceed, &resolved));
+        if (strstr(resolved, "/gpu/cuda")) vec_type = VECCUDA;
+        else if (strstr(resolved, "/gpu/hip")) vec_type = VECKOKKOS;
+        else if (strstr(resolved, "/gpu/sycl")) vec_type = VECKOKKOS;
+        else vec_type = VECSTANDARD;
+      }
+    }
+    PetscCall(DMSetVecType(rdy->dm, vec_type));
+
+    MatType mat_type = NULL;
+    if (strstr(vec_type, VECCUDA)) mat_type = MATAIJCUSPARSE;
+    else if (strstr(vec_type, VECKOKKOS)) mat_type = MATAIJKOKKOS;
+    else mat_type = MATAIJ;
+    PetscCall(DMSetMatType(rdy->dm, mat_type));
+  }
 
   // interpolate the grid to get more connectivity
   {
@@ -962,6 +990,11 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // print configuration info
   PetscCall(PrintConfig(rdy));
+
+  // initialize CEED if needed
+  if (rdy->ceed_resource[0]) {
+    CeedInit(rdy->ceed_resource, &rdy->ceed);
+  }
 
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
