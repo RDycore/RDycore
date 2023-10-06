@@ -2,8 +2,9 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymemoryimpl.h>
-#include "swe_setup_ceed.h"
 #include <rdycore.h>
+
+#include "swe_setup_ceed.h"
 
 // Maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
