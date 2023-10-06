@@ -165,8 +165,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   PetscReal sn_vec_int[num], cn_vec_int[num];
   PetscReal flux_vec_int[num][3], amax_vec_int[num];
 
-  RiemannDataSWE *datal = rdy->datal_internal_edges;
-  RiemannDataSWE *datar = rdy->datar_internal_edges;
+  RiemannDataSWE *datal = &rdy->datal_internal_edges;
+  RiemannDataSWE *datar = &rdy->datar_internal_edges;
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {

@@ -980,8 +980,8 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
   PetscCall(RiemannDataSWECreate(num, datal));
   PetscCall(RiemannDataSWECreate(num, datar));
 
-  rdy->datal_internal_edges = datal;
-  rdy->datar_internal_edges = datar;
+  rdy->datal_internal_edges = *datal;
+  rdy->datar_internal_edges = *datar;
 
   PetscFunctionReturn(0);
 }

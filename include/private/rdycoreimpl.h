@@ -178,7 +178,7 @@ struct _p_RDy {
 
   } ceed_rhs;
 
-  RiemannDataSWE *datal_internal_edges, *datar_internal_edges;
+  RiemannDataSWE datal_internal_edges, datar_internal_edges;
   RiemannDataSWE **datal_bnd_edges, **datar_bnd_edges;
 };
 
