@@ -967,6 +967,25 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  PetscInt  num = mesh->num_internal_edges;
+
+  RiemannDataSWE *datal, *datar;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datal));
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datar));
+
+  PetscCall(RiemannDataSWECreate(num, datal));
+  PetscCall(RiemannDataSWECreate(num, datar));
+
+  rdy->datal_internal_edges = datal;
+  rdy->datar_internal_edges = datar;
+
+  PetscFunctionReturn(0);
+}
+
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file.
 PetscErrorCode RDySetup(RDy rdy) {
@@ -1024,6 +1043,9 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
+
+  RDyLogDebug(rdy, "Initializing data structures for computing fluxes...");
+  PetscCall(InitDataStructsForComputingFlux(rdy));
 
   if (rdy->ceed_resource[0]) {
     RDyLogDebug(rdy, "Setting up the CEED Operator...");

@@ -165,10 +165,8 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   PetscReal sn_vec_int[num], cn_vec_int[num];
   PetscReal flux_vec_int[num][3], amax_vec_int[num];
 
-  // TODO: Preallocate datal/datar during model initialization
-  RiemannDataSWE datal, datar;
-  PetscCall(RiemannDataSWECreate(num, &datal));
-  PetscCall(RiemannDataSWECreate(num, &datar));
+  RiemannDataSWE *datal = rdy->datal_internal_edges;
+  RiemannDataSWE *datar = rdy->datar_internal_edges;
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -177,13 +175,13 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
     PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
     if (r != -1) {
-      datal.h[ii]  = x_ptr[l * ndof + 0];
-      datal.hu[ii] = x_ptr[l * ndof + 1];
-      datal.hv[ii] = x_ptr[l * ndof + 2];
+      datal->h[ii]  = x_ptr[l * ndof + 0];
+      datal->hu[ii] = x_ptr[l * ndof + 1];
+      datal->hv[ii] = x_ptr[l * ndof + 2];
 
-      datar.h[ii]  = x_ptr[r * ndof + 0];
-      datar.hu[ii] = x_ptr[r * ndof + 1];
-      datar.hv[ii] = x_ptr[r * ndof + 2];
+      datar->h[ii]  = x_ptr[r * ndof + 0];
+      datar->hu[ii] = x_ptr[r * ndof + 1];
+      datar->hv[ii] = x_ptr[r * ndof + 2];
 
       cn_vec_int[ii] = edges->cn[iedge];
       sn_vec_int[ii] = edges->sn[iedge];
@@ -192,12 +190,12 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 
   // Compute u/v for left and right cells
   const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  PetscCall(GetVelocityFromMomentum(tiny_h, &datal));
-  PetscCall(GetVelocityFromMomentum(tiny_h, &datar));
+  PetscCall(GetVelocityFromMomentum(tiny_h, datal));
+  PetscCall(GetVelocityFromMomentum(tiny_h, datar));
 
   // Call Riemann solver (only Roe currently supported)
   PetscCheck(rdy->config.numerics.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, &datal, &datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+  PetscCall(ComputeRoeFlux(num, datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -234,9 +232,6 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   // Restore vectors
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
-
-  PetscCall(RiemannDataSWEDestroy(datal));
-  PetscCall(RiemannDataSWEDestroy(datar));
 
   PetscFunctionReturn(0);
 }
