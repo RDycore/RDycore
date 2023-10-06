@@ -426,6 +426,38 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
   PetscFunctionReturn(0);
 }
 
+/// Compute u/v based on hu/hv
+static PetscErrorCode ComputeDiagnosticVariables(RDy rdy) {
+  PetscFunctionBeginUser;
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  // Get access to Vec
+  PetscScalar *x_ptr;
+  PetscCall(VecGetArray(rdy->X_local, &x_ptr));
+
+  RiemannDataSWE *data = &rdy->data_cells;
+
+  // Collect the h/hu/hv for cells to compute u/v
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    data->h[icell]  = x_ptr[icell * ndof + 0];
+    data->hu[icell] = x_ptr[icell * ndof + 1];
+    data->hv[icell] = x_ptr[icell * ndof + 2];
+  }
+
+  // Compute u/v for cells
+  PetscCall(GetVelocityFromMomentum(rdy->config.physics.flow.tiny_h, data));
+
+  PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
+
+  PetscFunctionReturn(0);
+}
+
 // adds source terms to the right hand side vector F
 static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscFunctionBeginUser;
@@ -444,16 +476,6 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   RiemannDataSWE *data = &rdy->data_cells;
-
-  // Collect the h/hu/hv for cells to compute u/v
-  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    data->h[icell]  = x_ptr[icell * ndof + 0];
-    data->hu[icell] = x_ptr[icell * ndof + 1];
-    data->hv[icell] = x_ptr[icell * ndof + 2];
-  }
-
-  // Compute u/v for cells
-  PetscCall(GetVelocityFromMomentum(rdy->config.physics.flow.tiny_h, data));
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {

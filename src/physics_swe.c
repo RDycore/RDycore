@@ -269,6 +269,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(PetscViewerDestroy(&viewer));
     }
   } else {
+    PetscCall(ComputeDiagnosticVariables(rdy));
     PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
     PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
     PetscCall(AddSourceTerm(rdy, F));  // TODO: move source term to use libCEED
