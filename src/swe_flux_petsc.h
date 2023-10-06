@@ -167,6 +167,7 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 
   RiemannDataSWE *datal = &rdy->datal_internal_edges;
   RiemannDataSWE *datar = &rdy->datar_internal_edges;
+  RiemannDataSWE *datac = &rdy->data_cells;
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -175,13 +176,17 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
     PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
     if (r != -1) {
-      datal->h[ii]  = x_ptr[l * ndof + 0];
-      datal->hu[ii] = x_ptr[l * ndof + 1];
-      datal->hv[ii] = x_ptr[l * ndof + 2];
+      datal->h[ii]   = datac->h[l];
+      datal->u[ii]   = datac->u[l];
+      datal->v[ii]   = datac->v[l];
+      datal->hu[ii]  = datac->hu[l];
+      datal->hv[ii]  = datac->hv[l];
 
-      datar->h[ii]  = x_ptr[r * ndof + 0];
-      datar->hu[ii] = x_ptr[r * ndof + 1];
-      datar->hv[ii] = x_ptr[r * ndof + 2];
+      datar->h[ii]   = datac->h[r];
+      datar->u[ii]   = datac->u[r];
+      datar->v[ii]   = datac->v[r];
+      datar->hu[ii]  = datac->hu[r];
+      datar->hv[ii]  = datac->hv[r];
 
       cn_vec_int[ii] = edges->cn[iedge];
       sn_vec_int[ii] = edges->sn[iedge];
@@ -190,8 +195,6 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
 
   // Compute u/v for left and right cells
   const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  PetscCall(GetVelocityFromMomentum(tiny_h, datal));
-  PetscCall(GetVelocityFromMomentum(tiny_h, datar));
 
   // Call Riemann solver (only Roe currently supported)
   PetscCheck(rdy->config.numerics.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
