@@ -1,10 +1,10 @@
-#ifndef swe_setup_ceed_h
-#define swe_setup_ceed_h
+#ifndef SWE_SETUP_CEED_H
+#define SWE_SETUP_CEED_H
 
 #include "swe_flux_ceed.h"
 
 // Free a plain data context that was allocated using PETSc; returning libCEED error codes
-int FreeContextPetsc(void *data) {
+static int FreeContextPetsc(void *data) {
   if (PetscFree(data)) return CeedError(NULL, CEED_ERROR_ACCESS, "PetscFree failed");
   return CEED_ERROR_SUCCESS;
 }
@@ -308,4 +308,4 @@ static PetscErrorCode RDyCeedOperatorSetUp(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
-#endif  // swe_setup_cee_h
+#endif  // SWE_SETUP_CEED_H
