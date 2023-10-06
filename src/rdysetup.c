@@ -972,6 +972,7 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
 
   RDyMesh *mesh = &rdy->mesh;
   PetscInt num  = mesh->num_internal_edges;
+  printf("mesh->num_internal_edges = %d\n", num);
 
   RiemannDataSWE *datal, *datar;
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datal));
@@ -982,6 +983,21 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
 
   rdy->datal_internal_edges = *datal;
   rdy->datar_internal_edges = *datar;
+
+  RiemannDataSWE *datal_bnd, *datar_bnd;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), rdy->num_boundaries, &datal_bnd));
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), rdy->num_boundaries, &datar_bnd));
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; b++) {
+    RDyBoundary *boundary  = &rdy->boundaries[b];
+    PetscInt     num_edges = boundary->num_edges;
+
+    PetscCall(RiemannDataSWECreate(num_edges, &datal_bnd[b]));
+    PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
+  }
+
+  rdy->datal_bnd_edges = &(*datal_bnd);
+  rdy->datar_bnd_edges = &(*datar_bnd);
 
   PetscFunctionReturn(0);
 }
