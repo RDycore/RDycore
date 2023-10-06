@@ -4,6 +4,8 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
+#include "swe_setup_ceed.h"
+
 // Maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
 
@@ -1022,6 +1024,11 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
+
+  if (rdy->ceed_resource[0]) {
+    RDyLogDebug(rdy, "Setting up the CEED Operator...");
+    PetscCall(RDyCeedOperatorSetUp(rdy));
+  }
 
   PetscFunctionReturn(0);
 }
