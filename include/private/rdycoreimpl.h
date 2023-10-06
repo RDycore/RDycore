@@ -6,6 +6,7 @@
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
 
 // This type defines a region consisting of cells identified by their local
