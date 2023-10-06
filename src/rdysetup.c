@@ -970,8 +970,8 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
 PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
   PetscFunctionBegin;
 
-  RDyMesh  *mesh  = &rdy->mesh;
-  PetscInt  num = mesh->num_internal_edges;
+  RDyMesh *mesh = &rdy->mesh;
+  PetscInt num  = mesh->num_internal_edges;
 
   RiemannDataSWE *datal, *datar;
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datal));
