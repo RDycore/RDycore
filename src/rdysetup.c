@@ -972,7 +972,6 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
 
   RDyMesh *mesh = &rdy->mesh;
   PetscInt num  = mesh->num_internal_edges;
-  printf("mesh->num_internal_edges = %d\n", num);
 
   RiemannDataSWE *datal, *datar;
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datal));
@@ -998,6 +997,22 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
 
   rdy->datal_bnd_edges = &(*datal_bnd);
   rdy->datar_bnd_edges = &(*datar_bnd);
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode InitDataStructsForSourceTerm(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyMesh *mesh = &rdy->mesh;
+  PetscInt num  = mesh->num_cells;
+
+  RiemannDataSWE *data;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &data));
+
+  PetscCall(RiemannDataSWECreate(num, data));
+
+  rdy->data_cells = *data;
 
   PetscFunctionReturn(0);
 }
@@ -1062,6 +1077,9 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing data structures for computing fluxes...");
   PetscCall(InitDataStructsForComputingFlux(rdy));
+
+  RDyLogDebug(rdy, "Initializing data structures for computing source term...");
+  PetscCall(InitDataStructsForSourceTerm(rdy));
 
   if (rdy->ceed_resource[0]) {
     RDyLogDebug(rdy, "Setting up the CEED Operator...");

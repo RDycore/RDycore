@@ -443,27 +443,23 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt N = mesh->num_cells;
-
-  // TODO: Preallocate data during model initialization
-  RiemannDataSWE data;
-  PetscCall(RiemannDataSWECreate(N, &data));
+  RiemannDataSWE *data = &rdy->data_cells;
 
   // Collect the h/hu/hv for cells to compute u/v
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    data.h[icell]  = x_ptr[icell * ndof + 0];
-    data.hu[icell] = x_ptr[icell * ndof + 1];
-    data.hv[icell] = x_ptr[icell * ndof + 2];
+    data->h[icell]  = x_ptr[icell * ndof + 0];
+    data->hu[icell] = x_ptr[icell * ndof + 1];
+    data->hv[icell] = x_ptr[icell * ndof + 2];
   }
 
   // Compute u/v for cells
-  PetscCall(GetVelocityFromMomentum(rdy->config.physics.flow.tiny_h, &data));
+  PetscCall(GetVelocityFromMomentum(rdy->config.physics.flow.tiny_h, data));
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {
-      PetscReal h  = data.h[icell];
-      PetscReal hu = data.hu[icell];
-      PetscReal hv = data.hv[icell];
+      PetscReal h  = data->h[icell];
+      PetscReal hu = data->hu[icell];
+      PetscReal hv = data->hv[icell];
 
       PetscReal dz_dx = cells->dz_dx[icell];
       PetscReal dz_dy = cells->dz_dy[icell];
@@ -471,8 +467,8 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
       PetscReal bedx = dz_dx * GRAVITY * h;
       PetscReal bedy = dz_dy * GRAVITY * h;
 
-      PetscReal u = data.u[icell];
-      PetscReal v = data.v[icell];
+      PetscReal u = data->u[icell];
+      PetscReal v = data->v[icell];
 
       PetscReal Fsum_x = f_ptr[icell * ndof + 1];
       PetscReal Fsum_y = f_ptr[icell * ndof + 2];
@@ -507,8 +503,6 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(rdy->water_src, &water_src_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
-
-  PetscCall(RiemannDataSWEDestroy(data));
 
   PetscFunctionReturn(0);
 }
