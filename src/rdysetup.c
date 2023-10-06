@@ -967,6 +967,8 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionReturn(0);
 }
 
+/// For computing fluxes, allocates structs to hold values left and right
+/// of internal and boundary edges
 PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
   PetscFunctionBegin;
 
@@ -1001,6 +1003,7 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
   PetscFunctionReturn(0);
 }
 
+/// Allocates a struct for computing the source/sink term
 PetscErrorCode InitDataStructsForSourceTerm(RDy rdy) {
   PetscFunctionBegin;
 
