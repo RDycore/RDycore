@@ -178,9 +178,11 @@ struct _p_RDy {
 
   } ceed_rhs;
 
-  RiemannDataSWE datal_internal_edges, datar_internal_edges;
-  RiemannDataSWE *datal_bnd_edges, *datar_bnd_edges;
-  RiemannDataSWE data_cells;
+  struct {
+    RiemannDataSWE datal_internal_edges, datar_internal_edges;
+    RiemannDataSWE *datal_bnd_edges, *datar_bnd_edges;
+    RiemannDataSWE data_cells;
+  } data_swe;
 };
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);

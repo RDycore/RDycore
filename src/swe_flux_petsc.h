@@ -165,9 +165,9 @@ static PetscErrorCode RHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberD
   PetscReal sn_vec_int[num], cn_vec_int[num];
   PetscReal flux_vec_int[num][3], amax_vec_int[num];
 
-  RiemannDataSWE *datal = &rdy->datal_internal_edges;
-  RiemannDataSWE *datar = &rdy->datar_internal_edges;
-  RiemannDataSWE *datac = &rdy->data_cells;
+  RiemannDataSWE *datal = &rdy->data_swe.datal_internal_edges;
+  RiemannDataSWE *datar = &rdy->data_swe.datar_internal_edges;
+  RiemannDataSWE *datac = &rdy->data_swe.data_cells;
 
   // Collect the h/hu/hv for left and right cells to compute u/v
   for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
@@ -406,9 +406,9 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
   // loop over all boundaries and apply boundary conditions
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary    *boundary = &rdy->boundaries[b];
-    RiemannDataSWE *datal    = &rdy->datal_bnd_edges[b];
-    RiemannDataSWE *datar    = &rdy->datar_bnd_edges[b];
-    RiemannDataSWE *datac    = &rdy->data_cells;
+    RiemannDataSWE *datal    = &rdy->data_swe.datal_bnd_edges[b];
+    RiemannDataSWE *datar    = &rdy->data_swe.datar_bnd_edges[b];
+    RiemannDataSWE *datac    = &rdy->data_swe.data_cells;
 
     switch (rdy->boundary_conditions[b].flow->type) {
       case CONDITION_REFLECTING:
@@ -444,7 +444,7 @@ static PetscErrorCode ComputeDiagnosticVariables(RDy rdy) {
   PetscScalar *x_ptr;
   PetscCall(VecGetArray(rdy->X_local, &x_ptr));
 
-  RiemannDataSWE *data = &rdy->data_cells;
+  RiemannDataSWE *data = &rdy->data_swe.data_cells;
 
   // Collect the h/hu/hv for cells to compute u/v
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
@@ -478,7 +478,7 @@ static PetscErrorCode AddSourceTerm(RDy rdy, Vec F) {
   PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  RiemannDataSWE *data = &rdy->data_cells;
+  RiemannDataSWE *data = &rdy->data_swe.data_cells;
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {

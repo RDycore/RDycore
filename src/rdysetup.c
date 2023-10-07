@@ -982,8 +982,8 @@ static PetscErrorCode AllocateFluxStorage(RDy rdy) {
   PetscCall(RiemannDataSWECreate(num, datal));
   PetscCall(RiemannDataSWECreate(num, datar));
 
-  rdy->datal_internal_edges = *datal;
-  rdy->datar_internal_edges = *datar;
+  rdy->data_swe.datal_internal_edges = *datal;
+  rdy->data_swe.datar_internal_edges = *datar;
 
   RiemannDataSWE *datal_bnd, *datar_bnd;
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), rdy->num_boundaries, &datal_bnd));
@@ -997,8 +997,8 @@ static PetscErrorCode AllocateFluxStorage(RDy rdy) {
     PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
   }
 
-  rdy->datal_bnd_edges = &(*datal_bnd);
-  rdy->datar_bnd_edges = &(*datar_bnd);
+  rdy->data_swe.datal_bnd_edges = &(*datal_bnd);
+  rdy->data_swe.datar_bnd_edges = &(*datar_bnd);
 
   PetscFunctionReturn(0);
 }
@@ -1015,7 +1015,7 @@ static PetscErrorCode AllocateSourceTermStorage(RDy rdy) {
 
   PetscCall(RiemannDataSWECreate(num, data));
 
-  rdy->data_cells = *data;
+  rdy->data_swe.data_cells = *data;
 
   PetscFunctionReturn(0);
 }
