@@ -969,7 +969,7 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
 
 /// For computing fluxes, allocates structs to hold values left and right
 /// of internal and boundary edges
-PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
+static PetscErrorCode AllocateFluxStorage(RDy rdy) {
   PetscFunctionBegin;
 
   RDyMesh *mesh = &rdy->mesh;
@@ -1004,7 +1004,7 @@ PetscErrorCode InitDataStructsForComputingFlux(RDy rdy) {
 }
 
 /// Allocates a struct for computing the source/sink term
-PetscErrorCode InitDataStructsForSourceTerm(RDy rdy) {
+static PetscErrorCode AllocateSourceTermStorage(RDy rdy) {
   PetscFunctionBegin;
 
   RDyMesh *mesh = &rdy->mesh;
@@ -1079,10 +1079,10 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitSolution(rdy));
 
   RDyLogDebug(rdy, "Initializing data structures for computing fluxes...");
-  PetscCall(InitDataStructsForComputingFlux(rdy));
+  PetscCall(AllocateFluxStorage(rdy));
 
   RDyLogDebug(rdy, "Initializing data structures for computing source term...");
-  PetscCall(InitDataStructsForSourceTerm(rdy));
+  PetscCall(AllocateSourceTermStorage(rdy));
 
   if (rdy->ceed_resource[0]) {
     RDyLogDebug(rdy, "Setting up the CEED Operator...");
