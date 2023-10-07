@@ -967,6 +967,59 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionReturn(0);
 }
 
+/// For computing fluxes, allocates structs to hold values left and right
+/// of internal and boundary edges
+static PetscErrorCode AllocateFluxStorage(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyMesh *mesh = &rdy->mesh;
+  PetscInt num  = mesh->num_internal_edges;
+
+  RiemannDataSWE *datal, *datar;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datal));
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datar));
+
+  PetscCall(RiemannDataSWECreate(num, datal));
+  PetscCall(RiemannDataSWECreate(num, datar));
+
+  rdy->data_swe.datal_internal_edges = *datal;
+  rdy->data_swe.datar_internal_edges = *datar;
+
+  RiemannDataSWE *datal_bnd, *datar_bnd;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), rdy->num_boundaries, &datal_bnd));
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), rdy->num_boundaries, &datar_bnd));
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; b++) {
+    RDyBoundary *boundary  = &rdy->boundaries[b];
+    PetscInt     num_edges = boundary->num_edges;
+
+    PetscCall(RiemannDataSWECreate(num_edges, &datal_bnd[b]));
+    PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
+  }
+
+  rdy->data_swe.datal_bnd_edges = &(*datal_bnd);
+  rdy->data_swe.datar_bnd_edges = &(*datar_bnd);
+
+  PetscFunctionReturn(0);
+}
+
+/// Allocates a struct for computing the source/sink term
+static PetscErrorCode AllocateSourceTermStorage(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyMesh *mesh = &rdy->mesh;
+  PetscInt num  = mesh->num_cells;
+
+  RiemannDataSWE *data;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &data));
+
+  PetscCall(RiemannDataSWECreate(num, data));
+
+  rdy->data_swe.data_cells = *data;
+
+  PetscFunctionReturn(0);
+}
+
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file.
 PetscErrorCode RDySetup(RDy rdy) {
@@ -1024,6 +1077,12 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
+
+  RDyLogDebug(rdy, "Initializing data structures for computing fluxes...");
+  PetscCall(AllocateFluxStorage(rdy));
+
+  RDyLogDebug(rdy, "Initializing data structures for computing source term...");
+  PetscCall(AllocateSourceTermStorage(rdy));
 
   if (rdy->ceed_resource[0]) {
     RDyLogDebug(rdy, "Setting up the CEED Operator...");
