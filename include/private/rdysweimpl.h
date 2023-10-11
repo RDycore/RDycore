@@ -1,9 +1,8 @@
 #ifndef RDYSWEIMPL_H
 #define RDYSWEIMPL_H
 
-#include <private/rdymemoryimpl.h>
-
 #include <petscsys.h>
+#include <private/rdymemoryimpl.h>
 
 typedef struct {
   PetscInt   N;            // number of data values
@@ -52,4 +51,4 @@ static PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
   PetscFunctionReturn(0);
 }
 
-#endif // rdyswe_h
+#endif  // rdyswe_h
