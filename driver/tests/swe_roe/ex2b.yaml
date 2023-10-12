@@ -25,7 +25,7 @@ output:
     boundary_fluxes: 10
 
 grid:
-  file: ../../../share/meshes/planar_dam_10x5.msh
+  file: planar_dam_10x5.msh
 
 surface_composition:
   regions:
