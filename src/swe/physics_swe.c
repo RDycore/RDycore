@@ -106,12 +106,6 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
   PetscFunctionBeginUser;
 
   if (!rdy->ceed_rhs.water_src_updated) {
-    PetscInt num_sub_ops;
-    CeedCompositeOperatorGetNumSub(rdy->ceed_rhs.op_src, &num_sub_ops);
-
-    CeedOperator *sub_ops;
-    CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
-
     CeedOperatorField water_src_field;
     GetWaterSourceFromSWESourceOperator(rdy->ceed_rhs.op_src, &water_src_field);
     CeedVector water_src;
@@ -177,9 +171,6 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
   }
 
   {
-    CeedOperator *sub_ops;
-    CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
-
     CeedOperatorField riemannf_field;
     GetRiemannFluxFromSWESourceOperator(rdy->ceed_rhs.op_src, &riemannf_field);
 
