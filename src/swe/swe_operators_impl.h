@@ -120,9 +120,9 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
     if (qL.h > tiny_h || qR.h > tiny_h) {
       SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     =  flux[j] * geom[2][i];
-        cell_R[j][i]     =  flux[j] * geom[3][i];
-        accum_flux[j][i] += flux[j]; // accumulated flux
+        cell_L[j][i] = flux[j] * geom[2][i];
+        cell_R[j][i] = flux[j] * geom[3][i];
+        accum_flux[j][i] += flux[j];  // accumulated flux
       }
     }
   }
@@ -176,8 +176,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
       CeedScalar flux[3], amax;
       SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     =  flux[j] * geom[2][i];
-        accum_flux[j][i] += flux[j]; // accumulated flux
+        cell_L[j][i] = flux[j] * geom[2][i];
+        accum_flux[j][i] += flux[j];  // accumulated flux
       }
     }
   }
