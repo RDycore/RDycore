@@ -1,13 +1,13 @@
 # Main library -- we list all source files here (incl. those in subdirectories)
 add_library(rdycore
+  print_config.c
   read_config_file.c
   rdycore.c
-  physics_swe.c
-  print_config.c
   rdydata.c
   rdymesh.c
   rdyadvance.c
   rdysetup.c
+  swe/physics_swe.c
   time_series.c
   write_xdmf_output.c
 )
