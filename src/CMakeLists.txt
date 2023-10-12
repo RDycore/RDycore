@@ -8,6 +8,7 @@ add_library(rdycore
   rdyadvance.c
   rdysetup.c
   swe/physics_swe.c
+  swe/swe_operators.c
   time_series.c
   write_xdmf_output.c
 )

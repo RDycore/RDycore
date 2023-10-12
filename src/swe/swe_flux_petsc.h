@@ -418,7 +418,7 @@ static PetscErrorCode RHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberD
         PetscCall(ApplyCriticalOutflowBC(rdy, boundary, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
         break;
       default:
-        PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", rdy->boundary_ids[b]);
+        PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary->id);
     }
   }
 

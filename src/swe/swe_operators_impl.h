@@ -1,5 +1,5 @@
-#ifndef swe_flux_ceed_h
-#define swe_flux_ceed_h
+#ifndef SWE_OPERATORS_IMPL_H
+#define SWE_OPERATORS_IMPL_H
 
 #include <ceed/types.h>
 
@@ -236,4 +236,4 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   return 0;
 }
 
-#endif  // swe_flux_ceed_h
+#endif

@@ -3,8 +3,8 @@
 #include <private/rdymemoryimpl.h>
 #include <stddef.h>  // for offsetof
 
-#include "swe_flux_ceed.h"
 #include "swe_flux_petsc.h"
+#include "swe_operators.h"
 
 PetscClassId  RDY_CLASSID;
 PetscLogEvent RDY_CeedOperatorApply;
@@ -112,9 +112,8 @@ static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
 
-    PetscInt          source_op_id = rdy->ceed_rhs.water_src_op_id;
     CeedOperatorField water_src_field;
-    CeedOperatorGetFieldByName(sub_ops[source_op_id], "water_src", &water_src_field);
+    GetWaterSourceFromSWESourceOperator(rdy->ceed_rhs.op_src, &water_src_field);
     CeedVector water_src;
     CeedOperatorFieldGetVector(water_src_field, &water_src);
 
@@ -181,10 +180,8 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     CeedOperator *sub_ops;
     CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_src, &sub_ops);
 
-    PetscInt source_op_id = rdy->ceed_rhs.water_src_op_id;
-
     CeedOperatorField riemannf_field;
-    CeedOperatorGetFieldByName(sub_ops[source_op_id], "riemannf", &riemannf_field);
+    GetRiemannFluxFromSWESourceOperator(rdy->ceed_rhs.op_src, &riemannf_field);
 
     CeedVector riemannf_ceed;
     CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed);

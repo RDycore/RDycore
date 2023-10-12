@@ -142,7 +142,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
       RDyFree((*rdy)->boundaries[i].edge_ids);
     }
   }
-  if ((*rdy)->boundary_ids) RDyFree((*rdy)->boundary_ids);
   if ((*rdy)->boundaries) RDyFree((*rdy)->boundaries);
 
   // destroy solver
