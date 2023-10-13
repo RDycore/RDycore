@@ -31,7 +31,7 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode CreateSWEInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, PetscReal tiny_h, CeedOperator *flux_op) {
+static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, PetscReal tiny_h, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   CeedInt   num_comp = 3;
@@ -123,8 +123,8 @@ static PetscErrorCode CreateSWEInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Pe
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode CreateSWEBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
-                                                    CeedOperator *flux_op) {
+static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
+                                                 CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   CeedInt   num_comp = 3;
@@ -235,7 +235,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
   CeedCompositeOperatorCreate(ceed, flux_op);
 
   CeedOperator interior_op;
-  PetscCall(CreateSWEInteriorFluxOperator(ceed, mesh, tiny_h, &interior_op));
+  PetscCall(CreateInteriorFluxOperator(ceed, mesh, tiny_h, &interior_op));
   CeedCompositeOperatorAddSub(*flux_op, interior_op);
   CeedOperatorDestroy(&interior_op);
 
@@ -243,7 +243,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
     CeedOperator boundary_op;
     RDyBoundary  boundary           = boundaries[b];
     RDyCondition boundary_condition = boundary_conditions[b];
-    PetscCall(CreateSWEBoundaryFluxOperator(ceed, mesh, boundary, boundary_condition, tiny_h, &boundary_op));
+    PetscCall(CreateBoundaryFluxOperator(ceed, mesh, boundary, boundary_condition, tiny_h, &boundary_op));
     CeedCompositeOperatorAddSub(*flux_op, boundary_op);
     CeedOperatorDestroy(&boundary_op);
   }
