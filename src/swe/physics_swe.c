@@ -1,13 +1,17 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdymemoryimpl.h>
+#include <private/rdysweimpl.h>
 #include <stddef.h>  // for offsetof
-
-#include "swe_flux_petsc.h"
-#include "swe_operators.h"
 
 PetscClassId  RDY_CLASSID;
 PetscLogEvent RDY_CeedOperatorApply;
+
+// these functions are implemented in swe_flux_petsc.c
+PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
+PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
+PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy);
+PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F);
 
 //-----------------------
 // Debugging diagnostics
@@ -257,10 +261,10 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(PetscViewerDestroy(&viewer));
     }
   } else {
-    PetscCall(ComputeDiagnosticVariables(rdy));
-    PetscCall(RHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
-    PetscCall(RHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
-    PetscCall(AddSourceTerm(rdy, F));  // TODO: move source term to use libCEED
+    PetscCall(ComputeSWEDiagnosticVariables(rdy));
+    PetscCall(SWERHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
+    PetscCall(SWERHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
+    PetscCall(AddSWESourceTerm(rdy, F));
     if (0) {
       PetscInt nstep;
       PetscCall(TSGetStepNumber(ts, &nstep));
@@ -285,6 +289,38 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     RDyLogDebug(rdy, "[%d] Time = %f Max courant number %g encountered at edge %d of cell %d is %f", stepnum, time, courant_num_diags.max_courant_num,
                 courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
   }
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RiemannDataSWECreate(PetscInt N, RiemannDataSWE *data) {
+  PetscFunctionBegin;
+
+  data->N = N;
+  PetscCall(RDyAlloc(PetscReal, data->N, &data->h));
+  PetscCall(RDyAlloc(PetscReal, data->N, &data->hu));
+  PetscCall(RDyAlloc(PetscReal, data->N, &data->hv));
+  PetscCall(RDyAlloc(PetscReal, data->N, &data->u));
+  PetscCall(RDyAlloc(PetscReal, data->N, &data->v));
+
+  PetscCall(RDyFill(PetscReal, data->N, data->h, 0.0));
+  PetscCall(RDyFill(PetscReal, data->N, data->hu, 0.0));
+  PetscCall(RDyFill(PetscReal, data->N, data->hv, 0.0));
+  PetscCall(RDyFill(PetscReal, data->N, data->u, 0.0));
+  PetscCall(RDyFill(PetscReal, data->N, data->v, 0.0));
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
+  PetscFunctionBegin;
+
+  data.N = 0;
+  PetscCall(RDyFree(data.h));
+  PetscCall(RDyFree(data.hu));
+  PetscCall(RDyFree(data.hv));
+  PetscCall(RDyFree(data.u));
+  PetscCall(RDyFree(data.v));
 
   PetscFunctionReturn(0);
 }

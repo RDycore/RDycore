@@ -2,9 +2,8 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymemoryimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
-
-#include "swe/swe_operators.h"
 
 // Maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
@@ -973,15 +972,9 @@ static PetscErrorCode AllocateFluxStorage(RDy rdy) {
   RDyMesh *mesh = &rdy->mesh;
   PetscInt num  = mesh->num_internal_edges;
 
-  RiemannDataSWE *datal, *datar;
-  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datal));
-  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &datar));
-
-  PetscCall(RiemannDataSWECreate(num, datal));
-  PetscCall(RiemannDataSWECreate(num, datar));
-
-  rdy->data_swe.datal_internal_edges = *datal;
-  rdy->data_swe.datar_internal_edges = *datar;
+  RiemannDataSWE datal, datar;
+  PetscCall(RiemannDataSWECreate(num, &datal));
+  PetscCall(RiemannDataSWECreate(num, &datar));
 
   RiemannDataSWE *datal_bnd, *datar_bnd;
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), rdy->num_boundaries, &datal_bnd));
@@ -995,8 +988,13 @@ static PetscErrorCode AllocateFluxStorage(RDy rdy) {
     PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
   }
 
-  rdy->data_swe.datal_bnd_edges = &(*datal_bnd);
-  rdy->data_swe.datar_bnd_edges = &(*datar_bnd);
+  PetscRiemannDataSWE *data_swe;
+  PetscCall(RDyAlloc(sizeof(PetscRiemannDataSWE), 1, &data_swe));
+  data_swe->datal_internal_edges = datal;
+  data_swe->datar_internal_edges = datar;
+  data_swe->datal_bnd_edges      = datal_bnd;
+  data_swe->datar_bnd_edges      = datar_bnd;
+  rdy->petsc_rhs                 = data_swe;
 
   PetscFunctionReturn(0);
 }
@@ -1013,7 +1011,8 @@ static PetscErrorCode AllocateSourceTermStorage(RDy rdy) {
 
   PetscCall(RiemannDataSWECreate(num, data));
 
-  rdy->data_swe.data_cells = *data;
+  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  data_swe->data_cells          = *data;
 
   PetscFunctionReturn(0);
 }
