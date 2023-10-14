@@ -4,7 +4,7 @@
 #include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
-#include "swe_setup_ceed.h"
+#include "swe/swe_operators.h"
 
 // Maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
@@ -544,7 +544,6 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   }
 
   // allocate resources for boundaries
-  PetscCall(RDyAlloc(PetscInt, rdy->num_boundaries, &rdy->boundary_ids));
   PetscCall(RDyAlloc(RDyBoundary, rdy->num_boundaries, &rdy->boundaries));
 
   // now fetch boundary edge IDs
@@ -562,7 +561,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
       PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[b];
-        rdy->boundary_ids[b]  = boundary_id;
+        boundary->id          = boundary_id;
 
         // find the number of edges for this boundary
         PetscInt num_edges;
@@ -814,7 +813,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
   // Assign a boundary condition to each boundary.
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyCondition *bc                = &rdy->boundary_conditions[b];
-    PetscInt      boundary_id       = rdy->boundary_ids[b];
+    PetscInt      boundary_id       = rdy->boundaries[b].id;
     PetscInt      bc_boundary_index = -1;
     for (PetscInt ib = 0; ib < rdy->config.num_boundary_conditions; ++ib) {
       if (rdy->config.boundary_conditions[ib].id == boundary_id) {
@@ -872,7 +871,6 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
   PetscCall(VecZeroEntries(rdy->water_src));
   rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
-  rdy->ceed_rhs.water_src_op_id   = -1;
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));
@@ -1085,8 +1083,23 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(AllocateSourceTermStorage(rdy));
 
   if (rdy->ceed_resource[0]) {
-    RDyLogDebug(rdy, "Setting up the CEED Operator...");
-    PetscCall(RDyCeedOperatorSetUp(rdy));
+    RDyLogDebug(rdy, "Setting up CEED Operators...");
+
+    // create the operators themselves
+    PetscCall(CreateSWEFluxOperator(rdy->ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
+                                    rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_edges));
+
+    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_src));
+
+    // create associated vectors for storage
+    int num_comp = 3;
+    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed);
+    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed);
+    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed);
+    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed);
+
+    // reset the time step size
+    rdy->ceed_rhs.dt = 0.0;
   }
 
   PetscFunctionReturn(0);

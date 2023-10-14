@@ -109,7 +109,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
           local_flux_md[num_md * n]     = rdy->mesh.edges.global_ids[edge_id];
-          local_flux_md[num_md * n + 1] = rdy->boundary_ids[b];
+          local_flux_md[num_md * n + 1] = boundary->id;
           local_flux_md[num_md * n + 2] = bc.flow->type;
 
           local_flux_data[num_data * n]     = rdy->time_series.boundary_fluxes.fluxes[n].water_mass;

@@ -19,6 +19,7 @@ typedef struct {
 // This type defines a boundary consisting of edges identified by their local
 // indices.
 typedef struct {
+  PetscInt  id;  // boundary identifier
   PetscInt *edge_ids;
   PetscInt  num_edges;
 } RDyBoundary;
@@ -110,7 +111,6 @@ struct _p_RDy {
 
   // mesh boundaries
   PetscInt     num_boundaries;
-  PetscInt    *boundary_ids;
   RDyBoundary *boundaries;
 
   // materials associated with mesh regions (1 per region)
@@ -167,21 +167,19 @@ struct _p_RDy {
   // RHS operator (optional)
   struct {
     PetscBool water_src_updated;
-    PetscInt  water_src_op_id;
 
-    CeedOperator         op_edges;
-    CeedOperator         op_src;
-    CeedVector           u_local_ceed, u_ceed;
-    CeedVector           f_ceed, s_ceed;
-    CeedQFunctionContext src_context;
-    CeedScalar           dt;
+    CeedOperator op_edges;
+    CeedOperator op_src;
+    CeedVector   u_local_ceed, u_ceed;
+    CeedVector   f_ceed, s_ceed;
+    CeedScalar   dt;
 
   } ceed_rhs;
 
   struct {
-    RiemannDataSWE datal_internal_edges, datar_internal_edges;
+    RiemannDataSWE  datal_internal_edges, datar_internal_edges;
     RiemannDataSWE *datal_bnd_edges, *datar_bnd_edges;
-    RiemannDataSWE data_cells;
+    RiemannDataSWE  data_cells;
   } data_swe;
 };
 

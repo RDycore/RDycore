@@ -1,5 +1,5 @@
-#ifndef swe_flux_ceed_h
-#define swe_flux_ceed_h
+#ifndef SWE_OPERATORS_IMPL_H
+#define SWE_OPERATORS_IMPL_H
 
 #include <ceed/types.h>
 
@@ -107,6 +107,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   const CeedScalar(*q_R)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   CeedScalar(*cell_L)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*cell_R)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*accum_flux)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
   const SWEContext context            = (SWEContext)ctx;
 
   const CeedScalar tiny_h  = context->tiny_h;
@@ -121,6 +122,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
         cell_R[j][i] = flux[j] * geom[3][i];
+        accum_flux[j][i] += flux[j];  // accumulated flux
       }
     }
   }
@@ -157,6 +159,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*accum_flux)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[1];
   const SWEContext context            = (SWEContext)ctx;
 
   const CeedScalar tiny_h  = context->tiny_h;
@@ -174,6 +177,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
       SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
+        accum_flux[j][i] += flux[j];  // accumulated flux
       }
     }
   }
@@ -232,4 +236,4 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   return 0;
 }
 
-#endif  // swe_flux_ceed_h
+#endif
