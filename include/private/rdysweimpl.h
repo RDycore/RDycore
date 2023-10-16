@@ -27,15 +27,16 @@ typedef struct {
   PetscInt  global_cell_id;   // cell in which the max courant number was encountered
 } CourantNumberDiagnostics;
 
-PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries],
-                                                  RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, CeedOperator *flux_op);
-PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial materials_by_cell[mesh->num_cells], PetscReal tiny_h,
-                                                    CeedOperator *source_op);
+PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *m, RDyMaterial[m->num_cells], PetscReal, CeedOperator *);
 
-PETSC_INTERN PetscErrorCode GetWaterSourceFromSWESourceOperator(CeedOperator source_op, CeedOperatorField *water_source_field);
-PETSC_INTERN PetscErrorCode GetRiemannFluxFromSWESourceOperator(CeedOperator source_op, CeedOperatorField *riemann_flux_field);
+PETSC_INTERN PetscErrorCode GetWaterSourceFromSWESourceOperator(CeedOperator, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode GetRiemannFluxFromSWESourceOperator(CeedOperator, CeedOperatorField *);
 
-PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt N, RiemannDataSWE *data);
-PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data);
+PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
+PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);
+
+PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(RDyMesh *, PetscInt n, RDyBoundary[n], void **);
+PETSC_INTERN PetscErrorCode CreatePetscSWESource(RDyMesh *, void *);
 
 #endif  // rdyswe_h

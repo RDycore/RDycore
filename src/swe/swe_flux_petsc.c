@@ -3,10 +3,62 @@
 
 #include <petscsys.h>
 #include <private/rdymathimpl.h>
+#include <private/rdymemoryimpl.h>
 #include <private/rdysweimpl.h>
 
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
+
+/// For computing fluxes, allocates structs to hold values left and right
+/// of internal and boundary edges. This must be called before CreatePetscSWESource.
+PetscErrorCode CreatePetscSWEFlux(RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries], void **petsc_rhs) {
+  PetscFunctionBegin;
+
+  PetscInt num = mesh->num_internal_edges;
+
+  RiemannDataSWE datal, datar;
+  PetscCall(RiemannDataSWECreate(num, &datal));
+  PetscCall(RiemannDataSWECreate(num, &datar));
+
+  RiemannDataSWE *datal_bnd, *datar_bnd;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), num_boundaries, &datal_bnd));
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), num_boundaries, &datar_bnd));
+
+  for (PetscInt b = 0; b < num_boundaries; b++) {
+    RDyBoundary *boundary  = &boundaries[b];
+    PetscInt     num_edges = boundary->num_edges;
+
+    PetscCall(RiemannDataSWECreate(num_edges, &datal_bnd[b]));
+    PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
+  }
+
+  PetscRiemannDataSWE *data_swe;
+  PetscCall(RDyAlloc(sizeof(PetscRiemannDataSWE), 1, &data_swe));
+  data_swe->datal_internal_edges = datal;
+  data_swe->datar_internal_edges = datar;
+  data_swe->datal_bnd_edges      = datal_bnd;
+  data_swe->datar_bnd_edges      = datar_bnd;
+  *petsc_rhs                     = data_swe;
+
+  PetscFunctionReturn(0);
+}
+
+/// Allocates a struct for computing the source/sink term
+PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
+  PetscFunctionBegin;
+
+  PetscInt num = mesh->num_cells;
+
+  RiemannDataSWE *data;
+  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &data));
+
+  PetscCall(RiemannDataSWECreate(num, data));
+
+  PetscRiemannDataSWE *data_swe = petsc_rhs;
+  data_swe->data_cells          = *data;
+
+  PetscFunctionReturn(0);
+}
 
 // computes velocities in x and y-dir based on momentum in x and y-dir
 // N - Size of the array
