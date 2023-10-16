@@ -6,7 +6,6 @@
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
-#include <private/rdysweimpl.h>
 #include <rdycore.h>
 
 // This type defines a region consisting of cells identified by their local
@@ -176,11 +175,8 @@ struct _p_RDy {
 
   } ceed_rhs;
 
-  struct {
-    RiemannDataSWE  datal_internal_edges, datar_internal_edges;
-    RiemannDataSWE *datal_bnd_edges, *datar_bnd_edges;
-    RiemannDataSWE  data_cells;
-  } data_swe;
+  // Non-CEED solver data (must be cast to e. g. PetscRiemannDataSWE*)
+  void *petsc_rhs;
 };
 
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
