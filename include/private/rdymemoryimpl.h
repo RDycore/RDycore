@@ -9,7 +9,7 @@
 // @param [in] type The data type for which storage is allocated
 // @param [in] count The number of elements in the requested allocation
 // @param [out] result A pointer to the requested memory block
-#define RDyAlloc(type, count, result) PetscCalloc1(sizeof(type) * (count), result)
+#define RDyAlloc(type, count, result) PetscCalloc1((count), result)
 
 // Resizes the given block of memory to the new requested size.
 // @param [in] type The data type for which storage is resized

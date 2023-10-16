@@ -316,9 +316,9 @@ PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->ids));
   PetscCall(RDyAlloc(PetscInt, num_edges, &edges->global_ids));
-  PetscCall(RDyAlloc(PetscInt, num_edges, &edges->vertex_ids));
+  PetscCall(RDyAlloc(PetscInt, 2 * num_edges, &edges->vertex_ids));
   PetscCall(RDyFill(PetscInt, num_edges, edges->global_ids, -1));
-  PetscCall(RDyFill(PetscInt, num_edges, edges->vertex_ids, -1));
+  PetscCall(RDyFill(PetscInt, 2 * num_edges, edges->vertex_ids, -1));
 
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_local));
   PetscCall(RDyAlloc(PetscBool, num_edges, &edges->is_internal));
