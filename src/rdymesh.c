@@ -737,14 +737,13 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) 
   if (useNatural) {
     PetscInt num_fields;
 
-    PetscCall(DMGetNumFields(dm, &num_fields));
-
     // Create the natural vector
     Vec      natural;
     PetscInt natural_size = 0, natural_start;
     PetscCall(DMPlexCreateNaturalVector(dm, &natural));
     PetscCall(PetscObjectSetName((PetscObject)natural, "Natural Vec"));
     PetscCall(VecGetLocalSize(natural, &natural_size));
+    PetscCall(VecGetBlockSize(natural, &num_fields));
     PetscCall(VecGetOwnershipRange(natural, &natural_start, NULL));
 
     // Add entries in the natural vector
