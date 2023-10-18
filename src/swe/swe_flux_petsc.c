@@ -58,6 +58,51 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
   PetscFunctionReturn(0);
 }
 
+// Initialize the data on the right handside of the boundary edges.
+PetscErrorCode InitBoundaryPetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries], RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, void **petsc_rhs) {
+  PetscFunctionBegin;
+
+  PetscRiemannDataSWE *data_swe = *petsc_rhs;
+
+  for (PetscInt b = 0; b < num_boundaries; ++b) {
+    RDyBoundary    *boundary      = &boundaries[b];
+    RDyCondition   *boundary_cond = &boundary_conditions[b];
+    RiemannDataSWE *datar         = &data_swe->datar_bnd_edges[b];
+
+    RDyFlowCondition *flow_bc = boundary_cond->flow;
+
+    switch (boundary_cond->flow->type) {
+      case CONDITION_DIRICHLET:
+        // Set h/u/v for right cells
+        for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+          PetscInt iedge = boundary->edge_ids[e];
+          PetscInt icell = edges->cell_ids[2 * iedge];
+
+          if (cells->is_local[icell]) {
+            datar->h[e] = flow_bc->height;
+
+            if (flow_bc->height > tiny_h) {
+              datar->u[e] = flow_bc->momentum[0]/flow_bc->height;
+              datar->v[e] = flow_bc->momentum[1]/flow_bc->height;
+            } else {
+              datar->u[e] = 0.0;
+              datar->v[e] = 0.0;
+            }
+          }
+        }
+        break;
+      case CONDITION_REFLECTING:
+        break;
+      case CONDITION_CRITICAL_OUTFLOW:
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary->id);
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // computes velocities in x and y-dir based on momentum in x and y-dir
 // N - Size of the array
 // tiny_h - Threshold value for height
@@ -407,32 +452,12 @@ static PetscErrorCode ApplyDirchletBC(RDy rdy, RDyBoundary *boundary, RDyConditi
                                         PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
   PetscFunctionBeginUser;
 
-  RDyCells         *cells = &rdy->mesh.cells;
-  RDyEdges         *edges = &rdy->mesh.edges;
-  RDyFlowCondition *flow_bc = boundary_cond->flow;
-
   PetscInt  num = boundary->num_edges;
   PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
 
   PetscCall(PerformPrecomputationForBC(rdy, boundary, tiny_h, num, datal, datac, cn_vec_bnd, sn_vec_bnd));
 
-  // Compute h/u/v for right cells
-  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-    PetscInt iedge = boundary->edge_ids[e];
-    PetscInt icell = edges->cell_ids[2 * iedge];
-
-    if (cells->is_local[icell]) {
-      datar->h[e] = flow_bc->height;
-
-      if (flow_bc->height > tiny_h) {
-        datar->u[e] = flow_bc->momentum[0]/flow_bc->height;
-        datar->v[e] = flow_bc->momentum[1]/flow_bc->height;
-      } else {
-        datar->u[e] = 0;
-        datar->v[e] = 0;
-      }
-    }
-  }
+  // Currently, only time-invariant BC is supported and the values in 'datar' (aka BC) was set during model setup
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal, datar, sn_vec_bnd, cn_vec_bnd, F));
 
