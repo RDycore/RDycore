@@ -1044,7 +1044,7 @@ PetscErrorCode RDySetup(RDy rdy) {
     // allocate storage for our PETSc implementation of the  flux and
     // source terms
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
-    PetscCall(CreatePetscSWEFlux(&rdy->mesh, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
+    PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
   }
 

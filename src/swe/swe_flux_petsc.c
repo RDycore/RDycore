@@ -11,14 +11,12 @@ static const PetscReal GRAVITY = 9.806;
 
 /// For computing fluxes, allocates structs to hold values left and right
 /// of internal and boundary edges. This must be called before CreatePetscSWESource.
-PetscErrorCode CreatePetscSWEFlux(RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries], void **petsc_rhs) {
+PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries], void **petsc_rhs) {
   PetscFunctionBegin;
 
-  PetscInt num = mesh->num_internal_edges;
-
   RiemannDataSWE datal, datar;
-  PetscCall(RiemannDataSWECreate(num, &datal));
-  PetscCall(RiemannDataSWECreate(num, &datar));
+  PetscCall(RiemannDataSWECreate(num_internal_edges, &datal));
+  PetscCall(RiemannDataSWECreate(num_internal_edges, &datar));
 
   RiemannDataSWE *datal_bnd, *datar_bnd;
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), num_boundaries, &datal_bnd));

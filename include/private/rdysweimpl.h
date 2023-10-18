@@ -36,7 +36,7 @@ PETSC_INTERN PetscErrorCode GetRiemannFluxFromSWESourceOperator(CeedOperator, Ce
 PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);
 
-PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(RDyMesh *, PetscInt n, RDyBoundary[n], void **);
+PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt n, RDyBoundary[n], void **);
 PETSC_INTERN PetscErrorCode CreatePetscSWESource(RDyMesh *, void *);
 
 #endif  // rdyswe_h
