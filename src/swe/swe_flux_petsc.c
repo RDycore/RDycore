@@ -403,6 +403,44 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannD
   PetscFunctionReturn(0);
 }
 
+// applies a dirchlet boundary condition on the given boundary, computing
+// fluxes F for the solution vector components X
+static PetscErrorCode ApplyDirchletBC(RDy rdy, RDyBoundary *boundary, RDyCondition *boundary_cond, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac,
+                                        PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
+  PetscFunctionBeginUser;
+
+  RDyCells         *cells = &rdy->mesh.cells;
+  RDyEdges         *edges = &rdy->mesh.edges;
+  RDyFlowCondition *flow_bc = boundary_cond->flow;
+
+  PetscInt  num = boundary->num_edges;
+  PetscReal sn_vec_bnd[num], cn_vec_bnd[num];
+
+  PetscCall(PerformPrecomputationForBC(rdy, boundary, tiny_h, num, datal, datac, cn_vec_bnd, sn_vec_bnd));
+
+  // Compute h/u/v for right cells
+  for (PetscInt e = 0; e < boundary->num_edges; ++e) {
+    PetscInt iedge = boundary->edge_ids[e];
+    PetscInt icell = edges->cell_ids[2 * iedge];
+
+    if (cells->is_local[icell]) {
+      datar->h[e] = flow_bc->height;
+
+      if (flow_bc->height > tiny_h) {
+        datar->u[e] = flow_bc->momentum[0]/flow_bc->height;
+        datar->v[e] = flow_bc->momentum[1]/flow_bc->height;
+      } else {
+        datar->u[e] = 0;
+        datar->v[e] = 0;
+      }
+    }
+  }
+
+  PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal, datar, sn_vec_bnd, cn_vec_bnd, F));
+
+  PetscFunctionReturn(0);
+}
+
 // applies a critical outflow boundary condition, computing
 // fluxes F for the solution vector components X
 static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac,
@@ -460,12 +498,16 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
   // loop over all boundaries and apply boundary conditions
   PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    RDyBoundary    *boundary = &rdy->boundaries[b];
-    RiemannDataSWE *datal    = &data_swe->datal_bnd_edges[b];
-    RiemannDataSWE *datar    = &data_swe->datar_bnd_edges[b];
-    RiemannDataSWE *datac    = &data_swe->data_cells;
+    RDyBoundary    *boundary      = &rdy->boundaries[b];
+    RDyCondition   *boundary_cond = &rdy->boundary_conditions[b];
+    RiemannDataSWE *datal         = &data_swe->datal_bnd_edges[b];
+    RiemannDataSWE *datar         = &data_swe->datar_bnd_edges[b];
+    RiemannDataSWE *datac         = &data_swe->data_cells;
 
     switch (rdy->boundary_conditions[b].flow->type) {
+      case CONDITION_DIRICHLET:
+        PetscCall(ApplyDirchletBC(rdy, boundary, boundary_cond, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
+        break;
       case CONDITION_REFLECTING:
         PetscCall(ApplyReflectingBC(rdy, boundary, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
         break;
