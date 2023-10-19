@@ -11,6 +11,7 @@ module rdycore
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumEdgesInABoundaryConditions, RDyGetBoundaryConditionFlowType, &
+            RDySetDirichletBoundaryConditionValues, &
             RDyGetHeight, RDyGetXVelocity, RDyGetYVelocity
 
   ! RDycore uses double-precision floating point numbers
@@ -69,6 +70,15 @@ module rdycore
       type(c_ptr),    value, intent(in)  :: rdy
       integer(c_int), value, intent(in)  :: bnd_cond_id
       integer(c_int),        intent(out) :: num_edges
+    end function
+
+    integer(c_int) function rdysetdirichletboundaryconditionvalues_(rdy, bnd_cond_id, num_edges, ndof, bc_values) bind(c, name="RDySetDirichletBoundaryConditionValues")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int), value, intent(in)  :: bnd_cond_id
+      integer(c_int), value, intent(in)  :: num_edges
+      integer(c_int), value, intent(in)  :: ndof
+      type(c_ptr), value, intent(in)     :: bc_values
     end function
 
     integer(c_int) function rdygetboundaryconditionflowtype_(rdy, bnd_cond_id, bnd_cond_type) bind(c, name="RDyGetBoundaryConditionFlowType")
@@ -229,6 +239,16 @@ contains
     integer,   intent(out)   :: num_edges
     integer,   intent(out)   :: ierr
     ierr = rdygetnumedgesinaboundaryconditions_(rdy_%c_rdy, bnd_cond_id-1, num_edges)
+  end subroutine
+
+  subroutine RDySetDirichletBoundaryConditionValues(rdy_, bnd_cond_id, num_edges, ndof, bc_values, ierr)
+    type(RDy),       intent(inout)       :: rdy_
+    integer,         intent(in)          :: bnd_cond_id
+    integer,         intent(in)          :: num_edges
+    integer,         intent(in)          :: ndof
+    real(RDyDouble), pointer, intent(in) :: bc_values(:)
+    integer,         intent(out)         :: ierr
+    ierr = rdysetdirichletboundaryconditionvalues_(rdy_%c_rdy, bnd_cond_id-1, num_edges, ndof, c_loc(bc_values))
   end subroutine
 
   subroutine RDyGetBoundaryConditionFlowType(rdy_, bnd_cond_id, bnd_cond_type, ierr)
