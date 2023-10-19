@@ -41,8 +41,9 @@ int main(int argc, char *argv[]) {
     PetscInt nbcs;
     PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
     for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
-      PetscInt num_edges;
+      PetscInt num_edges, bc_type;
       PetscCall(RDyGetNumEdgesInABoundaryConditions(rdy, ibc, &num_edges));
+      PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
     }
 
     // run the simulation to completion using the time parameters in the
