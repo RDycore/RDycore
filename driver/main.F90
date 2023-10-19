@@ -47,7 +47,7 @@ program rdycore_f90
       ! get information about boundary conditions
       PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbconds, ierr))
       do ibcond = 1, nbconds
-        PetscCallA(RDyGetNumEdgesInABoundaryConditions(rdy_, ibcond, num_edges, ierr))
+        PetscCallA(RDyGetNumBoundaryConditionEdges(rdy_, ibcond, num_edges, ierr))
         PetscCallA(RDyGetBoundaryConditionFlowType(rdy_, ibcond, bcond_type, ierr))
       enddo
 

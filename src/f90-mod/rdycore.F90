@@ -10,7 +10,7 @@ module rdycore
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
-            RDyGetNumEdgesInABoundaryConditions, RDyGetBoundaryConditionFlowType, &
+            RDyGetNumBoundaryConditionEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryConditionValues, &
             RDyGetHeight, RDyGetXVelocity, RDyGetYVelocity
 
@@ -65,7 +65,7 @@ module rdycore
       integer(c_int),        intent(out) :: num_bnd_conds
     end function
 
-    integer(c_int) function rdygetnumedgesinaboundaryconditions_(rdy, bnd_cond_id, num_edges) bind(c, name="RDyGetNumEdgesInABoundaryConditions")
+    integer(c_int) function rdygetnumboundaryconditionedges_(rdy, bnd_cond_id, num_edges) bind(c, name="RDyGetNumBoundaryConditionEdges")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr),    value, intent(in)  :: rdy
       integer(c_int), value, intent(in)  :: bnd_cond_id
@@ -233,12 +233,12 @@ contains
     ierr = rdygetnumboundaryconditions_(rdy_%c_rdy, num_bnd_conds)
   end subroutine
 
-  subroutine RDyGetNumEdgesInABoundaryConditions(rdy_, bnd_cond_id, num_edges, ierr)
+  subroutine RDyGetNumBoundaryConditionEdges(rdy_, bnd_cond_id, num_edges, ierr)
     type(RDy), intent(inout) :: rdy_
     integer,   intent(in)    :: bnd_cond_id
     integer,   intent(out)   :: num_edges
     integer,   intent(out)   :: ierr
-    ierr = rdygetnumedgesinaboundaryconditions_(rdy_%c_rdy, bnd_cond_id-1, num_edges)
+    ierr = rdygetnumboundaryconditionedges_(rdy_%c_rdy, bnd_cond_id-1, num_edges)
   end subroutine
 
   subroutine RDySetDirichletBoundaryConditionValues(rdy_, bnd_cond_id, num_edges, ndof, bc_values, ierr)

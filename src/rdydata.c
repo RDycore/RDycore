@@ -23,7 +23,7 @@ static PetscErrorCode CheckBoundaryConditionID(RDy rdy, PetscInt bnd_cond_id) {
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetNumEdgesInABoundaryConditions(RDy rdy, PetscInt bnd_cond_id, PetscInt *num_edges) {
+PetscErrorCode RDyGetNumBoundaryConditionEdges(RDy rdy, PetscInt bnd_cond_id, PetscInt *num_edges) {
   PetscFunctionBegin;
   PetscCall(CheckBoundaryConditionID(rdy, bnd_cond_id));
   RDyBoundary *boundary = &rdy->boundaries[bnd_cond_id];
