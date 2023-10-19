@@ -58,10 +58,24 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_id, Pets
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
   if (rdy->ceed_resource[0]) {  // ceed
+    // fetch the array storing the boundary values
     CeedOperatorField dirichlet_field;
     PetscCall(GetSWEFluxOperatorDirichletBoundaryValues(rdy->ceed_rhs.op_edges, boundary_id, &dirichlet_field));
     CeedVector dirichlet_vector;
-    // FIXME: set boundary values here!
+    CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector);
+    PetscInt num_comp = 3;
+    CeedScalar(*dirichlet_ceed)[num_comp];
+    CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed);
+
+    // set the boundary values
+    for (PetscInt i = 0; i < boundary.num_edges; ++i) {
+      dirichlet_ceed[i][0] = bc_values[num_comp * i];
+      dirichlet_ceed[i][1] = bc_values[num_comp * i + 1];
+      dirichlet_ceed[i][2] = bc_values[num_comp * i + 2];
+    }
+
+    // copy the values into the CEED operator
+    CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed);
   } else {  // petsc
     PetscCall(SetPetscSWEDirichletBoundaryValues(rdy->petsc_rhs, &rdy->mesh, boundary, bc_values, tiny_h));
   }
