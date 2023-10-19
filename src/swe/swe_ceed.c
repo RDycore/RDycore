@@ -1,6 +1,6 @@
 #include <private/rdysweimpl.h>
 
-#include "swe_operators_impl.h"
+#include "swe_ceed_impl.h"
 
 // frees a data context allocated using PETSc, returning a libCEED error code
 static int FreeContextPetsc(void *data) {
@@ -134,6 +134,10 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   CeedQFunctionUser func;
   const char       *func_loc;
   switch (boundary_condition.flow->type) {
+    case CONDITION_DIRICHLET:
+      func     = SWEBoundaryFlux_Dirichlet_Roe;
+      func_loc = SWEBoundaryFlux_Dirichlet_Roe_loc;
+      break;
     case CONDITION_REFLECTING:
       func     = SWEBoundaryFlux_Reflecting_Roe;
       func_loc = SWEBoundaryFlux_Reflecting_Roe_loc;
@@ -151,6 +155,9 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
   CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE);
   CeedQFunctionAddOutput(qf, "cell_left", num_comp, CEED_EVAL_NONE);
+  if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
+    CeedQFunctionAddInput(qf, "q_dirichlet", num_comp, CEED_EVAL_NONE);
+  }
   CeedQFunctionAddOutput(qf, "flux", num_comp, CEED_EVAL_NONE);
 
   CeedQFunctionContext qf_context;
@@ -159,14 +166,17 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   CeedQFunctionSetContext(qf, qf_context);
   CeedQFunctionContextDestroy(&qf_context);
 
-  CeedElemRestriction restrict_l, restrict_geom, restrict_flux;
-  CeedVector          geom, flux;
+  CeedElemRestriction restrict_l, restrict_dirichlet, restrict_geom, restrict_flux;
+  CeedVector          geom, flux, dirichlet;
   {
     CeedInt num_edges = boundary.num_edges;
 
     // create element restrictions for left and right input/output states
-    CeedInt *offset_l;
+    CeedInt *offset_l, *offset_dirichlet = NULL;
     PetscCall(PetscMalloc1(num_edges, &offset_l));
+    if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
+      PetscCall(PetscMalloc1(num_edges, &offset_dirichlet));
+    }
 
     // create an element restriction for geometric factors that convert
     // fluxes to cell states
@@ -186,7 +196,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL);
     CeedVectorSetValue(flux, 0.0);
 
-    // create an element restrictions for the "left" (interior) input/output
+    // create an element restriction for the "left" (interior) input/output
     // states, populate offsets for these states, and set the (invariant)
     // geometric parameters
     CeedScalar(*g)[3];
@@ -195,7 +205,11 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
       PetscInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
       PetscInt l   = edges->cell_ids[2 * iedge];
+      PetscInt r   = edges->cell_ids[2 * iedge + 1];
       offset_l[oe] = l * num_comp;
+      if (offset_dirichlet) {  // Dirichlet boundary values
+        offset_dirichlet[oe] = r * num_comp;
+      }
 
       g[oe][0] = edges->sn[iedge];
       g[oe][1] = edges->cn[iedge];
@@ -209,11 +223,25 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
                               &restrict_l);
     PetscCall(PetscFree(offset_l));
     if (0) CeedElemRestrictionView(restrict_l, stdout);
+
+    // if we have Dirichlet boundary values, create a restriction and passive
+    // input vector for them
+    if (offset_dirichlet) {
+      CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_dirichlet,
+                                &restrict_dirichlet);
+      PetscCall(PetscFree(offset_dirichlet));
+      if (0) CeedElemRestrictionView(restrict_dirichlet, stdout);
+      CeedElemRestrictionCreateVector(restrict_dirichlet, &dirichlet, NULL);
+      CeedVectorSetValue(dirichlet, 0.0);
+    }
   }
 
   CeedOperatorCreate(ceed, qf, NULL, NULL, flux_op);
   CeedOperatorSetField(*flux_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
   CeedOperatorSetField(*flux_op, "q_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
+    CeedOperatorSetField(*flux_op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_COLLOCATED, dirichlet);
+  }
   CeedOperatorSetField(*flux_op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(*flux_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux);
 
@@ -260,6 +288,22 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
   }
 
   if (0) CeedOperatorView(*flux_op, stdout);
+  PetscFunctionReturn(0);
+}
+
+// Gets the field representing Dirіchlet boundary values for the boundary with
+// the given ID (if available)
+PetscErrorCode GetSWEFluxOperatorDirichletBoundaryValues(CeedOperator flux_op, PetscInt boundary_id, CeedOperatorField *boundary_values) {
+  PetscFunctionBeginUser;
+
+  // get the relevant boundary sub-operator
+  CeedOperator *sub_ops;
+  CeedCompositeOperatorGetSubList(flux_op, &sub_ops);
+  CeedOperator boundary_flux_op = sub_ops[1 + boundary_id];
+
+  // fetch the field
+  CeedOperatorGetFieldByName(boundary_flux_op, "q_dirichlet", boundary_values);
+
   PetscFunctionReturn(0);
 }
 
@@ -379,7 +423,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial mat
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the source of water.
 // This can be used to implement a time-dependent water source.
-PetscErrorCode GetWaterSourceFromSWESourceOperator(CeedOperator source_op, CeedOperatorField *water_source_field) {
+PetscErrorCode GetSWESourceOperatorWaterSource(CeedOperator source_op, CeedOperatorField *water_source_field) {
   PetscFunctionBeginUser;
 
   // get the source sub-operator responsible for the water source (the first one)
@@ -394,7 +438,7 @@ PetscErrorCode GetWaterSourceFromSWESourceOperator(CeedOperator source_op, CeedO
 
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the Riemann flux.
-PetscErrorCode GetRiemannFluxFromSWESourceOperator(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {
+PetscErrorCode GetSWESourceOperatorRiemannFlux(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {
   PetscFunctionBeginUser;
 
   // get the source sub-operator responsible for the water source (the first one)

@@ -1046,8 +1046,8 @@ PetscErrorCode RDySetup(RDy rdy) {
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
     PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
-    PetscCall(InitBoundaryPetscSWEFlux(&rdy->mesh.cells, &rdy->mesh.edges, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                       rdy->config.physics.flow.tiny_h, &rdy->petsc_rhs));
+    PetscCall(InitPetscSWEBoundaryFlux(rdy->petsc_rhs, &rdy->mesh.cells, &rdy->mesh.edges, rdy->num_boundaries, rdy->boundaries,
+                                       rdy->boundary_conditions, rdy->config.physics.flow.tiny_h));
   }
 
   PetscFunctionReturn(0);

@@ -59,11 +59,11 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
 }
 
 // Initialize the data on the right handside of the boundary edges.
-PetscErrorCode InitBoundaryPetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries],
-                                        RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, void **petsc_rhs) {
+PetscErrorCode InitPetscSWEBoundaryFlux(void *petsc_rhs, RDyCells *cells, RDyEdges *edges, PetscInt num_boundaries,
+                                        RDyBoundary boundaries[num_boundaries], RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h) {
   PetscFunctionBegin;
 
-  PetscRiemannDataSWE *data_swe = *petsc_rhs;
+  PetscRiemannDataSWE *data_swe = petsc_rhs;
 
   for (PetscInt b = 0; b < num_boundaries; ++b) {
     RDyBoundary    *boundary      = &boundaries[b];
@@ -650,6 +650,36 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(rdy->water_src, &water_src_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
+
+  PetscFunctionReturn(0);
+}
+
+// sets Dirichlet boundary values on the given boundary
+PetscErrorCode SetPetscSWEDirichletBoundaryValues(void *petsc_rhs, RDyMesh *mesh, RDyBoundary boundary, PetscReal *boundary_values,
+                                                  PetscReal tiny_h) {
+  PetscFunctionBegin;
+
+  PetscRiemannDataSWE *data_swe = petsc_rhs;
+  RDyCells            *cells    = &mesh->cells;
+  RDyEdges            *edges    = &mesh->edges;
+  RiemannDataSWE      *datar    = &data_swe->datar_bnd_edges[boundary.id];
+
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt iedge = boundary.edge_ids[e];
+    PetscInt icell = edges->cell_ids[2 * iedge];
+
+    if (cells->is_local[icell]) {
+      datar->h[e] = boundary_values[3 * e];
+
+      if (datar->h[e] > tiny_h) {
+        datar->u[e] = boundary_values[3 * e + 1] / datar->h[e];
+        datar->v[e] = boundary_values[3 * e + 2] / datar->h[e];
+      } else {
+        datar->u[e] = 0.0;
+        datar->v[e] = 0.0;
+      }
+    }
+  }
 
   PetscFunctionReturn(0);
 }

@@ -129,6 +129,30 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   return 0;
 }
 
+CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*q_R)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // Dirichlet boundary values
+  CeedScalar(*cell_L)[CEED_Q_VLA]     = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SWEContext context            = (SWEContext)ctx;
+
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar gravity = context->gravity;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    if (qL.h > tiny_h) {
+      CeedScalar flux[3], amax;
+      SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i] = flux[j] * geom[2][i];
+      }
+    }
+  }
+  return 0;
+}
+
 CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
