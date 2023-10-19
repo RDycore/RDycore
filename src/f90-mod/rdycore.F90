@@ -220,7 +220,7 @@ contains
     integer,   intent(in)    :: bnd_cond_id
     integer,   intent(out)   :: num_edges
     integer,   intent(out)   :: ierr
-    ierr = rdygetnumedgesinaboundaryconditions_(rdy_%c_rdy, bnd_cond_id, num_edges)
+    ierr = rdygetnumedgesinaboundaryconditions_(rdy_%c_rdy, bnd_cond_id-1, num_edges)
   end subroutine
 
   subroutine RDyGetTime(rdy_, time, ierr)
