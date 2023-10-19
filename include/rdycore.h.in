@@ -45,9 +45,21 @@ PETSC_EXTERN PetscErrorCode RDyGetStep(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetCouplingInterval(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditionEdges(RDy, PetscInt, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, PetscInt, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryConditionValues(RDy, PetscInt, PetscInt, PetscInt, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetHeight(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetXVelocity(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetYVelocity(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetWaterSource(RDy, PetscReal*);
+
+// "kinds" of initial/boundary/source conditions applied to regions/boundaries
+typedef enum {
+  CONDITION_DIRICHLET = 0,    // Dirichlet condition (value is specified)
+  CONDITION_NEUMANN,          // Neumann condition (derivative is specified)
+  CONDITION_REFLECTING,       // Reflecting condition
+  CONDITION_CRITICAL_OUTFLOW  // Critical flow
+} RDyConditionType;
 
 #endif

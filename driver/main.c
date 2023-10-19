@@ -37,6 +37,15 @@ int main(int argc, char *argv[]) {
     PetscCalloc1(n * sizeof(PetscReal), &vy);
     PetscCalloc1(n * sizeof(PetscReal), &rain);
 
+    // get information about boundary conditions
+    PetscInt nbcs;
+    PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+    for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
+      PetscInt num_edges, bc_type;
+      PetscCall(RDyGetNumBoundaryConditionEdges(rdy, ibc, &num_edges));
+      PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
+    }
+
     // run the simulation to completion using the time parameters in the
     // config file
     PetscReal prev_time, coupling_interval;
