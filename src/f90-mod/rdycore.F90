@@ -9,7 +9,7 @@ module rdycore
 
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
-            RDyGetNumLocalCells, RDyGetHeight, &
+            RDyGetNumLocalCells, RDyGetNumBoundaryConditions, RDyGetHeight, &
             RDyGetXVelocity, RDyGetYVelocity
 
   ! RDycore uses double-precision floating point numbers
@@ -55,6 +55,19 @@ module rdycore
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr),    value, intent(in)  :: rdy
       integer(c_int),        intent(out) :: num_cells
+    end function
+
+    integer(c_int) function rdygetnumboundaryconditions_(rdy, num_bnd_conds) bind(c, name="RDyGetNumBoundaryConditions")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int),        intent(out) :: num_bnd_conds
+    end function
+
+    integer(c_int) function rdygetnumedgesinaboundaryconditions_(rdy, bnd_cond_id, num_edges) bind(c, name="RDyGetNumEdgesInABoundaryConditions")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int), value, intent(in)  :: bnd_cond_id
+      integer(c_int),        intent(out) :: num_edges
     end function
 
     integer(c_int) function rdygettime_(rdy, time) bind(c, name="RDyGetTime")
@@ -193,6 +206,21 @@ contains
     integer,   intent(out)   :: num_cells
     integer,   intent(out)   :: ierr
     ierr = rdygetnumlocalcells_(rdy_%c_rdy, num_cells)
+  end subroutine
+
+  subroutine RDyGetNumBoundaryConditions(rdy_, num_bnd_conds, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(out)   :: num_bnd_conds
+    integer,   intent(out)   :: ierr
+    ierr = rdygetnumboundaryconditions_(rdy_%c_rdy, num_bnd_conds)
+  end subroutine
+
+  subroutine RDyGetNumEdgesInABoundaryConditions(rdy_, bnd_cond_id, num_edges, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(in)    :: bnd_cond_id
+    integer,   intent(out)   :: num_edges
+    integer,   intent(out)   :: ierr
+    ierr = rdygetnumedgesinaboundaryconditions_(rdy_%c_rdy, bnd_cond_id, num_edges)
   end subroutine
 
   subroutine RDyGetTime(rdy_, time, ierr)

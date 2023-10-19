@@ -7,6 +7,23 @@ PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode RDyGetNumBoundaryConditions(RDy rdy, PetscInt *num_bnd_conds) {
+  PetscFunctionBegin;
+  *num_bnd_conds = rdy->num_boundaries;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode RDyGetNumEdgesInABoundaryConditions(RDy rdy, PetscInt bnd_cond_id, PetscInt *num_edges) {
+  PetscFunctionBegin;
+  PetscCheck(bnd_cond_id < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
+             "Boundary condition ID (%d) exceeds the max number of boundary conditions (%d)", bnd_cond_id, rdy->num_boundaries);
+  PetscCheck(bnd_cond_id >= 0, rdy->comm, PETSC_ERR_USER,
+             "Boundary condition ID (%d) cannot be less than zero.", bnd_cond_id);
+  RDyBoundary *boundary  = &rdy->boundaries[bnd_cond_id];
+  *num_edges = boundary->num_edges;
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
   PetscFunctionBegin;
 

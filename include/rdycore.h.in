@@ -45,6 +45,7 @@ PETSC_EXTERN PetscErrorCode RDyGetStep(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetCouplingInterval(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetHeight(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetXVelocity(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetYVelocity(RDy, PetscReal*);
