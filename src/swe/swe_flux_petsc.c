@@ -59,7 +59,8 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
 }
 
 // Initialize the data on the right handside of the boundary edges.
-PetscErrorCode InitBoundaryPetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries], RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, void **petsc_rhs) {
+PetscErrorCode InitBoundaryPetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries],
+                                        RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, void **petsc_rhs) {
   PetscFunctionBegin;
 
   PetscRiemannDataSWE *data_swe = *petsc_rhs;
@@ -448,8 +449,8 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannD
 
 // applies a dirchlet boundary condition on the given boundary, computing
 // fluxes F for the solution vector components X
-static PetscErrorCode ApplyDirchletBC(RDy rdy, RDyBoundary *boundary, RDyCondition *boundary_cond, RiemannDataSWE *datal, RiemannDataSWE *datar, RiemannDataSWE *datac,
-                                        PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
+static PetscErrorCode ApplyDirchletBC(RDy rdy, RDyBoundary *boundary, RDyCondition *boundary_cond, RiemannDataSWE *datal, RiemannDataSWE *datar,
+                                      RiemannDataSWE *datac, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
   PetscFunctionBeginUser;
 
   PetscInt  num = boundary->num_edges;
