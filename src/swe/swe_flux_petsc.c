@@ -447,9 +447,9 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannD
   PetscFunctionReturn(0);
 }
 
-// applies a dirchlet boundary condition on the given boundary, computing
+// applies a dirichlet boundary condition on the given boundary, computing
 // fluxes F for the solution vector components X
-static PetscErrorCode ApplyDirchletBC(RDy rdy, RDyBoundary *boundary, RDyCondition *boundary_cond, RiemannDataSWE *datal, RiemannDataSWE *datar,
+static PetscErrorCode ApplyDirichletBC(RDy rdy, RDyBoundary *boundary, RDyCondition *boundary_cond, RiemannDataSWE *datal, RiemannDataSWE *datar,
                                       RiemannDataSWE *datac, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
   PetscFunctionBeginUser;
 
@@ -530,7 +530,7 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
 
     switch (rdy->boundary_conditions[b].flow->type) {
       case CONDITION_DIRICHLET:
-        PetscCall(ApplyDirchletBC(rdy, boundary, boundary_cond, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
+        PetscCall(ApplyDirichletBC(rdy, boundary, boundary_cond, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
         break;
       case CONDITION_REFLECTING:
         PetscCall(ApplyReflectingBC(rdy, boundary, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
