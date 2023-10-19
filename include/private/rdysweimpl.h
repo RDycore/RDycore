@@ -28,7 +28,7 @@ typedef struct {
 } CourantNumberDiagnostics;
 
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *m, RDyMaterial[m->num_cells], PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, RDyMaterial[mesh->num_cells], PetscReal, CeedOperator *);
 
 PETSC_INTERN PetscErrorCode GetWaterSourceFromSWESourceOperator(CeedOperator, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode GetRiemannFluxFromSWESourceOperator(CeedOperator, CeedOperatorField *);
