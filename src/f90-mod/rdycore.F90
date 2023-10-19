@@ -70,6 +70,13 @@ module rdycore
       integer(c_int),        intent(out) :: num_edges
     end function
 
+    integer(c_int) function rdygetboundaryconditionflowtype_(rdy, bnd_cond_id, bnd_cond_type) bind(c, name="RDyGetBoundaryConditionFlowType")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int), value, intent(in)  :: bnd_cond_id
+      integer(c_int),        intent(out) :: bnd_cond_type
+    end function
+
     integer(c_int) function rdygettime_(rdy, time) bind(c, name="RDyGetTime")
       use iso_c_binding, only: c_int, c_ptr, c_double
       type(c_ptr),    value, intent(in)  :: rdy
@@ -221,6 +228,14 @@ contains
     integer,   intent(out)   :: num_edges
     integer,   intent(out)   :: ierr
     ierr = rdygetnumedgesinaboundaryconditions_(rdy_%c_rdy, bnd_cond_id-1, num_edges)
+  end subroutine
+
+  subroutine RDyGetBoundaryConditionFlowType(rdy_, bnd_cond_id, bnd_cond_type, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(in)    :: bnd_cond_id
+    integer,   intent(out)   :: bnd_cond_type
+    integer,   intent(out)   :: ierr
+    ierr = rdygetboundaryconditionflowtype_(rdy_%c_rdy, bnd_cond_id-1, bnd_cond_type)
   end subroutine
 
   subroutine RDyGetTime(rdy_, time, ierr)

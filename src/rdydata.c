@@ -23,6 +23,16 @@ PetscErrorCode RDyGetNumEdgesInABoundaryConditions(RDy rdy, PetscInt bnd_cond_id
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, PetscInt bnd_cond_id, PetscInt *bc_type) {
+  PetscFunctionBegin;
+  PetscCheck(bnd_cond_id < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
+             "Boundary condition ID (%d) exceeds the max number of boundary conditions (%d)", bnd_cond_id, rdy->num_boundaries);
+  PetscCheck(bnd_cond_id >= 0, rdy->comm, PETSC_ERR_USER, "Boundary condition ID (%d) cannot be less than zero.", bnd_cond_id);
+  RDyCondition *boundary_cond = &rdy->boundary_conditions[bnd_cond_id];
+  *bc_type                    = boundary_cond->flow->type;
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
   PetscFunctionBegin;
 
