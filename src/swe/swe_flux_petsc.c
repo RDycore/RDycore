@@ -450,7 +450,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannD
 // applies a dirichlet boundary condition on the given boundary, computing
 // fluxes F for the solution vector components X
 static PetscErrorCode ApplyDirichletBC(RDy rdy, RDyBoundary *boundary, RDyCondition *boundary_cond, RiemannDataSWE *datal, RiemannDataSWE *datar,
-                                      RiemannDataSWE *datac, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
+                                       RiemannDataSWE *datac, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscReal *F) {
   PetscFunctionBeginUser;
 
   PetscInt  num = boundary->num_edges;

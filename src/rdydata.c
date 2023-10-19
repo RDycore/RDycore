@@ -53,7 +53,8 @@ PetscErrorCode RDySetDirichletBoundaryConditionValues(RDy rdy, PetscInt bnd_cond
 
   RDyCondition *boundary_cond = &rdy->boundary_conditions[bnd_cond_id];
   PetscCheck(boundary_cond->flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for boundary condition (%d), but it is of a different type (%d)", bnd_cond_id, boundary_cond->flow->type);
+             "Trying to set dirichlet values for boundary condition (%d), but it is of a different type (%d)", bnd_cond_id,
+             boundary_cond->flow->type);
 
   RDyCells            *cells    = &rdy->mesh.cells;
   RDyEdges            *edges    = &rdy->mesh.edges;
