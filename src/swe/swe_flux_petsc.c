@@ -82,8 +82,8 @@ PetscErrorCode InitBoundaryPetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscI
             datar->h[e] = flow_bc->height;
 
             if (flow_bc->height > tiny_h) {
-              datar->u[e] = flow_bc->momentum[0]/flow_bc->height;
-              datar->v[e] = flow_bc->momentum[1]/flow_bc->height;
+              datar->u[e] = flow_bc->momentum[0] / flow_bc->height;
+              datar->v[e] = flow_bc->momentum[1] / flow_bc->height;
             } else {
               datar->u[e] = 0.0;
               datar->v[e] = 0.0;
