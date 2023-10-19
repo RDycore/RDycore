@@ -9,8 +9,9 @@ module rdycore
 
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
-            RDyGetNumLocalCells, RDyGetNumBoundaryConditions, RDyGetHeight, &
-            RDyGetXVelocity, RDyGetYVelocity
+            RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
+            RDyGetNumEdgesInABoundaryConditions, RDyGetBoundaryConditionFlowType, &
+            RDyGetHeight, RDyGetXVelocity, RDyGetYVelocity
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
