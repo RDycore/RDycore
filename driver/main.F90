@@ -20,6 +20,7 @@ program rdycore_f90
   type(RDy)           :: rdy_
   PetscErrorCode      :: ierr
   PetscInt            :: n, step
+  PetscInt            :: nbconds, ibcond, num_edges
   PetscReal, pointer  :: h(:), vx(:), vy(:), rain(:)
   PetscReal           :: time, time_step, prev_time, coupling_interval
 
@@ -40,6 +41,12 @@ program rdycore_f90
       ! allocate arrays for inspecting simulation data
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
       allocate(h(n), vx(n), vy(n), rain(n))
+
+      ! get information about boundary conditions
+      PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbconds, ierr))
+      do ibcond = 0, nbconds-1
+        PetscCallA(RDyGetNumEdgesInABoundaryConditions(rdy_, ibcond, num_edges, ierr))
+      enddo
 
       ! run the simulation to completion using the time parameters in the
       ! config file
