@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <petscviewer.h>
 #include <private/rdylogimpl.h>
+#include <rdycore.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
@@ -204,14 +205,6 @@ typedef struct {
 // initial, boundary and source conditions
 // ---------------------------------------
 // The following data structures are used in several sections.
-
-// "kinds" of initial/boundary/source conditions applied to regions/boundaries
-typedef enum {
-  CONDITION_DIRICHLET = 0,    // Dirichlet condition (value is specified)
-  CONDITION_NEUMANN,          // Neumann condition (derivative is specified)
-  CONDITION_REFLECTING,       // Reflecting condition
-  CONDITION_CRITICAL_OUTFLOW  // Critical flow
-} RDyConditionType;
 
 // This type defines an initial/boundary condition and/or source/sink with named
 // flow, sediment, and salinity conditions.
