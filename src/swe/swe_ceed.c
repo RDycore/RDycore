@@ -292,14 +292,15 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
 }
 
 // Gets the field representing Dirіchlet boundary values for the boundary with
-// the given ID (if available)
-PetscErrorCode GetSWEFluxOperatorDirichletBoundaryValues(CeedOperator flux_op, PetscInt boundary_id, CeedOperatorField *boundary_values) {
+// the given index (if available). NOTE that the boundary index b identifies the
+// bth boundary added to the SWE flux operator, NOT the boundary with ID b.
+PetscErrorCode GetSWEFluxOperatorDirichletBoundaryValues(CeedOperator flux_op, PetscInt boundary_index, CeedOperatorField *boundary_values) {
   PetscFunctionBeginUser;
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
   CeedCompositeOperatorGetSubList(flux_op, &sub_ops);
-  CeedOperator boundary_flux_op = sub_ops[1 + boundary_id];
+  CeedOperator boundary_flux_op = sub_ops[1 + boundary_index];
 
   // fetch the field
   CeedOperatorGetFieldByName(boundary_flux_op, "q_dirichlet", boundary_values);

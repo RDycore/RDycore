@@ -23,9 +23,7 @@ PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt num_boun
   PetscCall(RDyAlloc(sizeof(RiemannDataSWE), num_boundaries, &datar_bnd));
 
   for (PetscInt b = 0; b < num_boundaries; b++) {
-    RDyBoundary *boundary  = &boundaries[b];
-    PetscInt     num_edges = boundary->num_edges;
-
+    PetscInt num_edges = boundaries[b].num_edges;
     PetscCall(RiemannDataSWECreate(num_edges, &datal_bnd[b]));
     PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
   }
@@ -56,52 +54,6 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
   data_swe->data_cells          = *data;
 
   PetscFunctionReturn(0);
-}
-
-// Initialize the data on the right handside of the boundary edges.
-PetscErrorCode InitPetscSWEBoundaryFlux(void *petsc_rhs, RDyCells *cells, RDyEdges *edges, PetscInt num_boundaries,
-                                        RDyBoundary boundaries[num_boundaries], RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h) {
-  PetscFunctionBegin;
-
-  PetscRiemannDataSWE *data_swe = petsc_rhs;
-
-  for (PetscInt b = 0; b < num_boundaries; ++b) {
-    RDyBoundary    *boundary      = &boundaries[b];
-    RDyCondition   *boundary_cond = &boundary_conditions[b];
-    RiemannDataSWE *datar         = &data_swe->datar_bnd_edges[b];
-
-    RDyFlowCondition *flow_bc = boundary_cond->flow;
-
-    switch (boundary_cond->flow->type) {
-      case CONDITION_DIRICHLET:
-        // Set h/u/v for right cells
-        for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-          PetscInt iedge = boundary->edge_ids[e];
-          PetscInt icell = edges->cell_ids[2 * iedge];
-
-          if (cells->is_local[icell]) {
-            datar->h[e] = flow_bc->height;
-
-            if (flow_bc->height > tiny_h) {
-              datar->u[e] = flow_bc->momentum[0] / flow_bc->height;
-              datar->v[e] = flow_bc->momentum[1] / flow_bc->height;
-            } else {
-              datar->u[e] = 0.0;
-              datar->v[e] = 0.0;
-            }
-          }
-        }
-        break;
-      case CONDITION_REFLECTING:
-        break;
-      case CONDITION_CRITICAL_OUTFLOW:
-        break;
-      default:
-        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary->id);
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // computes velocities in x and y-dir based on momentum in x and y-dir
@@ -654,32 +606,15 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   PetscFunctionReturn(0);
 }
 
-// sets Dirichlet boundary values on the given boundary
-PetscErrorCode SetPetscSWEDirichletBoundaryValues(void *petsc_rhs, RDyMesh *mesh, RDyBoundary boundary, PetscReal *boundary_values,
-                                                  PetscReal tiny_h) {
+// Sets Dirichlet boundary values on the boundary with the given index. NOTE
+// that the boundary index b identifies the bth boundary in RDycore's array of
+// boundaries and boundary conditions, and NOT the boundary with ID b.
+PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_rhs, PetscInt boundary_index, RiemannDataSWE *boundary_data) {
   PetscFunctionBegin;
 
+  printf("Boundary index: %d\n", boundary_index);
   PetscRiemannDataSWE *data_swe = petsc_rhs;
-  RDyCells            *cells    = &mesh->cells;
-  RDyEdges            *edges    = &mesh->edges;
-  RiemannDataSWE      *datar    = &data_swe->datar_bnd_edges[boundary.id];
-
-  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-    PetscInt iedge = boundary.edge_ids[e];
-    PetscInt icell = edges->cell_ids[2 * iedge];
-
-    if (cells->is_local[icell]) {
-      datar->h[e] = boundary_values[3 * e];
-
-      if (datar->h[e] > tiny_h) {
-        datar->u[e] = boundary_values[3 * e + 1] / datar->h[e];
-        datar->v[e] = boundary_values[3 * e + 2] / datar->h[e];
-      } else {
-        datar->u[e] = 0.0;
-        datar->v[e] = 0.0;
-      }
-    }
-  }
+  *boundary_data                = data_swe->datar_bnd_edges[boundary_index];
 
   PetscFunctionReturn(0);
 }

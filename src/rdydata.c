@@ -39,19 +39,28 @@ PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, PetscInt boundary_id, Pe
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_id, PetscInt num_edges, PetscInt ndof, PetscReal *bc_values) {
+PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_id, PetscInt num_edges, PetscInt ndof, PetscReal *boundary_values) {
   PetscFunctionBegin;
 
   PetscCall(CheckBoundaryConditionID(rdy, boundary_id));
 
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%d) for the boundary condition need to be three.", ndof);
 
-  RDyBoundary boundary = rdy->boundaries[boundary_id];
-  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
-             "The number of edges (%d) in the data to set boundary condition for ID = %d, do not match the actual number of edge (%d)", num_edges,
-             boundary_id, boundary.num_edges);
+  // find the index of the boundary with the given ID
+  PetscInt b_index = -1;
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    if (rdy->boundaries[b].id == boundary_id) {
+      b_index = b;
+      break;
+    }
+  }
+  PetscCheck(b_index != -1, rdy->comm, PETSC_ERR_USER, "Invalid boundary ID: %d", boundary_id);
 
-  RDyCondition boundary_cond = rdy->boundary_conditions[boundary_id];
+  RDyBoundary boundary = rdy->boundaries[b_index];
+  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER, "The given number of edges (%d) for boundary %d is incorrect (should be %d)",
+             num_edges, boundary_id, boundary.num_edges);
+
+  RDyCondition boundary_cond = rdy->boundary_conditions[b_index];
   PetscCheck(boundary_cond.flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
              "Trying to set dirichlet values for boundary %d, but it has a different type (%d)", boundary_id, boundary_cond.flow->type);
 
@@ -60,7 +69,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_id, Pets
   if (rdy->ceed_resource[0]) {  // ceed
     // fetch the array storing the boundary values
     CeedOperatorField dirichlet_field;
-    PetscCall(GetSWEFluxOperatorDirichletBoundaryValues(rdy->ceed_rhs.op_edges, boundary_id, &dirichlet_field));
+    PetscCall(GetSWEFluxOperatorDirichletBoundaryValues(rdy->ceed_rhs.op_edges, b_index, &dirichlet_field));
     CeedVector dirichlet_vector;
     CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector);
     PetscInt num_comp = 3;
@@ -69,15 +78,36 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_id, Pets
 
     // set the boundary values
     for (PetscInt i = 0; i < boundary.num_edges; ++i) {
-      dirichlet_ceed[i][0] = bc_values[num_comp * i];
-      dirichlet_ceed[i][1] = bc_values[num_comp * i + 1];
-      dirichlet_ceed[i][2] = bc_values[num_comp * i + 2];
+      dirichlet_ceed[i][0] = boundary_values[num_comp * i];
+      dirichlet_ceed[i][1] = boundary_values[num_comp * i + 1];
+      dirichlet_ceed[i][2] = boundary_values[num_comp * i + 2];
     }
 
     // copy the values into the CEED operator
     CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed);
   } else {  // petsc
-    PetscCall(SetPetscSWEDirichletBoundaryValues(rdy->petsc_rhs, &rdy->mesh, boundary, bc_values, tiny_h));
+    // fetch the boundary data
+    RiemannDataSWE bdata;
+    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc_rhs, b_index, &bdata));
+
+    // set the boundary values
+    RDyCells *cells = &rdy->mesh.cells;
+    RDyEdges *edges = &rdy->mesh.edges;
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      PetscInt iedge = boundary.edge_ids[e];
+      PetscInt icell = edges->cell_ids[2 * iedge];
+      if (cells->is_local[icell]) {
+        bdata.h[e] = boundary_values[3 * e];
+
+        if (bdata.h[e] > tiny_h) {
+          bdata.u[e] = boundary_values[3 * e + 1] / bdata.h[e];
+          bdata.v[e] = boundary_values[3 * e + 2] / bdata.h[e];
+        } else {
+          bdata.u[e] = 0.0;
+          bdata.v[e] = 0.0;
+        }
+      }
+    }
   }
   PetscFunctionReturn(0);
 }
