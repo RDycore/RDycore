@@ -10,8 +10,8 @@ module rdycore
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
-            RDyGetNumBoundaryConditionEdges, RDyGetBoundaryConditionFlowType, &
-            RDySetDirichletBoundaryConditionValues, &
+            RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
+            RDySetDirichletBoundaryValues, &
             RDyGetHeight, RDyGetXVelocity, RDyGetYVelocity
 
   ! RDycore uses double-precision floating point numbers
@@ -65,26 +65,26 @@ module rdycore
       integer(c_int),        intent(out) :: num_bnd_conds
     end function
 
-    integer(c_int) function rdygetnumboundaryconditionedges_(rdy, bnd_cond_id, num_edges) bind(c, name="RDyGetNumBoundaryConditionEdges")
+    integer(c_int) function rdygetnumboundaryedges_(rdy, boundary_id, num_edges) bind(c, name="RDyGetNumBoundaryEdges")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int), value, intent(in)  :: bnd_cond_id
+      integer(c_int), value, intent(in)  :: boundary_id
       integer(c_int),        intent(out) :: num_edges
     end function
 
-    integer(c_int) function rdysetdirichletboundaryconditionvalues_(rdy, bnd_cond_id, num_edges, ndof, bc_values) bind(c, name="RDySetDirichletBoundaryConditionValues")
+    integer(c_int) function rdysetdirichletboundaryvalues_(rdy, boundary_id, num_edges, ndof, bc_values) bind(c, name="RDySetDirichletBoundaryValues")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int), value, intent(in)  :: bnd_cond_id
+      integer(c_int), value, intent(in)  :: boundary_id
       integer(c_int), value, intent(in)  :: num_edges
       integer(c_int), value, intent(in)  :: ndof
       type(c_ptr), value, intent(in)     :: bc_values
     end function
 
-    integer(c_int) function rdygetboundaryconditionflowtype_(rdy, bnd_cond_id, bnd_cond_type) bind(c, name="RDyGetBoundaryConditionFlowType")
+    integer(c_int) function rdygetboundaryconditionflowtype_(rdy, boundary_id, bnd_cond_type) bind(c, name="RDyGetBoundaryConditionFlowType")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int), value, intent(in)  :: bnd_cond_id
+      integer(c_int), value, intent(in)  :: boundary_id
       integer(c_int),        intent(out) :: bnd_cond_type
     end function
 
@@ -233,30 +233,30 @@ contains
     ierr = rdygetnumboundaryconditions_(rdy_%c_rdy, num_bnd_conds)
   end subroutine
 
-  subroutine RDyGetNumBoundaryConditionEdges(rdy_, bnd_cond_id, num_edges, ierr)
+  subroutine RDyGetNumBoundaryEdges(rdy_, boundary_id, num_edges, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(in)    :: bnd_cond_id
+    integer,   intent(in)    :: boundary_id
     integer,   intent(out)   :: num_edges
     integer,   intent(out)   :: ierr
-    ierr = rdygetnumboundaryconditionedges_(rdy_%c_rdy, bnd_cond_id-1, num_edges)
+    ierr = rdygetnumboundaryedges_(rdy_%c_rdy, boundary_id-1, num_edges)
   end subroutine
 
-  subroutine RDySetDirichletBoundaryConditionValues(rdy_, bnd_cond_id, num_edges, ndof, bc_values, ierr)
+  subroutine RDySetDirichletBoundaryValues(rdy_, boundary_id, num_edges, ndof, bc_values, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    integer,         intent(in)          :: bnd_cond_id
+    integer,         intent(in)          :: boundary_id
     integer,         intent(in)          :: num_edges
     integer,         intent(in)          :: ndof
     real(RDyDouble), pointer, intent(in) :: bc_values(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetdirichletboundaryconditionvalues_(rdy_%c_rdy, bnd_cond_id-1, num_edges, ndof, c_loc(bc_values))
+    ierr = rdysetdirichletboundaryvalues_(rdy_%c_rdy, boundary_id-1, num_edges, ndof, c_loc(bc_values))
   end subroutine
 
-  subroutine RDyGetBoundaryConditionFlowType(rdy_, bnd_cond_id, bnd_cond_type, ierr)
+  subroutine RDyGetBoundaryConditionFlowType(rdy_, boundary_id, bnd_cond_type, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(in)    :: bnd_cond_id
+    integer,   intent(in)    :: boundary_id
     integer,   intent(out)   :: bnd_cond_type
     integer,   intent(out)   :: ierr
-    ierr = rdygetboundaryconditionflowtype_(rdy_%c_rdy, bnd_cond_id-1, bnd_cond_type)
+    ierr = rdygetboundaryconditionflowtype_(rdy_%c_rdy, boundary_id-1, bnd_cond_type)
   end subroutine
 
   subroutine RDyGetTime(rdy_, time, ierr)

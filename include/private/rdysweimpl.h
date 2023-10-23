@@ -28,16 +28,20 @@ typedef struct {
 } CourantNumberDiagnostics;
 
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *m, RDyMaterial[m->num_cells], PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator, RDyBoundary, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator, RDyBoundary boundary, PetscReal[3 * boundary.num_edges]);
 
-PETSC_INTERN PetscErrorCode GetWaterSourceFromSWESourceOperator(CeedOperator, CeedOperatorField *);
-PETSC_INTERN PetscErrorCode GetRiemannFluxFromSWESourceOperator(CeedOperator, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, RDyMaterial[mesh->num_cells], PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator, PetscReal *);
 
 PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);
 
 PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt n, RDyBoundary[n], void **);
 PETSC_INTERN PetscErrorCode CreatePetscSWESource(RDyMesh *, void *);
-PETSC_INTERN PetscErrorCode InitBoundaryPetscSWEFlux(RDyCells *, RDyEdges *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal, void **);
+PETSC_INTERN PetscErrorCode InitPetscSWEBoundaryFlux(void *, RDyCells *, RDyEdges *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal);
+PETSC_INTERN PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *, PetscInt, RiemannDataSWE *);
 
-#endif  // rdyswe_h
+#endif

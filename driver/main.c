@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
     for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
       PetscInt num_edges, bc_type;
-      PetscCall(RDyGetNumBoundaryConditionEdges(rdy, ibc, &num_edges));
+      PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
       PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
     }
 

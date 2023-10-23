@@ -102,45 +102,12 @@ static PetscErrorCode RDyCeedOperatorUpdateDt(RDy rdy, PetscReal dt) {
   PetscFunctionReturn(0);
 }
 
-/// If the source term was updated, copy new values for libCEED
-/// @param [inout] rdy A RDy struc
-///
-/// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyCeedUpdateSourceTerm(RDy rdy) {
-  PetscFunctionBeginUser;
-
-  if (!rdy->ceed_rhs.water_src_updated) {
-    CeedOperatorField water_src_field;
-    GetWaterSourceFromSWESourceOperator(rdy->ceed_rhs.op_src, &water_src_field);
-    CeedVector water_src;
-    CeedOperatorFieldGetVector(water_src_field, &water_src);
-
-    PetscInt num_comp_water_src = 1;
-    CeedScalar(*wat_src_ceed)[num_comp_water_src];
-    CeedVectorGetArray(water_src, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
-    PetscScalar *wat_src_p;
-    PetscCall(VecGetArray(rdy->water_src, &wat_src_p));
-
-    for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-      wat_src_ceed[i][0] = wat_src_p[i];
-    }
-
-    CeedVectorRestoreArray(water_src, (CeedScalar **)&wat_src_ceed);
-    PetscCall(VecRestoreArray(rdy->water_src, &wat_src_p));
-
-    rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
-  }
-
-  PetscFunctionReturn(0);
-}
-
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
 static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, Vec F) {
   PetscFunctionBeginUser;
 
   PetscCall(RDyCeedOperatorUpdateDt(rdy, dt));
-  PetscCall(RDyCeedUpdateSourceTerm(rdy));
 
   {
     PetscScalar *u_local, *f;
@@ -176,7 +143,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
   {
     CeedOperatorField riemannf_field;
-    GetRiemannFluxFromSWESourceOperator(rdy->ceed_rhs.op_src, &riemannf_field);
+    SWESourceOperatorGetRiemannFlux(rdy->ceed_rhs.op_src, &riemannf_field);
 
     CeedVector riemannf_ceed;
     CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed);

@@ -560,6 +560,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
       PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[b];
+        boundary->index       = b;
         boundary->id          = boundary_id;
 
         // find the number of edges for this boundary
@@ -811,17 +812,17 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 
   // Assign a boundary condition to each boundary.
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    RDyCondition *bc                = &rdy->boundary_conditions[b];
-    PetscInt      boundary_id       = rdy->boundaries[b].id;
-    PetscInt      bc_boundary_index = -1;
+    RDyCondition *bc          = &rdy->boundary_conditions[b];
+    PetscInt      boundary_id = rdy->boundaries[b].id;
+    PetscInt      bc_index    = -1;
     for (PetscInt ib = 0; ib < rdy->config.num_boundary_conditions; ++ib) {
       if (rdy->config.boundary_conditions[ib].id == boundary_id) {
-        bc_boundary_index = ib;
+        bc_index = ib;
         break;
       }
     }
-    if (bc_boundary_index != -1) {
-      RDyConditionSpec *bc_spec = &rdy->config.boundary_conditions[bc_boundary_index];
+    if (bc_index != -1) {
+      RDyConditionSpec *bc_spec = &rdy->config.boundary_conditions[bc_index];
 
       // If no flow condition was specified for a boundary, we set it to our
       // reflecting flow condition.
@@ -867,9 +868,11 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
-  PetscCall(VecZeroEntries(rdy->water_src));
-  rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
+  if (!rdy->ceed_resource[0]) {
+    // water_src is only needed for PETSc source operator
+    PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
+    PetscCall(VecZeroEntries(rdy->water_src));
+  }
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));
@@ -948,6 +951,39 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscCall(VecRestoreArray(rdy->X, &x_ptr));
 
   PetscFunctionReturn(0);
+}
+
+// initialize the data on the right hand side of the boundary edges
+static PetscErrorCode SetInitialBoundaryConditions(RDy rdy) {
+  PetscFunctionBegin;
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    RDyBoundary       boundary      = rdy->boundaries[b];
+    RDyCondition      boundary_cond = rdy->boundary_conditions[b];
+    RDyFlowCondition *flow_bc       = boundary_cond.flow;
+
+    PetscReal boundary_values[3 * boundary.num_edges];
+    switch (boundary_cond.flow->type) {
+      case CONDITION_DIRICHLET:
+
+        // initialize the relevant boundary values
+        for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+          boundary_values[3 * e]     = flow_bc->height;
+          boundary_values[3 * e + 1] = flow_bc->momentum[0];
+          boundary_values[3 * e + 2] = flow_bc->momentum[1];
+        }
+        PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
+        break;
+      case CONDITION_REFLECTING:
+        break;
+      case CONDITION_CRITICAL_OUTFLOW:
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary.id);
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // the name of the log file set by RDySetLogFile below
@@ -1046,9 +1082,8 @@ PetscErrorCode RDySetup(RDy rdy) {
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
     PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
-    PetscCall(InitBoundaryPetscSWEFlux(&rdy->mesh.cells, &rdy->mesh.edges, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                       rdy->config.physics.flow.tiny_h, &rdy->petsc_rhs));
   }
 
+  SetInitialBoundaryConditions(rdy);
   PetscFunctionReturn(0);
 }

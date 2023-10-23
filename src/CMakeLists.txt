@@ -8,8 +8,8 @@ add_library(rdycore
   rdyadvance.c
   rdysetup.c
   swe/physics_swe.c
-  swe/swe_flux_petsc.c
-  swe/swe_ceed_operators.c
+  swe/swe_petsc.c
+  swe/swe_ceed.c
   time_series.c
   write_xdmf_output.c
 )
