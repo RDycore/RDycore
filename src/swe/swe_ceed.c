@@ -306,7 +306,8 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyBoundary boundary, PetscReal boundary_values[boundary.num_edges]) {
+PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyBoundary boundary,
+                                                         PetscReal boundary_values[3 * boundary.num_edges]) {
   PetscFunctionBeginUser;
 
   // fetch the array storing the boundary values
