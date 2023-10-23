@@ -560,6 +560,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
       PetscCall(DMGetPoints_Private(rdy->dm, label, boundary_id, 1, &edge_is));
       if (edge_is) {
         RDyBoundary *boundary = &rdy->boundaries[b];
+        boundary->index       = b;
         boundary->id          = boundary_id;
 
         // find the number of edges for this boundary
@@ -867,9 +868,11 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
-  PetscCall(VecZeroEntries(rdy->water_src));
-  rdy->ceed_rhs.water_src_updated = PETSC_TRUE;
+  if (!rdy->ceed_resource[0]) {
+    // water_src is only needed for PETSc source operator
+    PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
+    PetscCall(VecZeroEntries(rdy->water_src));
+  }
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->X, &n_dof));

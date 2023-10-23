@@ -291,20 +291,42 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
   PetscFunctionReturn(0);
 }
 
-// Gets the field representing Dirіchlet boundary values for the boundary with
-// the given index (if available). NOTE that the boundary index b identifies the
-// bth boundary added to the SWE flux operator, NOT the boundary with ID b.
-PetscErrorCode GetSWEFluxOperatorDirichletBoundaryValues(CeedOperator flux_op, PetscInt boundary_index, CeedOperatorField *boundary_values) {
+// Gets the field representing Dirіchlet boundary values for the given boundary.
+PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_values) {
   PetscFunctionBeginUser;
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
   CeedCompositeOperatorGetSubList(flux_op, &sub_ops);
-  CeedOperator boundary_flux_op = sub_ops[1 + boundary_index];
+  CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
 
   // fetch the field
   CeedOperatorGetFieldByName(boundary_flux_op, "q_dirichlet", boundary_values);
 
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyBoundary boundary, PetscReal *boundary_values) {
+  PetscFunctionBeginUser;
+
+  // fetch the array storing the boundary values
+  CeedOperatorField dirichlet_field;
+  PetscCall(SWEFluxOperatorGetDirichletBoundaryValues(flux_op, boundary, &dirichlet_field));
+  CeedVector dirichlet_vector;
+  CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector);
+  PetscInt num_comp = 3;
+  CeedScalar(*dirichlet_ceed)[num_comp];
+  CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed);
+
+  // set the boundary values
+  for (PetscInt i = 0; i < boundary.num_edges; ++i) {
+    dirichlet_ceed[i][0] = boundary_values[num_comp * i];
+    dirichlet_ceed[i][1] = boundary_values[num_comp * i + 1];
+    dirichlet_ceed[i][2] = boundary_values[num_comp * i + 2];
+  }
+
+  // copy the values into the CEED operator
+  CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed);
   PetscFunctionReturn(0);
 }
 
@@ -424,7 +446,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial mat
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the source of water.
 // This can be used to implement a time-dependent water source.
-PetscErrorCode GetSWESourceOperatorWaterSource(CeedOperator source_op, CeedOperatorField *water_source_field) {
+PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOperatorField *water_source_field) {
   PetscFunctionBeginUser;
 
   // get the source sub-operator responsible for the water source (the first one)
@@ -437,9 +459,30 @@ PetscErrorCode GetSWESourceOperatorWaterSource(CeedOperator source_op, CeedOpera
   PetscFunctionReturn(0);
 }
 
+PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *water_src) {
+  PetscFunctionBeginUser;
+
+  CeedOperatorField water_src_field;
+  SWESourceOperatorGetWaterSource(source_op, &water_src_field);
+  CeedVector water_src_vec;
+  CeedOperatorFieldGetVector(water_src_field, &water_src_vec);
+
+  PetscInt num_comp_water_src = 1;
+  CeedScalar(*wat_src_ceed)[num_comp_water_src];
+  CeedVectorGetArray(water_src_vec, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
+
+  CeedSize water_src_len;
+  CeedVectorGetLength(water_src_vec, &water_src_len);
+  for (PetscInt i = 0; i < water_src_len; ++i) {
+    wat_src_ceed[i][0] = water_src[i];
+  }
+
+  CeedVectorRestoreArray(water_src_vec, (CeedScalar **)&wat_src_ceed);
+  PetscFunctionReturn(0);
+}
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the Riemann flux.
-PetscErrorCode GetSWESourceOperatorRiemannFlux(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {
+PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {
   PetscFunctionBeginUser;
 
   // get the source sub-operator responsible for the water source (the first one)

@@ -18,7 +18,8 @@ typedef struct {
 // This type defines a boundary consisting of edges identified by their local
 // indices.
 typedef struct {
-  PetscInt  id;  // boundary identifier
+  PetscInt  id;     // boundary identifier (matches label in mesh file)
+  PetscInt  index;  // index of boundary within RDycore boundary list
   PetscInt *edge_ids;
   PetscInt  num_edges;
 } RDyBoundary;
@@ -165,14 +166,11 @@ struct _p_RDy {
   char ceed_resource[PETSC_MAX_PATH_LEN];
   // RHS operator (optional)
   struct {
-    PetscBool water_src_updated;
-
     CeedOperator op_edges;
     CeedOperator op_src;
     CeedVector   u_local_ceed, u_ceed;
     CeedVector   f_ceed, s_ceed;
     CeedScalar   dt;
-
   } ceed_rhs;
 
   // Non-CEED solver data (must be cast to e. g. PetscRiemannDataSWE*)

@@ -14,81 +14,53 @@ PetscErrorCode RDyGetNumBoundaryConditions(RDy rdy, PetscInt *num_bnd_conds) {
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode CheckBoundaryConditionID(RDy rdy, PetscInt bnd_cond_id) {
+static PetscErrorCode CheckBoundaryConditionIndex(RDy rdy, PetscInt boundary_index) {
   PetscFunctionBegin;
-  PetscCheck(bnd_cond_id < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
-             "Boundary condition ID (%d) exceeds the max number of boundary conditions (%d)", bnd_cond_id, rdy->num_boundaries);
-
-  PetscCheck(bnd_cond_id >= 0, rdy->comm, PETSC_ERR_USER, "Boundary condition ID (%d) cannot be less than zero.", bnd_cond_id);
+  PetscCheck(boundary_index < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
+             "Boundary condition index (%d) exceeds the max number of boundary conditions (%d)", boundary_index, rdy->num_boundaries);
+  PetscCheck(boundary_index >= 0, rdy->comm, PETSC_ERR_USER, "Boundary condition index (%d) cannot be less than zero.", boundary_index);
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetNumBoundaryEdges(RDy rdy, PetscInt boundary_id, PetscInt *num_edges) {
+PetscErrorCode RDyGetNumBoundaryEdges(RDy rdy, PetscInt boundary_index, PetscInt *num_edges) {
   PetscFunctionBegin;
-  PetscCall(CheckBoundaryConditionID(rdy, boundary_id));
-  RDyBoundary *boundary = &rdy->boundaries[boundary_id];
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  RDyBoundary *boundary = &rdy->boundaries[boundary_index];
   *num_edges            = boundary->num_edges;
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, PetscInt boundary_id, PetscInt *bc_type) {
+PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, PetscInt boundary_index, PetscInt *bc_type) {
   PetscFunctionBegin;
-  PetscCall(CheckBoundaryConditionID(rdy, boundary_id));
-  RDyCondition *boundary_cond = &rdy->boundary_conditions[boundary_id];
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  RDyCondition *boundary_cond = &rdy->boundary_conditions[boundary_index];
   *bc_type                    = boundary_cond->flow->type;
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_id, PetscInt num_edges, PetscInt ndof, PetscReal *boundary_values) {
+PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscInt ndof, PetscReal *boundary_values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckBoundaryConditionID(rdy, boundary_id));
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
 
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%d) for the boundary condition need to be three.", ndof);
 
-  // find the index of the boundary with the given ID
-  PetscInt b_index = -1;
-  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    if (rdy->boundaries[b].id == boundary_id) {
-      b_index = b;
-      break;
-    }
-  }
-  PetscCheck(b_index != -1, rdy->comm, PETSC_ERR_USER, "Invalid boundary ID: %d", boundary_id);
+  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
+             "The given number of edges (%d) for boundary with index %d is incorrect (should be %d)", num_edges, boundary_index, boundary.num_edges);
 
-  RDyBoundary boundary = rdy->boundaries[b_index];
-  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER, "The given number of edges (%d) for boundary %d is incorrect (should be %d)",
-             num_edges, boundary_id, boundary.num_edges);
-
-  RDyCondition boundary_cond = rdy->boundary_conditions[b_index];
+  RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for boundary %d, but it has a different type (%d)", boundary_id, boundary_cond.flow->type);
+             "Trying to set dirichlet values for boundary with index %d, but it has a different type (%d)", boundary_index, boundary_cond.flow->type);
 
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
   if (rdy->ceed_resource[0]) {  // ceed
-    // fetch the array storing the boundary values
-    CeedOperatorField dirichlet_field;
-    PetscCall(GetSWEFluxOperatorDirichletBoundaryValues(rdy->ceed_rhs.op_edges, b_index, &dirichlet_field));
-    CeedVector dirichlet_vector;
-    CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector);
-    PetscInt num_comp = 3;
-    CeedScalar(*dirichlet_ceed)[num_comp];
-    CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed);
-
-    // set the boundary values
-    for (PetscInt i = 0; i < boundary.num_edges; ++i) {
-      dirichlet_ceed[i][0] = boundary_values[num_comp * i];
-      dirichlet_ceed[i][1] = boundary_values[num_comp * i + 1];
-      dirichlet_ceed[i][2] = boundary_values[num_comp * i + 2];
-    }
-
-    // copy the values into the CEED operator
-    CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed);
+    PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed_rhs.op_edges, rdy->boundaries[boundary_index], boundary_values));
   } else {  // petsc
     // fetch the boundary data
     RiemannDataSWE bdata;
-    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc_rhs, b_index, &bdata));
+    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc_rhs, boundary_index, &bdata));
 
     // set the boundary values
     RDyCells *cells = &rdy->mesh.cells;
@@ -151,15 +123,16 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
 PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
   PetscFunctionBegin;
 
-  // we store the water source in a PETSc vector and update it in the
-  // solver only as needed (indicated by the water_src_updated flag)
-  PetscReal *s;
-  PetscCall(VecGetArray(rdy->water_src, &s));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    s[i] = watsrc[i];
+  if (rdy->ceed_resource[0]) {  // ceed
+    PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed_rhs.op_src, watsrc));
+  } else {  // petsc
+    PetscReal *s;
+    PetscCall(VecGetArray(rdy->water_src, &s));
+    for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+      s[i] = watsrc[i];
+    }
+    PetscCall(VecRestoreArray(rdy->water_src, &s));
   }
-  PetscCall(VecRestoreArray(rdy->water_src, &s));
-  rdy->ceed_rhs.water_src_updated = PETSC_FALSE;
 
   PetscFunctionReturn(0);
 }
