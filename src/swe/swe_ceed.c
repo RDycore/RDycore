@@ -356,24 +356,24 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial mat
       CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
       CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_owned_cells * num_comp_geom, strides_geom, &restrict_geom);
       CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
-      CeedVectorSetValue(geom, 0.0);  // initialize to ensure the arrays is allocated
+      CeedVectorSetValue(geom, 0.0);
 
       CeedInt strides_water_src[] = {num_comp_water_src, 1, num_comp_water_src};
       CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_owned_cells * num_comp_water_src, strides_water_src,
                                        &restrict_water_src);
       CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
-      CeedVectorSetValue(water_src, 0.0);  // initialize to ensure the arrays is allocated
+      CeedVectorSetValue(water_src, 0.0);
 
       CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
       CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n, strides_mannings_n,
                                        &restrict_mannings_n);
       CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL);
-      CeedVectorSetValue(mannings_n, 0.0);  // initialize to ensure the arrays is allocated
+      CeedVectorSetValue(mannings_n, 0.0);
 
       CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
       CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf, &restrict_riemannf);
       CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL);
-      CeedVectorSetValue(riemannf, 0.0);  // initialize to ensure the arrays is allocated
+      CeedVectorSetValue(riemannf, 0.0);
 
       PetscCall(PetscMalloc1(num_owned_cells, &offset_c));
       CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
@@ -403,7 +403,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial mat
       CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
       CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
       CeedOperatorSetField(op, "water_src", restrict_water_src, CEED_BASIS_COLLOCATED, water_src);
-      CeedOperatorSetField(op, "mannings_n", restrict_water_src, CEED_BASIS_COLLOCATED, mannings_n);
+      CeedOperatorSetField(op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n);
       CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
       CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
       CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);

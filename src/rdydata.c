@@ -151,6 +151,8 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
 PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
   PetscFunctionBegin;
 
+  // we store the water source in a PETSc vector and update it in the
+  // solver only as needed (indicated by the water_src_updated flag)
   PetscReal *s;
   PetscCall(VecGetArray(rdy->water_src, &s));
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
@@ -158,5 +160,6 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
   }
   PetscCall(VecRestoreArray(rdy->water_src, &s));
   rdy->ceed_rhs.water_src_updated = PETSC_FALSE;
+
   PetscFunctionReturn(0);
 }
