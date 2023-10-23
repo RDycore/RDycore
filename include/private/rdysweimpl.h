@@ -29,7 +29,7 @@ typedef struct {
 
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator, RDyBoundary, CeedOperatorField *);
-PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator, RDyBoundary, PetscReal *);
+PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator, RDyBoundary boundary, PetscReal[boundary.num_edges]);
 
 PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, RDyMaterial[mesh->num_cells], PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator, CeedOperatorField *);
