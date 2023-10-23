@@ -972,7 +972,7 @@ static PetscErrorCode SetInitialBoundaryConditions(RDy rdy) {
           boundary_values[3 * e + 1] = flow_bc->momentum[0];
           boundary_values[3 * e + 2] = flow_bc->momentum[1];
         }
-        PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.id, boundary.num_edges, 3, boundary_values));
+        PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
         break;
       case CONDITION_REFLECTING:
         break;
