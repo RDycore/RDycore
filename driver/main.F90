@@ -1,4 +1,6 @@
 module driver
+#include <petsc/finclude/petsc.h>
+  use petsc
   implicit none
 contains
   subroutine usage()
@@ -6,6 +8,60 @@ contains
     print *, "rdycore_f90 <input.yaml>"
     print *, ""
   end subroutine
+
+
+  subroutine opendata(filename, data_vec, ndata)
+    implicit none
+    character(*)   :: filename
+    Vec            :: data_vec
+    PetscInt       :: ndata
+
+    PetscInt       :: size
+    PetscViewer    :: viewer
+    PetscErrorCode :: ierr
+
+    PetscCallA(VecCreate(PETSC_COMM_SELF, data_vec, ierr))
+    PetscCallA(PetscViewerBinaryOpen(PETSC_COMM_SELF, filename, FILE_MODE_READ, viewer, ierr))
+    PetscCallA(VecLoad(data_vec, viewer, ierr));
+    PetscCallA(PetscViewerDestroy(viewer, ierr));
+  
+    PetscCallA(VecGetSize(data_vec, size, ierr))
+    ndata = size / 2
+
+  end subroutine
+
+  subroutine getcurrentdata(data_ptr, ndata, cur_time, cur_data_idx, cur_data)
+    implicit none
+    PetscScalar, pointer :: data_ptr(:)
+    PetscInt             :: ndata
+    PetscReal            :: cur_time
+    PetscInt             :: cur_data_idx
+    PetscReal            :: cur_data
+
+    PetscBool            :: found
+    PetscInt, parameter  :: stride = 2
+    PetscInt             :: itime
+    PetscReal            :: time_dn, time_up
+
+    found = PETSC_FALSE
+    do itime = 1, ndata
+      time_dn = data_ptr((itime-1)*stride + 1)
+      time_up = data_ptr((itime-1)*stride + 3)
+      if (cur_time >= time_dn .and. cur_time < time_up) then
+        found = PETSC_TRUE
+        cur_data_idx = itime
+        cur_data = data_ptr((cur_data_idx-1)*stride + 2)
+        exit
+      endif
+    enddo
+
+    if (.not.found) then
+      cur_data_idx = ndata
+      cur_data = data_ptr((cur_data_idx-1)*stride + 2)
+    endif
+
+  end subroutine
+
 end module
 
 program rdycore_f90
@@ -21,10 +77,20 @@ program rdycore_f90
   character(len=1024) :: config_file
   type(RDy)           :: rdy_
   PetscErrorCode      :: ierr
-  PetscInt            :: n, step
+  PetscInt            :: n, step, iedge
   PetscInt            :: nbconds, ibcond, num_edges, bcond_type
-  PetscReal, pointer  :: h(:), vx(:), vy(:), rain(:)
-  PetscReal           :: time, time_step, prev_time, coupling_interval
+  PetscReal, pointer  :: h(:), vx(:), vy(:), rain(:), bc_values(:)
+  PetscReal           :: time, time_step, prev_time, coupling_interval, cur_time
+
+  PetscBool           :: rain_specified, bc_specified
+  character(len=1024) :: rainfile, bcfile
+  Vec                 :: rain_vec, bc_vec
+  PetscScalar, pointer:: rain_ptr(:), bc_ptr(:)
+  PetscInt            :: nrain, nbc, num_edges_dirc_bc
+  PetscInt            :: dirc_bc_idx, global_dirc_bc_idx
+  PetscInt            :: cur_rain_idx, prev_rain_idx
+  PetscInt            :: cur_bc_idx, prev_bc_idx
+  PetscReal           :: cur_rain, cur_bc
 
   if (command_argument_count() < 1) then
     call usage()
@@ -36,6 +102,18 @@ program rdycore_f90
     PetscCallA(RDyInit(ierr))
 
     if (trim(config_file) /= trim('-help')) then
+
+      PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-rain', rainfile, rain_specified, ierr))
+      PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-bc', bcfile, bc_specified, ierr))
+
+      if (rain_specified) then
+        call opendata(rainfile, rain_vec, nrain)
+      endif
+
+      if (bc_specified) then
+        call opendata(bcfile, bc_vec, nbc)
+      endif
+
       ! create rdycore and set it up with the given file
       PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
       PetscCallA(RDySetup(rdy_, ierr))
@@ -45,11 +123,22 @@ program rdycore_f90
       allocate(h(n), vx(n), vy(n), rain(n))
 
       ! get information about boundary conditions
+      dirc_bc_idx = 0
+      num_edges_dirc_bc = 0
       PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbconds, ierr))
       do ibcond = 1, nbconds
         PetscCallA(RDyGetNumBoundaryEdges(rdy_, ibcond, num_edges, ierr))
         PetscCallA(RDyGetBoundaryConditionFlowType(rdy_, ibcond, bcond_type, ierr))
+
+        if (bcond_type == CONDITION_DIRICHLET) then
+          if (bc_specified .and. dirc_bc_idx > 0) then
+            SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "When BC file specified via -bc argument, only one CONDITION_DIRICHLET can be present in the yaml")
+          endif
+          dirc_bc_idx = ibcond
+          num_edges_dirc_bc = num_edges
+        endif
       enddo
+      allocate(bc_values(num_edges_dirc_bc * 3))
 
       ! run the simulation to completion using the time parameters in the
       ! config file
@@ -57,11 +146,39 @@ program rdycore_f90
       PetscCallA(RDyGetCouplingInterval(rdy_, coupling_interval, ierr))
       PetscCallA(RDySetCouplingInterval(rdy_, coupling_interval, ierr))
 
+      prev_rain_idx = 0
+      prev_bc_idx = 0
+
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
 
         ! apply a 1 mm/hr rain over the entire domain 
-        rain(:) = 1.d0/3600.d0/1000.d0
-        PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
+        if (.not. rain_specified) then
+          rain(:) = 1.d0/3600.d0/1000.d0
+          PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
+        else
+          PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
+          call getcurrentdata(rain_ptr, nrain, cur_time, cur_rain_idx, cur_rain)
+          if (cur_rain_idx /= prev_rain_idx) then
+            prev_rain_idx = cur_rain_idx
+            rain(:) = cur_rain
+            PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
+          endif
+        endif
+
+        if (bc_specified) then
+          call getcurrentdata(bc_ptr, nbc, cur_time, cur_bc_idx, cur_bc)
+          if (cur_bc_idx /= prev_bc_idx) then
+            prev_bc_idx = cur_bc_idx
+            do iedge = 1, num_edges_dirc_bc
+              bc_values((iedge-1)*3 + 1) = cur_bc
+              bc_values((iedge-1)*3 + 2) = 0.d0
+              bc_values((iedge-1)*3 + 3) = 0.d0
+            enddo
+          endif
+          if (num_edges_dirc_bc > 0) then
+            PetscCallA(RDySetDirichletBoundaryValues(rdy_, dirc_bc_idx, num_edges_dirc_bc, 3, bc_values, ierr))
+          endif
+        endif
 
         ! advance the solution by the coupling interval specified in the config file
         PetscCallA(RDyAdvance(rdy_, ierr))
@@ -91,7 +208,15 @@ program rdycore_f90
         PetscCallA(RDyGetYVelocity(rdy_, vy, ierr))
       end do
 
-      deallocate(h, vx, vy, rain)
+      deallocate(h, vx, vy, rain, bc_values)
+      if (rain_specified) then
+        PetscCallA(VecRestoreArrayF90(rain_vec, rain_ptr, ierr))
+        PetscCallA(VecDestroy(rain_vec, ierr))
+      endif
+      if (bc_specified) then
+        PetscCallA(VecRestoreArrayF90(bc_vec, bc_ptr, ierr))
+        PetscCallA(VecDestroy(bc_vec, ierr))
+      endif
       PetscCallA(RDyDestroy(rdy_, ierr))
     end if
 
