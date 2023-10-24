@@ -342,8 +342,9 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
 
     if (cells->is_local[icell]) {
       PetscReal hl = datal->h[e];
+      PetscReal hr = datar->h[e];
 
-      if (!(hl < tiny_h)) {
+      if (!(hl < tiny_h && hr < tiny_h)) {
         PetscReal cnum = amax_vec_bnd[e] * edge_len / cell_area * rdy->dt;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
@@ -612,7 +613,6 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
 PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_rhs, PetscInt boundary_index, RiemannDataSWE *boundary_data) {
   PetscFunctionBegin;
 
-  printf("Boundary index: %d\n", boundary_index);
   PetscRiemannDataSWE *data_swe = petsc_rhs;
   *boundary_data                = data_swe->datar_bnd_edges[boundary_index];
 
