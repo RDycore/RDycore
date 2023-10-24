@@ -1,5 +1,4 @@
 #include <petscsys.h>
-#include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
 static const char *help_str =

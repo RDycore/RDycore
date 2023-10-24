@@ -1,6 +1,5 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdymathimpl.h>
-#include <private/rdymemoryimpl.h>
 #include <private/rdysweimpl.h>
 #include <stddef.h>  // for offsetof
 
@@ -264,17 +263,11 @@ PetscErrorCode RiemannDataSWECreate(PetscInt N, RiemannDataSWE *data) {
   PetscFunctionBegin;
 
   data->N = N;
-  PetscCall(RDyAlloc(PetscReal, data->N, &data->h));
-  PetscCall(RDyAlloc(PetscReal, data->N, &data->hu));
-  PetscCall(RDyAlloc(PetscReal, data->N, &data->hv));
-  PetscCall(RDyAlloc(PetscReal, data->N, &data->u));
-  PetscCall(RDyAlloc(PetscReal, data->N, &data->v));
-
-  PetscCall(RDyFill(PetscReal, data->N, data->h, 0.0));
-  PetscCall(RDyFill(PetscReal, data->N, data->hu, 0.0));
-  PetscCall(RDyFill(PetscReal, data->N, data->hv, 0.0));
-  PetscCall(RDyFill(PetscReal, data->N, data->u, 0.0));
-  PetscCall(RDyFill(PetscReal, data->N, data->v, 0.0));
+  PetscCall(PetscCalloc1(data->N, &data->h));
+  PetscCall(PetscCalloc1(data->N, &data->hu));
+  PetscCall(PetscCalloc1(data->N, &data->hv));
+  PetscCall(PetscCalloc1(data->N, &data->u));
+  PetscCall(PetscCalloc1(data->N, &data->v));
 
   PetscFunctionReturn(0);
 }
@@ -283,11 +276,11 @@ PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
   PetscFunctionBegin;
 
   data.N = 0;
-  PetscCall(RDyFree(data.h));
-  PetscCall(RDyFree(data.hu));
-  PetscCall(RDyFree(data.hv));
-  PetscCall(RDyFree(data.u));
-  PetscCall(RDyFree(data.v));
+  PetscCall(PetscFree(data.h));
+  PetscCall(PetscFree(data.hu));
+  PetscCall(PetscFree(data.hv));
+  PetscCall(PetscFree(data.u));
+  PetscCall(PetscFree(data.v));
 
   PetscFunctionReturn(0);
 }

@@ -1,11 +1,10 @@
 #include <private/rdycoreimpl.h>
-#include <private/rdymemoryimpl.h>
 
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate per-boundary flux offsets
-  PetscCall(RDyAlloc(PetscInt, rdy->num_boundaries + 1, &(rdy->time_series.boundary_fluxes.offsets)));
+  PetscCall(PetscCalloc1(rdy->num_boundaries + 1, &(rdy->time_series.boundary_fluxes.offsets)));
 
   // make sure the number of degrees of freedom is the same as the number of
   // boundary fluxes
@@ -35,7 +34,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   MPI_Allreduce(&num_boundary_edges, &rdy->time_series.boundary_fluxes.num_global_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
 
   // allocate (local) boundary flux storage
-  PetscCall(RDyAlloc(PetscReal, 3 * num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
+  PetscCall(PetscCalloc1(3 * num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
 
   PetscFunctionReturn(0);
 }
@@ -212,8 +211,8 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
 PetscErrorCode DestroyTimeSeries(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->time_series.boundary_fluxes.fluxes) {
-    RDyFree(rdy->time_series.boundary_fluxes.offsets);
-    RDyFree(rdy->time_series.boundary_fluxes.fluxes);
+    PetscFree(rdy->time_series.boundary_fluxes.offsets);
+    PetscFree(rdy->time_series.boundary_fluxes.fluxes);
   }
   PetscFunctionReturn(0);
 }
