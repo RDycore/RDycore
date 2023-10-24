@@ -2,7 +2,6 @@
 #include <float.h>
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdymemoryimpl.h>
 
 // =============
 //  YAML Parser
@@ -683,7 +682,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
 
     // create a content string and broadcast it
-    PetscCall(RDyAlloc(char, config_size, &config_str));
+    PetscCall(PetscCalloc1(config_size, &config_str));
     rewind(file);
     fread(config_str, sizeof(char), config_size, file);
     PetscCall(PetscFClose(rdy->comm, file));
@@ -693,7 +692,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
 
     // recreate the configuration string.
-    PetscCall(RDyAlloc(char, config_size, &config_str));
+    PetscCall(PetscCalloc1(config_size, &config_str));
     MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
   }
 
@@ -710,7 +709,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscCall(SetAdditionalOptions(rdy));
 
   // clean up
-  RDyFree(config_str);
+  PetscFree(config_str);
 
   PetscFunctionReturn(0);
 }

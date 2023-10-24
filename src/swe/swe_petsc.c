@@ -3,7 +3,6 @@
 
 #include <petscsys.h>
 #include <private/rdymathimpl.h>
-#include <private/rdymemoryimpl.h>
 #include <private/rdysweimpl.h>
 
 // gravitational acceleration [m/s/s]
@@ -19,8 +18,8 @@ PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt num_boun
   PetscCall(RiemannDataSWECreate(num_internal_edges, &datar));
 
   RiemannDataSWE *datal_bnd, *datar_bnd;
-  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), num_boundaries, &datal_bnd));
-  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), num_boundaries, &datar_bnd));
+  PetscCall(PetscCalloc1(num_boundaries, &datal_bnd));
+  PetscCall(PetscCalloc1(num_boundaries, &datar_bnd));
 
   for (PetscInt b = 0; b < num_boundaries; b++) {
     PetscInt num_edges = boundaries[b].num_edges;
@@ -29,7 +28,7 @@ PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt num_boun
   }
 
   PetscRiemannDataSWE *data_swe;
-  PetscCall(RDyAlloc(sizeof(PetscRiemannDataSWE), 1, &data_swe));
+  PetscCall(PetscCalloc1(1, &data_swe));
   data_swe->datal_internal_edges = datal;
   data_swe->datar_internal_edges = datar;
   data_swe->datal_bnd_edges      = datal_bnd;
@@ -46,7 +45,7 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
   PetscInt num = mesh->num_cells;
 
   RiemannDataSWE *data;
-  PetscCall(RDyAlloc(sizeof(RiemannDataSWE), 1, &data));
+  PetscCall(PetscCalloc1(1, &data));
 
   PetscCall(RiemannDataSWECreate(num, data));
 

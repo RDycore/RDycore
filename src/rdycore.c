@@ -1,6 +1,5 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdymemoryimpl.h>
 #include <rdycore.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
@@ -49,10 +48,10 @@ PetscErrorCode RDyOnFinalize(void (*shutdown_func)(void)) {
   PetscFunctionBegin;
   if (shutdown_funcs_ == NULL) {
     shutdown_funcs_cap_ = 32;
-    PetscCall(RDyAlloc(ShutdownFunc, shutdown_funcs_cap_, &shutdown_funcs_));
+    PetscCall(PetscCalloc1(shutdown_funcs_cap_, &shutdown_funcs_));
   } else if (num_shutdown_funcs_ == shutdown_funcs_cap_) {  // need more space!
     shutdown_funcs_cap_ *= 2;
-    PetscCall(RDyRealloc(ShutdownFunc, shutdown_funcs_cap_, &shutdown_funcs_));
+    PetscCall(PetscRealloc(sizeof(ShutdownFunc) * shutdown_funcs_cap_, &shutdown_funcs_));
   }
   shutdown_funcs_[num_shutdown_funcs_] = shutdown_func;
   ++num_shutdown_funcs_;
@@ -69,7 +68,7 @@ PetscErrorCode RDyFinalize(void) {
     for (int i = num_shutdown_funcs_ - 1; i >= 0; --i) {
       shutdown_funcs_[i]();
     }
-    RDyFree(shutdown_funcs_);
+    PetscFree(shutdown_funcs_);
   }
 
   PetscFinalize();
@@ -120,29 +119,29 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->mesh.num_cells) RDyMeshDestroy((*rdy)->mesh);
 
   // destroy conditions
-  if ((*rdy)->initial_conditions) RDyFree((*rdy)->initial_conditions);
-  if ((*rdy)->sources) RDyFree((*rdy)->sources);
-  if ((*rdy)->boundary_conditions) RDyFree((*rdy)->boundary_conditions);
+  if ((*rdy)->initial_conditions) PetscFree((*rdy)->initial_conditions);
+  if ((*rdy)->sources) PetscFree((*rdy)->sources);
+  if ((*rdy)->boundary_conditions) PetscFree((*rdy)->boundary_conditions);
 
   // destroy materials
-  if ((*rdy)->materials_by_cell) RDyFree((*rdy)->materials_by_cell);
-  if ((*rdy)->materials) RDyFree((*rdy)->materials);
+  if ((*rdy)->materials_by_cell) PetscFree((*rdy)->materials_by_cell);
+  if ((*rdy)->materials) PetscFree((*rdy)->materials);
 
   // destroy regions and boundaries
   for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
     if ((*rdy)->regions[i].cell_ids) {
-      RDyFree((*rdy)->regions[i].cell_ids);
+      PetscFree((*rdy)->regions[i].cell_ids);
     }
   }
-  if ((*rdy)->region_ids) RDyFree((*rdy)->region_ids);
-  if ((*rdy)->regions) RDyFree((*rdy)->regions);
+  if ((*rdy)->region_ids) PetscFree((*rdy)->region_ids);
+  if ((*rdy)->regions) PetscFree((*rdy)->regions);
 
   for (PetscInt i = 0; i < (*rdy)->num_boundaries; ++i) {
     if ((*rdy)->boundaries[i].edge_ids) {
-      RDyFree((*rdy)->boundaries[i].edge_ids);
+      PetscFree((*rdy)->boundaries[i].edge_ids);
     }
   }
-  if ((*rdy)->boundaries) RDyFree((*rdy)->boundaries);
+  if ((*rdy)->boundaries) PetscFree((*rdy)->boundaries);
 
   // destroy solver
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
@@ -179,7 +178,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
   }
 
-  PetscCall(RDyFree(*rdy));
+  PetscCall(PetscFree(*rdy));
   *rdy = NULL;
   PetscFunctionReturn(0);
 }

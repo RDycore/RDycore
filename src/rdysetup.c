@@ -1,7 +1,6 @@
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdymemoryimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
@@ -375,8 +374,8 @@ static PetscErrorCode InitRegions(RDy rdy) {
     PetscCall(ISGetIndices(region_id_is, &region_ids));
 
     // allocate and set region data
-    PetscCall(RDyAlloc(PetscInt, rdy->num_regions, &rdy->region_ids));
-    PetscCall(RDyAlloc(RDyRegion, rdy->num_regions, &rdy->regions));
+    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->region_ids));
+    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->regions));
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       PetscInt region_id = region_ids[r];
       IS       cell_is;  // cell index space
@@ -390,7 +389,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
         if (num_cells > 0) {
           RDyLogDebug(rdy, "  Found region %d (%d cells)", region_id, num_cells);
           region->num_cells = num_cells;
-          PetscCall(RDyAlloc(PetscInt, region->num_cells, &region->cell_ids));
+          PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
         }
         const PetscInt *cell_ids;
         PetscCall(ISGetIndices(cell_is, &cell_ids));
@@ -543,7 +542,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   }
 
   // allocate resources for boundaries
-  PetscCall(RDyAlloc(RDyBoundary, rdy->num_boundaries, &rdy->boundaries));
+  PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundaries));
 
   // now fetch boundary edge IDs
   if (label) {
@@ -568,7 +567,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
         if (num_edges > 0) {
           boundary->num_edges = num_edges;
-          PetscCall(RDyAlloc(PetscInt, boundary->num_edges, &boundary->edge_ids));
+          PetscCall(PetscCalloc1(boundary->num_edges, &boundary->edge_ids));
         }
 
         // extract edge IDs
@@ -643,7 +642,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate storage for materials for cells
-  PetscCall(RDyAlloc(RDyMaterial, rdy->mesh.num_cells, &rdy->materials_by_cell));
+  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
 
   // read material properties for the entire domain from files if given
   READ_MATERIAL_PROPERTY_FROM_FILE(rdy, manning);
@@ -651,7 +650,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
   // set up region-wise material and override cell-wise materials if needed
   if (rdy->config.surface_composition.num_regions > 0) {
     // allocate storage for regional materials
-    PetscCall(RDyAlloc(RDyMaterial, rdy->num_regions, &rdy->materials));
+    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->materials));
 
     // assign materials to each region as needed
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -691,7 +690,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate storage for by-region initial conditions
-  PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->initial_conditions));
+  PetscCall(PetscCalloc1(rdy->num_regions, &rdy->initial_conditions));
 
   // assign іnitial conditions to each region as indicated in our config
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -746,7 +745,7 @@ static PetscErrorCode InitSources(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->config.sources.num_regions > 0) {
     // Allocate storage for sources
-    PetscCall(RDyAlloc(RDyCondition, rdy->num_regions, &rdy->sources));
+    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->sources));
 
     // Assign sources to each region as needed.
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -808,7 +807,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
   PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER, "Could not allocate a reflecting flow condition! Please increase MAX_BOUNDARY_ID.");
 
   // Allocate storage for boundary conditions.
-  PetscCall(RDyAlloc(RDyCondition, rdy->num_boundaries, &rdy->boundary_conditions));
+  PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundary_conditions));
 
   // Assign a boundary condition to each boundary.
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
