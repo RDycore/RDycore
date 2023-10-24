@@ -81,7 +81,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerPopFormat(viewer));
   PetscCall(PetscViewerDestroy(&viewer));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 //--------------------------------
@@ -148,7 +148,7 @@ static PetscErrorCode ExtractGridTopologies(MPI_Comm comm, hid_t h5_file, GridTo
 
   *num_topologies = index;
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 //------------------------------------
@@ -248,7 +248,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   // write footer and close the file
   PetscCall(PetscFPrintf(rdy->comm, fp, "  </Domain>\n</Xdmf>\n"));
   PetscCall(PetscFClose(rdy->comm, fp));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
@@ -261,5 +261,5 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
       PetscCall(WriteXDMFXMFData(rdy, step, t));
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

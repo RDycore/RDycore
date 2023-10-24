@@ -115,7 +115,7 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
   }
   PetscOptionsEnd();
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode CreateDM(RDy rdy) {
@@ -232,7 +232,7 @@ static PetscErrorCode CreateDM(RDy rdy) {
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // retrieves the index of a material using its name
@@ -250,7 +250,7 @@ static PetscErrorCode FindMaterial(RDy rdy, const char *name, PetscInt *index) {
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // retrieves the index of a flow condition using its name
@@ -268,7 +268,7 @@ static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *ind
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
@@ -314,7 +314,7 @@ static PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   DMPlexSetGlobalToNaturalSF(rdy->aux_dm, sf_natural);
   PetscSFDestroy(&sf_natural);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // retrieves the index of a sediment condition using its name
@@ -332,7 +332,7 @@ static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt 
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // retrieves the index of a salinity condition using its name
@@ -350,7 +350,7 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // initializes mesh region data
@@ -410,7 +410,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
                "Cannot assign initial conditions for the given grid.");
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // from Jed's commit (fd7c843):
@@ -443,7 +443,7 @@ static PetscErrorCode DMGetPoints_Private(DM dm, DMLabel domainLabel, PetscInt l
   } else {
     *pointIS = depthIS;
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // initializes mesh boundary data
@@ -589,7 +589,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   MPI_Allreduce(&rdy->num_boundaries, &num_global_boundaries, 1, MPI_INT, MPI_SUM, rdy->comm);
   PetscCheck(num_global_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // reads data for a single DOF from a binary file into a Vec
@@ -621,7 +621,7 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
   PetscCall(VecDestroy(&natural));
   PetscCall(VecDestroy(&global));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 #define READ_MATERIAL_PROPERTY_FROM_FILE(rdy, property)                                                   \
@@ -682,7 +682,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
       }
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // sets up initial conditions
@@ -737,7 +737,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       }
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // sets up sources
@@ -788,7 +788,7 @@ static PetscErrorCode InitSources(RDy rdy) {
       }
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // sets up boundary conditions
@@ -853,7 +853,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // create solvers and vectors
@@ -907,7 +907,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetFromOptions(rdy->ts));
   PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // initializes solution vector data
@@ -949,7 +949,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
   }
   PetscCall(VecRestoreArray(rdy->X, &x_ptr));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // initialize the data on the right hand side of the boundary edges
@@ -996,7 +996,7 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionBegin;
   strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
   overridden_logfile_[PETSC_MAX_PATH_LEN - 1] = '\0';
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Performs any setup needed by RDy, reading from the specified configuration
@@ -1084,5 +1084,5 @@ PetscErrorCode RDySetup(RDy rdy) {
   }
 
   SetInitialBoundaryConditions(rdy);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

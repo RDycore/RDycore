@@ -15,7 +15,7 @@ extern PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit);
 PetscErrorCode GetOutputDir(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
   PetscFunctionBegin;
   strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Creates the output directory if it doesn't exist.
@@ -35,7 +35,7 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscCheck((result == 0) || (err_no == EEXIST), rdy->comm, PETSC_ERR_USER, "Could not create output directory: %s (errno = %d)", output_dir,
              err_no);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // generates a filename in the output directory
@@ -50,7 +50,7 @@ static PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index
   char ending[PETSC_MAX_PATH_LEN];
   snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
   snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s%s", output_dir, prefix, ending);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Determines the appropriate output file name based on
@@ -106,14 +106,14 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported output format specified.");
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode DestroyOutputViewer(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->output_vf) PetscCall(PetscViewerAndFormatDestroy(&rdy->output_vf));
   if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // this writes a log message for output at the proper interval
@@ -126,7 +126,7 @@ PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X
     const char        *units      = TimeUnitAsString(rdy->config.time.unit);
     RDyLogDetail(rdy, "Step %d: writing %s output at t = %g %s", step, format, time, units);
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Creates a Viewer for visualization and sets up visualization monitoring.
@@ -177,7 +177,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // this is called when -preload is set so we can get more accurate timings
@@ -198,7 +198,7 @@ static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   // clean up
   PetscCall(VecDestroy(&X_preload));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Advances the solution by the coupling interval specified in the input
@@ -262,7 +262,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(DestroyOutputViewer(rdy));
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Returns true if RDycore has satisfied its simulation termination criteria
@@ -288,33 +288,33 @@ PetscErrorCode RDyGetTime(RDy rdy, PetscReal *time) {
   PetscReal t;
   PetscCall(TSGetTime(rdy->ts, &t));
   *time = ConvertTimeFromSeconds(t, rdy->config.time.unit);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Stores the internal time step size (in config-specified units) in time_step.
 PetscErrorCode RDyGetTimeStep(RDy rdy, PetscReal *time_step) {
   PetscFunctionBegin;
   *time_step = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Stores the step index in step.
 PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
   PetscFunctionBegin;
   PetscCall(TSGetStepNumber(rdy->ts, step));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Stores the coupling interval (in config-specified units) in interval.
 PetscErrorCode RDyGetCouplingInterval(RDy rdy, PetscReal *interval) {
   PetscFunctionBegin;
   *interval = rdy->config.time.coupling_interval;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the coupling interval (in config-specified units).
 PetscErrorCode RDySetCouplingInterval(RDy rdy, PetscReal interval) {
   PetscFunctionBegin;
   rdy->config.time.coupling_interval = interval;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

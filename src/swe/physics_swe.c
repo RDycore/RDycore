@@ -64,7 +64,7 @@ static PetscErrorCode InitMPITypesAndOps(void) {
   // make sure the operator and the type are destroyed upon exit
   PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 //---------------------------
@@ -80,7 +80,7 @@ PetscErrorCode InitSWE(RDy rdy) {
 
   PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
   PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode RDyCeedOperatorUpdateDt(RDy rdy, PetscReal dt) {
@@ -98,7 +98,7 @@ static PetscErrorCode RDyCeedOperatorUpdateDt(RDy rdy, PetscReal dt) {
       CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &dt);
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
@@ -256,7 +256,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
                 courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RiemannDataSWECreate(PetscInt N, RiemannDataSWE *data) {
@@ -269,7 +269,7 @@ PetscErrorCode RiemannDataSWECreate(PetscInt N, RiemannDataSWE *data) {
   PetscCall(PetscCalloc1(data->N, &data->u));
   PetscCall(PetscCalloc1(data->N, &data->v));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
@@ -282,5 +282,5 @@ PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
   PetscCall(PetscFree(data.u));
   PetscCall(PetscFree(data.v));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

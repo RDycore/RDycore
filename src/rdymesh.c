@@ -71,7 +71,7 @@ PetscErrorCode RDyCellsCreate(PetscInt num_cells, RDyCells *cells) {
     cells->neighbor_offsets[icell] = icell * neighbors_per_cell;
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Creates a fully initialized RDyCells struct from a given DM.
@@ -146,7 +146,7 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   PetscCall(DMGetLocalToGlobalMapping(dm, &map));
   PetscCall(ISLocalToGlobalMappingApply(map, num_cells, cells->ids, cells->global_ids));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Destroys an RDyCells struct, freeing its resources.
@@ -174,7 +174,7 @@ PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.dz_dx));
   PetscCall(PetscFree(cells.dz_dy));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Allocates and initializes an RDyVertices struct.
@@ -215,7 +215,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
     vertices->cell_offsets[ivertex] = ivertex * cells_per_vertex;
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Creates a fully initialized RDyVertices struct from a given DM.
@@ -287,7 +287,7 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   PetscCall(DMGetLocalToGlobalMapping(dm, &map));
   PetscCall(ISLocalToGlobalMappingApply(map, num_vertices, vertices->ids, vertices->global_ids));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Destroys an RDyVertices struct, freeing its resources.
@@ -308,7 +308,7 @@ PetscErrorCode RDyVerticesDestroy(RDyVertices vertices) {
   PetscCall(PetscFree(vertices.edge_ids));
   PetscCall(PetscFree(vertices.points));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Allocates and initializes an RDyEdges struct.
@@ -342,7 +342,7 @@ PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
     edges->ids[iedge] = iedge;
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Creates a fully initialized RDyEdges struct from a given DM.
@@ -410,7 +410,7 @@ PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   PetscCall(DMGetLocalToGlobalMapping(dm, &map));
   PetscCall(ISLocalToGlobalMappingApply(map, num_edges, edges->ids, edges->global_ids));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Destroys an RDyEdges struct, freeing its resources.
@@ -435,7 +435,7 @@ PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(PetscFree(edges.cn));
   PetscCall(PetscFree(edges.sn));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // computes attributes about edges needed by RDycore.
@@ -597,7 +597,7 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // returns true if the vertices forming the triangle are in counter clockwise
@@ -668,7 +668,7 @@ static PetscErrorCode ComputeXYSlopesForTriangle(PetscReal xyz0[3], PetscReal xy
   den    = (x2 - x0) * (y1 - y0) - (x1 - x0) * (y2 - y0);
   *dz_dy = num / den;
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // computes geometric attributes about cells needed by RDycore
@@ -728,7 +728,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) {
@@ -793,7 +793,7 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) 
     PetscCall(VecDestroy(&local));
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Creates an RDyMesh from a PETSc DM.
@@ -842,7 +842,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   MPI_Comm_rank(comm, &rank);
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Destroys an RDyMesh struct, freeing its resources.
@@ -854,5 +854,5 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(RDyCellsDestroy(mesh.cells));
   PetscCall(RDyEdgesDestroy(mesh.edges));
   PetscCall(RDyVerticesDestroy(mesh.vertices));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

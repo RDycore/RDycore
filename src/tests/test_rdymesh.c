@@ -77,7 +77,7 @@ static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   DMCreateGlobalVector(*dm, &dummy);
   VecDestroy(&dummy);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Test the creation of an RDyMesh from a DM.
