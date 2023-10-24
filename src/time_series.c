@@ -66,12 +66,13 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary *boundary, PetscInt
     if (!auto_generated) {
       PetscInt n = rdy->time_series.boundary_fluxes.offsets[b];
       for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-        PetscInt edge_id = boundary->edge_ids[e];
-        PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
+        PetscInt edge_id   = boundary->edge_ids[e];
+        PetscInt cell_id   = rdy->mesh.edges.cell_ids[2 * edge_id];
+        PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
-          time_series->boundary_fluxes.fluxes[n].water_mass += fluxes[e][0] * rdy->dt;
-          time_series->boundary_fluxes.fluxes[n].x_momentum += fluxes[e][1] * rdy->dt;
-          time_series->boundary_fluxes.fluxes[n].y_momentum += fluxes[e][2] * rdy->dt;
+          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * fluxes[e][0] * rdy->dt;
+          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * fluxes[e][1] * rdy->dt;
+          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * fluxes[e][2] * rdy->dt;
           ++n;
         }
       }
