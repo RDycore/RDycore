@@ -108,10 +108,12 @@ program rdycore_f90
 
       if (rain_specified) then
         call opendata(rainfile, rain_vec, nrain)
+        PetscCallA(VecGetArrayF90(rain_vec, rain_ptr, ierr))
       endif
 
       if (bc_specified) then
         call opendata(bcfile, bc_vec, nbc)
+        PetscCallA(VecGetArrayF90(bc_vec, bc_ptr, ierr))
       endif
 
       ! create rdycore and set it up with the given file
