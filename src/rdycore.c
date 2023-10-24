@@ -16,7 +16,7 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
     }
     initialized_ = PETSC_TRUE;
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Initializes the RDycore library for use with Fortran. It's used by the
@@ -33,7 +33,7 @@ PetscErrorCode RDyInitFortran(void) {
     }
     initialized_ = PETSC_TRUE;
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Functions called at shutdown. This can be used by all subsystems via
@@ -55,7 +55,7 @@ PetscErrorCode RDyOnFinalize(void (*shutdown_func)(void)) {
   }
   shutdown_funcs_[num_shutdown_funcs_] = shutdown_func;
   ++num_shutdown_funcs_;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Shuts down a process in which RDyInit or RDyInitNotArguments was called.
@@ -74,7 +74,7 @@ PetscErrorCode RDyFinalize(void) {
   PetscFinalize();
 
   initialized_ = PETSC_FALSE;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Returns PETSC_TRUE if the RDyCore library has been initialized, PETSC_FALSE
@@ -98,7 +98,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   // set the config file
   strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // fortran 90 version of RDyCreate
@@ -107,7 +107,7 @@ PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rd
 
   PetscCall(RDyCreate(MPI_Comm_f2c(*f90_comm), config_file, rdy));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Destroys the given RDy object, freeing any allocated resources.
@@ -180,5 +180,5 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   PetscCall(PetscFree(*rdy));
   *rdy = NULL;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

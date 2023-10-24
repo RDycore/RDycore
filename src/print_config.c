@@ -10,7 +10,7 @@ static PetscErrorCode PrintPhysics(RDy rdy) {
   RDyLogDetail(rdy, "    Bed friction: %s", FlagString(rdy->config.physics.flow.bed_friction));
   RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment));
   RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static const char* SpatialString(RDyNumericsSpatial method) {
@@ -34,7 +34,7 @@ static PetscErrorCode PrintNumerics(RDy rdy) {
   RDyLogDetail(rdy, "  Spatial discretization: %s", SpatialString(rdy->config.numerics.spatial));
   RDyLogDetail(rdy, "  Temporal discretization: %s", TemporalString(rdy->config.numerics.temporal));
   RDyLogDetail(rdy, "  Riemann solver: %s", RiemannString(rdy->config.numerics.riemann));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static const char* TimeUnitString(RDyTimeUnit unit) {
@@ -46,7 +46,7 @@ static PetscErrorCode PrintTime(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Time:");
   RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.time.final_time, TimeUnitString(rdy->config.time.unit));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode PrintRestart(RDy rdy) {
@@ -64,7 +64,7 @@ static PetscErrorCode PrintRestart(RDy rdy) {
   } else {
     RDyLogDetail(rdy, "  (disabled)");
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode PrintLogging(RDy rdy) {
@@ -75,7 +75,7 @@ static PetscErrorCode PrintLogging(RDy rdy) {
   } else {
     RDyLogDetail(rdy, "  Primary log file: <stdout>");
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // prints config information at the requested log level
@@ -92,5 +92,5 @@ PetscErrorCode PrintConfig(RDy rdy) {
   PetscCall(PrintLogging(rdy));
   PetscCall(PrintRestart(rdy));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

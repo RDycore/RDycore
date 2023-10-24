@@ -5,13 +5,13 @@
 PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
   *num_cells = rdy->mesh.num_cells_local;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetNumBoundaryConditions(RDy rdy, PetscInt *num_bnd_conds) {
   PetscFunctionBegin;
   *num_bnd_conds = rdy->num_boundaries;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode CheckBoundaryConditionIndex(RDy rdy, PetscInt boundary_index) {
@@ -19,7 +19,7 @@ static PetscErrorCode CheckBoundaryConditionIndex(RDy rdy, PetscInt boundary_ind
   PetscCheck(boundary_index < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
              "Boundary condition index (%d) exceeds the max number of boundary conditions (%d)", boundary_index, rdy->num_boundaries);
   PetscCheck(boundary_index >= 0, rdy->comm, PETSC_ERR_USER, "Boundary condition index (%d) cannot be less than zero.", boundary_index);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetNumBoundaryEdges(RDy rdy, PetscInt boundary_index, PetscInt *num_edges) {
@@ -27,7 +27,7 @@ PetscErrorCode RDyGetNumBoundaryEdges(RDy rdy, PetscInt boundary_index, PetscInt
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
   RDyBoundary *boundary = &rdy->boundaries[boundary_index];
   *num_edges            = boundary->num_edges;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, PetscInt boundary_index, PetscInt *bc_type) {
@@ -35,7 +35,7 @@ PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, PetscInt boundary_index,
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
   RDyCondition *boundary_cond = &rdy->boundary_conditions[boundary_index];
   *bc_type                    = boundary_cond->flow->type;
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscInt ndof, PetscReal *boundary_values) {
@@ -81,7 +81,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_index, P
       }
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
@@ -93,7 +93,7 @@ PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
     h[i] = x[3 * i];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetXVelocity(RDy rdy, PetscReal *vx) {
@@ -105,7 +105,7 @@ PetscErrorCode RDyGetXVelocity(RDy rdy, PetscReal *vx) {
     vx[i] = x[3 * i + 1];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
@@ -117,7 +117,7 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
     vy[i] = x[3 * i + 2];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
@@ -134,5 +134,5 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
     PetscCall(VecRestoreArray(rdy->water_src, &s));
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

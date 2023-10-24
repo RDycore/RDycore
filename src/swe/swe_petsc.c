@@ -35,7 +35,7 @@ PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt num_boun
   data_swe->datar_bnd_edges      = datar_bnd;
   *petsc_rhs                     = data_swe;
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Allocates a struct for computing the source/sink term
@@ -52,7 +52,7 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
   PetscRiemannDataSWE *data_swe = petsc_rhs;
   data_swe->data_cells          = *data;
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // computes velocities in x and y-dir based on momentum in x and y-dir
@@ -76,7 +76,7 @@ static PetscErrorCode GetVelocityFromMomentum(PetscReal tiny_h, RiemannDataSWE *
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Computes flux based on Roe solver
@@ -186,7 +186,7 @@ static PetscErrorCode ComputeRoeFlux(PetscInt N, RiemannDataSWE *datal, RiemannD
     amax[n] = chat + fabs(uperp);
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // computes RHS on internal edges
@@ -285,7 +285,7 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Before computing BC fluxes, perform common precomputation irrespective of BC type that include:
@@ -312,7 +312,7 @@ static PetscErrorCode PerformPrecomputationForBC(RDy rdy, RDyBoundary *boundary,
     sn[e] = edges->sn[iedge];
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // After the right values (hr/ur/vr) have been computed based on the different type of BCs,
@@ -361,7 +361,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary *boundary, PetscReal tiny_h
   // accumulate boundary fluxes if we are asked to track time series
   PetscCall(AccumulateBoundaryFluxes(rdy, boundary, boundary->num_edges, flux_vec_bnd));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // applies a reflecting boundary condition on the given boundary, computing
@@ -396,7 +396,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary *boundary, RiemannD
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal, datar, sn_vec_bnd, cn_vec_bnd, F));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // applies a dirichlet boundary condition on the given boundary, computing
@@ -414,7 +414,7 @@ static PetscErrorCode ApplyDirichletBC(RDy rdy, RDyBoundary *boundary, RDyCondit
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal, datar, sn_vec_bnd, cn_vec_bnd, F));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // applies a critical outflow boundary condition, computing
@@ -450,7 +450,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary *boundary, Rie
 
   PetscCall(ComputeBC(rdy, boundary, tiny_h, courant_num_diags, num, datal, datar, sn_vec_bnd, cn_vec_bnd, F));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // computes RHS on boundary edges
@@ -499,7 +499,7 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Compute u/v based on hu/hv
@@ -531,7 +531,7 @@ PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy) {
 
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // adds source terms to the right hand side vector F
@@ -603,7 +603,7 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   PetscCall(VecRestoreArray(rdy->water_src, &water_src_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Sets Dirichlet boundary values on the boundary with the given index. NOTE
@@ -615,7 +615,7 @@ PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_rhs, PetscInt boun
   PetscRiemannDataSWE *data_swe = petsc_rhs;
   *boundary_data                = data_swe->datar_bnd_edges[boundary_index];
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 #endif  // swe_flux_petsc_h

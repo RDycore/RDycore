@@ -511,7 +511,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
   cyaml_err_t    err           = cyaml_load_data(yaml_data, yaml_data_len, &yaml_config, &config_schema, (void **)config, NULL);
   PetscCheck(err == CYAML_OK, comm, PETSC_ERR_USER, "Error parsing config file: %s", cyaml_strerror(err));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // checks config for any invalid or omitted parameters
@@ -600,7 +600,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   // validate output options
   PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
              "Binary output does not support output batching");
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // adds entries to PETSc's options database based on parsed config info
@@ -658,7 +658,7 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
     }
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 #undef VALUE_LEN
 }
 
@@ -711,5 +711,5 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // clean up
   PetscFree(config_str);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

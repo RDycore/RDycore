@@ -36,7 +36,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   // allocate (local) boundary flux storage
   PetscCall(PetscCalloc1(3 * num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Initializes time series data storage.
@@ -48,7 +48,7 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
     InitBoundaryFluxes(rdy);
     PetscCall(TSMonitorSet(rdy->ts, WriteTimeSeries, rdy, NULL));
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Accumulates boundary fluxes on the given boundary from the given array of
@@ -77,7 +77,7 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary *boundary, PetscInt
       }
     }
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time) {
@@ -191,7 +191,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     memset(rdy->time_series.boundary_fluxes.fluxes, 0, 3 * num_global_edges * sizeof(PetscReal));
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // This monitoring function writes out all requested time series data.
@@ -204,7 +204,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
     rdy->time_series.last_step = step;
   }
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Free resources allocated to time series.
@@ -214,5 +214,5 @@ PetscErrorCode DestroyTimeSeries(RDy rdy) {
     PetscFree(rdy->time_series.boundary_fluxes.offsets);
     PetscFree(rdy->time_series.boundary_fluxes.fluxes);
   }
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

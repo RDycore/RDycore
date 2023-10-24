@@ -28,7 +28,7 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
                                      "Height threshold below which dry condition is assumed");
   CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SWEContext_, gravity), 1, "Accelaration due to gravity");
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, PetscReal tiny_h, CeedOperator *flux_op) {
@@ -120,7 +120,7 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
   CeedVectorDestroy(&geom);
   CeedVectorDestroy(&flux);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
@@ -251,7 +251,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   CeedVectorDestroy(&geom);
   CeedVectorDestroy(&flux);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Creates a flux operator for the shallow water equations that produces
@@ -288,7 +288,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
   }
 
   if (0) CeedOperatorView(*flux_op, stdout);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Gets the field representing Dirіchlet boundary values for the given boundary.
@@ -303,7 +303,7 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
   // fetch the field
   CeedOperatorGetFieldByName(boundary_flux_op, "q_dirichlet", boundary_values);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyBoundary boundary,
@@ -328,7 +328,7 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 
   // copy the values into the CEED operator
   CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Given a computational mesh, creates a source operator for the shallow water
@@ -441,7 +441,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial mat
 
   if (0) CeedOperatorView(*source_op, stdout);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Given a shallow water equations source operator created by
@@ -457,7 +457,7 @@ PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOpera
 
   // fetch the field
   CeedOperatorGetFieldByName(water_source_op, "water_src", water_source_field);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *water_src) {
@@ -479,7 +479,7 @@ PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_
   }
 
   CeedVectorRestoreArray(water_src_vec, (CeedScalar **)&wat_src_ceed);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the Riemann flux.
@@ -493,5 +493,5 @@ PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOpera
 
   // fetch the field
   CeedOperatorGetFieldByName(riemannf_source_op, "riemannf", riemann_flux_field);
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
