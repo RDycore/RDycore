@@ -32,7 +32,7 @@ static PetscErrorCode OpenData(char *filename, Vec *data_vec, PetscInt *ndata) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// For a given cur_time, 
+// For a given cur_time,
 //   cur_data = value_1 if cur_time >= time_1 and cur_time < time_2
 PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal cur_time, PetscInt *cur_data_idx, PetscReal *cur_data) {
   PetscFunctionBegin;
