@@ -127,7 +127,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (bc_specified) {
-      PetscCheck(dirc_bc_idx > -1, comm, PETSC_ERR_USER, "The BC file specified via -bc argument, but no CONDITION_DIRICHLET found in the yaml");
+      PetscInt global_dirc_bc_idx = -1;
+      MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+      PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
+                 "The BC file specified via -bc argument, but no CONDITION_DIRICHLET found in the yaml");
     }
     PetscReal *bc_values;
     PetscCalloc1(num_edges_dirc_bc * 3, &bc_values);
