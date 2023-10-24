@@ -612,7 +612,6 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
 PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_rhs, PetscInt boundary_index, RiemannDataSWE *boundary_data) {
   PetscFunctionBegin;
 
-  printf("Boundary index: %d\n", boundary_index);
   PetscRiemannDataSWE *data_swe = petsc_rhs;
   *boundary_data                = data_swe->datar_bnd_edges[boundary_index];
 
