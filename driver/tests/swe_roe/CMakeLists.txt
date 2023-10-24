@@ -64,3 +64,17 @@ foreach(np 1 2)
     add_test(swe_roe_four_mounds_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml ${${config}_args})
   endforeach()
 endforeach()
+
+# houston-harvey test
+file (COPY
+      ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.yaml
+      ${MESH_DIR}/Houston1km_with_z.exo
+      ${CONDITION_DIR}/Houston1km.IC
+      ${CONDITION_DIR}/Houston1km.BC.bin
+      ${CONDITION_DIR}/Houston1km.Rain.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config basic)
+    add_test(houston_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -rain Houston1km.Rain.bin -bc Houston1km.BC.bin ${${config}_args})
+  endforeach()
+endforeach()
