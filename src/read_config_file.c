@@ -190,6 +190,7 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 
 // mapping of strings to file formats
 static const cyaml_strval_t output_file_formats[] = {
+    {"none",   OUTPUT_NONE},
     {"binary", OUTPUT_BINARY},
     {"xdmf",   OUTPUT_XDMF  },
     {"cgns",   OUTPUT_CGNS  },
@@ -203,9 +204,9 @@ static const cyaml_schema_field_t output_time_series_fields_schema[] = {
 
 // mapping of output fields to members of RDyOutputSection
 static const cyaml_schema_field_t output_fields_schema[] = {
-    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
-    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyOutputSection, interval),
-    CYAML_FIELD(INT, "batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size, {.missing = 1}),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
+    CYAML_FIELD_INT("interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, interval),
+    CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
     CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
 };
@@ -598,8 +599,13 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   }
 
   // validate output options
+  PetscCheck((config->output.format == OUTPUT_NONE) || (config->output.interval > 0), comm, PETSC_ERR_USER,
+             "Output interval must be specified as a positive number of steps.");
   PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
              "Binary output does not support output batching");
+  if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
+    config->output.batch_size = 1;
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

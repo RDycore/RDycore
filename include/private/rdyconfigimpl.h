@@ -134,7 +134,7 @@ typedef struct {
 // ---------------
 
 // output file formats
-typedef enum { OUTPUT_BINARY = 0, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
+typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
 
 // time series output interval parameters appended to files
 typedef struct {
