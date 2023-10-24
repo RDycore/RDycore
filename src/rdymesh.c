@@ -337,8 +337,6 @@ PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
   PetscCall(PetscCalloc1(num_edges, &edges->lengths));
   PetscCall(PetscCalloc1(num_edges, &edges->cn));
   PetscCall(PetscCalloc1(num_edges, &edges->sn));
-  FILL(num_edges, edges->cn, 0.0);
-  FILL(num_edges, edges->sn, 0.0);
 
   for (PetscInt iedge = 0; iedge < num_edges; iedge++) {
     edges->ids[iedge] = iedge;
