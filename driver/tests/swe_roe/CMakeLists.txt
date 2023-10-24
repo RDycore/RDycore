@@ -41,7 +41,7 @@ endforeach()
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_ic_file.yaml
      ${MESH_DIR}/DamBreak_grid5x10.exo
-     ${IC_DIR}/DamBreak_grid5x10_wetdownstream.IC
+     ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.IC
      ${MATERIALS_DIR}/manning_grid5x10.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
@@ -55,7 +55,7 @@ endforeach()
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/four_mounds_60x24.yaml
       ${MESH_DIR}/four_mounds_60x24.exo
-      ${IC_DIR}/four_mounds_60x24.ic
+      ${CONDITION_DIR}/four_mounds_60x24.ic
       ${MATERIALS_DIR}/manning_four_mound_60x24.bin
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
