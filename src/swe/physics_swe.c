@@ -83,30 +83,17 @@ PetscErrorCode InitSWE(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyCeedOperatorUpdateDt(RDy rdy, PetscReal dt) {
-  PetscFunctionBeginUser;
-  if (rdy->ceed_resource[0]) {
-    if (rdy->ceed_rhs.dt != dt) {
-      rdy->ceed_rhs.dt = dt;
-
-      CeedContextFieldLabel label;
-
-      CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_edges, "time step", &label);
-      CeedOperatorSetContextDouble(rdy->ceed_rhs.op_edges, label, &dt);
-
-      CeedOperatorGetContextFieldLabel(rdy->ceed_rhs.op_src, "time step", &label);
-      CeedOperatorSetContextDouble(rdy->ceed_rhs.op_src, label, &dt);
-    }
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
 static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, Vec F) {
   PetscFunctionBeginUser;
 
-  PetscCall(RDyCeedOperatorUpdateDt(rdy, dt));
+  // update the timestep for the ceed operators if necessary
+  if (rdy->ceed_rhs.dt != dt) {
+    PetscCall(SWEFluxOperatorSetTimeStep(rdy->ceed_rhs.op_edges, dt));
+    PetscCall(SWESourceOperatorSetTimeStep(rdy->ceed_rhs.op_src, dt));
+    rdy->ceed_rhs.dt = dt;
+  }
 
   {
     PetscScalar *u_local, *f;

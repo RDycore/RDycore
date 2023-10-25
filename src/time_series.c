@@ -1,4 +1,5 @@
 #include <private/rdycoreimpl.h>
+#include <private/rdysweimpl.h>  // for CEED boundary flux accumulation
 
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
@@ -19,9 +20,9 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyCondition bc = rdy->boundary_conditions[b];
     if (!bc.auto_generated) {
-      RDyBoundary *boundary = &rdy->boundaries[b];
-      for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-        PetscInt edge_id = boundary->edge_ids[e];
+      RDyBoundary boundary = rdy->boundaries[b];
+      for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+        PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) ++num_boundary_edges;
       }
@@ -52,26 +53,23 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
 }
 
 // Accumulates boundary fluxes on the given boundary from the given array of
-// fluxes on boundary edges.
-PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary *boundary, PetscInt num_edges, PetscReal fluxes[num_edges][3]) {
+// time-integrated flux densities on boundary edges.
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscReal time_integrated_flux_densities[boundary.num_edges][3]) {
   PetscFunctionBegin;
   RDyTimeSeriesData *time_series = &rdy->time_series;
   if (time_series->boundary_fluxes.fluxes) {
-    // figure out whether this boundary has an auto-generated BC
-    PetscInt  b              = boundary - rdy->boundaries;
-    PetscBool auto_generated = rdy->boundary_conditions[b].auto_generated;
-
-    // if not, accumulate fluxes locally
-    if (!auto_generated) {
-      PetscInt n = rdy->time_series.boundary_fluxes.offsets[b];
-      for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-        PetscInt  edge_id  = boundary->edge_ids[e];
+    // if the boundary condition for this boundary is auto-generated,
+    // accumulate fluxes locally
+    if (!rdy->boundary_conditions[boundary.index].auto_generated) {
+      PetscInt n = rdy->time_series.boundary_fluxes.offsets[boundary.index];
+      for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+        PetscInt  edge_id  = boundary.edge_ids[e];
         PetscInt  cell_id  = rdy->mesh.edges.cell_ids[2 * edge_id];
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
-          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * fluxes[e][0] * rdy->dt;
-          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * fluxes[e][1] * rdy->dt;
-          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * fluxes[e][2] * rdy->dt;
+          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * time_integrated_flux_densities[e][0];
+          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * time_integrated_flux_densities[e][1];
+          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * time_integrated_flux_densities[e][2];
           ++n;
         }
       }
@@ -194,12 +192,43 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// fetches boundary fluxes from the CEED (SWE) flux operator
+static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
+  PetscFunctionBegin;
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    RDyBoundary boundary = rdy->boundaries[b];
+
+    // fetch the flux accumulation field for this boundary
+    CeedOperatorField bflux;
+    PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed_rhs.op_edges, boundary, &bflux));
+
+    // get the vector storing the boundary data and make it available on the host
+    CeedVector bflux_vec;
+    CeedOperatorFieldGetVector(bflux, &bflux_vec);
+    int num_comp = 3;  // SWE
+    CeedScalar(*bflux_data)[num_comp];
+    CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data);
+
+    // hand over the boundary fluxes and zero the flux vector
+    PetscCall(AccumulateBoundaryFluxes(rdy, boundary, bflux_data));
+    CeedVectorRestoreArray(bflux_vec, (CeedScalar **)&bflux_data);
+    CeedVectorSetValue(bflux_vec, 0.0);  // reset flux accumulation
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This monitoring function writes out all requested time series data.
 PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
 
   RDy rdy = ctx;
   if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
+    // if we're using CEED, we need to fetch the boundary fluxes from the
+    // flux operator
+    if (rdy->ceed_resource[0]) {
+      FetchCeedBoundaryFluxes(rdy);
+    }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
     rdy->time_series.last_step = step;
   }
