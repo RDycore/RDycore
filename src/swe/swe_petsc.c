@@ -324,13 +324,11 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
   RDyCells *cells = &rdy->mesh.cells;
   RDyEdges *edges = &rdy->mesh.edges;
 
-  PetscInt num = boundary.num_edges;
-
-  PetscReal flux_vec_bnd[num][3], amax_vec_bnd[num];
+  PetscReal flux_vec_bnd[boundary.num_edges][3], amax_vec_bnd[boundary.num_edges];
 
   // Call Riemann solver (only Roe is currently supported)
   PetscCheck(rdy->config.numerics.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
-  PetscCall(ComputeRoeFlux(num, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
+  PetscCall(ComputeRoeFlux(boundary.num_edges, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
   for (PetscInt e = 0; e < boundary.num_edges; ++e) {
@@ -358,7 +356,13 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
     }
   }
 
-  // accumulate boundary fluxes if we are asked to track time series
+  // integrate the boundary fluxes and accumulate them in case we are asked
+  // to track time series
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    for (PetscInt i = 0; i < 3; ++i) {
+      flux_vec_bnd[e][i] *= rdy->dt;
+    }
+  }
   PetscCall(AccumulateBoundaryFluxes(rdy, boundary, flux_vec_bnd));
 
   PetscFunctionReturn(PETSC_SUCCESS);

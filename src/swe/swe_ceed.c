@@ -291,6 +291,17 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// updates the time step used by the SWE flux operator
+PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator flux_op, PetscReal dt) {
+  PetscFunctionBeginUser;
+
+  CeedContextFieldLabel label;
+  CeedOperatorGetContextFieldLabel(flux_op, "time step", &label);
+  CeedOperatorSetContextDouble(flux_op, label, &dt);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Gets the field representing the boundary flux for the given boundary.
 PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
   PetscFunctionBeginUser;
@@ -455,6 +466,17 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial mat
   }
 
   if (0) CeedOperatorView(*source_op, stdout);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// updates the time step used by the SWE source operator
+PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator source_op, PetscReal dt) {
+  PetscFunctionBeginUser;
+
+  CeedContextFieldLabel label;
+  CeedOperatorGetContextFieldLabel(source_op, "time step", &label);
+  CeedOperatorSetContextDouble(source_op, label, &dt);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
