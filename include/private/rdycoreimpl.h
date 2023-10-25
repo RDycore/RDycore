@@ -48,8 +48,12 @@ typedef struct {
   PetscInt last_step;
   // fluxes on boundary edges
   struct {
-    // numbers of local and global boundary edges on which fluxes are computed
-    PetscInt num_local_edges, num_global_edges;
+    // per-process numbers of local boundary edges on which fluxes are accumulated
+    PetscInt *num_local_edges;
+    // number of global boundary edges on which fluxes are accumulated
+    PetscInt num_global_edges;
+    // global flux metadata (global edge ID, boundary ID, BC type)
+    PetscInt *global_flux_md;
     // array of per-boundary offsets in local fluxes array below
     PetscInt *offsets;
     // local array of boundary fluxes
