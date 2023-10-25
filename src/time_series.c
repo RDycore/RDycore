@@ -19,9 +19,9 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyCondition bc = rdy->boundary_conditions[b];
     if (!bc.auto_generated) {
-      RDyBoundary *boundary = &rdy->boundaries[b];
-      for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-        PetscInt edge_id = boundary->edge_ids[e];
+      RDyBoundary boundary = rdy->boundaries[b];
+      for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+        PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) ++num_boundary_edges;
       }
@@ -53,19 +53,28 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
 
 // Accumulates boundary fluxes on the given boundary from the given array of
 // fluxes on boundary edges.
-PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary *boundary, PetscInt num_edges, PetscReal fluxes[num_edges][3]) {
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscReal fluxes[boundary.num_edges][3]) {
   PetscFunctionBegin;
   RDyTimeSeriesData *time_series = &rdy->time_series;
   if (time_series->boundary_fluxes.fluxes) {
-    // figure out whether this boundary has an auto-generated BC
-    PetscInt  b              = boundary - rdy->boundaries;
-    PetscBool auto_generated = rdy->boundary_conditions[b].auto_generated;
+    // figure out whether the boundary condition for this boundary is
+    // auto-generated
+    bool     auto_generated = false;
+    PetscInt b_index        = -1;
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      if (rdy->boundaries[b].id == boundary.id) {
+        b_index        = b;
+        auto_generated = rdy->boundary_conditions[b].auto_generated;
+        break;
+      }
+    }
+    PetscCheck(b_index >= 0, rdy->comm, PETSC_ERR_USER, "Invalid boundary given for accumulation of boundary fluxes!");
 
     // if not, accumulate fluxes locally
     if (!auto_generated) {
-      PetscInt n = rdy->time_series.boundary_fluxes.offsets[b];
-      for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-        PetscInt  edge_id  = boundary->edge_ids[e];
+      PetscInt n = rdy->time_series.boundary_fluxes.offsets[b_index];
+      for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+        PetscInt  edge_id  = boundary.edge_ids[e];
         PetscInt  cell_id  = rdy->mesh.edges.cell_ids[2 * edge_id];
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
