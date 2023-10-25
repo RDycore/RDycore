@@ -91,7 +91,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
   // update the timestep for the ceed operators if necessary
   if (rdy->ceed_rhs.dt != dt) {
     PetscCall(SWEFluxOperatorSetTimeStep(rdy->ceed_rhs.op_edges, dt));
-    PetscCall(SWESourceOperatorSetTimeStep(rdy->ceed_rhs.op_edges, dt));
+    PetscCall(SWESourceOperatorSetTimeStep(rdy->ceed_rhs.op_src, dt));
     rdy->ceed_rhs.dt = dt;
   }
 
