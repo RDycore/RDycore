@@ -140,6 +140,9 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
   if (rdy->config.output.interval) {
     RDyLogDebug(rdy, "Writing output every %d timestep(s)", rdy->config.output.interval);
     switch (rdy->config.output.format) {
+      case OUTPUT_NONE:
+        // nothing to do here
+        break;
       case OUTPUT_CGNS:
         // we've already configured this viewer in SetAdditionalOptions (see read_config_file.c)
         break;
