@@ -219,7 +219,7 @@ static const cyaml_schema_field_t output_fields_schema[] = {
 
 // mapping of grid fields to members of RDyGridSection
 static const cyaml_schema_field_t grid_fields_schema[] = {
-  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 0),
+  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 1),
   CYAML_FIELD_END
 };
 
@@ -231,7 +231,7 @@ static const cyaml_strval_t domain_file_formats[] = {
 
 // mapping of domain fields to members of RDyDomainConditions
 static const cyaml_schema_field_t domain_fields_schema[] = {
-    CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyDomainConditions, file, 0),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyDomainConditions, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
     CYAML_FIELD_END
 };
@@ -243,7 +243,7 @@ static const cyaml_schema_field_t domain_fields_schema[] = {
 // mapping of material specification fields to members of RDyMaterialSpec
 static const cyaml_schema_field_t material_spec_fields_schema[] = {
     CYAML_FIELD_INT("id", CYAML_FLAG_DEFAULT, RDyMaterialSpec, id),
-    CYAML_FIELD_STRING("material", CYAML_FLAG_DEFAULT, RDyMaterialSpec, material, 0),
+    CYAML_FIELD_STRING("material", CYAML_FLAG_DEFAULT, RDyMaterialSpec, material, 1),
     CYAML_FIELD_END
 };
 
@@ -253,7 +253,7 @@ static const cyaml_schema_value_t material_spec_entry = {
 };
 
 static const cyaml_schema_field_t surface_composition_domain_files_fields_schema[] = {
-    CYAML_FIELD_STRING("manning", CYAML_FLAG_DEFAULT, RDySurfaceCompositionFiles, manning, 0),
+    CYAML_FIELD_STRING("manning", CYAML_FLAG_DEFAULT, RDySurfaceCompositionFiles, manning, 1),
     CYAML_FIELD_END
 };
 
@@ -277,7 +277,7 @@ static const cyaml_schema_field_t surface_composition_fields_schema[] = {
 
 // mapping of material fields to RDyMaterial
 static const cyaml_schema_field_t material_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterial, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterial, name, 1),
     CYAML_FIELD(FLOAT, "manning", CYAML_FLAG_OPTIONAL, RDyMaterial, manning, {.missing = INVALID_REAL}),
     CYAML_FIELD_END
 };
@@ -298,7 +298,7 @@ static const cyaml_schema_value_t material_entry = {
 
 // schema for region fields
 static const cyaml_schema_field_t region_spec_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionSpec, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionSpec, name, 1),
     CYAML_FIELD_INT("mesh_region_id", CYAML_FLAG_DEFAULT, RDyRegionSpec, mesh_region_id),
     CYAML_FIELD_END
 };
@@ -328,9 +328,8 @@ static const cyaml_schema_value_t region_spec_entry = {
 
 // mapping of conditions fields to members of RDyRegionConditionSpec
 static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, name),
-    CYAML_FIELD_STRING("region", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, region),
-    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 0),
+    CYAML_FIELD_STRING("region", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, region, 1),
+    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediment, 0),
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
     CYAML_FIELD_END
@@ -369,7 +368,7 @@ static const cyaml_schema_field_t sources_fields_schema[] = {
 
 // schema for boundary fields
 static const cyaml_schema_field_t boundary_spec_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundarySpec, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundarySpec, name, 1),
     CYAML_FIELD_INT("mesh_boundary_id", CYAML_FLAG_DEFAULT, RDyBoundarySpec, mesh_boundary_id),
     CYAML_FIELD_END
 };
@@ -400,11 +399,11 @@ static const cyaml_schema_value_t boundary_name_entry = {
 
 // mapping of conditions fields to members of RDyBoundaryConditionSpec
 static const cyaml_schema_field_t boundary_condition_spec_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, name),
-    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, boundaries, num_boundaries, &boundary_name_entry, 0, MAX_NUM_BOUNDARIES),
-    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 0),
-    CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediment, 0),
-    CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, name, 1),
+    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, boundaries, num_boundaries, &boundary_name_entry, 0, MAX_NUM_BOUNDARIES),
+    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, flow, 1),
+    CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, sediment, 0),
+    CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, salinity, 0),
     CYAML_FIELD_END
 };
 
@@ -441,7 +440,7 @@ static const cyaml_schema_value_t momentum_component_entry = {
 
 // schema for flow condition fields
 static const cyaml_schema_field_t flow_condition_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
     CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = INVALID_REAL}),
     CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component_entry, 2),
@@ -466,7 +465,7 @@ static const cyaml_schema_value_t flow_condition_entry = {
 
 // schema for sediment_condition fields
 static const cyaml_schema_field_t sediment_condition_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySedimentCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
     CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySedimentCondition, concentration),
     CYAML_FIELD_END
@@ -490,7 +489,7 @@ static const cyaml_schema_value_t sediment_condition_entry = {
 
 // schema for salinity fields
 static const cyaml_schema_field_t salinity_condition_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySalinityCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
     CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySalinityCondition, concentration),
     CYAML_FIELD_END
@@ -522,7 +521,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyConfig, boundaries, num_boundaries,
                                &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
-                               &condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
+                               &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_MAPPING("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, sources_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),

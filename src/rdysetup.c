@@ -713,44 +713,43 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
   // assign іnitial conditions to each region as indicated in our config
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyCondition *ic              = &rdy->initial_conditions[r];
-    PetscInt      region_id       = rdy->regions[r].id;
+    RDyRegion     region          = rdy->regions[r];
     PetscInt      ic_region_index = -1;
     for (PetscInt ic = 0; ic < rdy->config.initial_conditions.num_regions; ++ic) {
-      if (rdy->config.initial_conditions.by_region[ic].id == region_id) {
+      if (!strcmp(rdy->config.initial_conditions.by_region[ic].region, region.name)) {
         ic_region_index = ic;
         break;
       }
     }
     PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
-               "Region %" PetscInt_FMT " has no initial conditions!", region_id);
+               "Region '%s' has no initial conditions!", region.name);
 
     if (ic_region_index != -1) {
-      RDyRegionConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
-
-      PetscCheck(strlen(ic_spec->flow), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial flow condition!", region_id);
+      RDyRegionConditionSpec ic_spec = rdy->config.initial_conditions.by_region[ic_region_index];
+      PetscCheck(strlen(ic_spec.flow), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial flow condition!", region.name);
       PetscInt flow_index;
-      PetscCall(FindFlowCondition(rdy, ic_spec->flow, &flow_index));
+      PetscCall(FindFlowCondition(rdy, ic_spec.flow, &flow_index));
       RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
       PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                 "initial flow condition %s for region %" PetscInt_FMT " is not of dirichlet type!", flow_cond->name, region_id);
+                 "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
       ic->flow = flow_cond;
 
       if (rdy->config.physics.sediment) {
-        PetscCheck(strlen(ic_spec->sediment), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial sediment condition!", region_id);
+        PetscCheck(strlen(ic_spec.sediment), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial sediment condition!", region.name);
         PetscInt sed_index;
-        PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
+        PetscCall(FindSedimentCondition(rdy, ic_spec.sediment, &sed_index));
         RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
         PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial sediment condition %s for region %" PetscInt_FMT " is not of dirichlet type!", sed_cond->name, region_id);
+                   "initial sediment condition '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
         ic->sediment = sed_cond;
       }
       if (rdy->config.physics.salinity) {
-        PetscCheck(strlen(ic_spec->salinity), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial salinity condition!", region_id);
+        PetscCheck(strlen(ic_spec.salinity), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial salinity condition!", region.name);
         PetscInt sal_index;
-        PetscCall(FindSalinityCondition(rdy, ic_spec->salinity, &sal_index));
+        PetscCall(FindSalinityCondition(rdy, ic_spec.salinity, &sal_index));
         RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
         PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial salinity condition %s for region %" PetscInt_FMT " is not of dirichlet type!", sal_cond->name, region_id);
+                   "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
         ic->salinity = sal_cond;
       }
     }
@@ -763,45 +762,45 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
 static PetscErrorCode InitSources(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->config.sources.num_regions > 0) {
-    // Allocate storage for sources
+    // allocate storage for sources
     PetscCall(PetscCalloc1(rdy->num_regions, &rdy->sources));
 
-    // Assign sources to each region as needed.
+    // assign sources to each region as needed
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       RDyCondition *src              = &rdy->sources[r];
-      PetscInt      region_id        = rdy->regions[r].id;
+      RDyRegion     region           = rdy->regions[r];
       PetscInt      src_region_index = -1;
       for (PetscInt isrc = 0; isrc < rdy->config.sources.num_regions; ++isrc) {
-        if (rdy->config.sources.by_region[isrc].id == region_id) {
+        if (!strcmp(rdy->config.sources.by_region[isrc].region, region.name)) {
           src_region_index = isrc;
           break;
         }
       }
       if (src_region_index != -1) {
-        RDyRegionConditionSpec *src_spec = &rdy->config.sources.by_region[src_region_index];
-        if (strlen(src_spec->flow)) {
+        RDyRegionConditionSpec src_spec = rdy->config.sources.by_region[src_region_index];
+        if (strlen(src_spec.flow)) {
           PetscInt flow_index;
-          PetscCall(FindFlowCondition(rdy, src_spec->flow, &flow_index));
+          PetscCall(FindFlowCondition(rdy, src_spec.flow, &flow_index));
           RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
-          PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "flow source %s for region %" PetscInt_FMT " is not of dirichlet type!", flow_cond->name, region_id);
+          PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "flow source '%s' for region '%s' is not of dirichlet type!",
+                     flow_cond->name, region.name);
           src->flow = flow_cond;
         }
 
-        if (rdy->config.physics.sediment && strlen(src_spec->sediment)) {
+        if (rdy->config.physics.sediment && strlen(src_spec.sediment)) {
           PetscInt sed_index;
-          PetscCall(FindSedimentCondition(rdy, src_spec->sediment, &sed_index));
+          PetscCall(FindSedimentCondition(rdy, src_spec.sediment, &sed_index));
           RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
           PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "sediment source %s for region %" PetscInt_FMT " is not of dirichlet type!", sed_cond->name, region_id);
+                     "sediment source '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
           src->sediment = sed_cond;
         }
-        if (rdy->config.physics.salinity && strlen(src_spec->salinity)) {
+        if (rdy->config.physics.salinity && strlen(src_spec.salinity)) {
           PetscInt sal_index;
-          PetscCall(FindSalinityCondition(rdy, src_spec->salinity, &sal_index));
+          PetscCall(FindSalinityCondition(rdy, src_spec.salinity, &sal_index));
           RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
           PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "initial salinity condition %s for region %" PetscInt_FMT " is not of dirichlet type!", sal_cond->name, region_id);
+                     "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
           src->salinity = sal_cond;
         }
       }
