@@ -1,6 +1,5 @@
 # Main library -- we list all source files here (incl. those in subdirectories)
 add_library(rdycore
-  print_config.c
   rdycore.c
   rdydata.c
   rdymesh.c
