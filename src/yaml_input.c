@@ -287,23 +287,43 @@ static const cyaml_schema_value_t material_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterial, material_fields_schema),
 };
 
+// ---------------
+// regions section
+// ---------------
+// regions:
+//  - name: downstream   # human-readable name for the region
+//    mesh_region_id: 2  # mesh identifier for the region
+//  - name: upstream
+//    mesh_region_id: 1
 
-// ---------------------------------------------------------
+// schema for region fields
+static const cyaml_schema_field_t region_spec_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionSpec, name, 0),
+    CYAML_FIELD_INT("mesh_region_id", CYAML_FLAG_DEFAULT, RDyRegionSpec, mesh_region_id),
+    CYAML_FIELD_END
+};
+
+// a single region entry
+static const cyaml_schema_value_t region_spec_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyRegionSpec, region_spec_fields_schema),
+};
+
+// ---------------------------------------
 // initial_conditions and sources sections
-// ---------------------------------------------------------
+// ---------------------------------------
 // initial_conditions/sources:
 //   domain: # optional, specifies initial conditions/sources for entire domain
 //     file: <path-to-file/ic.{bin,h5,etc}>
 //     format: <bin|h5|etc>
-//   regions: # optional, specifies conditions on a per-region obasis
-//     - id: <region-id>
+//   regions: # optional, specifies conditions on a per-region basis
+//     - region: <region-name>
 //       flow: <name-of-a-flow-condition>
-//       sediment: <name-of-a-sediment-condition> # used if physics.sediment = true above
-//       salinity: <name-of-a-salinity-condition> # used if physics.salinity = true above
-//     - id: <region-id>
+//       sediment: <name-of-a-sediment-condition> # used if physics.sediment == true above
+//       salinity: <name-of-a-salinity-condition> # used if physics.salinity == true above
+//     - region: <region-name>
 //       flow: <name-of-a-flow-condition>
-//       sediment: <name-of-a-sediment-condition> # used only if physics.sediment = true above
-//       salinity: <name-of-a-salinity-condition> # used only if physics.salinity = true above
+//       sediment: <name-of-a-sediment-condition> # used only if physics.sediment == true above
+//       salinity: <name-of-a-salinity-condition> # used only if physics.salinity == true above
 // ...
 
 // mapping of conditions fields to members of RDyConditionSpec
@@ -315,7 +335,7 @@ static const cyaml_schema_field_t condition_spec_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// a single conditionspec entry
+// a single condition spec entry
 static const cyaml_schema_value_t condition_spec_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyConditionSpec, condition_spec_fields_schema),
 };
@@ -335,15 +355,38 @@ static const cyaml_schema_field_t sources_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// ---------------------------------------------------------
+// ------------------
+// boundaries section
+// ------------------
+// boundaries:
+//   - name: bottom_wall
+//     mesh_boundary_id: 3  # mesh identifier for the boundary
+//   - name: top_wall
+//     mesh_boundary_id: 2
+//   - name: exterior
+//     mesh_boundary_id: 1
+
+// schema for boundary fields
+static const cyaml_schema_field_t boundary_spec_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundarySpec, name, 0),
+    CYAML_FIELD_INT("mesh_boundary_id", CYAML_FLAG_DEFAULT, RDyBoundarySpec, mesh_boundary_id),
+    CYAML_FIELD_END
+};
+
+// a single boundary entry
+static const cyaml_schema_value_t boundary_spec_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyBoundarySpec, boundary_spec_fields_schema),
+};
+
+// ---------------------------
 // boundary_conditions section
-// ---------------------------------------------------------
+// ---------------------------
 // boundary_conditions:
-//   - id: <boundary-id>
+//   - boundaries: [<boundary-name1>, <boundary-name2>, ...]
 //     flow: <name-of-a-flow-condition>
 //     sediment: <name-of-a-sediment-condition> # used if physics.sediment = true above
 //     salinity: <name-of-a-salinity-condition> # used if physics.salinity = true above
-//   - id: <boundary-id>
+//   - boundaries: [<boundary-name1>, <boundary-name2>, ...]
 //     flow: <name-of-a-flow-condition>
 //     sediment: <name-of-a-sediment-condition> # used only if physics.sediment = true above
 //     salinity: <name-of-a-salinity-condition> # used only if physics.salinity = true above
@@ -455,7 +498,11 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
     CYAML_FIELD_MAPPING("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, surface_composition_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_DEFAULT, RDyConfig, regions, num_regions,
+                               &region_spec_entry, 0, MAX_NUM_REGIONS),
     CYAML_FIELD_MAPPING("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, initial_conditions_fields_schema),
+    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyConfig, boundaries, num_boundaries,
+                               &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
                                &condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_MAPPING("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, sources_fields_schema),

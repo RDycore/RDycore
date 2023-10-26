@@ -201,6 +201,24 @@ typedef struct {
   PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
 } RDyMaterial;
 
+// ----------------------
+// regions and boundaries
+// ----------------------
+
+// This type associates a named region with an integer ID representing a
+// disjoint set of cells in a mesh file.
+typedef struct {
+  char     name[MAX_NAME_LEN + 1];  // human-readable name of region
+  PetscInt mesh_region_id;          // ID of region cell set within mesh file
+} RDyRegionSpec;
+
+// This type associates a named boundary with an integer ID representing a
+// disjoint set of edges in a mesh file.
+typedef struct {
+  char     name[MAX_NAME_LEN + 1];  // human-readable name of boundary
+  PetscInt mesh_boundary_id;        // ID of boundary edge set within mesh file
+} RDyBoundarySpec;
+
 // ---------------------------------------
 // initial, boundary and source conditions
 // ---------------------------------------
@@ -290,8 +308,14 @@ typedef struct {
   PetscInt                     num_materials;
   RDyMaterial                  materials[MAX_NUM_MATERIALS];
 
+  PetscInt      num_regions;
+  RDyRegionSpec regions[MAX_NUM_REGIONS];
+
   RDyInitialConditionsSection initial_conditions;
   RDySourcesSection           sources;
+
+  PetscInt        num_boundaries;
+  RDyBoundarySpec boundaries[MAX_NUM_BOUNDARIES];
 
   PetscInt         num_boundary_conditions;
   RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
