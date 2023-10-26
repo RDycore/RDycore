@@ -1,7 +1,6 @@
 # Main library -- we list all source files here (incl. those in subdirectories)
 add_library(rdycore
   print_config.c
-  read_config_file.c
   rdycore.c
   rdydata.c
   rdymesh.c
@@ -11,7 +10,8 @@ add_library(rdycore
   swe/swe_petsc.c
   swe/swe_ceed.c
   time_series.c
-  write_xdmf_output.c
+  xdmf_output.c
+  yaml_input.c
 )
 add_dependencies(rdycore cyaml yaml)
 
