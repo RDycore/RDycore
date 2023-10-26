@@ -133,7 +133,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
       PetscFree((*rdy)->regions[i].cell_ids);
     }
   }
-  if ((*rdy)->region_ids) PetscFree((*rdy)->region_ids);
   if ((*rdy)->regions) PetscFree((*rdy)->regions);
 
   for (PetscInt i = 0; i < (*rdy)->num_boundaries; ++i) {

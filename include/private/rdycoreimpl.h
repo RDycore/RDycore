@@ -11,6 +11,8 @@
 // This type defines a region consisting of cells identified by their local
 // indices.
 typedef struct {
+  char      name[MAX_NAME_LEN + 1];  // region name
+  PetscInt  id;                      // region ID (as specified in mesh file)
   PetscInt *cell_ids;
   PetscInt  num_cells;
 } RDyRegion;
@@ -18,8 +20,9 @@ typedef struct {
 // This type defines a boundary consisting of edges identified by their local
 // indices.
 typedef struct {
-  PetscInt  id;     // boundary identifier (matches label in mesh file)
-  PetscInt  index;  // index of boundary within RDycore boundary list
+  char      name[MAX_NAME_LEN + 1];  // boundary name
+  PetscInt  id;                      // boundary ID (as specified in mesh file)
+  PetscInt  index;                   // index of boundary within RDycore boundary list
   PetscInt *edge_ids;
   PetscInt  num_edges;
 } RDyBoundary;
@@ -111,7 +114,6 @@ struct _p_RDy {
 
   // mesh regions
   PetscInt   num_regions;
-  PetscInt  *region_ids;
   RDyRegion *regions;
 
   // mesh boundaries

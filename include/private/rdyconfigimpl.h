@@ -224,14 +224,25 @@ typedef struct {
 // ---------------------------------------
 // The following data structures are used in several sections.
 
-// This type defines an initial/boundary condition and/or source/sink with named
+// This type defines an initial condition and/or source/sink with named
 // flow, sediment, and salinity conditions.
 typedef struct {
-  PetscInt id;                          // ID of region or boundary for related condition
-  char     flow[MAX_NAME_LEN + 1];      // name of related flow condition
-  char     sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
-  char     salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
-} RDyConditionSpec;
+  char region[MAX_NAME_LEN + 1];    // name of associated region
+  char flow[MAX_NAME_LEN + 1];      // name of related flow condition
+  char sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
+  char salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
+} RDyRegionConditionSpec;
+
+// This type defines a boundary condition with named flow, sediment, and
+// salinity conditions.
+typedef struct {
+  char     name[MAX_NAME_LEN + 1];                            // name of boundary condition
+  PetscInt num_boundaries;                                    // number of associated boundaries
+  char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];  // names of associated boundaries
+  char     flow[MAX_NAME_LEN + 1];                            // name of related flow condition
+  char     sediment[MAX_NAME_LEN + 1];                        // name of related sediment condition
+  char     salinity[MAX_NAME_LEN + 1];                        // name of related salinity condition
+} RDyBoundaryConditionSpec;
 
 // --------------------------
 // initial_conditions section
@@ -239,9 +250,9 @@ typedef struct {
 
 // all initial conditions
 typedef struct {
-  RDyDomainConditions domain;                      // domain-wide conditions
-  PetscInt            num_regions;                 // number of per-region conditions defined
-  RDyConditionSpec    by_region[MAX_NUM_REGIONS];  // names of types of conditions
+  RDyDomainConditions    domain;                      // domain-wide conditions
+  PetscInt               num_regions;                 // number of per-region conditions defined
+  RDyRegionConditionSpec by_region[MAX_NUM_REGIONS];  // names of types of conditions
 } RDyInitialConditionsSection;
 
 // ---------------------------
@@ -317,8 +328,8 @@ typedef struct {
   PetscInt        num_boundaries;
   RDyBoundarySpec boundaries[MAX_NUM_BOUNDARIES];
 
-  PetscInt         num_boundary_conditions;
-  RDyConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
+  PetscInt                 num_boundary_conditions;
+  RDyBoundaryConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 
   PetscInt             num_flow_conditions;
   RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];

@@ -413,15 +413,22 @@ static PetscErrorCode InitRegions(RDy rdy) {
     PetscCall(ISGetIndices(region_id_is, &region_ids));
 
     // allocate and set region data
-    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->region_ids));
     PetscCall(PetscCalloc1(rdy->num_regions, &rdy->regions));
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       PetscInt region_id = region_ids[r];
       IS       cell_is;  // cell index space
       PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
       if (cell_is) {
-        RDyRegion *region  = &rdy->regions[r];
-        rdy->region_ids[r] = region_id;
+        RDyRegion *region = &rdy->regions[r];
+        region->id        = region_id;
+
+        // fish the region's name out of our region config data
+        for (PetscInt r1 = 0; r1 < rdy->config.num_regions; ++r1) {
+          if (rdy->config.regions[r1].mesh_region_id == region_id) {
+            strcpy(region->name, rdy->config.regions[r1].name);
+            break;
+          }
+        }
 
         PetscInt num_cells;
         PetscCall(ISGetLocalSize(cell_is, &num_cells));
@@ -561,6 +568,14 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         boundary->index       = b;
         boundary->id          = boundary_id;
 
+        // fish the boundary's name out of our boundary config data
+        for (PetscInt b1 = 0; b1 < rdy->config.num_boundaries; ++b1) {
+          if (rdy->config.boundaries[b1].mesh_boundary_id == boundary_id) {
+            strcpy(boundary->name, rdy->config.boundaries[b1].name);
+            break;
+          }
+        }
+
         // find the number of edges for this boundary
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
@@ -657,7 +672,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
     // assign materials to each region as needed
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       RDyMaterial *material         = &rdy->materials[r];
-      PetscInt     region_id        = rdy->region_ids[r];
+      PetscInt     region_id        = rdy->regions[r].id;
       PetscInt     mat_region_index = -1;
       for (PetscInt imat = 0; imat < rdy->config.surface_composition.num_regions; ++imat) {
         if (rdy->config.surface_composition.by_region[imat].id == region_id) {
@@ -676,9 +691,9 @@ static PetscErrorCode InitMaterials(RDy rdy) {
         *material = *mat;
 
         // set the material properties for all cells in the region
-        RDyRegion *region = &rdy->regions[r];
-        for (PetscInt c = 0; c < region->num_cells; ++c) {
-          PetscInt cell                = region->cell_ids[c];
+        RDyRegion region = rdy->regions[r];
+        for (PetscInt c = 0; c < region.num_cells; ++c) {
+          PetscInt cell                = region.cell_ids[c];
           rdy->materials_by_cell[cell] = *mat;
         }
       }
@@ -698,7 +713,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
   // assign іnitial conditions to each region as indicated in our config
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyCondition *ic              = &rdy->initial_conditions[r];
-    PetscInt      region_id       = rdy->region_ids[r];
+    PetscInt      region_id       = rdy->regions[r].id;
     PetscInt      ic_region_index = -1;
     for (PetscInt ic = 0; ic < rdy->config.initial_conditions.num_regions; ++ic) {
       if (rdy->config.initial_conditions.by_region[ic].id == region_id) {
@@ -710,7 +725,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
                "Region %" PetscInt_FMT " has no initial conditions!", region_id);
 
     if (ic_region_index != -1) {
-      RDyConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
+      RDyRegionConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
 
       PetscCheck(strlen(ic_spec->flow), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial flow condition!", region_id);
       PetscInt flow_index;
@@ -754,7 +769,7 @@ static PetscErrorCode InitSources(RDy rdy) {
     // Assign sources to each region as needed.
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       RDyCondition *src              = &rdy->sources[r];
-      PetscInt      region_id        = rdy->region_ids[r];
+      PetscInt      region_id        = rdy->regions[r].id;
       PetscInt      src_region_index = -1;
       for (PetscInt isrc = 0; isrc < rdy->config.sources.num_regions; ++isrc) {
         if (rdy->config.sources.by_region[isrc].id == region_id) {
@@ -763,7 +778,7 @@ static PetscErrorCode InitSources(RDy rdy) {
         }
       }
       if (src_region_index != -1) {
-        RDyConditionSpec *src_spec = &rdy->config.sources.by_region[src_region_index];
+        RDyRegionConditionSpec *src_spec = &rdy->config.sources.by_region[src_region_index];
         if (strlen(src_spec->flow)) {
           PetscInt flow_index;
           PetscCall(FindFlowCondition(rdy, src_spec->flow, &flow_index));
@@ -816,40 +831,44 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 
   // Assign a boundary condition to each boundary.
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    RDyCondition *bc          = &rdy->boundary_conditions[b];
-    PetscInt      boundary_id = rdy->boundaries[b].id;
-    PetscInt      bc_index    = -1;
+    RDyCondition *bc       = &rdy->boundary_conditions[b];
+    RDyBoundary   boundary = rdy->boundaries[b];
+
+    // identify the index of the boundary condition assigned to this boundary.
+    PetscInt bc_index = -1;
     for (PetscInt ib = 0; ib < rdy->config.num_boundary_conditions; ++ib) {
-      if (rdy->config.boundary_conditions[ib].id == boundary_id) {
-        bc_index = ib;
-        break;
+      RDyBoundaryConditionSpec bc_spec = rdy->config.boundary_conditions[ib];
+      for (PetscInt ib1 = 0; ib1 < bc_spec.num_boundaries; ++ib1) {
+        if (!strcmp(bc_spec.boundaries[ib1], boundary.name)) {
+          PetscCheck(bc_index == -1, rdy->comm, PETSC_ERR_USER, "Boundary '%s' is assigned to more than one boundary condition!", boundary.name);
+          bc_index = ib;
+          break;
+        }
       }
     }
     if (bc_index != -1) {
-      RDyConditionSpec *bc_spec = &rdy->config.boundary_conditions[bc_index];
+      RDyBoundaryConditionSpec bc_spec = rdy->config.boundary_conditions[bc_index];
 
       // If no flow condition was specified for a boundary, we set it to our
       // reflecting flow condition.
-      if (!strlen(bc_spec->flow)) {
+      if (!strlen(bc_spec.flow)) {
         bc->flow = reflecting_flow;
       } else {
         PetscInt flow_index;
-        PetscCall(FindFlowCondition(rdy, bc_spec->flow, &flow_index));
+        PetscCall(FindFlowCondition(rdy, bc_spec.flow, &flow_index));
         bc->flow = &rdy->config.flow_conditions[flow_index];
       }
 
       if (rdy->config.physics.sediment) {
-        PetscCheck(strlen(bc_spec->sediment), rdy->comm, PETSC_ERR_USER, "Boundary %" PetscInt_FMT " has no sediment boundary condition!",
-                   boundary_id);
+        PetscCheck(strlen(bc_spec.sediment), rdy->comm, PETSC_ERR_USER, "Boundary '%s' has no sediment boundary condition!", boundary.name);
         PetscInt sed_index;
-        PetscCall(FindSedimentCondition(rdy, bc_spec->sediment, &sed_index));
+        PetscCall(FindSedimentCondition(rdy, bc_spec.sediment, &sed_index));
         bc->sediment = &rdy->config.sediment_conditions[sed_index];
       }
       if (rdy->config.physics.salinity) {
-        PetscCheck(strlen(bc_spec->salinity), rdy->comm, PETSC_ERR_USER, "Boundary %" PetscInt_FMT " has no salinity boundary condition!",
-                   boundary_id);
+        PetscCheck(strlen(bc_spec.salinity), rdy->comm, PETSC_ERR_USER, "Boundary '%s' has no salinity boundary condition!", boundary.name);
         PetscInt sal_index;
-        PetscCall(FindSalinityCondition(rdy, bc_spec->salinity, &sal_index));
+        PetscCall(FindSalinityCondition(rdy, bc_spec.salinity, &sal_index));
         bc->salinity = &rdy->config.salinity_conditions[sal_index];
       }
     } else {
