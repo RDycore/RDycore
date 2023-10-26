@@ -316,7 +316,7 @@ static const cyaml_schema_value_t region_spec_entry = {
 //     file: <path-to-file/ic.{bin,h5,etc}>
 //     format: <bin|h5|etc>
 //   regions: # optional, specifies conditions on a per-region basis
-//     - name: <region-name>
+//     - region: <region-name>
 //       flow: <name-of-a-flow-condition>
 //       sediment: <name-of-a-sediment-condition> # used if physics.sediment == true above
 //       salinity: <name-of-a-salinity-condition> # used if physics.salinity == true above
@@ -356,6 +356,7 @@ static const cyaml_schema_field_t sources_fields_schema[] = {
 };
 
 
+// ------------------
 // boundaries section
 // ------------------
 // boundaries:
@@ -723,6 +724,15 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
       PetscCall(DetermineOutputFile(rdy, 0, 0.0, "cgns", file_pattern));
       snprintf(value, VALUE_LEN, "cgns:%s", file_pattern);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution", value);
+    }
+  }
+
+  // set the solution monitoring interval (except for XDMF, which does its own thing)
+  if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+    PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
+    if (!has_param) {
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output.interval);
+      PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
 
