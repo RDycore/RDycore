@@ -2,8 +2,9 @@
 
 You can configure an RDycore simulation by creating a text file that uses
 the [YAML](https://yaml.org/) markup language. Typically, these files have a
-`.yml` or `.yaml` suffix like `dam-break.yaml`. In this section, we describe
-how to express the specifics for your simulation using the YAML syntax.
+`.yml` or `.yaml` suffix like [`ex2b.yaml`](https://github.com/RDycore/RDycore/blob/main/driver/tests/swe_roe/ex2b.yaml).
+In this section, we describe how to express the specifics for your simulation
+using the YAML syntax.
 
 RDycore's YAML input is broken up into several sections, each responsible for a
 different aspect of the desired simulation. These sections fall into several
