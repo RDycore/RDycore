@@ -1,0 +1,9 @@
+[submodule "external/cmocka"]
+	path = external/cmocka
+	url = git@github.com:clibs/cmocka.git
+[submodule "external/libyaml"]
+	path = external/libyaml
+	url = git@github.com:yaml/libyaml.git
+[submodule "external/libcyaml"]
+	path = external/libcyaml
+	url = git@github.com:tlsa/libcyaml.git

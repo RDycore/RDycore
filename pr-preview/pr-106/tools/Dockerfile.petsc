@@ -1,0 +1,73 @@
+# This Docker file builds PETSc specifically for the RDycore project. It's based
+# loosely off of the jedbrown/petsc image, without building MPICH from source,
+# and with the USER removed (since GitHub Actions only support Docker images
+# with a root user).
+
+FROM ubuntu:22.04
+
+RUN echo Etc/UTC > /etc/timezone && ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  autoconf \
+  automake \
+  bash-completion \
+  chrpath \
+  cmake \
+  curl \
+  gcc \
+  g++ \
+  gfortran \
+  git \
+  gmsh \
+  lcov \
+  liblapack-dev \
+  libmpich-dev \
+  libtool \
+  locales \
+  m4 \
+  make \
+  patch \
+  pkg-config \
+  python3-distutils \
+  zlib1g-dev \
+  ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN locale-gen en_US.UTF-8 && update-locale LANG=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+WORKDIR /build
+
+ARG PETSC_HASH=HEAD
+ENV PETSC_HASH=$PETSC_HASH
+ENV PETSC_DIR=/build/petsc
+ENV PETSC_ARCH=mpich-int32-real-opt
+RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
+  cd petsc && \
+  git reset --hard $PETSC_HASH && \
+  python3 configure \
+    --with-cc=mpicc \
+    --with-cxx=mpic++ \
+    --with-fc=mpif90 \
+    --CFLAGS='-g -O0' --CXXFLAGS='-g -O0' --FFLAGS='-g -O0 -Wno-unused-function' \
+    --with-clanguage=c \
+    --with-debug=1 \
+    --with-shared-libraries=1 \
+    --download-exodusii \
+    --download-fblaslapack \
+    --download-hdf5 \
+    --download-cgns \
+    --download-libceed \
+    --download-metis \
+    --download-netcdf \
+    --download-parmetis \
+    --download-pnetcdf \
+    --with-zlib \
+    && \
+  make all PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH -j; \
+  cat configure.log
+
+# Change the default shell to bash.
+SHELL ["/bin/bash", "-c"]
+
+LABEL maintainer='Jeffrey Johnson <jeff@cohere-llc.com>'
+LABEL description='PETSc built with various libraries for RDycore'

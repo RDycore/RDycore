@@ -1,0 +1,26 @@
+diff --git a/Makefile b/Makefile
+index 613cf56..bad0d02 100644
+--- a/Makefile
++++ b/Makefile
+@@ -126,7 +126,7 @@ TEST_BINS = \
+ 		$(BUILDDIR)/test/units/cyaml-shared \
+ 		$(BUILDDIR)/test/units/cyaml-static
+ 
+-all: $(BUILDDIR)/$(LIB_SH_MAJ) $(BUILDDIR)/$(LIB_STATIC) examples
++all: $(BUILDDIR)/$(LIB_STATIC) examples
+ 
+ coverage: test-verbose
+ 	$(Q)$(MKDIR) $(BUILDDIR)
+@@ -173,11 +173,8 @@ docs:
+ clean:
+ 	rm -rf build/
+ 
+-install: $(BUILDDIR)/$(LIB_SH_MAJ) $(BUILDDIR)/$(LIB_STATIC) $(BUILDDIR)/$(LIB_PKGCON)
++install: $(BUILDDIR)/$(LIB_STATIC) $(BUILDDIR)/$(LIB_PKGCON)
+ 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/$(LIBDIR)
+-	$(INSTALL) $(BUILDDIR)/$(LIB_SH_MAJ) $(DESTDIR)$(PREFIX)/$(LIBDIR)/$(LIB_SH_VER)
+-	(cd $(DESTDIR)$(PREFIX)/$(LIBDIR) && { ln -s -f $(LIB_SH_VER) $(LIB_SH_MAJ) || { rm -f $(LIB_SH_MAJ) && ln -s $(LIB_SH_VER) $(LIB_SH_MAJ); }; })
+-	(cd $(DESTDIR)$(PREFIX)/$(LIBDIR) && { ln -s -f $(LIB_SH_VER) $(LIB_SHARED) || { rm -f $(LIB_SHARED) && ln -s $(LIB_SH_VER) $(LIB_SHARED); }; })
+ 	$(INSTALL) $(BUILDDIR)/$(LIB_STATIC) $(DESTDIR)$(PREFIX)/$(LIBDIR)/$(LIB_STATIC)
+ 	chmod 644 $(DESTDIR)$(PREFIX)/$(LIBDIR)/$(LIB_STATIC)
+ 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/$(INCLUDEDIR)/cyaml
