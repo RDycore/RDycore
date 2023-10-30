@@ -473,6 +473,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#restart" class="md-nav__link">
+    restart
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#salinity_conditions" class="md-nav__link">
     salinity_conditions
   </a>
@@ -496,6 +503,13 @@
         <li class="md-nav__item">
   <a href="#surface_composition" class="md-nav__link">
     surface_composition
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time" class="md-nav__link">
+    time
   </a>
   
 </li>
@@ -686,6 +700,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#restart" class="md-nav__link">
+    restart
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#salinity_conditions" class="md-nav__link">
     salinity_conditions
   </a>
@@ -709,6 +730,13 @@
         <li class="md-nav__item">
   <a href="#surface_composition" class="md-nav__link">
     surface_composition
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time" class="md-nav__link">
+    time
   </a>
   
 </li>
@@ -737,21 +765,29 @@ how to express the specifics for your simulation using the YAML syntax.</p>
 different aspect of the desired simulation. These sections fall into several
 broad categories:</p>
 <ul>
-<li>Model equations and discretizations<ul>
+<li><strong>Model equations and discretizations</strong><ul>
 <li><a href="input.html#physіcs">physics</a>: configures the different physical models
   represented within RDycore</li>
 <li><a href="input.html#numerics">numerics</a>: specifies the numerical methods used
   to solve the model equations</li>
+<li><a href="input.html#grid">grid</a>: defines RDycore's discrete computational domain</li>
+<li><a href="input.html#regions">regions</a>: associates regions (disjoint sets of cells)
+  defined in a grid file with human-readable names</li>
+<li><a href="input.html#boundaries">boundaries</a>: associates boundaries (disjoint sets of
+  edges) defined in a grid file with human-readable names</li>
+<li><a href="input.html#time">time</a>: defines the timespan for the simulation, sets
+  limits and units for time stepping</li>
 </ul>
 </li>
-<li>Simulation diagnostics, output, and restarts<ul>
+<li><strong>Simulation diagnostics, output, and restarts</strong><ul>
 <li><a href="input.html#logging">logging</a>: controls informational messages logged to
   files or to the terminal</li>
 <li><a href="input.html#output">output</a>: configures simulation output, including
   scalable I/O formats and related parameters</li>
+<li><a href="input.html#restart">restart</a>: configures simulation restart dumps</li>
 </ul>
 </li>
-<li>Material properties<ul>
+<li><strong>Material properties</strong><ul>
 <li><a href="input.html#materials">materials</a>: defines the materials available to
   the simulation</li>
 <li><a href="input.html#surface_composition">surface_composition</a>: associates
@@ -759,15 +795,7 @@ broad categories:</p>
   relevant material properties are stored</li>
 </ul>
 </li>
-<li>Spatial discretization<ul>
-<li><a href="input.html#grid">grid</a>: controls RDycore's spatial discretization</li>
-<li><a href="input.html#regions">regions</a>: associates regions (disjoint sets of cells)
-  defined in a grid file with human-readable names</li>
-<li><a href="input.html#boundaries">boundaries</a>: associates boundaries (disjoint sets of
-  edges) defined in a grid file with human-readable names</li>
-</ul>
-</li>
-<li>Initial and boundary conditions, source terms<ul>
+<li><strong>Initial and boundary conditions, source terms</strong><ul>
 <li><a href="input.html#initial_conditions">initial_conditions</a>: associates initial
   conditions (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, and/or
   <code>salinity_conditions</code>) with specific regions defined in the <code>regions</code>
@@ -794,7 +822,7 @@ broad categories:</p>
 </ul>
 <p>Each of these sections is described below, with a motivating example.</p>
 <h2 id="boundaries"><code>boundaries</code></h2>
-<div class="highlight"><pre><span></span><code><span class="p p-Indicator">[</span><span class="nv">boundaries</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><span class="nt">boundaries</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top_wall</span>
 <span class="w">    </span><span class="nt">mesh_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bottom_wall</span>
@@ -803,7 +831,7 @@ broad categories:</p>
 <span class="w">    </span><span class="nt">mesh_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </code></pre></div>
 <p>The <code>boundaries</code> section is a sequence (list) of boundary definitions, each of
-which contains the following fields:</p>
+which contains the following parameters:</p>
 <ul>
 <li><code>name</code>: a human-readable name for the boundary</li>
 <li><code>grid_boundary_id</code>: an integer identifier associated with a disjoint set of
@@ -812,22 +840,205 @@ which contains the following fields:</p>
 </ul>
 <p>Boundary definitions can appear in any order within the sequence.</p>
 <h2 id="boundary_conditions"><code>boundary_conditions</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">boundary_conditions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">boundary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top_wall</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reflecting_bc</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">boundary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bottom_wall</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">outflow_bc</span>
+</code></pre></div>
+<p>The <code>boundary_conditions</code> section is a sequence (list) associating <code>flow</code>,
+<code>sediment</code>, and <code>salinity</code> conditions (as defined in their respective sections)
+with boundaries (as defined in the <code>boundaries</code> section). A boundary can have
+at most one set of boundary conditions associated with it. If no boundary
+conditions are given for a specific boundary, that boundary is assigned an
+automatically-generated reflecting boundary condition and homogeneous Neumann
+sediment and salinity conditions.</p>
+<p>The above example shows a valid configuration for a simulation in which sediments
+and salinity are not modeled, so only the <code>flow</code> parameter is required. The
+presence of sediment boundary concentrations requires the <code>sediment</code> parameter,
+as the presence of salinity concentrations requires the <code>salinity</code> parameter.</p>
 <h2 id="flow_conditions"><code>flow_conditions</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">flow_conditions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
+<span class="w">    </span><span class="nt">height</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">    </span><span class="nt">momentum</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_ic</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
+<span class="w">    </span><span class="nt">height</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w">    </span><span class="nt">momentum</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reflecting_bc</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reflecting</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">outflow_bc</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical-outflow</span>
+</code></pre></div>
+<p>The <code>flow_conditions</code> section contains a sequence of sets of parameters defining
+flow within a cell or cell boundary (edge). These flow conditions can be used
+to define initial conditions, source contributions, and boundary conditions
+elsewhere in the file. The parameters that define a flow condition are</p>
+<ul>
+<li><code>name</code>: a human-readable name that can be used to refer to this flow condition</li>
+<li><code>type</code>: the type of constraint applied by this flow condition. Available
+  options are<ul>
+<li><code>dirichlet</code>: the condition explicitly specifies the value of relevant
+  flow variables. This is useful for Dirichlet boundary conditions,
+  initial conditions, and source terms.</li>
+<li><code>neumann</code>: the condition explicitly specifies the value of the directional
+  derivative of relevant flow variables on cell boundaries. This is useful
+  only for boundary conditions. Currently, only homogeneous Neumann conditions
+  are supported.</li>
+<li><code>reflecting</code>: the condition specifies that no flow occurs through a given
+  boundary, and that the boundary reflects the momentum contained in the flow.
+  Useful only for boundary conditions.</li>
+<li><code>critical-outflow</code>: the condition specifies that flow through a boundary
+  is defined by a critical outflow condition. Useful only for boundary
+  conditions.</li>
+</ul>
+</li>
+</ul>
+<p>In the case of a Dirichlet condition, flow is prescribed by the following
+parameters:</p>
+<ul>
+<li><code>height</code>: the height of water [m] at the relevant point (within a cell
+  or on its boundary)</li>
+<li><code>momentum</code>: a 2-component sequence/list containing the <code>x</code> and <code>y</code> components
+  of the momentum [kg m/s] at the relevant point (within a cell or on its
+  boundary)</li>
+</ul>
 <h2 id="grid"><code>grid</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">grid</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">breaking-dam.exo</span>
+</code></pre></div>
+<p>The <code>grid</code> section defines the computational domain used by RDycore. Currently,
+has only a single parameter:</p>
+<ul>
+<li><code>file</code>: the file containing the grid representing the computational domain.
+  This grid must be stored in a format supported by PETSc's <a href="https://petsc.org/release/manual/dmplex/">DMPlex</a>
+  data structure.</li>
+</ul>
 <h2 id="logging"><code>logging</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">logging</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rdycore.log</span>
+<span class="w">  </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">info</span>
+</code></pre></div>
+<p>The <code>logging</code> section controls how messages emitted by RDycore are logged.
+The relevant parameters in this section are</p>
+<ul>
+<li><code>file</code>: the file to which logged messages are written, relative to the
+  directory in which RDycore (coupled or uncoupled) is executed. If this
+  parameter is omitted, logged messages are written to standard output.</li>
+<li><code>level</code>: the desired level of detail that determines which messages are
+  logged. Available options are<ul>
+<li><code>none</code>: no messages are logged</li>
+<li><code>warning</code>: only warnings/urgent messages are logged</li>
+<li><code>info</code>: warnings and informational messages are logged</li>
+<li><code>detail</code>: warnings, informational messages, and messages with some
+  degree of technical detail are logged</li>
+<li><code>debug</code>: all messages including debugging prints are logged</li>
+</ul>
+</li>
+</ul>
 <h2 id="materials"><code>materials</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">materials</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smooth</span>
+<span class="w">    </span><span class="nt">manning</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.015</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rough</span>
+<span class="w">    </span><span class="nt">manning</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.075</span>
+</code></pre></div>
+<p>The <code>materials</code> section is a sequence (list) of named materials defined by
+specific material properties. The following parameters define these materials:</p>
+<ul>
+<li><code>name</code>: a human-readable name that can be used to refer to a material</li>
+<li><code>manning</code>: the value of the <a href="https://en.wikipedia.org/wiki/Manning_formula">Manning roughness coefficient</a>
+  for the material</li>
+</ul>
 <h2 id="numerics"><code>numerics</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">numerics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">spatial</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fv</span>
+<span class="w">  </span><span class="nt">temporal</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">euler</span>
+<span class="w">  </span><span class="nt">riemann</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roe</span>
+</code></pre></div>
+<p>The <code>numerics</code> section defines the spatial and temporal discretizations used by
+RDycore. The parameters that define these discretizations are</p>
+<ul>
+<li><code>spatial</code>: determines the spatial discretization. Can be either <code>fv</code> for
+  a finite volume method, or <code>fe</code> for a finite element method. Currently, only
+  <code>fv</code> is implemented. Default value: <code>fv</code></li>
+<li><code>temporal</code>: determines the method of time integration used. Can be <code>euler</code>
+  for the forward Euler method, <code>rk4</code> for a 4th-order Runge-Kutta method, or
+  <code>beuler</code> for the L-stable backward Euler method. Currently, only <code>euler</code> and
+  <code>rk4</code> are supported. Default value: <code>euler</code></li>
+<li><code>riemann</code>: determines the form of the Riemann solver used for the shallow
+  water equations. Can be <code>roe</code> for the Roe solver or <code>hllc</code> for the HLLC solver.
+  Currently, only <code>roe</code> is implemented. Default value: <code>roe</code></li>
+</ul>
 <h2 id="output"><code>output</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xdmf</span>
+<span class="w">  </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</code></pre></div>
+<p>The <code>output</code> section control simulation output, including visualization and
+time series data (and excluding restart data). Relevant parameters are</p>
+<ul>
+<li><code>format</code>: the format of the output written. Available options are<ul>
+<li><code>none</code>: no output is written. This is the default value.</li>
+<li><code>binary</code>: output is written using PETSc's binary data format</li>
+<li><code>xdmf</code>: output is written to the <a href="https://xdmf.org/index.php/XDMF_Model_and_Format">XDMF</a> format</li>
+<li><code>cgns</code>: output is written to the <a href="https://cgns.github.io/">CFD General Notation System (CGNS)</a> format</li>
+</ul>
+</li>
+<li><code>interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
+<li><code>batch_size</code>: the number of time steps for which output data is stored in a
+  single file. For example, a batch size of 10 specifies that each individual
+  output file stores data for 10 time steps. Default value: 1</li>
+<li><code>time_series</code>: this subsection controls time series simulation output, which
+  is useful for inspection and possibly even coupling. Currently, this subsection
+  has only one parameter:<ul>
+<li><code>boundary_fluxes</code>: the interval (number of timesteps) at which boundary
+  flux data is appended to a tab-delimited text file</li>
+</ul>
+</li>
+</ul>
 <h2 id="physics"><code>physics</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">physics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">flow</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swe</span>
+<span class="w">    </span><span class="nt">bed_friction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">tiny</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
+<span class="w">  </span><span class="nt">sediment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">salinity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>The <code>physics</code> section determines which model physics are active in RDycore.
+There are three available physical models.</p>
+<p>First is the flow model, which is configured in the <code>flow</code> subsection. This
+model determines how flooding is represented within RDycore. The relevant
+parameters in this subsection are:</p>
+<ul>
+<li><code>mode</code>, which determines how the height of floodwater is computed. Valid
+   parameters are <code>swe</code> (<a href="https://en.wikipedia.org/wiki/Shallow_water_equations">shallow water equations</a>)
+   and <code>diffusive</code> (<a href="https://en.wikipedia.org/wiki/Shallow_water_equations#Diffusive_wave">diffusive wave approximation</a>,
+   not yet supported). This parameter is required and has no default value.</li>
+<li><code>bed_friction</code>, which can be set to <code>true</code> or <code>false</code> to enable/disable
+  riverbed friction. Default value: <code>false</code></li>
+<li><code>tiny_h</code>, which is the water height below which a given point is assumed to
+  be dry. Default value: <code>1e-7</code></li>
+</ul>
+<p>The second physical model is the sediment model. You can enable or disable this
+by setting the <code>sediment</code> parameter to <code>true</code> or <code>false</code>.</p>
+<p>The third physical model is the salinity model, which you can also enable or
+disable this by setting the <code>salinity</code> parameter to <code>true</code> or <code>false</code>.</p>
 <h2 id="regions"><code>regions</code></h2>
-<div class="highlight"><pre><span></span><code><span class="p p-Indicator">[</span><span class="nv">regions</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><span class="nt">regions</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
 <span class="w">    </span><span class="nt">grid_region_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">downstream</span>
 <span class="w">    </span><span class="nt">grid_region_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </code></pre></div>
 <p>The <code>regions</code> section is a sequence (list) of regions definitions, each of
-which contains the following fields:</p>
+which contains the following parameters:</p>
 <ul>
 <li><code>name</code>: a human-readable name for the boundary</li>
 <li><code>grid_region_id</code>: an integer identifier associated with a disjoint set of
@@ -836,10 +1047,129 @@ which contains the following fields:</p>
 </ul>
 <p>Region definitions can appear in any order within the sequence.</p>
 <h2 id="initial_conditions"><code>initial_conditions</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">initial_conditions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">downstream</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_ic</span>
+</code></pre></div>
+<p>The <code>initial_conditions</code> section is a sequence (list) associating <code>flow</code>,
+<code>sediment</code>, and <code>salinity</code> conditions (as defined in their respective sections)
+with regions (as defined in the <code>regions</code> section). A region must have exactly
+one set of initial conditions associated with it. The above example shows a valid
+configuration for a simulation in which sediments and salinity are not modeled,
+so only the <code>flow</code> parameter is required. The presence of sediment concentrations
+requires the <code>sediment</code> parameter, as the presence of salinity concentrations
+requires the <code>salinity</code> parameter.</p>
+<h2 id="restart"><code>restart</code></h2>
+<p>This section is not yet implemented.</p>
 <h2 id="salinity_conditions"><code>salinity_conditions</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">salinity_conditions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-sal-condition</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
+<span class="w">    </span><span class="nt">concentration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<p>The <code>salinity_conditions</code> section contains a sequence of sets of parameters
+defining the salinity concentration within a cell or cell boundary (edge).
+A salinity condition can be used to define initial conditions, source
+contributions, and boundary conditions elsewhere in the file. The parameters
+that define a salinity condition are</p>
+<ul>
+<li><code>name</code>: a human-readable name that can be used to refer to the salinity condition</li>
+<li><code>type</code>: the type of constraint applied by this salinity condition. Available
+  options are<ul>
+<li><code>dirichlet</code>: the condition explicitly specifies the value of the
+  salinity concentration. This is useful for Dirichlet boundary conditions,
+  initial conditions, and source terms.</li>
+<li><code>neumann</code>: the condition explicitly specifies the value of the directional
+  derivative of the concentration on cell boundaries. This is useful
+  only for boundary conditions. Currently, only homogeneous Neumann conditions
+  are supported.</li>
+</ul>
+</li>
+</ul>
+<p>In the case of a Dirichlet condition, a salinity concentration is prescribed
+by a <code>concentration</code> parameter.</p>
 <h2 id="sediment_conditions"><code>sediment_conditions</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">sediment_conditions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-sed-condition</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
+<span class="w">    </span><span class="nt">concentration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</code></pre></div>
+<p>The <code>sediment_conditions</code> section contains a sequence of sets of parameters
+defining the sediment concentration within a cell or cell boundary (edge).
+A sediment condition can be used to define initial conditions, source
+contributions, and boundary conditions elsewhere in the file. The parameters
+that define a sediment condition are</p>
+<ul>
+<li><code>name</code>: a human-readable name that can be used to refer to the sediment condition</li>
+<li><code>type</code>: the type of constraint applied by this sediment condition. Available
+  options are<ul>
+<li><code>dirichlet</code>: the condition explicitly specifies the value of the
+  sediment concentration. This is useful for Dirichlet boundary conditions,
+  initial conditions, and source terms.</li>
+<li><code>neumann</code>: the condition explicitly specifies the value of the directional
+  derivative of the sediment concentration on cell boundaries. This is
+  useful only for boundary conditions. Currently, only homogeneous Neumann
+  conditions are supported.</li>
+</ul>
+</li>
+</ul>
+<p>In the case of a Dirichlet condition, a sediment concentrations is prescribed
+by a <code>concentration</code> parameter.</p>
 <h2 id="sources"><code>sources</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">sources</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_src</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">downstream</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_src</span>
+</code></pre></div>
+<p>The <code>sources</code> section is a sequence (list) associating <code>flow</code>, <code>sediment</code>, and
+<code>salinity</code> sources (as defined in their respective sections) with regions (as
+defined in the <code>regions</code> section). Sources are optional for each region--if
+omitted, a region has no source contributions. A region may have no more than
+one set of source conditions associated with it. The above example shows a valid
+configuration for a simulation in which sediments and salinity are not modeled,
+so only the <code>flow</code> parameter is required. The presence of sediment sources
+requires the <code>sediment</code> parameter, as the presence of salinity sources requires
+the <code>salinity</code> parameter.</p>
 <h2 id="surface_composition"><code>surface_composition</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">surface_composition</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
+<span class="w">    </span><span class="nt">material</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smooth</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">downstream</span>
+<span class="w">    </span><span class="nt">material</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rough</span>
+</code></pre></div>
+<p>The <code>surface_composition</code> section is a sequence (list) associating materials
+(as defined in the <code>materials</code> section) with regions (as defined in the
+<code>regions</code> section). Since regions and materials both have human-readable names,
+the association between the two is made clear by the <code>region</code> and <code>material</code>
+parameters in each entry. A region is understood to be completely filled with
+the material with which it is associated--the relationship between regions and
+materials is necessarily 1:1.</p>
+<h2 id="time"><code>time</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">time</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">final_time</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">unit</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">years</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">max_step</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">time_step</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">coupling_interval</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
+</code></pre></div>
+<p>The <code>time</code> section determines the time-stepping strategy used by RDycore using
+the following parameters:</p>
+<ul>
+<li><code>units</code>: the units in which time is expressed in the input file. Available
+  options are <code>seconds</code>, <code>minutes</code>, <code>hours</code>, <code>days</code>, <code>months</code>, and <code>years</code>.
+  This parameter is required and has no default value.</li>
+<li><code>final_time</code>: the time at which the simulation ends (in the desired units)</li>
+<li><code>max_step</code>: the number of steps after which the simulation ends</li>
+<li><code>time_step</code>: a fixed size used for the time step in the desired units.</li>
+<li><code>coupling_inverval</code>: the time interval (in the desired units) at which
+  RDycore advances without coupling to E3SM. By default, RDycore runs a single
+  time step without coupling to E3SM.</li>
+</ul>
+<p>Exactly two of <code>final_time</code>, <code>max_step</code>, and <code>time_step</code> must be specified.
+The missing parameter is then computed from those parameters given.</p>
 
 
 
