@@ -158,12 +158,6 @@ typedef struct {
   char file[PETSC_MAX_PATH_LEN];  // mesh file
 } RDyGridSection;
 
-// file-based domain-wide condition/material specifications
-typedef struct {
-  char              file[PETSC_MAX_PATH_LEN];  // file specifying domain-wide conditions
-  PetscViewerFormat format;                    // format of file
-} RDyDomainConditions;
-
 // ---------------------------
 // surface_composition section
 // ---------------------------

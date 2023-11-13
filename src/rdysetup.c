@@ -401,60 +401,55 @@ static PetscErrorCode InitRegions(RDy rdy) {
   PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
-  if (label) {  // found regions (cell sets) in the grid
-    PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
-    PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
-               "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)", rdy->num_regions, MAX_NUM_REGIONS);
+  // If we didn't find any regions, we can't perform the simulation.
+  PetscCheck(label, rdy->comm, PETSC_ERR_USER,
+    "No regions (cell sets) found in grid! Cannot assign initial conditions.");
+  PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
+  PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER, "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)",
+             rdy->num_regions, MAX_NUM_REGIONS);
 
-    // fetch region IDs
-    IS region_id_is;
-    PetscCall(DMLabelGetValueIS(label, &region_id_is));
-    const PetscInt *region_ids;
-    PetscCall(ISGetIndices(region_id_is, &region_ids));
+  // fetch region IDs
+  IS region_id_is;
+  PetscCall(DMLabelGetValueIS(label, &region_id_is));
+  const PetscInt *region_ids;
+  PetscCall(ISGetIndices(region_id_is, &region_ids));
 
-    // allocate and set region data
-    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->regions));
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      PetscInt region_id = region_ids[r];
-      IS       cell_is;  // cell index space
-      PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
-      if (cell_is) {
-        RDyRegion *region = &rdy->regions[r];
-        region->id        = region_id;
+  // allocate and set region data
+  PetscCall(PetscCalloc1(rdy->num_regions, &rdy->regions));
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    PetscInt region_id = region_ids[r];
+    IS       cell_is;  // cell index space
+    PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
+    if (cell_is) {
+      RDyRegion *region = &rdy->regions[r];
+      region->id        = region_id;
 
-        // fish the region's name out of our region config data
-        for (PetscInt r1 = 0; r1 < rdy->config.num_regions; ++r1) {
-          if (rdy->config.regions[r1].mesh_region_id == region_id) {
-            strcpy(region->name, rdy->config.regions[r1].name);
-            break;
-          }
+      // fish the region's name out of our region config data
+      for (PetscInt r1 = 0; r1 < rdy->config.num_regions; ++r1) {
+        if (rdy->config.regions[r1].mesh_region_id == region_id) {
+          strcpy(region->name, rdy->config.regions[r1].name);
+          break;
         }
-
-        PetscInt num_cells;
-        PetscCall(ISGetLocalSize(cell_is, &num_cells));
-        if (num_cells > 0) {
-          RDyLogDebug(rdy, "  Found region %" PetscInt_FMT " (%" PetscInt_FMT " cells)", region_id, num_cells);
-          region->num_cells = num_cells;
-          PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
-        }
-        const PetscInt *cell_ids;
-        PetscCall(ISGetIndices(cell_is, &cell_ids));
-        for (PetscInt i = 0; i < num_cells; ++i) {
-          region->cell_ids[i] = cell_ids[i] - c_start;
-        }
-        PetscCall(ISRestoreIndices(cell_is, &cell_ids));
-        PetscCall(ISDestroy(&cell_is));
       }
+
+      PetscInt num_cells;
+      PetscCall(ISGetLocalSize(cell_is, &num_cells));
+      if (num_cells > 0) {
+        RDyLogDebug(rdy, "  Found region %d (%d cells)", region_id, num_cells);
+        region->num_cells = num_cells;
+        PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
+      }
+      const PetscInt *cell_ids;
+      PetscCall(ISGetIndices(cell_is, &cell_ids));
+      for (PetscInt i = 0; i < num_cells; ++i) {
+        region->cell_ids[i] = cell_ids[i] - c_start;
+      }
+      PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+      PetscCall(ISDestroy(&cell_is));
     }
-    PetscCall(ISRestoreIndices(region_id_is, &region_ids));
-    PetscCall(ISDestroy(&region_id_is));
-  } else {
-    // If we didn't find any regions, we'd better have a file from which to
-    // read initial conditions.
-    PetscCheck(strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
-               "No regions (cell sets) found in grid, and no initial conditions file given! "
-               "Cannot assign initial conditions for the given grid.");
   }
+  PetscCall(ISRestoreIndices(region_id_is, &region_ids));
+  PetscCall(ISDestroy(&region_id_is));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -941,17 +936,6 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(VecZeroEntries(rdy->X));
-  if (strlen(rdy->config.initial_conditions.domain.file)) {  // read from file
-    PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(rdy->comm, rdy->config.initial_conditions.domain.file, FILE_MODE_READ, &viewer));
-    Vec natural;
-    PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-    PetscCall(VecLoad(natural, viewer));
-    PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, rdy->X));
-    PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
-    PetscCall(PetscViewerDestroy(&viewer));
-    PetscCall(VecDestroy(&natural));
-  }
 
   // now initialize or override initial conditions by looping over regions
   // and writing values for corresponding cells
@@ -960,18 +944,32 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscScalar *x_ptr;
   PetscCall(VecGetArray(rdy->X, &x_ptr));
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyRegion    *region = &rdy->regions[r];
-    RDyCondition *ic     = &rdy->initial_conditions[r];
-    if (ic->flow) {
-      for (PetscInt c = 0; c < region->num_cells; ++c) {
-        PetscInt cell_id = region->cell_ids[c];
+    RDyRegion    region = rdy->regions[r];
+    RDyCondition ic     = rdy->initial_conditions[r];
+    PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER,
+      "No initial condition specified for region '%s'", region.name);
+    if (strlen(ic.flow->file)) { // read regional data from file
+      // FIXME: Figure this out!
+      PetscViewer viewer;
+      PetscCall(PetscViewerBinaryOpen(rdy->comm, ic.flow->file, FILE_MODE_READ, &viewer));
+      Vec natural;
+      PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
+      PetscCall(VecLoad(natural, viewer));
+      PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, rdy->X));
+      PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
+      PetscCall(PetscViewerDestroy(&viewer));
+      PetscCall(VecDestroy(&natural));
+    } else { // set components to specified values
+      for (PetscInt c = 0; c < region.num_cells; ++c) {
+        PetscInt cell_id = region.cell_ids[c];
         if (3 * cell_id < n_local) {  // skip ghost cells
-          x_ptr[3 * cell_id]     = ic->flow->height;
-          x_ptr[3 * cell_id + 1] = ic->flow->momentum[0];
-          x_ptr[3 * cell_id + 2] = ic->flow->momentum[1];
+          x_ptr[3 * cell_id]     = ic.flow->height;
+          x_ptr[3 * cell_id + 1] = ic.flow->momentum[0];
+          x_ptr[3 * cell_id + 2] = ic.flow->momentum[1];
         }
       }
     }
+    // TODO: salinity and sediment initial conditions go here.
   }
   PetscCall(VecRestoreArray(rdy->X, &x_ptr));
 

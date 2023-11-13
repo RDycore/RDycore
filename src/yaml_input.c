@@ -223,17 +223,11 @@ static const cyaml_schema_field_t grid_fields_schema[] = {
   CYAML_FIELD_END
 };
 
-// mapping of strings to domain-conditions-related file formats
-static const cyaml_strval_t domain_file_formats[] = {
+// mapping of strings to input file formats
+static const cyaml_strval_t input_file_formats[] = {
+    {"",       INPUT_NONE},
     {"binary", PETSC_VIEWER_NATIVE    },
     {"hdf5",   PETSC_VIEWER_HDF5_PETSC},
-};
-
-// mapping of domain fields to members of RDyDomainConditions
-static const cyaml_schema_field_t domain_fields_schema[] = {
-    CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyDomainConditions, file, 1),
-    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
-    CYAML_FIELD_END
 };
 
 // ---------------------------
@@ -422,8 +416,8 @@ static const cyaml_schema_value_t boundary_condition_spec_entry = {
 //   momentum: <px, py> # use only by dirichlet
 // - name: <name-of-flow-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical-outflow>
-//   file: <filename> # used only by dirichlet
-//   format: binary   # used only by dirichlet
+//   file: <filename>      # used only by dirichlet
+//   format: <binary|hdf5> # used only by dirichlet
 //   ...
 
 // mapping of strings to types of conditions
@@ -437,12 +431,6 @@ static const cyaml_strval_t condition_types[] = {
 // schema for momentum component (as specified in a 2-item sequence)
 static const cyaml_schema_value_t momentum_component_entry = {
     CYAML_VALUE(FLOAT, CYAML_FLAG_DEFAULT, PetscReal, {.missing = INVALID_REAL}),
-};
-
-// mapping of strings to input file formats
-static const cyaml_strval_t input_file_formats[] = {
-    {"",       INPUT_NONE},
-    {"binary", INPUT_BINARY},
 };
 
 // schema for flow condition fields
@@ -469,8 +457,8 @@ static const cyaml_schema_value_t flow_condition_entry = {
 //   concentration: <value> # used only by dirichlet
 // - name: <name-of-sediment-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   file: <filename> # used only by dirichlet
-//   format: binary   # used only by dirichlet
+//   file: <filename>      # used only by dirichlet
+//   format: <binary|hdf5> # used only by dirichlet
 //   ...
 
 // schema for sediment_condition fields
@@ -496,8 +484,8 @@ static const cyaml_schema_value_t sediment_condition_entry = {
 //   concentration: <value> # used only by dirichlet
 // - name: <name-of-salinity-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   file: <filename> # used only by dirichlet
-//   format: binary   # used only by dirichlet
+//   file: <filename>      # used only by dirichlet
+//   format: <binary|hdf5> # used only by dirichlet
 //   ...
 
 // schema for salinity fields
