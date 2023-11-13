@@ -118,8 +118,7 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateSection(RDy rdy, PetscSection *sec)
-{
+static PetscErrorCode CreateSection(RDy rdy, PetscSection *sec) {
   PetscInt n_field                             = 1;
   PetscInt n_field_comps[1]                    = {3};
   char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
@@ -573,7 +572,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         const PetscInt *edge_ids;
         PetscCall(ISGetIndices(edge_is, &edge_ids));
         for (PetscInt i = 0; i < num_edges; ++i) {
-          PetscCheck(edge_ids[i] >= e_start, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "Mesh point %" PetscInt_FMT " is not an edge. Likely the option -dm_plex_transform_label_match_strata is missing", edge_ids[i]);
+          PetscCheck(edge_ids[i] >= e_start, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
+                     "Mesh point %" PetscInt_FMT " is not an edge. Likely the option -dm_plex_transform_label_match_strata is missing", edge_ids[i]);
           boundary->edge_ids[i] = edge_ids[i] - e_start;
         }
         PetscCall(ISRestoreIndices(edge_is, &edge_ids));
