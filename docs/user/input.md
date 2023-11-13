@@ -114,8 +114,8 @@ flow_conditions:
     momentum: [0, 0]
   - name: dam_bottom_ic
     type: dirichlet
-    height: 5
-    momentum: [0, 0]
+    file: dam_ics.dat
+    format: binary
   - name: reflecting_bc
     type: reflecting
   - name: outflow_bc
@@ -144,14 +144,26 @@ elsewhere in the file. The parameters that define a flow condition are
       is defined by a critical outflow condition. Useful only for boundary
       conditions.
 
-In the case of a Dirichlet condition, flow is prescribed by the following
-parameters:
+In the case of a Dirichlet condition, flow is prescribed by providing parameters
+to set the water height and momentum. This can be done in one of two ways:
 
-* `height`: the height of water [m] at the relevant point (within a cell
-  or on its boundary)
-* `momentum`: a 2-component sequence/list containing the `x` and `y` components
-  of the momentum [kg m/s] at the relevant point (within a cell or on its
-  boundary)
+1. By specifying the parameters directly using the following fields:
+
+    * `height`: the height of water [m] at the relevant point (within a cell
+      or on its boundary)
+    * `momentum`: a 2-component sequence/list containing the `x` and `y` components
+      of the momentum [kg m/s] at the relevant point (within a cell or on its
+      boundary)
+
+2. By specifying a file from which data for these parameters is to be read. The
+   data will be read into the components of the solution vector that correspond
+   to the cells belonging to the region to which this flow condition is
+   assigned:
+
+   * `file`: the path for the file from which data is read, specified relative
+     to the directory in which the RDycore executable was run.
+   * `format`: the format of the data in the file, which current must be
+     `binary` (specifying PETSc's binary format).
 
 ## `grid`
 
@@ -362,8 +374,20 @@ that define a salinity condition are
       only for boundary conditions. Currently, only homogeneous Neumann conditions
       are supported.
 
-In the case of a Dirichlet condition, a salinity concentration is prescribed
-by a `concentration` parameter.
+In the case of a Dirichlet condition, a salinity concentration is prescribed by
+providing one or more parameters. This can be done in one of two ways:
+
+1. By specifying the concentration directly using the `concentration` parameter
+
+2. By specifying a file from which concentration data is to be read. The
+   data will be read into the components of the solution vector that correspond
+   to the cells belonging to the region to which this flow condition is
+   assigned:
+
+   * `file`: the path for the file from which data is read, specified relative
+     to the directory in which the RDycore executable was run.
+   * `format`: the format of the data in the file, which current must be
+     `binary` (specifying PETSc's binary format).
 
 ## `sediment_conditions`
 
@@ -391,8 +415,20 @@ that define a sediment condition are
       useful only for boundary conditions. Currently, only homogeneous Neumann
       conditions are supported.
 
-In the case of a Dirichlet condition, a sediment concentrations is prescribed
-by a `concentration` parameter.
+In the case of a Dirichlet condition, a sediment concentration is prescribed by
+providing one or more parameters. This can be done in one of two ways:
+
+1. By specifying the concentration directly using the `concentration` parameter
+
+2. By specifying a file from which concentration data is to be read. The
+   data will be read into the components of the solution vector that correspond
+   to the cells belonging to the region to which this flow condition is
+   assigned:
+
+   * `file`: the path for the file from which data is read, specified relative
+     to the directory in which the RDycore executable was run.
+   * `format`: the format of the data in the file, which current must be
+     `binary` (specifying PETSc's binary format).
 
 ## `sources`
 
