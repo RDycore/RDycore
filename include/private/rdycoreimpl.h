@@ -100,7 +100,8 @@ struct _p_RDy {
   RDyConfig config;
 
   // PETSc (DMPlex) grid
-  DM dm;
+  DM        dm;
+  PetscBool refine;
 
   // Auxiliary DM for diagnostics
   DM aux_dm;

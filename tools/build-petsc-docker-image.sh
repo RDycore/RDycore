@@ -25,7 +25,7 @@ TAG=$PETSC_HASH
 mkdir -p docker-build
 cp Dockerfile.petsc docker-build/Dockerfile
 cd docker-build
-docker build -t $IMAGE_NAME:$TAG --network=host \
+docker buildx build -t $IMAGE_NAME:$TAG --network=host \
   --build-arg PETSC_HASH=$PETSC_HASH \
   .
 STATUS=$?
