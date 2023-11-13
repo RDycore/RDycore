@@ -614,14 +614,14 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
 static PetscErrorCode SetAdditionalOptions(RDy rdy) {
 #define VALUE_LEN 128
   PetscFunctionBegin;
-  PetscBool has_param, locRefine;
+  PetscBool has_param, loc_refine;
   char      value[VALUE_LEN + 1] = {0};
 
-  PetscCall(PetscOptionsHasName(NULL, NULL, "-dm_refine", &locRefine));
+  PetscCall(PetscOptionsHasName(NULL, NULL, "-dm_refine", &loc_refine));
   PetscCall(PetscOptionsHasName(NULL, "ref_", "-dm_refine", &rdy->refine));
   if (rdy->config.grid.file[0] != '\0') PetscCall(PetscOptionsSetValue(NULL, "-dm_plex_filename", rdy->config.grid.file));
   PetscCall(PetscOptionsSetValue(NULL, "-dist_dm_distribute_save_sf", "true"));
-  if (locRefine) PetscCall(PetscOptionsSetValue(NULL, "-dm_plex_transform_label_match_strata", "true"));
+  if (loc_refine) PetscCall(PetscOptionsSetValue(NULL, "-dm_plex_transform_label_match_strata", "true"));
   if (rdy->refine) PetscCall(PetscOptionsSetValue(NULL, "-ref_dm_plex_transform_label_match_strata", "true"));
 
   //--------

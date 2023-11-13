@@ -572,7 +572,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
         const PetscInt *edge_ids;
         PetscCall(ISGetIndices(edge_is, &edge_ids));
         for (PetscInt i = 0; i < num_edges; ++i) {
-          PetscCheck(edge_ids[i] >= e_start, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
+          PetscCheck((edge_ids[i] >= e_start) && (edge_ids[i] < e_end), PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
                      "Mesh point %" PetscInt_FMT " is not an edge. Likely the option -dm_plex_transform_label_match_strata is missing", edge_ids[i]);
           boundary->edge_ids[i] = edge_ids[i] - e_start;
         }

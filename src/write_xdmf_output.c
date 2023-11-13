@@ -44,9 +44,9 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
 
   // create and populate a multi-component natural vector
   Vec       natural;
-  PetscBool useNatural;
-  PetscCall(DMGetUseNatural(rdy->dm, &useNatural));
-  if (useNatural) {
+  PetscBool use_natural;
+  PetscCall(DMGetUseNatural(rdy->dm, &use_natural));
+  if (use_natural) {
     PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
     PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->X, natural));
     PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, rdy->X, natural));
