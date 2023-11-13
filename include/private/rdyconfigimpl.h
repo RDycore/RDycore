@@ -268,6 +268,9 @@ typedef struct {
 // all source conditions (identical to initial conditions in structure)
 typedef RDyInitialConditionsSection RDySourcesSection;
 
+// input file formats
+typedef enum { INPUT_NONE = 0, INPUT_BINARY } RDyInputFormat;
+
 // -----------------------
 // flow_conditions section
 // -----------------------
@@ -278,6 +281,8 @@ typedef struct {
   RDyConditionType type;
   PetscReal        height;
   PetscReal        momentum[2];
+  char             file[PETSC_MAX_PATH_LEN];
+  RDyInputFormat   format;
 } RDyFlowCondition;
 
 // ---------------------------
@@ -289,6 +294,8 @@ typedef struct {
   char             name[MAX_NAME_LEN + 1];
   RDyConditionType type;
   PetscReal        concentration;
+  char             file[PETSC_MAX_PATH_LEN];
+  RDyInputFormat   format;
 } RDySedimentCondition;
 
 // ---------------------------
@@ -300,6 +307,8 @@ typedef struct {
   char             name[MAX_NAME_LEN + 1];
   RDyConditionType type;
   PetscReal        concentration;
+  char             file[PETSC_MAX_PATH_LEN];
+  RDyInputFormat   format;
 } RDySalinityCondition;
 
 // a representation of the config file itself

@@ -15,7 +15,7 @@
 // Here we've implemented a parser (using libcyaml) to handle the RDycore
 // configuration file whose specification can be found at
 //
-// https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
+// https://rdycore.github.io/RDycore/user/input.html
 //
 // In the style of libcyaml (https://github.com/tlsa/libcyaml/blob/main/docs/guide.md),
 // this parser defines a schema for each section and populates the appropriate struct(s)
@@ -422,8 +422,8 @@ static const cyaml_schema_value_t boundary_condition_spec_entry = {
 //   momentum: <px, py> # use only by dirichlet
 // - name: <name-of-flow-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical-outflow>
-//   height: <value> # used only by dirichlet
-//   momentum: <px, py> # used only by dirichlet
+//   file: <filename> # used only by dirichlet
+//   format: binary   # used only by dirichlet
 //   ...
 
 // mapping of strings to types of conditions
@@ -439,12 +439,20 @@ static const cyaml_schema_value_t momentum_component_entry = {
     CYAML_VALUE(FLOAT, CYAML_FLAG_DEFAULT, PetscReal, {.missing = INVALID_REAL}),
 };
 
+// mapping of strings to input file formats
+static const cyaml_strval_t input_file_formats[] = {
+    {"",       INPUT_NONE},
+    {"binary", INPUT_BINARY},
+};
+
 // schema for flow condition fields
 static const cyaml_schema_field_t flow_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
     CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = INVALID_REAL}),
     CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component_entry, 2),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyFlowCondition, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyFlowCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
@@ -458,17 +466,20 @@ static const cyaml_schema_value_t flow_condition_entry = {
 // ---------------------------
 // - name: <name-of-sediment-condition-1>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   concentration: <value> # used only by dirichlet
 // - name: <name-of-sediment-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   file: <filename> # used only by dirichlet
+//   format: binary   # used only by dirichlet
 //   ...
 
 // schema for sediment_condition fields
 static const cyaml_schema_field_t sediment_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySedimentCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySedimentCondition, concentration),
+    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_OPTIONAL, RDySedimentCondition, concentration),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDySedimentCondition, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDySedimentCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
@@ -482,17 +493,20 @@ static const cyaml_schema_value_t sediment_condition_entry = {
 // ---------------------------
 // - name: <name-of-salinity-condition-1>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   concentration: <value> # used only by dirichlet
 // - name: <name-of-salinity-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   file: <filename> # used only by dirichlet
+//   format: binary   # used only by dirichlet
 //   ...
 
 // schema for salinity fields
 static const cyaml_schema_field_t salinity_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySalinityCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySalinityCondition, concentration),
+    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_OPTIONAL, RDySalinityCondition, concentration),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDySalinityCondition, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDySalinityCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
