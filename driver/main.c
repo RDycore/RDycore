@@ -33,7 +33,8 @@ static PetscErrorCode OpenData(char *filename, Vec *data_vec, PetscInt *ndata) {
 
 // For a given cur_time,
 //   cur_data = value_1 if cur_time >= time_1 and cur_time < time_2
-PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal cur_time, PetscBool temporally_interpolate, PetscInt *cur_data_idx, PetscReal *cur_data) {
+PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal cur_time, PetscBool temporally_interpolate, PetscInt *cur_data_idx,
+                              PetscReal *cur_data) {
   PetscFunctionBegin;
 
   PetscBool found  = PETSC_FALSE;
@@ -60,7 +61,7 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
     *cur_data     = data_ptr[ndata * 2 - 1];
   } else {
     if (temporally_interpolate) {
-      *cur_data = (cur_time - time_dn)/(time_up - time_dn) * (data_up - data_dn) + data_dn;
+      *cur_data = (cur_time - time_dn) / (time_up - time_dn) * (data_up - data_dn) + data_dn;
     } else {
       *cur_data = data_dn;
     }
