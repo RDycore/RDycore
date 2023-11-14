@@ -225,7 +225,7 @@ static const cyaml_schema_field_t grid_fields_schema[] = {
 
 // mapping of strings to input file formats
 static const cyaml_strval_t input_file_formats[] = {
-    {"",       INPUT_NONE},
+    {"",       PETSC_VIEWER_NOFORMAT  },
     {"binary", PETSC_VIEWER_NATIVE    },
     {"hdf5",   PETSC_VIEWER_HDF5_PETSC},
 };
@@ -235,50 +235,45 @@ static const cyaml_strval_t input_file_formats[] = {
 // ---------------------------
 
 // mapping of material specification fields to members of RDyMaterialSpec
-static const cyaml_schema_field_t material_spec_fields_schema[] = {
-    CYAML_FIELD_INT("id", CYAML_FLAG_DEFAULT, RDyMaterialSpec, id),
-    CYAML_FIELD_STRING("material", CYAML_FLAG_DEFAULT, RDyMaterialSpec, material, 1),
-    CYAML_FIELD_END
-};
-
-// a single material specification entry
-static const cyaml_schema_value_t material_spec_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialSpec, material_spec_fields_schema),
-};
-
-static const cyaml_schema_field_t surface_composition_domain_files_fields_schema[] = {
-    CYAML_FIELD_STRING("manning", CYAML_FLAG_DEFAULT, RDySurfaceCompositionFiles, manning, 1),
-    CYAML_FIELD_END
-};
-
-static const cyaml_schema_field_t surface_composition_domain_fields_schema[] = {
-    CYAML_FIELD_MAPPING("files", CYAML_FLAG_DEFAULT, RDySurfaceCompositionDomain, files, surface_composition_domain_files_fields_schema),
-    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
-    CYAML_FIELD_END
-};
-
-// mapping of surface_composition fields to RDyInitialConditionsSection
 static const cyaml_schema_field_t surface_composition_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, domain, surface_composition_domain_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, by_region, num_regions, &material_spec_entry, 0,
-                               MAX_NUM_REGIONS),
+    CYAML_FIELD_STRING("region", CYAML_FLAG_DEFAULT, RDySurfaceCompositionSpec, region, 1),
+    CYAML_FIELD_STRING("material", CYAML_FLAG_DEFAULT, RDySurfaceCompositionSpec, material, 1),
     CYAML_FIELD_END
+};
+
+// a single surface composition entry
+static const cyaml_schema_value_t surface_composition_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySurfaceCompositionSpec, surface_composition_fields_schema),
 };
 
 // -----------------
 // materials section
 // -----------------
 
-// mapping of material fields to RDyMaterial
+// mapping of material property fields to RDyMaterialPropertySpec
+static const cyaml_schema_field_t material_property_spec_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterialPropertySpec, name, 1),
+    CYAML_FIELD_FLOAT("value", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, value),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
+    CYAML_FIELD_END
+};
+
+// a single material property entry
+static const cyaml_schema_value_t material_property_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialPropertySpec, material_property_spec_fields_schema),
+};
+
+// mapping of material fields to RDyMaterialSpec
 static const cyaml_schema_field_t material_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterial, name, 1),
-    CYAML_FIELD(FLOAT, "manning", CYAML_FLAG_OPTIONAL, RDyMaterial, manning, {.missing = INVALID_REAL}),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterialSpec, name, 1),
+    CYAML_FIELD_SEQUENCE_COUNT("properties", CYAML_FLAG_DEFAULT, RDyMaterialSpec, properties, num_properties, &material_property_entry, 0, MAX_NUM_MATERIAL_PROPERTIES),
     CYAML_FIELD_END
 };
 
 // a single material entry
 static const cyaml_schema_value_t material_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterial, material_fields_schema),
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialSpec, material_fields_schema),
 };
 
 // ---------------
@@ -306,18 +301,14 @@ static const cyaml_schema_value_t region_spec_entry = {
 // initial_conditions and sources sections
 // ---------------------------------------
 // initial_conditions/sources:
-//   domain: # optional, specifies initial conditions/sources for entire domain
-//     file: <path-to-file/ic.{bin,h5,etc}>
-//     format: <bin|h5|etc>
-//   regions: # optional, specifies conditions on a per-region basis
-//     - region: <region-name>
-//       flow: <name-of-a-flow-condition>
-//       sediment: <name-of-a-sediment-condition> # used if physics.sediment == true above
-//       salinity: <name-of-a-salinity-condition> # used if physics.salinity == true above
-//     - region: <region-name>
-//       flow: <name-of-a-flow-condition>
-//       sediment: <name-of-a-sediment-condition> # used only if physics.sediment == true above
-//       salinity: <name-of-a-salinity-condition> # used only if physics.salinity == true above
+//  - region: <region-name>
+//    flow: <name-of-a-flow-condition>
+//    sediment: <name-of-a-sediment-condition> # used if physics.sediment == true above
+//    salinity: <name-of-a-salinity-condition> # used if physics.salinity == true above
+//  - region: <region-name>
+//    flow: <name-of-a-flow-condition>
+//    sediment: <name-of-a-sediment-condition> # used only if physics.sediment == true above
+//    salinity: <name-of-a-salinity-condition> # used only if physics.salinity == true above
 // ...
 
 // mapping of conditions fields to members of RDyRegionConditionSpec
@@ -329,26 +320,10 @@ static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// a single region condition spec entry
+// a single regional initial condition / source spec entry
 static const cyaml_schema_value_t region_condition_spec_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, region_condition_spec_fields_schema),
 };
-
-// mapping of initial_conditions fields to RDyInitialConditionsSection
-static const cyaml_schema_field_t initial_conditions_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, domain, domain_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, by_region, num_regions, &region_condition_spec_entry, 0,
-                               MAX_NUM_REGIONS),
-    CYAML_FIELD_END
-};
-
-// mapping of sources fields to RDySources
-static const cyaml_schema_field_t sources_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySourcesSection, domain, domain_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, by_region, num_regions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
-    CYAML_FIELD_END
-};
-
 
 // ------------------
 // boundaries section
@@ -516,17 +491,17 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
-    CYAML_FIELD_MAPPING("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, surface_composition_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, num_material_assignments, &surface_composition_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_DEFAULT, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
     CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_DEFAULT, RDyConfig, regions, num_regions,
                                &region_spec_entry, 0, MAX_NUM_REGIONS),
-    CYAML_FIELD_MAPPING("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, initial_conditions_fields_schema),
+    CYAML_FIELD_SEQUENCE_COUNT("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, num_regions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
     CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyConfig, boundaries, num_boundaries,
                                &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
                                &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
-    CYAML_FIELD_MAPPING("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, sources_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
+    CYAML_FIELD_SEQUENCE_COUNT("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, num_regions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_DEFAULT, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions,
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
@@ -627,15 +602,24 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
                "time.coupling_interval must not exceed time.final_time");
   }
 
-  // we need either a domain initial condition or region-by-region conditions
-  PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_regions > 0), comm, PETSC_ERR_USER,
-             "Invalid initial_conditions! No domain or per-region conditions given.");
+  // we need initial conditions specified for each region
+  PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
+             "Only %d initial conditions were specified in initial_conditions (%d needed)", config->num_initial_conditions, config->num_regions);
+
+  // we need material properties for each region as well
+  PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
+             "Only %d material <-> region assignments were found in surface_composition (%d needed)", config->num_material_assignments,
+             config->num_regions);
 
   // validate our materials
-  for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
-    const RDyMaterial *material = &config->materials[i];
-    // at the moment, we need Manning's coefficient
-    PetscCheck(material->manning != INVALID_REAL, comm, PETSC_ERR_USER, "Missing Manning's coefficient in materials.%s", material->name);
+  for (PetscInt i = 0; i < config->num_materials; ++i) {
+    const RDyMaterialSpec mat_spec = config->materials[i];
+
+    // at the moment, we need Manning's coefficient, and we don't understand
+    // any other property
+    PetscCheck(mat_spec.num_properties == 1, comm, PETSC_ERR_USER, "Only 1 material property ('manning') is supported.");
+    PetscCheck(!strcmp(mat_spec.properties[0].name, "manning"), comm, PETSC_ERR_USER, "Invalid material property name: %s (must be 'manning').",
+               mat_spec.properties[0].name);
   }
 
   // validate our flow conditions

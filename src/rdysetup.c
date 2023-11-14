@@ -271,24 +271,6 @@ static PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// retrieves the index of a material using its name
-static PetscErrorCode FindMaterial(RDy rdy, const char *name, PetscInt *index) {
-  PetscFunctionBegin;
-
-  // Currently, we do a linear search on the name of the material, which is O(N)
-  // for N regions. If this is too slow, we can sort the conditions by name and
-  // use binary search, which is O(log2 N).
-  *index = -1;
-  for (PetscInt i = 0; i < rdy->config.num_materials; ++i) {
-    if (!strcmp(rdy->config.materials[i].name, name)) {
-      *index = i;
-      break;
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 // retrieves the index of a flow condition using its name
 static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
@@ -402,8 +384,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
   // If we didn't find any regions, we can't perform the simulation.
-  PetscCheck(label, rdy->comm, PETSC_ERR_USER,
-    "No regions (cell sets) found in grid! Cannot assign initial conditions.");
+  PetscCheck(label, rdy->comm, PETSC_ERR_USER, "No regions (cell sets) found in grid! Cannot assign initial conditions.");
   PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
   PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER, "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)",
              rdy->num_regions, MAX_NUM_REGIONS);
@@ -604,6 +585,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 }
 
 // reads data for a single DOF from a binary file into a Vec
+// TODO: currently, we only support binary PETSc files
 static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec *local) {
   PetscFunctionBegin;
 
@@ -635,17 +617,24 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define READ_MATERIAL_PROPERTY_FROM_FILE(rdy, property)                                                   \
-  if (strlen(rdy->config.surface_composition.domain.files.property)) {                                    \
-    Vec local;                                                                                            \
-    PetscCall(ReadOneDOFVecFromFile(rdy, rdy->config.surface_composition.domain.files.property, &local)); \
-    PetscScalar *x_ptr;                                                                                   \
-    PetscCall(VecGetArray(local, &x_ptr));                                                                \
-    for (PetscInt icell = 0; icell < rdy->mesh.num_cells; icell++) {                                      \
-      rdy->materials_by_cell[icell].property = x_ptr[icell];                                              \
-    }                                                                                                     \
-    PetscCall(VecRestoreArray(local, &x_ptr));                                                            \
-    PetscCall(VecDestroy(&local));                                                                        \
+#define READ_MATERIAL_PROPERTY(property, mat_prop_spec, region, materials_by_cell) \
+  if (mat_prop_spec.file) { /* read property from a file */                        \
+    Vec local;                                                                     \
+    PetscCall(ReadOneDOFVecFromFile(rdy, mat_prop_spec.file, &local));             \
+    PetscScalar *x_ptr;                                                            \
+    PetscCall(VecGetArray(local, &x_ptr));                                         \
+    for (PetscInt c = 0; c < region.num_cells; ++c) {                              \
+      PetscInt cell                    = region.cell_ids[c];                       \
+      materials_by_cell[cell].property = x_ptr[c];                                 \
+    }                                                                              \
+    PetscCall(VecRestoreArray(local, &x_ptr));                                     \
+    PetscCall(VecDestroy(&local));                                                 \
+  } else {                                                                         \
+    /* set this material property for all cells in the region */                   \
+    for (PetscInt c = 0; c < region.num_cells; ++c) {                              \
+      PetscInt cell                    = region.cell_ids[c];                       \
+      materials_by_cell[cell].property = mat_prop_spec.value;                      \
+    }                                                                              \
   }
 
 // sets up materials
@@ -653,45 +642,34 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
 static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
 
-  // allocate storage for materials for cells
+  // allocate storage for materials
   PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
 
-  // read material properties for the entire domain from files if given
-  READ_MATERIAL_PROPERTY_FROM_FILE(rdy, manning);
+  // assign materials to each region as needed
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion region = rdy->regions[r];
 
-  // set up region-wise material and override cell-wise materials if needed
-  if (rdy->config.surface_composition.num_regions > 0) {
-    // allocate storage for regional materials
-    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->materials));
-
-    // assign materials to each region as needed
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyMaterial *material         = &rdy->materials[r];
-      PetscInt     region_id        = rdy->regions[r].id;
-      PetscInt     mat_region_index = -1;
-      for (PetscInt imat = 0; imat < rdy->config.surface_composition.num_regions; ++imat) {
-        if (rdy->config.surface_composition.by_region[imat].id == region_id) {
-          mat_region_index = imat;
-          break;
+    // find the material specification corresponding to this region
+    PetscInt region_mat_index = -1;
+    for (PetscInt isurf_comp = 0; isurf_comp < rdy->config.num_material_assignments; ++isurf_comp) {
+      if (!strcmp(rdy->config.surface_composition[isurf_comp].region, region.name)) {
+        RDySurfaceCompositionSpec surf_comp = rdy->config.surface_composition[isurf_comp];
+        for (PetscInt imat = 0; imat < rdy->config.num_materials; ++imat) {
+          if (!strcmp(rdy->config.materials[imat].name, surf_comp.material)) {
+            region_mat_index = imat;
+            break;
+          }
         }
+        if (region_mat_index != -1) break;
       }
-      if (mat_region_index != -1) {
-        // retrieve the material object for this region
-        RDyMaterialSpec *mat_spec = &rdy->config.surface_composition.by_region[mat_region_index];
-        PetscInt         mat_index;
-        PetscCall(FindMaterial(rdy, mat_spec->material, &mat_index));
-        RDyMaterial *mat = &rdy->config.materials[mat_index];
+    }
+    PetscCheck(region_mat_index != -1, rdy->comm, PETSC_ERR_USER, "Region '%s' has no assigned material!", region.name);
+    RDyMaterialSpec mat_spec = rdy->config.materials[region_mat_index];
 
-        // set the region's material properties
-        *material = *mat;
-
-        // set the material properties for all cells in the region
-        RDyRegion region = rdy->regions[r];
-        for (PetscInt c = 0; c < region.num_cells; ++c) {
-          PetscInt cell                = region.cell_ids[c];
-          rdy->materials_by_cell[cell] = *mat;
-        }
-      }
+    // set the region's material properties
+    for (PetscInt p = 0; p < mat_spec.num_properties; ++p) {
+      RDyMaterialPropertySpec mat_prop_spec = mat_spec.properties[p];
+      READ_MATERIAL_PROPERTY(manning, mat_prop_spec, region, rdy->materials_by_cell);
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -709,44 +687,41 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyCondition *ic              = &rdy->initial_conditions[r];
     RDyRegion     region          = rdy->regions[r];
-    PetscInt      ic_region_index = -1;
-    for (PetscInt ic = 0; ic < rdy->config.initial_conditions.num_regions; ++ic) {
-      if (!strcmp(rdy->config.initial_conditions.by_region[ic].region, region.name)) {
-        ic_region_index = ic;
+    PetscInt      region_ic_index = -1;
+    for (PetscInt ic = 0; ic < rdy->config.num_initial_conditions; ++ic) {
+      if (!strcmp(rdy->config.initial_conditions[ic].region, region.name)) {
+        region_ic_index = ic;
         break;
       }
     }
-    PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
-               "Region '%s' has no initial conditions!", region.name);
+    PetscCheck(region_ic_index != -1, rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial conditions!", region.name);
 
-    if (ic_region_index != -1) {
-      RDyRegionConditionSpec ic_spec = rdy->config.initial_conditions.by_region[ic_region_index];
-      PetscCheck(strlen(ic_spec.flow), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial flow condition!", region.name);
-      PetscInt flow_index;
-      PetscCall(FindFlowCondition(rdy, ic_spec.flow, &flow_index));
-      RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
-      PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                 "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
-      ic->flow = flow_cond;
+    RDyRegionConditionSpec ic_spec = rdy->config.initial_conditions[region_ic_index];
+    PetscCheck(strlen(ic_spec.flow), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial flow condition!", region.name);
+    PetscInt flow_index;
+    PetscCall(FindFlowCondition(rdy, ic_spec.flow, &flow_index));
+    RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
+    PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+               "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
+    ic->flow = flow_cond;
 
-      if (rdy->config.physics.sediment) {
-        PetscCheck(strlen(ic_spec.sediment), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial sediment condition!", region.name);
-        PetscInt sed_index;
-        PetscCall(FindSedimentCondition(rdy, ic_spec.sediment, &sed_index));
-        RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
-        PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial sediment condition '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
-        ic->sediment = sed_cond;
-      }
-      if (rdy->config.physics.salinity) {
-        PetscCheck(strlen(ic_spec.salinity), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial salinity condition!", region.name);
-        PetscInt sal_index;
-        PetscCall(FindSalinityCondition(rdy, ic_spec.salinity, &sal_index));
-        RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
-        PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
-        ic->salinity = sal_cond;
-      }
+    if (rdy->config.physics.sediment) {
+      PetscCheck(strlen(ic_spec.sediment), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial sediment condition!", region.name);
+      PetscInt sed_index;
+      PetscCall(FindSedimentCondition(rdy, ic_spec.sediment, &sed_index));
+      RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
+      PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                 "initial sediment condition '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
+      ic->sediment = sed_cond;
+    }
+    if (rdy->config.physics.salinity) {
+      PetscCheck(strlen(ic_spec.salinity), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial salinity condition!", region.name);
+      PetscInt sal_index;
+      PetscCall(FindSalinityCondition(rdy, ic_spec.salinity, &sal_index));
+      RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
+      PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                 "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
+      ic->salinity = sal_cond;
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -756,7 +731,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
 //   can be run after refinement
 static PetscErrorCode InitSources(RDy rdy) {
   PetscFunctionBegin;
-  if (rdy->config.sources.num_regions > 0) {
+  if (rdy->config.num_sources > 0) {
     // allocate storage for sources
     PetscCall(PetscCalloc1(rdy->num_regions, &rdy->sources));
 
@@ -764,15 +739,15 @@ static PetscErrorCode InitSources(RDy rdy) {
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       RDyCondition *src              = &rdy->sources[r];
       RDyRegion     region           = rdy->regions[r];
-      PetscInt      src_region_index = -1;
-      for (PetscInt isrc = 0; isrc < rdy->config.sources.num_regions; ++isrc) {
-        if (!strcmp(rdy->config.sources.by_region[isrc].region, region.name)) {
-          src_region_index = isrc;
+      PetscInt      region_src_index = -1;
+      for (PetscInt isrc = 0; isrc < rdy->config.num_sources; ++isrc) {
+        if (!strcmp(rdy->config.sources[isrc].region, region.name)) {
+          region_src_index = isrc;
           break;
         }
       }
-      if (src_region_index != -1) {
-        RDyRegionConditionSpec src_spec = rdy->config.sources.by_region[src_region_index];
+      if (region_src_index != -1) {
+        RDyRegionConditionSpec src_spec = rdy->config.sources[region_src_index];
         if (strlen(src_spec.flow)) {
           PetscInt flow_index;
           PetscCall(FindFlowCondition(rdy, src_spec.flow, &flow_index));
@@ -946,9 +921,8 @@ static PetscErrorCode InitSolution(RDy rdy) {
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion    region = rdy->regions[r];
     RDyCondition ic     = rdy->initial_conditions[r];
-    PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER,
-      "No initial condition specified for region '%s'", region.name);
-    if (strlen(ic.flow->file)) { // read regional data from file
+    PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER, "No initial condition specified for region '%s'", region.name);
+    if (strlen(ic.flow->file)) {  // read regional data from file
       // FIXME: Figure this out!
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(rdy->comm, ic.flow->file, FILE_MODE_READ, &viewer));
@@ -959,7 +933,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
       PetscCall(PetscViewerDestroy(&viewer));
       PetscCall(VecDestroy(&natural));
-    } else { // set components to specified values
+    } else {  // set components to specified values
       for (PetscInt c = 0; c < region.num_cells; ++c) {
         PetscInt cell_id = region.cell_ids[c];
         if (3 * cell_id < n_local) {  // skip ghost cells

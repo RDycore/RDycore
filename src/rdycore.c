@@ -125,7 +125,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   // destroy materials
   if ((*rdy)->materials_by_cell) PetscFree((*rdy)->materials_by_cell);
-  if ((*rdy)->materials) PetscFree((*rdy)->materials);
 
   // destroy regions and boundaries
   for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {

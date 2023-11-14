@@ -26,6 +26,10 @@
 // the maximum number of materials that can be defined for a simulation
 #define MAX_NUM_MATERIALS 32
 
+// the maximum number of material properties that can be defined for a given
+// material in a simulation
+#define MAX_NUM_MATERIAL_PROPERTIES 32
+
 // the maximum number of flow/sediment/salinity conditions that can be defined for a
 // simulation
 #define MAX_NUM_CONDITIONS 32
@@ -162,38 +166,30 @@ typedef struct {
 // surface_composition section
 // ---------------------------
 
-// a named regional material specification
+// an association between a regions and a material
 typedef struct {
-  PetscInt id;                          // ID of region for related material
-  char     material[MAX_NAME_LEN + 1];  // name of related material
-} RDyMaterialSpec;
-
-typedef struct {
-  char manning[PETSC_MAX_PATH_LEN];
-} RDySurfaceCompositionFiles;
-
-typedef struct {
-  PetscViewerFormat          format;
-  RDySurfaceCompositionFiles files;
-} RDySurfaceCompositionDomain;
-
-// all surface composition data
-typedef struct {
-  RDySurfaceCompositionDomain domain;                        // domain-wide material properties
-  PetscInt                    num_regions;                   // number of per-region materials
-  RDyMaterialSpec             by_region[MAX_NUM_MATERIALS];  // materials by region
-} RDySurfaceCompositionSection;
+  char region[MAX_NAME_LEN + 1];    // name of related region
+  char material[MAX_NAME_LEN + 1];  // name of related material
+} RDySurfaceCompositionSpec;
 
 // -----------------------
 // materials section
 // -----------------------
 
-// a material with specific properties
-// (undefined properties are set to INVALID_INT/INVALID_REAL)
+// the specification of a material property as given by input
 typedef struct {
-  char      name[MAX_NAME_LEN + 1];
-  PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
-} RDyMaterial;
+  char              name[MAX_NAME_LEN + 1];    // the name of the material property
+  PetscReal         value;                     // specified value of the material property
+  char              file[PETSC_MAX_PATH_LEN];  // file from which data is to be read
+  PetscViewerFormat format;                    // file format
+} RDyMaterialPropertySpec;
+
+// the specification of a material as a collection of material properties
+typedef struct {
+  char                    name[MAX_NAME_LEN + 1];                   // the name of the material
+  PetscInt                num_properties;                           // number of material properties specified
+  RDyMaterialPropertySpec properties[MAX_NUM_MATERIAL_PROPERTIES];  // collection of material properties
+} RDyMaterialSpec;
 
 // ----------------------
 // regions and boundaries
@@ -238,45 +234,18 @@ typedef struct {
   char     salinity[MAX_NAME_LEN + 1];                        // name of related salinity condition
 } RDyBoundaryConditionSpec;
 
-// --------------------------
-// initial_conditions section
-// --------------------------
-
-// all initial conditions
-typedef struct {
-  RDyDomainConditions    domain;                      // domain-wide conditions
-  PetscInt               num_regions;                 // number of per-region conditions defined
-  RDyRegionConditionSpec by_region[MAX_NUM_REGIONS];  // names of types of conditions
-} RDyInitialConditionsSection;
-
-// ---------------------------
-// boundary_conditions section
-// ---------------------------
-
-// (nothing needed here aside from what's provided in initial_conditions)
-
-// ---------------
-// sources section
-// ---------------
-
-// all source conditions (identical to initial conditions in structure)
-typedef RDyInitialConditionsSection RDySourcesSection;
-
-// input file formats
-typedef enum { INPUT_NONE = 0, INPUT_BINARY } RDyInputFormat;
-
 // -----------------------
 // flow_conditions section
 // -----------------------
 
 // flow-related condition data
 typedef struct {
-  char             name[MAX_NAME_LEN + 1];
-  RDyConditionType type;
-  PetscReal        height;
-  PetscReal        momentum[2];
-  char             file[PETSC_MAX_PATH_LEN];
-  RDyInputFormat   format;
+  char              name[MAX_NAME_LEN + 1];
+  RDyConditionType  type;
+  PetscReal         height;
+  PetscReal         momentum[2];
+  char              file[PETSC_MAX_PATH_LEN];
+  PetscViewerFormat format;
 } RDyFlowCondition;
 
 // ---------------------------
@@ -285,11 +254,11 @@ typedef struct {
 
 // sediment-related condition data
 typedef struct {
-  char             name[MAX_NAME_LEN + 1];
-  RDyConditionType type;
-  PetscReal        concentration;
-  char             file[PETSC_MAX_PATH_LEN];
-  RDyInputFormat   format;
+  char              name[MAX_NAME_LEN + 1];
+  RDyConditionType  type;
+  PetscReal         concentration;
+  char              file[PETSC_MAX_PATH_LEN];
+  PetscViewerFormat format;
 } RDySedimentCondition;
 
 // ---------------------------
@@ -298,11 +267,11 @@ typedef struct {
 
 // salinity-related condition data
 typedef struct {
-  char             name[MAX_NAME_LEN + 1];
-  RDyConditionType type;
-  PetscReal        concentration;
-  char             file[PETSC_MAX_PATH_LEN];
-  RDyInputFormat   format;
+  char              name[MAX_NAME_LEN + 1];
+  RDyConditionType  type;
+  PetscReal         concentration;
+  char              file[PETSC_MAX_PATH_LEN];
+  PetscViewerFormat format;
 } RDySalinityCondition;
 
 // a representation of the config file itself
@@ -318,15 +287,20 @@ typedef struct {
 
   RDyGridSection grid;
 
-  RDySurfaceCompositionSection surface_composition;
-  PetscInt                     num_materials;
-  RDyMaterial                  materials[MAX_NUM_MATERIALS];
+  PetscInt        num_materials;
+  RDyMaterialSpec materials[MAX_NUM_MATERIALS];
 
   PetscInt      num_regions;
   RDyRegionSpec regions[MAX_NUM_REGIONS];
 
-  RDyInitialConditionsSection initial_conditions;
-  RDySourcesSection           sources;
+  PetscInt                  num_material_assignments;
+  RDySurfaceCompositionSpec surface_composition[MAX_NUM_REGIONS];
+
+  PetscInt               num_initial_conditions;
+  RDyRegionConditionSpec initial_conditions[MAX_NUM_REGIONS];
+
+  PetscInt               num_sources;
+  RDyRegionConditionSpec sources[MAX_NUM_REGIONS];
 
   PetscInt        num_boundaries;
   RDyBoundarySpec boundaries[MAX_NUM_BOUNDARIES];

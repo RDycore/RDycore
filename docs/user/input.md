@@ -207,15 +207,32 @@ The relevant parameters in this section are
 ```yaml
 materials:
   - name: smooth
-    manning: 0.015
+    properties:
+    - name: manning
+      value: 0.15
   - name: rough
-    manning: 0.075
+    properties:
+    - name: manning
+      file: rough-manning.dat
+      format: binary
 ```
 
 The `materials` section is a sequence (list) of named materials defined by
-specific material properties. The following parameters define these materials:
+specific material properties. Each material is essentially a named list of
+material properties specified either directly by value or by data in a specific
+file with a specific format. A material itself is specified by the following
+fields:
 
 * `name`: a human-readable name that can be used to refer to a material
+* `properties`: a list of material properties, each specified by the appropriate
+  fields:
+    * `name`: the name of the material property
+    * `value`: the value of the material property (omitted when `file` is specified)
+    * `file`: the name of a file from which the property is to be read (omitted when `value` is specified)
+    * `format`: the format of the specified file (if any)
+
+Some examples of valid material properties are:
+
 * `manning`: the value of the [Manning roughness coefficient](https://en.wikipedia.org/wiki/Manning_formula)
   for the material
 
