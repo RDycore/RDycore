@@ -162,7 +162,7 @@ typedef struct {
 // surface_composition section
 // ---------------------------
 
-// an association between a regions and a material
+// an association between a region and a material
 typedef struct {
   char region[MAX_NAME_LEN + 1];    // name of related region
   char material[MAX_NAME_LEN + 1];  // name of related material
