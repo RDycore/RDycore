@@ -75,6 +75,6 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -rain Houston1km.Rain.bin -bc Houston1km.BC.bin ${${config}_args})
+    add_test(houston_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -rain Houston1km.Rain.bin -bc Houston1km.BC.bin -interpolate_bc ${${config}_args})
   endforeach()
 endforeach()
