@@ -8,7 +8,7 @@ file(COPY ${MESH_DIR}/planar_dam_10x5.msh
 foreach(exe_name
         test_rdyinit
         test_rdymesh
-        test_read_config_file)
+        test_yaml_input)
   set(exe_source ${exe_name}.c)
   add_executable(${exe_name} ${exe_source})
   target_link_libraries(${exe_name} PRIVATE ${RDYCORE_LIBRARIES} cmocka)

@@ -499,7 +499,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
                                &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
                                &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
-    CYAML_FIELD_SEQUENCE_COUNT("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, num_regions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, num_sources, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
     CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_DEFAULT, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions,
@@ -604,7 +604,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   // we need initial conditions specified for each region
   PetscCheck(config->num_initial_conditions > 0, comm, PETSC_ERR_USER, "No initial conditions were specified!");
   PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
-             "Only %d initial conditions were specified in initial_conditions (%d needed)", config->num_initial_conditions, config->num_regions);
+             "%d initial conditions were specified in initial_conditions (exactly %d needed)", config->num_initial_conditions, config->num_regions);
 
   // we need material properties for each region as well
   PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
