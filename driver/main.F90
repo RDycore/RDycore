@@ -30,27 +30,33 @@ contains
 
   end subroutine
 
-  subroutine getcurrentdata(data_ptr, ndata, cur_time, cur_data_idx, cur_data)
+  subroutine getcurrentdata(data_ptr, ndata, cur_time, temporally_interpolate, cur_data_idx, cur_data)
     implicit none
-    PetscScalar, pointer :: data_ptr(:)
-    PetscInt             :: ndata
-    PetscReal            :: cur_time
-    PetscInt             :: cur_data_idx
-    PetscReal            :: cur_data
+    PetscScalar, pointer   :: data_ptr(:)
+    PetscInt , intent(in)  :: ndata
+    PetscReal, intent(in)  :: cur_time
+    PetscBool, intent(in)  :: temporally_interpolate
+    PetscInt , intent(out) :: cur_data_idx
+    PetscReal, intent(out) :: cur_data
 
     PetscBool            :: found
     PetscInt, parameter  :: stride = 2
     PetscInt             :: itime
     PetscReal            :: time_dn, time_up
+    PetscReal            :: data_dn, data_up
 
     found = PETSC_FALSE
-    do itime = 1, ndata
+    do itime = 1, ndata-1
+
       time_dn = data_ptr((itime-1)*stride + 1)
+      data_dn = data_ptr((itime-1)*stride + 2)
+
       time_up = data_ptr((itime-1)*stride + 3)
+      data_up = data_ptr((itime-1)*stride + 4)
+
       if (cur_time >= time_dn .and. cur_time < time_up) then
         found = PETSC_TRUE
         cur_data_idx = itime
-        cur_data = data_ptr((cur_data_idx-1)*stride + 2)
         exit
       endif
     enddo
@@ -58,6 +64,12 @@ contains
     if (.not.found) then
       cur_data_idx = ndata
       cur_data = data_ptr((cur_data_idx-1)*stride + 2)
+    else
+      if (temporally_interpolate) then
+        cur_data = (cur_time - time_dn)/(time_up - time_dn)*(data_up - data_dn) + data_dn
+      else
+        cur_data = data_dn
+      endif
     endif
 
   end subroutine
@@ -91,6 +103,7 @@ program rdycore_f90
   PetscInt            :: cur_rain_idx, prev_rain_idx
   PetscInt            :: cur_bc_idx, prev_bc_idx
   PetscReal           :: cur_rain, cur_bc
+  PetscBool           :: interpolate_rain, interpolate_bc, flg
 
   if (command_argument_count() < 1) then
     call usage()
@@ -105,6 +118,12 @@ program rdycore_f90
 
       PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-rain', rainfile, rain_specified, ierr))
       PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-bc', bcfile, bc_specified, ierr))
+
+      ! Flags to temporally interpolate rain and bc forcing
+      interpolate_rain = PETSC_FALSE
+      interpolate_bc   = PETSC_FALSE
+      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-interpolate_rain', interpolate_rain, flg, ierr))
+      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-interpolate_bc', interpolate_bc, flg, ierr))
 
       if (rain_specified) then
         call opendata(rainfile, rain_vec, nrain)
@@ -159,8 +178,8 @@ program rdycore_f90
           PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
         else
           PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
-          call getcurrentdata(rain_ptr, nrain, cur_time, cur_rain_idx, cur_rain)
-          if (cur_rain_idx /= prev_rain_idx) then
+          call getcurrentdata(rain_ptr, nrain, cur_time, interpolate_rain, cur_rain_idx, cur_rain)
+          if (interpolate_rain .or. cur_rain_idx /= prev_rain_idx) then
             prev_rain_idx = cur_rain_idx
             rain(:) = cur_rain
             PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
@@ -168,8 +187,8 @@ program rdycore_f90
         endif
 
         if (bc_specified) then
-          call getcurrentdata(bc_ptr, nbc, cur_time, cur_bc_idx, cur_bc)
-          if (cur_bc_idx /= prev_bc_idx) then
+          call getcurrentdata(bc_ptr, nbc, cur_time, interpolate_bc, cur_bc_idx, cur_bc)
+          if (interpolate_bc .or. cur_bc_idx /= prev_bc_idx) then
             prev_bc_idx = cur_bc_idx
             do iedge = 1, num_edges_dirc_bc
               bc_values((iedge-1)*3 + 1) = cur_bc

@@ -33,19 +33,25 @@ static PetscErrorCode OpenData(char *filename, Vec *data_vec, PetscInt *ndata) {
 
 // For a given cur_time,
 //   cur_data = value_1 if cur_time >= time_1 and cur_time < time_2
-PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal cur_time, PetscInt *cur_data_idx, PetscReal *cur_data) {
+PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal cur_time, PetscBool temporally_interpolate, PetscInt *cur_data_idx,
+                              PetscReal *cur_data) {
   PetscFunctionBegin;
 
   PetscBool found  = PETSC_FALSE;
   PetscInt  stride = 2;
+  PetscReal time_up, time_dn;
+  PetscReal data_up, data_dn;
 
   for (PetscInt itime = 0; itime < ndata - 1; itime++) {
-    PetscReal time_dn = data_ptr[itime * stride];
-    PetscReal time_up = data_ptr[itime * stride + 2];
+    time_dn = data_ptr[itime * stride];
+    data_dn = data_ptr[itime * stride + 1];
+
+    time_up = data_ptr[itime * stride + 2];
+    data_up = data_ptr[itime * stride + 3];
+
     if (cur_time >= time_dn && cur_time < time_up) {
       found         = PETSC_TRUE;
       *cur_data_idx = itime;
-      *cur_data     = data_ptr[itime * stride + 1];
       break;
     }
   }
@@ -53,6 +59,12 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
   if (!found) {
     *cur_data_idx = ndata - 1;
     *cur_data     = data_ptr[ndata * 2 - 1];
+  } else {
+    if (temporally_interpolate) {
+      *cur_data = (cur_time - time_dn) / (time_up - time_dn) * (data_up - data_dn) + data_dn;
+    } else {
+      *cur_data = data_dn;
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -82,6 +94,10 @@ int main(int argc, char *argv[]) {
     char      rainfile[PETSC_MAX_PATH_LEN], bcfile[PETSC_MAX_PATH_LEN];
     PetscCall(PetscOptionsGetString(NULL, NULL, "-rain", rainfile, sizeof(rainfile), &rain_specified));
     PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
+
+    PetscBool interpolate_rain = PETSC_FALSE, interpolate_bc = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_rain", &interpolate_rain, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_bc", &interpolate_bc, NULL));
 
     Vec          rain_vec = NULL, bc_vec = NULL;
     PetscScalar *rain_ptr = NULL, *bc_ptr = NULL;
@@ -158,9 +174,9 @@ int main(int argc, char *argv[]) {
         PetscCall(RDySetWaterSource(rdy, rain));
       } else {
         PetscReal cur_rain;
-        PetscCall(GetCurrentData(rain_ptr, nrain, time, &cur_rain_idx, &cur_rain));
+        PetscCall(GetCurrentData(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &cur_rain));
 
-        if (cur_rain_idx != prev_rain_idx) {  // is it time to update the source term?
+        if (interpolate_rain || cur_rain_idx != prev_rain_idx) {  // is it time to update the source term?
           prev_rain_idx = cur_rain_idx;
           for (PetscInt icell = 0; icell < n; icell++) {
             rain[icell] = cur_rain;
@@ -171,8 +187,8 @@ int main(int argc, char *argv[]) {
 
       if (bc_specified && num_edges_dirc_bc > 0) {
         PetscReal cur_bc;
-        PetscCall(GetCurrentData(bc_ptr, nbc, time, &cur_bc_idx, &cur_bc));
-        if (cur_bc_idx != prev_bc_idx) {  // is it time to update the bc?
+        PetscCall(GetCurrentData(bc_ptr, nbc, time, interpolate_bc, &cur_bc_idx, &cur_bc));
+        if (interpolate_bc || cur_bc_idx != prev_bc_idx) {  // is it time to update the bc?
           prev_bc_idx = cur_bc_idx;
           for (PetscInt iedge = 0; iedge < num_edges_dirc_bc; iedge++) {
             bc_values[iedge * 3]     = cur_bc;
