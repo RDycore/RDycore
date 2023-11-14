@@ -64,11 +64,11 @@ Each of these sections is described below, with a motivating example.
 ```yaml
 boundaries:
   - name: top_wall
-    mesh_boundary_id: 2
+    grid_boundary_id: 2
   - name: bottom_wall
-    mesh_boundary_id: 3
+    grid_boundary_id: 3
   - name: exterior
-    mesh_boundary_id: 1
+    grid_boundary_id: 1
 ```
 
 The `boundaries` section is a sequence (list) of boundary definitions, each of
@@ -79,22 +79,26 @@ which contains the following parameters:
   grid edges. If this identifier is not found within the grid file specified
   in the `grid` section, a fatal error occurs.
 
-Boundary definitions can appear in any order within the sequence.
+Boundary definitions can appear in any order within the sequence. The
+`boundaries` section is optional, and need not be specified if you don't need to
+associate a specific boundary condition with a specific boundary.
 
 ## `boundary_conditions`
 
 ```yaml
 boundary_conditions:
-  - boundary: top_wall
+  - boundaries: [top_wall]
     flow: reflecting_bc
-  - boundary: bottom_wall
+  - boundaries: [bottom_wall]
     flow: outflow_bc
 ```
 
 The `boundary_conditions` section is a sequence (list) associating `flow`,
 `sediment`, and `salinity` conditions (as defined in their respective sections)
 with boundaries (as defined in the `boundaries` section). A boundary can have
-at most one set of boundary conditions associated with it. If no boundary
+at most one set of boundary conditions associated with it, but a boundary
+condition can be associated with multiple boundaries, as indicated by the
+`boundaries` field, which accepts a list of boundary names. If no boundary
 conditions are given for a specific boundary, that boundary is assigned an
 automatically-generated reflecting boundary condition and homogeneous Neumann
 sediment and salinity conditions.
@@ -103,6 +107,10 @@ The above example shows a valid configuration for a simulation in which sediment
 and salinity are not modeled, so only the `flow` parameter is required. The
 presence of sediment boundary concentrations requires the `sediment` parameter,
 as the presence of salinity concentrations requires the `salinity` parameter.
+
+Like the `boundaries` section, the `boundary_conditions` section is optional.
+If no boundary conditions are specified, all boundaries are assumed to have a
+reflecting boundary condition.
 
 ## `flow_conditions`
 
@@ -208,13 +216,13 @@ The relevant parameters in this section are
 materials:
   - name: smooth
     properties:
-    - name: manning
-      value: 0.15
+      manning:
+        value: 0.15
   - name: rough
     properties:
-    - name: manning
-      file: rough-manning.dat
-      format: binary
+      manning:
+        file: rough-manning.dat
+        format: binary
 ```
 
 The `materials` section is a sequence (list) of named materials defined by
@@ -224,16 +232,15 @@ file with a specific format. A material itself is specified by the following
 fields:
 
 * `name`: a human-readable name that can be used to refer to a material
-* `properties`: a list of material properties, each specified by the appropriate
-  fields:
-    * `name`: the name of the material property
+* `properties`: a mapping of material properties, with property names
+  mapped to one or more of the following fields:
     * `value`: the value of the material property (omitted when `file` is specified)
     * `file`: the name of a file from which the property is to be read (omitted when `value` is specified)
     * `format`: the format of the specified file (if any)
 
-Some examples of valid material properties are:
+Valid material properties are:
 
-* `manning`: the value of the [Manning roughness coefficient](https://en.wikipedia.org/wiki/Manning_formula)
+* `manning` (required): the value of the [Manning roughness coefficient](https://en.wikipedia.org/wiki/Manning_formula)
   for the material
 
 ## `numerics`

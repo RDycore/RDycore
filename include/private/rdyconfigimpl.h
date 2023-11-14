@@ -26,10 +26,6 @@
 // the maximum number of materials that can be defined for a simulation
 #define MAX_NUM_MATERIALS 32
 
-// the maximum number of material properties that can be defined for a given
-// material in a simulation
-#define MAX_NUM_MATERIAL_PROPERTIES 32
-
 // the maximum number of flow/sediment/salinity conditions that can be defined for a
 // simulation
 #define MAX_NUM_CONDITIONS 32
@@ -159,7 +155,7 @@ typedef struct {
 
 // all grid parameters
 typedef struct {
-  char file[PETSC_MAX_PATH_LEN];  // mesh file
+  char file[PETSC_MAX_PATH_LEN];  // grid file
 } RDyGridSection;
 
 // ---------------------------
@@ -176,19 +172,24 @@ typedef struct {
 // materials section
 // -----------------------
 
-// the specification of a material property as given by input
+// the specification of a single material property, given by a value to be read
+// from a file
 typedef struct {
-  char              name[MAX_NAME_LEN + 1];    // the name of the material property
   PetscReal         value;                     // specified value of the material property
   char              file[PETSC_MAX_PATH_LEN];  // file from which data is to be read
   PetscViewerFormat format;                    // file format
 } RDyMaterialPropertySpec;
 
+// the specification of a set of properties defining a material, each of which
+// is given by a value or read from a file
+typedef struct {
+  RDyMaterialPropertySpec manning;  // Manning roughness coefficient
+} RDyMaterialPropertiesSpec;
+
 // the specification of a material as a collection of material properties
 typedef struct {
-  char                    name[MAX_NAME_LEN + 1];                   // the name of the material
-  PetscInt                num_properties;                           // number of material properties specified
-  RDyMaterialPropertySpec properties[MAX_NUM_MATERIAL_PROPERTIES];  // collection of material properties
+  char                      name[MAX_NAME_LEN + 1];  // the name of the material
+  RDyMaterialPropertiesSpec properties;              // collection of material properties
 } RDyMaterialSpec;
 
 // ----------------------
@@ -196,17 +197,17 @@ typedef struct {
 // ----------------------
 
 // This type associates a named region with an integer ID representing a
-// disjoint set of cells in a mesh file.
+// disjoint set of cells in a grid file.
 typedef struct {
   char     name[MAX_NAME_LEN + 1];  // human-readable name of region
-  PetscInt mesh_region_id;          // ID of region cell set within mesh file
+  PetscInt grid_region_id;          // ID of region cell set within grid file
 } RDyRegionSpec;
 
 // This type associates a named boundary with an integer ID representing a
-// disjoint set of edges in a mesh file.
+// disjoint set of edges in a grid file.
 typedef struct {
   char     name[MAX_NAME_LEN + 1];  // human-readable name of boundary
-  PetscInt mesh_boundary_id;        // ID of boundary edge set within mesh file
+  PetscInt grid_boundary_id;        // ID of boundary edge set within grid file
 } RDyBoundarySpec;
 
 // ---------------------------------------
@@ -226,7 +227,6 @@ typedef struct {
 // This type defines a boundary condition with named flow, sediment, and
 // salinity conditions.
 typedef struct {
-  char     name[MAX_NAME_LEN + 1];                            // name of boundary condition
   PetscInt num_boundaries;                                    // number of associated boundaries
   char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];  // names of associated boundaries
   char     flow[MAX_NAME_LEN + 1];                            // name of related flow condition

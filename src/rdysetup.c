@@ -407,7 +407,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
 
       // fish the region's name out of our region config data
       for (PetscInt r1 = 0; r1 < rdy->config.num_regions; ++r1) {
-        if (rdy->config.regions[r1].mesh_region_id == region_id) {
+        if (rdy->config.regions[r1].grid_region_id == region_id) {
           strcpy(region->name, rdy->config.regions[r1].name);
           break;
         }
@@ -546,7 +546,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 
         // fish the boundary's name out of our boundary config data
         for (PetscInt b1 = 0; b1 < rdy->config.num_boundaries; ++b1) {
-          if (rdy->config.boundaries[b1].mesh_boundary_id == boundary_id) {
+          if (rdy->config.boundaries[b1].grid_boundary_id == boundary_id) {
             strcpy(boundary->name, rdy->config.boundaries[b1].name);
             break;
           }
@@ -617,24 +617,24 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define READ_MATERIAL_PROPERTY(property, mat_prop_spec, region, materials_by_cell) \
-  if (mat_prop_spec.file) { /* read property from a file */                        \
-    Vec local;                                                                     \
-    PetscCall(ReadOneDOFVecFromFile(rdy, mat_prop_spec.file, &local));             \
-    PetscScalar *x_ptr;                                                            \
-    PetscCall(VecGetArray(local, &x_ptr));                                         \
-    for (PetscInt c = 0; c < region.num_cells; ++c) {                              \
-      PetscInt cell                    = region.cell_ids[c];                       \
-      materials_by_cell[cell].property = x_ptr[c];                                 \
-    }                                                                              \
-    PetscCall(VecRestoreArray(local, &x_ptr));                                     \
-    PetscCall(VecDestroy(&local));                                                 \
-  } else {                                                                         \
-    /* set this material property for all cells in the region */                   \
-    for (PetscInt c = 0; c < region.num_cells; ++c) {                              \
-      PetscInt cell                    = region.cell_ids[c];                       \
-      materials_by_cell[cell].property = mat_prop_spec.value;                      \
-    }                                                                              \
+#define READ_MATERIAL_PROPERTY(property, mat_props_spec, region, materials_by_cell) \
+  if (mat_props_spec.property.file[0]) { /* read property from a file */            \
+    Vec local;                                                                      \
+    PetscCall(ReadOneDOFVecFromFile(rdy, mat_props_spec.property.file, &local));    \
+    PetscScalar *x_ptr;                                                             \
+    PetscCall(VecGetArray(local, &x_ptr));                                          \
+    for (PetscInt c = 0; c < region.num_cells; ++c) {                               \
+      PetscInt cell                    = region.cell_ids[c];                        \
+      materials_by_cell[cell].property = x_ptr[c];                                  \
+    }                                                                               \
+    PetscCall(VecRestoreArray(local, &x_ptr));                                      \
+    PetscCall(VecDestroy(&local));                                                  \
+  } else {                                                                          \
+    /* set this material property for all cells in the region */                    \
+    for (PetscInt c = 0; c < region.num_cells; ++c) {                               \
+      PetscInt cell                    = region.cell_ids[c];                        \
+      materials_by_cell[cell].property = mat_props_spec.property.value;             \
+    }                                                                               \
   }
 
 // sets up materials
@@ -664,13 +664,10 @@ static PetscErrorCode InitMaterials(RDy rdy) {
       }
     }
     PetscCheck(region_mat_index != -1, rdy->comm, PETSC_ERR_USER, "Region '%s' has no assigned material!", region.name);
-    RDyMaterialSpec mat_spec = rdy->config.materials[region_mat_index];
+    RDyMaterialPropertiesSpec mat_props_spec = rdy->config.materials[region_mat_index].properties;
 
     // set the region's material properties
-    for (PetscInt p = 0; p < mat_spec.num_properties; ++p) {
-      RDyMaterialPropertySpec mat_prop_spec = mat_spec.properties[p];
-      READ_MATERIAL_PROPERTY(manning, mat_prop_spec, region, rdy->materials_by_cell);
-    }
+    READ_MATERIAL_PROPERTY(manning, mat_props_spec, region, rdy->materials_by_cell);
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

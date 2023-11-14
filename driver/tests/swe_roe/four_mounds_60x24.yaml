@@ -21,16 +21,31 @@ time:
 grid:
   file: four_mounds_60x24.exo
 
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
 surface_composition:
-  domain:
-    format: binary
-    files:
-      manning: manning_four_mound_60x24.bin
+  - region: domain
+    material: domain_material
+
+materials:
+  - name: domain_material
+    properties:
+      manning:
+        file: manning_four_mound_60x24.bin
+        format: binary
 
 initial_conditions:
-  domain:
-    format: binary
+  - region: domain
+    flow: domain_flow_іc
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
     file: four_mounds_60x24.ic
+    format: binary
 
 output:
   format: xdmf

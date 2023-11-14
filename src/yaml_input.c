@@ -215,7 +215,7 @@ static const cyaml_schema_field_t output_fields_schema[] = {
 // grid section
 // ------------
 // grid:
-//   file: <path-to-file/mesh.{msh,h5,exo}>
+//   file: <path-to-file/grid.{msh,h5,exo}>
 
 // mapping of grid fields to members of RDyGridSection
 static const cyaml_schema_field_t grid_fields_schema[] = {
@@ -251,23 +251,23 @@ static const cyaml_schema_value_t surface_composition_entry = {
 // -----------------
 
 // mapping of material property fields to RDyMaterialPropertySpec
-static const cyaml_schema_field_t material_property_spec_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterialPropertySpec, name, 1),
+static const cyaml_schema_field_t material_property_fields_schema[] = {
     CYAML_FIELD_FLOAT("value", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, value),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
-// a single material property entry
-static const cyaml_schema_value_t material_property_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialPropertySpec, material_property_spec_fields_schema),
+// mapping of material property fields to RDyMaterialPropertіesSpec
+static const cyaml_schema_field_t material_properties_fields_schema[] = {
+    CYAML_FIELD_MAPPING("manning", CYAML_FLAG_DEFAULT, RDyMaterialPropertiesSpec, manning, material_property_fields_schema),
+    CYAML_FIELD_END
 };
 
 // mapping of material fields to RDyMaterialSpec
 static const cyaml_schema_field_t material_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterialSpec, name, 1),
-    CYAML_FIELD_SEQUENCE_COUNT("properties", CYAML_FLAG_DEFAULT, RDyMaterialSpec, properties, num_properties, &material_property_entry, 0, MAX_NUM_MATERIAL_PROPERTIES),
+    CYAML_FIELD_MAPPING("properties", CYAML_FLAG_DEFAULT, RDyMaterialSpec, properties, material_properties_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -281,14 +281,14 @@ static const cyaml_schema_value_t material_entry = {
 // ---------------
 // regions:
 //  - name: downstream   # human-readable name for the region
-//    mesh_region_id: 2  # mesh identifier for the region
+//    grid_region_id: 2  # grid identifier for the region
 //  - name: upstream
-//    mesh_region_id: 1
+//    grid_region_id: 1
 
 // schema for region fields
 static const cyaml_schema_field_t region_spec_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionSpec, name, 1),
-    CYAML_FIELD_INT("mesh_region_id", CYAML_FLAG_DEFAULT, RDyRegionSpec, mesh_region_id),
+    CYAML_FIELD_INT("grid_region_id", CYAML_FLAG_DEFAULT, RDyRegionSpec, grid_region_id),
     CYAML_FIELD_END
 };
 
@@ -330,16 +330,16 @@ static const cyaml_schema_value_t region_condition_spec_entry = {
 // ------------------
 // boundaries:
 //   - name: bottom_wall
-//     mesh_boundary_id: 3  # mesh identifier for the boundary
+//     grid_boundary_id: 3  # grid identifier for the boundary
 //   - name: top_wall
-//     mesh_boundary_id: 2
+//     grid_boundary_id: 2
 //   - name: exterior
-//     mesh_boundary_id: 1
+//     grid_boundary_id: 1
 
 // schema for boundary fields
 static const cyaml_schema_field_t boundary_spec_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundarySpec, name, 1),
-    CYAML_FIELD_INT("mesh_boundary_id", CYAML_FLAG_DEFAULT, RDyBoundarySpec, mesh_boundary_id),
+    CYAML_FIELD_INT("grid_boundary_id", CYAML_FLAG_DEFAULT, RDyBoundarySpec, grid_boundary_id),
     CYAML_FIELD_END
 };
 
@@ -369,7 +369,6 @@ static const cyaml_schema_value_t boundary_name_entry = {
 
 // mapping of conditions fields to members of RDyBoundaryConditionSpec
 static const cyaml_schema_field_t boundary_condition_spec_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, name, 1),
     CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, boundaries, num_boundaries, &boundary_name_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, sediment, 0),
@@ -495,8 +494,8 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_DEFAULT, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
     CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_DEFAULT, RDyConfig, regions, num_regions,
                                &region_spec_entry, 0, MAX_NUM_REGIONS),
-    CYAML_FIELD_SEQUENCE_COUNT("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, num_regions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
-    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyConfig, boundaries, num_boundaries,
+    CYAML_FIELD_SEQUENCE_COUNT("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, num_initial_conditions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_OPTIONAL, RDyConfig, boundaries, num_boundaries,
                                &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
                                &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
@@ -603,6 +602,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   }
 
   // we need initial conditions specified for each region
+  PetscCheck(config->num_initial_conditions > 0, comm, PETSC_ERR_USER, "No initial conditions were specified!");
   PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
              "Only %d initial conditions were specified in initial_conditions (%d needed)", config->num_initial_conditions, config->num_regions);
 
@@ -612,23 +612,16 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
              config->num_regions);
 
   // validate our materials
-  for (PetscInt i = 0; i < config->num_materials; ++i) {
-    const RDyMaterialSpec mat_spec = config->materials[i];
-
-    // at the moment, we need Manning's coefficient, and we don't understand
-    // any other property
-    PetscCheck(mat_spec.num_properties == 1, comm, PETSC_ERR_USER, "Only 1 material property ('manning') is supported.");
-    PetscCheck(!strcmp(mat_spec.properties[0].name, "manning"), comm, PETSC_ERR_USER, "Invalid material property name: %s (must be 'manning').",
-               mat_spec.properties[0].name);
-  }
+  PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
 
   // validate our flow conditions
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
-      PetscCheck(flow_cond->height != INVALID_REAL, comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s", flow_cond->name);
-      PetscCheck((flow_cond->momentum[0] != INVALID_REAL) && (flow_cond->momentum[1] != INVALID_REAL), comm, PETSC_ERR_USER,
+      PetscCheck(flow_cond->height != INVALID_REAL || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
+                 flow_cond->name);
+      PetscCheck(flow_cond->file[0] || ((flow_cond->momentum[0] != INVALID_REAL) && (flow_cond->momentum[1] != INVALID_REAL)), comm, PETSC_ERR_USER,
                  "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }
   }
