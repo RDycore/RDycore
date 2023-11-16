@@ -205,10 +205,9 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
       PetscInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
       PetscInt l   = edges->cell_ids[2 * iedge];
-      PetscInt r   = edges->cell_ids[2 * iedge + 1];
       offset_l[oe] = l * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
-        offset_dirichlet[oe] = r * num_comp;
+        offset_dirichlet[oe] = l * num_comp;
       }
 
       g[oe][0] = edges->sn[iedge];
