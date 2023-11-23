@@ -346,8 +346,8 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 
   // set the boundary values
   for (PetscInt i = 0; i < boundary.num_edges; ++i) {
-    PetscInt edge_id = boundary.edge_ids[i];
-    PetscInt cell_id = mesh->edges.cell_ids[2 * edge_id];
+    PetscInt edge_id           = boundary.edge_ids[i];
+    PetscInt cell_id           = mesh->edges.cell_ids[2 * edge_id];
     dirichlet_ceed[cell_id][0] = boundary_values[num_comp * i];
     dirichlet_ceed[cell_id][1] = boundary_values[num_comp * i + 1];
     dirichlet_ceed[cell_id][2] = boundary_values[num_comp * i + 2];
