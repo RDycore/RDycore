@@ -27,7 +27,7 @@ typedef struct {
   PetscInt  global_cell_id;   // cell in which the max courant number was encountered
 } CourantNumberDiagnostics;
 
-PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator, RDyBoundary, CeedOperatorField *);
