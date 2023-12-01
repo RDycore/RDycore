@@ -56,7 +56,8 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_index, P
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
   if (rdy->ceed_resource[0]) {  // ceed
-    PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed_rhs.op_edges, &rdy->mesh, rdy->boundaries[boundary_index], boundary_values));
+    PetscInt size = 3 * rdy->boundaries[boundary_index].num_edges;
+    PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed_rhs.op_edges, &rdy->mesh, rdy->boundaries[boundary_index], size, boundary_values));
   } else {  // petsc
     // fetch the boundary data
     RiemannDataSWE bdata;

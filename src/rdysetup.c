@@ -1069,7 +1069,7 @@ PetscErrorCode RDySetup(RDy rdy) {
     PetscCall(CreateSWEFluxOperator(rdy->ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
                                     rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_edges));
 
-    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_src));
+    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_src));
 
     // create associated vectors for storage
     int num_comp = 3;

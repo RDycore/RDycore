@@ -332,7 +332,7 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
 }
 
 PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary,
-                                                         PetscReal boundary_values[3 * boundary.num_edges]) {
+                                                         PetscInt size, PetscReal boundary_values[size]) {
   PetscFunctionBeginUser;
 
   // fetch the array storing the boundary values
@@ -363,10 +363,11 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 // manipulated by libCEED calls.
 // @param [in]  ceed The Ceed context used to create the operator
 // @param [in]  mesh The computational mesh for which the operator is created
+// @param [in]  num_cells Number of cells
 // @param [in]  materials_by_cell An array of RDyMaterials defining cellwise material properties
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial materials_by_cell[mesh->num_cells], PetscReal tiny_h,
+PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial materials_by_cell[num_cells], PetscReal tiny_h,
                                        CeedOperator *source_op) {
   PetscFunctionBeginUser;
 
