@@ -239,8 +239,9 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     PetscInt  stepnum;
     PetscCall(TSGetTime(ts, &time));
     PetscCall(TSGetStepNumber(ts, &stepnum));
-    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT " is %f", stepnum, time, courant_num_diags.max_courant_num,
-                courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT " is %f",
+                stepnum, time, courant_num_diags.max_courant_num, courant_num_diags.global_edge_id, courant_num_diags.global_cell_id,
+                courant_num_diags.max_courant_num);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

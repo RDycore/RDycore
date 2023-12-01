@@ -82,8 +82,8 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
     for (CeedInt e = 0, oe = 0; e < mesh->num_internal_edges; e++) {
       CeedInt iedge = edges->internal_edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      CeedInt l   = edges->cell_ids[2 * iedge];
-      CeedInt r   = edges->cell_ids[2 * iedge + 1];
+      CeedInt l    = edges->cell_ids[2 * iedge];
+      CeedInt r    = edges->cell_ids[2 * iedge + 1];
       offset_l[oe] = l * num_comp;
       offset_r[oe] = r * num_comp;
 
@@ -147,7 +147,8 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
       func_loc = SWEBoundaryFlux_Outflow_Roe_loc;
       break;
     default:
-      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
+                 boundary.id);
   }
   CeedQFunction qf;
   CeedInt       num_comp_geom = 3;
@@ -204,7 +205,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     for (CeedInt e = 0, oe = 0; e < num_edges; e++) {
       CeedInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      CeedInt l   = edges->cell_ids[2 * iedge];
+      CeedInt l    = edges->cell_ids[2 * iedge];
       offset_l[oe] = l * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
         offset_dirichlet[oe] = l * num_comp;
@@ -331,8 +332,8 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary,
-                                                         PetscInt size, PetscReal boundary_values[size]) {
+PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary, PetscInt size,
+                                                         PetscReal boundary_values[size]) {
   PetscFunctionBeginUser;
 
   // fetch the array storing the boundary values
@@ -346,8 +347,8 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 
   // set the boundary values
   for (CeedInt i = 0; i < boundary.num_edges; ++i) {
-    CeedInt edge_id           = boundary.edge_ids[i];
-    CeedInt cell_id           = mesh->edges.cell_ids[2 * edge_id];
+    CeedInt edge_id            = boundary.edge_ids[i];
+    CeedInt cell_id            = mesh->edges.cell_ids[2 * edge_id];
     dirichlet_ceed[cell_id][0] = boundary_values[num_comp * i];
     dirichlet_ceed[cell_id][1] = boundary_values[num_comp * i + 1];
     dirichlet_ceed[cell_id][2] = boundary_values[num_comp * i + 2];

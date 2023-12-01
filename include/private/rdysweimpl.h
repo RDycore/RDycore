@@ -31,8 +31,7 @@ PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RD
 PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator, RDyBoundary, CeedOperatorField *);
-PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator, RDyMesh *, RDyBoundary boundary,
-                                                                      PetscInt size, PetscReal[size]);
+PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator, RDyMesh *, RDyBoundary boundary, PetscInt size, PetscReal[size]);
 
 PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial[num_cells], PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator, PetscReal);

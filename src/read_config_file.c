@@ -538,8 +538,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   if (config->time.final_time != INVALID_REAL) ++num_time_settings;
   if (config->time.max_step != INVALID_REAL) ++num_time_settings;
   if (config->time.time_step != INVALID_REAL) ++num_time_settings;
-  PetscCheck(num_time_settings, comm, PETSC_ERR_USER, "Exactly 2 of time.final_time, time.max_step, time.time_step must be specified (%" PetscInt_FMT " given)",
-             num_time_settings);
+  PetscCheck(num_time_settings, comm, PETSC_ERR_USER,
+             "Exactly 2 of time.final_time, time.max_step, time.time_step must be specified (%" PetscInt_FMT " given)", num_time_settings);
 
   // set the third parameter based on the two that are given
   if (config->time.final_time == INVALID_REAL) {

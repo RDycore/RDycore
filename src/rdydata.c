@@ -17,8 +17,10 @@ PetscErrorCode RDyGetNumBoundaryConditions(RDy rdy, PetscInt *num_bnd_conds) {
 static PetscErrorCode CheckBoundaryConditionIndex(RDy rdy, PetscInt boundary_index) {
   PetscFunctionBegin;
   PetscCheck(boundary_index < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
-             "Boundary condition index (%" PetscInt_FMT ") exceeds the max number of boundary conditions (%" PetscInt_FMT ")", boundary_index, rdy->num_boundaries);
-  PetscCheck(boundary_index >= 0, rdy->comm, PETSC_ERR_USER, "Boundary condition index (%" PetscInt_FMT ") cannot be less than zero.", boundary_index);
+             "Boundary condition index (%" PetscInt_FMT ") exceeds the max number of boundary conditions (%" PetscInt_FMT ")", boundary_index,
+             rdy->num_boundaries);
+  PetscCheck(boundary_index >= 0, rdy->comm, PETSC_ERR_USER, "Boundary condition index (%" PetscInt_FMT ") cannot be less than zero.",
+             boundary_index);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -47,11 +49,13 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_index, P
 
   RDyBoundary boundary = rdy->boundaries[boundary_index];
   PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
-             "The given number of edges (%" PetscInt_FMT ") for boundary with index %" PetscInt_FMT " is incorrect (should be %" PetscInt_FMT ")", num_edges, boundary_index, boundary.num_edges);
+             "The given number of edges (%" PetscInt_FMT ") for boundary with index %" PetscInt_FMT " is incorrect (should be %" PetscInt_FMT ")",
+             num_edges, boundary_index, boundary.num_edges);
 
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%d)", boundary_index, boundary_cond.flow->type);
+             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%d)", boundary_index,
+             boundary_cond.flow->type);
 
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;

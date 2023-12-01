@@ -331,7 +331,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
   PetscCall(ComputeRoeFlux(boundary.num_edges, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
-  PetscInt ndof = 3;
+  PetscInt ndof      = 3;
   PetscInt num_edges = boundary.num_edges;
   for (PetscInt e = 0; e < num_edges; ++e) {
     PetscInt  iedge     = boundary.edge_ids[e];
