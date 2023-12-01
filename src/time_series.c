@@ -34,7 +34,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
     PetscCall(PetscCalloc1(num_md * num_global_edges, &global_flux_md));
 
     // local -> global flux metadata
-    PetscInt n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
+    PetscMPIInt n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
     n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
       n_recv_counts[p]     = num_md * rdy->time_series.boundary_fluxes.num_local_edges[p];
@@ -172,7 +172,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   if (rdy->rank == 0) {
     int       num_md         = 3;
     PetscInt *global_flux_md = rdy->time_series.boundary_fluxes.global_flux_md;
-    PetscInt  n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
+    PetscMPIInt  n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
     n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
       n_recv_counts[p]     = num_data * rdy->time_series.boundary_fluxes.num_local_edges[p];
@@ -204,7 +204,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
       PetscReal y_momentum     = global_flux_data[num_data * e + 2];
       PetscReal x_normal       = global_flux_data[num_data * e + 3];
       PetscReal y_normal       = global_flux_data[num_data * e + 4];
-      PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%d\t%d\t%d\t%e\t%e\t%e\t%e\t%e\n", time, global_edge_id, boundary_id, bc_type, water_mass,
+      PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%" PetscInt_FMT "\t%" PetscInt_FMT "\t%" PetscInt_FMT "\t%e\t%e\t%e\t%e\t%e\n", time, global_edge_id, boundary_id, bc_type, water_mass,
                              x_momentum, y_momentum, x_normal, y_normal));
     }
     PetscCall(PetscFClose(rdy->comm, fp));

@@ -206,7 +206,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(TSGetStepNumber(ts, &nstep));
 
       char file[PETSC_MAX_PATH_LEN];
-      sprintf(file, "F_ceed_nstep%d_N%d.bin", nstep, rdy->nproc);
+      sprintf(file, "F_ceed_nstep%" PetscInt_FMT "_N%d.bin", nstep, rdy->nproc);
 
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
@@ -223,7 +223,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(TSGetStepNumber(ts, &nstep));
 
       char file[PETSC_MAX_PATH_LEN];
-      sprintf(file, "F_petsc_nstep%d_N%d.bin", nstep, rdy->nproc);
+      sprintf(file, "F_petsc_nstep%" PetscInt_FMT "_N%d.bin", nstep, rdy->nproc);
 
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
@@ -239,7 +239,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     PetscInt  stepnum;
     PetscCall(TSGetTime(ts, &time));
     PetscCall(TSGetStepNumber(ts, &stepnum));
-    RDyLogDebug(rdy, "[%d] Time = %f Max courant number %g encountered at edge %d of cell %d is %f", stepnum, time, courant_num_diags.max_courant_num,
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT " is %f", stepnum, time, courant_num_diags.max_courant_num,
                 courant_num_diags.global_edge_id, courant_num_diags.global_cell_id, courant_num_diags.max_courant_num);
   }
 

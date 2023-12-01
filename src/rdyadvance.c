@@ -81,7 +81,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output.batch_size == 1) {
         // output from each step gets its own HDF5 file
-        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%d.%s", output_dir, prefix, step, suffix);
+        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%" PetscInt_FMT ".%s", output_dir, prefix, step, suffix);
       } else {
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size = rdy->config.output.batch_size;
@@ -124,7 +124,7 @@ PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X
     static const char *formats[3] = {"binary", "XDMF", "CGNS"};
     const char        *format     = formats[rdy->config.output.format];
     const char        *units      = TimeUnitAsString(rdy->config.time.unit);
-    RDyLogDetail(rdy, "Step %d: writing %s output at t = %g %s", step, format, time, units);
+    RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing %s output at t = %g %s", step, format, time, units);
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -138,7 +138,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
 
   PetscViewerFormat format = PETSC_VIEWER_DEFAULT;
   if (rdy->config.output.interval) {
-    RDyLogDebug(rdy, "Writing output every %d timestep(s)", rdy->config.output.interval);
+    RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " timestep(s)", rdy->config.output.interval);
     switch (rdy->config.output.format) {
       case OUTPUT_NONE:
         // nothing to do here

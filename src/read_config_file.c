@@ -538,7 +538,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   if (config->time.final_time != INVALID_REAL) ++num_time_settings;
   if (config->time.max_step != INVALID_REAL) ++num_time_settings;
   if (config->time.time_step != INVALID_REAL) ++num_time_settings;
-  PetscCheck(num_time_settings, comm, PETSC_ERR_USER, "Exactly 2 of time.final_time, time.max_step, time.time_step must be specified (%d given)",
+  PetscCheck(num_time_settings, comm, PETSC_ERR_USER, "Exactly 2 of time.final_time, time.max_step, time.time_step must be specified (%" PetscInt_FMT " given)",
              num_time_settings);
 
   // set the third parameter based on the two that are given
@@ -632,7 +632,7 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%d", rdy->config.output.interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
@@ -666,7 +666,7 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   if (rdy->config.output.format == OUTPUT_CGNS) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%d", rdy->config.output.batch_size);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.batch_size);
       PetscOptionsSetValue(NULL, "-viewer_cgns_batch_size", value);
     }
   }

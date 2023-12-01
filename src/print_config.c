@@ -60,7 +60,7 @@ static PetscErrorCode PrintRestart(RDy rdy) {
       strcpy(format, "hdf5");
     }
     RDyLogDetail(rdy, "  File format: %s", format);
-    RDyLogDetail(rdy, "  interval: %d", rdy->config.restart.interval);
+    RDyLogDetail(rdy, "  interval: %" PetscInt_FMT " ", rdy->config.restart.interval);
   } else {
     RDyLogDetail(rdy, "  (disabled)");
   }

@@ -90,9 +90,9 @@ struct _p_RDy {
   // MPI communicator used for the simulation
   MPI_Comm comm;
   // MPI rank of local process
-  PetscInt rank;
+  PetscMPIInt rank;
   // Number of processes in the communicator
-  PetscInt nproc;
+  PetscMPIInt nproc;
   // file storing input data for the simulation
   char config_file[PETSC_MAX_PATH_LEN];
 

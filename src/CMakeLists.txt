@@ -26,7 +26,7 @@ if (ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-add_subdirectory(f90-mod)
+#add_subdirectory(f90-mod)
 
 # Pass RDYCORE_LIBRARIES to the parent directory.
 set(RDYCORE_LIBRARIES ${RDYCORE_LIBRARIES} PARENT_SCOPE)

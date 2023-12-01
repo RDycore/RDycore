@@ -481,7 +481,7 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
     PetscInt l = edges->cell_ids[2 * iedge];
     PetscInt r = edges->cell_ids[2 * iedge + 1];
 
-    PetscCheck(l >= 0, comm, PETSC_ERR_USER, "non-internal 'left' edge %d encountered (expected internal edge)", l);
+    PetscCheck(l >= 0, comm, PETSC_ERR_USER, "non-internal 'left' edge %" PetscInt_FMT " encountered (expected internal edge)", l);
     PetscBool is_internal_edge = (r >= 0);
 
     edges->is_owned[iedge] = !leaf_owner || leaf_owner[e] == rank;
@@ -684,7 +684,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     PetscInt nverts = cells->num_vertices[icell];
 
-    PetscCheck((nverts == 3) || (nverts == 4), comm, PETSC_ERR_USER, "Cell has %d vertices (must be 3 or 4)", nverts);
+    PetscCheck((nverts == 3) || (nverts == 4), comm, PETSC_ERR_USER, "Cell has %" PetscInt_FMT " vertices (must be 3 or 4)", nverts);
 
     if (nverts == 3) {
       PetscInt offset = cells->vertex_offsets[icell];
@@ -731,7 +731,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscInt rank) {
+static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt rank) {
   PetscFunctionBegin;
 
   PetscBool useNatural;
@@ -838,7 +838,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Extract natural cell IDs from the DM.
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-  PetscInt rank;
+  PetscMPIInt rank;
   MPI_Comm_rank(comm, &rank);
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
 
