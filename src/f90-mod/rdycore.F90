@@ -1,9 +1,11 @@
 ! This file defines the Fortran interface for RDycore.
 #include <petsc/finclude/petscsys.h>
 
+
+
 module rdycore
 
-  use iso_c_binding, only: c_ptr, c_int, c_loc
+  use iso_c_binding, only: c_ptr, c_int, c_int64_t, c_loc
 
   implicit none
 
@@ -55,37 +57,37 @@ module rdycore
 
     integer(c_int) function rdygetnumlocalcells_(rdy, num_cells) bind(c, name="RDyGetNumLocalCells")
       use iso_c_binding, only: c_int, c_ptr
-      type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int),        intent(out) :: num_cells
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscInt,           intent(out) :: num_cells
     end function
 
     integer(c_int) function rdygetnumboundaryconditions_(rdy, num_bnd_conds) bind(c, name="RDyGetNumBoundaryConditions")
       use iso_c_binding, only: c_int, c_ptr
-      type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int),        intent(out) :: num_bnd_conds
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscInt,           intent(out) :: num_bnd_conds
     end function
 
     integer(c_int) function rdygetnumboundaryedges_(rdy, boundary_id, num_edges) bind(c, name="RDyGetNumBoundaryEdges")
       use iso_c_binding, only: c_int, c_ptr
-      type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int), value, intent(in)  :: boundary_id
-      integer(c_int),        intent(out) :: num_edges
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt,    value, intent(in) :: boundary_id
+      PetscInt,    intent(out)       :: num_edges
     end function
 
     integer(c_int) function rdysetdirichletboundaryvalues_(rdy, boundary_id, num_edges, ndof, bc_values) bind(c, name="RDySetDirichletBoundaryValues")
       use iso_c_binding, only: c_int, c_ptr
-      type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int), value, intent(in)  :: boundary_id
-      integer(c_int), value, intent(in)  :: num_edges
-      integer(c_int), value, intent(in)  :: ndof
-      type(c_ptr), value, intent(in)     :: bc_values
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscInt,    value, intent(in)  :: boundary_id
+      PetscInt,    value, intent(in)  :: num_edges
+      PetscInt,    value, intent(in)  :: ndof
+      type(c_ptr), value, intent(in)  :: bc_values
     end function
 
     integer(c_int) function rdygetboundaryconditionflowtype_(rdy, boundary_id, bnd_cond_type) bind(c, name="RDyGetBoundaryConditionFlowType")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int), value, intent(in)  :: boundary_id
-      integer(c_int),        intent(out) :: bnd_cond_type
+      PetscInt, value, intent(in)  :: boundary_id
+      PetscInt,        intent(out) :: bnd_cond_type
     end function
 
     integer(c_int) function rdygettime_(rdy, time) bind(c, name="RDyGetTime")
@@ -102,8 +104,8 @@ module rdycore
 
     integer(c_int) function rdygetstep_(rdy, step) bind(c, name="RDyGetStep")
       use iso_c_binding, only: c_int, c_ptr
-      type(c_ptr),    value, intent(in)  :: rdy
-      integer(c_int),        intent(out) :: step
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscInt,           intent(out) :: step
     end function
 
     integer(c_int) function rdygetcouplinginterval_(rdy, interval) bind(c, name="RDyGetCouplingInterval")
@@ -221,31 +223,31 @@ contains
 
   subroutine RDyGetNumLocalCells(rdy_, num_cells, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(out)   :: num_cells
+    PetscInt,  intent(out)   :: num_cells
     integer,   intent(out)   :: ierr
     ierr = rdygetnumlocalcells_(rdy_%c_rdy, num_cells)
   end subroutine
 
   subroutine RDyGetNumBoundaryConditions(rdy_, num_bnd_conds, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(out)   :: num_bnd_conds
+    PetscInt,  intent(out)   :: num_bnd_conds
     integer,   intent(out)   :: ierr
     ierr = rdygetnumboundaryconditions_(rdy_%c_rdy, num_bnd_conds)
   end subroutine
 
   subroutine RDyGetNumBoundaryEdges(rdy_, boundary_id, num_edges, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(in)    :: boundary_id
-    integer,   intent(out)   :: num_edges
+    PetscInt,  intent(in)    :: boundary_id
+    PetscInt,  intent(out)   :: num_edges
     integer,   intent(out)   :: ierr
     ierr = rdygetnumboundaryedges_(rdy_%c_rdy, boundary_id-1, num_edges)
   end subroutine
 
   subroutine RDySetDirichletBoundaryValues(rdy_, boundary_id, num_edges, ndof, bc_values, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    integer,         intent(in)          :: boundary_id
-    integer,         intent(in)          :: num_edges
-    integer,         intent(in)          :: ndof
+    PetscInt,        intent(in)          :: boundary_id
+    PetscInt,        intent(in)          :: num_edges
+    PetscInt,        intent(in)          :: ndof
     real(RDyDouble), pointer, intent(in) :: bc_values(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetdirichletboundaryvalues_(rdy_%c_rdy, boundary_id-1, num_edges, ndof, c_loc(bc_values))
@@ -253,8 +255,8 @@ contains
 
   subroutine RDyGetBoundaryConditionFlowType(rdy_, boundary_id, bnd_cond_type, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(in)    :: boundary_id
-    integer,   intent(out)   :: bnd_cond_type
+    PetscInt,  intent(in)    :: boundary_id
+    PetscInt,  intent(out)   :: bnd_cond_type
     integer,   intent(out)   :: ierr
     ierr = rdygetboundaryconditionflowtype_(rdy_%c_rdy, boundary_id-1, bnd_cond_type)
   end subroutine
@@ -289,7 +291,7 @@ contains
 
   subroutine RDyGetStep(rdy_, step, ierr)
     type(RDy), intent(inout) :: rdy_
-    integer,   intent(out)   :: step
+    PetscInt,  intent(out)   :: step
     integer,   intent(out)   :: ierr
     ierr = rdygetstep_(rdy_%c_rdy, step)
   end subroutine
