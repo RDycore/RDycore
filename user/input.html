@@ -900,11 +900,11 @@ broad categories:</p>
 <h2 id="boundaries"><code>boundaries</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">boundaries</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top_wall</span>
-<span class="w">    </span><span class="nt">mesh_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">grid_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bottom_wall</span>
-<span class="w">    </span><span class="nt">mesh_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">    </span><span class="nt">grid_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exterior</span>
-<span class="w">    </span><span class="nt">mesh_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">grid_boundary_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </code></pre></div>
 <p>The <code>boundaries</code> section is a sequence (list) of boundary definitions, each of
 which contains the following parameters:</p>
@@ -914,18 +914,22 @@ which contains the following parameters:</p>
   grid edges. If this identifier is not found within the grid file specified
   in the <code>grid</code> section, a fatal error occurs.</li>
 </ul>
-<p>Boundary definitions can appear in any order within the sequence.</p>
+<p>Boundary definitions can appear in any order within the sequence. The
+<code>boundaries</code> section is optional, and need not be specified if you don't need to
+associate a specific boundary condition with a specific boundary.</p>
 <h2 id="boundary_conditions"><code>boundary_conditions</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">boundary_conditions</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">boundary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top_wall</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">boundaries</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">top_wall</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reflecting_bc</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">boundary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bottom_wall</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">boundaries</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">bottom_wall</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">outflow_bc</span>
 </code></pre></div>
 <p>The <code>boundary_conditions</code> section is a sequence (list) associating <code>flow</code>,
 <code>sediment</code>, and <code>salinity</code> conditions (as defined in their respective sections)
 with boundaries (as defined in the <code>boundaries</code> section). A boundary can have
-at most one set of boundary conditions associated with it. If no boundary
+at most one set of boundary conditions associated with it, but a boundary
+condition can be associated with multiple boundaries, as indicated by the
+<code>boundaries</code> field, which accepts a list of boundary names. If no boundary
 conditions are given for a specific boundary, that boundary is assigned an
 automatically-generated reflecting boundary condition and homogeneous Neumann
 sediment and salinity conditions.</p>
@@ -933,6 +937,9 @@ sediment and salinity conditions.</p>
 and salinity are not modeled, so only the <code>flow</code> parameter is required. The
 presence of sediment boundary concentrations requires the <code>sediment</code> parameter,
 as the presence of salinity concentrations requires the <code>salinity</code> parameter.</p>
+<p>Like the <code>boundaries</code> section, the <code>boundary_conditions</code> section is optional.
+If no boundary conditions are specified, all boundaries are assumed to have a
+reflecting boundary condition.</p>
 <h2 id="flow_conditions"><code>flow_conditions</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">flow_conditions</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
@@ -1034,15 +1041,33 @@ The relevant parameters in this section are</p>
 <h2 id="materials"><code>materials</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">materials</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smooth</span>
-<span class="w">    </span><span class="nt">manning</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.015</span>
+<span class="w">    </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">manning</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.15</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rough</span>
-<span class="w">    </span><span class="nt">manning</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.075</span>
+<span class="w">    </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">manning</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rough-manning.dat</span>
+<span class="w">        </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary</span>
 </code></pre></div>
 <p>The <code>materials</code> section is a sequence (list) of named materials defined by
-specific material properties. The following parameters define these materials:</p>
+specific material properties. Each material is essentially a named list of
+material properties specified either directly by value or by data in a specific
+file with a specific format. A material itself is specified by the following
+fields:</p>
 <ul>
 <li><code>name</code>: a human-readable name that can be used to refer to a material</li>
-<li><code>manning</code>: the value of the <a href="https://en.wikipedia.org/wiki/Manning_formula">Manning roughness coefficient</a>
+<li><code>properties</code>: a mapping of material properties, with property names
+  mapped to one or more of the following fields:<ul>
+<li><code>value</code>: the value of the material property (omitted when <code>file</code> is specified)</li>
+<li><code>file</code>: the name of a file from which the property is to be read (omitted when <code>value</code> is specified)</li>
+<li><code>format</code>: the format of the specified file (if any)</li>
+</ul>
+</li>
+</ul>
+<p>Valid material properties are:</p>
+<ul>
+<li><code>manning</code> (required): the value of the <a href="https://en.wikipedia.org/wiki/Manning_formula">Manning roughness coefficient</a>
   for the material</li>
 </ul>
 <h2 id="numerics"><code>numerics</code></h2>
