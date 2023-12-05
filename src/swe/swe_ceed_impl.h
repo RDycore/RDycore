@@ -110,7 +110,6 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   CeedScalar(*accum_flux)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
   const SWEContext context            = (SWEContext)ctx;
 
-  const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar gravity = context->gravity;
 
@@ -121,9 +120,9 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
     if (qL.h > tiny_h || qR.h > tiny_h) {
       SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[2][i];
-        cell_R[j][i] = flux[j] * geom[3][i];
-        accum_flux[j][i] += flux[j] * dt;  // time-integrated flux density
+        cell_L[j][i]     = flux[j] * geom[2][i];
+        cell_R[j][i]     = flux[j] * geom[3][i];
+        accum_flux[j][i] = flux[j];
       }
     }
   }
@@ -138,7 +137,6 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   CeedScalar(*accum_flux)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[1];
   const SWEContext context            = (SWEContext)ctx;
 
-  const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar gravity = context->gravity;
 
@@ -149,8 +147,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
       CeedScalar flux[3], amax;
       SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[2][i];
-        accum_flux[j][i] += flux[j] * dt;  // time-integrated flux density
+        cell_L[j][i]     = flux[j] * geom[2][i];
+        accum_flux[j][i] = flux[j];
       }
     }
   }
@@ -190,7 +188,6 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   CeedScalar(*accum_flux)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[1];
   const SWEContext context            = (SWEContext)ctx;
 
-  const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar gravity = context->gravity;
 
@@ -205,8 +202,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
       CeedScalar flux[3], amax;
       SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[2][i];
-        accum_flux[j][i] += flux[j] * dt;  // time-integrated flux density
+        cell_L[j][i]     = flux[j] * geom[2][i];
+        accum_flux[j][i] = flux[j];
       }
     }
   }
