@@ -403,8 +403,8 @@ static PetscErrorCode InitRegions(RDy rdy) {
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
   if (label) {  // found regions (cell sets) in the grid
     PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
-    PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER, "Number of regions in mesh (%d) exceeds MAX_NUM_REGIONS (%d)",
-               rdy->num_regions, MAX_NUM_REGIONS);
+    PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
+               "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)", rdy->num_regions, MAX_NUM_REGIONS);
 
     // fetch region IDs
     IS region_id_is;
@@ -426,7 +426,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
         PetscInt num_cells;
         PetscCall(ISGetLocalSize(cell_is, &num_cells));
         if (num_cells > 0) {
-          RDyLogDebug(rdy, "  Found region %d (%d cells)", region_id, num_cells);
+          RDyLogDebug(rdy, "  Found region %" PetscInt_FMT " (%" PetscInt_FMT " cells)", region_id, num_cells);
           region->num_cells = num_cells;
           PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
         }
@@ -486,7 +486,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   if (label) {  // found face sets!
     PetscCall(DMLabelGetNumValues(label, &num_boundaries_in_file));
     PetscCheck(num_boundaries_in_file <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER,
-               "Number of boundaries in mesh (%d) exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file, MAX_NUM_BOUNDARIES);
+               "Number of boundaries in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file, MAX_NUM_BOUNDARIES);
 
     // fetch boundary IDs
     PetscCall(DMLabelGetValueIS(label, &boundary_id_is));
@@ -499,7 +499,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
       if (edge_is) {
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
-        RDyLogDebug(rdy, "  Found boundary %d (%d edges)", boundary_id, num_edges);
+        RDyLogDebug(rdy, "  Found boundary %" PetscInt_FMT " (%" PetscInt_FMT " edges)", boundary_id, num_edges);
 
         // we can't use this boundary ID for unassigned edges
         if (unassigned_edge_boundary_id == boundary_id) ++unassigned_edge_boundary_id;
@@ -527,7 +527,8 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
   }
   if (num_unassigned_edges > 0) {
-    RDyLogDebug(rdy, "Adding boundary %d for %d unassigned boundary edges", unassigned_edge_boundary_id, num_unassigned_edges);
+    RDyLogDebug(rdy, "Adding boundary %" PetscInt_FMT " for %" PetscInt_FMT " unassigned boundary edges", unassigned_edge_boundary_id,
+                num_unassigned_edges);
     if (!label) {
       // create a "Face Sets" label if one doesn't already exist
       PetscCall(DMCreateLabel(rdy->dm, "Face Sets"));
@@ -706,35 +707,35 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       }
     }
     PetscCheck(ic_region_index != -1 || strlen(rdy->config.initial_conditions.domain.file), rdy->comm, PETSC_ERR_USER,
-               "Region %d has no initial conditions!", region_id);
+               "Region %" PetscInt_FMT " has no initial conditions!", region_id);
 
     if (ic_region_index != -1) {
       RDyConditionSpec *ic_spec = &rdy->config.initial_conditions.by_region[ic_region_index];
 
-      PetscCheck(strlen(ic_spec->flow), rdy->comm, PETSC_ERR_USER, "Region %d has no initial flow condition!", region_id);
+      PetscCheck(strlen(ic_spec->flow), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial flow condition!", region_id);
       PetscInt flow_index;
       PetscCall(FindFlowCondition(rdy, ic_spec->flow, &flow_index));
       RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
       PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                 "initial flow condition %s for region %d is not of dirichlet type!", flow_cond->name, region_id);
+                 "initial flow condition %s for region %" PetscInt_FMT " is not of dirichlet type!", flow_cond->name, region_id);
       ic->flow = flow_cond;
 
       if (rdy->config.physics.sediment) {
-        PetscCheck(strlen(ic_spec->sediment), rdy->comm, PETSC_ERR_USER, "Region %d has no initial sediment condition!", region_id);
+        PetscCheck(strlen(ic_spec->sediment), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial sediment condition!", region_id);
         PetscInt sed_index;
         PetscCall(FindSedimentCondition(rdy, ic_spec->sediment, &sed_index));
         RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
         PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial sediment condition %s for region %d is not of dirichlet type!", sed_cond->name, region_id);
+                   "initial sediment condition %s for region %" PetscInt_FMT " is not of dirichlet type!", sed_cond->name, region_id);
         ic->sediment = sed_cond;
       }
       if (rdy->config.physics.salinity) {
-        PetscCheck(strlen(ic_spec->salinity), rdy->comm, PETSC_ERR_USER, "Region %d has no initial salinity condition!", region_id);
+        PetscCheck(strlen(ic_spec->salinity), rdy->comm, PETSC_ERR_USER, "Region %" PetscInt_FMT " has no initial salinity condition!", region_id);
         PetscInt sal_index;
         PetscCall(FindSalinityCondition(rdy, ic_spec->salinity, &sal_index));
         RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
         PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial salinity condition %s for region %d is not of dirichlet type!", sal_cond->name, region_id);
+                   "initial salinity condition %s for region %" PetscInt_FMT " is not of dirichlet type!", sal_cond->name, region_id);
         ic->salinity = sal_cond;
       }
     }
@@ -767,8 +768,8 @@ static PetscErrorCode InitSources(RDy rdy) {
           PetscInt flow_index;
           PetscCall(FindFlowCondition(rdy, src_spec->flow, &flow_index));
           RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
-          PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "flow source %s for region %d is not of dirichlet type!",
-                     flow_cond->name, region_id);
+          PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                     "flow source %s for region %" PetscInt_FMT " is not of dirichlet type!", flow_cond->name, region_id);
           src->flow = flow_cond;
         }
 
@@ -776,8 +777,8 @@ static PetscErrorCode InitSources(RDy rdy) {
           PetscInt sed_index;
           PetscCall(FindSedimentCondition(rdy, src_spec->sediment, &sed_index));
           RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
-          PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "sediment source %s for region %d is not of dirichlet type!",
-                     sed_cond->name, region_id);
+          PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                     "sediment source %s for region %" PetscInt_FMT " is not of dirichlet type!", sed_cond->name, region_id);
           src->sediment = sed_cond;
         }
         if (rdy->config.physics.salinity && strlen(src_spec->salinity)) {
@@ -785,7 +786,7 @@ static PetscErrorCode InitSources(RDy rdy) {
           PetscCall(FindSalinityCondition(rdy, src_spec->salinity, &sal_index));
           RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
           PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "initial salinity condition %s for region %d is not of dirichlet type!", sal_cond->name, region_id);
+                     "initial salinity condition %s for region %" PetscInt_FMT " is not of dirichlet type!", sal_cond->name, region_id);
           src->salinity = sal_cond;
         }
       }
@@ -838,13 +839,15 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
       }
 
       if (rdy->config.physics.sediment) {
-        PetscCheck(strlen(bc_spec->sediment), rdy->comm, PETSC_ERR_USER, "Boundary %d has no sediment boundary condition!", boundary_id);
+        PetscCheck(strlen(bc_spec->sediment), rdy->comm, PETSC_ERR_USER, "Boundary %" PetscInt_FMT " has no sediment boundary condition!",
+                   boundary_id);
         PetscInt sed_index;
         PetscCall(FindSedimentCondition(rdy, bc_spec->sediment, &sed_index));
         bc->sediment = &rdy->config.sediment_conditions[sed_index];
       }
       if (rdy->config.physics.salinity) {
-        PetscCheck(strlen(bc_spec->salinity), rdy->comm, PETSC_ERR_USER, "Boundary %d has no salinity boundary condition!", boundary_id);
+        PetscCheck(strlen(bc_spec->salinity), rdy->comm, PETSC_ERR_USER, "Boundary %" PetscInt_FMT " has no salinity boundary condition!",
+                   boundary_id);
         PetscInt sal_index;
         PetscCall(FindSalinityCondition(rdy, bc_spec->salinity, &sal_index));
         bc->salinity = &rdy->config.salinity_conditions[sal_index];
@@ -983,7 +986,8 @@ static PetscErrorCode SetInitialBoundaryConditions(RDy rdy) {
       case CONDITION_CRITICAL_OUTFLOW:
         break;
       default:
-        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary.id);
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
+                   boundary.id);
     }
   }
 
@@ -1069,7 +1073,8 @@ PetscErrorCode RDySetup(RDy rdy) {
     PetscCall(CreateSWEFluxOperator(rdy->ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
                                     rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_edges));
 
-    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_src));
+    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
+                                      &rdy->ceed_rhs.op_src));
 
     // create associated vectors for storage
     int num_comp = 3;

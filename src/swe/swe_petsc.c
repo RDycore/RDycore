@@ -331,7 +331,9 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
   PetscCall(ComputeRoeFlux(boundary.num_edges, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
   // Save the flux values in the Vec based by TS
-  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+  PetscInt ndof      = 3;
+  PetscInt num_edges = boundary.num_edges;
+  for (PetscInt e = 0; e < num_edges; ++e) {
     PetscInt  iedge     = boundary.edge_ids[e];
     PetscInt  icell     = edges->cell_ids[2 * iedge];
     PetscReal edge_len  = edges->lengths[iedge];
@@ -349,14 +351,14 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
           courant_num_diags->global_cell_id  = cells->global_ids[icell];
         }
 
-        for (PetscInt idof = 0; idof < 3; idof++) {
-          F[3 * icell + idof] += flux_vec_bnd[e][idof] * (-edge_len / cell_area);
+        for (PetscInt idof = 0; idof < ndof; idof++) {
+          F[ndof * icell + idof] += flux_vec_bnd[e][idof] * (-edge_len / cell_area);
         }
       }
     }
   }
 
-  PetscCall(AccumulateBoundaryFluxes(rdy, boundary, flux_vec_bnd));
+  PetscCall(AccumulateBoundaryFluxes(rdy, boundary, num_edges, ndof, flux_vec_bnd));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -488,7 +490,7 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
         PetscCall(ApplyCriticalOutflowBC(rdy, boundary, datal, datar, datac, tiny_h, courant_num_diags, f_ptr));
         break;
       default:
-        PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary.id);
+        PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);
     }
   }
 

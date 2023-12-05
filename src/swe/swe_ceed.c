@@ -80,10 +80,10 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
     CeedScalar(*g)[4];
     CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
     for (CeedInt e = 0, oe = 0; e < mesh->num_internal_edges; e++) {
-      PetscInt iedge = edges->internal_edge_ids[e];
+      CeedInt iedge = edges->internal_edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      PetscInt l   = edges->cell_ids[2 * iedge];
-      PetscInt r   = edges->cell_ids[2 * iedge + 1];
+      CeedInt l    = edges->cell_ids[2 * iedge];
+      CeedInt r    = edges->cell_ids[2 * iedge + 1];
       offset_l[oe] = l * num_comp;
       offset_r[oe] = r * num_comp;
 
@@ -147,7 +147,8 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
       func_loc = SWEBoundaryFlux_Outflow_Roe_loc;
       break;
     default:
-      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %d\n", boundary.id);
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
+                 boundary.id);
   }
   CeedQFunction qf;
   CeedInt       num_comp_geom = 3;
@@ -182,7 +183,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     // fluxes to cell states
     CeedInt num_owned_edges = 0;
     for (CeedInt e = 0; e < boundary.num_edges; e++) {
-      PetscInt iedge = boundary.edge_ids[e];
+      CeedInt iedge = boundary.edge_ids[e];
       if (edges->is_owned[iedge]) num_owned_edges++;
     }
     CeedInt g_strides[] = {num_comp_geom, 1, num_comp_geom};
@@ -202,9 +203,9 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     CeedScalar(*g)[3];
     CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
     for (CeedInt e = 0, oe = 0; e < num_edges; e++) {
-      PetscInt iedge = boundary.edge_ids[e];
+      CeedInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      PetscInt l   = edges->cell_ids[2 * iedge];
+      CeedInt l    = edges->cell_ids[2 * iedge];
       offset_l[oe] = l * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
         offset_dirichlet[oe] = l * num_comp;
@@ -264,7 +265,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
 // @param [in]  boundary_conditions An array of metadata defining boundary conditions the operator will enforce
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundaries, RDyBoundary boundaries[num_boundaries],
+PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary boundaries[num_boundaries],
                                      RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
@@ -277,7 +278,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, int num_boundarie
   CeedCompositeOperatorAddSub(*flux_op, interior_op);
   CeedOperatorDestroy(&interior_op);
 
-  for (PetscInt b = 0; b < num_boundaries; b++) {
+  for (CeedInt b = 0; b < num_boundaries; b++) {
     CeedOperator boundary_op;
     RDyBoundary  boundary           = boundaries[b];
     RDyCondition boundary_condition = boundary_conditions[b];
@@ -331,8 +332,8 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary,
-                                                         PetscReal boundary_values[3 * boundary.num_edges]) {
+PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary, PetscInt size,
+                                                         PetscReal boundary_values[size]) {
   PetscFunctionBeginUser;
 
   // fetch the array storing the boundary values
@@ -340,14 +341,14 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
   PetscCall(SWEFluxOperatorGetDirichletBoundaryValues(flux_op, boundary, &dirichlet_field));
   CeedVector dirichlet_vector;
   CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector);
-  PetscInt num_comp = 3;
+  CeedInt num_comp = 3;
   CeedScalar(*dirichlet_ceed)[num_comp];
   CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed);
 
   // set the boundary values
-  for (PetscInt i = 0; i < boundary.num_edges; ++i) {
-    PetscInt edge_id           = boundary.edge_ids[i];
-    PetscInt cell_id           = mesh->edges.cell_ids[2 * edge_id];
+  for (CeedInt i = 0; i < boundary.num_edges; ++i) {
+    CeedInt edge_id            = boundary.edge_ids[i];
+    CeedInt cell_id            = mesh->edges.cell_ids[2 * edge_id];
     dirichlet_ceed[cell_id][0] = boundary_values[num_comp * i];
     dirichlet_ceed[cell_id][1] = boundary_values[num_comp * i + 1];
     dirichlet_ceed[cell_id][2] = boundary_values[num_comp * i + 2];
@@ -363,10 +364,11 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 // manipulated by libCEED calls.
 // @param [in]  ceed The Ceed context used to create the operator
 // @param [in]  mesh The computational mesh for which the operator is created
+// @param [in]  num_cells Number of cells
 // @param [in]  materials_by_cell An array of RDyMaterials defining cellwise material properties
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, RDyMaterial materials_by_cell[mesh->num_cells], PetscReal tiny_h,
+PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial materials_by_cell[num_cells], PetscReal tiny_h,
                                        CeedOperator *source_op) {
   PetscFunctionBeginUser;
 
@@ -507,13 +509,13 @@ PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal
   CeedVector water_src_vec;
   CeedOperatorFieldGetVector(water_src_field, &water_src_vec);
 
-  PetscInt num_comp_water_src = 1;
+  CeedInt num_comp_water_src = 1;
   CeedScalar(*wat_src_ceed)[num_comp_water_src];
   CeedVectorGetArray(water_src_vec, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
 
   CeedSize water_src_len;
   CeedVectorGetLength(water_src_vec, &water_src_len);
-  for (PetscInt i = 0; i < water_src_len; ++i) {
+  for (CeedInt i = 0; i < water_src_len; ++i) {
     wat_src_ceed[i][0] = water_src[i];
   }
 

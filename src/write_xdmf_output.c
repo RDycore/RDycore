@@ -24,7 +24,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   char fname[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineOutputFile(rdy, step, time, "h5", fname));
   const char *units = TimeUnitAsString(rdy->config.time.unit);
-  RDyLogDetail(rdy, "Step %d: writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
+  RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
 
   // write the grid if we're the first step in a batch.
   PetscInt dataset = step / rdy->config.output.interval;
@@ -39,7 +39,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
 
   // write solution data to a new GROUP with components in separate datasets
   char group_name[1025];
-  snprintf(group_name, 1024, "%d %E %s", step, time, units);
+  snprintf(group_name, 1024, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
 
   // create and populate a multi-component natural vector
@@ -177,7 +177,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   PetscCall(DetermineOutputFile(rdy, step, time, "h5", h5_name));
   PetscCall(DetermineOutputFile(rdy, step, time, "xmf", xmf_name));
   const char *units = TimeUnitAsString(rdy->config.time.unit);
-  RDyLogDetail(rdy, "Step %d: writing XDMF XMF output at t = %g %s to %s", step, time, units, xmf_name);
+  RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF XMF output at t = %g %s to %s", step, time, units, xmf_name);
 
   FILE *fp;
   PetscCall(PetscFOpen(rdy->comm, xmf_name, "w", &fp));
@@ -205,7 +205,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 
   // construct the group name containing the time-specific solution data
   char time_group[1025];
-  snprintf(time_group, 1024, "%d %E %s", step, time, units);
+  snprintf(time_group, 1024, "%" PetscInt_FMT " %E %s", step, time, units);
 
   // write time-specific field data
   for (PetscInt i = 0; i < num_topologies; ++i) {
@@ -218,15 +218,15 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                            "      <Time Value=\"%E\" />\n",
                            time));
     PetscCall(PetscFPrintf(rdy->comm, fp,
-                           "      <Topology Type=\"%s\" NumberOfElements=\"%d\">\n"
-                           "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%d %d\">\n"
+                           "      <Topology Type=\"%s\" NumberOfElements=\"%" PetscInt_FMT "\">\n"
+                           "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%" PetscInt_FMT " %" PetscInt_FMT "\">\n"
                            "          %s:%s/cells\n"
                            "        </DataItem>\n"
                            "      </Topology>\n",
                            topo_type[num_corners], num_cells, num_cells, num_corners, h5_basename, h5_topo_group));
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Geometry GeometryType=\"%s\">\n"
-                           "        <DataItem Format=\"HDF\" Dimensions=\"%d %d\">\n"
+                           "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " %" PetscInt_FMT "\">\n"
                            "          %s:%s/vertices\n"
                            "        </DataItem>\n"
                            "      </Geometry>\n",
@@ -240,7 +240,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
     for (int f = 0; f < 3; ++f) {
       PetscCall(PetscFPrintf(rdy->comm, fp,
                              "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
-                             "      <DataItem Dimensions=\"%d\" Format=\"HDF\">\n"
+                             "      <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
                              "        %s:/%s/%s\n"
                              "      </DataItem>\n"
                              "      </Attribute>\n",

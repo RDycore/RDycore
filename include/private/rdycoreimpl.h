@@ -90,9 +90,9 @@ struct _p_RDy {
   // MPI communicator used for the simulation
   MPI_Comm comm;
   // MPI rank of local process
-  PetscInt rank;
+  PetscMPIInt rank;
   // Number of processes in the communicator
-  PetscInt nproc;
+  PetscMPIInt nproc;
   // file storing input data for the simulation
   char config_file[PETSC_MAX_PATH_LEN];
 
@@ -197,7 +197,7 @@ PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *
 
 // time series
 PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);
-PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary boundary, PetscReal[boundary.num_edges][3]);
+PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal[size][ndof]);
 PETSC_INTERN PetscErrorCode WriteTimeSeries(TS, PetscInt, PetscReal, Vec, void *);
 PETSC_INTERN PetscErrorCode DestroyTimeSeries(RDy);
 

@@ -104,6 +104,7 @@ program rdycore_f90
   PetscInt            :: cur_bc_idx, prev_bc_idx
   PetscReal           :: cur_rain, cur_bc
   PetscBool           :: interpolate_rain, interpolate_bc, flg
+  PetscInt, parameter :: ndof = 3
 
   if (command_argument_count() < 1) then
     call usage()
@@ -159,7 +160,7 @@ program rdycore_f90
           num_edges_dirc_bc = num_edges
         endif
       enddo
-      allocate(bc_values(num_edges_dirc_bc * 3))
+      allocate(bc_values(num_edges_dirc_bc * ndof))
 
       ! run the simulation to completion using the time parameters in the
       ! config file
@@ -191,13 +192,13 @@ program rdycore_f90
           if (interpolate_bc .or. cur_bc_idx /= prev_bc_idx) then
             prev_bc_idx = cur_bc_idx
             do iedge = 1, num_edges_dirc_bc
-              bc_values((iedge-1)*3 + 1) = cur_bc
-              bc_values((iedge-1)*3 + 2) = 0.d0
-              bc_values((iedge-1)*3 + 3) = 0.d0
+              bc_values((iedge-1)*ndof + 1) = cur_bc
+              bc_values((iedge-1)*ndof + 2) = 0.d0
+              bc_values((iedge-1)*ndof + 3) = 0.d0
             enddo
           endif
           if (num_edges_dirc_bc > 0) then
-            PetscCallA(RDySetDirichletBoundaryValues(rdy_, dirc_bc_idx, num_edges_dirc_bc, 3, bc_values, ierr))
+            PetscCallA(RDySetDirichletBoundaryValues(rdy_, dirc_bc_idx, num_edges_dirc_bc, ndof, bc_values, ierr))
           endif
         endif
 
