@@ -26,26 +26,40 @@ output:
 grid:
   file: Houston1km_with_z.exo
 
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
 surface_composition:
-  regions:
-    - id: 1
-      material: smooth
+  - region: domain
+    material: smooth
 
 materials:
   - name: smooth
-    manning: 0.015
+    properties:
+      manning:
+        value: 0.015
 
 initial_conditions:
-  domain:
-    format: binary
-    file: Houston1km.IC
+  - region: domain
+    flow: domain_flow_ic
+
+boundaries:
+  - name: bottom_wall
+    grid_boundary_id: 1
 
 boundary_conditions:
-  - id: 1 # bottom_wall
+  - boundaries: [bottom_wall]
     flow: outflow_bc
 
 flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    file: Houston1km.IC
+    format: binary
   - name: outflow_bc
     type: dirichlet
     height: 0
     momentum: [0, 0]
+

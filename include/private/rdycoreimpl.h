@@ -8,9 +8,18 @@
 #include <private/rdymeshimpl.h>
 #include <rdycore.h>
 
+// This type defines a material with specific properties.
+// (undefined properties are set to INVALID_INT/INVALID_REAL)
+typedef struct {
+  char      name[MAX_NAME_LEN + 1];
+  PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
+} RDyMaterial;
+
 // This type defines a region consisting of cells identified by their local
 // indices.
 typedef struct {
+  char      name[MAX_NAME_LEN + 1];  // region name
+  PetscInt  id;                      // region ID (as specified in mesh file)
   PetscInt *cell_ids;
   PetscInt  num_cells;
 } RDyRegion;
@@ -18,8 +27,9 @@ typedef struct {
 // This type defines a boundary consisting of edges identified by their local
 // indices.
 typedef struct {
-  PetscInt  id;     // boundary identifier (matches label in mesh file)
-  PetscInt  index;  // index of boundary within RDycore boundary list
+  char      name[MAX_NAME_LEN + 1];  // boundary name
+  PetscInt  id;                      // boundary ID (as specified in mesh file)
+  PetscInt  index;                   // index of boundary within RDycore boundary list
   PetscInt *edge_ids;
   PetscInt  num_edges;
 } RDyBoundary;
@@ -111,15 +121,12 @@ struct _p_RDy {
 
   // mesh regions
   PetscInt   num_regions;
-  PetscInt  *region_ids;
   RDyRegion *regions;
 
   // mesh boundaries
   PetscInt     num_boundaries;
   RDyBoundary *boundaries;
 
-  // materials associated with mesh regions (1 per region)
-  RDyMaterial *materials;
   // materials associated with individual (local) cells
   RDyMaterial *materials_by_cell;
 

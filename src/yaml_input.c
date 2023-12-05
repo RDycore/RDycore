@@ -15,7 +15,7 @@
 // Here we've implemented a parser (using libcyaml) to handle the RDycore
 // configuration file whose specification can be found at
 //
-// https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
+// https://rdycore.github.io/RDycore/user/input.html
 //
 // In the style of libcyaml (https://github.com/tlsa/libcyaml/blob/main/docs/guide.md),
 // this parser defines a schema for each section and populates the appropriate struct(s)
@@ -215,25 +215,19 @@ static const cyaml_schema_field_t output_fields_schema[] = {
 // grid section
 // ------------
 // grid:
-//   file: <path-to-file/mesh.{msh,h5,exo}>
+//   file: <path-to-file/grid.{msh,h5,exo}>
 
 // mapping of grid fields to members of RDyGridSection
 static const cyaml_schema_field_t grid_fields_schema[] = {
-  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 0),
+  CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 1),
   CYAML_FIELD_END
 };
 
-// mapping of strings to domain-conditions-related file formats
-static const cyaml_strval_t domain_file_formats[] = {
+// mapping of strings to input file formats
+static const cyaml_strval_t input_file_formats[] = {
+    {"",       PETSC_VIEWER_NOFORMAT  },
     {"binary", PETSC_VIEWER_NATIVE    },
     {"hdf5",   PETSC_VIEWER_HDF5_PETSC},
-};
-
-// mapping of domain fields to members of RDyDomainConditions
-static const cyaml_schema_field_t domain_fields_schema[] = {
-    CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyDomainConditions, file, 0),
-    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
-    CYAML_FIELD_END
 };
 
 // ---------------------------
@@ -241,116 +235,151 @@ static const cyaml_schema_field_t domain_fields_schema[] = {
 // ---------------------------
 
 // mapping of material specification fields to members of RDyMaterialSpec
-static const cyaml_schema_field_t material_spec_fields_schema[] = {
-    CYAML_FIELD_INT("id", CYAML_FLAG_DEFAULT, RDyMaterialSpec, id),
-    CYAML_FIELD_STRING("material", CYAML_FLAG_DEFAULT, RDyMaterialSpec, material, 0),
-    CYAML_FIELD_END
-};
-
-// a single material specification entry
-static const cyaml_schema_value_t material_spec_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialSpec, material_spec_fields_schema),
-};
-
-static const cyaml_schema_field_t surface_composition_domain_files_fields_schema[] = {
-    CYAML_FIELD_STRING("manning", CYAML_FLAG_DEFAULT, RDySurfaceCompositionFiles, manning, 0),
-    CYAML_FIELD_END
-};
-
-static const cyaml_schema_field_t surface_composition_domain_fields_schema[] = {
-    CYAML_FIELD_MAPPING("files", CYAML_FLAG_DEFAULT, RDySurfaceCompositionDomain, files, surface_composition_domain_files_fields_schema),
-    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyDomainConditions, format, domain_file_formats, CYAML_ARRAY_LEN(domain_file_formats)),
-    CYAML_FIELD_END
-};
-
-// mapping of surface_composition fields to RDyInitialConditionsSection
 static const cyaml_schema_field_t surface_composition_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, domain, surface_composition_domain_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySurfaceCompositionSection, by_region, num_regions, &material_spec_entry, 0,
-                               MAX_NUM_REGIONS),
+    CYAML_FIELD_STRING("region", CYAML_FLAG_DEFAULT, RDySurfaceCompositionSpec, region, 1),
+    CYAML_FIELD_STRING("material", CYAML_FLAG_DEFAULT, RDySurfaceCompositionSpec, material, 1),
     CYAML_FIELD_END
+};
+
+// a single surface composition entry
+static const cyaml_schema_value_t surface_composition_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySurfaceCompositionSpec, surface_composition_fields_schema),
 };
 
 // -----------------
 // materials section
 // -----------------
 
-// mapping of material fields to RDyMaterial
+// mapping of material property fields to RDyMaterialPropertySpec
+static const cyaml_schema_field_t material_property_fields_schema[] = {
+    CYAML_FIELD_FLOAT("value", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, value),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
+    CYAML_FIELD_END
+};
+
+// mapping of material property fields to RDyMaterialPropertіesSpec
+static const cyaml_schema_field_t material_properties_fields_schema[] = {
+    CYAML_FIELD_MAPPING("manning", CYAML_FLAG_DEFAULT, RDyMaterialPropertiesSpec, manning, material_property_fields_schema),
+    CYAML_FIELD_END
+};
+
+// mapping of material fields to RDyMaterialSpec
 static const cyaml_schema_field_t material_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterial, name, 0),
-    CYAML_FIELD(FLOAT, "manning", CYAML_FLAG_OPTIONAL, RDyMaterial, manning, {.missing = INVALID_REAL}),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyMaterialSpec, name, 1),
+    CYAML_FIELD_MAPPING("properties", CYAML_FLAG_DEFAULT, RDyMaterialSpec, properties, material_properties_fields_schema),
     CYAML_FIELD_END
 };
 
 // a single material entry
 static const cyaml_schema_value_t material_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterial, material_fields_schema),
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyMaterialSpec, material_fields_schema),
 };
 
+// ---------------
+// regions section
+// ---------------
+// regions:
+//  - name: downstream   # human-readable name for the region
+//    grid_region_id: 2  # grid identifier for the region
+//  - name: upstream
+//    grid_region_id: 1
 
-// ---------------------------------------------------------
+// schema for region fields
+static const cyaml_schema_field_t region_spec_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyRegionSpec, name, 1),
+    CYAML_FIELD_INT("grid_region_id", CYAML_FLAG_DEFAULT, RDyRegionSpec, grid_region_id),
+    CYAML_FIELD_END
+};
+
+// a single region entry
+static const cyaml_schema_value_t region_spec_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyRegionSpec, region_spec_fields_schema),
+};
+
+// ---------------------------------------
 // initial_conditions and sources sections
-// ---------------------------------------------------------
+// ---------------------------------------
 // initial_conditions/sources:
-//   domain: # optional, specifies initial conditions/sources for entire domain
-//     file: <path-to-file/ic.{bin,h5,etc}>
-//     format: <bin|h5|etc>
-//   regions: # optional, specifies conditions on a per-region obasis
-//     - id: <region-id>
-//       flow: <name-of-a-flow-condition>
-//       sediment: <name-of-a-sediment-condition> # used if physics.sediment = true above
-//       salinity: <name-of-a-salinity-condition> # used if physics.salinity = true above
-//     - id: <region-id>
-//       flow: <name-of-a-flow-condition>
-//       sediment: <name-of-a-sediment-condition> # used only if physics.sediment = true above
-//       salinity: <name-of-a-salinity-condition> # used only if physics.salinity = true above
+//  - region: <region-name>
+//    flow: <name-of-a-flow-condition>
+//    sediment: <name-of-a-sediment-condition> # used if physics.sediment == true above
+//    salinity: <name-of-a-salinity-condition> # used if physics.salinity == true above
+//  - region: <region-name>
+//    flow: <name-of-a-flow-condition>
+//    sediment: <name-of-a-sediment-condition> # used only if physics.sediment == true above
+//    salinity: <name-of-a-salinity-condition> # used only if physics.salinity == true above
 // ...
 
-// mapping of conditions fields to members of RDyConditionSpec
-static const cyaml_schema_field_t condition_spec_fields_schema[] = {
-    CYAML_FIELD_INT("id", CYAML_FLAG_DEFAULT, RDyConditionSpec, id),
-    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyConditionSpec, flow, 0),
-    CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyConditionSpec, sediment, 0),
-    CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyConditionSpec, salinity, 0),
+// mapping of conditions fields to members of RDyRegionConditionSpec
+static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
+    CYAML_FIELD_STRING("region", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, region, 1),
+    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 1),
+    CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediment, 0),
+    CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
     CYAML_FIELD_END
 };
 
-// a single conditionspec entry
-static const cyaml_schema_value_t condition_spec_entry = {
-    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyConditionSpec, condition_spec_fields_schema),
+// a single regional initial condition / source spec entry
+static const cyaml_schema_value_t region_condition_spec_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, region_condition_spec_fields_schema),
 };
 
-// mapping of initial_conditions fields to RDyInitialConditionsSection
-static const cyaml_schema_field_t initial_conditions_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, domain, domain_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDyInitialConditionsSection, by_region, num_regions, &condition_spec_entry, 0,
-                               MAX_NUM_REGIONS),
+// ------------------
+// boundaries section
+// ------------------
+// boundaries:
+//   - name: bottom_wall
+//     grid_boundary_id: 3  # grid identifier for the boundary
+//   - name: top_wall
+//     grid_boundary_id: 2
+//   - name: exterior
+//     grid_boundary_id: 1
+
+// schema for boundary fields
+static const cyaml_schema_field_t boundary_spec_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyBoundarySpec, name, 1),
+    CYAML_FIELD_INT("grid_boundary_id", CYAML_FLAG_DEFAULT, RDyBoundarySpec, grid_boundary_id),
     CYAML_FIELD_END
 };
 
-// mapping of sources fields to RDySources
-static const cyaml_schema_field_t sources_fields_schema[] = {
-    CYAML_FIELD_MAPPING("domain", CYAML_FLAG_OPTIONAL, RDySourcesSection, domain, domain_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_OPTIONAL, RDySourcesSection, by_region, num_regions, &condition_spec_entry, 0, MAX_NUM_REGIONS),
-    CYAML_FIELD_END
+// a single boundary entry
+static const cyaml_schema_value_t boundary_spec_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyBoundarySpec, boundary_spec_fields_schema),
 };
 
-// ---------------------------------------------------------
+// ---------------------------
 // boundary_conditions section
-// ---------------------------------------------------------
+// ---------------------------
 // boundary_conditions:
-//   - id: <boundary-id>
+//   - boundaries: [<boundary-name1>, <boundary-name2>, ...]
 //     flow: <name-of-a-flow-condition>
 //     sediment: <name-of-a-sediment-condition> # used if physics.sediment = true above
 //     salinity: <name-of-a-salinity-condition> # used if physics.salinity = true above
-//   - id: <boundary-id>
+//   - boundaries: [<boundary-name1>, <boundary-name2>, ...]
 //     flow: <name-of-a-flow-condition>
 //     sediment: <name-of-a-sediment-condition> # used only if physics.sediment = true above
 //     salinity: <name-of-a-salinity-condition> # used only if physics.salinity = true above
 // ...
 
-// The above is just a sequence of condition specs, so we don't need any other
-// definitions.
+// schema for boundary name
+static const cyaml_schema_value_t boundary_name_entry = {
+    CYAML_VALUE_STRING(CYAML_FLAG_DEFAULT, char, 1, MAX_NAME_LEN),
+};
+
+// mapping of conditions fields to members of RDyBoundaryConditionSpec
+static const cyaml_schema_field_t boundary_condition_spec_fields_schema[] = {
+    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, boundaries, num_boundaries, &boundary_name_entry, 0, MAX_NUM_BOUNDARIES),
+    CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, flow, 1),
+    CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, sediment, 0),
+    CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, salinity, 0),
+    CYAML_FIELD_END
+};
+
+// a single boundary condition spec entry
+static const cyaml_schema_value_t boundary_condition_spec_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, boundary_condition_spec_fields_schema),
+};
 
 // -----------------------
 // flow_conditions section
@@ -361,8 +390,8 @@ static const cyaml_schema_field_t sources_fields_schema[] = {
 //   momentum: <px, py> # use only by dirichlet
 // - name: <name-of-flow-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical-outflow>
-//   height: <value> # used only by dirichlet
-//   momentum: <px, py> # used only by dirichlet
+//   file: <filename>      # used only by dirichlet
+//   format: <binary|hdf5> # used only by dirichlet
 //   ...
 
 // mapping of strings to types of conditions
@@ -374,16 +403,18 @@ static const cyaml_strval_t condition_types[] = {
 };
 
 // schema for momentum component (as specified in a 2-item sequence)
-static const cyaml_schema_value_t momentum_component = {
+static const cyaml_schema_value_t momentum_component_entry = {
     CYAML_VALUE(FLOAT, CYAML_FLAG_DEFAULT, PetscReal, {.missing = INVALID_REAL}),
 };
 
 // schema for flow condition fields
 static const cyaml_schema_field_t flow_condition_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
     CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = INVALID_REAL}),
-    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component, 2),
+    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component_entry, 2),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyFlowCondition, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyFlowCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
@@ -397,17 +428,20 @@ static const cyaml_schema_value_t flow_condition_entry = {
 // ---------------------------
 // - name: <name-of-sediment-condition-1>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   concentration: <value> # used only by dirichlet
 // - name: <name-of-sediment-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   file: <filename>      # used only by dirichlet
+//   format: <binary|hdf5> # used only by dirichlet
 //   ...
 
 // schema for sediment_condition fields
 static const cyaml_schema_field_t sediment_condition_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySedimentCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySedimentCondition, concentration),
+    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_OPTIONAL, RDySedimentCondition, concentration),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDySedimentCondition, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDySedimentCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
@@ -421,17 +455,20 @@ static const cyaml_schema_value_t sediment_condition_entry = {
 // ---------------------------
 // - name: <name-of-salinity-condition-1>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   concentration: <value> # used only by dirichlet
 // - name: <name-of-salinity-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical>
-//   concentration: <value>
+//   file: <filename>      # used only by dirichlet
+//   format: <binary|hdf5> # used only by dirichlet
 //   ...
 
 // schema for salinity fields
 static const cyaml_schema_field_t salinity_condition_fields_schema[] = {
-    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 0),
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySalinityCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_DEFAULT, RDySalinityCondition, concentration),
+    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_OPTIONAL, RDySalinityCondition, concentration),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDySalinityCondition, file, 1),
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDySalinityCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
 };
 
@@ -453,13 +490,17 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
-    CYAML_FIELD_MAPPING("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, surface_composition_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
-    CYAML_FIELD_MAPPING("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, initial_conditions_fields_schema),
+    CYAML_FIELD_SEQUENCE_COUNT("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, num_material_assignments, &surface_composition_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_DEFAULT, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_DEFAULT, RDyConfig, regions, num_regions,
+                               &region_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, num_initial_conditions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_OPTIONAL, RDyConfig, boundaries, num_boundaries,
+                               &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
-                               &condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
-    CYAML_FIELD_MAPPING("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, sources_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
+                               &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
+    CYAML_FIELD_SEQUENCE_COUNT("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, num_sources, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_DEFAULT, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions,
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
@@ -560,24 +601,27 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
                "time.coupling_interval must not exceed time.final_time");
   }
 
-  // we need either a domain initial condition or region-by-region conditions
-  PetscCheck(strlen(config->initial_conditions.domain.file) || (config->initial_conditions.num_regions > 0), comm, PETSC_ERR_USER,
-             "Invalid initial_conditions! No domain or per-region conditions given.");
+  // we need initial conditions specified for each region
+  PetscCheck(config->num_initial_conditions > 0, comm, PETSC_ERR_USER, "No initial conditions were specified!");
+  PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
+             "%d initial conditions were specified in initial_conditions (exactly %d needed)", config->num_initial_conditions, config->num_regions);
+
+  // we need material properties for each region as well
+  PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
+             "Only %d material <-> region assignments were found in surface_composition (%d needed)", config->num_material_assignments,
+             config->num_regions);
 
   // validate our materials
-  for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
-    const RDyMaterial *material = &config->materials[i];
-    // at the moment, we need Manning's coefficient
-    PetscCheck(material->manning != INVALID_REAL, comm, PETSC_ERR_USER, "Missing Manning's coefficient in materials.%s", material->name);
-  }
+  PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
 
   // validate our flow conditions
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
-      PetscCheck(flow_cond->height != INVALID_REAL, comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s", flow_cond->name);
-      PetscCheck((flow_cond->momentum[0] != INVALID_REAL) && (flow_cond->momentum[1] != INVALID_REAL), comm, PETSC_ERR_USER,
+      PetscCheck(flow_cond->height != INVALID_REAL || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
+                 flow_cond->name);
+      PetscCheck(flow_cond->file[0] || ((flow_cond->momentum[0] != INVALID_REAL) && (flow_cond->momentum[1] != INVALID_REAL)), comm, PETSC_ERR_USER,
                  "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }
   }
@@ -662,6 +706,15 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
     }
   }
 
+  // set the solution monitoring interval (except for XDMF, which does its own thing)
+  if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+    PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
+    if (!has_param) {
+      snprintf(value, VALUE_LEN, "%d", rdy->config.output.interval);
+      PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
+    }
+  }
+
   // adjust the CGNS output batch size if needed
   if (rdy->config.output.format == OUTPUT_CGNS) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-viewer_cgns_batch_size", &has_param));
@@ -723,6 +776,104 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
 
   // clean up
   PetscFree(config_str);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// =============
+//  PrintConfig
+// =============
+
+static const char *FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
+
+static PetscErrorCode PrintPhysics(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Physics:");
+  RDyLogDetail(rdy, "  Flow:");
+  RDyLogDetail(rdy, "    Bed friction: %s", FlagString(rdy->config.physics.flow.bed_friction));
+  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment));
+  RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static const char *SpatialString(RDyNumericsSpatial method) {
+  static const char *strings[2] = {"finite volume (FV)", "finite element (FE)"};
+  return strings[method];
+}
+
+static const char *TemporalString(RDyNumericsTemporal method) {
+  static const char *strings[3] = {"forward euler", "4th-order Runge-Kutta", "backward euler"};
+  return strings[method];
+}
+
+static const char *RiemannString(RDyNumericsRiemann solver) {
+  static const char *strings[2] = {"roe", "hllc"};
+  return strings[solver];
+}
+
+static PetscErrorCode PrintNumerics(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Numerics:");
+  RDyLogDetail(rdy, "  Spatial discretization: %s", SpatialString(rdy->config.numerics.spatial));
+  RDyLogDetail(rdy, "  Temporal discretization: %s", TemporalString(rdy->config.numerics.temporal));
+  RDyLogDetail(rdy, "  Riemann solver: %s", RiemannString(rdy->config.numerics.riemann));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static const char *TimeUnitString(RDyTimeUnit unit) {
+  static const char *strings[6] = {"seconds", "minutes", "hours", "days", "months", "years"};
+  return strings[unit];
+}
+
+static PetscErrorCode PrintTime(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Time:");
+  RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.time.final_time, TimeUnitString(rdy->config.time.unit));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PrintRestart(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Restart:");
+  if (rdy->config.restart.interval > 0) {
+    char format[12];
+    if (rdy->config.restart.format == PETSC_VIEWER_NATIVE) {
+      strcpy(format, "binary");
+    } else {
+      strcpy(format, "hdf5");
+    }
+    RDyLogDetail(rdy, "  File format: %s", format);
+    RDyLogDetail(rdy, "  interval: %" PetscInt_FMT, rdy->config.restart.interval);
+  } else {
+    RDyLogDetail(rdy, "  (disabled)");
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PrintLogging(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Logging:");
+  if (strlen(rdy->config.logging.file)) {
+    RDyLogDetail(rdy, "  Primary log file: %s", rdy->config.logging.file);
+  } else {
+    RDyLogDetail(rdy, "  Primary log file: <stdout>");
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Prints config information at the requested log level.
+PetscErrorCode PrintConfig(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyLogDetail(rdy, "==========================================================");
+  RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
+  RDyLogDetail(rdy, "==========================================================");
+
+  PetscCall(PrintPhysics(rdy));
+  PetscCall(PrintNumerics(rdy));
+  PetscCall(PrintTime(rdy));
+  PetscCall(PrintLogging(rdy));
+  PetscCall(PrintRestart(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

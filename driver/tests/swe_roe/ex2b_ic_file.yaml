@@ -26,13 +26,31 @@ output:
 grid:
   file: DamBreak_grid5x10.exo
 
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
 surface_composition:
-  domain:
-    format: binary
-    files:
-      manning: manning_grid5x10.bin
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        file: manning_grid5x10.bin
+        format: binary
 
 initial_conditions:
-  domain:
-    format: binary
+  - region: domain
+    flow: domain_flow_іc
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
     file: DamBreak_grid5x10_wetdownstream.IC
+    format: binary
+
+# we don't specify boundaries or boundary conditions, so all boundaries are
+# reflecting

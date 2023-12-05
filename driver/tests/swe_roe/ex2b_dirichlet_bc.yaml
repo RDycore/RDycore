@@ -25,41 +25,46 @@ output:
 grid:
   file: planar_dam_10x5.msh
 
+regions:
+  - name: upstream
+    grid_region_id: 1
+  - name: downstream
+    grid_region_id: 2
+
 surface_composition:
-  regions:
-    - id: 1 # upstream region
-      material: smooth
-    - id: 2 # downstream region
-      material: smooth
+  - region: upstream
+    material: smooth
+  - region: downstream
+    material: smooth
 
 materials:
   - name: smooth
-    manning: 0.015
+    properties:
+      manning:
+        value: 0.015
 
 initial_conditions:
-  regions:
-    - id: 1 # upstream region
-      flow: dam_top_ic
-    - id: 2 # downstream region
-      flow: dam_bottom_ic
+  - region: upstream
+    flow: dam_top_ic
+  - region: downstream
+    flow: dam_bottom_ic
 
-# The mesh contains three boundaries on which following BCs are being
-# applied:
-# 1. "boundary"    : Reflecting wall BC
-# 2. "top_wall"    : Reflecting wall BC
-# 3. "bottom_wall" : Critical outflow BC
-#
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+  - name: top_wall
+    grid_boundary_id: 2
+  - name: bottom_wall
+    grid_boundary_id: 3
+
 # Below we define BCs for "top_wall" and "bottom_wall", but do not specify
 # the BC for "boundary". If no BC is specified for a boundary, the reflecting
 # wall BC is assumed.
 boundary_conditions:
-  - id: 1
-    flow: dam_top_ic
-  - id: 2 # top_wall
+  - boundaries: [top_wall]
     flow: reflecting_bc
-  - id: 3 # bottom_wall
+  - boundaries: [bottom_wall]
     flow: outflow_bc
-
 
 flow_conditions:
   - name: dam_top_ic
