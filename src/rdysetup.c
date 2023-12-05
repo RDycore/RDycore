@@ -386,8 +386,8 @@ static PetscErrorCode InitRegions(RDy rdy) {
   // If we didn't find any regions, we can't perform the simulation.
   PetscCheck(label, rdy->comm, PETSC_ERR_USER, "No regions (cell sets) found in grid! Cannot assign initial conditions.");
   PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
-  PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER, "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)",
-             rdy->num_regions, MAX_NUM_REGIONS);
+  PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
+             "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)", rdy->num_regions, MAX_NUM_REGIONS);
 
   // fetch region IDs
   IS region_id_is;
