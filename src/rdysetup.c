@@ -577,7 +577,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   }
 
   // make sure we have at least one region and boundary across all mpi ranks
-  PetscInt num_global_boundaries = 0;
+  PetscMPIInt num_global_boundaries = 0;
   MPI_Allreduce(&rdy->num_boundaries, &num_global_boundaries, 1, MPI_INT, MPI_SUM, rdy->comm);
   PetscCheck(num_global_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
 

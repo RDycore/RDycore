@@ -29,8 +29,8 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 
   // gather it on the root process (rank 0)
   if (rdy->rank == 0) {
-    PetscInt *global_flux_md;
-    PetscInt  num_global_edges = rdy->time_series.boundary_fluxes.num_global_edges;
+    PetscMPIInt *global_flux_md;
+    PetscInt     num_global_edges = rdy->time_series.boundary_fluxes.num_global_edges;
     PetscCall(PetscCalloc1(num_md * num_global_edges, &global_flux_md));
 
     // local -> global flux metadata
@@ -41,7 +41,11 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
       n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
     MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm);
-    rdy->time_series.boundary_fluxes.global_flux_md = global_flux_md;
+    PetscCall(PetscCalloc1(num_md * num_global_edges, &rdy->time_series.boundary_fluxes.global_flux_md));
+    for (PetscInt i = 0; i < num_md * num_global_edges; ++i) {
+      rdy->time_series.boundary_fluxes.global_flux_md[i] = (PetscInt)global_flux_md[i];
+    }
+    PetscFree(global_flux_md);
   } else {
     // send the root proc the local flux metadata
     MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm);
