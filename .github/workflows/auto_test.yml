@@ -21,7 +21,8 @@ jobs:
       matrix:
         os: [ubuntu-latest] #, macos-latest]
         build-type: [Debug] #, Release]
-        container: ["rdycore-petsc:713b55d3-int32", "rdycore-petsc:713b55d3-int64"]
+        container: ["coherellc/rdycore-petsc:713b55d3-int32",
+                    "coherellc/rdycore-petsc:713b55d3-int64"]
 
     # Steps for building and running tests.
     steps:
