@@ -604,12 +604,13 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   // we need initial conditions specified for each region
   PetscCheck(config->num_initial_conditions > 0, comm, PETSC_ERR_USER, "No initial conditions were specified!");
   PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
-             "%d initial conditions were specified in initial_conditions (exactly %d needed)", config->num_initial_conditions, config->num_regions);
+             "%" PetscInt_FMT " initial conditions were specified in initial_conditions (exactly %" PetscInt_FMT " needed)",
+             config->num_initial_conditions, config->num_regions);
 
   // we need material properties for each region as well
   PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
-             "Only %d material <-> region assignments were found in surface_composition (%d needed)", config->num_material_assignments,
-             config->num_regions);
+             "Only %" PetscInt_FMT " material <-> region assignments were found in surface_composition (%" PetscInt_FMT " needed)",
+             config->num_material_assignments, config->num_regions);
 
   // validate our materials
   PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
@@ -710,7 +711,7 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%d", rdy->config.output.interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }

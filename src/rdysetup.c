@@ -416,7 +416,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
       PetscInt num_cells;
       PetscCall(ISGetLocalSize(cell_is, &num_cells));
       if (num_cells > 0) {
-        RDyLogDebug(rdy, "  Found region %d (%d cells)", region_id, num_cells);
+        RDyLogDebug(rdy, "  Found region %" PetscInt_FMT " (%" PetscInt_FMT " cells)", region_id, num_cells);
         region->num_cells = num_cells;
         PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
       }
