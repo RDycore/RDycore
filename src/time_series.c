@@ -84,8 +84,12 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   }
 
   // gather per-process numbers of local boundary edges
+  PetscMPIInt num_local_edges[rdy->nproc];
+  MPI_Allgather(&num_boundary_edges, 1, MPI_INT, num_local_edges, 1, MPI_INT, rdy->comm);
   PetscCall(PetscCalloc1(rdy->nproc, &rdy->time_series.boundary_fluxes.num_local_edges));
-  MPI_Allgather(&num_boundary_edges, 1, MPI_INT, rdy->time_series.boundary_fluxes.num_local_edges, 1, MPI_INT, rdy->comm);
+  for (PetscInt p = 0; p < rdy->nproc; ++p) {
+    rdy->time_series.boundary_fluxes.num_local_edges[p] = (PetscInt)num_local_edges[p];
+  }
 
   // determine the global number of boundary edges
   MPI_Allreduce(&num_boundary_edges, &rdy->time_series.boundary_fluxes.num_global_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
