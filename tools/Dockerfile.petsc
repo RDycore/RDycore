@@ -38,10 +38,13 @@ ENV LANG=en_US.UTF-8
 WORKDIR /build
 
 ARG PETSC_HASH=HEAD
+ARG PETSC_ID=int32
 ENV PETSC_HASH=$PETSC_HASH
 ENV PETSC_DIR=/build/petsc
-ENV PETSC_ARCH=mpich-int32-real-opt
-RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
+ENV PETSC_ARCH=mpich-$PETSC_ID-real-debug
+RUN \
+  if [ "$PETSC_ID" = "int64" ]; then export EXTRA_ARGS="--with-64-bit-indices"; fi && \
+  git clone --branch=main https://gitlab.com/petsc/petsc && \
   cd petsc && \
   git reset --hard $PETSC_HASH && \
   python3 configure \
@@ -62,6 +65,7 @@ RUN git clone --branch=main https://gitlab.com/petsc/petsc && \
     --download-parmetis \
     --download-pnetcdf \
     --with-zlib \
+    $EXTRA_ARGS \
     && \
   make all PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH -j; \
   cat configure.log

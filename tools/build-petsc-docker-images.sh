@@ -19,16 +19,25 @@ fi
 
 DOCKERHUB_USER=coherellc
 IMAGE_NAME=rdycore-petsc
-TAG=$PETSC_HASH
 
-# Build the image locally.
+# Build the image locally in configurations that use both 32-bit and 64-bit
+# integers for PETSc IDs.
 mkdir -p docker-build
 cp Dockerfile.petsc docker-build/Dockerfile
 cd docker-build
-docker buildx build -t $IMAGE_NAME:$TAG --network=host \
-  --build-arg PETSC_HASH=$PETSC_HASH \
-  .
-STATUS=$?
+for id_type in int32 int64
+do
+  TAG=$PETSC_HASH-$id_type
+  docker buildx build -t $IMAGE_NAME:$TAG --network=host \
+    --build-arg PETSC_HASH=$PETSC_HASH \
+    --build-arg PETSC_ID=$id_type \
+    .
+  STATUS=$?
+  if [[ "$STATUS" == "0" ]]; then
+    # Tag the image.
+    docker image tag $IMAGE_NAME:$TAG $DOCKERHUB_USER/$IMAGE_NAME:$TAG
+  fi
+done
 cd ..
 rm -rd docker-build
 
@@ -36,8 +45,12 @@ if [[ "$STATUS" == "0" ]]; then
   # Tag the image.
   docker image tag $IMAGE_NAME:$TAG $DOCKERHUB_USER/$IMAGE_NAME:$TAG
 
-  echo "To upload this image to DockerHub, use the following:"
+  echo "To upload the images to DockerHub, use the following:"
   echo "docker login"
-  echo "docker image push $DOCKERHUB_USER/$IMAGE_NAME:$TAG"
+  for id_type in int32 int64
+  do
+    TAG=$PETSC_HASH-$id_type
+    echo "docker image push $DOCKERHUB_USER/$IMAGE_NAME:$TAG"
+  done
   echo "docker logout"
 fi
