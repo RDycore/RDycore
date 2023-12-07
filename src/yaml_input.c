@@ -729,6 +729,86 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
 #undef VALUE_LEN
 }
 
+typedef struct {
+  const char *pattern;
+  const char *substitution;
+} Substitution;
+
+// supported string substitutions
+static const Substitution substitutions[] = {
+    {"${PETSC_ID_TYPE}", PETSC_ID_TYPE},
+    {NULL,               NULL         }, // terminator
+};
+
+// ON RANK 0 ONLY, reads the given file and performs the given set of string
+// substitutions, storing the resulting (newly allocated) string in content
+// and its size in content_size
+static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, const Substitution substitutions[], char **content,
+                                        PetscMPIInt *content_size) {
+  PetscFunctionBegin;
+
+  FILE *file = NULL;
+  PetscCall(PetscFOpen(comm, filename, "r", &file));
+
+  // determine the file's size and read it into a buffer
+  fseek(file, 0, SEEK_END);
+  PetscMPIInt raw_size = (PetscMPIInt)ftell(file);
+  rewind(file);
+  char *raw_content;
+  PetscCall(PetscCalloc1(raw_size, &raw_content));
+  fread(raw_content, sizeof(char), raw_size, file);
+  PetscCall(PetscFClose(comm, file));
+
+  // determine the size of the content with all substitutions applied
+  PetscInt num_substitutions = 0;
+  *content_size              = raw_size;
+  for (PetscInt s = 0; substitutions[s].pattern; ++s) {
+    const Substitution sub         = substitutions[s];
+    PetscInt           pattern_len = (PetscInt)strlen(sub.pattern);
+    PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
+    char              *p           = raw_content;
+    while (p != NULL) {
+      p = strstr(p, sub.pattern);
+      if (p != NULL) {
+        *content_size += subst_len - pattern_len;
+        p += pattern_len;
+        ++num_substitutions;
+      }
+    }
+  }
+
+  // allocate the content buffer and perform any string substitutions
+  PetscCall(PetscCalloc1(*content_size, content));
+  if (num_substitutions > 0) {
+    for (PetscInt s = 0; substitutions[s].pattern; ++s) {
+      const Substitution sub         = substitutions[s];
+      PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
+      PetscInt           pattern_len = (PetscInt)strlen(sub.pattern);
+      char              *p = raw_content, *q = *content;
+      while (p != NULL) {
+        char *new_p = strstr(p, sub.pattern);
+        if (new_p != NULL) {
+          memcpy(q, p, new_p - p);
+          q += new_p - p;
+          p = new_p + pattern_len;
+          memcpy(q, sub.substitution, subst_len);
+          q += subst_len;
+        } else {
+          memcpy(q, p, raw_size - (p - raw_content));
+          q += raw_size - (p - raw_content);
+          p = new_p;
+        }
+      }
+      PetscCheck(q - *content == *content_size, comm, PETSC_ERR_USER, "error performing string substitutions in %s!", filename);
+    }
+  } else {
+    memcpy(*content, raw_content, *content_size);
+  }
+
+  PetscFree(raw_content);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // reads the config file on process 0, broadcasts it as a string to all other
 // processes, and parses the string into rdy->config
 PetscErrorCode ReadConfigFile(RDy rdy) {
@@ -736,23 +816,14 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
 
   // open the config file on process 0, determine its size, and broadcast its
   // contents to all other processes.
-  long  config_size;
-  char *config_str;
+  char       *config_str;
+  PetscMPIInt config_size;
   if (rdy->rank == 0) {
-    // process 0: read the file
-    FILE *file = NULL;
-    PetscCall(PetscFOpen(rdy->comm, rdy->config_file, "r", &file));
+    // process 0: read the file and perform substitutions
+    PetscCall(ReadAndSubstitute(rdy->comm, rdy->config_file, substitutions, &config_str, &config_size));
 
-    // determine the file's size and broadcast it
-    fseek(file, 0, SEEK_END);
-    config_size = ftell(file);
-    MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
-
-    // create a content string and broadcast it
-    PetscCall(PetscCalloc1(config_size, &config_str));
-    rewind(file);
-    fread(config_str, sizeof(char), config_size, file);
-    PetscCall(PetscFClose(rdy->comm, file));
+    // broadcast the size of the content and then the content itself
+    MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
     MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
   } else {
     // other processes: read the size of the content
