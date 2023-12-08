@@ -777,9 +777,9 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
     }
   }
 
-  // allocate the content buffer and perform any string substitutions
-  PetscCall(PetscCalloc1(*content_size, content));
+  // perform any needed string substitutions or just use the raw input
   if (num_substitutions > 0) {
+    PetscCall(PetscCalloc1(*content_size, content));
     for (PetscInt s = 0; substitutions[s].pattern; ++s) {
       const Substitution sub         = substitutions[s];
       PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
