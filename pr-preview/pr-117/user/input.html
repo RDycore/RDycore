@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.0">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.1">
     
     
       
@@ -837,6 +837,24 @@ the <a href="https://yaml.org/">YAML</a> markup language. Typically, these files
 <code>.yml</code> or <code>.yaml</code> suffix like <a href="https://github.com/RDycore/RDycore/blob/main/driver/tests/swe_roe/ex2b.yaml"><code>ex2b.yaml</code></a>.
 In this section, we describe how to express the specifics for your simulation
 using the YAML syntax.</p>
+<p>Before a YAML file is parsed, RDycore performs some string substitutions to
+allow certain parameters to be used, e.g. for setting the names of data files
+based on different build configurations. The following table lists the patterns
+that are replaced, and the substitutions that replace them.</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Substitution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>${PETSC_ID_TYPE}</code></td>
+<td><code>int32</code> or <code>int64</code> based on whether PETSc is built with 64-bit indices</td>
+</tr>
+</tbody>
+</table>
 <p>RDycore's YAML input is broken up into several sections, each responsible for a
 different aspect of the desired simulation. These sections fall into several
 broad categories:</p>
