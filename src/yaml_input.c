@@ -801,11 +801,11 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
       }
       PetscCheck(q - *content == *content_size, comm, PETSC_ERR_USER, "error performing string substitutions in %s!", filename);
     }
+    PetscFree(raw_content);
   } else {
-    memcpy(*content, raw_content, *content_size);
+    *content = raw_content;
   }
 
-  PetscFree(raw_content);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
