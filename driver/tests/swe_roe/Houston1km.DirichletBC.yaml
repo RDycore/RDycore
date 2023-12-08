@@ -56,7 +56,7 @@ boundary_conditions:
 flow_conditions:
   - name: domain_flow_ic
     type: dirichlet
-    file: Houston1km.IC
+    file: Houston1km.ic.${PETSC_ID_TYPE}.bin
     format: binary
   - name: outflow_bc
     type: dirichlet

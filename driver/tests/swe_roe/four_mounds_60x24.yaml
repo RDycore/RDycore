@@ -34,7 +34,7 @@ materials:
   - name: domain_material
     properties:
       manning:
-        file: manning_four_mound_60x24.bin
+        file: manning_four_mound_60x24.${PETSC_ID_TYPE}.bin
         format: binary
 
 initial_conditions:
@@ -44,7 +44,7 @@ initial_conditions:
 flow_conditions:
   - name: domain_flow_ic
     type: dirichlet
-    file: four_mounds_60x24.ic
+    file: four_mounds_60x24.ic.${PETSC_ID_TYPE}.bin
     format: binary
 
 output:

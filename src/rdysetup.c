@@ -416,7 +416,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
       PetscInt num_cells;
       PetscCall(ISGetLocalSize(cell_is, &num_cells));
       if (num_cells > 0) {
-        RDyLogDebug(rdy, "  Found region %d (%d cells)", region_id, num_cells);
+        RDyLogDebug(rdy, "  Found region %" PetscInt_FMT " (%" PetscInt_FMT " cells)", region_id, num_cells);
         region->num_cells = num_cells;
         PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
       }
@@ -577,7 +577,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   }
 
   // make sure we have at least one region and boundary across all mpi ranks
-  PetscInt num_global_boundaries = 0;
+  PetscMPIInt num_global_boundaries = 0;
   MPI_Allreduce(&rdy->num_boundaries, &num_global_boundaries, 1, MPI_INT, MPI_SUM, rdy->comm);
   PetscCheck(num_global_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
 

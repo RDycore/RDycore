@@ -13,6 +13,14 @@
 #define RDYCORE_MINOR_VERSION @RDYCORE_MINOR_VERSION@
 #define RDYCORE_PATCH_VERSION @RDYCORE_PATCH_VERSION@
 
+//--------------------
+// Configuration Info
+//--------------------
+
+// this expands to "int32" or "int64", depending on whether PETSc was configured
+// with 64-bit indices
+#define PETSC_ID_TYPE "@PETSC_ID_TYPE@"
+
 //-------------------
 // RDycore Interface
 //-------------------

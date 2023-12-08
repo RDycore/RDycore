@@ -24,7 +24,7 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
 
-  int result_and_errno[2];
+  PetscMPIInt result_and_errno[2];
   if (rdy->rank == 0) {
     result_and_errno[0] = mkdir(output_dir, 0755);
     result_and_errno[1] = errno;

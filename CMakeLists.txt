@@ -26,6 +26,17 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
 include_directories(${CEED_INCLUDE_DIRS})
 
+# Determine PETSc's ID type (int32 or int64) by inspecting petscconf.h
+file(READ "${PETSC_DIR}/${PETSC_ARCH}/include/petscconf.h" petscconf_h)
+string(FIND ${petscconf_h} "#define PETSC_USE_64BIT_INDICES 1" index)
+if (index EQUAL -1) # PETSC_USE_64BIT_INDICES not defined
+  message(STATUS "PETSc is configured with 32-bit indices")
+  set(PETSC_ID_TYPE "int32")
+else()
+  message(STATUS "PETSc is configured with 64-bit indices")
+  set(PETSC_ID_TYPE "int64")
+endif()
+
 # Use PETSc's compiler config.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_COMPILER ${PETSC_COMPILER})

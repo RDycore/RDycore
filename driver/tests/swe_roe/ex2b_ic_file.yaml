@@ -39,7 +39,7 @@ materials:
   - name: smooth
     properties:
       manning:
-        file: manning_grid5x10.bin
+        file: manning_grid5x10.${PETSC_ID_TYPE}.bin
         format: binary
 
 initial_conditions:

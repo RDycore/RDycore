@@ -6,6 +6,15 @@ the [YAML](https://yaml.org/) markup language. Typically, these files have a
 In this section, we describe how to express the specifics for your simulation
 using the YAML syntax.
 
+Before a YAML file is parsed, RDycore performs some string substitutions to
+allow certain parameters to be used, e.g. for setting the names of data files
+based on different build configurations. The following table lists the patterns
+that are replaced, and the substitutions that replace them.
+
+| Pattern            | Substitution                                                           |
+| ------------------ | ---------------------------------------------------------------------- |
+| `${PETSC_ID_TYPE}` | `int32` or `int64` based on whether PETSc is built with 64-bit indices |
+
 RDycore's YAML input is broken up into several sections, each responsible for a
 different aspect of the desired simulation. These sections fall into several
 broad categories:
