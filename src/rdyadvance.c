@@ -1,6 +1,5 @@
 #include <errno.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdypreloadimpl.h>
 #include <rdycore.h>
 #include <string.h>
 #include <sys/stat.h>
