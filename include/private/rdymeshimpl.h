@@ -157,6 +157,8 @@ typedef struct RDyMesh {
   PetscInt num_owned_internal_edges;
   /// number of edges that are on the boundary
   PetscInt num_boundary_edges;
+  // total number of vertices in the mesh
+  PetscInt num_vertices_total;
   // number of vertices in the mesh attached to locally stored cells
   PetscInt num_vertices;
   // number of faces on the domain boundary attached to locally stored cells
@@ -185,7 +187,7 @@ PETSC_INTERN PetscErrorCode RDyCellsCreateFromDM(DM, RDyCells *);
 PETSC_INTERN PetscErrorCode RDyCellsDestroy(RDyCells);
 
 PETSC_INTERN PetscErrorCode RDyVerticesCreate(PetscInt, RDyVertices *);
-PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices *);
+PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices *, PetscInt *);
 PETSC_INTERN PetscErrorCode RDyVerticesDestroy(RDyVertices);
 
 PETSC_INTERN PetscErrorCode RDyEdgesCreate(PetscInt, RDyEdges *);

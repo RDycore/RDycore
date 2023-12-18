@@ -223,7 +223,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
 ///
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
+PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_total) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -286,6 +286,11 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
   ISLocalToGlobalMapping map;
   PetscCall(DMGetLocalToGlobalMapping(dm, &map));
   PetscCall(ISLocalToGlobalMappingApply(map, num_vertices, vertices->ids, vertices->global_ids));
+
+  // compute total number of vertices
+  DMGetCoordinates(dm, &coordinates);
+  VecGetSize(coordinates, num_vertices_total);
+  *num_vertices_total = *num_vertices_total / dim;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -846,7 +851,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices));
+  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_total));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
