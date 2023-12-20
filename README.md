@@ -12,7 +12,7 @@ To build RDycore, you need:
 * reliable C and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
   or [Mpich](https://www.mpich.org/))
-* [PETSc](https://gitlab.com/petsc/petsc) revision 713b55d3 (Dec 6, 2023) or later
+* [PETSc](https://gitlab.com/petsc/petsc) revision fc288817 (Dec 13, 2023) or later
 
 You can obtain all of these freely (except perhaps your favorite Fortran
 compiler) on the Linux and Mac platforms. On Linux, just use your favorite
@@ -36,7 +36,7 @@ To configure, build, and install RDycore:
    git submodule update --init --recursive
    ```
 2. Make sure you set your `PETSC_DIR` and `PETSC_ARCH` environment variables
-   to refer to an existing installation of PETSc (v3.18.1 or later).
+   to refer to your existing installation of PETSc.
 3. Create a directory in which you'll build RDycore (a "build directory").
    For example:
    ```

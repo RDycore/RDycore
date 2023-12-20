@@ -241,21 +241,15 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   // advance the solution to the specified time (handling preloading if requested)
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
                ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
-  static PetscBool already_preloaded = PETSC_FALSE;
-  PetscBool        preload;
-  PetscCall(PetscOptionsHasName(NULL, NULL, "-preload", &preload));
-  if (preload && !already_preloaded) {
-    PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
-    if (PetscPreLoadingOn) {
-      PetscCall(CalibrateSolverTimers(rdy));
-    } else {
-      PetscCall(TSSolve(rdy->ts, rdy->X));
-    }
-    already_preloaded = PETSC_TRUE;
-    PetscPreLoadEnd();
+  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
+  if (PetscPreLoadingOn) {
+    PetscCall(CalibrateSolverTimers(rdy));
+    PetscCall(TSSetTime(rdy->ts, time));
+    PetscCall(TSSetStepNumber(rdy->ts, step));
   } else {
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
+  PetscPreLoadEnd();
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
