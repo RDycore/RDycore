@@ -24,6 +24,18 @@ static PetscErrorCode CheckBoundaryConditionIndex(RDy rdy, PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CheckBoundaryNumEdges(RDy rdy, PetscInt boundary_index, PetscInt num_edges) {
+  PetscFunctionBegin;
+
+  RDyBoundary boundary = rdy->boundaries[boundary_index];
+
+  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
+             "The given number of edges (%" PetscInt_FMT ") for boundary with index %" PetscInt_FMT " is incorrect (should be %" PetscInt_FMT ")",
+             num_edges, boundary_index, boundary.num_edges);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetNumBoundaryEdges(RDy rdy, PetscInt boundary_index, PetscInt *num_edges) {
   PetscFunctionBegin;
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
@@ -139,5 +151,144 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
     PetscCall(VecRestoreArray(rdy->water_src, &s));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscReal *x) {
+  PetscFunctionBegin;
+
+  RDyCells *cells = &rdy->mesh.cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (cells->is_local[icell]) {
+      x[count++] = cells->centroids[icell].X[idim];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscInt idim = 0;  // x-dim
+  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, PetscReal *y) {
+  PetscFunctionBegin;
+  PetscInt idim = 1;  // y-dim
+  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, y));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, PetscReal *z) {
+  PetscFunctionBegin;
+  PetscInt idim = 2;  // z-dim
+  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, z));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, PetscInt *nat_id) {
+  PetscFunctionBegin;
+  RDyCells *cells = &rdy->mesh.cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (cells->is_local[icell]) {
+      nat_id[count++] = cells->natural_ids[icell];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyGetIDimCentroidOfBoundaryEdgeOrCell(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscBool data_for_edge,
+                                                             PetscInt idim, PetscReal *x) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  PetscCall(CheckBoundaryNumEdges(rdy, boundary_index, num_edges));
+
+  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyEdges   *edges    = &rdy->mesh.edges;
+
+  if (data_for_edge) {
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      PetscInt iedge = boundary.edge_ids[e];
+      x[e]           = edges->centroids[iedge].X[idim];
+    }
+  } else {
+    RDyCells *cells = &rdy->mesh.cells;
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      PetscInt iedge = boundary.edge_ids[e];
+      PetscInt icell = edges->cell_ids[2 * iedge];
+      x[e]           = cells->centroids[icell].X[idim];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscBool data_for_edge = PETSC_TRUE;
+  PetscInt  idim          = 0;  // x-dim
+  PetscCall(RDyGetIDimCentroidOfBoundaryEdgeOrCell(rdy, boundary_index, num_edges, data_for_edge, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetYCentroidOfBoundaryEdge(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscBool data_for_edge = PETSC_TRUE;
+  PetscInt  idim          = 1;  // y-dim
+  PetscCall(RDyGetIDimCentroidOfBoundaryEdgeOrCell(rdy, boundary_index, num_edges, data_for_edge, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetZCentroidOfBoundaryEdge(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscBool data_for_edge = PETSC_TRUE;
+  PetscInt  idim          = 2;  // z-dim
+  PetscCall(RDyGetIDimCentroidOfBoundaryEdgeOrCell(rdy, boundary_index, num_edges, data_for_edge, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetXCentroidOfBoundaryCell(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscBool data_for_edge = PETSC_FALSE;
+  PetscInt  idim          = 0;  // x-dim
+  PetscCall(RDyGetIDimCentroidOfBoundaryEdgeOrCell(rdy, boundary_index, num_edges, data_for_edge, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscBool data_for_edge = PETSC_FALSE;
+  PetscInt  idim          = 1;  // y-dim
+  PetscCall(RDyGetIDimCentroidOfBoundaryEdgeOrCell(rdy, boundary_index, num_edges, data_for_edge, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetZCentroidOfBoundaryCellCell(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscReal *x) {
+  PetscFunctionBegin;
+  PetscBool data_for_edge = PETSC_FALSE;
+  PetscInt  idim          = 2;  // z-dim
+  PetscCall(RDyGetIDimCentroidOfBoundaryEdgeOrCell(rdy, boundary_index, num_edges, data_for_edge, idim, x));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, PetscInt boundary_index, PetscInt num_edges, PetscInt *nat_ids) {
+  PetscFunctionBegin;
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  PetscCall(CheckBoundaryNumEdges(rdy, boundary_index, num_edges));
+
+  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyCells   *cells    = &rdy->mesh.cells;
+  RDyEdges   *edges    = &rdy->mesh.edges;
+
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt iedge = boundary.edge_ids[e];
+    PetscInt icell = edges->cell_ids[2 * iedge];
+    nat_ids[e]     = cells->natural_ids[icell];
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
