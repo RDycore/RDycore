@@ -799,7 +799,6 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
     PetscCall(VecDestroy(&local));
 
   } else {
-
     if (size == 1) {
       // Since there only one rank present, DMPlex does has useNatural = PETSC_FALSE
       // and the natural IDs of cell is the same as the local IDs.
@@ -815,7 +814,6 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
       }
       PetscCall(VecDestroy(&local));
     }
-
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

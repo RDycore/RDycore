@@ -144,6 +144,18 @@ module rdycore
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
+    integer(c_int) function rdysetxmomentumsource_(rdy, xmomsrc) bind(c, name="RDySetXMomentumSource")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: xmomsrc
+    end function
+
+    integer(c_int) function rdysetymomentumsource_(rdy, ymomsrc) bind(c, name="RDySetYMomentumSource")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      type(c_ptr), value, intent(in) :: ymomsrc
+    end function
+
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
@@ -322,6 +334,20 @@ contains
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetwatersource_(rdy_%c_rdy, c_loc(watsrc))
+  end subroutine
+
+  subroutine RDySetXMomentumSource(rdy_, xmomsrc, ierr)
+    type(RDy),       intent(inout)       :: rdy_
+    real(RDyDouble), pointer, intent(in) :: xmomsrc(:)
+    integer,         intent(out)         :: ierr
+    ierr = rdysetxmomentumsource_(rdy_%c_rdy, c_loc(xmomsrc))
+  end subroutine
+
+  subroutine RDySetYMomentumSource(rdy_, ymomsrc, ierr)
+    type(RDy),       intent(inout)       :: rdy_
+    real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
+    integer,         intent(out)         :: ierr
+    ierr = rdysetymomentumsource_(rdy_%c_rdy, c_loc(ymomsrc))
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

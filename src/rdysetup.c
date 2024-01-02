@@ -862,7 +862,12 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   if (!rdy->ceed_resource[0]) {
     // water_src is only needed for PETSc source operator
     PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->water_src));
+    PetscCall(VecDuplicate(rdy->water_src, &rdy->x_momentum_src));
+    PetscCall(VecDuplicate(rdy->water_src, &rdy->y_momentum_src));
+
     PetscCall(VecZeroEntries(rdy->water_src));
+    PetscCall(VecZeroEntries(rdy->x_momentum_src));
+    PetscCall(VecZeroEntries(rdy->y_momentum_src));
   }
 
   PetscInt n_dof;

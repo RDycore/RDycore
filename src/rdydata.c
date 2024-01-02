@@ -154,6 +154,35 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDySetMomentumrSource(RDy rdy, Vec momentum_vec, PetscReal *momentum_value) {
+  PetscFunctionBegin;
+
+  if (rdy->ceed_resource[0]) {
+    SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend RDySetMomentumrSource for Ceed");
+  } else {
+    PetscReal *m;
+    PetscCall(VecGetArray(momentum_vec, &m));
+    for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+      m[i] = momentum_value[i];
+    }
+    PetscCall(VecRestoreArray(momentum_vec, &m));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetXMomentumSource(RDy rdy, PetscReal *x_momentum) {
+  PetscFunctionBegin;
+  PetscCall(RDySetMomentumrSource(rdy, rdy->x_momentum_src, x_momentum));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetYMomentumSource(RDy rdy, PetscReal *y_momentum) {
+  PetscFunctionBegin;
+  PetscCall(RDySetMomentumrSource(rdy, rdy->y_momentum_src, y_momentum));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscReal *x) {
   PetscFunctionBegin;
 

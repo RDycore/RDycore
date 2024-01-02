@@ -541,9 +541,11 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   RDyCells *cells = &mesh->cells;
 
   // Get access to Vec
-  PetscScalar *x_ptr, *f_ptr, *water_src_ptr;
+  PetscScalar *x_ptr, *f_ptr, *water_src_ptr, *x_mom_src_ptr, *y_mom_src_ptr;
   PetscCall(VecGetArray(rdy->X_local, &x_ptr));
   PetscCall(VecGetArray(rdy->water_src, &water_src_ptr));
+  PetscCall(VecGetArray(rdy->x_momentum_src, &x_mom_src_ptr));
+  PetscCall(VecGetArray(rdy->y_momentum_src, &y_mom_src_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
 
   PetscInt ndof;
@@ -592,14 +594,16 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
       }
 
       f_ptr[icell * ndof + 0] += water_src_ptr[icell];
-      f_ptr[icell * ndof + 1] += -bedx - tbx;
-      f_ptr[icell * ndof + 2] += -bedy - tby;
+      f_ptr[icell * ndof + 1] += -bedx - tbx + x_mom_src_ptr[icell];
+      f_ptr[icell * ndof + 2] += -bedy - tby + y_mom_src_ptr[icell];
     }
   }
 
   // Restore vectors
   PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
   PetscCall(VecRestoreArray(rdy->water_src, &water_src_ptr));
+  PetscCall(VecRestoreArray(rdy->x_momentum_src, &x_mom_src_ptr));
+  PetscCall(VecRestoreArray(rdy->y_momentum_src, &y_mom_src_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
