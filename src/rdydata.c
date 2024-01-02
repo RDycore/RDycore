@@ -86,7 +86,9 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, PetscInt boundary_index, P
       PetscInt iedge = boundary.edge_ids[e];
       PetscInt icell = edges->cell_ids[2 * iedge];
       if (cells->is_local[icell]) {
-        bdata.h[e] = boundary_values[3 * e];
+        bdata.h[e]  = boundary_values[3 * e];
+        bdata.hu[e] = boundary_values[3 * e + 1];
+        bdata.hv[e] = boundary_values[3 * e + 2];
 
         if (bdata.h[e] > tiny_h) {
           bdata.u[e] = boundary_values[3 * e + 1] / bdata.h[e];
