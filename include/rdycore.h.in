@@ -74,6 +74,7 @@ PETSC_EXTERN PetscErrorCode RDyGetYVelocity(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetWaterSource(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetXMomentumSource(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetYMomentumSource(RDy, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetManningN(RDy, PetscReal*);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {
