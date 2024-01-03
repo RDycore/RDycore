@@ -379,10 +379,10 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
   {
     // source term
     CeedQFunction qf;
-    CeedInt       num_comp_geom = 2, num_comp_water_src = 1, num_comp_mannings_n = 1;
+    CeedInt       num_comp_geom = 2, num_comp_swe_src = 1, num_comp_mannings_n = 1;
     CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
     CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
-    CeedQFunctionAddInput(qf, "water_src", num_comp_water_src, CEED_EVAL_NONE);
+    CeedQFunctionAddInput(qf, "swe_src", num_comp_swe_src, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "mannings_n", num_comp_mannings_n, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
@@ -394,9 +394,9 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     CeedQFunctionSetContext(qf, qf_context);
     CeedQFunctionContextDestroy(&qf_context);
 
-    CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_mannings_n, restrict_riemannf;
+    CeedElemRestriction restrict_c, restrict_geom, restrict_swe_src, restrict_mannings_n, restrict_riemannf;
     CeedVector          geom;
-    CeedVector          water_src;
+    CeedVector          swe_src;
     CeedVector          mannings_n;
     CeedVector          riemannf;
     {  // Create element restrictions for state
@@ -410,11 +410,11 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
       CeedVectorSetValue(geom, 0.0);
 
-      CeedInt strides_water_src[] = {num_comp_water_src, 1, num_comp_water_src};
-      CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_owned_cells * num_comp_water_src, strides_water_src,
-                                       &restrict_water_src);
-      CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
-      CeedVectorSetValue(water_src, 0.0);
+      CeedInt strides_swe_src[] = {num_comp_swe_src, 1, num_comp_swe_src};
+      CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_swe_src, num_owned_cells * num_comp_swe_src, strides_swe_src,
+                                       &restrict_swe_src);
+      CeedElemRestrictionCreateVector(restrict_swe_src, &swe_src, NULL);
+      CeedVectorSetValue(swe_src, 0.0);
 
       CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
       CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n, strides_mannings_n,
@@ -454,7 +454,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedOperator op;
       CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
       CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
-      CeedOperatorSetField(op, "water_src", restrict_water_src, CEED_BASIS_COLLOCATED, water_src);
+      CeedOperatorSetField(op, "swe_src", restrict_swe_src, CEED_BASIS_COLLOCATED, swe_src);
       CeedOperatorSetField(op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n);
       CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
       CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
@@ -496,30 +496,30 @@ PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOpera
   CeedOperator water_source_op = sub_ops[0];
 
   // fetch the field
-  CeedOperatorGetFieldByName(water_source_op, "water_src", water_source_field);
+  CeedOperatorGetFieldByName(water_source_op, "swe_src", water_source_field);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // sets the per-cell water source for the given CEED SWE source operator
-PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *water_src) {
+PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *swe_src) {
   PetscFunctionBeginUser;
 
-  CeedOperatorField water_src_field;
-  SWESourceOperatorGetWaterSource(source_op, &water_src_field);
-  CeedVector water_src_vec;
-  CeedOperatorFieldGetVector(water_src_field, &water_src_vec);
+  CeedOperatorField swe_src_field;
+  SWESourceOperatorGetWaterSource(source_op, &swe_src_field);
+  CeedVector swe_src_vec;
+  CeedOperatorFieldGetVector(swe_src_field, &swe_src_vec);
 
-  CeedInt num_comp_water_src = 1;
-  CeedScalar(*wat_src_ceed)[num_comp_water_src];
-  CeedVectorGetArray(water_src_vec, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
+  CeedInt num_comp_swe_src = 1;
+  CeedScalar(*wat_src_ceed)[num_comp_swe_src];
+  CeedVectorGetArray(swe_src_vec, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
 
-  CeedSize water_src_len;
-  CeedVectorGetLength(water_src_vec, &water_src_len);
-  for (CeedInt i = 0; i < water_src_len; ++i) {
-    wat_src_ceed[i][0] = water_src[i];
+  CeedSize swe_src_len;
+  CeedVectorGetLength(swe_src_vec, &swe_src_len);
+  for (CeedInt i = 0; i < swe_src_len; ++i) {
+    wat_src_ceed[i][0] = swe_src[i];
   }
 
-  CeedVectorRestoreArray(water_src_vec, (CeedScalar **)&wat_src_ceed);
+  CeedVectorRestoreArray(swe_src_vec, (CeedScalar **)&wat_src_ceed);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
