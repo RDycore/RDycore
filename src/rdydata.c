@@ -159,29 +159,33 @@ PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
 PetscErrorCode RDySetMomentumrSource(RDy rdy, Vec momentum_vec, PetscReal *momentum_value) {
   PetscFunctionBegin;
 
-  if (rdy->ceed_resource[0]) {
-    SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend RDySetMomentumrSource for Ceed");
-  } else {
-    PetscReal *m;
-    PetscCall(VecGetArray(momentum_vec, &m));
-    for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-      m[i] = momentum_value[i];
-    }
-    PetscCall(VecRestoreArray(momentum_vec, &m));
+  PetscReal *m;
+  PetscCall(VecGetArray(momentum_vec, &m));
+  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+    m[i] = momentum_value[i];
   }
+  PetscCall(VecRestoreArray(momentum_vec, &m));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDySetXMomentumSource(RDy rdy, PetscReal *x_momentum) {
   PetscFunctionBegin;
-  PetscCall(RDySetMomentumrSource(rdy, rdy->x_momentum_src, x_momentum));
+  if (rdy->ceed_resource[0]) {
+    PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed_rhs.op_src, x_momentum));
+  } else {
+    PetscCall(RDySetMomentumrSource(rdy, rdy->x_momentum_src, x_momentum));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDySetYMomentumSource(RDy rdy, PetscReal *y_momentum) {
   PetscFunctionBegin;
-  PetscCall(RDySetMomentumrSource(rdy, rdy->y_momentum_src, y_momentum));
+  if (rdy->ceed_resource[0]) {
+    PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed_rhs.op_src, y_momentum));
+  } else {
+    PetscCall(RDySetMomentumrSource(rdy, rdy->y_momentum_src, y_momentum));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -38,6 +38,8 @@ PETSC_INTERN PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator, PetscReal
 PETSC_INTERN PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator, PetscReal *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorSetXMomentumSource(CeedOperator, PetscReal *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorSetYMomentumSource(CeedOperator, PetscReal *);
 
 PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);
