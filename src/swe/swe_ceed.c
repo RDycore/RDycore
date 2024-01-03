@@ -485,9 +485,9 @@ PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator source_op, PetscReal dt
 }
 
 // Given a shallow water equations source operator created by
-// CreateSWESourceOperator, fetches the field representing the source of water.
+// CreateSWESourceOperator, fetches the field associated with the field_name.
 // This can be used to implement a time-dependent water source.
-PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOperatorField *water_source_field) {
+PetscErrorCode SWESourceOperatorGetOperatorField(CeedOperator source_op, const char *field_name, CeedOperatorField *op_field) {
   PetscFunctionBeginUser;
 
   // get the source sub-operator responsible for the water source (the first one)
@@ -496,7 +496,7 @@ PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOpera
   CeedOperator water_source_op = sub_ops[0];
 
   // fetch the field
-  CeedOperatorGetFieldByName(water_source_op, "swe_src", water_source_field);
+  CeedOperatorGetFieldByName(water_source_op, field_name, op_field);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -510,7 +510,7 @@ PetscErrorCode SWESourceOperatorSetSourceForComponent(CeedOperator source_op, Ce
   PetscFunctionBeginUser;
 
   CeedOperatorField swe_src_field;
-  SWESourceOperatorGetWaterSource(source_op, &swe_src_field);
+  SWESourceOperatorGetOperatorField(source_op, "swe_src", &swe_src_field);
   CeedElemRestriction restrict_swe_src;
   CeedOperatorFieldGetElemRestriction(swe_src_field, &restrict_swe_src);
   CeedVector swe_src_vec;

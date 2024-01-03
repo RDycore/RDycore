@@ -35,7 +35,7 @@ PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperat
 
 PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial[num_cells], PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator, PetscReal);
-PETSC_INTERN PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator, const char*, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator, PetscReal *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetXMomentumSource(CeedOperator, PetscReal *);
