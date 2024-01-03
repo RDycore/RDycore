@@ -500,8 +500,13 @@ PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOpera
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// sets the per-cell water source for the given CEED SWE source operator
-PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *swe_src) {
+/// Sets the source component for the icomp-th of the shallow water equation
+/// @param [inout]  source_op The CEED source operator
+/// @param [in]  icomp The component for which the values will be filled
+/// @param [in]  *swe_src The array containing values for the source term
+///
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode SWESourceOperatorSetSourceForComponent(CeedOperator source_op, CeedInt icomp, PetscReal *swe_src) {
   PetscFunctionBeginUser;
 
   CeedOperatorField swe_src_field;
@@ -523,6 +528,14 @@ PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal
   }
 
   CeedVectorRestoreArray(swe_src_vec, (CeedScalar **)&wat_src_ceed);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// sets the per-cell water source for the given CEED SWE source operator
+PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *swe_src) {
+  PetscFunctionBeginUser;
+  CeedInt icomp = 0;
+  SWESourceOperatorSetSourceForComponent(source_op, icomp, swe_src);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
