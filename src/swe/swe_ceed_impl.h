@@ -256,8 +256,8 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
     }
 
     cell[0][i] = riemannf[0][i] + swe_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx;
-    cell[2][i] = riemannf[2][i] - bedy - tby;
+    cell[1][i] = riemannf[1][i] - bedx - tbx + swe_src[1][i];
+    cell[2][i] = riemannf[2][i] - bedy - tby + swe_src[2][i];
   }
   return 0;
 }

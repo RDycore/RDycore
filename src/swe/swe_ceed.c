@@ -379,7 +379,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
   {
     // source term
     CeedQFunction qf;
-    CeedInt       num_comp_geom = 2, num_comp_swe_src = 1, num_comp_mannings_n = 1;
+    CeedInt       num_comp_geom = 2, num_comp_swe_src = 3, num_comp_mannings_n = 1;
     CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
     CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "swe_src", num_comp_swe_src, CEED_EVAL_NONE);
@@ -506,16 +506,19 @@ PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal
 
   CeedOperatorField swe_src_field;
   SWESourceOperatorGetWaterSource(source_op, &swe_src_field);
+  CeedElemRestriction restrict_swe_src;
+  CeedOperatorFieldGetElemRestriction(swe_src_field, &restrict_swe_src);
   CeedVector swe_src_vec;
   CeedOperatorFieldGetVector(swe_src_field, &swe_src_vec);
 
-  CeedInt num_comp_swe_src = 1;
+  CeedInt num_comp_swe_src;
+  CeedElemRestrictionGetNumComponents(restrict_swe_src, &num_comp_swe_src);
   CeedScalar(*wat_src_ceed)[num_comp_swe_src];
   CeedVectorGetArray(swe_src_vec, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
 
   CeedSize swe_src_len;
   CeedVectorGetLength(swe_src_vec, &swe_src_len);
-  for (CeedInt i = 0; i < swe_src_len; ++i) {
+  for (CeedInt i = 0; i < swe_src_len/num_comp_swe_src; ++i) {
     wat_src_ceed[i][0] = swe_src[i];
   }
 
