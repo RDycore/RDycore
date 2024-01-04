@@ -192,8 +192,10 @@ PetscErrorCode RDySetYMomentumSource(RDy rdy, PetscReal *y_momentum) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscReal *x) {
+static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscInt size, PetscReal *x) {
   PetscFunctionBegin;
+
+  PetscAssert(rdy->mesh.num_cells_local == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
 
   RDyCells *cells = &rdy->mesh.cells;
 
@@ -206,29 +208,32 @@ static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, PetscReal *x) {
+PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal x[size]) {
   PetscFunctionBegin;
   PetscInt idim = 0;  // x-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, x));
+  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, x));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, PetscReal *y) {
+PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal y[size]) {
   PetscFunctionBegin;
   PetscInt idim = 1;  // y-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, y));
+  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, y));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, PetscReal *z) {
+PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal z[size]) {
   PetscFunctionBegin;
   PetscInt idim = 2;  // z-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, z));
+  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, z));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, PetscInt *nat_id) {
+PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, const PetscInt size, PetscInt *nat_id) {
   PetscFunctionBegin;
+
+  PetscAssert(rdy->mesh.num_cells_local == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+
   RDyCells *cells = &rdy->mesh.cells;
 
   PetscInt count = 0;
