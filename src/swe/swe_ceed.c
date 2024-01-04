@@ -501,7 +501,7 @@ static PetscErrorCode SWESubOperatorGetOperatorField(CeedOperator op, CeedInt su
 }
 
 /// For the given CeedOperator, first extract the 'sub_op_idx'-th sub-operator.
-/// Then, extract the CeedField associated with 'field_name' for the sub-operator. 
+/// Then, extract the CeedField associated with 'field_name' for the sub-operator.
 /// Finally, set values in the icomp-th component of the CeedField
 /// @param [inout]  op The Ceed source operator
 /// @param [in] sub_op_idx Index of the Ceed sub-operator
@@ -530,7 +530,7 @@ static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_
 
   CeedSize len;
   CeedVectorGetLength(swe_vec, &len);
-  for (CeedInt i = 0; i < len/num_comp; ++i) {
+  for (CeedInt i = 0; i < len / num_comp; ++i) {
     data_ceed[i][icomp] = value[i];
   }
 
