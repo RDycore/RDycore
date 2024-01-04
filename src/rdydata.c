@@ -332,7 +332,7 @@ PetscErrorCode RDySetManningN(RDy rdy, PetscReal *n_values) {
   PetscFunctionBegin;
 
   if (rdy->ceed_resource[0]) {  // ceed
-    SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend RDySetManningN for Ceed");
+    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));
   } else {  // petsc
     for (PetscInt icell = 0; icell < rdy->mesh.num_cells_local; ++icell) {
       rdy->materials_by_cell[icell].manning = n_values[icell];

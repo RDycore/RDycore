@@ -576,3 +576,10 @@ PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOpera
   CeedOperatorGetFieldByName(riemannf_source_op, "riemannf", riemann_flux_field);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+PetscErrorCode SWESourceOperatorSetManningsN(CeedOperator source_op, PetscReal *n_values) {
+  PetscFunctionBeginUser;
+  CeedInt sub_op_idx = 0, icomp = 0;
+  SetOperatorFieldComponent(source_op, sub_op_idx, "mannings_n", icomp, n_values);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
