@@ -145,9 +145,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
   // destroy vectors
-  if ((*rdy)->water_src) VecDestroy(&((*rdy)->water_src));
-  if ((*rdy)->x_momentum_src) VecDestroy(&((*rdy)->x_momentum_src));
-  if ((*rdy)->y_momentum_src) VecDestroy(&((*rdy)->y_momentum_src));
+  if ((*rdy)->swe_src) VecDestroy(&((*rdy)->swe_src));
   if ((*rdy)->R) VecDestroy(&((*rdy)->R));
   if ((*rdy)->X) VecDestroy(&((*rdy)->X));
   if ((*rdy)->X_local) VecDestroy(&((*rdy)->X_local));

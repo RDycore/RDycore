@@ -139,32 +139,33 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDySetSourceVec(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(src_vec, &ndof));
+
+  PetscAssert(idof < ndof, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Trying to set values for a block that exceeds total number of blocks");
+
+  PetscReal *s;
+  PetscCall(VecGetArray(src_vec, &s));
+  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+    s[i * ndof + idof] = values[i];
+  }
+  PetscCall(VecRestoreArray(src_vec, &s));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDySetWaterSource(RDy rdy, PetscReal *watsrc) {
   PetscFunctionBegin;
 
   if (rdy->ceed_resource[0]) {  // ceed
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed_rhs.op_src, watsrc));
   } else {  // petsc
-    PetscReal *s;
-    PetscCall(VecGetArray(rdy->water_src, &s));
-    for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-      s[i] = watsrc[i];
-    }
-    PetscCall(VecRestoreArray(rdy->water_src, &s));
+    PetscInt idof = 0;
+    PetscCall(RDySetSourceVec(rdy, rdy->swe_src, idof, watsrc));
   }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode RDySetMomentumrSource(RDy rdy, Vec momentum_vec, PetscReal *momentum_value) {
-  PetscFunctionBegin;
-
-  PetscReal *m;
-  PetscCall(VecGetArray(momentum_vec, &m));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    m[i] = momentum_value[i];
-  }
-  PetscCall(VecRestoreArray(momentum_vec, &m));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -174,7 +175,8 @@ PetscErrorCode RDySetXMomentumSource(RDy rdy, PetscReal *x_momentum) {
   if (rdy->ceed_resource[0]) {
     PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed_rhs.op_src, x_momentum));
   } else {
-    PetscCall(RDySetMomentumrSource(rdy, rdy->x_momentum_src, x_momentum));
+    PetscInt idof = 1;
+    PetscCall(RDySetSourceVec(rdy, rdy->swe_src, idof, x_momentum));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -184,7 +186,8 @@ PetscErrorCode RDySetYMomentumSource(RDy rdy, PetscReal *y_momentum) {
   if (rdy->ceed_resource[0]) {
     PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed_rhs.op_src, y_momentum));
   } else {
-    PetscCall(RDySetMomentumrSource(rdy, rdy->y_momentum_src, y_momentum));
+    PetscInt idof = 2;
+    PetscCall(RDySetSourceVec(rdy, rdy->swe_src, idof, y_momentum));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
