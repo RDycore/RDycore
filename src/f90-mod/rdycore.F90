@@ -14,7 +14,11 @@ module rdycore
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
-            RDyGetHeightOfLocalCell, RDyGetXMomentumOfLocalCell, RDyGetYMomentumOfLocalCell
+            RDyGetTime, RDyGetTimeStep, RDyGetStep, RDyGetCouplingInterval, &
+            RDySetCouplingInterval, &
+            RDyGetHeightOfLocalCell, RDyGetXMomentumOfLocalCell, RDyGetYMomentumOfLocalCell, &
+            RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
+            RDySetManningsNForLocalCell
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
