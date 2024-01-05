@@ -162,7 +162,7 @@ module rdycore
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
-    integer(c_int) function rdysetmanningnforlocalcell_(rdy, size, n) bind(c, name="RDySetManningNForLocalCell")
+    integer(c_int) function rdysetmanningsnforlocalcell_(rdy, size, n) bind(c, name="RDySetManningsNForLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
@@ -369,12 +369,12 @@ contains
     ierr = rdysetymomentumsourceforlocalcell_(rdy_%c_rdy, size, c_loc(ymomsrc))
   end subroutine
 
-  subroutine RDySetManningNForLocalCell(rdy_, size, n, ierr)
+  subroutine RDySetManningsNForLocalCell(rdy_, size, n, ierr)
     type(RDy),       intent(inout)       :: rdy_
     integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetmanningnforlocalcell_(rdy_%c_rdy, size, c_loc(n))
+    ierr = rdysetmanningsnforlocalcell_(rdy_%c_rdy, size, c_loc(n))
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

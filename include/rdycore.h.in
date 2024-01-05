@@ -82,7 +82,7 @@ PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryValues(RDy, const PetscInt, c
 PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCell(RDy, const PetscInt, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy, const PetscInt, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetManningNForLocalCell(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCell(RDy, const PetscInt, PetscReal*);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {

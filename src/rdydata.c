@@ -351,7 +351,7 @@ PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetManningNForLocalCell(RDy rdy, const PetscInt size, PetscReal *n_values) {
+PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal *n_values) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
