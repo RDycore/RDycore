@@ -21,7 +21,7 @@ module rdycore
             RDyGetXCentroidOfBoundaryEdge, RDyGetYCentroidOfBoundaryEdge, RDyGetZCentroidOfBoundaryEdge, &
             RDyGetNaturalIDOfBoundaryCell, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
-            RDySetManningsNForLocalCell
+            RDyGetManningsNForLocalCell, RDySetManningsNForLocalCell
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -251,6 +251,13 @@ module rdycore
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: ymomsrc
+    end function
+
+    integer(c_int) function rdygetmanningsnforlocalcell_(rdy, size, n) bind(c, name="RDyGetManningsNForLocalCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt, value, intent(in)    :: size
+      type(c_ptr), value, intent(in) :: n
     end function
 
     integer(c_int) function rdysetmanningsnforlocalcell_(rdy, size, n) bind(c, name="RDySetManningsNForLocalCell")
@@ -553,6 +560,14 @@ contains
     real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetymomentumsourceforlocalcell_(rdy_%c_rdy, size, c_loc(ymomsrc))
+  end subroutine
+
+  subroutine RDyGetManningsNForLocalCell(rdy_, size, n, ierr)
+    type(RDy),       intent(inout)       :: rdy_
+    PetscInt,        intent(in)          :: size
+    real(RDyDouble), pointer, intent(out):: n(:)
+    integer,         intent(out)         :: ierr
+    ierr = rdygetmanningsnforlocalcell_(rdy_%c_rdy, size, c_loc(n))
   end subroutine
 
   subroutine RDySetManningsNForLocalCell(rdy_, size, n, ierr)

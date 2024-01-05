@@ -65,6 +65,7 @@ PETSC_EXTERN PetscErrorCode RDyGetYMomentumOfLocalCell(RDy rdy, const PetscInt s
 PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, const PetscInt size, PetscInt values[size]);
 
 PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);

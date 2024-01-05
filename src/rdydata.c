@@ -351,6 +351,22 @@ PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyGetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(rdy, size));
+
+  if (rdy->ceed_resource[0]) {  // ceed
+    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));
+  } else {  // petsc
+    for (PetscInt icell = 0; icell < rdy->mesh.num_cells_local; ++icell) {
+      n_values[icell] = rdy->materials_by_cell[icell].manning;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
   PetscFunctionBegin;
 

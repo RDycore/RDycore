@@ -145,10 +145,14 @@ program rdycore_f90
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
       allocate(h(n), hu(n), hv(n), rain(n), values(n), nat_id(n))
 
+      ! get some mesh attributes
       PetscCallA(RDyGetXCentroidOfLocalCell(rdy_, n, values, ierr))
       PetscCallA(RDyGetYCentroidOfLocalCell(rdy_, n, values, ierr))
       PetscCallA(RDyGetZCentroidOfLocalCell(rdy_, n, values, ierr))
       PetscCallA(RDyGetNatIDOfLocalCell(rdy_, n, nat_id, ierr))
+
+      PetscCallA(RDyGetManningsNForLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDySetManningsNForLocalCell(rdy_, n, values, ierr))
 
       values(:) = 0.d0
       PetscCallA(RDySetXMomentumSourceForLocalCell(rdy_, n, values, ierr))
