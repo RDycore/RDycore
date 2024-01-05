@@ -58,31 +58,31 @@ PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, const PetscInt, PetscInt*);
 
-PETSC_EXTERN PetscErrorCode RDyGetHeightOfLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetXMomentumOfLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetYMomentumOfLocalCell(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetHeightOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetXMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetYMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 
-PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetNatIDOfLocalCell(RDy, const PetscInt, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, const PetscInt size, PetscInt values[size]);
 
-PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy, const PetscInt, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfBoundaryEdge(RDy, const PetscInt, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryEdge(RDy, const PetscInt, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryCell(RDy, const PetscInt, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy, const PetscInt, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy, const PetscInt, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
 
-PETSC_EXTERN PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy, const PetscInt, const PetscInt, PetscInt*);
+PETSC_EXTERN PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt values[size]);
 
 PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, PetscReal);
 
-PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryValues(RDy, const PetscInt, const PetscInt, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCell(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt size, const PetscInt ndof, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {
