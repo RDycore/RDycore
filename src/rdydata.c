@@ -110,39 +110,39 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetHeight(RDy rdy, PetscReal *h) {
+static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscReal *x;
   PetscCall(VecGetArray(rdy->X, &x));
   for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    h[i] = x[3 * i];
+    values[i] = x[3 * i + idof];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetXVelocity(RDy rdy, PetscReal *vx) {
+PetscErrorCode RDyGetHeightOfLocalCell(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-
-  PetscReal *x;
-  PetscCall(VecGetArray(rdy->X, &x));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    vx[i] = x[3 * i + 1];
-  }
-  PetscCall(VecRestoreArray(rdy->X, &x));
+  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscInt idof = 0;
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
+PetscErrorCode RDyGetXMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
+  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscInt idof = 1;
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  PetscReal *x;
-  PetscCall(VecGetArray(rdy->X, &x));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
-    vy[i] = x[3 * i + 2];
-  }
-  PetscCall(VecRestoreArray(rdy->X, &x));
+PetscErrorCode RDyGetYMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscInt idof = 2;
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

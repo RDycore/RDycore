@@ -14,7 +14,7 @@ module rdycore
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
-            RDyGetHeight, RDyGetXVelocity, RDyGetYVelocity
+            RDyGetHeightOfLocalCell, RDyGetXMomentumOfLocalCell, RDyGetYMomentumOfLocalCell
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -120,22 +120,25 @@ module rdycore
       real(c_double), value, intent(in) :: interval
     end function
 
-    integer(c_int) function rdygetheight_(rdy, h) bind(c, name="RDyGetHeight")
+    integer(c_int) function rdygetheightoflocalcell_(rdy, size, h) bind(c, name="RDyGetHeightOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+      integer,            intent(in) :: size
       type(c_ptr), value, intent(in) :: h
     end function
 
-    integer(c_int) function rdygetxvelocity_(rdy, vx) bind(c, name="RDyGetXVelocity")
+    integer(c_int) function rdygetxmomentumoflocalcell_(rdy, size, hu) bind(c, name="RDyGetXMomentumOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      type(c_ptr), value, intent(in) :: vx
+      integer,            intent(in) :: size
+      type(c_ptr), value, intent(in) :: hu
     end function
 
-    integer(c_int) function rdygetyvelocity_(rdy, vy) bind(c, name="RDyGetYVelocity")
+    integer(c_int) function rdygetymomentumoflocalcell_(rdy, size, hv) bind(c, name="RDyGetYMomentumOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      type(c_ptr), value, intent(in) :: vy
+      integer,            intent(in) :: size
+      type(c_ptr), value, intent(in) :: hv
     end function
 
     integer(c_int) function rdysetwatersourceforlocalcell_(rdy, size, watsrc) bind(c, name="RDySetWaterSourceForLocalCell")
@@ -318,25 +321,28 @@ contains
     ierr = rdygetstep_(rdy_%c_rdy, step)
   end subroutine
 
-  subroutine RDyGetHeight(rdy_, h, ierr)
+  subroutine RDyGetHeightOfLocalCell(rdy_, size, h, ierr)
     type(RDy),       intent(inout)          :: rdy_
+    integer,         intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: h(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetheight_(rdy_%c_rdy, c_loc(h))
+    ierr = rdygetheightoflocalcell_(rdy_%c_rdy, size, c_loc(h))
   end subroutine
 
-  subroutine RDyGetXVelocity(rdy_, vx, ierr)
+  subroutine RDyGetXMomentumOfLocalCell(rdy_, size, hu, ierr)
     type(RDy),       intent(inout)          :: rdy_
-    real(RDyDouble), pointer, intent(inout) :: vx(:)
+    integer,         intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: hu(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetxvelocity_(rdy_%c_rdy, c_loc(vx))
+    ierr = rdygetxmomentumoflocalcell_(rdy_%c_rdy, size, c_loc(hu))
   end subroutine
 
-  subroutine RDyGetYVelocity(rdy_, vy, ierr)
+  subroutine RDyGetYMomentumOfLocalCell(rdy_, size, hv, ierr)
     type(RDy),       intent(inout)          :: rdy_
-    real(RDyDouble), pointer, intent(inout) :: vy(:)
+    integer,         intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: hv(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetyvelocity_(rdy_%c_rdy, c_loc(vy))
+    ierr = rdygetymomentumoflocalcell_(rdy_%c_rdy, size, c_loc(hv))
   end subroutine
 
   subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)

@@ -118,10 +118,10 @@ int main(int argc, char *argv[]) {
     // allocate arrays for inspecting simulation data
     PetscInt n;
     PetscCall(RDyGetNumLocalCells(rdy, &n));
-    PetscReal *h, *vx, *vy, *rain;
+    PetscReal *h, *hu, *hv, *rain;
     PetscCalloc1(n, &h);
-    PetscCalloc1(n, &vx);
-    PetscCalloc1(n, &vy);
+    PetscCalloc1(n, &hu);
+    PetscCalloc1(n, &hv);
     PetscCalloc1(n, &rain);
 
     // get information about boundary conditions
@@ -217,9 +217,9 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetStep(rdy, &step));
       PetscCheck(step > 0, comm, PETSC_ERR_USER, "Non-positive step index!");
 
-      PetscCall(RDyGetHeight(rdy, h));
-      PetscCall(RDyGetXVelocity(rdy, vx));
-      PetscCall(RDyGetYVelocity(rdy, vy));
+      PetscCall(RDyGetHeightOfLocalCell(rdy, n, h));
+      PetscCall(RDyGetXMomentumOfLocalCell(rdy, n, hu));
+      PetscCall(RDyGetYMomentumOfLocalCell(rdy, n, hv));
     }
 
     // clean up
@@ -234,8 +234,8 @@ int main(int argc, char *argv[]) {
     }
 
     PetscFree(h);
-    PetscFree(vx);
-    PetscFree(vy);
+    PetscFree(hu);
+    PetscFree(hv);
     PetscFree(rain);
     PetscFree(bc_values);
     PetscCall(RDyDestroy(&rdy));
