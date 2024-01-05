@@ -127,21 +127,21 @@ module rdycore
     integer(c_int) function rdygetheightoflocalcell_(rdy, size, h) bind(c, name="RDyGetHeightOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      integer,            intent(in) :: size
+      PetscInt,           intent(in) :: size
       type(c_ptr), value, intent(in) :: h
     end function
 
     integer(c_int) function rdygetxmomentumoflocalcell_(rdy, size, hu) bind(c, name="RDyGetXMomentumOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      integer,            intent(in) :: size
+      PetscInt,           intent(in) :: size
       type(c_ptr), value, intent(in) :: hu
     end function
 
     integer(c_int) function rdygetymomentumoflocalcell_(rdy, size, hv) bind(c, name="RDyGetYMomentumOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      integer,            intent(in) :: size
+      PetscInt,           intent(in) :: size
       type(c_ptr), value, intent(in) :: hv
     end function
 
@@ -327,7 +327,7 @@ contains
 
   subroutine RDyGetHeightOfLocalCell(rdy_, size, h, ierr)
     type(RDy),       intent(inout)          :: rdy_
-    integer,         intent(in)             :: size
+    PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: h(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetheightoflocalcell_(rdy_%c_rdy, size, c_loc(h))
@@ -335,7 +335,7 @@ contains
 
   subroutine RDyGetXMomentumOfLocalCell(rdy_, size, hu, ierr)
     type(RDy),       intent(inout)          :: rdy_
-    integer,         intent(in)             :: size
+    PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hu(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetxmomentumoflocalcell_(rdy_%c_rdy, size, c_loc(hu))
@@ -343,7 +343,7 @@ contains
 
   subroutine RDyGetYMomentumOfLocalCell(rdy_, size, hv, ierr)
     type(RDy),       intent(inout)          :: rdy_
-    integer,         intent(in)             :: size
+    PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hv(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetymomentumoflocalcell_(rdy_%c_rdy, size, c_loc(hv))
@@ -351,7 +351,7 @@ contains
 
   subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    integer,         intent(in)          :: size
+    PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetwatersourceforlocalcell_(rdy_%c_rdy, size, c_loc(watsrc))
@@ -359,7 +359,7 @@ contains
 
   subroutine RDySetXMomentumSourceForLocalCell(rdy_, size, xmomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    integer,         intent(in)          :: size
+    PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: xmomsrc(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetxmomentumsourceforlocalcell_(rdy_%c_rdy, size, c_loc(xmomsrc))
@@ -367,7 +367,7 @@ contains
 
   subroutine RDySetYMomentumSourceForLocalCell(rdy_, size, ymomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    integer,         intent(in)          :: size
+    PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetymomentumsourceforlocalcell_(rdy_%c_rdy, size, c_loc(ymomsrc))
@@ -375,7 +375,7 @@ contains
 
   subroutine RDySetManningsNForLocalCell(rdy_, size, n, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    integer,         intent(in)          :: size
+    PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetmanningsnforlocalcell_(rdy_%c_rdy, size, c_loc(n))
