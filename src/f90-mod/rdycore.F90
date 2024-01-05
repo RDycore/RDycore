@@ -18,6 +18,8 @@ module rdycore
             RDySetCouplingInterval, &
             RDyGetHeightOfLocalCell, RDyGetXMomentumOfLocalCell, RDyGetYMomentumOfLocalCell, &
             RDyGetXCentroidOfLocalCell, RDyGetYCentroidOfLocalCell, RDyGetZCentroidOfLocalCell, RDyGetNatIDOfLocalCell, &
+            RDyGetXCentroidOfBoundaryEdge, RDyGetYCentroidOfBoundaryEdge, RDyGetZCentroidOfBoundaryEdge, &
+            RDyGetNaturalIDOfBoundaryCell, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
             RDySetManningsNForLocalCell
 
@@ -170,6 +172,62 @@ module rdycore
     integer(c_int) function rdygetnatidoflocalcell_(rdy, size, values) bind(c, name="RDyGetNatIDOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetxcentroidofboundaryedge_(rdy, boundary_index, size, values) bind(c, name="RDyGetXCentroidOfBoundaryEdge")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetycentroidofboundaryedge_(rdy, boundary_index, size, values) bind(c, name="RDyGetYCentroidOfBoundaryEdge")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetzcentroidofboundaryedge_(rdy, boundary_index, size, values) bind(c, name="RDyGetZCentroidOfBoundaryEdge")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetxcentroidofboundarycell_(rdy, boundary_index, size, values) bind(c, name="RDyGetXCentroidOfBoundaryCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetycentroidofboundarycell_(rdy, boundary_index, size, values) bind(c, name="RDyGetYCentroidOfBoundaryCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetzcentroidofboundarycell_(rdy, boundary_index, size, values) bind(c, name="RDyGetZCentroidOfBoundaryCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetnaturalidofboundarycell_(rdy, boundary_index, size, values) bind(c, name="RDyGetNaturalIDOfBoundaryCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
@@ -408,6 +466,69 @@ contains
     PetscInt,        pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetnatidoflocalcell_(rdy_%c_rdy, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetXCentroidOfBoundaryEdge(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetxcentroidofboundaryedge_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetYCentroidOfBoundaryEdge(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetycentroidofboundaryedge_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetZCentroidOfBoundaryEdge(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetzcentroidofboundaryedge_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetXCentroidOfBoundaryCell(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetxcentroidofboundarycell_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetYCentroidOfBoundaryCell(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetycentroidofboundarycell_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetZCentroidOfBoundaryCell(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetzcentroidofboundarycell_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetNaturalIDOfBoundaryCell(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetnaturalidofboundarycell_(rdy_%c_rdy, boundary_index, size, c_loc(values))
   end subroutine
 
   subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)

@@ -326,7 +326,7 @@ PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetZCentroidOfBoundaryCellCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_FALSE;
   PetscInt  idim          = 2;  // z-dim

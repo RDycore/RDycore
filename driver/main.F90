@@ -91,8 +91,8 @@ program rdycore_f90
   PetscErrorCode      :: ierr
   PetscInt            :: n, step, iedge
   PetscInt            :: nbconds, ibcond, num_edges, bcond_type
-  PetscReal, pointer  :: h(:), hu(:), hv(:), rain(:), bc_values(:), values(:)
-  PetscInt, pointer   :: nat_id(:)
+  PetscReal, pointer  :: h(:), hu(:), hv(:), rain(:), bc_values(:), values(:), values_bnd(:)
+  PetscInt, pointer   :: nat_id(:), nat_id_bnd_cell(:)
   PetscReal           :: time, time_step, prev_time, coupling_interval, cur_time
 
   PetscBool           :: rain_specified, bc_specified
@@ -150,6 +150,10 @@ program rdycore_f90
       PetscCallA(RDyGetZCentroidOfLocalCell(rdy_, n, values, ierr))
       PetscCallA(RDyGetNatIDOfLocalCell(rdy_, n, nat_id, ierr))
 
+      values(:) = 0.d0
+      PetscCallA(RDySetXMomentumSourceForLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDySetYMomentumSourceForLocalCell(rdy_, n, values, ierr))
+
       ! get information about boundary conditions
       dirc_bc_idx = 0
       num_edges_dirc_bc = 0
@@ -165,6 +169,17 @@ program rdycore_f90
           dirc_bc_idx = ibcond
           num_edges_dirc_bc = num_edges
         endif
+
+        allocate(nat_id_bnd_cell(num_edges), values_bnd(num_edges))
+        PetscCallA(RDyGetNaturalIDOfBoundaryCell(rdy_, ibcond-1, num_edges, nat_id_bnd_cell, ierr))
+        PetscCallA(RDyGetXCentroidOfBoundaryEdge(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetYCentroidOfBoundaryEdge(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetZCentroidOfBoundaryEdge(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetXCentroidOfBoundaryCell(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetYCentroidOfBoundaryCell(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetZCentroidOfBoundaryCell(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+
+        deallocate(nat_id_bnd_cell)
       enddo
       allocate(bc_values(num_edges_dirc_bc * ndof))
 
