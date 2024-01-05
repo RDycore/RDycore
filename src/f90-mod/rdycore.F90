@@ -127,21 +127,21 @@ module rdycore
     integer(c_int) function rdygetheightoflocalcell_(rdy, size, h) bind(c, name="RDyGetHeightOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt,           intent(in) :: size
+      PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: h
     end function
 
     integer(c_int) function rdygetxmomentumoflocalcell_(rdy, size, hu) bind(c, name="RDyGetXMomentumOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt,           intent(in) :: size
+      PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hu
     end function
 
     integer(c_int) function rdygetymomentumoflocalcell_(rdy, size, hv) bind(c, name="RDyGetYMomentumOfLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt,           intent(in) :: size
+      PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hv
     end function
 
