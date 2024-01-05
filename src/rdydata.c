@@ -36,6 +36,12 @@ static PetscErrorCode CheckBoundaryNumEdges(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
+  PetscFunctionBegin;
+  PetscAssert(rdy->mesh.num_cells_local == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetNumBoundaryEdges(RDy rdy, const PetscInt boundary_index, PetscInt *num_edges) {
   PetscFunctionBegin;
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
@@ -140,7 +146,7 @@ PetscErrorCode RDyGetYVelocity(RDy rdy, PetscReal *vy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetSourceVec(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
+PetscErrorCode RDySetSourceVecForLocalCell(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscInt ndof;
@@ -158,37 +164,45 @@ PetscErrorCode RDySetSourceVec(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *v
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetWaterSource(RDy rdy, const PetscInt size, PetscReal *watsrc) {
+PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal *watsrc) {
   PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(rdy, size));
 
   if (rdy->ceed_resource[0]) {  // ceed
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed_rhs.op_src, watsrc));
   } else {  // petsc
     PetscInt idof = 0;
-    PetscCall(RDySetSourceVec(rdy, rdy->swe_src, idof, watsrc));
+    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, watsrc));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetXMomentumSource(RDy rdy, const PetscInt size, PetscReal *x_momentum) {
+PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal *x_momentum) {
   PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(rdy, size));
+
   if (rdy->ceed_resource[0]) {
     PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed_rhs.op_src, x_momentum));
   } else {
     PetscInt idof = 1;
-    PetscCall(RDySetSourceVec(rdy, rdy->swe_src, idof, x_momentum));
+    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, x_momentum));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetYMomentumSource(RDy rdy, const PetscInt size, PetscReal *y_momentum) {
+PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal *y_momentum) {
   PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(rdy, size));
+
   if (rdy->ceed_resource[0]) {
     PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed_rhs.op_src, y_momentum));
   } else {
     PetscInt idof = 2;
-    PetscCall(RDySetSourceVec(rdy, rdy->swe_src, idof, y_momentum));
+    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, y_momentum));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -196,7 +210,7 @@ PetscErrorCode RDySetYMomentumSource(RDy rdy, const PetscInt size, PetscReal *y_
 static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscInt size, PetscReal *x) {
   PetscFunctionBegin;
 
-  PetscAssert(rdy->mesh.num_cells_local == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscCall(CheckNumLocalCells(rdy, size));
 
   RDyCells *cells = &rdy->mesh.cells;
 
@@ -233,7 +247,7 @@ PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscRea
 PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, const PetscInt size, PetscInt *nat_id) {
   PetscFunctionBegin;
 
-  PetscAssert(rdy->mesh.num_cells_local == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscCall(CheckNumLocalCells(rdy, size));
 
   RDyCells *cells = &rdy->mesh.cells;
 
@@ -337,8 +351,10 @@ PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetManningN(RDy rdy, const PetscInt size, PetscReal *n_values) {
+PetscErrorCode RDySetManningNForLocalCell(RDy rdy, const PetscInt size, PetscReal *n_values) {
   PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(rdy, size));
 
   if (rdy->ceed_resource[0]) {  // ceed
     PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));

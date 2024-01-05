@@ -138,28 +138,28 @@ module rdycore
       type(c_ptr), value, intent(in) :: vy
     end function
 
-    integer(c_int) function rdysetwatersource_(rdy, size, watsrc) bind(c, name="RDySetWaterSource")
+    integer(c_int) function rdysetwatersourceforlocalcell_(rdy, size, watsrc) bind(c, name="RDySetWaterSourceForLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
-    integer(c_int) function rdysetxmomentumsource_(rdy, size, xmomsrc) bind(c, name="RDySetXMomentumSource")
+    integer(c_int) function rdysetxmomentumsourceforlocalcell_(rdy, size, xmomsrc) bind(c, name="RDySetXMomentumSourceForLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: xmomsrc
     end function
 
-    integer(c_int) function rdysetymomentumsource_(rdy, size, ymomsrc) bind(c, name="RDySetYMomentumSource")
+    integer(c_int) function rdysetymomentumsourceforlocalcell_(rdy, size, ymomsrc) bind(c, name="RDySetYMomentumSourceForLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
-    integer(c_int) function rdysetmanningn_(rdy, size, n) bind(c, name="RDySetManningN")
+    integer(c_int) function rdysetmanningnforlocalcell_(rdy, size, n) bind(c, name="RDySetManningNForLocalCell")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
@@ -339,36 +339,36 @@ contains
     ierr = rdygetyvelocity_(rdy_%c_rdy, c_loc(vy))
   end subroutine
 
-  subroutine RDySetWaterSource(rdy_, size, watsrc, ierr)
+  subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
     integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetwatersource_(rdy_%c_rdy, size, c_loc(watsrc))
+    ierr = rdysetwatersourceforlocalcell_(rdy_%c_rdy, size, c_loc(watsrc))
   end subroutine
 
-  subroutine RDySetXMomentumSource(rdy_, size, xmomsrc, ierr)
+  subroutine RDySetXMomentumSourceForLocalCell(rdy_, size, xmomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
     integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: xmomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetxmomentumsource_(rdy_%c_rdy, size, c_loc(xmomsrc))
+    ierr = rdysetxmomentumsourceforlocalcell_(rdy_%c_rdy, size, c_loc(xmomsrc))
   end subroutine
 
-  subroutine RDySetYMomentumSource(rdy_, size, ymomsrc, ierr)
+  subroutine RDySetYMomentumSourceForLocalCell(rdy_, size, ymomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
     integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetymomentumsource_(rdy_%c_rdy, size, c_loc(ymomsrc))
+    ierr = rdysetymomentumsourceforlocalcell_(rdy_%c_rdy, size, c_loc(ymomsrc))
   end subroutine
 
-  subroutine RDySetManningN(rdy_, size, n, ierr)
+  subroutine RDySetManningNForLocalCell(rdy_, size, n, ierr)
     type(RDy),       intent(inout)       :: rdy_
     integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetmanningn_(rdy_%c_rdy, size, c_loc(n))
+    ierr = rdysetmanningnforlocalcell_(rdy_%c_rdy, size, c_loc(n))
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

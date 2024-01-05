@@ -71,10 +71,10 @@ PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy, const PetscInt, c
 PETSC_EXTERN PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy, const PetscInt, const PetscInt, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetXVelocity(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetYVelocity(RDy, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetWaterSource(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetXMomentumSource(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetYMomentumSource(RDy, const PetscInt, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDySetManningN(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCell(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy, const PetscInt, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDySetManningNForLocalCell(RDy, const PetscInt, PetscReal*);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {
