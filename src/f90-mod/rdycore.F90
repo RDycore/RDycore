@@ -138,28 +138,32 @@ module rdycore
       type(c_ptr), value, intent(in) :: vy
     end function
 
-    integer(c_int) function rdysetwatersource_(rdy, watsrc) bind(c, name="RDySetWaterSource")
+    integer(c_int) function rdysetwatersource_(rdy, size, watsrc) bind(c, name="RDySetWaterSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+      PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
-    integer(c_int) function rdysetxmomentumsource_(rdy, xmomsrc) bind(c, name="RDySetXMomentumSource")
+    integer(c_int) function rdysetxmomentumsource_(rdy, size, xmomsrc) bind(c, name="RDySetXMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+      PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: xmomsrc
     end function
 
-    integer(c_int) function rdysetymomentumsource_(rdy, ymomsrc) bind(c, name="RDySetYMomentumSource")
+    integer(c_int) function rdysetymomentumsource_(rdy, size, ymomsrc) bind(c, name="RDySetYMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+      PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
-    integer(c_int) function rdysetmanningn_(rdy, watsrc) bind(c, name="RDySetManningN")
+    integer(c_int) function rdysetmanningn_(rdy, size, n) bind(c, name="RDySetManningN")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      type(c_ptr), value, intent(in) :: watsrc
+      PetscInt, value, intent(in)    :: size
+      type(c_ptr), value, intent(in) :: n
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -335,32 +339,36 @@ contains
     ierr = rdygetyvelocity_(rdy_%c_rdy, c_loc(vy))
   end subroutine
 
-  subroutine RDySetWaterSource(rdy_, watsrc, ierr)
+  subroutine RDySetWaterSource(rdy_, size, watsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetwatersource_(rdy_%c_rdy, c_loc(watsrc))
+    ierr = rdysetwatersource_(rdy_%c_rdy, size, c_loc(watsrc))
   end subroutine
 
-  subroutine RDySetXMomentumSource(rdy_, xmomsrc, ierr)
+  subroutine RDySetXMomentumSource(rdy_, size, xmomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: xmomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetxmomentumsource_(rdy_%c_rdy, c_loc(xmomsrc))
+    ierr = rdysetxmomentumsource_(rdy_%c_rdy, size, c_loc(xmomsrc))
   end subroutine
 
-  subroutine RDySetYMomentumSource(rdy_, ymomsrc, ierr)
+  subroutine RDySetYMomentumSource(rdy_, size, ymomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    integer,         intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetymomentumsource_(rdy_%c_rdy, c_loc(ymomsrc))
+    ierr = rdysetymomentumsource_(rdy_%c_rdy, size, c_loc(ymomsrc))
   end subroutine
 
-  subroutine RDySetManningN(rdy_, watsrc, ierr)
+  subroutine RDySetManningN(rdy_, size, n, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    real(RDyDouble), pointer, intent(in) :: watsrc(:)
+    integer,         intent(in)          :: size
+    real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetmanningn_(rdy_%c_rdy, c_loc(watsrc))
+    ierr = rdysetmanningn_(rdy_%c_rdy, size, c_loc(n))
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

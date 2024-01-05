@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
         for (PetscInt icell = 0; icell < n; icell++) {
           rain[icell] = 1.0 / 3600.0 / 1000.0;  // mm/hr --> m/s
         }
-        PetscCall(RDySetWaterSource(rdy, rain));
+        PetscCall(RDySetWaterSource(rdy, n, rain));
       } else {
         PetscReal cur_rain;
         PetscCall(GetCurrentData(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &cur_rain));
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
           for (PetscInt icell = 0; icell < n; icell++) {
             rain[icell] = cur_rain;
           }
-          PetscCall(RDySetWaterSource(rdy, rain));
+          PetscCall(RDySetWaterSource(rdy, n, rain));
         }
       }
 
