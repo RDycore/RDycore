@@ -91,7 +91,8 @@ program rdycore_f90
   PetscErrorCode      :: ierr
   PetscInt            :: n, step, iedge
   PetscInt            :: nbconds, ibcond, num_edges, bcond_type
-  PetscReal, pointer  :: h(:), hu(:), hv(:), rain(:), bc_values(:)
+  PetscReal, pointer  :: h(:), hu(:), hv(:), rain(:), bc_values(:), values(:)
+  PetscInt, pointer   :: nat_id(:)
   PetscReal           :: time, time_step, prev_time, coupling_interval, cur_time
 
   PetscBool           :: rain_specified, bc_specified
@@ -142,7 +143,12 @@ program rdycore_f90
 
       ! allocate arrays for inspecting simulation data
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
-      allocate(h(n), hu(n), hv(n), rain(n))
+      allocate(h(n), hu(n), hv(n), rain(n), values(n), nat_id(n))
+
+      PetscCallA(RDyGetXCentroidOfLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDyGetYCentroidOfLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDyGetZCentroidOfLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDyGetNatIDOfLocalCell(rdy_, n, nat_id, ierr))
 
       ! get information about boundary conditions
       dirc_bc_idx = 0
@@ -230,7 +236,7 @@ program rdycore_f90
         PetscCallA(RDyGetYMomentumOfLocalCell(rdy_, n, hv, ierr))
       end do
 
-      deallocate(h, hu, hv, rain, bc_values)
+      deallocate(h, hu, hv, rain, bc_values, values, nat_id)
       if (rain_specified) then
         PetscCallA(VecRestoreArrayF90(rain_vec, rain_ptr, ierr))
         PetscCallA(VecDestroy(rain_vec, ierr))

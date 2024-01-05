@@ -17,6 +17,7 @@ module rdycore
             RDyGetTime, RDyGetTimeStep, RDyGetStep, RDyGetCouplingInterval, &
             RDySetCouplingInterval, &
             RDyGetHeightOfLocalCell, RDyGetXMomentumOfLocalCell, RDyGetYMomentumOfLocalCell, &
+            RDyGetXCentroidOfLocalCell, RDyGetYCentroidOfLocalCell, RDyGetZCentroidOfLocalCell, RDyGetNatIDOfLocalCell, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
             RDySetManningsNForLocalCell
 
@@ -143,6 +144,34 @@ module rdycore
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hv
+    end function
+
+    integer(c_int) function rdygetxcentroidoflocalcell_(rdy, size, values) bind(c, name="RDyGetXCentroidOfLocalCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetycentroidoflocalcell_(rdy, size, values) bind(c, name="RDyGetYCentroidOfLocalCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetzcentroidoflocalcell_(rdy, size, values) bind(c, name="RDyGetZCentroidOfLocalCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetnatidoflocalcell_(rdy, size, values) bind(c, name="RDyGetNatIDOfLocalCell")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
     end function
 
     integer(c_int) function rdysetwatersourceforlocalcell_(rdy, size, watsrc) bind(c, name="RDySetWaterSourceForLocalCell")
@@ -347,6 +376,38 @@ contains
     real(RDyDouble), pointer, intent(inout) :: hv(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetymomentumoflocalcell_(rdy_%c_rdy, size, c_loc(hv))
+  end subroutine
+
+  subroutine RDyGetXCentroidOfLocalCell(rdy_, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetxcentroidoflocalcell_(rdy_%c_rdy, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetYCentroidOfLocalCell(rdy_, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetycentroidoflocalcell_(rdy_%c_rdy, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetZCentroidOfLocalCell(rdy_, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetzcentroidoflocalcell_(rdy_%c_rdy, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetNatIDOfLocalCell(rdy_, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    PetscInt,        pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetnatidoflocalcell_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
   subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)
