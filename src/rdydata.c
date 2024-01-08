@@ -122,7 +122,7 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetHeightOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
   PetscInt idof = 0;
@@ -130,7 +130,7 @@ PetscErrorCode RDyGetHeightOfLocalCell(RDy rdy, const PetscInt size, PetscReal v
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetXMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetLocalCellXMomentums(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
   PetscInt idof = 1;
@@ -138,7 +138,7 @@ PetscErrorCode RDyGetXMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscRea
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetYMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
   PetscInt idof = 2;
@@ -223,28 +223,28 @@ static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscInt idim = 0;  // x-dim
   PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscInt idim = 1;  // y-dim
   PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscInt idim = 2;  // z-dim
   PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, const PetscInt size, PetscInt values[size]) {
+PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -286,7 +286,7 @@ static PetscErrorCode RDyGetIDimCentroidOfBoundaryEdgeOrCell(RDy rdy, const Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetBoundaryEdgeXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_TRUE;
   PetscInt  idim          = 0;  // x-dim
@@ -294,7 +294,7 @@ PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetYCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetBoundaryEdgeYCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_TRUE;
   PetscInt  idim          = 1;  // y-dim
@@ -302,7 +302,7 @@ PetscErrorCode RDyGetYCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetZCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetBoundaryEdgeZCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_TRUE;
   PetscInt  idim          = 2;  // z-dim
@@ -310,7 +310,7 @@ PetscErrorCode RDyGetZCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetXCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetBoundaryCellXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_FALSE;
   PetscInt  idim          = 0;  // x-dim
@@ -318,7 +318,7 @@ PetscErrorCode RDyGetXCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetBoundaryCellYCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_FALSE;
   PetscInt  idim          = 1;  // y-dim
@@ -326,7 +326,7 @@ PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDyGetBoundaryCellZCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_FALSE;
   PetscInt  idim          = 2;  // z-dim
@@ -334,7 +334,7 @@ PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt values[size]) {
+PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt values[size]) {
   PetscFunctionBegin;
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
   PetscCall(CheckBoundaryNumEdges(rdy, boundary_index, size));
@@ -351,7 +351,7 @@ PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_in
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
+PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));

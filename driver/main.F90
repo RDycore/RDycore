@@ -146,12 +146,12 @@ program rdycore_f90
       allocate(h(n), hu(n), hv(n), rain(n), values(n), nat_id(n))
 
       ! get some mesh attributes
-      PetscCallA(RDyGetXCentroidOfLocalCell(rdy_, n, values, ierr))
-      PetscCallA(RDyGetYCentroidOfLocalCell(rdy_, n, values, ierr))
-      PetscCallA(RDyGetZCentroidOfLocalCell(rdy_, n, values, ierr))
-      PetscCallA(RDyGetNatIDOfLocalCell(rdy_, n, nat_id, ierr))
+      PetscCallA(RDyGetLocalCellXCentroids(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellZCentroids(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, n, nat_id, ierr))
 
-      PetscCallA(RDyGetManningsNForLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellManningsNs(rdy_, n, values, ierr))
       PetscCallA(RDySetManningsNForLocalCell(rdy_, n, values, ierr))
 
       values(:) = 0.d0
@@ -175,13 +175,13 @@ program rdycore_f90
         endif
 
         allocate(nat_id_bnd_cell(num_edges), values_bnd(num_edges))
-        PetscCallA(RDyGetNaturalIDOfBoundaryCell(rdy_, ibcond-1, num_edges, nat_id_bnd_cell, ierr))
-        PetscCallA(RDyGetXCentroidOfBoundaryEdge(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetYCentroidOfBoundaryEdge(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetZCentroidOfBoundaryEdge(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetXCentroidOfBoundaryCell(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetYCentroidOfBoundaryCell(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetZCentroidOfBoundaryCell(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond-1, num_edges, nat_id_bnd_cell, ierr))
+        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
 
         deallocate(nat_id_bnd_cell)
       enddo
@@ -250,9 +250,9 @@ program rdycore_f90
           SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive step index!")
         end if
 
-        PetscCallA(RDyGetHeightOfLocalCell(rdy_, n, h, ierr))
-        PetscCallA(RDyGetXMomentumOfLocalCell(rdy_, n, hu, ierr))
-        PetscCallA(RDyGetYMomentumOfLocalCell(rdy_, n, hv, ierr))
+        PetscCallA(RDyGetLocalCellHeights(rdy_, n, h, ierr))
+        PetscCallA(RDyGetLocalCellXMomentums(rdy_, n, hu, ierr))
+        PetscCallA(RDyGetLocalCellYMomentums(rdy_, n, hv, ierr))
       end do
 
       deallocate(h, hu, hv, rain, bc_values, values, nat_id)

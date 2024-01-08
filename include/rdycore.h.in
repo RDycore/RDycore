@@ -58,24 +58,24 @@ PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, const PetscInt, PetscInt*);
 
-PETSC_EXTERN PetscErrorCode RDyGetHeightOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetXMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetYMomentumOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellXMomentums(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal values[size]);
 
-PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetNatIDOfLocalCell(RDy rdy, const PetscInt size, PetscInt values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt values[size]);
 
-PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryEdge(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetXCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetYCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
-PETSC_EXTERN PetscErrorCode RDyGetZCentroidOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryEdgeXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryEdgeYCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryEdgeZCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellYCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellZCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal values[size]);
 
-PETSC_EXTERN PetscErrorCode RDyGetNaturalIDOfBoundaryCell(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt values[size]);
 
 PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, PetscReal);
 

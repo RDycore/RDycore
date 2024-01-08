@@ -217,9 +217,9 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetStep(rdy, &step));
       PetscCheck(step > 0, comm, PETSC_ERR_USER, "Non-positive step index!");
 
-      PetscCall(RDyGetHeightOfLocalCell(rdy, n, h));
-      PetscCall(RDyGetXMomentumOfLocalCell(rdy, n, hu));
-      PetscCall(RDyGetYMomentumOfLocalCell(rdy, n, hv));
+      PetscCall(RDyGetLocalCellHeights(rdy, n, h));
+      PetscCall(RDyGetLocalCellXMomentums(rdy, n, hu));
+      PetscCall(RDyGetLocalCellYMomentums(rdy, n, hv));
     }
 
     // clean up
