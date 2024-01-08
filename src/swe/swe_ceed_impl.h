@@ -212,7 +212,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
 
 CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
-  const CeedScalar(*water_src)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // rain rate
+  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // rain rate
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
   const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
   const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
@@ -255,9 +255,9 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
       tby = (hv + dt * Fsum_y - dt * bedy) * factor;
     }
 
-    cell[0][i] = riemannf[0][i] + water_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx;
-    cell[2][i] = riemannf[2][i] - bedy - tby;
+    cell[0][i] = riemannf[0][i] + swe_src[0][i];
+    cell[1][i] = riemannf[1][i] - bedx - tbx + swe_src[1][i];
+    cell[2][i] = riemannf[2][i] - bedy - tby + swe_src[2][i];
   }
   return 0;
 }

@@ -160,7 +160,7 @@ struct _p_RDy {
   Vec R;
 
   // source-sink vector
-  Vec water_src;
+  Vec swe_src;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;

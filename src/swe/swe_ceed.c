@@ -28,7 +28,7 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
                                      "Height threshold below which dry condition is assumed");
   CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SWEContext_, gravity), 1, "Accelaration due to gravity");
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, PetscReal tiny_h, CeedOperator *flux_op) {
@@ -120,7 +120,7 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
   CeedVectorDestroy(&geom);
   CeedVectorDestroy(&flux);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
@@ -251,7 +251,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   CeedVectorDestroy(&geom);
   CeedVectorDestroy(&flux);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Creates a flux operator for the shallow water equations that produces
@@ -288,7 +288,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_bound
   }
 
   if (0) CeedOperatorView(*flux_op, stdout);
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // updates the time step used by the SWE flux operator
@@ -299,7 +299,7 @@ PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator flux_op, PetscReal dt) {
   CeedOperatorGetContextFieldLabel(flux_op, "time step", &label);
   CeedOperatorSetContextDouble(flux_op, label, &dt);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Gets the field representing the boundary flux for the given boundary.
@@ -314,7 +314,7 @@ PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary 
   // fetch the field
   CeedOperatorGetFieldByName(boundary_flux_op, "flux", boundary_flux);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Gets the field representing Dirіchlet boundary values for the given boundary.
@@ -329,7 +329,7 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
   // fetch the field
   CeedOperatorGetFieldByName(boundary_flux_op, "q_dirichlet", boundary_values);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary, PetscInt size,
@@ -356,7 +356,7 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 
   // copy the values into the CEED operator
   CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed);
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Given a computational mesh, creates a source operator for the shallow water
@@ -379,10 +379,10 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
   {
     // source term
     CeedQFunction qf;
-    CeedInt       num_comp_geom = 2, num_comp_water_src = 1, num_comp_mannings_n = 1;
+    CeedInt       num_comp_geom = 2, num_comp_swe_src = 3, num_comp_mannings_n = 1;
     CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf);
     CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE);
-    CeedQFunctionAddInput(qf, "water_src", num_comp_water_src, CEED_EVAL_NONE);
+    CeedQFunctionAddInput(qf, "swe_src", num_comp_swe_src, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "mannings_n", num_comp_mannings_n, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE);
     CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE);
@@ -394,9 +394,9 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     CeedQFunctionSetContext(qf, qf_context);
     CeedQFunctionContextDestroy(&qf_context);
 
-    CeedElemRestriction restrict_c, restrict_geom, restrict_water_src, restrict_mannings_n, restrict_riemannf;
+    CeedElemRestriction restrict_c, restrict_geom, restrict_swe, restrict_mannings_n, restrict_riemannf;
     CeedVector          geom;
-    CeedVector          water_src;
+    CeedVector          swe_src;
     CeedVector          mannings_n;
     CeedVector          riemannf;
     {  // Create element restrictions for state
@@ -410,11 +410,11 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL);
       CeedVectorSetValue(geom, 0.0);
 
-      CeedInt strides_water_src[] = {num_comp_water_src, 1, num_comp_water_src};
-      CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_water_src, num_owned_cells * num_comp_water_src, strides_water_src,
-                                       &restrict_water_src);
-      CeedElemRestrictionCreateVector(restrict_water_src, &water_src, NULL);
-      CeedVectorSetValue(water_src, 0.0);
+      CeedInt strides_swe_src[] = {num_comp_swe_src, 1, num_comp_swe_src};
+      CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_swe_src, num_owned_cells * num_comp_swe_src, strides_swe_src,
+                                       &restrict_swe);
+      CeedElemRestrictionCreateVector(restrict_swe, &swe_src, NULL);
+      CeedVectorSetValue(swe_src, 0.0);
 
       CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
       CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n, strides_mannings_n,
@@ -454,7 +454,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedOperator op;
       CeedOperatorCreate(ceed, qf, NULL, NULL, &op);
       CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
-      CeedOperatorSetField(op, "water_src", restrict_water_src, CEED_BASIS_COLLOCATED, water_src);
+      CeedOperatorSetField(op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src);
       CeedOperatorSetField(op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n);
       CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
       CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
@@ -470,7 +470,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
 
   if (0) CeedOperatorView(*source_op, stdout);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // updates the time step used by the SWE source operator
@@ -481,46 +481,91 @@ PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator source_op, PetscReal dt
   CeedOperatorGetContextFieldLabel(source_op, "time step", &label);
   CeedOperatorSetContextDouble(source_op, label, &dt);
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Given a shallow water equations source operator created by
-// CreateSWESourceOperator, fetches the field representing the source of water.
+// CreateSWESourceOperator, fetches the field associated with the field_name.
 // This can be used to implement a time-dependent water source.
-PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator source_op, CeedOperatorField *water_source_field) {
+static PetscErrorCode SWESubOperatorGetOperatorField(CeedOperator op, CeedInt sub_op_idx, const char *field_name, CeedOperatorField *op_field) {
   PetscFunctionBeginUser;
+
+  // check if the requested suboperator index is valid
+  CeedInt num_sub_op;
+  CeedCompositeOperatorGetNumSub(op, &num_sub_op);
+  PetscCheck(sub_op_idx < num_sub_op, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "Trying to extract info about Ceed subporator = %d, but total number of Ceed operators = %d", sub_op_idx, num_sub_op);
 
   // get the source sub-operator responsible for the water source (the first one)
   CeedOperator *sub_ops;
-  CeedCompositeOperatorGetSubList(source_op, &sub_ops);
-  CeedOperator water_source_op = sub_ops[0];
+  CeedCompositeOperatorGetSubList(op, &sub_ops);
+  CeedOperator sub_op = sub_ops[sub_op_idx];
 
   // fetch the field
-  CeedOperatorGetFieldByName(water_source_op, "water_src", water_source_field);
-  PetscFunctionReturn(PETSC_SUCCESS);
+  CeedOperatorGetFieldByName(sub_op, field_name, op_field);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
+
+/// For the given CeedOperator, first extract the 'sub_op_idx'-th sub-operator.
+/// Then, extract the CeedField associated with 'field_name' for the sub-operator.
+/// Finally, set values in the icomp-th component of the CeedField
+/// @param [inout]  op The Ceed source operator
+/// @param [in] sub_op_idx Index of the Ceed sub-operator
+/// @param [in] field_name Name of the field in the Ceed sub-operator
+/// @param [in]  icomp The component of the field whose values will be set
+/// @param [in]  *swe_src The array containing values for the source term
+///
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_idx, const char *field_name, CeedInt icomp, PetscReal *value) {
+  PetscFunctionBeginUser;
+
+  CeedOperatorField swe_field;
+  SWESubOperatorGetOperatorField(op, sub_op_idx, field_name, &swe_field);
+
+  CeedElemRestriction restrict_swe;
+  CeedOperatorFieldGetElemRestriction(swe_field, &restrict_swe);
+
+  CeedVector swe_vec;
+  CeedOperatorFieldGetVector(swe_field, &swe_vec);
+
+  CeedInt num_comp;
+  CeedElemRestrictionGetNumComponents(restrict_swe, &num_comp);
+
+  CeedScalar(*data_ceed)[num_comp];
+  CeedVectorGetArray(swe_vec, CEED_MEM_HOST, (CeedScalar **)&data_ceed);
+
+  CeedSize len;
+  CeedVectorGetLength(swe_vec, &len);
+  for (CeedInt i = 0; i < len / num_comp; ++i) {
+    data_ceed[i][icomp] = value[i];
+  }
+
+  CeedVectorRestoreArray(swe_vec, (CeedScalar **)&data_ceed);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // sets the per-cell water source for the given CEED SWE source operator
-PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *water_src) {
+PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *swe_src) {
   PetscFunctionBeginUser;
+  CeedInt sub_op_idx = 0, icomp = 0;
+  SetOperatorFieldComponent(source_op, sub_op_idx, "swe_src", icomp, swe_src);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
 
-  CeedOperatorField water_src_field;
-  SWESourceOperatorGetWaterSource(source_op, &water_src_field);
-  CeedVector water_src_vec;
-  CeedOperatorFieldGetVector(water_src_field, &water_src_vec);
+// sets the per-cell x-momentum source for the given CEED SWE source operator
+PetscErrorCode SWESourceOperatorSetXMomentumSource(CeedOperator source_op, PetscReal *swe_src) {
+  PetscFunctionBeginUser;
+  CeedInt sub_op_idx = 0, icomp = 1;
+  SetOperatorFieldComponent(source_op, sub_op_idx, "swe_src", icomp, swe_src);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
 
-  CeedInt num_comp_water_src = 1;
-  CeedScalar(*wat_src_ceed)[num_comp_water_src];
-  CeedVectorGetArray(water_src_vec, CEED_MEM_HOST, (CeedScalar **)&wat_src_ceed);
-
-  CeedSize water_src_len;
-  CeedVectorGetLength(water_src_vec, &water_src_len);
-  for (CeedInt i = 0; i < water_src_len; ++i) {
-    wat_src_ceed[i][0] = water_src[i];
-  }
-
-  CeedVectorRestoreArray(water_src_vec, (CeedScalar **)&wat_src_ceed);
-  PetscFunctionReturn(PETSC_SUCCESS);
+// sets the per-cell y-momentum source for the given CEED SWE source operator
+PetscErrorCode SWESourceOperatorSetYMomentumSource(CeedOperator source_op, PetscReal *swe_src) {
+  PetscFunctionBeginUser;
+  CeedInt sub_op_idx = 0, icomp = 2;
+  SetOperatorFieldComponent(source_op, sub_op_idx, "swe_src", icomp, swe_src);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Given a shallow water equations source operator created by
@@ -535,5 +580,12 @@ PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOpera
 
   // fetch the field
   CeedOperatorGetFieldByName(riemannf_source_op, "riemannf", riemann_flux_field);
-  PetscFunctionReturn(PETSC_SUCCESS);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
+
+PetscErrorCode SWESourceOperatorSetManningsN(CeedOperator source_op, PetscReal *n_values) {
+  PetscFunctionBeginUser;
+  CeedInt sub_op_idx = 0, icomp = 0;
+  SetOperatorFieldComponent(source_op, sub_op_idx, "mannings_n", icomp, n_values);
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }

@@ -731,8 +731,14 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt rank) {
+static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
   PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+  PetscMPIInt rank, size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
 
   PetscBool useNatural;
   PetscCall(DMGetUseNatural(dm, &useNatural));
@@ -791,6 +797,23 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
     PetscCall(VecDestroy(&natural));
     PetscCall(VecDestroy(&global));
     PetscCall(VecDestroy(&local));
+
+  } else {
+    if (size == 1) {
+      // Since there only one rank present, DMPlex does has useNatural = PETSC_FALSE
+      // and the natural IDs of cell is the same as the local IDs.
+      Vec      local;
+      PetscInt local_size, num_fields;
+
+      PetscCall(DMCreateLocalVector(dm, &local));
+      PetscCall(VecGetBlockSize(local, &num_fields));
+      PetscCall(VecGetLocalSize(local, &local_size));
+
+      for (PetscInt i = 0; i < local_size / num_fields; ++i) {
+        cells->natural_ids[i] = i;
+      }
+      PetscCall(VecDestroy(&local));
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -836,11 +859,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   }
 
   // Extract natural cell IDs from the DM.
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-  PetscMPIInt rank;
-  MPI_Comm_rank(comm, &rank);
-  PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
+  PetscCall(SaveNaturalCellIDs(dm, &mesh->cells));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

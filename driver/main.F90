@@ -91,7 +91,8 @@ program rdycore_f90
   PetscErrorCode      :: ierr
   PetscInt            :: n, step, iedge
   PetscInt            :: nbconds, ibcond, num_edges, bcond_type
-  PetscReal, pointer  :: h(:), vx(:), vy(:), rain(:), bc_values(:)
+  PetscReal, pointer  :: h(:), hu(:), hv(:), rain(:), bc_values(:), values(:), values_bnd(:)
+  PetscInt, pointer   :: nat_id(:), nat_id_bnd_cell(:)
   PetscReal           :: time, time_step, prev_time, coupling_interval, cur_time
 
   PetscBool           :: rain_specified, bc_specified
@@ -142,7 +143,20 @@ program rdycore_f90
 
       ! allocate arrays for inspecting simulation data
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
-      allocate(h(n), vx(n), vy(n), rain(n))
+      allocate(h(n), hu(n), hv(n), rain(n), values(n), nat_id(n))
+
+      ! get some mesh attributes
+      PetscCallA(RDyGetLocalCellXCentroids(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellZCentroids(rdy_, n, values, ierr))
+      PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, n, nat_id, ierr))
+
+      PetscCallA(RDyGetLocalCellManningsNs(rdy_, n, values, ierr))
+      PetscCallA(RDySetManningsNForLocalCell(rdy_, n, values, ierr))
+
+      values(:) = 0.d0
+      PetscCallA(RDySetXMomentumSourceForLocalCell(rdy_, n, values, ierr))
+      PetscCallA(RDySetYMomentumSourceForLocalCell(rdy_, n, values, ierr))
 
       ! get information about boundary conditions
       dirc_bc_idx = 0
@@ -159,6 +173,17 @@ program rdycore_f90
           dirc_bc_idx = ibcond
           num_edges_dirc_bc = num_edges
         endif
+
+        allocate(nat_id_bnd_cell(num_edges), values_bnd(num_edges))
+        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond-1, num_edges, nat_id_bnd_cell, ierr))
+        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+
+        deallocate(nat_id_bnd_cell)
       enddo
       allocate(bc_values(num_edges_dirc_bc * ndof))
 
@@ -176,14 +201,14 @@ program rdycore_f90
         ! apply a 1 mm/hr rain over the entire domain 
         if (.not. rain_specified) then
           rain(:) = 1.d0/3600.d0/1000.d0
-          PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
+          PetscCallA(RDySetWaterSourceForLocalCell(rdy_, n, rain, ierr))
         else
           PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
           call getcurrentdata(rain_ptr, nrain, cur_time, interpolate_rain, cur_rain_idx, cur_rain)
           if (interpolate_rain .or. cur_rain_idx /= prev_rain_idx) then
             prev_rain_idx = cur_rain_idx
             rain(:) = cur_rain
-            PetscCallA(RDySetWaterSource(rdy_, rain, ierr))
+            PetscCallA(RDySetWaterSourceForLocalCell(rdy_, n, rain, ierr))
           endif
         endif
 
@@ -225,12 +250,12 @@ program rdycore_f90
           SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive step index!")
         end if
 
-        PetscCallA(RDyGetHeight(rdy_, h, ierr))
-        PetscCallA(RDyGetXVelocity(rdy_, vx, ierr))
-        PetscCallA(RDyGetYVelocity(rdy_, vy, ierr))
+        PetscCallA(RDyGetLocalCellHeights(rdy_, n, h, ierr))
+        PetscCallA(RDyGetLocalCellXMomentums(rdy_, n, hu, ierr))
+        PetscCallA(RDyGetLocalCellYMomentums(rdy_, n, hv, ierr))
       end do
 
-      deallocate(h, vx, vy, rain, bc_values)
+      deallocate(h, hu, hv, rain, bc_values, values, nat_id)
       if (rain_specified) then
         PetscCallA(VecRestoreArrayF90(rain_vec, rain_ptr, ierr))
         PetscCallA(VecDestroy(rain_vec, ierr))
