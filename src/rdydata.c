@@ -386,6 +386,6 @@ PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscRe
 
 PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic) {
   PetscFunctionBegin;
-  PetscCall(ic, rdy->X);
+  PetscCall(VecCopy(ic, rdy->X));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
