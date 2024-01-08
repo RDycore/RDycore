@@ -593,7 +593,7 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
 
       f_ptr[icell * ndof + 0] += swe_src_ptr[icell * ndof + 0];
       f_ptr[icell * ndof + 1] += -bedx - tbx + swe_src_ptr[icell * ndof + 1];
-      f_ptr[icell * ndof + 2] += -bedy - tby + swe_src_ptr[icell * ndof + 0];
+      f_ptr[icell * ndof + 2] += -bedy - tby + swe_src_ptr[icell * ndof + 2];
     }
   }
 
