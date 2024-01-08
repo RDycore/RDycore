@@ -5,6 +5,13 @@ add_executable(rdycore_exe
 set_target_properties(rdycore_exe PROPERTIES OUTPUT_NAME rdycore)
 target_link_libraries(rdycore_exe PRIVATE ${RDYCORE_LIBRARIES})
 
+# MMS C driver
+add_executable(rdycore_mms
+  mms.c
+)
+set_target_properties(rdycore_mms PROPERTIES OUTPUT_NAME rdycore_mms)
+target_link_libraries(rdycore_mms PRIVATE ${RDYCORE_LIBRARIES})
+
 # Fortran driver
 add_executable(rdycore_f90_exe
   main.F90
@@ -13,7 +20,7 @@ set_target_properties(rdycore_f90_exe PROPERTIES OUTPUT_NAME rdycore_f90)
 target_include_directories(rdycore_f90_exe PRIVATE ${PROJECT_BINARY_DIR}/src/f90-mod)
 target_link_libraries(rdycore_f90_exe PRIVATE ${RDYCORE_LIBRARIES})
 install(
-  TARGETS rdycore_exe rdycore_f90_exe
+  TARGETS rdycore_exe rdycore_mms rdycore_f90_exe
   DESTINATION bin
 )
 

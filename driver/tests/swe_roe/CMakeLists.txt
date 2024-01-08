@@ -78,3 +78,14 @@ foreach(np 1 2)
     add_test(houston_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -rain Houston1km.rain.${PETSC_ID_TYPE}.bin -bc Houston1km.bc.${PETSC_ID_TYPE}.bin -interpolate_bc ${${config}_args})
   endforeach()
 endforeach()
+
+# mms
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_dx1.yaml
+     ${MESH_DIR}/mms_triangles_dx1.exo
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1) # test on 1, 2 processes
+  foreach(config basic)
+    add_test(mms_file_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${mms_driver} mms_dx1.yaml ${${config}_args})
+  endforeach()
+endforeach()
