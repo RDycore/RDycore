@@ -152,7 +152,8 @@ PetscErrorCode RDySetSourceVecForLocalCell(RDy rdy, Vec src_vec, PetscInt idof, 
   PetscInt ndof;
   PetscCall(VecGetBlockSize(src_vec, &ndof));
 
-  PetscAssert(idof < ndof, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Trying to set values for a block that exceeds total number of blocks");
+  PetscCheck(idof < ndof, rdy->comm, PETSC_ERR_USER, "The block index (%" PetscInt_FMT ") exceeds the total number of blocks = %" PetscInt_FMT ")",
+             idof, ndof);
 
   PetscReal *s;
   PetscCall(VecGetArray(src_vec, &s));
