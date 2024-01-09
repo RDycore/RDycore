@@ -21,7 +21,7 @@ module rdycore
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
-            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell!, RDySetInitialConditions
+            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell, RDySetInitialConditions
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
