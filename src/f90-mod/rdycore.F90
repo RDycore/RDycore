@@ -1,6 +1,6 @@
 ! This file defines the Fortran interface for RDycore.
 #include <petsc/finclude/petscsys.h>
-
+#include <petsc/finclude/petscvec.h>
 
 
 module rdycore
@@ -21,7 +21,7 @@ module rdycore
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
-            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell, RDySetInitialConditions
+            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell!, RDySetInitialConditions
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -267,10 +267,10 @@ module rdycore
       type(c_ptr), value, intent(in) :: n
     end function
 
-    integer(c_int) function rdsetinitialconditions_(rdy, ic) bind(c, name="RDySetInitialConditions")
+    integer(c_int) function rdysetinitialconditions_(rdy, ic) bind(c, name="RDySetInitialConditions")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      Vec,                intent(in) :: ic
+      type(c_ptr), value, intent(in) :: ic
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -586,7 +586,7 @@ contains
 
   subroutine RDySetInitialConditions(rdy_, ic, ierr)
     type(RDy), intent(inout) :: rdy_
-    Vec,       intent(in)    :: ic
+    type(Vec), intent(in)    :: ic
     integer,   intent(out)   :: ierr
     ierr = rdysetinitialconditions_(rdy_%c_rdy, ic)
   end subroutine
