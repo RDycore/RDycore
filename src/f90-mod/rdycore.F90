@@ -487,7 +487,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundaryedgexcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundaryedgexcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryEdgeYCentroids(rdy_, boundary_index, size, values, ierr)
@@ -496,7 +496,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundaryedgeycentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundaryedgeycentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryEdgeZCentroids(rdy_, boundary_index, size, values, ierr)
@@ -505,7 +505,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundaryedgezcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundaryedgezcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellXCentroids(rdy_, boundary_index, size, values, ierr)
@@ -514,7 +514,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellxcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellxcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellYCentroids(rdy_, boundary_index, size, values, ierr)
@@ -523,7 +523,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellycentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellycentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellZCentroids(rdy_, boundary_index, size, values, ierr)
@@ -532,7 +532,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellzcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellzcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellNaturalIDs(rdy_, boundary_index, size, values, ierr)
@@ -541,7 +541,7 @@ contains
     PetscInt,        intent(in)             :: boundary_index
     PetscInt,        pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)
