@@ -267,8 +267,8 @@ program mms_f90
 
       ! allocate memory for manning's N and source sink terms
       allocate(h_source(ncells), hu_source(ncells), hv_source(ncells), mannings_n(ncells))
-      !PetscCallA(RDyCreatePrognosticVector(rdy_, ic_vec, ierr))
-      !PetscCallA(VecGetArrayF90(ic_vec, ic_ptr, ierr))
+      PetscCallA(RDyCreatePrognosticVec(rdy_, ic_vec, ierr))
+      PetscCallA(VecGetArrayF90(ic_vec, ic_ptr, ierr))
 
       cur_time = 0.d0
       do icell = 1, ncells
@@ -277,12 +277,12 @@ program mms_f90
         call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HV, hv_source(icell))
         call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), N, mannings_n(icell))
 
-        !ic_ptr((icell - 1)*3 + 1) = h_source(icell)
-        !ic_ptr((icell - 1)*3 + 2) = hu_source(icell)
-        !ic_ptr((icell - 1)*3 + 3) = hv_source(icell)
+        ic_ptr((icell - 1)*3 + 1) = h_source(icell)
+        ic_ptr((icell - 1)*3 + 2) = hu_source(icell)
+        ic_ptr((icell - 1)*3 + 3) = hv_source(icell)
       enddo
 
-      !PetscCallA(VecRestoreArrayF90(ic_vec, ic_ptr, ierr))
+      PetscCallA(VecRestoreArrayF90(ic_vec, ic_ptr, ierr))
 
       PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
       PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));

@@ -86,7 +86,7 @@ PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const Pet
 PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic);
 
-PETSC_EXTERN PetscErrorCode RDyCreatePrognosticVector(RDy rdy, Vec *prog_vec);
+PETSC_EXTERN PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {

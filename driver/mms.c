@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
 
     Vec ic_vec;
     PetscScalar *ic_ptr;
-    PetscCall(RDyCreatePrognosticVector(rdy, &ic_vec));
+    PetscCall(RDyCreatePrognosticVec(rdy, &ic_vec));
 
     PetscCall(VecGetArray(ic_vec, &ic_ptr));
     for (PetscInt icell = 0; icell < ncells; icell++) {

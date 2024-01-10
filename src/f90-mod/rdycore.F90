@@ -21,7 +21,8 @@ module rdycore
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
-            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell, RDySetInitialConditions
+            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell, RDySetInitialConditions, &
+            RDyCreatePrognosticVec
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -272,6 +273,13 @@ module rdycore
       use petscvec
       type(c_ptr), value, intent(in) :: rdy
       PetscFortranAddr               :: ic
+    end function
+
+    integer(c_int) function rdycreateprognosticvec_(rdy, prog_vec) bind(c, name="RDyCreatePrognosticVec")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr), value, intent(in) :: rdy
+      PetscFortranAddr               :: prog_vec
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -591,6 +599,14 @@ contains
     type(tVec), value, intent(in)  :: ic  ! Vec
     integer,   intent(out)         :: ierr
     ierr = rdysetinitialconditions_(rdy_%c_rdy, ic%v)
+  end subroutine
+
+  subroutine RDyCreatePrognosticVec(rdy_, prog_vec, ierr)
+    use petscvec
+    type(RDy), intent(inout) :: rdy_
+    type(tVec), pointer, intent(out)  :: prog_vec  ! Vec
+    integer,   intent(out)   :: ierr
+    ierr = rdycreateprognosticvec_(rdy_%c_rdy, c_loc(prog_vec%v))
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

@@ -390,7 +390,7 @@ PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyCreatePrognosticVector(RDy rdy, Vec *prog_vec) {
+PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
   PetscFunctionBegin;
   PetscCall(VecDuplicate(rdy->X, prog_vec));
   PetscFunctionReturn(PETSC_SUCCESS);
