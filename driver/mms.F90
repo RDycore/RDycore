@@ -285,7 +285,7 @@ program mms_f90
       !PetscCallA(VecRestoreArrayF90(ic_vec, ic_ptr, ierr))
 
       PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
-      !PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
+      PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
 
       ndof = 3
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria

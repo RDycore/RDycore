@@ -269,8 +269,9 @@ module rdycore
 
     integer(c_int) function rdysetinitialconditions_(rdy, ic) bind(c, name="RDySetInitialConditions")
       use iso_c_binding, only: c_int, c_ptr
+      use petscvec
       type(c_ptr), value, intent(in) :: rdy
-      type(c_ptr), value, intent(in) :: ic
+      PetscFortranAddr               :: ic
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -587,9 +588,9 @@ contains
   subroutine RDySetInitialConditions(rdy_, ic, ierr)
     use petscvec
     type(RDy), intent(inout)       :: rdy_
-    type(c_ptr), value, intent(in) :: ic  ! Vec
+    type(tVec), value, intent(in)  :: ic  ! Vec
     integer,   intent(out)         :: ierr
-    ierr = rdysetinitialconditions_(rdy_%c_rdy, ic)
+    ierr = rdysetinitialconditions_(rdy_%c_rdy, ic%v)
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)
