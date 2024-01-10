@@ -1,4 +1,4 @@
-module driver
+module mms_driver
 #include <petsc/finclude/petsc.h>
   use petsc
   implicit none
@@ -22,20 +22,20 @@ module driver
   PetscInt, parameter :: DZ_DY = 17
   PetscInt, parameter :: N     = 18
 
-  contains
+contains
   subroutine usage()
     print *, "rdycore_mms_f90: usage:"
     print *, "rdycore_mms_f90 <input.yaml>"
     print *, ""
   end subroutine
 
-end  module
+end module mms_driver
 
 module problem1
 
 #include <petsc/finclude/petsc.h>
   use petsc
-  use driver
+  use mms_driver
   implicit none
 
   PetscReal, parameter :: GRAVITY = 9.806d0
@@ -200,7 +200,7 @@ module problem1
 
     end subroutine problem1_dirichletvalue
 
-    end module problem1
+end module problem1
 
 program mms_f90
 
@@ -208,7 +208,7 @@ program mms_f90
 #include <finclude/rdycore.h>
 
   use rdycore
-  use driver
+  use mms_driver
   use petsc
   use problem1
 
