@@ -216,7 +216,7 @@ program mms_f90
 
   character(len=1024) :: config_file
   type(RDy)           :: rdy_
-  PetscInt            :: icell, ncells, nedges, nbcs, bc_type
+  PetscInt            :: icell, ncells, nedges, nbcs, ndof, bc_type
   PetscInt, parameter :: bc_idx = 1
   PetscReal           :: cur_time
   PetscReal, pointer  :: xc_cell(:), yc_cell(:)
@@ -287,7 +287,7 @@ program mms_f90
       PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
       !PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
 
-
+      ndof = 3
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
         PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
 
@@ -300,7 +300,7 @@ program mms_f90
         PetscCallA(RDySetYMomentumSourceForLocalCell(rdy_, ncells, hv_source, ierr))
 
         ! set dirchlet BC
-        PetscCallA(RDySetDirichletBoundaryValues(rdy_, bc_idx, nedges, 3, bc_values, ierr))
+        PetscCallA(RDySetDirichletBoundaryValues(rdy_, bc_idx, nedges, ndof, bc_values, ierr))
 
         ! advance the solution by the coupling interval
         PetscCallA(RDyAdvance(rdy_, ierr))

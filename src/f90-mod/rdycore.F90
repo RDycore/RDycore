@@ -586,10 +586,10 @@ contains
 
   subroutine RDySetInitialConditions(rdy_, ic, ierr)
     use petscvec
-    type(RDy), intent(inout) :: rdy_
-    Vec, intent(in)    :: ic
-    integer,   intent(out)   :: ierr
-    !ierr = rdysetinitialconditions_(rdy_%c_rdy, ic)
+    type(RDy), intent(inout)       :: rdy_
+    type(c_ptr), value, intent(in) :: ic  ! Vec
+    integer,   intent(out)         :: ierr
+    ierr = rdysetinitialconditions_(rdy_%c_rdy, ic)
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)
