@@ -283,6 +283,7 @@ program mms_f90
       enddo
 
       PetscCallA(VecRestoreArrayF90(ic_vec, ic_ptr, ierr))
+      PetscCallA(VecView(ic_vec,PETSC_VIEWER_STDOUT_SELF,ierr))
 
       PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
       PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
