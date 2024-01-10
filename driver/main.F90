@@ -175,13 +175,13 @@ program rdycore_f90
         endif
 
         allocate(nat_id_bnd_cell(num_edges), values_bnd(num_edges))
-        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond-1, num_edges, nat_id_bnd_cell, ierr))
-        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond, num_edges, nat_id_bnd_cell, ierr))
+        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
 
         deallocate(nat_id_bnd_cell)
       enddo
