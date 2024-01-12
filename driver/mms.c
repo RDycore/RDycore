@@ -215,9 +215,11 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetup(rdy));
 
     PetscInt   ncells = 0;
-    PetscReal *xc_cell, *yc_cell;
+    PetscReal *xc_cell, *yc_cell, *area_cell;
     PetscInt  *nat_id_cell;
     PetscReal *h_source, *hu_source, *hv_source;
+    PetscReal *h_soln, *hu_soln, *hv_soln;
+    PetscReal *h_anal, *hu_anal, *hv_anal;
 
     PetscInt   nedges = 0;
     PetscReal *xc_edge, *yc_edge;
@@ -233,14 +235,22 @@ int main(int argc, char *argv[]) {
 
       PetscCalloc1(ncells, &xc_cell);
       PetscCalloc1(ncells, &yc_cell);
+      PetscCalloc1(ncells, &area_cell);
       PetscCalloc1(ncells, &nat_id_cell);
       PetscCalloc1(ncells, &h_source);
       PetscCalloc1(ncells, &hu_source);
       PetscCalloc1(ncells, &hv_source);
+      PetscCalloc1(ncells, &h_soln);
+      PetscCalloc1(ncells, &hu_soln);
+      PetscCalloc1(ncells, &hv_soln);
+      PetscCalloc1(ncells, &h_anal);
+      PetscCalloc1(ncells, &hu_anal);
+      PetscCalloc1(ncells, &hv_anal);
 
       PetscCall(RDyGetLocalCellXCentroids(rdy, ncells, xc_cell));
       PetscCall(RDyGetLocalCellYCentroids(rdy, ncells, yc_cell));
       PetscCall(RDyGetLocalCellNaturalIDs(rdy, ncells, nat_id_cell));
+      PetscCall(RDyGetLocalCellAreas(rdy, ncells, area_cell));
     }
 
     // get information about boundary conditions
@@ -287,12 +297,12 @@ int main(int argc, char *argv[]) {
 
     PetscCall(VecGetArray(ic_vec, &ic_ptr));
     for (PetscInt icell = 0; icell < ncells; icell++) {
-      PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], H, &h_source[icell]));
-      PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], HU, &hu_source[icell]));
-      PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], HV, &hv_source[icell]));
-      ic_ptr[icell * 3 + 0] = h_source[icell];
-      ic_ptr[icell * 3 + 1] = hu_source[icell];
-      ic_ptr[icell * 3 + 2] = hv_source[icell];
+      PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], H, &h_anal[icell]));
+      PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], HU, &hu_anal[icell]));
+      PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], HV, &hv_anal[icell]));
+      ic_ptr[icell * 3 + 0] = h_anal[icell];
+      ic_ptr[icell * 3 + 1] = hu_anal[icell];
+      ic_ptr[icell * 3 + 2] = hv_anal[icell];
     }
     PetscCall(VecRestoreArray(ic_vec, &ic_ptr));
     PetscCall(RDySetInitialConditions(rdy, ic_vec));
@@ -316,12 +326,84 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyAdvance(rdy));
     }
 
+    PetscCall(RDyGetLocalCellHeights(rdy, ncells, h_soln));
+    PetscCall(RDyGetLocalCellXMomentums(rdy, ncells, hu_soln));
+    PetscCall(RDyGetLocalCellYMomentums(rdy, ncells, hv_soln));
+
+    PetscReal err[3], err1[3], err1_glb[3], err2[3], err2_glb[3], errm[3], errm_glb[3];
+    PetscReal area_cell_sum = 0.0, area_cell_sum_glb = 0.0;
+
+    for (PetscInt idof = 0; idof < 3; idof++) {
+      err1[idof] = 0.0;
+      err2[idof] = 0.0;
+      errm[idof] = 0.0;
+    }
+
+    PetscCall(RDyGetTime(rdy, &cur_time));
+    for (PetscInt icell = 0; icell < ncells; icell++) {
+      PetscCall(Problem1_GetData(&pdata, cur_time, xc_cell[icell], yc_cell[icell], H, &h_anal[icell]));
+      PetscCall(Problem1_GetData(&pdata, cur_time, xc_cell[icell], yc_cell[icell], HU, &hu_anal[icell]));
+      PetscCall(Problem1_GetData(&pdata, cur_time, xc_cell[icell], yc_cell[icell], HV, &hv_anal[icell]));
+
+      err[0] = PetscAbs(h_soln[icell] - h_anal[icell]);
+      err[1] = PetscAbs(hu_soln[icell] - hu_anal[icell]);
+      err[2] = PetscAbs(hv_soln[icell] - hv_anal[icell]);
+
+      area_cell_sum += area_cell[icell];
+
+      for (PetscInt idof = 0; idof < 3; idof++) {
+        err1[idof] += err[idof] * area_cell[icell];
+        err2[idof] += PetscPowReal(err[idof], 2.0) * area_cell[icell];
+        errm[idof] = PetscMax(err[idof], errm[idof]);
+      }
+    }
+
+    PetscInt ncells_glb;
+    PetscCall(MPI_Reduce(&ncells, &ncells_glb, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD));
+
+    PetscCall(MPI_Reduce(&err1, &err1_glb, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+    PetscCall(MPI_Reduce(&err2, &err2_glb, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+    PetscCall(MPI_Reduce(&errm, &errm_glb, 3, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD));
+
+    PetscCall(MPI_Reduce(&area_cell_sum, &area_cell_sum_glb, 1, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD));
+
+    PetscInt myrank;
+    PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+    if (!myrank) {
+      for (PetscInt idof = 0; idof < 3; idof++) {
+        err2_glb[idof] = PetscPowReal(err2_glb[idof], 0.5);
+      }
+
+      printf("Avg-cell-area    : %18.16f\n",area_cell_sum_glb/ncells_glb);
+      printf("Avg-length-scale : %18.16f\n",PetscPowReal(area_cell_sum_glb/ncells_glb, 0.5));
+
+      printf("Error-Norm-1     : ");
+      for (PetscInt idof = 0; idof < 3; idof++) printf ("%18.16f ", err1_glb[idof]);
+      printf("\n");
+
+      printf("Error-Norm-2     : ");
+      for (PetscInt idof = 0; idof < 3; idof++) printf ("%18.16f ", err2_glb[idof]);
+      printf("\n");
+
+      printf("Error-Norm-Max   : ");
+      for (PetscInt idof = 0; idof < 3; idof++) printf ("%18.16f ", errm_glb[idof]);
+      printf("\n");
+
+    }
+
     // free up memory
     PetscFree(xc_cell);
     PetscFree(yc_cell);
+    PetscFree(area_cell);
     PetscFree(h_source);
     PetscFree(hu_source);
     PetscFree(hv_source);
+    PetscFree(h_soln);
+    PetscFree(hu_soln);
+    PetscFree(hv_soln);
+    PetscFree(h_anal);
+    PetscFree(hu_anal);
+    PetscFree(hv_anal);
     PetscFree(xc_edge);
     PetscFree(yc_edge);
     PetscFree(xc_bnd_cell);

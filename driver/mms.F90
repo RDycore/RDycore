@@ -216,15 +216,20 @@ program mms_f90
 
   character(len=1024) :: config_file
   type(RDy)           :: rdy_
-  PetscInt            :: icell, ncells, nedges, nbcs, ndof, bc_type
+  PetscInt            :: myrank
+  PetscInt            :: icell, ncells, nedges, nbcs, bc_type, ncells_glb, idof
   PetscInt, parameter :: bc_idx = 1
   PetscReal           :: cur_time
-  PetscReal, pointer  :: xc_cell(:), yc_cell(:)
+  PetscReal, pointer  :: xc_cell(:), yc_cell(:), area_cell(:)
   PetscReal, pointer  :: h_source(:), hu_source(:), hv_source(:), mannings_n(:)
   PetscReal, pointer  :: xc_edge(:), yc_edge(:), xc_bnd_cell(:), yc_bnd_cell(:), h_bnd(:), hu_bnd(:), hv_bnd(:), bc_values(:)
+  PetscReal, pointer  :: h_soln(:), hu_soln(:), hv_soln(:)
+  PetscReal, pointer  :: h_anal(:), hu_anal(:), hv_anal(:)
+  PetscInt, parameter :: ndof = 3
+  PetscReal           :: err(3), err1(3), err1_glb(3), err2(3), err2_glb(3), errm(3), errm_glb(3), area_cell_sum, area_cell_sum_glb
   Vec                 :: ic_vec
-  PetscScalar, pointer :: ic_ptr(:)
-  PetscErrorCode      :: ierr
+  PetscScalar, pointer:: ic_ptr(:)
+  PetscErrorCode       :: ierr
 
   if (command_argument_count() < 1) then
     call usage()
@@ -241,9 +246,10 @@ program mms_f90
 
       ! get information about cells
       PetscCallA(RDyGetNumLocalCells(rdy_, ncells, ierr))
-      allocate(xc_cell(ncells), yc_cell(ncells))
+      allocate(xc_cell(ncells), yc_cell(ncells), area_cell(ncells))
       PetscCallA(RDyGetLocalCellXCentroids(rdy_, ncells, xc_cell, ierr))
       PetscCallA(RDyGetLocalCellYCentroids(rdy_, ncells, yc_cell, ierr))
+      PetscCallA(RDyGetLocalCellAreas(rdy_, ncells, area_cell, ierr))
 
       PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbcs, ierr))
       if (nbcs /= 1) then
@@ -270,16 +276,19 @@ program mms_f90
       PetscCallA(RDyCreatePrognosticVec(rdy_, ic_vec, ierr))
       PetscCallA(VecGetArrayF90(ic_vec, ic_ptr, ierr))
 
+      allocate(h_soln(ncells), hu_soln(ncells), hv_soln(ncells))
+      allocate(h_anal(ncells), hu_anal(ncells), hv_anal(ncells))
+
       cur_time = 0.d0
       do icell = 1, ncells
-        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), H, h_source(icell))
-        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HU, hu_source(icell))
-        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HV, hv_source(icell))
+        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), H, h_anal(icell))
+        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HU, hu_anal(icell))
+        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HV, hv_anal(icell))
         call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), N, mannings_n(icell))
 
-        ic_ptr((icell - 1)*3 + 1) = h_source(icell)
-        ic_ptr((icell - 1)*3 + 2) = hu_source(icell)
-        ic_ptr((icell - 1)*3 + 3) = hv_source(icell)
+        ic_ptr((icell - 1)*3 + 1) = h_anal(icell)
+        ic_ptr((icell - 1)*3 + 2) = hu_anal(icell)
+        ic_ptr((icell - 1)*3 + 3) = hv_anal(icell)
       enddo
 
       PetscCallA(VecRestoreArrayF90(ic_vec, ic_ptr, ierr))
@@ -287,7 +296,6 @@ program mms_f90
       PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
       PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
 
-      ndof = 3
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
         PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
 
@@ -307,8 +315,61 @@ program mms_f90
 
       enddo
 
+      ! compute error norms
+
+      PetscCallA(RDyGetLocalCellHeights(rdy_, ncells, h_soln, ierr))
+      PetscCallA(RDyGetLocalCellXMomentums(rdy_, ncells, hu_soln, ierr))
+      PetscCallA(RDyGetLocalCellYMomentums(rdy_, ncells, hv_soln, ierr))
+
+      PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
+
+      err1(:) = 0.d0
+      err2(:) = 0.d0
+      errm(:) = 0.d0
+      area_cell_sum = 0.d0
+
+      do icell = 1, ncells
+        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), H, h_anal(icell))
+        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HU, hu_anal(icell))
+        call problem1_getdata(cur_time, xc_cell(icell), yc_cell(icell), HV, hv_anal(icell))
+
+        err(1) = abs(h_soln(icell) - h_anal(icell))
+        err(2) = abs(hu_soln(icell) - hu_anal(icell))
+        err(3) = abs(hv_soln(icell) - hv_anal(icell))
+        area_cell_sum = area_cell_sum + area_cell(icell)
+
+        do idof = 1, ndof
+          err1(idof) = err1(idof) + err(idof) * area_cell(icell)
+          err2(idof) = err2(idof) + (err(idof) ** 2.d0) * area_cell(icell)
+          errm(idof) = max(err(idof), errm(idof))
+        enddo
+      enddo
+
+      PetscCallA(MPI_Reduce(ncells, ncells_glb, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
+
+      PetscCallA(MPI_Reduce(err1, err1_glb, ndof, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
+      PetscCallA(MPI_Reduce(err2, err2_glb, ndof, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
+      PetscCallA(MPI_Reduce(errm, errm_glb, ndof, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD, ierr))
+
+      PetscCallA(MPI_Reduce(area_cell_sum, area_cell_sum_glb, 1, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD, ierr))
+
+      PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD, myrank, ierr))
+      if (myrank == 0) then
+        do idof = 1, ndof
+          err2_glb(idof) = err2_glb(idof) ** 0.5d0
+        enddo
+        write(*,*)'Avg-cell-area    :', area_cell_sum_glb/ncells_glb
+        write(*,*)'Avg-length-scale :', (area_cell_sum_glb/ncells_glb) ** 0.5d0
+        write(*,*)'Error-Norm-1     :', err1_glb(:)
+        write(*,*)'Error-Norm-2     :', err2_glb(:)
+        write(*,*)'Error-Norm-Max   :', errm_glb(:)
+      endif
+
+      ! free up memory
       deallocate(xc_cell, yc_cell, h_source, hu_source, hv_source)
       deallocate(xc_edge, yc_edge, xc_bnd_cell, yc_bnd_cell, h_bnd, hu_bnd, hv_bnd, bc_values)
+      deallocate(h_soln, hu_soln, hv_soln)
+      deallocate(h_anal, hu_anal, hv_anal)
 
       ! shut off
       PetscCallA(RDyFinalize(ierr))
