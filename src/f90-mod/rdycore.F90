@@ -17,7 +17,8 @@ module rdycore
             RDyGetTime, RDyGetTimeStep, RDyGetStep, RDyGetCouplingInterval, &
             RDySetCouplingInterval, &
             RDyGetLocalCellHeights, RDyGetLocalCellXMomentums, RDyGetLocalCellYMomentums, &
-            RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, RDyGetLocalCellNaturalIDs, &
+            RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
+            RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
@@ -164,6 +165,13 @@ module rdycore
     end function
 
     integer(c_int) function rdygetlocalcellzcentroids_(rdy, size, values) bind(c, name="RDyGetLocalCellZCentroids")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetlocalcellareas_(rdy, size, values) bind(c, name="RDyGetLocalCellAreas")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
@@ -480,6 +488,14 @@ contains
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetlocalcellzcentroids_(rdy_%c_rdy, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetLocalCellAreas(rdy_, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetlocalcellareas_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetLocalCellNaturalIDs(rdy_, size, values, ierr)

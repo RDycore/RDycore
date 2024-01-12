@@ -245,6 +245,21 @@ PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal values[size]) {
+  PetscFunctionBegin;
+  PetscCall(CheckNumLocalCells(rdy, size));
+
+  RDyCells *cells = &rdy->mesh.cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (cells->is_local[icell]) {
+      values[count++] = cells->areas[icell];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt values[size]) {
   PetscFunctionBegin;
 
