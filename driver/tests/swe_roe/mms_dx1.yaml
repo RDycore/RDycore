@@ -8,7 +8,7 @@ numerics:
   riemann : roe
 
 logging:
-  level: detail
+  level: none
 
 time:
   time_step        : 0.01
