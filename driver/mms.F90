@@ -216,7 +216,7 @@ program mms_f90
 
   character(len=1024) :: config_file
   type(RDy)           :: rdy_
-  PetscInt            :: myrank
+  PetscMPIInt         :: myrank
   PetscInt            :: icell, ncells, nedges, nbcs, bc_type, ncells_glb, idof
   PetscInt, parameter :: bc_idx = 1
   PetscReal           :: cur_time
@@ -238,6 +238,8 @@ program mms_f90
 
     ! initialize subsystems
     PetscCallA(RDyInit(ierr))
+
+    PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD, myrank, ierr))
 
     if (trim(config_file) /= trim('-help')) then
       ! create rdycore and set it up with the given file
@@ -361,7 +363,6 @@ program mms_f90
 
       PetscCallA(MPI_Reduce(area_cell_sum, area_cell_sum_glb, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
 
-      PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD, myrank, ierr))
       if (myrank == 0) then
         do idof = 1, ndof
           err2_glb(idof) = err2_glb(idof) ** 0.5d0

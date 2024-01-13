@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
   // initialize subsystems
   PetscCall(RDyInit(argc, argv, help_str));
 
-  PetscInt myrank, commsize;
+  PetscMPIInt myrank, commsize;
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &commsize));
 
