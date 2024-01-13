@@ -369,7 +369,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    PetscInt ncells_glb;
+    PetscMPIInt ncells_glb;
     PetscCall(MPI_Reduce(&ncells, &ncells_glb, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD));
 
     PetscCall(MPI_Reduce(&err1, &err1_glb, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
@@ -383,7 +383,6 @@ int main(int argc, char *argv[]) {
         err2_glb[idof] = PetscPowReal(err2_glb[idof], 0.5);
       }
 
-      printf("ncells_glb = %d; area_cell_sum_glb = %f\n",ncells_glb,area_cell_sum_glb);
       printf("Avg-cell-area    : %18.16f\n",area_cell_sum_glb/ncells_glb);
       printf("Avg-length-scale : %18.16f\n",PetscPowReal(area_cell_sum_glb/ncells_glb, 0.5));
 

@@ -217,7 +217,8 @@ program mms_f90
   character(len=1024) :: config_file
   type(RDy)           :: rdy_
   PetscMPIInt         :: myrank
-  PetscInt            :: icell, ncells, nedges, nbcs, bc_type, ncells_glb, idof
+  PetscInt            :: icell, ncells, nedges, nbcs, bc_type, idof
+  PetscMPIInt         :: ncells_glb
   PetscInt, parameter :: bc_idx = 1
   PetscReal           :: cur_time
   PetscReal, pointer  :: xc_cell(:), yc_cell(:), area_cell(:)
@@ -355,13 +356,13 @@ program mms_f90
         enddo
       enddo
 
-      PetscCallA(MPI_Reduce(ncells, ncells_glb, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
+      PetscCallMPIA(MPI_Reduce(ncells, ncells_glb, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
 
-      PetscCallA(MPI_Reduce(err1, err1_glb, ndof, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
-      PetscCallA(MPI_Reduce(err2, err2_glb, ndof, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
-      PetscCallA(MPI_Reduce(errm, errm_glb, ndof, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD, ierr))
+      PetscCallMPIA(MPI_Allreduce(err1, err1_glb, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD, ierr))
+      PetscCallMPIA(MPI_Allreduce(err2, err2_glb, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD, ierr))
+      PetscCallMPIA(MPI_Allreduce(errm, errm_glb, 3, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD, ierr))
 
-      PetscCallA(MPI_Reduce(area_cell_sum, area_cell_sum_glb, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
+      PetscCallMPIA(MPI_Reduce(area_cell_sum, area_cell_sum_glb, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
 
       if (myrank == 0) then
         do idof = 1, ndof
