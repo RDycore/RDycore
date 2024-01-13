@@ -204,6 +204,10 @@ int main(int argc, char *argv[]) {
   // initialize subsystems
   PetscCall(RDyInit(argc, argv, help_str));
 
+  PetscInt myrank, commsize;
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &commsize));
+
   if (strcmp(argv[1], "-help")) {  // if given a config file
 
     // create rdycore and set it up with the given file
@@ -257,26 +261,29 @@ int main(int argc, char *argv[]) {
     {
       PetscInt nbcs, bc_type;
       PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
-      PetscCheck(nbcs == 1, comm, PETSC_ERR_USER, "Only expecting one boundary condition to be present in the yaml");
-      PetscCall(RDyGetNumBoundaryEdges(rdy, bc_idx, &nedges));
-      PetscCall(RDyGetBoundaryConditionFlowType(rdy, bc_idx, &bc_type));
-      PetscCheck(bc_type == CONDITION_DIRICHLET, comm, PETSC_ERR_USER, "Only expecting CONDITION_DIRICHLET to be present in the yaml");
+      if (nbcs > 0) {
+        PetscCall(RDyGetNumBoundaryEdges(rdy, bc_idx, &nedges));
+        PetscCall(RDyGetBoundaryConditionFlowType(rdy, bc_idx, &bc_type));
+        PetscCheck(bc_type == CONDITION_DIRICHLET, comm, PETSC_ERR_USER, "Only expecting CONDITION_DIRICHLET to be present in the yaml");
 
-      PetscCalloc1(nedges, &xc_edge);
-      PetscCalloc1(nedges, &yc_edge);
-      PetscCalloc1(nedges, &xc_bnd_cell);
-      PetscCalloc1(nedges, &yc_bnd_cell);
-      PetscCalloc1(nedges, &nat_id_bnd_cell);
-      PetscCalloc1(nedges, &h_bnd);
-      PetscCalloc1(nedges, &hu_bnd);
-      PetscCalloc1(nedges, &hv_bnd);
-      PetscCalloc1(nedges * 3, &bc_values);
+        if (nedges > 0) {
+          PetscCalloc1(nedges, &xc_edge);
+          PetscCalloc1(nedges, &yc_edge);
+          PetscCalloc1(nedges, &xc_bnd_cell);
+          PetscCalloc1(nedges, &yc_bnd_cell);
+          PetscCalloc1(nedges, &nat_id_bnd_cell);
+          PetscCalloc1(nedges, &h_bnd);
+          PetscCalloc1(nedges, &hu_bnd);
+          PetscCalloc1(nedges, &hv_bnd);
+          PetscCalloc1(nedges * 3, &bc_values);
 
-      PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_idx, nedges, xc_edge));
-      PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_idx, nedges, yc_edge));
-      PetscCall(RDyGetBoundaryCellXCentroids(rdy, bc_idx, nedges, xc_bnd_cell));
-      PetscCall(RDyGetBoundaryCellYCentroids(rdy, bc_idx, nedges, yc_bnd_cell));
-      PetscCall(RDyGetBoundaryCellNaturalIDs(rdy, bc_idx, nedges, nat_id_bnd_cell));
+          PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_idx, nedges, xc_edge));
+          PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_idx, nedges, yc_edge));
+          PetscCall(RDyGetBoundaryCellXCentroids(rdy, bc_idx, nedges, xc_bnd_cell));
+          PetscCall(RDyGetBoundaryCellYCentroids(rdy, bc_idx, nedges, yc_bnd_cell));
+          PetscCall(RDyGetBoundaryCellNaturalIDs(rdy, bc_idx, nedges, nat_id_bnd_cell));
+        }
+      }
     }
 
     PetscReal cur_time = 0.0;
@@ -312,7 +319,9 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetTime(rdy, &cur_time));
 
       PetscCall(Problem1_SourceTerm(&pdata, cur_time, ncells, xc_cell, yc_cell, h_source, hu_source, hv_source));
-      PetscCall(Problem1_DirichletValue(&pdata, cur_time, nedges, xc_bnd_cell, yc_bnd_cell, xc_edge, yc_edge, h_bnd, hu_bnd, hv_bnd, bc_values));
+      if (nedges > 0) {
+        PetscCall(Problem1_DirichletValue(&pdata, cur_time, nedges, xc_bnd_cell, yc_bnd_cell, xc_edge, yc_edge, h_bnd, hu_bnd, hv_bnd, bc_values));
+      }
 
       // set the MMS source terms
       PetscCall(RDySetWaterSourceForLocalCell(rdy, ncells, h_source));
@@ -320,7 +329,9 @@ int main(int argc, char *argv[]) {
       PetscCall(RDySetYMomentumSourceForLocalCell(rdy, ncells, hv_source));
 
       // set dirchlet BC
-      PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, bc_values));
+      if (nedges > 0) {
+        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, bc_values));
+      }
 
       // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
@@ -365,15 +376,14 @@ int main(int argc, char *argv[]) {
     PetscCall(MPI_Reduce(&err2, &err2_glb, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
     PetscCall(MPI_Reduce(&errm, &errm_glb, 3, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD));
 
-    PetscCall(MPI_Reduce(&area_cell_sum, &area_cell_sum_glb, 1, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD));
+    PetscCall(MPI_Reduce(&area_cell_sum, &area_cell_sum_glb, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
 
-    PetscInt myrank;
-    PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
     if (!myrank) {
       for (PetscInt idof = 0; idof < 3; idof++) {
         err2_glb[idof] = PetscPowReal(err2_glb[idof], 0.5);
       }
 
+      printf("ncells_glb = %d; area_cell_sum_glb = %f\n",ncells_glb,area_cell_sum_glb);
       printf("Avg-cell-area    : %18.16f\n",area_cell_sum_glb/ncells_glb);
       printf("Avg-length-scale : %18.16f\n",PetscPowReal(area_cell_sum_glb/ncells_glb, 0.5));
 
@@ -404,14 +414,16 @@ int main(int argc, char *argv[]) {
     PetscFree(h_anal);
     PetscFree(hu_anal);
     PetscFree(hv_anal);
-    PetscFree(xc_edge);
-    PetscFree(yc_edge);
-    PetscFree(xc_bnd_cell);
-    PetscFree(yc_bnd_cell);
-    PetscFree(nat_id_bnd_cell);
-    PetscFree(h_bnd);
-    PetscFree(hu_bnd);
-    PetscFree(hv_bnd);
+    if (nedges > 0) {
+      PetscFree(xc_edge);
+      PetscFree(yc_edge);
+      PetscFree(xc_bnd_cell);
+      PetscFree(yc_bnd_cell);
+      PetscFree(nat_id_bnd_cell);
+      PetscFree(h_bnd);
+      PetscFree(hu_bnd);
+      PetscFree(hv_bnd);
+    }
   }
 
   PetscCall(RDyFinalize());

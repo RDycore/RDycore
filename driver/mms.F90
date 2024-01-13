@@ -252,24 +252,28 @@ program mms_f90
       PetscCallA(RDyGetLocalCellAreas(rdy_, ncells, area_cell, ierr))
 
       PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbcs, ierr))
-      if (nbcs /= 1) then
-        SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Only expecting one boundary condition to be present in the yaml")
+
+      nedges = 0
+      if (nbcs > 0) then
+        PetscCallA(RDyGetBoundaryConditionFlowType(rdy_, bc_idx, bc_type, ierr))
+        if (bc_type /= CONDITION_DIRICHLET) then
+          SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Only expecting CONDITION_DIRICHLET to be present in the yaml")
+        endif
+
+        PetscCallA(RDyGetNumBoundaryEdges(rdy_, bc_idx, nedges, ierr))
+
+        if (nedges > 0) then
+          allocate(xc_edge(nedges), yc_edge(nedges), xc_bnd_cell(nedges), yc_bnd_cell(nedges))
+          allocate(h_bnd(nedges), hu_bnd(nedges), hv_bnd(nedges), bc_values(3*nedges))
+  
+          ! get geometric attributes about edges
+          PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, bc_idx, nedges, xc_edge, ierr));
+          PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, bc_idx, nedges, yc_edge, ierr));
+          PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, bc_idx, nedges, xc_bnd_cell, ierr));
+          PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, bc_idx, nedges, yc_bnd_cell, ierr));
+        endif
+
       endif
-
-      PetscCallA(RDyGetBoundaryConditionFlowType(rdy_, bc_idx, bc_type, ierr))
-      if (bc_type /= CONDITION_DIRICHLET) then
-        SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Only expecting CONDITION_DIRICHLET to be present in the yaml")
-      endif
-
-      PetscCallA(RDyGetNumBoundaryEdges(rdy_, bc_idx, nedges, ierr))
-      allocate(xc_edge(nedges), yc_edge(nedges), xc_bnd_cell(nedges), yc_bnd_cell(nedges))
-      allocate(h_bnd(nedges), hu_bnd(nedges), hv_bnd(nedges), bc_values(3*nedges))
-
-      ! get geometric attributes about edges
-      PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, bc_idx, nedges, xc_edge, ierr));
-      PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, bc_idx, nedges, yc_edge, ierr));
-      PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, bc_idx, nedges, xc_bnd_cell, ierr));
-      PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, bc_idx, nedges, yc_bnd_cell, ierr));
 
       ! allocate memory for manning's N and source sink terms
       allocate(h_source(ncells), hu_source(ncells), hv_source(ncells), mannings_n(ncells))
@@ -300,15 +304,19 @@ program mms_f90
         PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
 
         call problem1_sourceterm(cur_time, ncells, xc_cell, yc_cell, h_source, hu_source, hv_source)
-        call problem1_dirichletvalue(cur_time, nedges, xc_bnd_cell, yc_bnd_cell, xc_edge, yc_edge, h_bnd, hu_bnd, hv_bnd, bc_values)
+        if (nedges > 0) then
+          call problem1_dirichletvalue(cur_time, nedges, xc_bnd_cell, yc_bnd_cell, xc_edge, yc_edge, h_bnd, hu_bnd, hv_bnd, bc_values)
+        endif
 
         ! set the MMS source terms
         PetscCallA(RDySetWaterSourceForLocalCell(rdy_, ncells, h_source, ierr))
         PetscCallA(RDySetXMomentumSourceForLocalCell(rdy_, ncells, hu_source, ierr))
         PetscCallA(RDySetYMomentumSourceForLocalCell(rdy_, ncells, hv_source, ierr))
 
-        ! set dirchlet BC
-        PetscCallA(RDySetDirichletBoundaryValues(rdy_, bc_idx, nedges, ndof, bc_values, ierr))
+        if (nedges > 0) then
+          ! set dirchlet BC
+          PetscCallA(RDySetDirichletBoundaryValues(rdy_, bc_idx, nedges, ndof, bc_values, ierr))
+        endif
 
         ! advance the solution by the coupling interval
         PetscCallA(RDyAdvance(rdy_, ierr))
@@ -351,7 +359,7 @@ program mms_f90
       PetscCallA(MPI_Reduce(err2, err2_glb, ndof, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
       PetscCallA(MPI_Reduce(errm, errm_glb, ndof, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD, ierr))
 
-      PetscCallA(MPI_Reduce(area_cell_sum, area_cell_sum_glb, 1, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD, ierr))
+      PetscCallA(MPI_Reduce(area_cell_sum, area_cell_sum_glb, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD, ierr))
 
       PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD, myrank, ierr))
       if (myrank == 0) then
@@ -367,7 +375,9 @@ program mms_f90
 
       ! free up memory
       deallocate(xc_cell, yc_cell, h_source, hu_source, hv_source)
-      deallocate(xc_edge, yc_edge, xc_bnd_cell, yc_bnd_cell, h_bnd, hu_bnd, hv_bnd, bc_values)
+      if (nedges > 0) then
+        deallocate(xc_edge, yc_edge, xc_bnd_cell, yc_bnd_cell, h_bnd, hu_bnd, hv_bnd, bc_values)
+      endif
       deallocate(h_soln, hu_soln, hv_soln)
       deallocate(h_anal, hu_anal, hv_anal)
 
