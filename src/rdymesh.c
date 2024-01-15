@@ -285,7 +285,7 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
   // fetch global vertex IDs if mesh is not refined
   if (!mesh_refined) {
     PetscMPIInt commsize;
-    MPI_Comm comm;
+    MPI_Comm    comm;
     PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
     PetscCallMPI(MPI_Comm_size(comm, &commsize));
 
@@ -306,7 +306,7 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
       PetscCall(DMPlexGetChart(dm, &p_start, &p_end));
       PetscCall(PetscSFGetGraph(sf, NULL, &Nl, &local, &natural));
       PetscCheck(p_end - p_start == Nl, comm, PETSC_ERR_PLIB,
-                "The number of mesh points %" PetscInt_FMT " != %" PetscInt_FMT " the number of migration leaves", p_end - p_start, Nl);
+                 "The number of mesh points %" PetscInt_FMT " != %" PetscInt_FMT " the number of migration leaves", p_end - p_start, Nl);
 
       PetscMPIInt min_vertex_idx;  // to save the min v_start
 
@@ -315,7 +315,7 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
         if (local) PetscCall(PetscFindInt(v, Nl, local, &v));
         PetscCheck(v >= 0, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Vertex %" PetscInt_FMT " not found in migration SF", v);
         PetscCheck(!natural[v].rank, PETSC_COMM_SELF, PETSC_ERR_PLIB,
-                  "Natural ID for vertex %" PetscInt_FMT " should come from rank 0 not %" PetscInt_FMT, v, natural[v].rank);
+                   "Natural ID for vertex %" PetscInt_FMT " should come from rank 0 not %" PetscInt_FMT, v, natural[v].rank);
         vertices->global_ids[ivertex] = natural[v].index;
 
         if (v == v_start) {
