@@ -223,7 +223,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
 ///
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_total) {
+PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_total, PetscBool mesh_refined) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -282,10 +282,58 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
 
   VecRestoreArray(coordinates, &coords);
 
-  // fetch global vertex IDs.
-  ISLocalToGlobalMapping map;
-  PetscCall(DMGetLocalToGlobalMapping(dm, &map));
-  PetscCall(ISLocalToGlobalMappingApply(map, num_vertices, vertices->ids, vertices->global_ids));
+  // fetch global vertex IDs if mesh is not refined
+  if (!mesh_refined) {
+    PetscMPIInt commsize;
+    MPI_Comm comm;
+    PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+    PetscCallMPI(MPI_Comm_size(comm, &commsize));
+
+    if (commsize == 1) {
+      for (PetscInt v = v_start; v < v_end; v++) {
+        PetscInt ivertex              = v - v_start;
+        vertices->global_ids[ivertex] = ivertex;
+      }
+    } else {
+      PetscSF            sf;
+      const PetscInt    *local;
+      const PetscSFNode *natural;
+      PetscInt           p_start, p_end, Nl;
+
+      PetscCall(DMPlexGetMigrationSF(dm, &sf));
+      PetscCheck(sf, comm, PETSC_ERR_ARG_WRONGSTATE, "DM must have a migration SF");
+
+      PetscCall(DMPlexGetChart(dm, &p_start, &p_end));
+      PetscCall(PetscSFGetGraph(sf, NULL, &Nl, &local, &natural));
+      PetscCheck(p_end - p_start == Nl, comm, PETSC_ERR_PLIB,
+                "The number of mesh points %" PetscInt_FMT " != %" PetscInt_FMT " the number of migration leaves", p_end - p_start, Nl);
+
+      PetscMPIInt min_vertex_idx;  // to save the min v_start
+
+      for (PetscInt v = v_start; v < v_end; v++) {
+        PetscInt ivertex = v - v_start;
+        if (local) PetscCall(PetscFindInt(v, Nl, local, &v));
+        PetscCheck(v >= 0, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Vertex %" PetscInt_FMT " not found in migration SF", v);
+        PetscCheck(!natural[v].rank, PETSC_COMM_SELF, PETSC_ERR_PLIB,
+                  "Natural ID for vertex %" PetscInt_FMT " should come from rank 0 not %" PetscInt_FMT, v, natural[v].rank);
+        vertices->global_ids[ivertex] = natural[v].index;
+
+        if (v == v_start) {
+          min_vertex_idx = natural[v].index;
+        } else {
+          min_vertex_idx = PetscMin(min_vertex_idx, natural[v].index);
+        }
+      }
+
+      MPI_Allreduce(MPI_IN_PLACE, &min_vertex_idx, 1, MPI_INT, MPI_MIN, comm);
+
+      // substract the min v_start
+      for (PetscInt v = v_start; v < v_end; v++) {
+        PetscInt ivertex = v - v_start;
+        vertices->global_ids[ivertex] -= min_vertex_idx;
+      }
+    }
+  }
 
   // compute total number of vertices
   DMGetCoordinates(dm, &coordinates);
@@ -828,7 +876,7 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
 /// @param [in] dm A PETSc DM
 /// @param [out] mesh A pointer to an RDyMesh that stores allocated data.
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
+PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined) {
   PetscFunctionBegin;
 
   PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
@@ -851,7 +899,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_total));
+  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_total, mesh_refined));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
