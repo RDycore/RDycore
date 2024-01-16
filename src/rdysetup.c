@@ -1030,14 +1030,12 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
 
-  RDyLogDebug(rdy, "Initializing regions and boundaries...");
+  RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
-  PetscCall(InitBoundaries(rdy));
 
-  RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
+  RDyLogDebug(rdy, "Initializing initial conditions and sources...");
   PetscCall(InitInitialConditions(rdy));
   PetscCall(InitSources(rdy));
-  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Creating solvers and vectors...");
   PetscCall(CreateSolvers(rdy));
@@ -1046,6 +1044,10 @@ PetscErrorCode RDySetup(RDy rdy) {
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
+  RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
+  PetscCall(InitBoundaries(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Initializing materials...");
   PetscCall(InitMaterials(rdy));
