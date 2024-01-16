@@ -1,0 +1,62 @@
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial : fv
+  temporal: euler
+  riemann : roe
+
+logging:
+  level: none
+
+time:
+  time_step        : 0.01
+  unit             : seconds
+  final_time       : 5.00
+  coupling_interval: 0.01
+
+output:
+  format: xdmf
+  interval: 500
+
+
+grid:
+  file: mms_triangles_dx1.exo
+
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: placeholder_materials
+
+boundaries:
+  - name: domain_boundary
+    grid_boundary_id: 1
+    
+materials:
+  - name: placeholder_materials
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: domain
+    flow: placeholder_ic
+
+flow_conditions:
+  - name: placeholder_ic
+    type: dirichlet
+    height: 0.01
+    momentum: [0, 0]
+  - name: placeholder_dirichlet_condition
+    type: dirichlet
+    height: 0.01
+    momentum: [0, 0]
+    
+boundary_conditions:
+  - boundaries: [domain_boundary]
+    flow: placeholder_dirichlet_condition

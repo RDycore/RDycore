@@ -3,6 +3,8 @@
 # location of built driver executables
 set(rdycore_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore)
 set(rdycore_f90_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_f90)
+set(mms_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_mms)
+set(mms_f90_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_mms_f90)
 
 # Run the drivers with no arguments to test usage.
 foreach(driver ${rdycore_driver} ${rdycore_f90_driver})

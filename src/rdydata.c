@@ -245,6 +245,21 @@ PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal values[size]) {
+  PetscFunctionBegin;
+  PetscCall(CheckNumLocalCells(rdy, size));
+
+  RDyCells *cells = &rdy->mesh.cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (cells->is_local[icell]) {
+      values[count++] = cells->areas[icell];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt values[size]) {
   PetscFunctionBegin;
 
@@ -381,5 +396,17 @@ PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscRe
     }
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic) {
+  PetscFunctionBegin;
+  PetscCall(VecCopy(ic, rdy->X));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
+  PetscFunctionBegin;
+  PetscCall(VecDuplicate(rdy->X, prog_vec));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

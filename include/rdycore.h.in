@@ -65,6 +65,7 @@ PETSC_EXTERN PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt si
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt values[size]);
 
@@ -84,6 +85,9 @@ PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscIn
 PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]);
+PETSC_EXTERN PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic);
+
+PETSC_EXTERN PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {

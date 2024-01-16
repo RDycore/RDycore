@@ -1,6 +1,6 @@
 ! This file defines the Fortran interface for RDycore.
 #include <petsc/finclude/petscsys.h>
-
+#include <petsc/finclude/petscvec.h>
 
 
 module rdycore
@@ -17,11 +17,13 @@ module rdycore
             RDyGetTime, RDyGetTimeStep, RDyGetStep, RDyGetCouplingInterval, &
             RDySetCouplingInterval, &
             RDyGetLocalCellHeights, RDyGetLocalCellXMomentums, RDyGetLocalCellYMomentums, &
-            RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, RDyGetLocalCellNaturalIDs, &
+            RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
+            RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetWaterSourceForLocalCell, RDySetXMomentumSourceForLocalCell, RDySetYMomentumSourceForLocalCell, &
-            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell
+            RDyGetLocalCellManningsNs, RDySetManningsNForLocalCell, RDySetInitialConditions, &
+            RDyCreatePrognosticVec
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -169,6 +171,13 @@ module rdycore
       type(c_ptr), value, intent(in) :: values
     end function
 
+    integer(c_int) function rdygetlocalcellareas_(rdy, size, values) bind(c, name="RDyGetLocalCellAreas")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
     integer(c_int) function rdygetlocalcellnaturalids_(rdy, size, values) bind(c, name="RDyGetLocalCellNaturalIDs")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
@@ -265,6 +274,20 @@ module rdycore
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value, intent(in)    :: size
       type(c_ptr), value, intent(in) :: n
+    end function
+
+    integer(c_int) function rdysetinitialconditions_(rdy, ic) bind(c, name="RDySetInitialConditions")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr),      value, intent(in) :: rdy
+      PetscFortranAddr, value, intent(in) :: ic
+    end function
+
+    integer(c_int) function rdycreateprognosticvec_(rdy, prog_vec) bind(c, name="RDyCreatePrognosticVec")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscFortranAddr,   intent(out) :: prog_vec
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -467,6 +490,14 @@ contains
     ierr = rdygetlocalcellzcentroids_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
+  subroutine RDyGetLocalCellAreas(rdy_, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    real(RDyDouble), pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetlocalcellareas_(rdy_%c_rdy, size, c_loc(values))
+  end subroutine
+
   subroutine RDyGetLocalCellNaturalIDs(rdy_, size, values, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
@@ -481,7 +512,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundaryedgexcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundaryedgexcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryEdgeYCentroids(rdy_, boundary_index, size, values, ierr)
@@ -490,7 +521,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundaryedgeycentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundaryedgeycentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryEdgeZCentroids(rdy_, boundary_index, size, values, ierr)
@@ -499,7 +530,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundaryedgezcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundaryedgezcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellXCentroids(rdy_, boundary_index, size, values, ierr)
@@ -508,7 +539,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellxcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellxcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellYCentroids(rdy_, boundary_index, size, values, ierr)
@@ -517,7 +548,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellycentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellycentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellZCentroids(rdy_, boundary_index, size, values, ierr)
@@ -526,7 +557,7 @@ contains
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellzcentroids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellzcentroids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDyGetBoundaryCellNaturalIDs(rdy_, boundary_index, size, values, ierr)
@@ -535,7 +566,7 @@ contains
     PetscInt,        intent(in)             :: boundary_index
     PetscInt,        pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index, size, c_loc(values))
+    ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDySetWaterSourceForLocalCell(rdy_, size, watsrc, ierr)
@@ -576,6 +607,22 @@ contains
     real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetmanningsnforlocalcell_(rdy_%c_rdy, size, c_loc(n))
+  end subroutine
+
+  subroutine RDySetInitialConditions(rdy_, ic, ierr)
+    use petscvec
+    type(RDy),  intent(inout) :: rdy_
+    type(tVec), intent(in)    :: ic  ! Vec
+    integer,    intent(out)   :: ierr
+    ierr = rdysetinitialconditions_(rdy_%c_rdy, ic%v)
+  end subroutine
+
+  subroutine RDyCreatePrognosticVec(rdy_, prog_vec, ierr)
+    use petscvec
+    type(RDy),  intent(inout) :: rdy_
+    type(tVec), intent(inout) :: prog_vec  ! Vec
+    integer,    intent(out)   :: ierr
+    ierr = rdycreateprognosticvec_(rdy_%c_rdy, prog_vec%v)
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

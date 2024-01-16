@@ -1,4 +1,4 @@
-module driver
+module rdy_driver
 #include <petsc/finclude/petsc.h>
   use petsc
   implicit none
@@ -24,7 +24,7 @@ contains
     PetscCallA(PetscViewerBinaryOpen(PETSC_COMM_SELF, filename, FILE_MODE_READ, viewer, ierr))
     PetscCallA(VecLoad(data_vec, viewer, ierr));
     PetscCallA(PetscViewerDestroy(viewer, ierr));
-  
+
     PetscCallA(VecGetSize(data_vec, size, ierr))
     ndata = size / 2
 
@@ -74,14 +74,14 @@ contains
 
   end subroutine
 
-end module
+end module rdy_driver
 
 program rdycore_f90
 #include <petsc/finclude/petsc.h>
 #include <finclude/rdycore.h>
 
   use rdycore
-  use driver
+  use rdy_driver
   use petsc
 
   implicit none
@@ -175,13 +175,13 @@ program rdycore_f90
         endif
 
         allocate(nat_id_bnd_cell(num_edges), values_bnd(num_edges))
-        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond-1, num_edges, nat_id_bnd_cell, ierr))
-        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond-1, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond, num_edges, nat_id_bnd_cell, ierr))
+        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
+        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
 
         deallocate(nat_id_bnd_cell)
       enddo
@@ -198,7 +198,7 @@ program rdycore_f90
 
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
 
-        ! apply a 1 mm/hr rain over the entire domain 
+        ! apply a 1 mm/hr rain over the entire domain
         if (.not. rain_specified) then
           rain(:) = 1.d0/3600.d0/1000.d0
           PetscCallA(RDySetWaterSourceForLocalCell(rdy_, n, rain, ierr))
