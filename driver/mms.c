@@ -161,7 +161,6 @@ static PetscErrorCode Problem1_SourceTerm(ProblemData *pdata, PetscReal t, Petsc
     hv_source[icell] += v * v * dhdy + 2.0 * v * h * dvdy + GRAVITY * h * dhdy;
     hv_source[icell] += dzdy * GRAVITY * h;
     hv_source[icell] += Cd * v * PetscSqrtReal(u * u + v * v);
-
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -298,7 +297,7 @@ int main(int argc, char *argv[]) {
     }
     PetscCall(RDySetManningsNForLocalCell(rdy, ncells, mannings_n));
 
-    Vec ic_vec;
+    Vec          ic_vec;
     PetscScalar *ic_ptr;
     PetscCall(RDyCreatePrognosticVec(rdy, &ic_vec));
 
@@ -383,21 +382,20 @@ int main(int argc, char *argv[]) {
         err2_glb[idof] = PetscPowReal(err2_glb[idof], 0.5);
       }
 
-      printf("Avg-cell-area    : %18.16f\n",area_cell_sum_glb/ncells_glb);
-      printf("Avg-length-scale : %18.16f\n",PetscPowReal(area_cell_sum_glb/ncells_glb, 0.5));
+      printf("Avg-cell-area    : %18.16f\n", area_cell_sum_glb / ncells_glb);
+      printf("Avg-length-scale : %18.16f\n", PetscPowReal(area_cell_sum_glb / ncells_glb, 0.5));
 
       printf("Error-Norm-1     : ");
-      for (PetscInt idof = 0; idof < 3; idof++) printf ("%18.16f ", err1_glb[idof]);
+      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", err1_glb[idof]);
       printf("\n");
 
       printf("Error-Norm-2     : ");
-      for (PetscInt idof = 0; idof < 3; idof++) printf ("%18.16f ", err2_glb[idof]);
+      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", err2_glb[idof]);
       printf("\n");
 
       printf("Error-Norm-Max   : ");
-      for (PetscInt idof = 0; idof < 3; idof++) printf ("%18.16f ", errm_glb[idof]);
+      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", errm_glb[idof]);
       printf("\n");
-
     }
 
     // free up memory
