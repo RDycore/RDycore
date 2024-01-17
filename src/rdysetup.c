@@ -449,9 +449,50 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 
   // Keep track of whether edges on the domain boundary have been assigned to
   // any boundaries.
-  IS unassigned_edges_is;
+  PetscInt e_start, e_end;  // starting and ending edge points
+  DMPlexGetHeightStratum(rdy->dm, 1, &e_start, &e_end);
+
+  IS       unassigned_edges_is;
+  PetscInt num_edges_invalid = 0;
+
+  // First remove all edges that are not valid. The invalid edges are:
+  // - edges between two non-local(=ghost) cells, and
+  // - a boundary edge of a non-local(=ghost) cell
   if (boundary_edge_present) {
     ISDuplicate(boundary_edge_is, &unassigned_edges_is);
+
+    RDyMesh  *mesh  = &rdy->mesh;
+    RDyEdges *edges = &mesh->edges;
+    RDyCells *cells = &mesh->cells;
+
+    PetscInt invalid_idx[mesh->num_edges];
+
+    for (PetscInt iedge = 0; iedge < mesh->num_edges; iedge++) {
+      PetscInt  cell_id_1  = edges->cell_ids[2 * iedge];  // this cell id will always be > -1
+      PetscInt  cell_id_2  = edges->cell_ids[2 * iedge + 1];
+      PetscBool edge_valid = PETSC_TRUE;
+
+      // check if the edge is valid
+      if (cell_id_2 >= 0) {
+        edge_valid = (cells->is_local[cell_id_1] || cells->is_local[cell_id_2]);
+      } else {
+        edge_valid = cells->is_local[cell_id_1];
+      }
+
+      if (!edge_valid) {
+        invalid_idx[num_edges_invalid++] = iedge + e_start;
+      }
+    }
+
+    if (num_edges_invalid) {  // remove invalid edges, if any
+      IS invalid_is, new_unassigned_edges_is;
+
+      PetscCall(ISCreateGeneral(PETSC_COMM_SELF, num_edges_invalid, invalid_idx, PETSC_COPY_VALUES, &invalid_is));
+      PetscCall(ISDifference(unassigned_edges_is, invalid_is, &new_unassigned_edges_is));
+      ISDestroy(&invalid_is);
+      ISDestroy(&unassigned_edges_is);
+      unassigned_edges_is = new_unassigned_edges_is;
+    }
   }
   PetscInt unassigned_edge_boundary_id = 0;  // boundary ID for unassigned edges
 
@@ -459,8 +500,6 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   // boundary conditions. All edges on the domain boundary not assigned to other
   // boundaries are assigned to a special boundary to which we apply reflecting
   // boundary conditions.
-  PetscInt e_start, e_end;  // starting and ending edge points
-  DMPlexGetHeightStratum(rdy->dm, 1, &e_start, &e_end);
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   PetscInt        num_boundaries_in_file = 0;
@@ -1030,14 +1069,12 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
 
-  RDyLogDebug(rdy, "Initializing regions and boundaries...");
+  RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
-  PetscCall(InitBoundaries(rdy));
 
-  RDyLogDebug(rdy, "Initializing initial/boundary conditions and sources...");
+  RDyLogDebug(rdy, "Initializing initial conditions and sources...");
   PetscCall(InitInitialConditions(rdy));
   PetscCall(InitSources(rdy));
-  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Creating solvers and vectors...");
   PetscCall(CreateSolvers(rdy));
@@ -1046,6 +1083,10 @@ PetscErrorCode RDySetup(RDy rdy) {
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
+  RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
+  PetscCall(InitBoundaries(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Initializing materials...");
   PetscCall(InitMaterials(rdy));
