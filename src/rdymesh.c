@@ -259,6 +259,9 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
     for (PetscInt idim = 0; idim < dim; idim++) {
       vertices->points[ivertex].X[idim] = coords[coordOffset + idim];
     }
+    if (dim < 3) {
+      vertices->points[ivertex].X[2] = 0.0;
+    }
 
     vertices->num_edges[ivertex] = 0;
     vertices->num_cells[ivertex] = 0;
