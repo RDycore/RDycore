@@ -875,6 +875,79 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMesh *mesh, Vec *coords_nat) {
+  PetscFunctionBegin;
+
+  Vec xcoord_nat, ycoord_nat, zcoord_nat;
+  PetscCall(VecCreateMPI(comm, PETSC_DECIDE, mesh->num_vertices_total, &xcoord_nat));
+  PetscCall(VecDuplicate(xcoord_nat, &ycoord_nat));
+  PetscCall(VecDuplicate(xcoord_nat, &zcoord_nat));
+
+  PetscInt  num_vertices = mesh->num_vertices;
+  PetscInt  indices[num_vertices];
+  PetscReal x[num_vertices], y[num_vertices], z[num_vertices];
+
+  RDyVertices *vertices = &mesh->vertices;
+  for (PetscInt v = 0; v < num_vertices; v++) {
+    indices[v] = vertices->global_ids[v];
+    x[v]       = vertices->points[v].X[0];
+    y[v]       = vertices->points[v].X[1];
+    z[v]       = vertices->points[v].X[2];
+  }
+
+  PetscCall(VecSetValues(xcoord_nat, num_vertices, indices, x, INSERT_VALUES));
+  PetscCall(VecSetValues(ycoord_nat, num_vertices, indices, y, INSERT_VALUES));
+  PetscCall(VecSetValues(zcoord_nat, num_vertices, indices, z, INSERT_VALUES));
+
+  PetscCall(VecAssemblyBegin(xcoord_nat));
+  PetscCall(VecAssemblyEnd(xcoord_nat));
+  PetscCall(VecAssemblyBegin(ycoord_nat));
+  PetscCall(VecAssemblyEnd(ycoord_nat));
+  PetscCall(VecAssemblyBegin(zcoord_nat));
+  PetscCall(VecAssemblyEnd(zcoord_nat));
+
+  if (0) {
+    VecView(xcoord_nat, PETSC_VIEWER_STDOUT_WORLD);
+    VecView(ycoord_nat, PETSC_VIEWER_STDOUT_WORLD);
+    VecView(zcoord_nat, PETSC_VIEWER_STDOUT_WORLD);
+  }
+
+  PetscInt local_size;
+  PetscCall(VecGetLocalSize(xcoord_nat, &local_size));
+  PetscInt ndim = 3;
+
+  PetscCall(VecCreate(comm, coords_nat));
+  PetscCall(VecSetSizes(*coords_nat, local_size * ndim, PETSC_DECIDE));
+  PetscCall(VecSetBlockSize(*coords_nat, ndim));
+  PetscCall(VecSetFromOptions(*coords_nat));
+
+  PetscScalar *x_ptr, *y_ptr, *z_ptr, *xyz_ptr;
+
+  PetscCall(VecGetArray(xcoord_nat, &x_ptr));
+  PetscCall(VecGetArray(ycoord_nat, &y_ptr));
+  PetscCall(VecGetArray(zcoord_nat, &z_ptr));
+  PetscCall(VecGetArray(*coords_nat, &xyz_ptr));
+
+  for (PetscInt v = 0; v < local_size; v++) {
+    xyz_ptr[v * ndim]     = x_ptr[v];
+    xyz_ptr[v * ndim + 1] = y_ptr[v];
+    xyz_ptr[v * ndim + 2] = z_ptr[v];
+  }
+
+  PetscCall(VecRestoreArray(xcoord_nat, &x_ptr));
+  PetscCall(VecRestoreArray(ycoord_nat, &y_ptr));
+  PetscCall(VecRestoreArray(zcoord_nat, &z_ptr));
+  PetscCall(VecRestoreArray(*coords_nat, &xyz_ptr));
+
+  if (0) VecView(*coords_nat, PETSC_VIEWER_STDOUT_WORLD);
+
+  PetscCall(VecDestroy(&xcoord_nat));
+  PetscCall(VecDestroy(&ycoord_nat));
+  PetscCall(VecDestroy(&zcoord_nat));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates an RDyMesh from a PETSc DM.
 /// @param [in] dm A PETSc DM
 /// @param [out] mesh A pointer to an RDyMesh that stores allocated data.
@@ -916,6 +989,9 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined)
 
   // Extract natural cell IDs from the DM.
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells));
+
+  Vec coords_nat;
+  PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh, &coords_nat));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
