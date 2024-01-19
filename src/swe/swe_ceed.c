@@ -208,7 +208,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
       CeedInt l    = edges->cell_ids[2 * iedge];
       offset_l[oe] = l * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
-        offset_dirichlet[oe] = l * num_comp;
+        offset_dirichlet[oe] = e * num_comp;
       }
 
       g[oe][0] = edges->sn[iedge];
@@ -227,7 +227,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     // if we have Dirichlet boundary values, create a restriction and passive
     // input vector for them
     if (offset_dirichlet) {
-      CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_dirichlet,
+      CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, num_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_dirichlet,
                                 &restrict_dirichlet);
       PetscCall(PetscFree(offset_dirichlet));
       if (0) CeedElemRestrictionView(restrict_dirichlet, stdout);
@@ -347,11 +347,9 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 
   // set the boundary values
   for (CeedInt i = 0; i < boundary.num_edges; ++i) {
-    CeedInt edge_id            = boundary.edge_ids[i];
-    CeedInt cell_id            = mesh->edges.cell_ids[2 * edge_id];
-    dirichlet_ceed[cell_id][0] = boundary_values[num_comp * i];
-    dirichlet_ceed[cell_id][1] = boundary_values[num_comp * i + 1];
-    dirichlet_ceed[cell_id][2] = boundary_values[num_comp * i + 2];
+    dirichlet_ceed[i][0] = boundary_values[num_comp * i];
+    dirichlet_ceed[i][1] = boundary_values[num_comp * i + 1];
+    dirichlet_ceed[i][2] = boundary_values[num_comp * i + 2];
   }
 
   // copy the values into the CEED operator
