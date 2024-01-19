@@ -16,7 +16,7 @@ logging:
 time:
   time_step: 0.005
   unit: hours
-  max_step: 1000
+  max_step: 1
   coupling_interval: 0.005
 
 output:
