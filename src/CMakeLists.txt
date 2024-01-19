@@ -2,6 +2,7 @@
 add_library(rdycore
   rdycore.c
   rdydata.c
+  rdydm.c
   rdymesh.c
   rdyadvance.c
   rdysetup.c
