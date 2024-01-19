@@ -1,9 +1,14 @@
 #include <petscdmplex.h>
+#include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdymeshimpl.h>
 
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
+
+static  PetscInt TRI_ID_XDMF  = 4;
+static  PetscInt QUAD_ID_XDMF = 5;
+
 
 // fills the given array of length n with the given value
 #define FILL(n, array, value)      \
@@ -948,6 +953,115 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool is_dm_refined, Vec *cell_conn) {
+  PetscFunctionBegin;
+
+  // create a local DM
+  DM       local_dm;
+  PetscInt max_num_vertices       = 4;
+  PetscInt n_aux_field            = 1;
+  PetscInt n_aux_field_dof[1]     = {max_num_vertices};
+  char     aux_field_names[1][20] = {"Cell Connections"};
+
+  PetscCall(CloneAndCreateCellCenteredDM(dm, is_dm_refined, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+
+  Vec          global_vec, natural_vec;
+  PetscScalar *vec_ptr;
+  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+
+  PetscCall(VecSet(global_vec, -1));
+  PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+  for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
+    for (PetscInt v = 0; v < cells->num_vertices[c]; v++) {
+      PetscInt offset    = cells->vertex_offsets[c];
+      PetscInt vertex_id = cells->vertex_ids[offset + v];
+      PetscInt index     = c * max_num_vertices + v;
+      vec_ptr[index]     = vertices->global_ids[vertex_id];
+    }
+  }
+
+  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+
+  PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+  PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+
+  if (0) {
+    PetscCall(VecView(global_vec, PETSC_VIEWER_STDOUT_WORLD));
+    PetscCall(VecView(natural_vec, PETSC_VIEWER_STDOUT_WORLD));
+  }
+  PetscCall(VecDestroy(&global_vec));
+
+  PetscInt size, count = 0;
+  PetscCall(VecGetLocalSize(natural_vec, &size));
+
+  PetscCall(VecGetArray(natural_vec, &vec_ptr));
+
+  // Determine the number of vertices that are valid (i.e. vertex id > -1).
+  PetscInt ncells = size/max_num_vertices;
+  for (PetscInt i = 0; i < ncells; i++) {
+    for (PetscInt j = 0; j < max_num_vertices; j++) {
+      if (vec_ptr[i * max_num_vertices + j] > -1) count++;
+    }
+  }
+  // Add the number of cells
+  count += ncells;
+
+  // The *cell_conn vector is a long 1D distributed vector that will hold information about
+  // cell vertices. For an i-th cell, the first entry will denoted a valid XMDF element ID
+  // followed by the ID of vertices in the natural order that form the i-th cell.
+  // The supported element types include:
+  // - Triangles (TRI_ID_XDMF)
+  // - Quadrilaterals (QUAD_ID_XDMF)
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+  PetscCall(VecCreate(comm, cell_conn));
+  PetscCall(VecSetSizes(*cell_conn, count, PETSC_DECIDE));
+  PetscCall(VecSetFromOptions(*cell_conn));
+
+  PetscScalar *cell_conn_ptr;
+  PetscInt idx = 0;
+
+  VecGetArray(*cell_conn, &cell_conn_ptr);
+  for (PetscInt i = 0; i < ncells; i++) {
+    PetscInt nvertices = 0;
+    for (PetscInt j = 0; j < max_num_vertices; j++) {
+      if (vec_ptr[i * max_num_vertices + j] > -1) nvertices++;
+    }
+    switch (nvertices) {
+      case 3:
+        cell_conn_ptr[idx++] = TRI_ID_XDMF;
+        break;
+      case 4:
+        cell_conn_ptr[idx++] = QUAD_ID_XDMF;
+        break;
+      default:
+        SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported cell type");
+        break;
+    }
+    for (PetscInt j = 0; j < max_num_vertices; j++) {
+      if (vec_ptr[i * max_num_vertices + j] > -1) {
+        cell_conn_ptr[idx++] = vec_ptr[i * max_num_vertices + j];
+      }
+    }
+  }
+  VecRestoreArray(*cell_conn, &cell_conn_ptr);
+  if (1) {
+    PetscCall(VecView(*cell_conn, PETSC_VIEWER_STDOUT_WORLD));
+  }
+
+  PetscCall(VecRestoreArray(natural_vec, &vec_ptr));
+  PetscCall(VecDestroy(&natural_vec));
+
+  PetscCall(DMDestroy(&local_dm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates an RDyMesh from a PETSc DM.
 /// @param [in] dm A PETSc DM
 /// @param [out] mesh A pointer to an RDyMesh that stores allocated data.
@@ -990,8 +1104,9 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined)
   // Extract natural cell IDs from the DM.
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells));
 
-  Vec coords_nat;
+  Vec coords_nat, cell_conn;
   PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh, &coords_nat));
+  PetscCall(CreateCellConnectionVector(dm, mesh, mesh_refined, &cell_conn));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
