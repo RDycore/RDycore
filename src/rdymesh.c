@@ -6,9 +6,8 @@
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
 
-static  PetscInt TRI_ID_XDMF  = 4;
-static  PetscInt QUAD_ID_XDMF = 5;
-
+static PetscInt TRI_ID_XDMF  = 4;
+static PetscInt QUAD_ID_XDMF = 5;
 
 // fills the given array of length n with the given value
 #define FILL(n, array, value)      \
@@ -1001,7 +1000,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
   PetscCall(VecGetArray(natural_vec, &vec_ptr));
 
   // Determine the number of vertices that are valid (i.e. vertex id > -1).
-  PetscInt ncells = size/max_num_vertices;
+  PetscInt ncells = size / max_num_vertices;
   for (PetscInt i = 0; i < ncells; i++) {
     for (PetscInt j = 0; j < max_num_vertices; j++) {
       if (vec_ptr[i * max_num_vertices + j] > -1) count++;
@@ -1024,7 +1023,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
   PetscCall(VecSetFromOptions(*cell_conn));
 
   PetscScalar *cell_conn_ptr;
-  PetscInt idx = 0;
+  PetscInt     idx = 0;
 
   VecGetArray(*cell_conn, &cell_conn_ptr);
   for (PetscInt i = 0; i < ncells; i++) {
