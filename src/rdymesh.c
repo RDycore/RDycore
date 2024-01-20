@@ -1103,9 +1103,11 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined)
   // Extract natural cell IDs from the DM.
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells));
 
-  Vec coords_nat, cell_conn;
-  PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh, &coords_nat));
-  PetscCall(CreateCellConnectionVector(dm, mesh, mesh_refined, &cell_conn));
+  if (!mesh_refined) {
+    Vec coords_nat, cell_conn;
+    PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh, &coords_nat));
+    PetscCall(CreateCellConnectionVector(dm, mesh, mesh_refined, &cell_conn));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
