@@ -42,7 +42,7 @@ jobs:
 
     - name: Building RDycore (${{ matrix.build-type }})
       run: |
-        grep PETSC_VERSION_GIT $PETSC_DIR/include/petscconf.h | sed -e s/#define\ //g
+        grep PETSC_VERSION_GIT $PETSC_DIR/$PETSC_ARCH/include/petscconf.h | sed -e s/#define\ //g
         cd build
         make -j
 
