@@ -36,6 +36,7 @@ jobs:
     - name: Configuring RDycore (${{ matrix.build-type }})
       run: |
         wc src/rdymesh.c
+        cat src/rdymesh.c
         cmake -S . -B build \
         -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
         -DENABLE_COVERAGE=ON \
