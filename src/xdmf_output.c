@@ -262,7 +262,6 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
   if (step % rdy->config.output.interval == 0) {
     PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
     if (rdy->config.output.format == OUTPUT_XDMF) {
-      Vec coords_nat;
       PetscCall(WriteXDMFHDF5Data(rdy, step, t));
       PetscCall(WriteXDMFXMFData(rdy, step, t));
     }
