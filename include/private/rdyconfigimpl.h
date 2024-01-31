@@ -119,14 +119,24 @@ typedef struct {
   RDyLogLevel level;                     // selected log level
 } RDyLoggingSection;
 
+// -------------------
+// checkpoint section
+// -------------------
+
+// all checkpoint parameters
+typedef struct {
+  PetscViewerFormat format;    // file format
+  PetscInt          interval;  // number of steps between checkpoints [steps]
+} RDyCheckpointSection;
+
 // ---------------
 // restart section
 // ---------------
 
 // all restart parameters
 typedef struct {
-  PetscViewerFormat format;    // file format
-  PetscInt          interval;  // number of steps between restart dumps [steps]
+  char      file[PETSC_MAX_PATH_LEN];  // checkpoint file from which to restart
+  PetscBool reinitialize;              // PETSC_TRUE resets simulation time to 0
 } RDyRestartSection;
 
 // ---------------
@@ -281,9 +291,10 @@ typedef struct {
   RDyNumericsSection numerics;
   RDyTimeSection     time;
 
-  RDyLoggingSection logging;
-  RDyRestartSection restart;
-  RDyOutputSection  output;
+  RDyLoggingSection    logging;
+  RDyCheckpointSection checkpoint;
+  RDyRestartSection    restart;
+  RDyOutputSection     output;
 
   RDyGridSection grid;
 
