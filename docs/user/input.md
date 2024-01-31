@@ -36,7 +36,10 @@ broad categories:
       files or to the terminal
     * [output](input.md#output): configures simulation output, including
       scalable I/O formats and related parameters
-    * [restart](input.md#restart): configures simulation restart dumps
+    * [checkpoint](input.md#checkpoint): configures simulation checkpoint
+      files, which are used for restarts
+    * [restart](input.md#restart): configures whether a simulation is restarted
+      from a previously saved checkpoint file
 * **Material properties**
     * [materials](input.md#materials): defines the materials available to
       the simulation
@@ -287,7 +290,7 @@ output:
 ```
 
 The `output` section control simulation output, including visualization and
-time series data (and excluding restart data). Relevant parameters are
+time series data (and excluding checkpoint data). Relevant parameters are
 
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
@@ -377,9 +380,46 @@ so only the `flow` parameter is required. The presence of sediment concentration
 requires the `sediment` parameter, as the presence of salinity concentrations
 requires the `salinity` parameter.
 
+## `checkpoint`
+
+```yaml
+checkpoint:
+  format: hdf5
+  interval: 100
+```
+
+The `checkpoint` section contains fields that specify whether and how RDycore
+writes checkpoint files, which can be used to restart simulations using
+parameters in the `restart` section.
+
+* `format`: the format of the checkpoint files to be written. This can be either
+  `binary` (the default) or `hdf5`.
+* `interval`: the number of time steps taken between writing checkpoint files.
+  This must be a positive integer.
+* `prefix`: an optional prefix for checkpoint files. If omitted, the prefix for
+  checkpoint files is the prefix of the YAML input file name for the simulation.
+
+The name of a checkpoint file written at time step `N` is `<prefix>-N.<format>`,
+where `<prefix>` is the checkpoint prefix and `<format>` is `bin` for a binary
+file and `h5` for an HDF5 file.
+
+This section is optional. If omitted, no checkpoint files are written.
+
 ## `restart`
 
-This section is not yet implemented.
+```yaml
+restart:
+  file: checkpoint-100.h5
+  reinitialize: true
+```
+
+The `restart` section allows a user to specify a checkpoint file from which a
+simulation is restarted.
+
+* `file`: the name of the checkpoint file from which to restart the simulation
+* `reinitialize`: a flag indicating whether to reinitialize the simulation time
+  to 0 (`true`) or continue from the time at which the checkpoint file was
+  written (`false`)
 
 ## `salinity_conditions`
 
