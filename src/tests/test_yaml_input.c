@@ -77,7 +77,7 @@ static void TestFullSpec(void **state) {
       "logging:\n"
       "  file: rdycore.log\n"
       "  level: detail\n\n"
-      "restart:\n"
+      "checkpoint:\n"
       "  format: hdf5\n"
       "  interval: 10\n\n"
       "grid:\n"

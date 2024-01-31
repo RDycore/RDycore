@@ -501,6 +501,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("numerics", CYAML_FLAG_DEFAULT, RDyConfig, numerics, numerics_fields_schema),
     CYAML_FIELD_MAPPING("time", CYAML_FLAG_DEFAULT, RDyConfig, time, time_fields_schema),
     CYAML_FIELD_MAPPING("logging", CYAML_FLAG_OPTIONAL, RDyConfig, logging, logging_fields_schema),
+    CYAML_FIELD_MAPPING("checkpoint", CYAML_FLAG_OPTIONAL, RDyConfig, checkpoint, checkpoint_fields_schema),
     CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
@@ -975,6 +976,7 @@ PetscErrorCode PrintConfig(RDy rdy) {
   PetscCall(PrintNumerics(rdy));
   PetscCall(PrintTime(rdy));
   PetscCall(PrintLogging(rdy));
+  PetscCall(PrintCheckpoint(rdy));
   PetscCall(PrintRestart(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
