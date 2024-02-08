@@ -1,6 +1,40 @@
 #include <petscviewerhdf5.h>
 #include <private/rdycoreimpl.h>
 
+// this struct contains metadata that is written to checkpoint files
+typedef struct {
+  PetscInt  nproc;  // number of MPI processes / tasks
+  PetscReal dt;     // timestep
+} CheckpointMetadata;
+
+// creates a new PetscBag that can store checkpoint metadata, populated with
+// data from rdy
+static PetscErrorCode CreateMetadataBag(RDy rdy, PetscBag *bag) {
+  PetscFunctionBegin;
+
+  CheckpointMetadata *metadata;
+  PetscCall(PetscBagCreate(rdy->comm, sizeof(CheckpointMetadata), bag));
+  PetscCall(PetscBagGetData(*bag, (void **)&metadata));
+  PetscCall(PetscBagSetName(*bag, "metadata", "Checkpoint metadata"));
+  PetscCall(PetscBagRegisterInt(*bag, &metadata->nproc, rdy->nproc, "nproc", "Number of MPI tasks"));
+  PetscCall(PetscBagRegisterReal(*bag, &metadata->dt, rdy->dt, "dt", "Simulation timestep"));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// reads checkpoint metadata into rdy from the given PetscBag and destroys it
+static PetscErrorCode ConsumeMetadataBag(RDy rdy, PetscBag bag) {
+  PetscFunctionBegin;
+
+  CheckpointMetadata *metadata;
+  PetscCall(PetscBagGetData(bag, (void **)&metadata));
+  rdy->nproc = metadata->nproc;
+  rdy->dt    = metadata->dt;
+  PetscCall(PetscBagDestroy(&bag));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
@@ -19,7 +53,12 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
   }
 
   RDyLogInfo(rdy, "Writing checkpoint file %s...", filename);
+
+  PetscBag bag;
+  PetscCall(CreateMetadataBag(rdy, &bag));
+  PetscCall(PetscBagView(bag, viewer));
   PetscCall(VecView(X, viewer));
+  PetscCall(PetscBagDestroy(&bag));
 
   PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished writing checkpoint file.");
@@ -57,8 +96,13 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid checkpoint file: %s", filename);
   }
 
+  PetscBag bag;
+  PetscCall(CreateMetadataBag(rdy, &bag));
+  PetscCall(PetscBagLoad(viewer, bag));
+  PetscCall(ConsumeMetadataBag(rdy, bag));
   PetscCall(VecLoad(rdy->X, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
