@@ -189,6 +189,7 @@ struct _p_RDy {
   void *petsc_rhs;
 };
 
+PETSC_INTERN PetscErrorCode DetermineConfigPrefix(RDy, char *);
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 
@@ -199,8 +200,13 @@ PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 // output functions
 PETSC_INTERN PetscErrorCode CreateOutputDir(RDy);
 PETSC_INTERN PetscErrorCode GetOutputDir(RDy, char dir[PETSC_MAX_PATH_LEN]);
+PETSC_INTERN PetscErrorCode GenerateIndexedFilename(const char *, PetscInt, PetscInt, const char *, char *);
 PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char *, char *);
 PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *);
+
+// checkpoint/restart functions
+PETSC_INTERN PetscErrorCode InitCheckpoints(RDy);
+PETSC_INTERN PetscErrorCode ReadCheckpointFile(RDy, const char *);
 
 // time series
 PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);

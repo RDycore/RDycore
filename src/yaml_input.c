@@ -824,6 +824,24 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Determines the prefix of the YAML configuration file.
+PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
+  PetscFunctionBegin;
+
+  memset(prefix, 0, sizeof(char) * (strlen(rdy->config_file) + 1));
+  char *p = strstr(rdy->config_file, ".yaml");
+  if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
+    p = strstr(rdy->config_file, ".yml");
+  }
+  if (p) {
+    size_t prefix_len = p - rdy->config_file;
+    strncpy(prefix, rdy->config_file, prefix_len);
+  } else {
+    strcpy(prefix, rdy->config_file);
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // reads the config file on process 0, broadcasts it as a string to all other
 // processes, and parses the string into rdy->config
 PetscErrorCode ReadConfigFile(RDy rdy) {

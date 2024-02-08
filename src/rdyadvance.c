@@ -42,7 +42,7 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
 // * with the given prefix
 // * with the given zero-padded index (padded to the given max index value)
 // * and the given suffix
-static PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix, char *filename) {
+PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix, char *filename) {
   PetscFunctionBegin;
   int  num_digits = (int)(log10((double)max_index_val)) + 1;
   char fmt[16]    = {0};
@@ -62,17 +62,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
 
   size_t config_len = strlen(rdy->config_file);
   char   prefix[config_len + 1];
-  memset(prefix, 0, sizeof(char) * (config_len + 1));
-  char *p = strstr(rdy->config_file, ".yaml");
-  if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
-    p = strstr(rdy->config_file, ".yml");
-  }
-  if (p) {
-    size_t prefix_len = p - rdy->config_file;
-    strncpy(prefix, rdy->config_file, prefix_len);
-  } else {
-    strcpy(prefix, rdy->config_file);
-  }
+  PetscCall(DetermineConfigPrefix(rdy, prefix));
 
   // encode specific information into the filename based on its format
   if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
