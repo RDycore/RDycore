@@ -136,7 +136,7 @@ typedef struct {
 // all restart parameters
 typedef struct {
   char      file[PETSC_MAX_PATH_LEN];  // checkpoint file from which to restart
-  PetscBool reinitialize;              // PETSC_TRUE resets simulation time to 0
+  PetscBool continue_run;              // PETSC_FALSE resets simulation time to 0
 } RDyRestartSection;
 
 // ---------------
