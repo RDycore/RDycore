@@ -149,6 +149,8 @@ typedef struct RDyMesh {
   PetscInt num_cells;
   // number of cells in the mesh owned by the local process
   PetscInt num_cells_local;
+  // number of total cells in the mesh
+  PetscInt num_cells_total;
   // number of edges in the mesh attached to locally stored cells
   PetscInt num_edges;
   /// number of edges that are internal (i.e. shared by two cells)
@@ -180,6 +182,9 @@ typedef struct RDyMesh {
   PetscInt *closureSize, **closure;
   // the maximum closure size for any cell (locally stored?)
   PetscInt maxClosureSize;
+
+  Vec coords_nat, cell_conn;
+
 } RDyMesh;
 
 PETSC_INTERN PetscErrorCode RDyCellsCreate(PetscInt, RDyCells *);

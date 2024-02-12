@@ -856,7 +856,7 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMesh *mesh, Vec *coords_nat) {
+static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   Vec xcoord_nat, ycoord_nat, zcoord_nat;
@@ -897,6 +897,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecGetLocalSize(xcoord_nat, &local_size));
   PetscInt ndim = 3;
 
+  Vec *coords_nat = &mesh->coords_nat;
   PetscCall(VecCreate(comm, coords_nat));
   PetscCall(VecSetSizes(*coords_nat, local_size * ndim, PETSC_DECIDE));
   PetscCall(VecSetBlockSize(*coords_nat, ndim));
@@ -922,6 +923,8 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
 
   if (0) VecView(*coords_nat, PETSC_VIEWER_STDOUT_WORLD);
 
+  PetscCall((PetscObjectSetName((PetscObject)mesh->coords_nat, "Vertices")));
+
   PetscCall(VecDestroy(&xcoord_nat));
   PetscCall(VecDestroy(&ycoord_nat));
   PetscCall(VecDestroy(&zcoord_nat));
@@ -929,7 +932,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool is_dm_refined, Vec *cell_conn) {
+static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool is_dm_refined) {
   PetscFunctionBegin;
 
   // create a local DM
@@ -995,6 +998,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+  Vec *cell_conn = &mesh->cell_conn;
   PetscCall(VecCreate(comm, cell_conn));
   PetscCall(VecSetSizes(*cell_conn, count, PETSC_DECIDE));
   PetscCall(VecSetFromOptions(*cell_conn));
@@ -1026,9 +1030,10 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
     }
   }
   VecRestoreArray(*cell_conn, &cell_conn_ptr);
-  if (1) {
+  if (0) {
     PetscCall(VecView(*cell_conn, PETSC_VIEWER_STDOUT_WORLD));
   }
+  PetscCall((PetscObjectSetName((PetscObject)mesh->cell_conn, "Cells")));
 
   PetscCall(VecRestoreArray(natural_vec, &vec_ptr));
   PetscCall(VecDestroy(&natural_vec));
@@ -1084,10 +1089,11 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined)
   MPI_Comm_rank(comm, &rank);
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
 
+  PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_total, 1, MPI_INTEGER, MPI_SUM, comm));
+
   if (!mesh_refined) {
-    Vec coords_nat, cell_conn;
-    PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh, &coords_nat));
-    PetscCall(CreateCellConnectionVector(dm, mesh, mesh_refined, &cell_conn));
+    PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
+    PetscCall(CreateCellConnectionVector(dm, mesh, mesh_refined));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
