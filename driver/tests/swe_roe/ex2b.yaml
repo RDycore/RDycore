@@ -17,6 +17,10 @@ time:
   unit: hours
   max_step: 1000
 
+checkpoint:
+  format: binary
+  interval: 100
+
 output:
   format: xdmf
   interval: 100

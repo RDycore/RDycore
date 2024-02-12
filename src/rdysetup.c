@@ -107,9 +107,11 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
   {
-    PetscCall(PetscOptionsReal("-dt", "dt (seconds)", "", rdy->dt, &rdy->dt, NULL));
+    PetscCall(PetscOptionsReal("-dt", "time step size (seconds)", "", rdy->dt, &rdy->dt, NULL));
     PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed_resource, rdy->ceed_resource,
                                  sizeof rdy->ceed_resource, NULL));
+    PetscCall(PetscOptionsString("-restart", "restart from the given checkpoint file", "", rdy->config.restart.file, rdy->config.restart.file,
+                                 sizeof rdy->config.restart.file, NULL));
   }
   PetscOptionsEnd();
 
