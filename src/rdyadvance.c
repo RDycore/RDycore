@@ -224,9 +224,14 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
 
+  PetscReal next_coupling_time = interval;
+  while (next_coupling_time < time) {
+    next_coupling_time += interval;
+  }
+
   // advance the solution to the specified time (handling preloading if requested)
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
-               ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
+               ConvertTimeFromSeconds(next_coupling_time, rdy->config.time.unit));
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
   if (PetscPreLoadingOn) {
     PetscCall(CalibrateSolverTimers(rdy));

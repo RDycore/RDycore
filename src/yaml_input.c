@@ -185,12 +185,12 @@ static const cyaml_schema_field_t checkpoint_fields_schema[] = {
 // ---------------
 // restart:
 //   file: <checkpoint-filename>
-//   continue_run: <true/false>  # default: true
+//   reinitialize: <true/false>  # default: false
 
 // mapping of restart fields to members of RDyRestartSection
 static const cyaml_schema_field_t restart_fields_schema[] = {
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyRestartSection, file, 0),
-    CYAML_FIELD(BOOL, "continue_run", CYAML_FLAG_OPTIONAL, RDyRestartSection, continue_run, {.missing = PETSC_TRUE}),
+    CYAML_FIELD_BOOL("reinitialize", CYAML_FLAG_OPTIONAL, RDyRestartSection, reinitialize),
     CYAML_FIELD_END
 };
 
@@ -960,10 +960,8 @@ static PetscErrorCode PrintRestart(RDy rdy) {
   RDyLogDetail(rdy, "Restart:");
   if (rdy->config.restart.file[0]) {
     RDyLogDetail(rdy, "  File: %s", rdy->config.restart.file);
-    if (rdy->config.restart.continue_run) {
-      RDyLogDetail(rdy, "  Continue run: true");
-    } else {
-      RDyLogDetail(rdy, "  Continue run: false");
+    if (rdy->config.restart.reinitialize) {
+      RDyLogDetail(rdy, "  (time is reinitialized to zero)");
     }
   } else {
     RDyLogDetail(rdy, "  (disabled)");

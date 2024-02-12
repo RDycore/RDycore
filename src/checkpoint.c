@@ -60,10 +60,10 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
   PetscCall(PetscBagGetData(bag, (void **)&metadata));
   rdy->nproc = metadata->nproc;
   rdy->dt    = metadata->dt;
-  if (rdy->config.restart.continue_run) {
-    PetscCall(TSSetTime(rdy->ts, metadata->t));
-  } else {
+  if (rdy->config.restart.reinitialize) {
     PetscCall(TSSetTime(rdy->ts, 0.0));
+  } else {
+    PetscCall(TSSetTime(rdy->ts, metadata->t));
   }
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 

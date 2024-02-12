@@ -17,6 +17,14 @@ foreach(np 1 2) # test on 1, 2 processes
   endforeach()
 endforeach()
 
+# test restarts from timestep 100
+foreach (np 1 2)
+  foreach(config basic ceed)
+    add_test(swe_roe_ex2b_restart_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
+    add_test(swe_roe_ex2b_restart_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
+  endforeach()
+endforeach()
+
 # Dirichlet BC test
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_dirichlet_bc.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
