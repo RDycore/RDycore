@@ -137,38 +137,38 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   snprintf(time_group, 1024, "%" PetscInt_FMT " %E %s", step, time, units);
 
   PetscCall(PetscFPrintf(rdy->comm, fp,
-                          "    <Grid Name=\"domain\">\n"
-                          "      <Time Value=\"%E\" />\n",
-                          time));
+                         "    <Grid Name=\"domain\">\n"
+                         "      <Time Value=\"%E\" />\n",
+                         time));
 
   RDyMesh *mesh = &rdy->mesh;
   PetscInt size;
   VecGetSize(mesh->cell_conn, &size);
   PetscCall(PetscFPrintf(rdy->comm, fp,
-                          "      <Topology Type=\"Mixed\" NumberOfElements=\"%" PetscInt_FMT "\">\n"
-                          "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%" PetscInt_FMT "\">\n"
-                          "          %s:/Domain/Cells\n"
-                          "        </DataItem>\n"
-                          "      </Topology>\n",
-                          mesh->num_cells_total, size, h5_basename));
+                         "      <Topology Type=\"Mixed\" NumberOfElements=\"%" PetscInt_FMT "\">\n"
+                         "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%" PetscInt_FMT "\">\n"
+                         "          %s:/Domain/Cells\n"
+                         "        </DataItem>\n"
+                         "      </Topology>\n",
+                         mesh->num_cells_total, size, h5_basename));
   PetscCall(PetscFPrintf(rdy->comm, fp,
-                          "      <Geometry GeometryType=\"XYZ\">\n"
-                          "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " 3\">\n"
-                          "          %s:Domain/Vertices\n"
-                          "        </DataItem>\n"
-                          "      </Geometry>\n",
-                          num_vertices, h5_basename));
+                         "      <Geometry GeometryType=\"XYZ\">\n"
+                         "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " 3\">\n"
+                         "          %s:Domain/Vertices\n"
+                         "        </DataItem>\n"
+                         "      </Geometry>\n",
+                         num_vertices, h5_basename));
 
   // write cell field metadata
   const char *cell_field_names[3] = {"Height", "MomentumX", "MomentumY"};
   for (int f = 0; f < 3; ++f) {
     PetscCall(PetscFPrintf(rdy->comm, fp,
-                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
-                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                            "          %s:/%s/%s\n"
-                            "        </DataItem>\n"
-                            "      </Attribute>\n",
-                            cell_field_names[f], mesh->num_cells_total, h5_basename, time_group, cell_field_names[f]));
+                           "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
+                           "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
+                           "          %s:/%s/%s\n"
+                           "        </DataItem>\n"
+                           "      </Attribute>\n",
+                           cell_field_names[f], mesh->num_cells_total, h5_basename, time_group, cell_field_names[f]));
   }
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
