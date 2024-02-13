@@ -736,6 +736,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
     PetscCheck(strlen(ic_spec.flow), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial flow condition!", region.name);
     PetscInt flow_index;
     PetscCall(FindFlowCondition(rdy, ic_spec.flow, &flow_index));
+    PetscCheck(flow_index != -1, rdy->comm, PETSC_ERR_USER, "initial flow condition '%s' for region '%s' was not found!", ic_spec.flow, region.name);
     RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
     PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
@@ -787,6 +788,8 @@ static PetscErrorCode InitSources(RDy rdy) {
         if (strlen(src_spec.flow)) {
           PetscInt flow_index;
           PetscCall(FindFlowCondition(rdy, src_spec.flow, &flow_index));
+          PetscCheck(flow_index != -1, rdy->comm, PETSC_ERR_USER, "source flow condition '%s' for region '%s' was not found!", src_spec.flow,
+                     region.name);
           RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
           PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "flow source '%s' for region '%s' is not of dirichlet type!",
                      flow_cond->name, region.name);
@@ -861,6 +864,8 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
       } else {
         PetscInt flow_index;
         PetscCall(FindFlowCondition(rdy, bc_spec.flow, &flow_index));
+        PetscCheck(flow_index != -1, rdy->comm, PETSC_ERR_USER, "boundary flow condition '%s' for boundary '%s' was not found!", bc_spec.flow,
+                   boundary.name);
         bc->flow = &rdy->config.flow_conditions[flow_index];
       }
 
