@@ -2,6 +2,9 @@
 # Tests for the shallow water equations using a roe solver
 #----------------------------------------------------------
 
+find_program(H5DIFF h5diff REQUIRED)
+set(rdycore_c_driver ${rdycore_driver})
+
 # ex2b
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -12,16 +15,25 @@ set(preload_args -preload)
 
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
-    add_test(swe_roe_ex2b_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${${config}_args})
-    add_test(swe_roe_ex2b_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml ${${config}_args})
-  endforeach()
-endforeach()
+    foreach(lang c f90)
+      # run a full simulation to completion
+      add_test(swe_roe_ex2b_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args})
 
-# test restarts from timestep 100
-foreach (np 1 2)
-  foreach(config basic ceed)
-    add_test(swe_roe_ex2b_restart_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
-    add_test(swe_roe_ex2b_restart_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
+      # stash the simulation's final HDF5 output
+      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
+      set_tests_properties(swe_roe_ex2b_reference_${lang}_np_${np}_${config}
+        PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_np_${np}_${config}")
+
+      # restart from timestep 100
+      add_test(swe_roe_ex2b_restart_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
+      set_tests_properties(swe_roe_ex2b_restart_${lang}_np_${np}_${config}
+        PROPERTIES DEPENDS "swe_roe_ex2b_reference_${lang}_np_${np}_${config}")
+
+      # compare restarted results with the reference output we stashed
+      add_test(swe_roe_ex2b_compare_${lang}_np_${np}_${config} ${H5DIFF} ex2b-ref.h5 output/ex2b-0.h5 "/900 4.500000E-03 hr")
+      set_tests_properties(swe_roe_ex2b_compare_${lang}_np_${np}_${config}
+        PROPERTIES DEPENDS "swe_roe_ex2b_restart_${lang}_np_${np}_${config}")
+    endforeach()
   endforeach()
 endforeach()
 
