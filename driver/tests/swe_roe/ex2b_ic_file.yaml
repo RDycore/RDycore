@@ -44,12 +44,12 @@ materials:
 
 initial_conditions:
   - region: domain
-    flow: domain_flow_іc
+    flow: domain_flow_ic
 
 flow_conditions:
   - name: domain_flow_ic
     type: dirichlet
-    file: DamBreak_grid5x10_wetdownstream.IC
+    file: DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
     format: binary
 
 # we don't specify boundaries or boundary conditions, so all boundaries are

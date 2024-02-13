@@ -39,7 +39,7 @@ materials:
 
 initial_conditions:
   - region: domain
-    flow: domain_flow_іc
+    flow: domain_flow_ic
 
 flow_conditions:
   - name: domain_flow_ic
