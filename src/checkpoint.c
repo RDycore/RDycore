@@ -32,6 +32,7 @@ typedef struct {
   PetscInt  nproc;  // number of MPI processes / tasks
   PetscReal t;      // simulation time
   PetscReal dt;     // timestep
+  PetscInt  step;   // timestep number
 } CheckpointMetadata;
 
 // creates a new PetscBag that can store checkpoint metadata, populated with
@@ -48,6 +49,9 @@ static PetscErrorCode CreateMetadata(RDy rdy, PetscBag *bag) {
   PetscCall(TSGetTime(rdy->ts, &t));
   PetscCall(PetscBagRegisterReal(*bag, &metadata->t, t, "t", "Simulation time"));
   PetscCall(PetscBagRegisterReal(*bag, &metadata->dt, rdy->dt, "dt", "Simulation timestep"));
+  PetscInt step;
+  PetscCall(TSGetStepNumber(rdy->ts, &step));
+  PetscCall(PetscBagRegisterInt(*bag, &metadata->step, step, "step", "Simulation step number"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -64,6 +68,7 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
     PetscCall(TSSetTime(rdy->ts, 0.0));
   } else {
     PetscCall(TSSetTime(rdy->ts, metadata->t));
+    PetscCall(TSSetStepNumber(rdy->ts, metadata->step));
   }
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 
