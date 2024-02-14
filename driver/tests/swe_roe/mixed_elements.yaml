@@ -1,0 +1,64 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses a file
+# to specify the initial conditions (and a corresponding Exodus mesh).
+
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  final_time: 1.0
+  unit: seconds
+  max_step: 1
+  coupling_interval: 1.0
+
+#output:
+#  format: xdmf
+#  interval: 100
+#  batch_size: 20
+#  time_series:
+#    boundary_fluxes: 10
+
+grid:
+  file: DamBreak_grid5x10_mixed_elements.exo
+
+# one region represents the whole domain
+regions:
+  - name: domain_quad
+    grid_region_id: 1
+  - name: domain_tri
+    grid_region_id: 2
+
+surface_composition:
+  - region: domain_quad
+    material: materials_whole_domain
+  - region: domain_tri
+    material: materials_whole_domain
+
+materials:
+  - name: materials_whole_domain
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: domain_quad
+    flow: domain_flow_ic_whole_domain
+  - region: domain_tri
+    flow: domain_flow_ic_whole_domain
+
+flow_conditions:
+  - name: domain_flow_ic_whole_domain
+    type: dirichlet
+    height: 10
+    momentum: [0, 0]
+
+# we don't specify boundaries or boundary conditions, so all boundaries are
+# reflecting
