@@ -34,6 +34,6 @@
 --download-exodusii \
 --download-libceed \
 --download-cgns-commit=HEAD \
---with-debugging=1 \
+--with-debugging=0 \
 PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
 
