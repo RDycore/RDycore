@@ -1,0 +1,35 @@
+# Modules as of 16-Feb-2024
+module -q unload cray-hdf5-parallel
+module -q unload cray-netcdf-hdf5parallel
+module -q unload cray-parallel-netcdf
+module -q unload cray-netcdf
+module -q unload cray-hdf5
+module -q unload PrgEnv-gnu
+module -q unload PrgEnv-intel
+module -q unload PrgEnv-nvidia
+module -q unload PrgEnv-cray
+module -q unload PrgEnv-aocc
+module -q unload intel
+module -q unload intel-oneapi
+module -q unload nvidia
+module -q unload aocc
+module -q unload cudatoolkit
+module -q unload climate-utils
+module -q unload craype-accel-nvidia80
+module -q unload craype-accel-host
+module -q unload perftools-base
+module -q unload perftools
+module -q unload darshan
+
+module load PrgEnv-gnu/8.3.3
+module load gcc/11.2.0
+module load cray-libsci/23.02.1.1
+
+module load craype-accel-host
+module load craype/2.7.20
+module load cray-mpich/8.1.25
+module load cray-hdf5-parallel/1.12.2.3
+module load cray-netcdf-hdf5parallel/4.9.0.3
+module load cray-parallel-netcdf/1.12.3.3
+module load cmake/3.24.3
+
