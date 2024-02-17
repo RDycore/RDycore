@@ -55,7 +55,13 @@ elif [ "$mach" = "pm-gpu" ]; then
 
 elif [ "$mach" = "frontier"  ]; then
 
-  echo "Add settings for Frontier"
+  MODULE_FILE=$DIR/modules.frontier.gnugpu
+  export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc
+  if [ "$with64bit" -eq 0 ]; then
+     export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
+  else
+     export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
+  fi
 else
 
   echo "Unsupported machine."
