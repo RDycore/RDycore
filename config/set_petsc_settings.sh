@@ -7,7 +7,7 @@ display_help() {
     echo "Usage: $0 " >&2
     echo
     echo "   -h, --help             Display this message"
-    echo "   --mach <machine_name>  Machine name (pm-cpu, pm-gpu, frontier)"
+    echo "   --mach <machine_name>  Machine name (pm-cpu, pm-gpu, frontier, aurora)"
     echo "   --64bit                With 64bit support (optional)"
     echo
     exit 1
@@ -62,9 +62,20 @@ elif [ "$mach" = "frontier"  ]; then
   else
      export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
   fi
-else
 
-  echo "Unsupported machine."
+elif [ "$mach" = "aurora"  ]; then
+
+  MODULE_FILE=$DIR/modules.aurora.openapi
+  export PETSC_DIR=/lus/gecko/projects/CSC250STMS07_CNDA/bishtgautam/petsc
+  if [ "$with64bit" -eq 0 ]; then
+     export PETSC_ARHC=aurora-opt-32bit-openapi-ifx-fc288817
+  else
+     export PETSC_ARHC=aurora-opt-64bit-openapi-ifx-fc288817
+  fi
+
+else
+  echo "Supported machines include       : pm-cpu, pm-gpu, frontier, aurora"
+  echo "An unsupported machine specified : $mach"
   display_help
   exit 1
 fi
