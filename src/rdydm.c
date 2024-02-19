@@ -91,6 +91,8 @@ static PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// This function create the primary DM for RDycore. The Vec and Mat types are
+/// set for CPU or GPUs.
 PetscErrorCode CreateDM(RDy rdy) {
   PetscSection sec;
   PetscMPIInt  size;
@@ -210,6 +212,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// This function creates an auxillary (or secondary) DM
 PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
