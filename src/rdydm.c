@@ -134,6 +134,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   }
 
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+  PetscCall(DMSetRefineLevel(rdy->dm, 0));
   PetscCall(DMSetFromOptions(rdy->dm));
 
   // name the grid
