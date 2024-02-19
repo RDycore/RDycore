@@ -56,7 +56,8 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateSection(RDy rdy, PetscSection *sec) {
+/// This function creates one Section with 3 DOFs for SWE.
+static PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
   PetscInt n_field                             = 1;
   PetscInt n_field_comps[1]                    = {3};
   char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
@@ -136,7 +137,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   // NOTE Need to create section before distribution, so that natural map can be created
   // create a section with (h, hu, hv) as degrees of freedom
   if (!rdy->refine) {
-    PetscCall(CreateSection(rdy, &sec));
+    PetscCall(CreateSectionForSWE(rdy, &sec));
     // embed the section's data in our grid and toss the section
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   }
@@ -180,7 +181,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // create parallel section and global-to-natural mapping
   if (rdy->refine) {
-    PetscCall(CreateSection(rdy, &sec));
+    PetscCall(CreateSectionForSWE(rdy, &sec));
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   } else if (size > 1) {
     PetscSF      sfMigration, sfNatural;
