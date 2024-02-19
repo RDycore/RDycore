@@ -8,7 +8,7 @@
 
 /// Create a new cell-centered DM (cc_dm) from a given DM and adds a number of given
 /// cell-centered fields as Sections in the new DM.
-PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, PetscInt n_cc_field, PetscInt n_cc_field_dof[n_cc_field], PetscInt max_field_name,
+PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscInt n_cc_field, PetscInt n_cc_field_dof[n_cc_field], PetscInt max_field_name,
                                             char aux_field_names[n_cc_field][max_field_name], DM *cc_dm) {
   PetscFunctionBegin;
 
@@ -44,7 +44,10 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, Pets
   PetscCall(PetscSectionViewFromOptions(aux_sec, NULL, "-aux_layout_view"));
   PetscCall(PetscSectionDestroy(&aux_sec));
 
-  if (!is_dm_refined) {
+  PetscInt refine_level;
+  DMGetRefineLevel(dm, &refine_level);
+
+  if (!refine_level) {
     // copy adjacency info from the primary DM
     PetscSF sf_migration, sf_natural;
     PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));
@@ -221,7 +224,7 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscInt n_cc_field_dof[1]      = {1};
   char     aux_field_names[1][20] = {"Parameter"};
 
-  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, rdy->refine, n_cc_field, n_cc_field_dof, 20, &aux_field_names[0], &rdy->aux_dm));
+  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, n_cc_field, n_cc_field_dof, 20, &aux_field_names[0], &rdy->aux_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

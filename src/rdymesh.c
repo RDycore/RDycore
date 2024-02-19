@@ -227,7 +227,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
 ///
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_total, PetscBool mesh_refined) {
+PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_total) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -290,7 +290,9 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
   VecRestoreArray(coordinates, &coords);
 
   // fetch global vertex IDs if mesh is not refined
-  if (!mesh_refined) {
+  PetscInt refine_level;
+  PetscCall(DMGetRefineLevel(dm, &refine_level));
+  if (!refine_level) {
     PetscMPIInt commsize;
     MPI_Comm    comm;
     PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -932,7 +934,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool is_dm_refined) {
+static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   // create a local DM
@@ -942,7 +944,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
   PetscInt n_aux_field_dof[1]     = {max_num_vertices};
   char     aux_field_names[1][20] = {"Cell Connections"};
 
-  PetscCall(CloneAndCreateCellCenteredDM(dm, is_dm_refined, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+  PetscCall(CloneAndCreateCellCenteredDM(dm, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
 
   Vec          global_vec, natural_vec;
   PetscScalar *vec_ptr;
@@ -1047,7 +1049,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
 /// @param [in] dm A PETSc DM
 /// @param [out] mesh A pointer to an RDyMesh that stores allocated data.
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined) {
+PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
@@ -1070,7 +1072,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined)
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_total, mesh_refined));
+  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_total));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
@@ -1091,9 +1093,11 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh, PetscBool mesh_refined)
 
   PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_total, 1, MPI_INTEGER, MPI_SUM, comm));
 
-  if (!mesh_refined) {
+  PetscInt refine_level;
+  PetscCall(DMGetRefineLevel(dm, &refine_level));
+  if (!refine_level) {
     PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
-    PetscCall(CreateCellConnectionVector(dm, mesh, mesh_refined));
+    PetscCall(CreateCellConnectionVector(dm, mesh));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

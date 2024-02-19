@@ -884,7 +884,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Creating FV mesh...");
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh, rdy->refine));
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
