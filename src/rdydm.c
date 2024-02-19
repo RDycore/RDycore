@@ -6,23 +6,25 @@
 // Maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
 
-PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, PetscInt n_aux_field, PetscInt n_aux_field_dof[n_aux_field], PetscInt m,
-                                            char aux_field_names[n_aux_field][m], DM *aux_dm) {
+/// Create a new cell-centered DM (cc_dm) from a given DM and adds a number of given
+/// cell-centered fields as Sections in the new DM.
+PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, PetscInt n_cc_field, PetscInt n_cc_field_dof[n_cc_field], PetscInt max_field_name,
+                                            char aux_field_names[n_cc_field][max_field_name], DM *cc_dm) {
   PetscFunctionBegin;
 
-  PetscCall(DMClone(dm, aux_dm));
+  PetscCall(DMClone(dm, cc_dm));
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
   PetscSection aux_sec;
   PetscCall(PetscSectionCreate(comm, &aux_sec));
-  PetscCall(PetscSectionSetNumFields(aux_sec, n_aux_field));
-  PetscInt n_aux_field_dof_tot = 0;
-  for (PetscInt f = 0; f < n_aux_field; ++f) {
+  PetscCall(PetscSectionSetNumFields(aux_sec, n_cc_field));
+  PetscInt n_cc_field_dof_tot = 0;
+  for (PetscInt f = 0; f < n_cc_field; ++f) {
     PetscCall(PetscSectionSetFieldName(aux_sec, f, &aux_field_names[f][0]));
-    PetscCall(PetscSectionSetFieldComponents(aux_sec, f, n_aux_field_dof[f]));
-    n_aux_field_dof_tot += n_aux_field_dof[f];
+    PetscCall(PetscSectionSetFieldComponents(aux_sec, f, n_cc_field_dof[f]));
+    n_cc_field_dof_tot += n_cc_field_dof[f];
   }
 
   // set the number of auxiliary degrees of freedom in each cell
@@ -30,15 +32,15 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, Pets
   DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
   PetscCall(PetscSectionSetChart(aux_sec, c_start, c_end));
   for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < n_aux_field; ++f) {
-      PetscCall(PetscSectionSetFieldDof(aux_sec, c, f, n_aux_field_dof[f]));
+    for (PetscInt f = 0; f < n_cc_field; ++f) {
+      PetscCall(PetscSectionSetFieldDof(aux_sec, c, f, n_cc_field_dof[f]));
     }
-    PetscCall(PetscSectionSetDof(aux_sec, c, n_aux_field_dof_tot));
+    PetscCall(PetscSectionSetDof(aux_sec, c, n_cc_field_dof_tot));
   }
 
   // embed the section's data in the auxiliary DM and toss the section
   PetscCall(PetscSectionSetUp(aux_sec));
-  PetscCall(DMSetLocalSection(*aux_dm, aux_sec));
+  PetscCall(DMSetLocalSection(*cc_dm, aux_sec));
   PetscCall(PetscSectionViewFromOptions(aux_sec, NULL, "-aux_layout_view"));
   PetscCall(PetscSectionDestroy(&aux_sec));
 
@@ -46,8 +48,8 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscBool is_dm_refined, Pets
     // copy adjacency info from the primary DM
     PetscSF sf_migration, sf_natural;
     PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));
-    PetscCall(DMPlexCreateGlobalToNaturalSF(*aux_dm, aux_sec, sf_migration, &sf_natural));
-    PetscCall(DMPlexSetGlobalToNaturalSF(*aux_dm, sf_natural));
+    PetscCall(DMPlexCreateGlobalToNaturalSF(*cc_dm, aux_sec, sf_migration, &sf_natural));
+    PetscCall(DMPlexSetGlobalToNaturalSF(*cc_dm, sf_natural));
     PetscCall(PetscSFDestroy(&sf_natural));
   }
 
@@ -211,11 +213,11 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
   // create an auxiliary section with a diagnostic parameter.
-  PetscInt n_aux_field            = 1;
-  PetscInt n_aux_field_dof[1]     = {1};
+  PetscInt n_cc_field             = 1;
+  PetscInt n_cc_field_dof[1]      = {1};
   char     aux_field_names[1][20] = {"Parameter"};
 
-  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, rdy->refine, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &rdy->aux_dm));
+  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, rdy->refine, n_cc_field, n_cc_field_dof, 20, &aux_field_names[0], &rdy->aux_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
