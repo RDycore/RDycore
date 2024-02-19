@@ -6,8 +6,8 @@
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
 
-static PetscInt TRI_ID_XDMF  = 4;
-static PetscInt QUAD_ID_XDMF = 5;
+static PetscInt TRI_ID_EXODUS  = 4;
+static PetscInt QUAD_ID_EXODUS = 5;
 
 // fills the given array of length n with the given value
 #define FILL(n, array, value)      \
@@ -993,8 +993,8 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
   // cell vertices. For an i-th cell, the first entry will denoted a valid XMDF element ID
   // followed by the ID of vertices in the natural order that form the i-th cell.
   // The supported element types include:
-  // - Triangles (TRI_ID_XDMF)
-  // - Quadrilaterals (QUAD_ID_XDMF)
+  // - Triangles (TRI_ID_EXODUS)
+  // - Quadrilaterals (QUAD_ID_EXODUS)
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -1014,10 +1014,10 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh, PetscBool
     }
     switch (nvertices) {
       case 3:
-        cell_conn_ptr[idx++] = TRI_ID_XDMF;
+        cell_conn_ptr[idx++] = TRI_ID_EXODUS;
         break;
       case 4:
-        cell_conn_ptr[idx++] = QUAD_ID_XDMF;
+        cell_conn_ptr[idx++] = QUAD_ID_EXODUS;
         break;
       default:
         SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported cell type");
