@@ -1,5 +1,7 @@
-# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses a file
-# to specify the initial conditions (and a corresponding Exodus mesh).
+# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses
+# - a mesh comprising of mixed element types (quads + triangles),
+# - a PETSc binary file for initial conditions, and
+# - a PETSc binary file for material properity.
 
 physics:
   flow:
