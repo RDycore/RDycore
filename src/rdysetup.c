@@ -453,24 +453,39 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define READ_MATERIAL_PROPERTY(property, mat_props_spec, region, materials_by_cell) \
-  if (mat_props_spec.property.file[0]) { /* read property from a file */            \
-    Vec local;                                                                      \
-    PetscCall(ReadOneDOFVecFromFile(rdy, mat_props_spec.property.file, &local));    \
-    PetscScalar *x_ptr;                                                             \
-    PetscCall(VecGetArray(local, &x_ptr));                                          \
-    for (PetscInt c = 0; c < region.num_cells; ++c) {                               \
-      PetscInt cell                    = region.cell_ids[c];                        \
-      materials_by_cell[cell].property = x_ptr[c];                                  \
-    }                                                                               \
-    PetscCall(VecRestoreArray(local, &x_ptr));                                      \
-    PetscCall(VecDestroy(&local));                                                  \
-  } else {                                                                          \
-    /* set this material property for all cells in the region */                    \
-    for (PetscInt c = 0; c < region.num_cells; ++c) {                               \
-      PetscInt cell                    = region.cell_ids[c];                        \
-      materials_by_cell[cell].property = mat_props_spec.property.value;             \
-    }                                                                               \
+#define READ_MATERIAL_PROPERTY(property, mat_props_spec, materials_by_cell)                            \
+  {                                                                                                    \
+    Vec mat_prop_vec = NULL;                                                                           \
+    if (mat_props_spec.property.file[0]) {                                                             \
+      ReadOneDOFVecFromFile(rdy, mat_props_spec.property.file, &mat_prop_vec);                         \
+    }                                                                                                  \
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {                                                  \
+      RDyRegion region = rdy->regions[r];                                                              \
+      for (PetscInt isurf_comp = 0; isurf_comp < rdy->config.num_material_assignments; ++isurf_comp) { \
+        RDySurfaceCompositionSpec surface_comp = rdy->config.surface_composition[isurf_comp];          \
+        if (!strcmp(surface_comp.region, region.name)) {                                               \
+          if (mat_prop_vec) {                                                                          \
+            PetscScalar *x_ptr;                                                                        \
+            PetscCall(VecGetArray(mat_prop_vec, &x_ptr));                                              \
+            for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
+              PetscInt cell                    = region.cell_ids[c];                                   \
+              materials_by_cell[cell].property = x_ptr[c];                                             \
+            }                                                                                          \
+            PetscCall(VecRestoreArray(mat_prop_vec, &x_ptr));                                          \
+            PetscCall(VecDestroy(&mat_prop_vec));                                                      \
+          } else {                                                                                     \
+            /* set this material property for all cells in each matching region */                     \
+            for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
+              PetscInt cell                    = region.cell_ids[c];                                   \
+              materials_by_cell[cell].property = mat_props_spec.property.value;                        \
+            }                                                                                          \
+          }                                                                                            \
+        }                                                                                              \
+      }                                                                                                \
+    }                                                                                                  \
+    if (mat_prop_vec) {                                                                                \
+      PetscCall(VecDestroy(&mat_prop_vec));                                                            \
+    }                                                                                                  \
   }
 
 // sets up materials
@@ -478,18 +493,13 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
 static PetscErrorCode InitMaterials(RDy rdy) {
   PetscFunctionBegin;
 
-  // allocate storage for materials
-  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
-
-  // assign materials to each region as needed
+  // check that each region has a material assigned to it
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyRegion region = rdy->regions[r];
-
-    // find the material specification corresponding to this region
-    PetscInt region_mat_index = -1;
+    RDyRegion region           = rdy->regions[r];
+    PetscInt  region_mat_index = -1;
     for (PetscInt isurf_comp = 0; isurf_comp < rdy->config.num_material_assignments; ++isurf_comp) {
-      if (!strcmp(rdy->config.surface_composition[isurf_comp].region, region.name)) {
-        RDySurfaceCompositionSpec surf_comp = rdy->config.surface_composition[isurf_comp];
+      RDySurfaceCompositionSpec surf_comp = rdy->config.surface_composition[isurf_comp];
+      if (!strcmp(surf_comp.region, region.name)) {
         for (PetscInt imat = 0; imat < rdy->config.num_materials; ++imat) {
           if (!strcmp(rdy->config.materials[imat].name, surf_comp.material)) {
             region_mat_index = imat;
@@ -500,11 +510,17 @@ static PetscErrorCode InitMaterials(RDy rdy) {
       }
     }
     PetscCheck(region_mat_index != -1, rdy->comm, PETSC_ERR_USER, "Region '%s' has no assigned material!", region.name);
-    RDyMaterialPropertiesSpec mat_props_spec = rdy->config.materials[region_mat_index].properties;
-
-    // set the region's material properties
-    READ_MATERIAL_PROPERTY(manning, mat_props_spec, region, rdy->materials_by_cell);
   }
+
+  // allocate storage for materials
+  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
+
+  // read material properties in from files as needed
+  for (PetscInt imat = 0; imat < rdy->config.num_materials; ++imat) {
+    RDyMaterialPropertiesSpec mat_props_spec = rdy->config.materials[imat].properties;
+    READ_MATERIAL_PROPERTY(manning, mat_props_spec, rdy->materials_by_cell);
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -750,41 +766,80 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   PetscCall(VecZeroEntries(rdy->X));
 
-  // now initialize or override initial conditions by looping over regions
-  // and writing values for corresponding cells
-  PetscInt n_local;
-  PetscCall(VecGetLocalSize(rdy->X, &n_local));
-  PetscScalar *x_ptr;
-  PetscCall(VecGetArray(rdy->X, &x_ptr));
+  // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion    region = rdy->regions[r];
     RDyCondition ic     = rdy->initial_conditions[r];
     PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER, "No initial condition specified for region '%s'", region.name);
-    if (strlen(ic.flow->file)) {  // read regional data from file
-      // FIXME: Figure this out!
+  }
+
+  // now initialize or override initial conditions for each region
+  PetscInt n_local;
+  PetscCall(VecGetLocalSize(rdy->X, &n_local));
+  PetscScalar *x_ptr;
+  PetscCall(VecGetArray(rdy->X, &x_ptr));
+
+  // initialize flow conditions
+  for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
+    RDyFlowCondition flow_ic = rdy->config.flow_conditions[f];
+    Vec              local   = NULL;
+    if (flow_ic.file[0]) {  // read flow data from file
       PetscViewer viewer;
-      PetscCall(PetscViewerBinaryOpen(rdy->comm, ic.flow->file, FILE_MODE_READ, &viewer));
-      Vec natural;
+      PetscCall(PetscViewerBinaryOpen(rdy->comm, flow_ic.file, FILE_MODE_READ, &viewer));
+
+      Vec natural, global;
       PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
+      PetscCall(DMCreateGlobalVector(rdy->dm, &global));
+      PetscCall(DMCreateLocalVector(rdy->dm, &local));
+
       PetscCall(VecLoad(natural, viewer));
-      PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, rdy->X));
-      PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, rdy->X));
       PetscCall(PetscViewerDestroy(&viewer));
+
+      // scatter natural-to-global
+      PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, global));
+
+      // scatter global-to-local
+      PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, local));
+
       PetscCall(VecDestroy(&natural));
-    } else {  // set components to specified values
-      for (PetscInt c = 0; c < region.num_cells; ++c) {
-        PetscInt cell_id = region.cell_ids[c];
-        if (3 * cell_id < n_local) {  // skip ghost cells
-          x_ptr[3 * cell_id]     = ic.flow->height;
-          x_ptr[3 * cell_id + 1] = ic.flow->momentum[0];
-          x_ptr[3 * cell_id + 2] = ic.flow->momentum[1];
+      PetscCall(VecDestroy(&global));
+    }
+
+    // set regional flow as needed
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyRegion    region = rdy->regions[r];
+      RDyCondition ic     = rdy->initial_conditions[r];
+      if (!strcmp(ic.flow->name, flow_ic.name)) {
+        if (local) {
+          PetscScalar *local_ptr;
+          PetscCall(VecGetArray(local, &local_ptr));
+          for (PetscInt c = 0; c < region.num_cells; ++c) {
+            PetscInt cell_id       = region.cell_ids[c];
+            x_ptr[3 * cell_id]     = local_ptr[3 * cell_id];
+            x_ptr[3 * cell_id + 1] = local_ptr[3 * cell_id + 1];
+            x_ptr[3 * cell_id + 2] = local_ptr[3 * cell_id + 2];
+          }
+          PetscCall(VecRestoreArray(local, &local_ptr));
+        } else {
+          for (PetscInt c = 0; c < region.num_cells; ++c) {
+            PetscInt cell_id = region.cell_ids[c];
+            if (3 * cell_id < n_local) {  // skip ghost cells
+              x_ptr[3 * cell_id]     = flow_ic.height;
+              x_ptr[3 * cell_id + 1] = flow_ic.momentum[0];
+              x_ptr[3 * cell_id + 2] = flow_ic.momentum[1];
+            }
+          }
         }
       }
     }
-    // TODO: salinity and sediment initial conditions go here.
+    PetscCall(VecDestroy(&local));
   }
-  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
 
+  // TODO: salinity and sediment initial conditions go here.
+
+  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
