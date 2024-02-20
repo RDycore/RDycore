@@ -60,7 +60,7 @@ elif [ "$mach" = "frontier"  ]; then
   if [ "$with64bit" -eq 0 ]; then
      export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
   else
-     export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
+     export PETSC_ARCH=frontier-gpu-opt-64bit-gcc-11-2-0-fc288817
   fi
 
 elif [ "$mach" = "aurora"  ]; then
