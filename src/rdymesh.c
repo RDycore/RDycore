@@ -1,9 +1,13 @@
 #include <petscdmplex.h>
+#include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdymeshimpl.h>
 
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
+
+static PetscInt TRI_ID_EXODUS  = 4;
+static PetscInt QUAD_ID_EXODUS = 5;
 
 // fills the given array of length n with the given value
 #define FILL(n, array, value)      \
@@ -223,7 +227,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
 ///
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
+PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_global) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -259,6 +263,9 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
     for (PetscInt idim = 0; idim < dim; idim++) {
       vertices->points[ivertex].X[idim] = coords[coordOffset + idim];
     }
+    if (dim < 3) {
+      vertices->points[ivertex].X[2] = 0.0;
+    }
 
     vertices->num_edges[ivertex] = 0;
     vertices->num_cells[ivertex] = 0;
@@ -282,10 +289,65 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices) {
 
   VecRestoreArray(coordinates, &coords);
 
-  // fetch global vertex IDs.
-  ISLocalToGlobalMapping map;
-  PetscCall(DMGetLocalToGlobalMapping(dm, &map));
-  PetscCall(ISLocalToGlobalMappingApply(map, num_vertices, vertices->ids, vertices->global_ids));
+  // fetch global vertex IDs if mesh is not refined
+  PetscInt refine_level;
+  PetscCall(DMGetRefineLevel(dm, &refine_level));
+  if (!refine_level) {
+    PetscMPIInt commsize;
+    MPI_Comm    comm;
+    PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+    PetscCallMPI(MPI_Comm_size(comm, &commsize));
+
+    if (commsize == 1) {
+      for (PetscInt v = v_start; v < v_end; v++) {
+        PetscInt ivertex              = v - v_start;
+        vertices->global_ids[ivertex] = ivertex;
+      }
+    } else {
+      PetscSF            sf;
+      const PetscInt    *local;
+      const PetscSFNode *natural;
+      PetscInt           p_start, p_end, Nl;
+
+      PetscCall(DMPlexGetMigrationSF(dm, &sf));
+      PetscCheck(sf, comm, PETSC_ERR_ARG_WRONGSTATE, "DM must have a migration SF");
+
+      PetscCall(DMPlexGetChart(dm, &p_start, &p_end));
+      PetscCall(PetscSFGetGraph(sf, NULL, &Nl, &local, &natural));
+      PetscCheck(p_end - p_start == Nl, comm, PETSC_ERR_PLIB,
+                 "The number of mesh points %" PetscInt_FMT " != %" PetscInt_FMT " the number of migration leaves", p_end - p_start, Nl);
+
+      PetscMPIInt min_vertex_idx;  // to save the min v_start
+
+      for (PetscInt v = v_start; v < v_end; v++) {
+        PetscInt ivertex = v - v_start;
+        if (local) PetscCall(PetscFindInt(v, Nl, local, &v));
+        PetscCheck(v >= 0, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Vertex %" PetscInt_FMT " not found in migration SF", v);
+        PetscCheck(!natural[v].rank, PETSC_COMM_SELF, PETSC_ERR_PLIB,
+                   "Natural ID for vertex %" PetscInt_FMT " should come from rank 0 not %" PetscInt_FMT, v, natural[v].rank);
+        vertices->global_ids[ivertex] = natural[v].index;
+
+        if (v == v_start) {
+          min_vertex_idx = natural[v].index;
+        } else {
+          min_vertex_idx = PetscMin(min_vertex_idx, natural[v].index);
+        }
+      }
+
+      MPI_Allreduce(MPI_IN_PLACE, &min_vertex_idx, 1, MPI_INT, MPI_MIN, comm);
+
+      // substract the min v_start
+      for (PetscInt v = v_start; v < v_end; v++) {
+        PetscInt ivertex = v - v_start;
+        vertices->global_ids[ivertex] -= min_vertex_idx;
+      }
+    }
+  }
+
+  // compute total number of vertices
+  DMGetCoordinates(dm, &coordinates);
+  VecGetSize(coordinates, num_vertices_global);
+  *num_vertices_global = *num_vertices_global / dim;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -731,14 +793,8 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
+static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt rank) {
   PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-  PetscMPIInt rank, size;
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &size);
 
   PetscBool useNatural;
   PetscCall(DMGetUseNatural(dm, &useNatural));
@@ -798,23 +854,208 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells) {
     PetscCall(VecDestroy(&global));
     PetscCall(VecDestroy(&local));
 
-  } else {
-    if (size == 1) {
-      // Since there only one rank present, DMPlex does has useNatural = PETSC_FALSE
-      // and the natural IDs of cell is the same as the local IDs.
-      Vec      local;
-      PetscInt local_size, num_fields;
-
-      PetscCall(DMCreateLocalVector(dm, &local));
-      PetscCall(VecGetBlockSize(local, &num_fields));
-      PetscCall(VecGetLocalSize(local, &local_size));
-
-      for (PetscInt i = 0; i < local_size / num_fields; ++i) {
-        cells->natural_ids[i] = i;
+    PetscMPIInt myrank, commsize;
+    PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &commsize));
+    for (PetscInt irank = 0; irank < commsize; irank++) {
+      if (irank == myrank) {
+        printf("myrank = %d\n", myrank);
+        for (PetscInt icell = 0; icell < local_size / num_fields; icell++) {
+          printf("%02d %03d %f %f %f %d\n", icell, cells->natural_ids[icell], cells->centroids[icell].X[0], cells->centroids[icell].X[1],
+                 cells->centroids[icell].X[2], cells->is_local[icell]);
+        }
       }
-      PetscCall(VecDestroy(&local));
+      MPI_Barrier(PETSC_COMM_WORLD);
+    }
+    exit(0);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  Vec xcoord_nat, ycoord_nat, zcoord_nat;
+  PetscCall(VecCreateMPI(comm, PETSC_DECIDE, mesh->num_vertices_global, &xcoord_nat));
+  PetscCall(VecDuplicate(xcoord_nat, &ycoord_nat));
+  PetscCall(VecDuplicate(xcoord_nat, &zcoord_nat));
+
+  PetscInt  num_vertices = mesh->num_vertices;
+  PetscInt  indices[num_vertices];
+  PetscReal x[num_vertices], y[num_vertices], z[num_vertices];
+
+  RDyVertices *vertices = &mesh->vertices;
+  for (PetscInt v = 0; v < num_vertices; v++) {
+    indices[v] = vertices->global_ids[v];
+    x[v]       = vertices->points[v].X[0];
+    y[v]       = vertices->points[v].X[1];
+    z[v]       = vertices->points[v].X[2];
+  }
+
+  PetscCall(VecSetValues(xcoord_nat, num_vertices, indices, x, INSERT_VALUES));
+  PetscCall(VecSetValues(ycoord_nat, num_vertices, indices, y, INSERT_VALUES));
+  PetscCall(VecSetValues(zcoord_nat, num_vertices, indices, z, INSERT_VALUES));
+
+  PetscCall(VecAssemblyBegin(xcoord_nat));
+  PetscCall(VecAssemblyEnd(xcoord_nat));
+  PetscCall(VecAssemblyBegin(ycoord_nat));
+  PetscCall(VecAssemblyEnd(ycoord_nat));
+  PetscCall(VecAssemblyBegin(zcoord_nat));
+  PetscCall(VecAssemblyEnd(zcoord_nat));
+
+  if (0) {
+    VecView(xcoord_nat, PETSC_VIEWER_STDOUT_WORLD);
+    VecView(ycoord_nat, PETSC_VIEWER_STDOUT_WORLD);
+    VecView(zcoord_nat, PETSC_VIEWER_STDOUT_WORLD);
+  }
+
+  PetscInt local_size;
+  PetscCall(VecGetLocalSize(xcoord_nat, &local_size));
+  PetscInt ndim = 3;
+
+  Vec *coords_nat = &mesh->coords_nat;
+  PetscCall(VecCreate(comm, coords_nat));
+  PetscCall(VecSetSizes(*coords_nat, local_size * ndim, PETSC_DECIDE));
+  PetscCall(VecSetBlockSize(*coords_nat, ndim));
+  PetscCall(VecSetFromOptions(*coords_nat));
+
+  PetscScalar *x_ptr, *y_ptr, *z_ptr, *xyz_ptr;
+
+  PetscCall(VecGetArray(xcoord_nat, &x_ptr));
+  PetscCall(VecGetArray(ycoord_nat, &y_ptr));
+  PetscCall(VecGetArray(zcoord_nat, &z_ptr));
+  PetscCall(VecGetArray(*coords_nat, &xyz_ptr));
+
+  for (PetscInt v = 0; v < local_size; v++) {
+    xyz_ptr[v * ndim]     = x_ptr[v];
+    xyz_ptr[v * ndim + 1] = y_ptr[v];
+    xyz_ptr[v * ndim + 2] = z_ptr[v];
+  }
+
+  PetscCall(VecRestoreArray(xcoord_nat, &x_ptr));
+  PetscCall(VecRestoreArray(ycoord_nat, &y_ptr));
+  PetscCall(VecRestoreArray(zcoord_nat, &z_ptr));
+  PetscCall(VecRestoreArray(*coords_nat, &xyz_ptr));
+
+  if (0) VecView(*coords_nat, PETSC_VIEWER_STDOUT_WORLD);
+
+  PetscCall((PetscObjectSetName((PetscObject)mesh->coords_nat, "Vertices")));
+
+  PetscCall(VecDestroy(&xcoord_nat));
+  PetscCall(VecDestroy(&ycoord_nat));
+  PetscCall(VecDestroy(&zcoord_nat));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  // create a local DM
+  DM       local_dm;
+  PetscInt max_num_vertices       = 4;
+  PetscInt n_aux_field            = 1;
+  PetscInt n_aux_field_dof[1]     = {max_num_vertices};
+  char     aux_field_names[1][20] = {"Cell Connections"};
+
+  PetscCall(CloneAndCreateCellCenteredDM(dm, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+
+  Vec          global_vec, natural_vec;
+  PetscScalar *vec_ptr;
+  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+
+  PetscCall(VecSet(global_vec, -1));
+  PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+  for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
+    for (PetscInt v = 0; v < cells->num_vertices[c]; v++) {
+      PetscInt offset    = cells->vertex_offsets[c];
+      PetscInt vertex_id = cells->vertex_ids[offset + v];
+      PetscInt index     = c * max_num_vertices + v;
+      vec_ptr[index]     = vertices->global_ids[vertex_id];
     }
   }
+
+  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+
+  PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+  PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+
+  if (0) {
+    PetscCall(VecView(global_vec, PETSC_VIEWER_STDOUT_WORLD));
+    PetscCall(VecView(natural_vec, PETSC_VIEWER_STDOUT_WORLD));
+  }
+  PetscCall(VecDestroy(&global_vec));
+
+  PetscInt size, count = 0;
+  PetscCall(VecGetLocalSize(natural_vec, &size));
+
+  PetscCall(VecGetArray(natural_vec, &vec_ptr));
+
+  // Determine the number of vertices that are valid (i.e. vertex id > -1).
+  PetscInt ncells = size / max_num_vertices;
+  for (PetscInt i = 0; i < ncells; i++) {
+    for (PetscInt j = 0; j < max_num_vertices; j++) {
+      if (vec_ptr[i * max_num_vertices + j] > -1) count++;
+    }
+  }
+  // Add the number of cells
+  count += ncells;
+
+  // The *cell_conn vector is a long 1D distributed vector that will hold information about
+  // cell vertices. For an i-th cell, the first entry will denoted a valid XMDF element ID
+  // followed by the ID of vertices in the natural order that form the i-th cell.
+  // The supported element types include:
+  // - Triangles (TRI_ID_EXODUS)
+  // - Quadrilaterals (QUAD_ID_EXODUS)
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+  Vec *cell_conn = &mesh->cell_conn;
+  PetscCall(VecCreate(comm, cell_conn));
+  PetscCall(VecSetSizes(*cell_conn, count, PETSC_DECIDE));
+  PetscCall(VecSetFromOptions(*cell_conn));
+
+  PetscScalar *cell_conn_ptr;
+  PetscInt     idx = 0;
+
+  VecGetArray(*cell_conn, &cell_conn_ptr);
+  for (PetscInt i = 0; i < ncells; i++) {
+    PetscInt nvertices = 0;
+    for (PetscInt j = 0; j < max_num_vertices; j++) {
+      if (vec_ptr[i * max_num_vertices + j] > -1) nvertices++;
+    }
+    switch (nvertices) {
+      case 3:
+        cell_conn_ptr[idx++] = TRI_ID_EXODUS;
+        break;
+      case 4:
+        cell_conn_ptr[idx++] = QUAD_ID_EXODUS;
+        break;
+      default:
+        SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported cell type");
+        break;
+    }
+    for (PetscInt j = 0; j < max_num_vertices; j++) {
+      if (vec_ptr[i * max_num_vertices + j] > -1) {
+        cell_conn_ptr[idx++] = vec_ptr[i * max_num_vertices + j];
+      }
+    }
+  }
+  VecRestoreArray(*cell_conn, &cell_conn_ptr);
+  if (0) {
+    PetscCall(VecView(*cell_conn, PETSC_VIEWER_STDOUT_WORLD));
+  }
+  PetscCall((PetscObjectSetName((PetscObject)mesh->cell_conn, "Cells")));
+
+  PetscCall(VecRestoreArray(natural_vec, &vec_ptr));
+  PetscCall(VecDestroy(&natural_vec));
+
+  PetscCall(DMDestroy(&local_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -831,6 +1072,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
   PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
+  printf("c_start/end = %d %d\n", c_start, c_end);
   mesh->num_cells = c_end - c_start;
 
   // Determine the number of edges in the mesh
@@ -846,7 +1088,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices));
+  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_global));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
@@ -859,7 +1101,20 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   }
 
   // Extract natural cell IDs from the DM.
-  PetscCall(SaveNaturalCellIDs(dm, &mesh->cells));
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+  PetscMPIInt rank;
+  MPI_Comm_rank(comm, &rank);
+  PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
+
+  PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
+
+  PetscInt refine_level;
+  PetscCall(DMGetRefineLevel(dm, &refine_level));
+  if (!refine_level) {
+    PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
+    PetscCall(CreateCellConnectionVector(dm, mesh));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

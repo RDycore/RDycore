@@ -149,6 +149,8 @@ typedef struct RDyMesh {
   PetscInt num_cells;
   // number of cells in the mesh owned by the local process
   PetscInt num_cells_local;
+  // number of total cells in the global mesh
+  PetscInt num_cells_global;
   // number of edges in the mesh attached to locally stored cells
   PetscInt num_edges;
   /// number of edges that are internal (i.e. shared by two cells)
@@ -157,6 +159,8 @@ typedef struct RDyMesh {
   PetscInt num_owned_internal_edges;
   /// number of edges that are on the boundary
   PetscInt num_boundary_edges;
+  // total number of vertices in the global mesh
+  PetscInt num_vertices_global;
   // number of vertices in the mesh attached to locally stored cells
   PetscInt num_vertices;
   // number of faces on the domain boundary attached to locally stored cells
@@ -178,6 +182,9 @@ typedef struct RDyMesh {
   PetscInt *closureSize, **closure;
   // the maximum closure size for any cell (locally stored?)
   PetscInt maxClosureSize;
+
+  Vec coords_nat, cell_conn;
+
 } RDyMesh;
 
 PETSC_INTERN PetscErrorCode RDyCellsCreate(PetscInt, RDyCells *);
@@ -185,7 +192,7 @@ PETSC_INTERN PetscErrorCode RDyCellsCreateFromDM(DM, RDyCells *);
 PETSC_INTERN PetscErrorCode RDyCellsDestroy(RDyCells);
 
 PETSC_INTERN PetscErrorCode RDyVerticesCreate(PetscInt, RDyVertices *);
-PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices *);
+PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices *, PetscInt *);
 PETSC_INTERN PetscErrorCode RDyVerticesDestroy(RDyVertices);
 
 PETSC_INTERN PetscErrorCode RDyEdgesCreate(PetscInt, RDyEdges *);

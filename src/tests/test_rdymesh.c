@@ -86,6 +86,7 @@ static void TestRDyMeshCreateFromDM(void **state) {
   DM       dm;
   PetscInt Nx = 100, Ny = 100;
   assert_int_equal(0, Create2DUnitBoxDM(Nx, Ny, &dm));
+  assert_int_equal(0, DMSetRefineLevel(dm, 1));
 
   // Now create a local mesh representation.
   RDyMesh mesh;
