@@ -102,7 +102,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
   // mesh metadata
-  PetscInt num_vertices = rdy->mesh.num_vertices_total;
+  PetscInt num_vertices = rdy->mesh.num_vertices_global;
   PetscInt coord_dim;
   PetscCall(DMGetCoordinateDim(rdy->dm, &coord_dim));
 
@@ -150,7 +150,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                          "          %s:/Domain/Cells\n"
                          "        </DataItem>\n"
                          "      </Topology>\n",
-                         mesh->num_cells_total, size, h5_basename));
+                         mesh->num_cells_global, size, h5_basename));
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Geometry GeometryType=\"XYZ\">\n"
                          "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " 3\">\n"
@@ -168,7 +168,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                            "          %s:/%s/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
-                           cell_field_names[f], mesh->num_cells_total, h5_basename, time_group, cell_field_names[f]));
+                           cell_field_names[f], mesh->num_cells_global, h5_basename, time_group, cell_field_names[f]));
   }
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));

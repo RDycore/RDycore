@@ -227,7 +227,7 @@ PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, RDyVertices *vertices) {
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
 ///
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_total) {
+PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *num_vertices_global) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -346,8 +346,8 @@ PetscErrorCode RDyVerticesCreateFromDM(DM dm, RDyVertices *vertices, PetscInt *n
 
   // compute total number of vertices
   DMGetCoordinates(dm, &coordinates);
-  VecGetSize(coordinates, num_vertices_total);
-  *num_vertices_total = *num_vertices_total / dim;
+  VecGetSize(coordinates, num_vertices_global);
+  *num_vertices_global = *num_vertices_global / dim;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -853,6 +853,21 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
     PetscCall(VecDestroy(&natural));
     PetscCall(VecDestroy(&global));
     PetscCall(VecDestroy(&local));
+
+    PetscMPIInt myrank, commsize;
+    PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &commsize));
+    for (PetscInt irank = 0; irank < commsize; irank++) {
+      if (irank == myrank) {
+        printf("myrank = %d\n", myrank);
+        for (PetscInt icell = 0; icell < local_size / num_fields; icell++) {
+          printf("%02d %03d %f %f %f %d\n", icell, cells->natural_ids[icell], cells->centroids[icell].X[0], cells->centroids[icell].X[1],
+                 cells->centroids[icell].X[2], cells->is_local[icell]);
+        }
+      }
+      MPI_Barrier(PETSC_COMM_WORLD);
+    }
+    exit(0);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -862,7 +877,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionBegin;
 
   Vec xcoord_nat, ycoord_nat, zcoord_nat;
-  PetscCall(VecCreateMPI(comm, PETSC_DECIDE, mesh->num_vertices_total, &xcoord_nat));
+  PetscCall(VecCreateMPI(comm, PETSC_DECIDE, mesh->num_vertices_global, &xcoord_nat));
   PetscCall(VecDuplicate(xcoord_nat, &ycoord_nat));
   PetscCall(VecDuplicate(xcoord_nat, &zcoord_nat));
 
@@ -1057,6 +1072,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
   PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
+  printf("c_start/end = %d %d\n", c_start, c_end);
   mesh->num_cells = c_end - c_start;
 
   // Determine the number of edges in the mesh
@@ -1072,7 +1088,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_total));
+  PetscCall(RDyVerticesCreateFromDM(dm, &mesh->vertices, &mesh->num_vertices_global));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
@@ -1091,7 +1107,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   MPI_Comm_rank(comm, &rank);
   PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
 
-  PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_total, 1, MPI_INTEGER, MPI_SUM, comm));
+  PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
   PetscInt refine_level;
   PetscCall(DMGetRefineLevel(dm, &refine_level));
