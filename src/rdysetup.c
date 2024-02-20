@@ -456,7 +456,7 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
 #define READ_MATERIAL_PROPERTY(property, mat_props_spec, materials_by_cell)                            \
   {                                                                                                    \
     Vec mat_prop_vec = NULL;                                                                           \
-    if (mat_props_spec.manning.file[0]) {                                                              \
+    if (mat_props_spec.property.file[0]) {                                                             \
       ReadOneDOFVecFromFile(rdy, mat_props_spec.property.file, &mat_prop_vec);                         \
     }                                                                                                  \
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {                                                  \
