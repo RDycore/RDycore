@@ -109,7 +109,7 @@ file(COPY
      ${CONDITION_DIR}/DamBreak_grid5x10_mixed_elements_wetdownstream.ic.${PETSC_ID_TYPE}.bin
      ${MATERIALS_DIR}/manning_grid5x10_mixed_elements.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1) # test on 1 processes
+foreach(np 1 2) # test on 1 processes
   foreach(config basic ceed preload)
     add_test(swe_roe_mixed_elements_ic_file_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} mixed_elements_ic_file.yaml ${${config}_args})
     add_test(swe_roe_mixed_elements_ic_file_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} mixed_elements_ic_file.yaml ${${config}_args})
