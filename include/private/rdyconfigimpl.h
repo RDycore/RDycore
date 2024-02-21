@@ -125,8 +125,9 @@ typedef struct {
 
 // all checkpoint parameters
 typedef struct {
-  PetscViewerFormat format;    // file format
-  PetscInt          interval;  // number of steps between checkpoints [steps]
+  PetscViewerFormat format;                      // file format
+  PetscInt          interval;                    // number of steps between checkpoints [steps]
+  char              prefix[PETSC_MAX_PATH_LEN];  // prefix of checkpoint files
 } RDyCheckpointSection;
 
 // ---------------

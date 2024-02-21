@@ -83,7 +83,11 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
   if (step % rdy->config.checkpoint.interval == 0) {
     // determine an appropriate prefix for checkpoint files
     char prefix[PETSC_MAX_PATH_LEN], filename[PETSC_MAX_PATH_LEN];
-    PetscCall(DetermineConfigPrefix(rdy, prefix));
+    if (rdy->config.checkpoint.prefix[0]) {
+      strcpy(prefix, rdy->config.checkpoint.prefix);
+    } else {
+      PetscCall(DetermineConfigPrefix(rdy, prefix));
+    }
 
     PetscViewer             viewer;
     const PetscViewerFormat format = rdy->config.checkpoint.format;

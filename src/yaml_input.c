@@ -165,7 +165,8 @@ static const cyaml_schema_field_t logging_fields_schema[] = {
 // ------------------
 // checkpoint:
 //   format: <binary|hdf5>
-//   interval: <value-in-steps>  # default: 0 (no checkpoints)
+//   interval: <value-in-steps>        # default: 0 (no checkpoints)
+//   prefix: <checkpoint-file-prefix>  # default: same as input file prefix
 
 // mapping of strings to file formats
 static const cyaml_strval_t checkpoint_file_formats[] = {
@@ -177,6 +178,7 @@ static const cyaml_strval_t checkpoint_file_formats[] = {
 static const cyaml_schema_field_t checkpoint_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyCheckpointSection, format, checkpoint_file_formats, CYAML_ARRAY_LEN(checkpoint_file_formats)),
     CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyCheckpointSection, interval),
+    CYAML_FIELD_STRING("prefix", CYAML_FLAG_OPTIONAL, RDyCheckpointSection, prefix, 0),
     CYAML_FIELD_END
 };
 
