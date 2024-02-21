@@ -816,7 +816,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id       = region.cell_ids[c];
+            PetscInt cell_id = region.cell_ids[c];
             if (3 * cell_id < n_local) {  // skip ghost cells
               x_ptr[3 * cell_id]     = local_ptr[3 * cell_id];
               x_ptr[3 * cell_id + 1] = local_ptr[3 * cell_id + 1];
