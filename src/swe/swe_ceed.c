@@ -54,7 +54,7 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
   CeedQFunctionSetContext(qf, qf_context);
   CeedQFunctionContextDestroy(&qf_context);
 
-  CeedElemRestriction restrict_l, restrict_r, restrict_geom, restrict_flux;
+  CeedElemRestriction q_restrict_l, q_restrict_r, c_restrict_l, c_restrict_r, restrict_geom, restrict_flux;
   CeedVector          geom, flux;
   {
     CeedInt num_edges = mesh->num_owned_internal_edges;
@@ -75,17 +75,20 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
     // create element restrictions for left and right input/output states,
     // populate offsets for these states, and set the (invariant)
     // geometric parameters
-    CeedInt *offset_l, *offset_r;
-    PetscCall(PetscMalloc2(num_edges, &offset_l, num_edges, &offset_r));
+    CeedInt *q_offset_l, *q_offset_r, *c_offset_l, *c_offset_r;
+    PetscCall(PetscMalloc2(num_edges, &q_offset_l, num_edges, &q_offset_r));
+    PetscCall(PetscMalloc2(num_edges, &c_offset_l, num_edges, &c_offset_r));
     CeedScalar(*g)[4];
     CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
     for (CeedInt e = 0, oe = 0; e < mesh->num_internal_edges; e++) {
       CeedInt iedge = edges->internal_edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      CeedInt l    = edges->cell_ids[2 * iedge];
-      CeedInt r    = edges->cell_ids[2 * iedge + 1];
-      offset_l[oe] = l * num_comp;
-      offset_r[oe] = r * num_comp;
+      CeedInt l      = edges->cell_ids[2 * iedge];
+      CeedInt r      = edges->cell_ids[2 * iedge + 1];
+      q_offset_l[oe] = l * num_comp;
+      q_offset_r[oe] = r * num_comp;
+      c_offset_l[oe] = cells->G2L[l] * num_comp;
+      c_offset_r[oe] = cells->G2L[r] * num_comp;
 
       g[oe][0] = edges->sn[iedge];
       g[oe][1] = edges->cn[iedge];
@@ -96,27 +99,38 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
     CeedVectorRestoreArray(geom, (CeedScalar **)&g);
 
     // create element restrictions for left and right cell states
-    CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l, &restrict_l);
-    CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_r, &restrict_r);
-    PetscCall(PetscFree2(offset_l, offset_r));
+    CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,
+                              &q_restrict_l);
+    CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_r,
+                              &q_restrict_r);
+    CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_l,
+                              &c_restrict_l);
+    CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_r,
+                              &c_restrict_r);
+    PetscCall(PetscFree2(q_offset_l, q_offset_r));
+    PetscCall(PetscFree2(c_offset_l, c_offset_r));
     if (0) {
-      CeedElemRestrictionView(restrict_l, stdout);
-      CeedElemRestrictionView(restrict_r, stdout);
+      CeedElemRestrictionView(q_restrict_l, stdout);
+      CeedElemRestrictionView(q_restrict_r, stdout);
+      CeedElemRestrictionView(c_restrict_l, stdout);
+      CeedElemRestrictionView(c_restrict_r, stdout);
     }
   }
 
   CeedOperatorCreate(ceed, qf, NULL, NULL, flux_op);
   CeedOperatorSetField(*flux_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
-  CeedOperatorSetField(*flux_op, "q_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(*flux_op, "q_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(*flux_op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(*flux_op, "cell_right", restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(*flux_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(*flux_op, "q_right", q_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(*flux_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(*flux_op, "cell_right", c_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(*flux_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux);
 
   CeedElemRestrictionDestroy(&restrict_geom);
   CeedElemRestrictionDestroy(&restrict_flux);
-  CeedElemRestrictionDestroy(&restrict_l);
-  CeedElemRestrictionDestroy(&restrict_r);
+  CeedElemRestrictionDestroy(&q_restrict_l);
+  CeedElemRestrictionDestroy(&q_restrict_r);
+  CeedElemRestrictionDestroy(&c_restrict_l);
+  CeedElemRestrictionDestroy(&c_restrict_r);
   CeedVectorDestroy(&geom);
   CeedVectorDestroy(&flux);
 
@@ -167,14 +181,15 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   CeedQFunctionSetContext(qf, qf_context);
   CeedQFunctionContextDestroy(&qf_context);
 
-  CeedElemRestriction restrict_l, restrict_dirichlet, restrict_geom, restrict_flux;
+  CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux;
   CeedVector          geom, flux, dirichlet;
   {
     CeedInt num_edges = boundary.num_edges;
 
     // create element restrictions for left and right input/output states
-    CeedInt *offset_l, *offset_dirichlet = NULL;
-    PetscCall(PetscMalloc1(num_edges, &offset_l));
+    CeedInt *q_offset_l, *c_offset_l, *offset_dirichlet = NULL;
+    PetscCall(PetscMalloc1(num_edges, &q_offset_l));
+    PetscCall(PetscMalloc1(num_edges, &c_offset_l));
     if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
       PetscCall(PetscMalloc1(num_edges, &offset_dirichlet));
     }
@@ -205,8 +220,9 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     for (CeedInt e = 0, oe = 0; e < num_edges; e++) {
       CeedInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      CeedInt l    = edges->cell_ids[2 * iedge];
-      offset_l[oe] = l * num_comp;
+      CeedInt l      = edges->cell_ids[2 * iedge];
+      q_offset_l[oe] = l * num_comp;
+      c_offset_l[oe] = cells->G2L[l] * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
         offset_dirichlet[oe] = e * num_comp;
       }
@@ -219,10 +235,16 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     CeedVectorRestoreArray(geom, (CeedScalar **)&g);
 
     // create the element restriction for the left cell states
-    CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_l,
-                              &restrict_l);
-    PetscCall(PetscFree(offset_l));
-    if (0) CeedElemRestrictionView(restrict_l, stdout);
+    CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,
+                              &q_restrict_l);
+    CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_l,
+                              &c_restrict_l);
+    PetscCall(PetscFree(q_offset_l));
+    PetscCall(PetscFree(c_offset_l));
+    if (0) {
+      CeedElemRestrictionView(q_restrict_l, stdout);
+      CeedElemRestrictionView(c_restrict_l, stdout);
+    }
 
     // if we have Dirichlet boundary values, create a restriction and passive
     // input vector for them
@@ -238,16 +260,17 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
 
   CeedOperatorCreate(ceed, qf, NULL, NULL, flux_op);
   CeedOperatorSetField(*flux_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom);
-  CeedOperatorSetField(*flux_op, "q_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(*flux_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
   if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
     CeedOperatorSetField(*flux_op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_COLLOCATED, dirichlet);
   }
-  CeedOperatorSetField(*flux_op, "cell_left", restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(*flux_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(*flux_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux);
 
   CeedElemRestrictionDestroy(&restrict_geom);
   CeedElemRestrictionDestroy(&restrict_flux);
-  CeedElemRestrictionDestroy(&restrict_l);
+  CeedElemRestrictionDestroy(&q_restrict_l);
+  CeedElemRestrictionDestroy(&c_restrict_l);
   CeedVectorDestroy(&geom);
   CeedVectorDestroy(&flux);
 
@@ -288,6 +311,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_bound
   }
 
   if (0) CeedOperatorView(*flux_op, stdout);
+
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
@@ -392,13 +416,13 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     CeedQFunctionSetContext(qf, qf_context);
     CeedQFunctionContextDestroy(&qf_context);
 
-    CeedElemRestriction restrict_c, restrict_geom, restrict_swe, restrict_mannings_n, restrict_riemannf;
+    CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_swe, restrict_mannings_n, restrict_riemannf;
     CeedVector          geom;
     CeedVector          swe_src;
     CeedVector          mannings_n;
     CeedVector          riemannf;
     {  // Create element restrictions for state
-      CeedInt *offset_c;
+      CeedInt *offset_c, *offset_q;
       CeedScalar(*g)[num_comp_geom];
       CeedScalar(*n)[num_comp_mannings_n];
       CeedInt num_owned_cells = mesh->num_cells_local;
@@ -425,13 +449,15 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL);
       CeedVectorSetValue(riemannf, 0.0);
 
+      PetscCall(PetscMalloc1(num_owned_cells, &offset_q));
       PetscCall(PetscMalloc1(num_owned_cells, &offset_c));
       CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g);
       CeedVectorGetArray(mannings_n, CEED_MEM_HOST, (CeedScalar **)&n);
       for (CeedInt c = 0, oc = 0; c < mesh->num_cells; c++) {
         if (!cells->is_local[c]) continue;
 
-        offset_c[oc] = c * num_comp;
+        offset_q[oc] = c * num_comp;
+        offset_c[oc] = cells->G2L[c] * num_comp;
 
         g[oc][0] = cells->dz_dx[c];
         g[oc][1] = cells->dz_dy[c];
@@ -442,10 +468,16 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       }
       CeedVectorRestoreArray(geom, (CeedScalar **)&g);
       CeedVectorRestoreArray(mannings_n, (CeedScalar **)&n);
+      CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_q,
+                                &restrict_q);
       CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_c,
                                 &restrict_c);
       PetscCall(PetscFree(offset_c));
-      if (0) CeedElemRestrictionView(restrict_c, stdout);
+      PetscCall(PetscFree(offset_q));
+      if (0) {
+        CeedElemRestrictionView(restrict_q, stdout);
+        CeedElemRestrictionView(restrict_c, stdout);
+      }
     }
 
     {
@@ -455,7 +487,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedOperatorSetField(op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src);
       CeedOperatorSetField(op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n);
       CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf);
-      CeedOperatorSetField(op, "q", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+      CeedOperatorSetField(op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
       CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
       CeedCompositeOperatorAddSub(*source_op, op);
       CeedOperatorDestroy(&op);
@@ -463,6 +495,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     CeedElemRestrictionDestroy(&restrict_geom);
     CeedElemRestrictionDestroy(&restrict_mannings_n);
     CeedElemRestrictionDestroy(&restrict_c);
+    CeedElemRestrictionDestroy(&restrict_q);
     CeedVectorDestroy(&geom);
   }
 

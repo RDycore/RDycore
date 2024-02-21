@@ -576,7 +576,7 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
       PetscReal u = data->u[icell];
       PetscReal v = data->v[icell];
 
-      PetscInt idx = cells->G2L[icell];
+      PetscInt  idx    = cells->G2L[icell];
       PetscReal Fsum_x = f_ptr[idx * ndof + 1];
       PetscReal Fsum_y = f_ptr[idx * ndof + 2];
 
