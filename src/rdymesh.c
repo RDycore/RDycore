@@ -853,21 +853,6 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
     PetscCall(VecDestroy(&natural));
     PetscCall(VecDestroy(&global));
     PetscCall(VecDestroy(&local));
-
-    PetscMPIInt myrank, commsize;
-    PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
-    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &commsize));
-    for (PetscInt irank = 0; irank < commsize; irank++) {
-      if (irank == myrank) {
-        printf("myrank = %d\n", myrank);
-        for (PetscInt icell = 0; icell < local_size / num_fields; icell++) {
-          printf("%02d %03d %f %f %f %d\n", icell, cells->natural_ids[icell], cells->centroids[icell].X[0], cells->centroids[icell].X[1],
-                 cells->centroids[icell].X[2], cells->is_local[icell]);
-        }
-      }
-      MPI_Barrier(PETSC_COMM_WORLD);
-    }
-    exit(0);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1072,7 +1057,6 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
   PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
-  printf("c_start/end = %d %d\n", c_start, c_end);
   mesh->num_cells = c_end - c_start;
 
   // Determine the number of edges in the mesh
