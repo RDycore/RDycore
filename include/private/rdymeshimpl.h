@@ -64,6 +64,12 @@ typedef struct {
   // surface x and y slopes
   PetscReal *dz_dx, *dz_dy;
 
+  // mapping of ghosted local cells ids to local cells ids
+  PetscInt *G2L;
+
+  // mapping of local cells ids to ghosted local cells
+  PetscInt *L2G;
+
 } RDyCells;
 
 // A struct of arrays storing information about mesh vertices. The ith element

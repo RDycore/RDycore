@@ -34,7 +34,10 @@ PetscErrorCode RDyCellsCreate(PetscInt num_cells, RDyCells *cells) {
   FILL(num_cells, cells->natural_ids, -1);
 
   PetscCall(PetscCalloc1(num_cells, &cells->is_local));
-  FILL(num_cells, cells->is_local, PETSC_FALSE);
+  PetscCall(PetscCalloc1(num_cells, &cells->is_local));
+
+  PetscCall(PetscCalloc1(num_cells, &cells->G2L));
+  FILL(num_cells, cells->G2L, -1);
 
   PetscCall(PetscCalloc1(num_cells, &cells->num_vertices));
   PetscCall(PetscCalloc1(num_cells, &cells->num_edges));
@@ -103,6 +106,7 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   PetscInt num_cells = c_end - c_start;
   PetscCall(RDyCellsCreate(num_cells, cells));
 
+  PetscInt num_cells_local = 0;
   for (PetscInt c = c_start; c < c_end; c++) {
     PetscInt  icell = c - c_start;
     PetscReal centroid[dim], normal[dim];
@@ -124,6 +128,7 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
     PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
     if (gref >= 0) {
       cells->is_local[icell] = PETSC_TRUE;
+      num_cells_local++;
     } else {
       cells->is_local[icell] = PETSC_FALSE;
     }
@@ -143,6 +148,26 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
       }
     }
     PetscCall(DMPlexRestoreTransitiveClosure(dm, c, use_cone, &pSize, &p));
+  }
+
+  // make a first pass to put all local cells at the beginning
+  PetscCall(PetscCalloc1(num_cells_local, &cells->L2G));
+  FILL(num_cells_local, cells->L2G, -1);
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < num_cells; icell++) {
+    if (cells->is_local[icell]) {
+      cells->G2L[icell] = count;
+      cells->L2G[count] = icell;
+      count++;
+    }
+  }
+
+  for (PetscInt icell = 0; icell < num_cells; icell++) {
+    if (!cells->is_local[icell]) {
+      cells->G2L[icell] = count;
+      count++;
+    }
   }
 
   // fetch global cell IDs.
