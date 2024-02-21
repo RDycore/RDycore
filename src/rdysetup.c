@@ -817,9 +817,11 @@ static PetscErrorCode InitSolution(RDy rdy) {
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id       = region.cell_ids[c];
-            x_ptr[3 * cell_id]     = local_ptr[3 * cell_id];
-            x_ptr[3 * cell_id + 1] = local_ptr[3 * cell_id + 1];
-            x_ptr[3 * cell_id + 2] = local_ptr[3 * cell_id + 2];
+            if (3 * cell_id < n_local) {  // skip ghost cells
+              x_ptr[3 * cell_id]     = local_ptr[3 * cell_id];
+              x_ptr[3 * cell_id + 1] = local_ptr[3 * cell_id + 1];
+              x_ptr[3 * cell_id + 2] = local_ptr[3 * cell_id + 2];
+            }
           }
           PetscCall(VecRestoreArray(local, &local_ptr));
         } else {
