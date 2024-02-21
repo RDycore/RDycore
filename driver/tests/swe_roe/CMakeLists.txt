@@ -53,7 +53,7 @@ foreach(np 1 2) # test on 1, 2 processes
       add_test(swe_roe_ex2b_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_checkpoint.yaml ${${config}_args})
 
       # stash the simulation's final HDF5 output
-      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
+      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b_checkpoint-0.h5 ex2b-ref.h5)
       set_tests_properties(swe_roe_ex2b_reference_${lang}_np_${np}_${config}
         PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_np_${np}_${config}")
 
