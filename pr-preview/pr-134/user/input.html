@@ -1234,7 +1234,7 @@ parameters in the <code>restart</code> section.</p>
 <li><code>prefix</code>: an optional prefix for checkpoint files. If omitted, the prefix for
   checkpoint files is the prefix of the YAML input file name for the simulation.</li>
 </ul>
-<p>The name of a checkpoint file written at time step <code>N</code> is <code>&lt;prefix&gt;-N.&lt;format&gt;</code>,
+<p>The name of a checkpoint file written at time step <code>N</code> is <code>&lt;prefix&gt;.rdycore.r.&lt;N&gt;.&lt;format&gt;</code>,
 where <code>&lt;prefix&gt;</code> is the checkpoint prefix and <code>&lt;format&gt;</code> is <code>bin</code> for a binary
 file and <code>h5</code> for an HDF5 file.</p>
 <p>This section is optional. If omitted, no checkpoint files are written.</p>
