@@ -77,6 +77,19 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// this generates the ancient-looking checkpoing filename expected by E3SM
+static PetscErrorCode GenerateE3SMCheckpointFilename(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val,
+                                                     const char *suffix, char *filename) {
+  PetscFunctionBegin;
+  int  num_digits = (int)(log10((double)max_index_val)) + 1;
+  char fmt[16]    = {0};
+  snprintf(fmt, 15, ".%%0%dd.%%s", num_digits);
+  char ending[PETSC_MAX_PATH_LEN];
+  snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
+  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.rdycore.r%s", directory, prefix, ending);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
@@ -84,7 +97,7 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     // determine an appropriate prefix for checkpoint files
     char prefix[PETSC_MAX_PATH_LEN], filename[PETSC_MAX_PATH_LEN];
     if (rdy->config.checkpoint.prefix[0]) {
-      strcpy(prefix, rdy->config.checkpoint.prefix);
+      strncpy(prefix, rdy->config.checkpoint.prefix, PETSC_MAX_PATH_LEN);
     } else {
       PetscCall(DetermineConfigPrefix(rdy, prefix));
     }
@@ -92,10 +105,10 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     PetscViewer             viewer;
     const PetscViewerFormat format = rdy->config.checkpoint.format;
     if (format == PETSC_VIEWER_NATIVE) {  // binary
-      PetscCall(GenerateIndexedFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "bin", filename));
+      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "bin", filename));
       PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
     } else {  // HDF5
-      PetscCall(GenerateIndexedFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "h5", filename));
+      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "h5", filename));
       PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
     }
 

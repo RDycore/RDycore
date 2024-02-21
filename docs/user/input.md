@@ -399,7 +399,7 @@ parameters in the `restart` section.
 * `prefix`: an optional prefix for checkpoint files. If omitted, the prefix for
   checkpoint files is the prefix of the YAML input file name for the simulation.
 
-The name of a checkpoint file written at time step `N` is `<prefix>-N.<format>`,
+The name of a checkpoint file written at time step `N` is `<prefix>.rdycore.r.<N>.<format>`,
 where `<prefix>` is the checkpoint prefix and `<format>` is `bin` for a binary
 file and `h5` for an HDF5 file.
 

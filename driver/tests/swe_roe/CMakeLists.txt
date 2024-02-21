@@ -44,26 +44,21 @@ foreach(np 1 2) # test on 1, 2 processes
 endforeach()
 
 # Checkpoint/restart tests
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_checkpoint.yaml ${MESH_DIR}/planar_dam_10x5.msh
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
     foreach(lang c f90)
-      # run a full simulation to completion
-      add_test(swe_roe_ex2b_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_checkpoint.yaml ${${config}_args})
-
-      # stash the simulation's final HDF5 output
-      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b_checkpoint-0.h5 ex2b-ref.h5)
+      # stash the original ex2b simulation's final HDF5 output
+      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
       set_tests_properties(swe_roe_ex2b_reference_${lang}_np_${np}_${config}
         PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_np_${np}_${config}")
 
       # restart from timestep 100
-      add_test(swe_roe_ex2b_restart_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_checkpoint.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
+      add_test(swe_roe_ex2b_restart_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b.rdycore.r.0100.bin)
       set_tests_properties(swe_roe_ex2b_restart_${lang}_np_${np}_${config}
         PROPERTIES DEPENDS "swe_roe_ex2b_reference_${lang}_np_${np}_${config}")
 
       # compare restarted results with the reference output we stashed
-      add_test(swe_roe_ex2b_compare_${lang}_np_${np}_${config} ${H5DIFF} ex2b-ref.h5 output/ex2b_checkpoint-0.h5 "/900 4.500000E-03 hr")
+      add_test(swe_roe_ex2b_compare_${lang}_np_${np}_${config} ${H5DIFF} ex2b-ref.h5 output/ex2b-0.h5 "/900 4.500000E-03 hr")
       set_tests_properties(swe_roe_ex2b_compare_${lang}_np_${np}_${config}
         PROPERTIES DEPENDS "swe_roe_ex2b_restart_${lang}_np_${np}_${config}")
     endforeach()
