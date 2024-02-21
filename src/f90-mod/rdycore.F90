@@ -300,6 +300,11 @@ module rdycore
       type(c_ptr), value, intent(in) :: rdy
     end function
 
+    logical(c_bool) function rdyrestarted_(rdy) bind(c, name="RDyRestarted")
+      use iso_c_binding, only: c_bool, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+    end function
+
     integer(c_int) function rdydestroy_(rdy) bind(c, name="RDyDestroy")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), intent(inout) :: rdy
@@ -635,6 +640,12 @@ contains
     type(RDy), intent(inout) :: rdy_
     logical :: RDyFinished
     RDyFinished = rdyfinished_(rdy_%c_rdy)
+  end function
+
+  function RDyRestarted(rdy_)
+    type(RDy), intent(inout) :: rdy_
+    logical :: RDyRestarted
+    RDyRestarted = rdyrestarted_(rdy_%c_rdy)
   end function
 
   subroutine RDyDestroy(rdy_, ierr)

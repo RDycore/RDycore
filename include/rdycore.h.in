@@ -47,6 +47,7 @@ PETSC_EXTERN PetscErrorCode RDyAdvance(RDy);
 
 // Accessing data
 PETSC_EXTERN PetscBool      RDyFinished(RDy);
+PETSC_EXTERN PetscBool      RDyRestarted(RDy);
 
 PETSC_EXTERN PetscErrorCode RDyGetTime(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetTimeStep(RDy, PetscReal*);

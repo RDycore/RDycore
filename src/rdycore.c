@@ -110,6 +110,10 @@ PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rd
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// returns PETSC_TRUE if the dycore was restarted from a checkpoint file,
+/// PETSC_FALSE if not
+PetscBool RDyRestarted(RDy rdy) { return rdy->config.restart.file[0]; }
+
 /// Destroys the given RDy object, freeing any allocated resources.
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
