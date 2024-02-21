@@ -5,34 +5,17 @@
 find_program(H5DIFF h5diff REQUIRED)
 set(rdycore_c_driver ${rdycore_driver})
 
-# ex2b
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
 # arguments for specific configurations ("basic" config has no options)
 set(ceed_args -ceed /cpu/self)
 set(preload_args -preload)
 
+# basic ex2b test
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
     foreach(lang c f90)
-      # run a full simulation to completion
       add_test(swe_roe_ex2b_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args})
-
-      # stash the simulation's final HDF5 output
-      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
-      set_tests_properties(swe_roe_ex2b_reference_${lang}_np_${np}_${config}
-        PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_np_${np}_${config}")
-
-      # restart from timestep 100
-      add_test(swe_roe_ex2b_restart_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
-      set_tests_properties(swe_roe_ex2b_restart_${lang}_np_${np}_${config}
-        PROPERTIES DEPENDS "swe_roe_ex2b_reference_${lang}_np_${np}_${config}")
-
-      # compare restarted results with the reference output we stashed
-      add_test(swe_roe_ex2b_compare_${lang}_np_${np}_${config} ${H5DIFF} ex2b-ref.h5 output/ex2b-0.h5 "/900 4.500000E-03 hr")
-      set_tests_properties(swe_roe_ex2b_compare_${lang}_np_${np}_${config}
-        PROPERTIES DEPENDS "swe_roe_ex2b_restart_${lang}_np_${np}_${config}")
     endforeach()
   endforeach()
 endforeach()
@@ -42,8 +25,9 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_dirichlet_bc.yaml ${MESH_DIR}/planar_
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed)
-    add_test(swe_roe_ex2b_dirichlet_bc_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b_dirichlet_bc.yaml ${${config}_args})
-    add_test(swe_roe_ex2b_dirichlet_bc_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_dirichlet_bc.yaml ${${config}_args})
+    foreach(lang c f90)
+      add_test(swe_roe_ex2b_dirichlet_bc_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_dirichlet_bc.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -52,8 +36,36 @@ endforeach()
 foreach(np 1 2) # test on 1, 2 processes
   set(cgns_output_args -ts_monitor_solution cgns:output/ex2b-%d.cgns -viewer_cgns_batch_size 20 -ts_monitor_solution_interval 100)
   foreach(config basic ceed preload)
-    add_test(swe_roe_ex2b_cgns_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b.yaml ${cgns_output_args} ${${config}_args})
-    add_test(swe_roe_ex2b_cgns_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b.yaml ${cgns_output_args} ${${config}_args})
+    foreach(lang c f90)
+      add_test(swe_roe_ex2b_cgns_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${cgns_output_args} ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
+# Checkpoint/restart tests
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_checkpoint.yaml ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2) # test on 1, 2 processes
+  foreach(config basic ceed preload)
+    foreach(lang c f90)
+      # run a full simulation to completion
+      add_test(swe_roe_ex2b_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_checkpoint.yaml ${${config}_args})
+
+      # stash the simulation's final HDF5 output
+      add_test(swe_roe_ex2b_reference_${lang}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
+      set_tests_properties(swe_roe_ex2b_reference_${lang}_np_${np}_${config}
+        PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_np_${np}_${config}")
+
+      # restart from timestep 100
+      add_test(swe_roe_ex2b_restart_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_checkpoint.yaml ${${config}_args} -restart checkpoints/ex2b-0100.bin)
+      set_tests_properties(swe_roe_ex2b_restart_${lang}_np_${np}_${config}
+        PROPERTIES DEPENDS "swe_roe_ex2b_reference_${lang}_np_${np}_${config}")
+
+      # compare restarted results with the reference output we stashed
+      add_test(swe_roe_ex2b_compare_${lang}_np_${np}_${config} ${H5DIFF} ex2b-ref.h5 output/ex2b-0.h5 "/900 4.500000E-03 hr")
+      set_tests_properties(swe_roe_ex2b_compare_${lang}_np_${np}_${config}
+        PROPERTIES DEPENDS "swe_roe_ex2b_restart_${lang}_np_${np}_${config}")
+    endforeach()
   endforeach()
 endforeach()
 
@@ -66,8 +78,9 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
-    add_test(swe_roe_ex2b_ic_file_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} ex2b_ic_file.yaml ${${config}_args})
-    add_test(swe_roe_ex2b_ic_file_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} ex2b_ic_file.yaml ${${config}_args})
+    foreach(lang c f90)
+      add_test(swe_roe_ex2b_ic_file_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_ic_file.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -80,8 +93,9 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic ceed preload)
-    add_test(swe_roe_four_mounds_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} four_mounds_60x24.yaml ${${config}_args})
-    add_test(swe_roe_four_mounds_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} four_mounds_60x24.yaml ${${config}_args})
+    foreach(lang c f90)
+      add_test(swe_roe_four_mounds_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} four_mounds_60x24.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -131,7 +145,8 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1) # test on 1 processes
   foreach(config basic ceed preload)
-    add_test(swe_roe_mixed_elements_ic_file_c_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} mixed_elements_ic_file.yaml ${${config}_args})
-    add_test(swe_roe_mixed_elements_ic_file_f90_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_f90_driver} mixed_elements_ic_file.yaml ${${config}_args})
+    foreach(lang c f90)
+      add_test(swe_roe_mixed_elements_ic_file_${lang}_np_${np}_${config} ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} mixed_elements_ic_file.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
