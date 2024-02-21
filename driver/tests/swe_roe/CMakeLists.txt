@@ -2,7 +2,8 @@
 # Tests for the shallow water equations using a roe solver
 #----------------------------------------------------------
 
-find_program(H5DIFF h5diff REQUIRED)
+find_program(H5DIFF h5diff REQUIRED
+             PATHS ${PETSC_DIR}/${PETSC_ARCH}/bin)
 set(rdycore_c_driver ${rdycore_driver})
 
 # arguments for specific configurations ("basic" config has no options)
