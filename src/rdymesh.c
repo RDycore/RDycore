@@ -982,8 +982,9 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
   for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
-    for (PetscInt v = 0; v < cells->num_vertices[c]; v++) {
-      PetscInt offset    = cells->vertex_offsets[c];
+    PetscInt icell = cells->L2G[c];
+    for (PetscInt v = 0; v < cells->num_vertices[icell]; v++) {
+      PetscInt offset    = cells->vertex_offsets[icell];
       PetscInt vertex_id = cells->vertex_ids[offset + v];
       PetscInt index     = c * max_num_vertices + v;
       vec_ptr[index]     = vertices->global_ids[vertex_id];
