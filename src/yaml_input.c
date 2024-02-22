@@ -724,6 +724,21 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
     }
   }
 
+  // allow the user to override our checkpoint format
+  if (rdy->config.checkpoint.interval) {
+    PetscBool format_overridden = PETSC_FALSE;
+    char      format[16];
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-checkpoint_format", format, 16, &format_overridden));
+    if (format_overridden) {
+      PetscCheck(!strcmp(format, "binary") || !strcmp(format, "hdf5"), rdy->comm, PETSC_ERR_USER, "Invalid checkpoint format given: %s", format);
+      if (!strcmp(format, "binary")) {
+        rdy->config.checkpoint.format = PETSC_VIEWER_NATIVE;
+      } else {  // hdf5
+        rdy->config.checkpoint.format = PETSC_VIEWER_HDF5_PETSC;
+      }
+    }
+  }
+
   // set the solution monitoring interval (except for XDMF, which does its own thing)
   if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));

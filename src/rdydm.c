@@ -210,6 +210,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // set grid adacency
   PetscCall(DMSetBasicAdjacency(rdy->dm, PETSC_TRUE, PETSC_TRUE));
+  PetscCall(DMCreateDS(rdy->dm));
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
 
