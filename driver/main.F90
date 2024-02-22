@@ -240,10 +240,14 @@ program rdycore_f90
           SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive time step!")
         end if
 
-        if (abs(time - prev_time - coupling_interval) >= 1e-12) then
-          SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "RDyAdvance advanced time improperly!")
+        if (.not. RDyRestarted(rdy_)) then
+          if (abs(time - prev_time - coupling_interval) >= 1e-12) then
+            SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "RDyAdvance advanced time improperly!")
+          end if
+          prev_time = prev_time + coupling_interval
+        else
+          prev_time = time
         end if
-        prev_time = prev_time + coupling_interval
 
         PetscCallA(RDyGetStep(rdy_, step, ierr));
         if (step <= 0) then

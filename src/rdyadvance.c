@@ -18,8 +18,8 @@ PetscErrorCode GetOutputDir(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates the output directory if it doesn't exist.
-PetscErrorCode CreateOutputDir(RDy rdy) {
+// creates the output directory if it doesn't exist
+static PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionBegin;
 
   RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
@@ -38,18 +38,19 @@ PetscErrorCode CreateOutputDir(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// generates a filename in the output directory
+// generates a filename in the given directory
 // * with the given prefix
 // * with the given zero-padded index (padded to the given max index value)
 // * and the given suffix
-static PetscErrorCode GenerateIndexedFilename(const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix, char *filename) {
+PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix,
+                                       char *filename) {
   PetscFunctionBegin;
   int  num_digits = (int)(log10((double)max_index_val)) + 1;
   char fmt[16]    = {0};
   snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
   char ending[PETSC_MAX_PATH_LEN];
   snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
-  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s%s", output_dir, prefix, ending);
+  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s%s", directory, prefix, ending);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -62,21 +63,11 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
 
   size_t config_len = strlen(rdy->config_file);
   char   prefix[config_len + 1];
-  memset(prefix, 0, sizeof(char) * (config_len + 1));
-  char *p = strstr(rdy->config_file, ".yaml");
-  if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
-    p = strstr(rdy->config_file, ".yml");
-  }
-  if (p) {
-    size_t prefix_len = p - rdy->config_file;
-    strncpy(prefix, rdy->config_file, prefix_len);
-  } else {
-    strcpy(prefix, rdy->config_file);
-  }
+  PetscCall(DetermineConfigPrefix(rdy, prefix));
 
   // encode specific information into the filename based on its format
   if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
-    PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.time.max_step, suffix, filename));
+    PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
   } else if (rdy->config.output.format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output.batch_size == 1) {
@@ -89,13 +80,13 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
         PetscInt batch      = step / interval / batch_size;
         PetscInt max_batch  = rdy->config.time.max_step / interval / batch_size;
         if (max_batch < 1) max_batch = 1;
-        PetscCall(GenerateIndexedFilename(prefix, batch, max_batch, suffix, filename));
+        PetscCall(GenerateIndexedFilename(output_dir, prefix, batch, max_batch, suffix, filename));
       }
     } else if (!strcasecmp(suffix, "xmf")) {  // XDMF "light" data
       PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
       // encode the step into the filename with zero-padding based on the
       // maximum step number
-      PetscCall(GenerateIndexedFilename(prefix, step, rdy->config.time.max_step, suffix, filename));
+      PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
@@ -215,11 +206,6 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   if (step == 0) {
     PetscCall(CreateOutputDir(rdy));
 
-    // set up monitoring functions for handling restarts and outputs
-    // if (rdy->config.restart.interval) {
-    //   PetscCall(TSMonitorSet(rdy->ts, WriteRestartFiles, rdy, NULL));
-    // }
-
     // create a viewer with the proper format for visualization output
     PetscCall(CreateOutputViewer(rdy));
 
@@ -238,9 +224,14 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
 
+  PetscReal next_coupling_time = interval;
+  while (next_coupling_time < time) {
+    next_coupling_time += interval;
+  }
+
   // advance the solution to the specified time (handling preloading if requested)
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
-               ConvertTimeFromSeconds(time + interval, rdy->config.time.unit));
+               ConvertTimeFromSeconds(next_coupling_time, rdy->config.time.unit));
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
   if (PetscPreLoadingOn) {
     PetscCall(CalibrateSolverTimers(rdy));

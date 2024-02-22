@@ -209,9 +209,13 @@ int main(int argc, char *argv[]) {
       PetscCheck(time > prev_time, comm, PETSC_ERR_USER, "Non-increasing time!");
       PetscCheck(time_step > 0.0, comm, PETSC_ERR_USER, "Non-positive time step!");
 
-      PetscCheck(fabs(time - prev_time - coupling_interval) < 1e-12, comm, PETSC_ERR_USER, "RDyAdvance advanced time improperly (%g, %g, %g)!",
-                 prev_time, time, fabs(time - prev_time + coupling_interval));
-      prev_time += coupling_interval;
+      if (!RDyRestarted(rdy)) {
+        PetscCheck(fabs(time - prev_time - coupling_interval) < 1e-12, comm, PETSC_ERR_USER, "RDyAdvance advanced time improperly (%g, %g, %g)!",
+                   prev_time, time, fabs(time - prev_time + coupling_interval));
+        prev_time += coupling_interval;
+      } else {
+        prev_time = time;
+      }
 
       PetscInt step;
       PetscCall(RDyGetStep(rdy, &step));

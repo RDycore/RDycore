@@ -160,23 +160,39 @@ static const cyaml_schema_field_t logging_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// ---------------
-// restart section
-// ---------------
-// restart:
+// ------------------
+// checkpoint section
+// ------------------
+// checkpoint:
 //   format: <binary|hdf5>
-//   interval: <value-in-steps>  # default: 0 (no restarts)
+//   interval: <value-in-steps>        # default: 0 (no checkpoints)
+//   prefix: <checkpoint-file-prefix>  # default: same as input file prefix
 
 // mapping of strings to file formats
-static const cyaml_strval_t restart_file_formats[] = {
+static const cyaml_strval_t checkpoint_file_formats[] = {
     {"binary", PETSC_VIEWER_NATIVE    },
     {"hdf5",   PETSC_VIEWER_HDF5_PETSC},
 };
 
+// mapping of checkpoint fields to members of RDyCheckpointSection
+static const cyaml_schema_field_t checkpoint_fields_schema[] = {
+    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyCheckpointSection, format, checkpoint_file_formats, CYAML_ARRAY_LEN(checkpoint_file_formats)),
+    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyCheckpointSection, interval),
+    CYAML_FIELD_STRING("prefix", CYAML_FLAG_OPTIONAL, RDyCheckpointSection, prefix, 0),
+    CYAML_FIELD_END
+};
+
+// ---------------
+// restart section
+// ---------------
+// restart:
+//   file: <checkpoint-filename>
+//   reinitialize: <true/false>  # default: false
+
 // mapping of restart fields to members of RDyRestartSection
 static const cyaml_schema_field_t restart_fields_schema[] = {
-    CYAML_FIELD_ENUM("format", CYAML_FLAG_DEFAULT, RDyRestartSection, format, restart_file_formats, CYAML_ARRAY_LEN(restart_file_formats)),
-    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyRestartSection, interval),
+    CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyRestartSection, file, 0),
+    CYAML_FIELD_BOOL("reinitialize", CYAML_FLAG_OPTIONAL, RDyRestartSection, reinitialize),
     CYAML_FIELD_END
 };
 
@@ -487,6 +503,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("numerics", CYAML_FLAG_DEFAULT, RDyConfig, numerics, numerics_fields_schema),
     CYAML_FIELD_MAPPING("time", CYAML_FLAG_DEFAULT, RDyConfig, time, time_fields_schema),
     CYAML_FIELD_MAPPING("logging", CYAML_FLAG_OPTIONAL, RDyConfig, logging, logging_fields_schema),
+    CYAML_FIELD_MAPPING("checkpoint", CYAML_FLAG_OPTIONAL, RDyConfig, checkpoint, checkpoint_fields_schema),
     CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
@@ -809,6 +826,24 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Determines the prefix of the YAML configuration file.
+PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
+  PetscFunctionBegin;
+
+  memset(prefix, 0, sizeof(char) * (strlen(rdy->config_file) + 1));
+  char *p = strstr(rdy->config_file, ".yaml");
+  if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
+    p = strstr(rdy->config_file, ".yml");
+  }
+  if (p) {
+    size_t prefix_len = p - rdy->config_file;
+    strncpy(prefix, rdy->config_file, prefix_len);
+  } else {
+    strcpy(prefix, rdy->config_file);
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // reads the config file on process 0, broadcasts it as a string to all other
 // processes, and parses the string into rdy->config
 PetscErrorCode ReadConfigFile(RDy rdy) {
@@ -904,18 +939,32 @@ static PetscErrorCode PrintTime(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PrintRestart(RDy rdy) {
+static PetscErrorCode PrintCheckpoint(RDy rdy) {
   PetscFunctionBegin;
-  RDyLogDetail(rdy, "Restart:");
-  if (rdy->config.restart.interval > 0) {
+  RDyLogDetail(rdy, "Checkpoint:");
+  if (rdy->config.checkpoint.interval > 0) {
     char format[12];
-    if (rdy->config.restart.format == PETSC_VIEWER_NATIVE) {
+    if (rdy->config.checkpoint.format == PETSC_VIEWER_NATIVE) {
       strcpy(format, "binary");
     } else {
       strcpy(format, "hdf5");
     }
     RDyLogDetail(rdy, "  File format: %s", format);
-    RDyLogDetail(rdy, "  interval: %" PetscInt_FMT, rdy->config.restart.interval);
+    RDyLogDetail(rdy, "  interval: %" PetscInt_FMT, rdy->config.checkpoint.interval);
+  } else {
+    RDyLogDetail(rdy, "  (disabled)");
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PrintRestart(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Restart:");
+  if (rdy->config.restart.file[0]) {
+    RDyLogDetail(rdy, "  File: %s", rdy->config.restart.file);
+    if (rdy->config.restart.reinitialize) {
+      RDyLogDetail(rdy, "  (time is reinitialized to zero)");
+    }
   } else {
     RDyLogDetail(rdy, "  (disabled)");
   }
@@ -945,6 +994,7 @@ PetscErrorCode PrintConfig(RDy rdy) {
   PetscCall(PrintNumerics(rdy));
   PetscCall(PrintTime(rdy));
   PetscCall(PrintLogging(rdy));
+  PetscCall(PrintCheckpoint(rdy));
   PetscCall(PrintRestart(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -107,9 +107,11 @@ static PetscErrorCode OverrideParameters(RDy rdy) {
 
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
   {
-    PetscCall(PetscOptionsReal("-dt", "dt (seconds)", "", rdy->dt, &rdy->dt, NULL));
+    PetscCall(PetscOptionsReal("-dt", "time step size (seconds)", "", rdy->dt, &rdy->dt, NULL));
     PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed_resource, rdy->ceed_resource,
                                  sizeof rdy->ceed_resource, NULL));
+    PetscCall(PetscOptionsString("-restart", "restart from the given checkpoint file", "", rdy->config.restart.file, rdy->config.restart.file,
+                                 sizeof rdy->config.restart.file, NULL));
   }
   PetscOptionsEnd();
 
@@ -846,7 +848,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
 }
 
 // initialize the data on the right hand side of the boundary edges
-static PetscErrorCode SetInitialBoundaryConditions(RDy rdy) {
+static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionBegin;
 
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -980,6 +982,17 @@ PetscErrorCode RDySetup(RDy rdy) {
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
   }
 
-  SetInitialBoundaryConditions(rdy);
+  // make sure any Dirichlet boundary conditions are properly specified
+  PetscCall(InitDirichletBoundaryConditions(rdy));
+
+  RDyLogDebug(rdy, "Initializing checkpoints...");
+  PetscCall(InitCheckpoints(rdy));
+
+  // if a restart has been requested, read the specified checkpoint file
+  // and overwrite the necessary data
+  if (rdy->config.restart.file[0]) {
+    PetscCall(ReadCheckpointFile(rdy, rdy->config.restart.file));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
