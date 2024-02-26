@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.10">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.11">
     
     
       
@@ -500,6 +500,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      checkpoint
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#restart" class="md-nav__link">
     <span class="md-ellipsis">
       restart
@@ -763,6 +772,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      checkpoint
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#restart" class="md-nav__link">
     <span class="md-ellipsis">
       restart
@@ -878,7 +896,10 @@ broad categories:</p>
   files or to the terminal</li>
 <li><a href="input.html#output">output</a>: configures simulation output, including
   scalable I/O formats and related parameters</li>
-<li><a href="input.html#restart">restart</a>: configures simulation restart dumps</li>
+<li><a href="input.html#checkpoint">checkpoint</a>: configures simulation checkpoint
+  files, which are used for restarts</li>
+<li><a href="input.html#restart">restart</a>: configures whether a simulation is restarted
+  from a previously saved checkpoint file</li>
 </ul>
 </li>
 <li><strong>Material properties</strong><ul>
@@ -1117,7 +1138,7 @@ RDycore. The parameters that define these discretizations are</p>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 </code></pre></div>
 <p>The <code>output</code> section control simulation output, including visualization and
-time series data (and excluding restart data). Relevant parameters are</p>
+time series data (and excluding checkpoint data). Relevant parameters are</p>
 <ul>
 <li><code>format</code>: the format of the output written. Available options are<ul>
 <li><code>none</code>: no output is written. This is the default value.</li>
@@ -1197,8 +1218,39 @@ configuration for a simulation in which sediments and salinity are not modeled,
 so only the <code>flow</code> parameter is required. The presence of sediment concentrations
 requires the <code>sediment</code> parameter, as the presence of salinity concentrations
 requires the <code>salinity</code> parameter.</p>
+<h2 id="checkpoint"><code>checkpoint</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">checkpoint</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdf5</span>
+<span class="w">  </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+</code></pre></div>
+<p>The <code>checkpoint</code> section contains fields that specify whether and how RDycore
+writes checkpoint files, which can be used to restart simulations using
+parameters in the <code>restart</code> section.</p>
+<ul>
+<li><code>format</code>: the format of the checkpoint files to be written. This can be either
+  <code>binary</code> (the default) or <code>hdf5</code>.</li>
+<li><code>interval</code>: the number of time steps taken between writing checkpoint files.
+  This must be a positive integer.</li>
+<li><code>prefix</code>: an optional prefix for checkpoint files. If omitted, the prefix for
+  checkpoint files is the prefix of the YAML input file name for the simulation.</li>
+</ul>
+<p>The name of a checkpoint file written at time step <code>N</code> is <code>&lt;prefix&gt;.rdycore.r.&lt;N&gt;.&lt;format&gt;</code>,
+where <code>&lt;prefix&gt;</code> is the checkpoint prefix and <code>&lt;format&gt;</code> is <code>bin</code> for a binary
+file and <code>h5</code> for an HDF5 file.</p>
+<p>This section is optional. If omitted, no checkpoint files are written.</p>
 <h2 id="restart"><code>restart</code></h2>
-<p>This section is not yet implemented.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">restart</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">checkpoint-100.h5</span>
+<span class="w">  </span><span class="nt">reinitialize</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>The <code>restart</code> section allows a user to specify a checkpoint file from which a
+simulation is restarted.</p>
+<ul>
+<li><code>file</code>: the name of the checkpoint file from which to restart the simulation</li>
+<li><code>reinitialize</code>: a flag indicating whether to reinitialize the simulation time
+  to 0 (<code>true</code>) or continue from the time at which the checkpoint file was
+  written (<code>false</code>)</li>
+</ul>
 <h2 id="salinity_conditions"><code>salinity_conditions</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">salinity_conditions</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-sal-condition</span>
