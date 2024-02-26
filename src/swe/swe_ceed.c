@@ -87,8 +87,8 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
       CeedInt r      = edges->cell_ids[2 * iedge + 1];
       q_offset_l[oe] = l * num_comp;
       q_offset_r[oe] = r * num_comp;
-      c_offset_l[oe] = cells->G2L[l] * num_comp;
-      c_offset_r[oe] = cells->G2L[r] * num_comp;
+      c_offset_l[oe] = cells->local_to_owned[l] * num_comp;
+      c_offset_r[oe] = cells->local_to_owned[r] * num_comp;
 
       g[oe][0] = edges->sn[iedge];
       g[oe][1] = edges->cn[iedge];
@@ -222,7 +222,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
       if (!edges->is_owned[iedge]) continue;
       CeedInt l      = edges->cell_ids[2 * iedge];
       q_offset_l[oe] = l * num_comp;
-      c_offset_l[oe] = cells->G2L[l] * num_comp;
+      c_offset_l[oe] = cells->local_to_owned[l] * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
         offset_dirichlet[oe] = e * num_comp;
       }
@@ -457,7 +457,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
         if (!cells->is_local[c]) continue;
 
         offset_q[oc] = c * num_comp;
-        offset_c[oc] = cells->G2L[c] * num_comp;
+        offset_c[oc] = cells->local_to_owned[c] * num_comp;
 
         g[oc][0] = cells->dz_dx[c];
         g[oc][1] = cells->dz_dy[c];

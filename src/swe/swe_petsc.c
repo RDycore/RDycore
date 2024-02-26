@@ -275,12 +275,12 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
           if (cells->is_local[l]) {
-            PetscInt idx = cells->G2L[l];
+            PetscInt idx = cells->local_to_owned[l];
             f_ptr[idx * ndof + idof] += flux_vec_int[ii][idof] * (-edge_len / areal);
           }
 
           if (cells->is_local[r]) {
-            PetscInt idx = cells->G2L[r];
+            PetscInt idx = cells->local_to_owned[r];
             f_ptr[idx * ndof + idof] += flux_vec_int[ii][idof] * (edge_len / arear);
           }
         }
@@ -358,7 +358,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
           courant_num_diags->global_cell_id  = cells->global_ids[icell];
         }
 
-        PetscInt idx = cells->G2L[icell];
+        PetscInt idx = cells->local_to_owned[icell];
         for (PetscInt idof = 0; idof < ndof; idof++) {
           F[ndof * idx + idof] += flux_vec_bnd[e][idof] * (-edge_len / cell_area);
         }
@@ -576,7 +576,7 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
       PetscReal u = data->u[icell];
       PetscReal v = data->v[icell];
 
-      PetscInt  idx    = cells->G2L[icell];
+      PetscInt  idx    = cells->local_to_owned[icell];
       PetscReal Fsum_x = f_ptr[idx * ndof + 1];
       PetscReal Fsum_y = f_ptr[idx * ndof + 2];
 

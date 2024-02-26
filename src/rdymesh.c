@@ -36,8 +36,8 @@ PetscErrorCode RDyCellsCreate(PetscInt num_cells, RDyCells *cells) {
   PetscCall(PetscCalloc1(num_cells, &cells->is_local));
   PetscCall(PetscCalloc1(num_cells, &cells->is_local));
 
-  PetscCall(PetscCalloc1(num_cells, &cells->G2L));
-  FILL(num_cells, cells->G2L, -1);
+  PetscCall(PetscCalloc1(num_cells, &cells->local_to_owned));
+  FILL(num_cells, cells->local_to_owned, -1);
 
   PetscCall(PetscCalloc1(num_cells, &cells->num_vertices));
   PetscCall(PetscCalloc1(num_cells, &cells->num_edges));
@@ -151,21 +151,21 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   }
 
   // make a first pass to put all local cells at the beginning
-  PetscCall(PetscCalloc1(num_cells_local, &cells->L2G));
-  FILL(num_cells_local, cells->L2G, -1);
+  PetscCall(PetscCalloc1(num_cells_local, &cells->owned_to_local));
+  FILL(num_cells_local, cells->owned_to_local, -1);
 
   PetscInt count = 0;
   for (PetscInt icell = 0; icell < num_cells; icell++) {
     if (cells->is_local[icell]) {
-      cells->G2L[icell] = count;
-      cells->L2G[count] = icell;
+      cells->local_to_owned[icell] = count;
+      cells->owned_to_local[count] = icell;
       count++;
     }
   }
 
   for (PetscInt icell = 0; icell < num_cells; icell++) {
     if (!cells->is_local[icell]) {
-      cells->G2L[icell] = count;
+      cells->local_to_owned[icell] = count;
       count++;
     }
   }
@@ -982,7 +982,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
   for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
-    PetscInt icell = cells->L2G[c];
+    PetscInt icell = cells->owned_to_local[c];
     for (PetscInt v = 0; v < cells->num_vertices[icell]; v++) {
       PetscInt offset    = cells->vertex_offsets[icell];
       PetscInt vertex_id = cells->vertex_ids[offset + v];

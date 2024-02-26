@@ -64,11 +64,13 @@ typedef struct {
   // surface x and y slopes
   PetscReal *dz_dx, *dz_dy;
 
-  // mapping of ghosted local cells ids to local cells ids
-  PetscInt *G2L;
+  // mapping cells of a local PETSc Vec that includes owned and ghost cells
+  // to a global PETSc Vec that only includes owned cells
+  PetscInt *local_to_owned;
 
-  // mapping of local cells ids to ghosted local cells
-  PetscInt *L2G;
+  // mapping cells of a global PETSc Vec that only includes owned cells
+  // to a local PETSc Vec that includes owned and ghost cells
+  PetscInt *owned_to_local;
 
 } RDyCells;
 
