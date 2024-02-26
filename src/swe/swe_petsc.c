@@ -274,8 +274,15 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
         }
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
-          if (cells->is_local[l]) f_ptr[l * ndof + idof] += flux_vec_int[ii][idof] * (-edge_len / areal);
-          if (cells->is_local[r]) f_ptr[r * ndof + idof] += flux_vec_int[ii][idof] * (edge_len / arear);
+          if (cells->is_local[l]) {
+            PetscInt idx = cells->local_to_owned[l];
+            f_ptr[idx * ndof + idof] += flux_vec_int[ii][idof] * (-edge_len / areal);
+          }
+
+          if (cells->is_local[r]) {
+            PetscInt idx = cells->local_to_owned[r];
+            f_ptr[idx * ndof + idof] += flux_vec_int[ii][idof] * (edge_len / arear);
+          }
         }
       }
     }
@@ -351,8 +358,9 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
           courant_num_diags->global_cell_id  = cells->global_ids[icell];
         }
 
+        PetscInt idx = cells->local_to_owned[icell];
         for (PetscInt idof = 0; idof < ndof; idof++) {
-          F[ndof * icell + idof] += flux_vec_bnd[e][idof] * (-edge_len / cell_area);
+          F[ndof * idx + idof] += flux_vec_bnd[e][idof] * (-edge_len / cell_area);
         }
       }
     }
@@ -568,8 +576,9 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
       PetscReal u = data->u[icell];
       PetscReal v = data->v[icell];
 
-      PetscReal Fsum_x = f_ptr[icell * ndof + 1];
-      PetscReal Fsum_y = f_ptr[icell * ndof + 2];
+      PetscInt  idx    = cells->local_to_owned[icell];
+      PetscReal Fsum_x = f_ptr[idx * ndof + 1];
+      PetscReal Fsum_y = f_ptr[idx * ndof + 2];
 
       PetscReal tbx = 0.0, tby = 0.0;
 
@@ -591,9 +600,9 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
         tby = (hv + dt * Fsum_y - dt * bedy) * factor;
       }
 
-      f_ptr[icell * ndof + 0] += swe_src_ptr[icell * ndof + 0];
-      f_ptr[icell * ndof + 1] += -bedx - tbx + swe_src_ptr[icell * ndof + 1];
-      f_ptr[icell * ndof + 2] += -bedy - tby + swe_src_ptr[icell * ndof + 2];
+      f_ptr[idx * ndof + 0] += swe_src_ptr[idx * ndof + 0];
+      f_ptr[idx * ndof + 1] += -bedx - tbx + swe_src_ptr[idx * ndof + 1];
+      f_ptr[idx * ndof + 2] += -bedy - tby + swe_src_ptr[idx * ndof + 2];
     }
   }
 

@@ -34,7 +34,10 @@ PetscErrorCode RDyCellsCreate(PetscInt num_cells, RDyCells *cells) {
   FILL(num_cells, cells->natural_ids, -1);
 
   PetscCall(PetscCalloc1(num_cells, &cells->is_local));
-  FILL(num_cells, cells->is_local, PETSC_FALSE);
+  PetscCall(PetscCalloc1(num_cells, &cells->is_local));
+
+  PetscCall(PetscCalloc1(num_cells, &cells->local_to_owned));
+  FILL(num_cells, cells->local_to_owned, -1);
 
   PetscCall(PetscCalloc1(num_cells, &cells->num_vertices));
   PetscCall(PetscCalloc1(num_cells, &cells->num_edges));
@@ -103,6 +106,7 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
   PetscInt num_cells = c_end - c_start;
   PetscCall(RDyCellsCreate(num_cells, cells));
 
+  PetscInt num_cells_local = 0;
   for (PetscInt c = c_start; c < c_end; c++) {
     PetscInt  icell = c - c_start;
     PetscReal centroid[dim], normal[dim];
@@ -124,6 +128,7 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
     PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
     if (gref >= 0) {
       cells->is_local[icell] = PETSC_TRUE;
+      num_cells_local++;
     } else {
       cells->is_local[icell] = PETSC_FALSE;
     }
@@ -143,6 +148,26 @@ PetscErrorCode RDyCellsCreateFromDM(DM dm, RDyCells *cells) {
       }
     }
     PetscCall(DMPlexRestoreTransitiveClosure(dm, c, use_cone, &pSize, &p));
+  }
+
+  // make a first pass to put all local cells at the beginning
+  PetscCall(PetscCalloc1(num_cells_local, &cells->owned_to_local));
+  FILL(num_cells_local, cells->owned_to_local, -1);
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < num_cells; icell++) {
+    if (cells->is_local[icell]) {
+      cells->local_to_owned[icell] = count;
+      cells->owned_to_local[count] = icell;
+      count++;
+    }
+  }
+
+  for (PetscInt icell = 0; icell < num_cells; icell++) {
+    if (!cells->is_local[icell]) {
+      cells->local_to_owned[icell] = count;
+      count++;
+    }
   }
 
   // fetch global cell IDs.
@@ -957,8 +982,9 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
   for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
-    for (PetscInt v = 0; v < cells->num_vertices[c]; v++) {
-      PetscInt offset    = cells->vertex_offsets[c];
+    PetscInt icell = cells->owned_to_local[c];
+    for (PetscInt v = 0; v < cells->num_vertices[icell]; v++) {
+      PetscInt offset    = cells->vertex_offsets[icell];
       PetscInt vertex_id = cells->vertex_ids[offset + v];
       PetscInt index     = c * max_num_vertices + v;
       vec_ptr[index]     = vertices->global_ids[vertex_id];
