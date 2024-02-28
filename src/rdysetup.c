@@ -768,6 +768,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   PetscCall(VecZeroEntries(rdy->X));
 
+  if (0) {
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion    region = rdy->regions[r];
@@ -840,10 +841,37 @@ static PetscErrorCode InitSolution(RDy rdy) {
     }
     PetscCall(VecDestroy(&local));
   }
+  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
+  }
+
+  if (1) {
+    PetscScalar *x_ptr;
+    PetscCall(VecGetArray(rdy->X, &x_ptr));
+
+    RDyMesh  *mesh  = &rdy->mesh;
+    RDyCells *cells = &mesh->cells;
+    PetscInt  h, hu = 0.0, hv = 0.0, ndof = 3;
+    PetscReal x_dam = 4.0;  // dam location
+
+    for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+      if (cells->is_local[icell]) {
+        if (cells->centroids[icell].X[0] < x_dam) {
+          h = 10.0;
+        } else {
+          h = 5.0;
+        }
+
+        PetscInt idx          = cells->local_to_owned[icell];
+        x_ptr[ndof * idx + 0] = h;
+        x_ptr[ndof * idx + 1] = hu;
+        x_ptr[ndof * idx + 2] = hv;
+      }
+    }
+    PetscCall(VecRestoreArray(rdy->X, &x_ptr));
+  }
 
   // TODO: salinity and sediment initial conditions go here.
 
-  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
