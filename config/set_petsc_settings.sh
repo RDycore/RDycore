@@ -51,11 +51,13 @@ fi
 if [ "$mach" = "pm" ]; then
 
   if [[ -z "$pm_node" ]]; then
-    echo "The -pm <cpu|gpu> was not specified, so assuming CPU nodes are being used."
+    echo ""
+    echo "NOTE: The -pm <cpu|gpu> was not specified, so assuming CPU nodes are being used."
+    echo ""
     pm_node=cpu
   fi
 
-  if [ "$pm_node"  = "cpu"]; then
+  if [ "$pm_node"  = "cpu" ]; then
 
     MODULE_FILE=$DIR/modules.pm-cpu.gnu
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
