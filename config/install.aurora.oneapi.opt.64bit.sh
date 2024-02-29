@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# source modules.aurora.openapi
+# source modules.aurora.oneapi
 
 ./configure \
 --with-cc=/soft/restricted/CNDA/updates/mpich/52.2/mpich-ofi-all-icc-default-pmix-gpu-drop52/bin/mpicc \
@@ -36,5 +36,5 @@
 --FOPTFLAGS="-O2 -g " \
 --CXXOPTFLAGS="-O2 -g " \
 --SYCLOPTFLAGS="-O2 -g " \
-PETSC_ARCH=aurora-opt-64bit-openapi-ifx-fc288817
+PETSC_ARCH=aurora-opt-64bit-oneapi-ifx-fc288817
 
