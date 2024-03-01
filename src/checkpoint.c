@@ -166,6 +166,7 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
     }
 #endif
+    PetscCall(PetscObjectSetName((PetscObject)X, "solution"));
     PetscCall(VecView(X, viewer));
 
     PetscCall(PetscViewerDestroy(&viewer));
@@ -222,6 +223,7 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
   }
 #endif
+  PetscCall(PetscObjectSetName((PetscObject)rdy->X, "solution"));
   PetscCall(VecLoad(rdy->X, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
