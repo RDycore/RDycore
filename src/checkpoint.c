@@ -4,6 +4,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+// we can remove this and any guarded logic if/when PetscBag supports HDF5
+#define PETSCBAG_DOESNT_SUPPORT_HDF5 1
+
 // checkpoint directory name (relative to current working directory)
 static const char *checkpoint_dir = "checkpoints";
 
@@ -77,6 +80,43 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+static PetscErrorCode WriteHDF5Metadata(RDy rdy, PetscViewer viewer) {
+  PetscFunctionBegin;
+  PetscCall(PetscViewerHDF5WriteGroup(viewer, "/metadata"));
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "/metadata"));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "nproc", PETSC_INT, &rdy->nproc));
+  PetscReal t;
+  PetscCall(TSGetTime(rdy->ts, &t));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "t", PETSC_DOUBLE, &t));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "dt", PETSC_DOUBLE, &rdy->dt));
+  PetscInt step;
+  PetscCall(TSGetStepNumber(rdy->ts, &step));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "step", PETSC_INT, &step));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
+  PetscFunctionBegin;
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "/metadata"));
+  PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "nproc", PETSC_INT, NULL, &rdy->nproc));
+  if (rdy->config.restart.reinitialize) {
+    PetscCall(TSSetTime(rdy->ts, 0.0));
+  } else {
+    PetscReal t;
+    PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "t", PETSC_DOUBLE, NULL, &t));
+    PetscCall(TSSetTime(rdy->ts, t));
+    PetscInt step;
+    PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "step", PETSC_INT, NULL, &step));
+    PetscCall(TSSetStepNumber(rdy->ts, step));
+  }
+  PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "dt", PETSC_DOUBLE, NULL, &rdy->dt));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif
+
 // this generates the ancient-looking checkpoing filename expected by E3SM
 static PetscErrorCode GenerateE3SMCheckpointFilename(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val,
                                                      const char *suffix, char *filename) {
@@ -114,11 +154,20 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
 
     RDyLogInfo(rdy, "Writing checkpoint file %s...", filename);
 
-    PetscBag bag;
-    PetscCall(CreateMetadata(rdy, &bag));
-    PetscCall(PetscBagView(bag, viewer));
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+    if (format == PETSC_VIEWER_HDF5_PETSC) {
+      PetscCall(WriteHDF5Metadata(rdy, viewer));
+    } else {
+#endif
+      PetscBag bag;
+      PetscCall(CreateMetadata(rdy, &bag));
+      PetscCall(PetscBagView(bag, viewer));
+      PetscCall(PetscBagDestroy(&bag));
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+    }
+#endif
+    PetscCall(PetscObjectSetName((PetscObject)X, "solution"));
     PetscCall(VecView(X, viewer));
-    PetscCall(PetscBagDestroy(&bag));
 
     PetscCall(PetscViewerDestroy(&viewer));
     RDyLogInfo(rdy, "Finished writing checkpoint file.");
@@ -157,14 +206,24 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
     PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
   } else if (strstr(filename, ".h5")) {  // HDF5
     PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_READ, &viewer));
+    PetscCall(PetscViewerHDF5PushTimestepping(viewer));  // FIXME: seems to be needed
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid checkpoint file: %s", filename);
   }
 
-  PetscBag bag;
-  PetscCall(CreateMetadata(rdy, &bag));
-  PetscCall(PetscBagLoad(viewer, bag));
-  PetscCall(ConsumeMetadata(rdy, bag));
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+  if (strstr(filename, ".h5")) {  // binary
+    PetscCall(ReadHDF5Metadata(rdy, viewer));
+  } else {
+#endif
+    PetscBag bag;
+    PetscCall(CreateMetadata(rdy, &bag));
+    PetscCall(PetscBagLoad(viewer, bag));
+    PetscCall(ConsumeMetadata(rdy, bag));
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+  }
+#endif
+  PetscCall(PetscObjectSetName((PetscObject)rdy->X, "solution"));
   PetscCall(VecLoad(rdy->X, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
