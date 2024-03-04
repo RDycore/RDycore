@@ -1076,7 +1076,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 /// @param [in] dm A PETSc DM object
 /// @param [inout] mesh A pointer to an RDyMesh that is updated
 /// @return PETSC_SUCCESS on success
-PetscErrorCode DetermineMaxAttributesForCellsAndVertices(DM dm, RDyMesh *mesh) {
+static PetscErrorCode DetermineMaxAttributesForCellsAndVertices(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   mesh->max_nvertices_per_cell = 0;
