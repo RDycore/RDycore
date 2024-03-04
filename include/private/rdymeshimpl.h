@@ -174,10 +174,14 @@ typedef struct RDyMesh {
   // number of faces on the domain boundary attached to locally stored cells
   PetscInt num_boundary_faces;
 
-  // the maximum number of vertices attached to any cell
-  PetscInt max_vertex_cells;
-  // the maximum number of vertices attached to any face
-  PetscInt max_vertex_faces;
+  // the maximum number of vertices that form a cell
+  PetscInt max_nvertices_per_cell;
+  // the maximum number of vertices that form a cell
+  PetscInt max_nedges_per_cell;
+  // the maximum number of cells that a vertex is a part
+  PetscInt max_ncells_per_vertex;
+  // the maximum number of edges that a vertex is a part
+  PetscInt max_nedges_per_vertex;
 
   // cell information
   RDyCells cells;
@@ -194,18 +198,6 @@ typedef struct RDyMesh {
   Vec coords_nat, cell_conn;
 
 } RDyMesh;
-
-PETSC_INTERN PetscErrorCode RDyCellsCreate(PetscInt, RDyCells *);
-PETSC_INTERN PetscErrorCode RDyCellsCreateFromDM(DM, RDyCells *);
-PETSC_INTERN PetscErrorCode RDyCellsDestroy(RDyCells);
-
-PETSC_INTERN PetscErrorCode RDyVerticesCreate(PetscInt, RDyVertices *);
-PETSC_INTERN PetscErrorCode RDyVerticesCreateFromDM(DM, RDyVertices *, PetscInt *);
-PETSC_INTERN PetscErrorCode RDyVerticesDestroy(RDyVertices);
-
-PETSC_INTERN PetscErrorCode RDyEdgesCreate(PetscInt, RDyEdges *);
-PETSC_INTERN PetscErrorCode RDyEdgesCreateFromDM(DM, RDyEdges *);
-PETSC_INTERN PetscErrorCode RDyEdgesDestroy(RDyEdges);
 
 PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, RDyMesh *);
 PETSC_INTERN PetscErrorCode RDyMeshDestroy(RDyMesh);
