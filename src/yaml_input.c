@@ -494,6 +494,45 @@ static const cyaml_schema_value_t salinity_condition_entry = {
 };
 
 // ----------------
+// ensemble section
+// ----------------
+//   size: <number-of-ensemble-members>
+//   members:
+//   - name: <name-of-first-member> # optional
+//     <set-of-overridden-sections-for-first-member>
+//   - name: <name-of-second-member> # optional
+//     <set-of-overridden-sections-for-second-member>
+//   ...
+//   - name: <name-of-last-member> # optional
+//     <set-of-overridden-sections-for-last-member>
+
+// schema for individual ensemble members
+static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, name, 1),
+    CYAML_FIELD_MAPPING("grid", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, grid, grid_fields_schema),
+    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, materials, num_overridden_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, boundary_conditions, num_overridden_boundary_conditions,
+                               &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
+    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, flow_conditions, num_overridden_flow_conditions, &flow_condition_entry, 0,
+                               MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, sediment_conditions, num_overridden_sediment_conditions,
+                               &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, salinity_conditions, num_overridden_salinity_conditions,
+                               &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_END
+};
+
+// a single ensemble member entry
+static const cyaml_schema_value_t ensemble_member_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyEnsembleMember, ensemble_member_fields_schema),
+};
+// ensemble specification
+static const cyaml_schema_field_t ensemble_fields_schema[] = {
+    CYAML_FIELD_INT("size", CYAML_FLAG_DEFAULT, RDyEnsembleSection, size),
+    CYAML_FIELD_SEQUENCE("members", CYAML_FLAG_POINTER, RDyEnsembleSection, members, &ensemble_member_entry, 0, CYAML_UNLIMITED),
+};
+
+// ----------------
 // top-level schema
 // ----------------
 
@@ -523,6 +562,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
     CYAML_FIELD_END
 };
 

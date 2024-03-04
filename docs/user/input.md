@@ -201,13 +201,22 @@ Here are the fields of the `ensemble` section:
   ensemble member; if omitted, the ensemble is automatically named in
   relation to its index within the list of members.
 
-syntax (`-`) to add a member to the ensemble. The member
-consists of a set of sections with specific overridden parameters. The example
-above redefines the Manning coefficient of the `smooth` [material](input.md#materials)
-defined elsewhere in the file. In plain language, the example varies the
-smoothness of the `smooth` material between ensemble members. The file used to
-initialize the `domain_flow_ic` condition is overridden for the third member
-(`member2`).
+Use the syntax (`-`) to add a member to the ensemble's `members` field. The
+member consists of a set of sections with specific overridden parameters.
+Sections that can be overridden in an ensemble member are:
+
+* [`grid`](input.md#grid)
+* [`materials`](input.md#materials)
+* [`boundary_conditions`](input.md#boundary_conditions)
+* [`flow_conditions`](input.md#flow_conditions)
+* [`sediment_conditions`](input.md#sediment_conditions)
+* [`salinity_conditions`](input.md#salinity_conditions)
+
+The example above redefines the Manning coefficient of the `smooth`
+[material](input.md#materials) defined elsewhere in the file. In plain language,
+the example varies the smoothness of the `smooth` material between ensemble
+members. Additionally, the file used to initialize the `domain_flow_ic`
+condition is overridden for the third member (`member2`).
 
 This syntax is a bit cumbersome for assembling ensembles by hand, but it's a
 simple mechanism for overriding parameters within ensemble members without
