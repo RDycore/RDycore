@@ -291,18 +291,16 @@ typedef struct {
 
 // specification of an ensemble member with overridable parameters
 typedef struct {
-  char                     name[MAX_NAME_LEN + 1];
-  RDyGridSection           grid;
-  PetscInt                 num_overridden_materials;
-  RDyMaterialSpec          materials[MAX_NUM_MATERIALS];
-  PetscInt                 num_overridden_boundary_conditions;
-  RDyBoundaryConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
-  PetscInt                 num_overridden_flow_conditions;
-  RDyFlowCondition         flow_conditions[MAX_NUM_CONDITIONS];
-  PetscInt                 num_overridden_sediment_conditions;
-  RDySedimentCondition     sediment_conditions[MAX_NUM_CONDITIONS];
-  PetscInt                 num_overridden_salinity_conditions;
-  RDySalinityCondition     salinity_conditions[MAX_NUM_CONDITIONS];
+  char                 name[MAX_NAME_LEN + 1];
+  RDyGridSection       grid;
+  PetscInt             num_overridden_materials;
+  RDyMaterialSpec      materials[MAX_NUM_MATERIALS];
+  PetscInt             num_overridden_flow_conditions;
+  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_overridden_sediment_conditions;
+  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_overridden_salinity_conditions;
+  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 } RDyEnsembleMember;
 
 // specification of an ensemble

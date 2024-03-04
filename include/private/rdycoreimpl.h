@@ -99,6 +99,9 @@ struct _p_RDy {
 
   // MPI communicator used for the simulation
   MPI_Comm comm;
+  // Global MPI communicator, used for ensemble analysis (equivalent to comm for
+  // single simulations)
+  MPI_Comm global_comm;
   // MPI rank of local process
   PetscMPIInt rank;
   // Number of processes in the communicator

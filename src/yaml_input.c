@@ -511,8 +511,6 @@ static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, name, 1),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, grid, grid_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, materials, num_overridden_materials, &material_entry, 0, MAX_NUM_MATERIALS),
-    CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, boundary_conditions, num_overridden_boundary_conditions,
-                               &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
     CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, flow_conditions, num_overridden_flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, sediment_conditions, num_overridden_sediment_conditions,
@@ -881,6 +879,72 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// in ensemble mode: configures the ensemble member residing on the local process
+static PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
+  PetscFunctionBegin;
+
+  // split the global communicator (evenly)
+  PetscInt global_nproc = rdy->nproc;
+  PetscInt global_rank  = rdy->rank;
+  rdy->nproc            = global_nproc / rdy->config.ensemble.size;  // number of procs for member
+  rdy->rank             = global_rank % rdy->config.ensemble.size;   // rank of current member proc
+  MPI_Comm_split(rdy->global_comm, rdy->nproc, rdy->rank, &rdy->comm);
+
+  // override ensemble member parameters by copying them into place
+  RDyEnsembleMember member_config = rdy->config.ensemble.members[rdy->rank];
+
+  // grid
+  if (member_config.grid.file[0]) {
+    rdy->config.grid = member_config.grid;
+  }
+
+  // materials
+  for (PetscInt m = 0; m < member_config.num_overridden_materials; ++m) {
+    // find the specified material
+    for (PetscInt mm = 0; mm < rdy->config.num_materials; ++mm) {
+      if (!strcmp(rdy->config.materials[mm].name, member_config.materials[m].name)) {
+        rdy->config.materials[mm] = member_config.materials[m];
+        break;
+      }
+    }
+  }
+
+  // flow conditions
+  for (PetscInt c = 0; c < member_config.num_overridden_flow_conditions; ++c) {
+    // find the specified flow condition
+    for (PetscInt cc = 0; cc < rdy->config.num_flow_conditions; ++cc) {
+      if (!strcmp(rdy->config.flow_conditions[cc].name, member_config.flow_conditions[c].name)) {
+        rdy->config.flow_conditions[cc] = member_config.flow_conditions[c];
+        break;
+      }
+    }
+  }
+
+  // sediment conditions
+  for (PetscInt c = 0; c < member_config.num_overridden_sediment_conditions; ++c) {
+    // find the specified sediment condition
+    for (PetscInt cc = 0; cc < rdy->config.num_sediment_conditions; ++cc) {
+      if (!strcmp(rdy->config.sediment_conditions[cc].name, member_config.sediment_conditions[c].name)) {
+        rdy->config.sediment_conditions[cc] = member_config.sediment_conditions[c];
+        break;
+      }
+    }
+  }
+
+  // salinity conditions
+  for (PetscInt c = 0; c < member_config.num_overridden_salinity_conditions; ++c) {
+    // find the specified salinity condition
+    for (PetscInt cc = 0; cc < rdy->config.num_salinity_conditions; ++cc) {
+      if (!strcmp(rdy->config.salinity_conditions[cc].name, member_config.salinity_conditions[c].name)) {
+        rdy->config.salinity_conditions[cc] = member_config.salinity_conditions[c];
+        break;
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Determines the prefix of the YAML configuration file.
 PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
   PetscFunctionBegin;
@@ -928,6 +992,13 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &config));
   PetscCall(ValidateConfig(rdy->comm, config));
+
+  // if this is an ensemble run, split our communicator, assign ranks to
+  // ensemble members, and override parameters
+  if (rdy->config.ensemble.size > 1) {
+    RDyLogInfo(rdy, "Configuring ensemble mode (%" PetscInt_FMT " members)", rdy->config.ensemble.size);
+    ConfigureEnsembleMember(rdy);
+  }
 
   // copy the config into place and dispose of it
   rdy->config = *config;
@@ -1037,20 +1108,22 @@ static PetscErrorCode PrintLogging(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Prints config information at the requested log level.
+// prints config information at the requested log level (single-run mode only)
 PetscErrorCode PrintConfig(RDy rdy) {
   PetscFunctionBegin;
 
-  RDyLogDetail(rdy, "==========================================================");
-  RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
-  RDyLogDetail(rdy, "==========================================================");
+  if (rdy->config.ensemble.size <= 1) {
+    RDyLogDetail(rdy, "==========================================================");
+    RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
+    RDyLogDetail(rdy, "==========================================================");
 
-  PetscCall(PrintPhysics(rdy));
-  PetscCall(PrintNumerics(rdy));
-  PetscCall(PrintTime(rdy));
-  PetscCall(PrintLogging(rdy));
-  PetscCall(PrintCheckpoint(rdy));
-  PetscCall(PrintRestart(rdy));
+    PetscCall(PrintPhysics(rdy));
+    PetscCall(PrintNumerics(rdy));
+    PetscCall(PrintTime(rdy));
+    PetscCall(PrintLogging(rdy));
+    PetscCall(PrintCheckpoint(rdy));
+    PetscCall(PrintRestart(rdy));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

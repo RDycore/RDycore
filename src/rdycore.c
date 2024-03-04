@@ -94,6 +94,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   (*rdy)->comm = comm;
   MPI_Comm_rank(comm, &((*rdy)->rank));
   MPI_Comm_size(comm, &((*rdy)->nproc));
+  (*rdy)->global_comm = comm;
 
   // set the config file
   strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
@@ -178,6 +179,11 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
+  }
+
+  // if we're in ensemble mode, free the created member communicator
+  if ((*rdy)->config.ensemble.size > 0) {
+    MPI_Comm_free(&((*rdy)->comm));
   }
 
   PetscCall(PetscFree(*rdy));

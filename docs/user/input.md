@@ -207,7 +207,6 @@ Sections that can be overridden in an ensemble member are:
 
 * [`grid`](input.md#grid)
 * [`materials`](input.md#materials)
-* [`boundary_conditions`](input.md#boundary_conditions)
 * [`flow_conditions`](input.md#flow_conditions)
 * [`sediment_conditions`](input.md#sediment_conditions)
 * [`salinity_conditions`](input.md#salinity_conditions)
