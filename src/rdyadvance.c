@@ -5,35 +5,56 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-// output directory name (relative to current working directory)
-static const char *output_dir = "output";
-
 extern PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit);
 extern PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit);
 
-/// Returns the name of the output directory.
-PetscErrorCode GetOutputDir(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
+/// Returns the name of the output directory:
+/// * "output"                        (single-run mode)
+/// * "output/<ensemble-member-name>" (ensemble mode)
+PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
   PetscFunctionBegin;
+  static char output_dir[PETSC_MAX_PATH_LEN] = {0};
+  if (!output_dir[0]) {
+    if (rdy->config.ensemble.size > 1) {
+      sprintf(output_dir, "output/%s", rdy->config.ensemble.members[rdy->rank].name);
+    } else {
+      strcpy(output_dir, "output");
+    }
+  }
   strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// creates the output directory if it doesn't exist
-static PetscErrorCode CreateOutputDir(RDy rdy) {
+// creates the directory on rank 0 of the provided communicator, broadcasting
+// results to the rest of the communicator's processes
+static PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
   PetscFunctionBegin;
-
-  RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
-
-  PetscMPIInt result_and_errno[2];
-  if (rdy->rank == 0) {
-    result_and_errno[0] = mkdir(output_dir, 0755);
+  PetscMPIInt rank, result_and_errno[2];
+  MPI_Comm_rank(comm, &rank);
+  if (rank == 0) {
+    result_and_errno[0] = mkdir(directory, 0755);
     result_and_errno[1] = errno;
   }
-  MPI_Bcast(&result_and_errno, 2, MPI_INT, 0, rdy->comm);
+  MPI_Bcast(&result_and_errno, 2, MPI_INT, 0, comm);
   int result = result_and_errno[0];
   int err_no = result_and_errno[1];
-  PetscCheck((result == 0) || (err_no == EEXIST), rdy->comm, PETSC_ERR_USER, "Could not create output directory: %s (errno = %d)", output_dir,
-             err_no);
+  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create output directory: %s (errno = %d)", directory, err_no);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// creates the output directory if it doesn't exist
+static PetscErrorCode CreateOutputDirectory(RDy rdy) {
+  PetscFunctionBegin;
+
+  char output_dir[PETSC_MAX_PATH_LEN];
+  PetscCall(GetOutputDirectory(rdy, output_dir));
+  RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
+
+  // create the output/ directory on rank 0
+  if (rdy->config.ensemble.size > 1) {
+    PetscCall(CreateDirectory(rdy->global_comm, "output"));
+  }
+  PetscCall(CreateDirectory(rdy->comm, output_dir));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -66,6 +87,8 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscCall(DetermineConfigPrefix(rdy, prefix));
 
   // encode specific information into the filename based on its format
+  char output_dir[PETSC_MAX_PATH_LEN];
+  PetscCall(GetOutputDirectory(rdy, output_dir));
   if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
     PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
   } else if (rdy->config.output.format == OUTPUT_XDMF) {
@@ -204,7 +227,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscInt step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
   if (step == 0) {
-    PetscCall(CreateOutputDir(rdy));
+    PetscCall(CreateOutputDirectory(rdy));
 
     // create a viewer with the proper format for visualization output
     PetscCall(CreateOutputViewer(rdy));

@@ -893,6 +893,16 @@ static PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   // override ensemble member parameters by copying them into place
   RDyEnsembleMember member_config = rdy->config.ensemble.members[rdy->rank];
 
+  // assign the ensemble a default name if it doesn't have one
+  if (!member_config.name[0]) {
+    int  num_digits = (int)(log10((double)rdy->config.ensemble.size)) + 1;
+    char fmt[16]    = {0};
+    snprintf(fmt, 15, "%%0%dd.%%s", num_digits);
+    char suffix[16];
+    sprintf(suffix, fmt, rdy->rank);
+    sprintf(member_config.name, "ensemble_%s", suffix);
+  }
+
   // grid
   if (member_config.grid.file[0]) {
     rdy->config.grid = member_config.grid;

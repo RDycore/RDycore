@@ -201,7 +201,7 @@ PETSC_INTERN PetscErrorCode InitSWE(RDy);
 PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 
 // output functions
-PETSC_INTERN PetscErrorCode GetOutputDir(RDy, char dir[PETSC_MAX_PATH_LEN]);
+PETSC_INTERN PetscErrorCode GetOutputDirectory(RDy, char dir[PETSC_MAX_PATH_LEN]);
 PETSC_INTERN PetscErrorCode GenerateIndexedFilename(const char *, const char *, PetscInt, PetscInt, const char *, char *);
 PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char *, char *);
 PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *);
