@@ -82,7 +82,7 @@ PetscErrorCode RDyFinalize(void) {
 PetscBool RDyInitialized(void) { return initialized_; }
 
 /// Creates a new RDy object representing an RDycore simulation context.
-/// @param comm        [in] the MPI communicator used by the simulation
+/// @param comm        [in] the MPI communicator used by the simulation or ensemble
 /// @param config_file [in] a path to a configuration (.yaml) file
 /// @param rdy         [out] a pointer that stores the newly created RDy.
 PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
@@ -91,10 +91,10 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   PetscCall(PetscNew(rdy));
 
   // MPI comm stuff
-  (*rdy)->comm = comm;
+  (*rdy)->global_comm = comm;
   MPI_Comm_rank(comm, &((*rdy)->rank));
   MPI_Comm_size(comm, &((*rdy)->nproc));
-  (*rdy)->global_comm = comm;
+  MPI_Comm_dup((*rdy)->global_comm, &((*rdy)->comm));
 
   // set the config file
   strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
@@ -181,11 +181,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
   }
 
-  // if we're in ensemble mode, free the created member communicator
-  if ((*rdy)->config.ensemble.size > 0) {
-    MPI_Comm_free(&((*rdy)->comm));
-  }
-
+  MPI_Comm_free(&((*rdy)->comm));
   PetscCall(PetscFree(*rdy));
   *rdy = NULL;
   PetscFunctionReturn(PETSC_SUCCESS);

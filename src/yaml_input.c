@@ -524,6 +524,7 @@ static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
 static const cyaml_schema_value_t ensemble_member_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyEnsembleMember, ensemble_member_fields_schema),
 };
+
 // ensemble specification
 static const cyaml_schema_field_t ensemble_fields_schema[] = {
     CYAML_FIELD_INT("size", CYAML_FLAG_DEFAULT, RDyEnsembleSection, size),
@@ -883,11 +884,21 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 static PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   PetscFunctionBegin;
 
-  // split the global communicator (evenly)
+  // the declared ensemble size should match the actual number of members
+  PetscCheck(rdy->config.ensemble.size == rdy->config.ensemble.members_count, rdy->global_comm, PETSC_ERR_USER,
+             "Declared ensemble size (%" PetscInt_FMT ") does not match the number of members (%" PetscInt_FMT ")", rdy->config.ensemble.size,
+             rdy->config.ensemble.members_count);
+
+  // the ensemble size should evenly divide the number of processes
   PetscInt global_nproc = rdy->nproc;
-  PetscInt global_rank  = rdy->rank;
-  rdy->nproc            = global_nproc / rdy->config.ensemble.size;  // number of procs for member
-  rdy->rank             = global_rank % rdy->config.ensemble.size;   // rank of current member proc
+  PetscCheck((global_nproc % rdy->config.ensemble.size) == 0, rdy->global_comm, PETSC_ERR_USER,
+             "In ensemble mode, the ensemble size must evenly divide the number of processes.");
+
+  // split the global communicator (evenly)
+  PetscInt global_rank = rdy->rank;
+  rdy->nproc           = global_nproc / rdy->config.ensemble.size;  // number of procs for member
+  rdy->rank            = global_rank % rdy->config.ensemble.size;   // rank of current member proc
+  MPI_Comm_free(&rdy->comm);
   MPI_Comm_split(rdy->global_comm, rdy->nproc, rdy->rank, &rdy->comm);
 
   // override ensemble member parameters by copying them into place
@@ -1003,16 +1014,15 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscCall(ParseYaml(rdy->comm, config_str, &config));
   PetscCall(ValidateConfig(rdy->comm, config));
 
+  // copy the config into place and dispose of the original
+  rdy->config = *config;
+  PetscFree(config);
+
   // if this is an ensemble run, split our communicator, assign ranks to
   // ensemble members, and override parameters
   if (rdy->config.ensemble.size > 1) {
-    RDyLogInfo(rdy, "Configuring ensemble mode (%" PetscInt_FMT " members)", rdy->config.ensemble.size);
     ConfigureEnsembleMember(rdy);
   }
-
-  // copy the config into place and dispose of it
-  rdy->config = *config;
-  PetscFree(config);
 
   // set any additional options needed in PETSc's options database
   PetscCall(SetAdditionalOptions(rdy));
@@ -1028,6 +1038,13 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
 // =============
 
 static const char *FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
+
+static PetscErrorCode PrintEnsemble(RDy rdy) {
+  PetscFunctionBegin;
+  RDyLogDetail(rdy, "Ensemble:");
+  RDyLogDetail(rdy, "  Size: %" PetscInt_FMT, rdy->config.ensemble.size);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
@@ -1122,18 +1139,17 @@ static PetscErrorCode PrintLogging(RDy rdy) {
 PetscErrorCode PrintConfig(RDy rdy) {
   PetscFunctionBegin;
 
-  if (rdy->config.ensemble.size <= 1) {
-    RDyLogDetail(rdy, "==========================================================");
-    RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
-    RDyLogDetail(rdy, "==========================================================");
+  RDyLogDetail(rdy, "==========================================================");
+  RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
+  RDyLogDetail(rdy, "==========================================================");
 
-    PetscCall(PrintPhysics(rdy));
-    PetscCall(PrintNumerics(rdy));
-    PetscCall(PrintTime(rdy));
-    PetscCall(PrintLogging(rdy));
-    PetscCall(PrintCheckpoint(rdy));
-    PetscCall(PrintRestart(rdy));
-  }
+  PetscCall(PrintEnsemble(rdy));
+  PetscCall(PrintPhysics(rdy));
+  PetscCall(PrintNumerics(rdy));
+  PetscCall(PrintTime(rdy));
+  PetscCall(PrintLogging(rdy));
+  PetscCall(PrintCheckpoint(rdy));
+  PetscCall(PrintRestart(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

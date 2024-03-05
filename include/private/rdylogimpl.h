@@ -29,9 +29,9 @@ static const char     *RDyLogLabels[5] = {"", "WARNING: ", "INFO: ", "DETAIL: ",
 // need to wrap this in PetscCall.
 #define RDyLog(rdy, log_level, ...)                                                             \
   if (((rdy)->config.logging.level > LOG_NONE) && ((rdy)->config.logging.level >= log_level)) { \
-    PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, "%s", RDyLogLabels[log_level]));            \
-    PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, __VA_ARGS__));                              \
-    PetscCall(PetscFPrintf((rdy)->comm, (rdy)->log, "\n"));                                     \
+    PetscCall(PetscFPrintf((rdy)->global_comm, (rdy)->log, "%s", RDyLogLabels[log_level]));     \
+    PetscCall(PetscFPrintf((rdy)->global_comm, (rdy)->log, __VA_ARGS__));                       \
+    PetscCall(PetscFPrintf((rdy)->global_comm, (rdy)->log, "\n"));                              \
   }
 
 // These are convenient macros for writing log messages at specific levels.
