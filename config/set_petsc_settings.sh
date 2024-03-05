@@ -38,6 +38,8 @@ done
 if [ ! -z "$LMOD_SYSTEM_NAME" ]; then
   if [[ $LMOD_SYSTEM_NAME == *"perlmutter"* ]]; then
     mach=pm
+  elif [[ $LMOD_SYSTEM_NAME == *"frontier"* ]]; then
+    mach=frontier
   fi
 fi
 
