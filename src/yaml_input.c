@@ -905,18 +905,18 @@ static PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   MPI_Comm_free(&rdy->comm);
   MPI_Comm_split(rdy->global_comm, rdy->nproc, rdy->rank, &rdy->comm);
 
-  // override ensemble member parameters by copying them into place
-  RDyEnsembleMember member_config = rdy->config.ensemble.members[rdy->rank];
-
   // assign the ensemble a default name if it doesn't have one
-  if (!member_config.name[0]) {
+  if (!rdy->config.ensemble.members[rdy->rank].name[0]) {
     int  num_digits = (int)(log10((double)rdy->config.ensemble.size)) + 1;
     char fmt[16]    = {0};
-    snprintf(fmt, 15, "%%0%dd.%%s", num_digits);
+    snprintf(fmt, 15, "%%0%dd", num_digits);
     char suffix[16];
     sprintf(suffix, fmt, rdy->rank);
-    sprintf(member_config.name, "ensemble_%s", suffix);
+    sprintf(rdy->config.ensemble.members[rdy->rank].name, "ensemble_%s", suffix);
   }
+
+  // override ensemble member parameters by copying them into place
+  RDyEnsembleMember member_config = rdy->config.ensemble.members[rdy->rank];
 
   // grid
   if (member_config.grid.file[0]) {
