@@ -16,7 +16,7 @@ PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
   static char output_dir[PETSC_MAX_PATH_LEN] = {0};
   if (!output_dir[0]) {
     if (rdy->config.ensemble.size > 1) {
-      sprintf(output_dir, "output/%s", rdy->config.ensemble.members[rdy->rank].name);
+      sprintf(output_dir, "output/%s", rdy->config.ensemble.members[rdy->ensemble_member_index].name);
     } else {
       strcpy(output_dir, "output");
     }
@@ -27,7 +27,7 @@ PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
 
 // creates the directory on rank 0 of the provided communicator, broadcasting
 // results to the rest of the communicator's processes
-static PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
+PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
   PetscFunctionBegin;
   PetscMPIInt rank, result_and_errno[2];
   MPI_Comm_rank(comm, &rank);
@@ -38,7 +38,7 @@ static PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
   MPI_Bcast(&result_and_errno, 2, MPI_INT, 0, comm);
   int result = result_and_errno[0];
   int err_no = result_and_errno[1];
-  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create output directory: %s (errno = %d)", directory, err_no);
+  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create directory: %s (errno = %d)", directory, err_no);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -50,11 +50,12 @@ static PetscErrorCode CreateOutputDirectory(RDy rdy) {
   PetscCall(GetOutputDirectory(rdy, output_dir));
   RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
 
-  // create the output/ directory on rank 0
+  // create the output/ directory on global rank 0
   if (rdy->config.ensemble.size > 1) {
     PetscCall(CreateDirectory(rdy->global_comm, "output"));
   }
   PetscCall(CreateDirectory(rdy->comm, output_dir));
+  MPI_Barrier(rdy->global_comm);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

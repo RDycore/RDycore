@@ -898,25 +898,28 @@ static PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   PetscFunctionBegin;
 
   // split the global communicator (evenly)
-  PetscInt global_nproc = rdy->nproc;
-  PetscInt global_rank  = rdy->rank;
-  rdy->nproc            = global_nproc / rdy->config.ensemble.size;  // number of procs for member
-  rdy->rank             = global_rank % rdy->config.ensemble.size;   // rank of current member proc
+  PetscMPIInt procs_per_ensemble = rdy->nproc / rdy->config.ensemble.size;
+  PetscMPIInt color              = rdy->rank / procs_per_ensemble;  // ensemble index
+  PetscMPIInt key                = 0;                               // let MPI decide how to order ranks
   MPI_Comm_free(&rdy->comm);
-  MPI_Comm_split(rdy->global_comm, rdy->nproc, rdy->rank, &rdy->comm);
+  MPI_Comm_split(rdy->global_comm, color, key, &rdy->comm);
+  printf("Global rank %d -> ensemble %d\n", rdy->rank, color);
+  MPI_Comm_size(rdy->comm, &rdy->nproc);
+  MPI_Comm_rank(rdy->comm, &rdy->rank);
+  rdy->ensemble_member_index = color;
 
   // assign the ensemble a default name if it doesn't have one
-  if (!rdy->config.ensemble.members[rdy->rank].name[0]) {
+  if (!rdy->config.ensemble.members[color].name[0]) {
     int  num_digits = (int)(log10((double)rdy->config.ensemble.size)) + 1;
     char fmt[16]    = {0};
     snprintf(fmt, 15, "%%0%dd", num_digits);
     char suffix[16];
-    sprintf(suffix, fmt, rdy->rank);
-    sprintf(rdy->config.ensemble.members[rdy->rank].name, "ensemble_%s", suffix);
+    sprintf(suffix, fmt, color);
+    sprintf(rdy->config.ensemble.members[color].name, "ensemble_%s", suffix);
   }
 
   // override ensemble member parameters by copying them into place
-  RDyEnsembleMember member_config = rdy->config.ensemble.members[rdy->rank];
+  RDyEnsembleMember member_config = rdy->config.ensemble.members[color];
 
   // grid
   if (member_config.grid.file[0]) {
