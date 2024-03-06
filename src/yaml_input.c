@@ -1006,7 +1006,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
   } else {
     // other processes: read the size of the content
-    MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
+    MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
 
     // recreate the configuration string.
     PetscCall(PetscCalloc1(config_size, &config_str));
