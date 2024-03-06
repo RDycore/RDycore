@@ -616,6 +616,19 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
 static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionBegin;
 
+  // check ensemble settings
+  PetscCheck(config->ensemble.size == 0 || config->ensemble.size > 1, comm, PETSC_ERR_USER,
+             "Ensemble size (%" PetscInt_FMT ") must be greater than 1", config->ensemble.size);
+  PetscCheck(config->ensemble.size == config->ensemble.members_count, comm, PETSC_ERR_USER,
+             "Declared ensemble size (%" PetscInt_FMT ") does not match the number of members (%" PetscInt_FMT ")", config->ensemble.size,
+             config->ensemble.members_count);
+  if (config->ensemble.size) {
+    PetscMPIInt nproc;
+    MPI_Comm_size(comm, &nproc);
+    PetscCheck((nproc % config->ensemble.size) == 0, comm, PETSC_ERR_USER,
+               "In ensemble mode, the ensemble size must evenly divide the number of processes.");
+  }
+
   // check numerics settings
   if (config->numerics.spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
@@ -884,20 +897,11 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 static PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   PetscFunctionBegin;
 
-  // the declared ensemble size should match the actual number of members
-  PetscCheck(rdy->config.ensemble.size == rdy->config.ensemble.members_count, rdy->global_comm, PETSC_ERR_USER,
-             "Declared ensemble size (%" PetscInt_FMT ") does not match the number of members (%" PetscInt_FMT ")", rdy->config.ensemble.size,
-             rdy->config.ensemble.members_count);
-
-  // the ensemble size should evenly divide the number of processes
-  PetscInt global_nproc = rdy->nproc;
-  PetscCheck((global_nproc % rdy->config.ensemble.size) == 0, rdy->global_comm, PETSC_ERR_USER,
-             "In ensemble mode, the ensemble size must evenly divide the number of processes.");
-
   // split the global communicator (evenly)
-  PetscInt global_rank = rdy->rank;
-  rdy->nproc           = global_nproc / rdy->config.ensemble.size;  // number of procs for member
-  rdy->rank            = global_rank % rdy->config.ensemble.size;   // rank of current member proc
+  PetscInt global_nproc = rdy->nproc;
+  PetscInt global_rank  = rdy->rank;
+  rdy->nproc            = global_nproc / rdy->config.ensemble.size;  // number of procs for member
+  rdy->rank             = global_rank % rdy->config.ensemble.size;   // rank of current member proc
   MPI_Comm_free(&rdy->comm);
   MPI_Comm_split(rdy->global_comm, rdy->nproc, rdy->rank, &rdy->comm);
 
@@ -1041,8 +1045,10 @@ static const char *FlagString(PetscBool flag) { return flag ? "enabled" : "disab
 
 static PetscErrorCode PrintEnsemble(RDy rdy) {
   PetscFunctionBegin;
-  RDyLogDetail(rdy, "Ensemble:");
-  RDyLogDetail(rdy, "  Size: %" PetscInt_FMT, rdy->config.ensemble.size);
+  if (rdy->config.ensemble.size) {
+    RDyLogDetail(rdy, "Ensemble:");
+    RDyLogDetail(rdy, "  Size: %" PetscInt_FMT, rdy->config.ensemble.size);
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
