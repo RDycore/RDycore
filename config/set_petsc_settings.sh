@@ -97,12 +97,12 @@ elif [ "$mach" = "frontier"  ]; then
 
 elif [ "$mach" = "aurora"  ]; then
 
-  MODULE_FILE=$DIR/modules.aurora.opeapi
+  MODULE_FILE=$DIR/modules.aurora.oneapi
   export PETSC_DIR=/lus/gecko/projects/CSC250STMS07_CNDA/bishtgautam/petsc
   if [ "$with64bit" -eq 0 ]; then
-     export PETSC_ARHC=aurora-opt-32bit-openapi-ifx-fc288817
+     export PETSC_ARCH=aurora-opt-32bit-oneapi-ifx-fc288817
   else
-     export PETSC_ARHC=aurora-opt-64bit-openapi-ifx-fc288817
+     export PETSC_ARCH=aurora-opt-64bit-oneapi-ifx-fc288817
   fi
 
 else
