@@ -776,8 +776,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
   }
 
   // now initialize or override initial conditions for each region
-  PetscInt n_local;
+  PetscInt n_local, ndof;
   PetscCall(VecGetLocalSize(rdy->X, &n_local));
+  PetscCall(VecGetBlockSize(rdy->X, &ndof));
   PetscScalar *x_ptr;
   PetscCall(VecGetArray(rdy->X, &x_ptr));
 
@@ -797,14 +798,21 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscCall(VecLoad(natural, viewer));
       PetscCall(PetscViewerDestroy(&viewer));
 
+      // check the block size of the initial condition vector agrees with the block size of rdy->X
+      PetscInt nblocks_nat;
+      PetscCall(VecGetBlockSize(natural, &nblocks_nat));
+      PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
+                 "The block size of the initial condition ('%d') do not match with the nDOFs ('%d')", nblocks_nat, ndof);
+
       // scatter natural-to-global
       PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
       PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, global));
 
       // scatter global-to-local
-      PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, local));
-      PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalBegin(rdy->dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalEnd(rdy->dm, global, INSERT_VALUES, local));
 
+      // free up memory
       PetscCall(VecDestroy(&natural));
       PetscCall(VecDestroy(&global));
     }
@@ -819,17 +827,17 @@ static PetscErrorCode InitSolution(RDy rdy) {
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id = region.cell_ids[c];
-            if (3 * cell_id < n_local) {  // skip ghost cells
-              x_ptr[3 * cell_id]     = local_ptr[3 * cell_id];
-              x_ptr[3 * cell_id + 1] = local_ptr[3 * cell_id + 1];
-              x_ptr[3 * cell_id + 2] = local_ptr[3 * cell_id + 2];
+            if (ndof * cell_id < n_local) {  // skip ghost cells
+              for (PetscInt idof = 0; idof < ndof; idof++) {
+                x_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
+              }
             }
           }
           PetscCall(VecRestoreArray(local, &local_ptr));
         } else {
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id = region.cell_ids[c];
-            if (3 * cell_id < n_local) {  // skip ghost cells
+            if (ndof * cell_id < n_local) {  // skip ghost cells
               x_ptr[3 * cell_id]     = flow_ic.height;
               x_ptr[3 * cell_id + 1] = flow_ic.momentum[0];
               x_ptr[3 * cell_id + 2] = flow_ic.momentum[1];
