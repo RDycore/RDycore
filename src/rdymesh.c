@@ -898,9 +898,14 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   RDyVertices *vertices = &mesh->vertices;
   for (PetscInt v = 0; v < num_vertices; v++) {
     indices[v] = vertices->global_ids[v];
-    x[v]       = vertices->points[v].X[0];
-    y[v]       = vertices->points[v].X[1];
-    z[v]       = vertices->points[v].X[2];
+    PetscCheck(
+        (indices[v] < mesh->num_vertices_global), comm, PETSC_ERR_USER,
+        "The global vertex id (= %d) is greater than the total number of vertices (= %d). Remove vertices from the mesh that are not part of any"
+        " grid cells.\n",
+        indices[v], mesh->num_vertices_global);
+    x[v] = vertices->points[v].X[0];
+    y[v] = vertices->points[v].X[1];
+    z[v] = vertices->points[v].X[2];
   }
 
   PetscCall(VecSetValues(xcoord_nat, num_vertices, indices, x, INSERT_VALUES));
