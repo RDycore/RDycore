@@ -424,6 +424,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#preinstalled-petsc-for-rdycore-on-certain-doe-machines" class="md-nav__link">
+    <span class="md-ellipsis">
+      Preinstalled PETSc for RDycore on certain DOE machines
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -600,6 +609,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#preinstalled-petsc-for-rdycore-on-certain-doe-machines" class="md-nav__link">
+    <span class="md-ellipsis">
+      Preinstalled PETSc for RDycore on certain DOE machines
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -710,6 +728,27 @@ you.</p>
 <p>The build directory has a structure that mirrors the source directory, and you
 can type <code>make</code> in any one of its subdirectories to do partial builds. In
 practice, though, it's safest to always build from the top of the build tree.</p>
+<h2 id="preinstalled-petsc-for-rdycore-on-certain-doe-machines">Preinstalled PETSc for RDycore on certain DOE machines</h2>
+<p>The RDycore team supports installation of the model at following DOE machines:</p>
+<ol>
+<li><a href="https://docs.nersc.gov/systems/perlmutter/">Perlmutter</a> at NERSC</li>
+<li><a href="https://docs.olcf.ornl.gov/systems/frontier_user_guide.html">Frontier</a> at OLCF</li>
+<li><a href="https://www.alcf.anl.gov/support-center/aurora/getting-started-aurora">Aurora</a> at ALCF</li>
+</ol>
+<p>First, run the shell script, <code>config/set_petsc_settings.sh</code>, to set PETSc-related environmental
+variables for the pre-installed PETSc on these supported machines and load appropriate modules.
+PETSc has been pre-installed with support for 32-bit and 64-bit integers on these supported machines,
+and the 32-bit PETSc installation is the default setting. The 64-bit PETSc installation can be used
+by passing the optional command line argument <code>--64bit</code> to <code>config/set_petsc_settings.sh</code>.</p>
+<p>The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes.
+   The PETSc settings for CPU or GPU nodes can be selected via <code>--pm cpu</code> or <code>--pm gpu</code>, respectively.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--pm<span class="w"> </span>&lt;cpu<span class="p">|</span>gpu&gt;<span class="w"> </span>&lt;--64bit&gt;
+</code></pre></div>
+<p>On all other systems, the script can be run as</p>
+<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>&lt;--64bit&gt;
+</code></pre></div>
+<p>After setting PETSc variables and loading the appropriate modules, follow the
+steps outlined in the <a href="#build-test-and-install-rdycore">previous section</a> to build the code.</p>
 
 
 
