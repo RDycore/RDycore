@@ -110,3 +110,36 @@ The build directory has a structure that mirrors the source directory, and you
 can type `make` in any one of its subdirectories to do partial builds. In
 practice, though, it's safest to always build from the top of the build tree.
 
+
+## Preinstalled PETSc for RDycore on certain DOE machines
+
+The RDycore team supports installation of the model at following DOE machines:
+
+1. [Perlmutter](https://docs.nersc.gov/systems/perlmutter/) at NERSC
+2. [Frontier](https://docs.olcf.ornl.gov/systems/frontier_user_guide.html) at OLCF
+3. [Aurora](https://www.alcf.anl.gov/support-center/aurora/getting-started-aurora) at ALCF
+
+
+First, run the shell script, `config/set_petsc_settings.sh`, to set PETSc-related environmental
+variables for the pre-installed PETSc on these supported machines and load appropriate modules.
+PETSc has been pre-installed with support for 32-bit and 64-bit integers on these supported machines,
+and the 32-bit PETSc installation is the default setting. The 64-bit PETSc installation can be used
+by passing the optional command line argument `--64bit` to `config/set_petsc_settings.sh`.
+
+The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes.
+   The PETSc settings for CPU or GPU nodes can be selected via `--pm cpu` or `--pm gpu`, respectively.
+
+```bash
+source config/set_petsc_settings.sh --pm <cpu|gpu> <--64bit>
+
+```
+
+On all other systems, the script can be run as
+
+```bash
+source config/set_petsc_settings.sh <--64bit>
+
+```
+
+After setting PETSc variables and loading the appropriate modules, follow the
+steps outlined in the [previous section](#build-test-and-install-rdycore) to build the code.
