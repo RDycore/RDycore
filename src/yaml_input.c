@@ -1029,6 +1029,8 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // ensemble members, and override parameters
   if (rdy->config.ensemble.size > 1) {
     ConfigureEnsembleMember(rdy);
+  } else {
+    rdy->ensemble_member_index = -1;  // not a member of an ensemble
   }
 
   // set any additional options needed in PETSc's options database
