@@ -1076,6 +1076,75 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Creates three PETSc Vec that saves x,y,z at cell centroid. These vectors are
+/// use for output.
+/// @param [in] dm A PETSc DM object
+/// @param [inout] mesh A pointer to an RDyMesh that is updated
+/// @return PETSC_SUCCESS on success
+static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  // create a local DM
+  DM       local_dm;
+  PetscInt n_aux_field            = 1;
+  PetscInt n_aux_field_dof[1]     = {1};
+  char     aux_field_names[1][20] = {"Cell Coordinates"};
+
+  PetscCall(CloneAndCreateCellCenteredDM(dm, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+
+  Vec global_vec, natural_vec;
+  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+
+  // create the Vec for storing coordinates in nautral order
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->xc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->yc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->zc));
+
+  // set names to the Vecs
+  PetscCall((PetscObjectSetName((PetscObject)mesh->xc, "XC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->yc, "YC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->zc, "ZC")));
+
+  RDyCells *cells = &mesh->cells;
+
+  for (PetscInt idim = 0; idim < 3; idim++) {
+
+    PetscScalar *vec_ptr;
+    PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+    // pack up the idim-th coordinates in global order
+    for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
+      PetscInt icell = cells->owned_to_local[c];
+      vec_ptr[c] = cells->centroids[icell].X[idim];
+    }
+    PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+    // scatter the data from global to natural order
+    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+
+    // save the coordinate in appropriate Vec
+    switch (idim) {
+      case 0:
+        PetscCall(VecCopy(natural_vec, mesh->xc));
+        break;
+      case 1:
+        PetscCall(VecCopy(natural_vec, mesh->yc));
+        break;
+      case 2:
+        PetscCall(VecCopy(natural_vec, mesh->zc));
+        break;
+    }
+  }
+
+  PetscCall(VecDestroy(&global_vec));
+  PetscCall(VecDestroy(&natural_vec));
+  PetscCall(DMDestroy(&local_dm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Determines the max number of edges/vertices per cell and max number of
 /// cells/edges per vertices
 /// @param [in] dm A PETSc DM object
@@ -1204,6 +1273,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   if (!refine_level) {
     PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
     PetscCall(CreateCellConnectionVector(dm, mesh));
+    PetscCall(CreateCellCentroidVectors(dm, mesh));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

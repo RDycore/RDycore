@@ -195,7 +195,12 @@ typedef struct RDyMesh {
   // the maximum closure size for any cell (locally stored?)
   PetscInt maxClosureSize;
 
-  Vec coords_nat, cell_conn;
+  // for output: coordinates of vertices (in vertex natural order)
+  Vec coords_nat;
+  // for output: connections of vertices forming the cells (in cell natural order)
+  Vec cell_conn;
+  // for output: cell centroids (in cell natural order)
+  Vec xc, yc, zc;
 
 } RDyMesh;
 
