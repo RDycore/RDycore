@@ -170,7 +170,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                            "          %s:/Domain/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
-                           geometric_cell_field_names[f], mesh->num_cells_global, h5_basename,geometric_cell_field_names[f]));
+                           geometric_cell_field_names[f], mesh->num_cells_global, h5_basename, geometric_cell_field_names[f]));
   }
 
   // write cell field metadata

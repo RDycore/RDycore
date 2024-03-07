@@ -1119,14 +1119,13 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   RDyCells *cells = &mesh->cells;
 
   for (PetscInt idim = 0; idim < 3; idim++) {
-
     PetscScalar *vec_ptr;
     PetscCall(VecGetArray(global_vec, &vec_ptr));
 
     // pack up the idim-th coordinates in global order
     for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
       PetscInt icell = cells->owned_to_local[c];
-      vec_ptr[c] = cells->centroids[icell].X[idim];
+      vec_ptr[c]     = cells->centroids[icell].X[idim];
     }
     PetscCall(VecGetArray(global_vec, &vec_ptr));
 
