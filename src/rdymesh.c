@@ -883,6 +883,11 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Creates a PETSc Vec (mesh->coords_nat) with block size of 3 that saves 3D coordinate
+/// values of vertices.
+/// @param [in] dm A PETSc DM object
+/// @param [inout] mesh A pointer to an RDyMesh that is updated
+/// @return PETSC_SUCCESS on success
 static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
@@ -964,6 +969,11 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Creates a 1D PETSc Vec (mesh->cell_conn) that saves information about
+/// cell connection for XDMF output.
+/// @param [in] dm A PETSc DM object
+/// @param [inout] mesh A pointer to an RDyMesh that is updated
+/// @return PETSC_SUCCESS on success
 static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
