@@ -883,6 +883,11 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Creates a PETSc Vec (mesh->output.vertices_xyz_norder) with block size of 3 that saves 3D coordinate
+/// values of vertices.
+/// @param [in] dm A PETSc DM object
+/// @param [inout] mesh A pointer to an RDyMesh that is updated
+/// @return PETSC_SUCCESS on success
 static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
@@ -929,18 +934,18 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecGetLocalSize(xcoord_nat, &local_size));
   PetscInt ndim = 3;
 
-  Vec *coords_nat = &mesh->coords_nat;
-  PetscCall(VecCreate(comm, coords_nat));
-  PetscCall(VecSetSizes(*coords_nat, local_size * ndim, PETSC_DECIDE));
-  PetscCall(VecSetBlockSize(*coords_nat, ndim));
-  PetscCall(VecSetFromOptions(*coords_nat));
+  Vec *vertices_xyz_norder = &mesh->output.vertices_xyz_norder;
+  PetscCall(VecCreate(comm, vertices_xyz_norder));
+  PetscCall(VecSetSizes(*vertices_xyz_norder, local_size * ndim, PETSC_DECIDE));
+  PetscCall(VecSetBlockSize(*vertices_xyz_norder, ndim));
+  PetscCall(VecSetFromOptions(*vertices_xyz_norder));
 
   PetscScalar *x_ptr, *y_ptr, *z_ptr, *xyz_ptr;
 
   PetscCall(VecGetArray(xcoord_nat, &x_ptr));
   PetscCall(VecGetArray(ycoord_nat, &y_ptr));
   PetscCall(VecGetArray(zcoord_nat, &z_ptr));
-  PetscCall(VecGetArray(*coords_nat, &xyz_ptr));
+  PetscCall(VecGetArray(*vertices_xyz_norder, &xyz_ptr));
 
   for (PetscInt v = 0; v < local_size; v++) {
     xyz_ptr[v * ndim]     = x_ptr[v];
@@ -951,11 +956,11 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecRestoreArray(xcoord_nat, &x_ptr));
   PetscCall(VecRestoreArray(ycoord_nat, &y_ptr));
   PetscCall(VecRestoreArray(zcoord_nat, &z_ptr));
-  PetscCall(VecRestoreArray(*coords_nat, &xyz_ptr));
+  PetscCall(VecRestoreArray(*vertices_xyz_norder, &xyz_ptr));
 
-  if (0) VecView(*coords_nat, PETSC_VIEWER_STDOUT_WORLD);
+  if (0) VecView(*vertices_xyz_norder, PETSC_VIEWER_STDOUT_WORLD);
 
-  PetscCall((PetscObjectSetName((PetscObject)mesh->coords_nat, "Vertices")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.vertices_xyz_norder, "Vertices")));
 
   PetscCall(VecDestroy(&xcoord_nat));
   PetscCall(VecDestroy(&ycoord_nat));
@@ -964,6 +969,11 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Creates a 1D PETSc Vec (mesh->output.cell_conns_norder) that saves information about
+/// cell connection for XDMF output.
+/// @param [in] dm A PETSc DM object
+/// @param [inout] mesh A pointer to an RDyMesh that is updated
+/// @return PETSC_SUCCESS on success
 static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
@@ -1022,7 +1032,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   // Add the number of cells
   count += ncells;
 
-  // The *cell_conn vector is a long 1D distributed vector that will hold information about
+  // The *cell_conns_norder vector is a long 1D distributed vector that will hold information about
   // cell vertices. For an i-th cell, the first entry will denoted a valid XMDF element ID
   // followed by the ID of vertices in the natural order that form the i-th cell.
   // The supported element types include:
@@ -1031,15 +1041,15 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-  Vec *cell_conn = &mesh->cell_conn;
-  PetscCall(VecCreate(comm, cell_conn));
-  PetscCall(VecSetSizes(*cell_conn, count, PETSC_DECIDE));
-  PetscCall(VecSetFromOptions(*cell_conn));
+  Vec *cell_conns_norder = &mesh->output.cell_conns_norder;
+  PetscCall(VecCreate(comm, cell_conns_norder));
+  PetscCall(VecSetSizes(*cell_conns_norder, count, PETSC_DECIDE));
+  PetscCall(VecSetFromOptions(*cell_conns_norder));
 
-  PetscScalar *cell_conn_ptr;
+  PetscScalar *cell_conns_norder_ptr;
   PetscInt     idx = 0;
 
-  VecGetArray(*cell_conn, &cell_conn_ptr);
+  VecGetArray(*cell_conns_norder, &cell_conns_norder_ptr);
   for (PetscInt i = 0; i < ncells; i++) {
     PetscInt nvertices = 0;
     for (PetscInt j = 0; j < max_num_vertices; j++) {
@@ -1047,10 +1057,10 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
     }
     switch (nvertices) {
       case 3:
-        cell_conn_ptr[idx++] = TRI_ID_EXODUS;
+        cell_conns_norder_ptr[idx++] = TRI_ID_EXODUS;
         break;
       case 4:
-        cell_conn_ptr[idx++] = QUAD_ID_EXODUS;
+        cell_conns_norder_ptr[idx++] = QUAD_ID_EXODUS;
         break;
       default:
         SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported cell type");
@@ -1058,19 +1068,87 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
     }
     for (PetscInt j = 0; j < max_num_vertices; j++) {
       if (vec_ptr[i * max_num_vertices + j] > -1) {
-        cell_conn_ptr[idx++] = vec_ptr[i * max_num_vertices + j];
+        cell_conns_norder_ptr[idx++] = vec_ptr[i * max_num_vertices + j];
       }
     }
   }
-  VecRestoreArray(*cell_conn, &cell_conn_ptr);
+  VecRestoreArray(*cell_conns_norder, &cell_conns_norder_ptr);
   if (0) {
-    PetscCall(VecView(*cell_conn, PETSC_VIEWER_STDOUT_WORLD));
+    PetscCall(VecView(*cell_conns_norder, PETSC_VIEWER_STDOUT_WORLD));
   }
-  PetscCall((PetscObjectSetName((PetscObject)mesh->cell_conn, "Cells")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.cell_conns_norder, "Cells")));
 
   PetscCall(VecRestoreArray(natural_vec, &vec_ptr));
   PetscCall(VecDestroy(&natural_vec));
 
+  PetscCall(DMDestroy(&local_dm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates three PETSc Vec that saves x,y,z at cell centroid. These vectors are
+/// use for output.
+/// @param [in] dm A PETSc DM object
+/// @param [inout] mesh A pointer to an RDyMesh that is updated
+/// @return PETSC_SUCCESS on success
+static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  // create a local DM
+  DM       local_dm;
+  PetscInt n_aux_field            = 1;
+  PetscInt n_aux_field_dof[1]     = {1};
+  char     aux_field_names[1][20] = {"Cell Coordinates"};
+
+  PetscCall(CloneAndCreateCellCenteredDM(dm, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+
+  Vec global_vec, natural_vec;
+  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+
+  // create the Vec for storing coordinates in nautral order
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+
+  // set names to the Vecs
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.yc, "YC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.zc, "ZC")));
+
+  RDyCells *cells = &mesh->cells;
+
+  for (PetscInt idim = 0; idim < 3; idim++) {
+    PetscScalar *vec_ptr;
+    PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+    // pack up the idim-th coordinates in global order
+    for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
+      PetscInt icell = cells->owned_to_local[c];
+      vec_ptr[c]     = cells->centroids[icell].X[idim];
+    }
+    PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+    // scatter the data from global to natural order
+    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+
+    // save the coordinate in appropriate Vec
+    switch (idim) {
+      case 0:
+        PetscCall(VecCopy(natural_vec, mesh->output.xc));
+        break;
+      case 1:
+        PetscCall(VecCopy(natural_vec, mesh->output.yc));
+        break;
+      case 2:
+        PetscCall(VecCopy(natural_vec, mesh->output.zc));
+        break;
+    }
+  }
+
+  PetscCall(VecDestroy(&global_vec));
+  PetscCall(VecDestroy(&natural_vec));
   PetscCall(DMDestroy(&local_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1157,6 +1235,9 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
 
   PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
 
+  // save the number of refinements
+  PetscCall(DMGetRefineLevel(dm, &mesh->refine_level));
+
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
   PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
@@ -1199,11 +1280,10 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
 
   PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
-  PetscInt refine_level;
-  PetscCall(DMGetRefineLevel(dm, &refine_level));
-  if (!refine_level) {
+  if (!mesh->refine_level) {
     PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
     PetscCall(CreateCellConnectionVector(dm, mesh));
+    PetscCall(CreateCellCentroidVectors(dm, mesh));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1218,5 +1298,13 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(RDyCellsDestroy(mesh.cells));
   PetscCall(RDyEdgesDestroy(mesh.edges));
   PetscCall(RDyVerticesDestroy(mesh.vertices));
+
+  if (!mesh.refine_level) {
+    PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
+    PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
+    PetscCall(VecDestroy(&mesh.output.xc));
+    PetscCall(VecDestroy(&mesh.output.yc));
+    PetscCall(VecDestroy(&mesh.output.zc));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

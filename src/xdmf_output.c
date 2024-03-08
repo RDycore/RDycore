@@ -85,8 +85,11 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
     PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
 
     RDyMesh *mesh = &rdy->mesh;
-    PetscCall(VecView(mesh->coords_nat, viewer));
-    PetscCall(VecView(mesh->cell_conn, viewer));
+    PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
+    PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
+    PetscCall(VecView(mesh->output.xc, viewer));
+    PetscCall(VecView(mesh->output.yc, viewer));
+    PetscCall(VecView(mesh->output.zc, viewer));
 
     PetscCall(PetscViewerHDF5PopGroup(viewer));
     PetscCall(PetscViewerPopFormat(viewer));
@@ -143,7 +146,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 
   RDyMesh *mesh = &rdy->mesh;
   PetscInt size;
-  VecGetSize(mesh->cell_conn, &size);
+  VecGetSize(mesh->output.cell_conns_norder, &size);
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Topology Type=\"Mixed\" NumberOfElements=\"%" PetscInt_FMT "\">\n"
                          "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%" PetscInt_FMT "\">\n"
@@ -158,6 +161,17 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                          "        </DataItem>\n"
                          "      </Geometry>\n",
                          num_vertices, h5_basename));
+
+  const char *geometric_cell_field_names[3] = {"XC", "YC", "ZC"};
+  for (int f = 0; f < 3; ++f) {
+    PetscCall(PetscFPrintf(rdy->comm, fp,
+                           "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
+                           "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
+                           "          %s:/Domain/%s\n"
+                           "        </DataItem>\n"
+                           "      </Attribute>\n",
+                           geometric_cell_field_names[f], mesh->num_cells_global, h5_basename, geometric_cell_field_names[f]));
+  }
 
   // write cell field metadata
   const char *cell_field_names[3] = {"Height", "MomentumX", "MomentumY"};

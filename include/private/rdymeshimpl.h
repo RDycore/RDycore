@@ -150,6 +150,9 @@ typedef struct {
 // A mesh representing a computational domain consisting of a set of cells
 // connected by edges and vertices
 typedef struct RDyMesh {
+  // number of mesh refinements based on DMRefine
+  PetscInt refine_level;
+
   // spatial dimension of the mesh (1, 2, or 3)
   PetscInt dim;
 
@@ -195,7 +198,14 @@ typedef struct RDyMesh {
   // the maximum closure size for any cell (locally stored?)
   PetscInt maxClosureSize;
 
-  Vec coords_nat, cell_conn;
+  struct {
+    // for output: coordinates of vertices (in vertex natural order)
+    Vec vertices_xyz_norder;
+    // for output: connections of vertices forming the cells (in cell natural order)
+    Vec cell_conns_norder;
+    // for output: cell centroids (in cell natural order)
+    Vec xc, yc, zc;
+  } output;
 
 } RDyMesh;
 
