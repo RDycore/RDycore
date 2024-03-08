@@ -85,8 +85,8 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
     PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
 
     RDyMesh *mesh = &rdy->mesh;
-    PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
-    PetscCall(VecView(mesh->output.cell_conn, viewer));
+    PetscCall(VecView(mesh->output.coords_nat, viewer));
+    PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
     PetscCall(VecView(mesh->output.xc, viewer));
     PetscCall(VecView(mesh->output.yc, viewer));
     PetscCall(VecView(mesh->output.zc, viewer));
@@ -146,7 +146,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 
   RDyMesh *mesh = &rdy->mesh;
   PetscInt size;
-  VecGetSize(mesh->output.cell_conn, &size);
+  VecGetSize(mesh->output.cell_conns_norder, &size);
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Topology Type=\"Mixed\" NumberOfElements=\"%" PetscInt_FMT "\">\n"
                          "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%" PetscInt_FMT "\">\n"
