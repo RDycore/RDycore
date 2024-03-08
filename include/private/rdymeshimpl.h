@@ -150,6 +150,9 @@ typedef struct {
 // A mesh representing a computational domain consisting of a set of cells
 // connected by edges and vertices
 typedef struct RDyMesh {
+  // number of mesh refinements based on DMRefine
+  PetscInt refine_level;
+
   // spatial dimension of the mesh (1, 2, or 3)
   PetscInt dim;
 

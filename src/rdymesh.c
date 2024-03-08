@@ -1235,6 +1235,9 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
 
   PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
 
+  // save the number of refinements
+  PetscCall(DMGetRefineLevel(dm, &mesh->refine_level));
+
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
   PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
@@ -1277,9 +1280,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
 
   PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
-  PetscInt refine_level;
-  PetscCall(DMGetRefineLevel(dm, &refine_level));
-  if (!refine_level) {
+  if (!mesh->refine_level) {
     PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
     PetscCall(CreateCellConnectionVector(dm, mesh));
     PetscCall(CreateCellCentroidVectors(dm, mesh));
@@ -1297,5 +1298,13 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(RDyCellsDestroy(mesh.cells));
   PetscCall(RDyEdgesDestroy(mesh.edges));
   PetscCall(RDyVerticesDestroy(mesh.vertices));
+
+  if (!mesh.refine_level) {
+    PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
+    PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
+    PetscCall(VecDestroy(&mesh.output.xc));
+    PetscCall(VecDestroy(&mesh.output.yc));
+    PetscCall(VecDestroy(&mesh.output.zc));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
