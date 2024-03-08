@@ -883,7 +883,7 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a PETSc Vec (mesh->coords_nat) with block size of 3 that saves 3D coordinate
+/// Creates a PETSc Vec (mesh->output.coords_nat) with block size of 3 that saves 3D coordinate
 /// values of vertices.
 /// @param [in] dm A PETSc DM object
 /// @param [inout] mesh A pointer to an RDyMesh that is updated
@@ -934,7 +934,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecGetLocalSize(xcoord_nat, &local_size));
   PetscInt ndim = 3;
 
-  Vec *coords_nat = &mesh->coords_nat;
+  Vec *coords_nat = &mesh->output.coords_nat;
   PetscCall(VecCreate(comm, coords_nat));
   PetscCall(VecSetSizes(*coords_nat, local_size * ndim, PETSC_DECIDE));
   PetscCall(VecSetBlockSize(*coords_nat, ndim));
@@ -960,7 +960,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
 
   if (0) VecView(*coords_nat, PETSC_VIEWER_STDOUT_WORLD);
 
-  PetscCall((PetscObjectSetName((PetscObject)mesh->coords_nat, "Vertices")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.coords_nat, "Vertices")));
 
   PetscCall(VecDestroy(&xcoord_nat));
   PetscCall(VecDestroy(&ycoord_nat));
@@ -969,7 +969,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a 1D PETSc Vec (mesh->cell_conn) that saves information about
+/// Creates a 1D PETSc Vec (mesh->output.cell_conn) that saves information about
 /// cell connection for XDMF output.
 /// @param [in] dm A PETSc DM object
 /// @param [inout] mesh A pointer to an RDyMesh that is updated
@@ -1041,7 +1041,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-  Vec *cell_conn = &mesh->cell_conn;
+  Vec *cell_conn = &mesh->output.cell_conn;
   PetscCall(VecCreate(comm, cell_conn));
   PetscCall(VecSetSizes(*cell_conn, count, PETSC_DECIDE));
   PetscCall(VecSetFromOptions(*cell_conn));
@@ -1076,7 +1076,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   if (0) {
     PetscCall(VecView(*cell_conn, PETSC_VIEWER_STDOUT_WORLD));
   }
-  PetscCall((PetscObjectSetName((PetscObject)mesh->cell_conn, "Cells")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.cell_conn, "Cells")));
 
   PetscCall(VecRestoreArray(natural_vec, &vec_ptr));
   PetscCall(VecDestroy(&natural_vec));
@@ -1107,14 +1107,14 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
 
   // create the Vec for storing coordinates in nautral order
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->xc));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->yc));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->zc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
+  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
 
   // set names to the Vecs
-  PetscCall((PetscObjectSetName((PetscObject)mesh->xc, "XC")));
-  PetscCall((PetscObjectSetName((PetscObject)mesh->yc, "YC")));
-  PetscCall((PetscObjectSetName((PetscObject)mesh->zc, "ZC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.yc, "YC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.zc, "ZC")));
 
   RDyCells *cells = &mesh->cells;
 
@@ -1136,13 +1136,13 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     // save the coordinate in appropriate Vec
     switch (idim) {
       case 0:
-        PetscCall(VecCopy(natural_vec, mesh->xc));
+        PetscCall(VecCopy(natural_vec, mesh->output.xc));
         break;
       case 1:
-        PetscCall(VecCopy(natural_vec, mesh->yc));
+        PetscCall(VecCopy(natural_vec, mesh->output.yc));
         break;
       case 2:
-        PetscCall(VecCopy(natural_vec, mesh->zc));
+        PetscCall(VecCopy(natural_vec, mesh->output.zc));
         break;
     }
   }
