@@ -85,7 +85,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
     PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
 
     RDyMesh *mesh = &rdy->mesh;
-    PetscCall(VecView(mesh->output.coords_nat, viewer));
+    PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
     PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
     PetscCall(VecView(mesh->output.xc, viewer));
     PetscCall(VecView(mesh->output.yc, viewer));
