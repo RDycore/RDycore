@@ -883,7 +883,7 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a PETSc Vec (mesh->output.coords_nat) with block size of 3 that saves 3D coordinate
+/// Creates a PETSc Vec (mesh->output.vertices_xyz_norder) with block size of 3 that saves 3D coordinate
 /// values of vertices.
 /// @param [in] dm A PETSc DM object
 /// @param [inout] mesh A pointer to an RDyMesh that is updated
@@ -934,18 +934,18 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecGetLocalSize(xcoord_nat, &local_size));
   PetscInt ndim = 3;
 
-  Vec *coords_nat = &mesh->output.coords_nat;
-  PetscCall(VecCreate(comm, coords_nat));
-  PetscCall(VecSetSizes(*coords_nat, local_size * ndim, PETSC_DECIDE));
-  PetscCall(VecSetBlockSize(*coords_nat, ndim));
-  PetscCall(VecSetFromOptions(*coords_nat));
+  Vec *vertices_xyz_norder = &mesh->output.vertices_xyz_norder;
+  PetscCall(VecCreate(comm, vertices_xyz_norder));
+  PetscCall(VecSetSizes(*vertices_xyz_norder, local_size * ndim, PETSC_DECIDE));
+  PetscCall(VecSetBlockSize(*vertices_xyz_norder, ndim));
+  PetscCall(VecSetFromOptions(*vertices_xyz_norder));
 
   PetscScalar *x_ptr, *y_ptr, *z_ptr, *xyz_ptr;
 
   PetscCall(VecGetArray(xcoord_nat, &x_ptr));
   PetscCall(VecGetArray(ycoord_nat, &y_ptr));
   PetscCall(VecGetArray(zcoord_nat, &z_ptr));
-  PetscCall(VecGetArray(*coords_nat, &xyz_ptr));
+  PetscCall(VecGetArray(*vertices_xyz_norder, &xyz_ptr));
 
   for (PetscInt v = 0; v < local_size; v++) {
     xyz_ptr[v * ndim]     = x_ptr[v];
@@ -956,11 +956,11 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecRestoreArray(xcoord_nat, &x_ptr));
   PetscCall(VecRestoreArray(ycoord_nat, &y_ptr));
   PetscCall(VecRestoreArray(zcoord_nat, &z_ptr));
-  PetscCall(VecRestoreArray(*coords_nat, &xyz_ptr));
+  PetscCall(VecRestoreArray(*vertices_xyz_norder, &xyz_ptr));
 
-  if (0) VecView(*coords_nat, PETSC_VIEWER_STDOUT_WORLD);
+  if (0) VecView(*vertices_xyz_norder, PETSC_VIEWER_STDOUT_WORLD);
 
-  PetscCall((PetscObjectSetName((PetscObject)mesh->output.coords_nat, "Vertices")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.vertices_xyz_norder, "Vertices")));
 
   PetscCall(VecDestroy(&xcoord_nat));
   PetscCall(VecDestroy(&ycoord_nat));

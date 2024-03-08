@@ -197,7 +197,7 @@ typedef struct RDyMesh {
 
   struct {
     // for output: coordinates of vertices (in vertex natural order)
-    Vec coords_nat;
+    Vec vertices_xyz_norder;
     // for output: connections of vertices forming the cells (in cell natural order)
     Vec cell_conn;
     // for output: cell centroids (in cell natural order)
