@@ -77,7 +77,6 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerDestroy(&viewer));
 
   if (dataset % rdy->config.output.batch_size == 0) {
-    printf("Writing Domain information\n");
     char group_name[1025];
     snprintf(group_name, 1024, "Domain");
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_APPEND, &viewer));

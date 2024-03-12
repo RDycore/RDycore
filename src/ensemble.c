@@ -33,6 +33,9 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
     rdy->config.grid = member_config.grid;
   }
 
+  // FIXME: for the moment, we override entire sections. We might want to do
+  // FIXME: this a bit more carefully as things evolve.
+
   // materials
   for (PetscInt m = 0; m < member_config.num_overridden_materials; ++m) {
     // find the specified material
