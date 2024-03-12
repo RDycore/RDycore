@@ -419,6 +419,24 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      checkpoint
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ensemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      ensemble
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#flow_conditions" class="md-nav__link">
     <span class="md-ellipsis">
       flow_conditions
@@ -431,6 +449,15 @@
   <a href="#grid" class="md-nav__link">
     <span class="md-ellipsis">
       grid
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initial_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      initial_conditions
     </span>
   </a>
   
@@ -485,24 +512,6 @@
   <a href="#regions" class="md-nav__link">
     <span class="md-ellipsis">
       regions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#initial_conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      initial_conditions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#checkpoint" class="md-nav__link">
-    <span class="md-ellipsis">
-      checkpoint
     </span>
   </a>
   
@@ -691,6 +700,24 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      checkpoint
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ensemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      ensemble
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#flow_conditions" class="md-nav__link">
     <span class="md-ellipsis">
       flow_conditions
@@ -703,6 +730,15 @@
   <a href="#grid" class="md-nav__link">
     <span class="md-ellipsis">
       grid
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initial_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      initial_conditions
     </span>
   </a>
   
@@ -757,24 +793,6 @@
   <a href="#regions" class="md-nav__link">
     <span class="md-ellipsis">
       regions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#initial_conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      initial_conditions
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#checkpoint" class="md-nav__link">
-    <span class="md-ellipsis">
-      checkpoint
     </span>
   </a>
   
@@ -934,6 +952,11 @@ broad categories:</p>
   sources</li>
 </ul>
 </li>
+<li><strong>Running Ensembles</strong><ul>
+<li><a href="input.html#ensemble">ensemble</a>: defines sets of parameters that vary
+  between ensemble members so RDycore can run several simulations at once</li>
+</ul>
+</li>
 </ul>
 <p>Each of these sections is described below, with a motivating example.</p>
 <h2 id="boundaries"><code>boundaries</code></h2>
@@ -979,6 +1002,89 @@ as the presence of salinity concentrations requires the <code>salinity</code> pa
 <p>Like the <code>boundaries</code> section, the <code>boundary_conditions</code> section is optional.
 If no boundary conditions are specified, all boundaries are assumed to have a
 reflecting boundary condition.</p>
+<h2 id="checkpoint"><code>checkpoint</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">checkpoint</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdf5</span>
+<span class="w">  </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+</code></pre></div>
+<p>The <code>checkpoint</code> section contains fields that specify whether and how RDycore
+writes checkpoint files, which can be used to restart simulations using
+parameters in the <code>restart</code> section.</p>
+<ul>
+<li><code>format</code>: the format of the checkpoint files to be written. This can be either
+  <code>binary</code> (the default) or <code>hdf5</code>.</li>
+<li><code>interval</code>: the number of time steps taken between writing checkpoint files.
+  This must be a positive integer.</li>
+<li><code>prefix</code>: an optional prefix for checkpoint files. If omitted, the prefix for
+  checkpoint files is the prefix of the YAML input file name for the simulation.</li>
+</ul>
+<p>The name of a checkpoint file written at time step <code>N</code> is <code>&lt;prefix&gt;.rdycore.r.&lt;N&gt;.&lt;format&gt;</code>,
+where <code>&lt;prefix&gt;</code> is the checkpoint prefix and <code>&lt;format&gt;</code> is <code>bin</code> for a binary
+file and <code>h5</code> for an HDF5 file.</p>
+<p>This section is optional. If omitted, no checkpoint files are written.</p>
+<h2 id="ensemble"><code>ensemble</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">ensemble</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">  </span><span class="nt">members</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">member0</span>
+<span class="w">    </span><span class="nt">materials</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smooth</span>
+<span class="w">      </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">manning</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.15</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">member1</span>
+<span class="w">    </span><span class="nt">materials</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smooth</span>
+<span class="w">      </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">manning</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.20</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">member2</span>
+<span class="w">    </span><span class="nt">materials</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smooth</span>
+<span class="w">      </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">manning</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.25</span>
+<span class="w">    </span><span class="nt">flow_conditions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">domain_flow_ic</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
+<span class="w">      </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Differnt.Houston1km.ic.${PETSC_ID_TYPE}.bin</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary</span>
+</code></pre></div>
+<p>The <code>ensemble</code> section defines parameter sets used to construct an ensemble
+of simulations with different parameters.</p>
+<p>Currently, this section lists all ensemble members, each with
+specific parameters overridden. This explicit approach to constructing ensembles
+allows the parameter sampling procedure to be performed by external tools.
+Here are the fields of the <code>ensemble</code> section:</p>
+<ul>
+<li><code>size</code>: the number of ensemble members. This parameter is redundant in the
+  sense that the number of ensemble members can be determined by the <code>members</code>
+  field (below), but RDycore throws an error if the actual number of members
+  does not match this parameter.</li>
+<li><code>members</code>: a list of ensemble members, specified using YAML's sequence syntax
+  (<code>-</code>). An ensemble member is just a collection of sections containing
+  overridden parameters. An optional <code>name</code> field provides a name for each
+  ensemble member; if omitted, the ensemble is automatically named in
+  relation to its index within the list of members.</li>
+</ul>
+<p>Use the syntax (<code>-</code>) to add a member to the ensemble's <code>members</code> field. The
+member consists of a set of sections with specific overridden parameters.
+Sections that can be overridden in an ensemble member are:</p>
+<ul>
+<li><a href="input.html#grid"><code>grid</code></a></li>
+<li><a href="input.html#materials"><code>materials</code></a></li>
+<li><a href="input.html#flow_conditions"><code>flow_conditions</code></a></li>
+<li><a href="input.html#sediment_conditions"><code>sediment_conditions</code></a></li>
+<li><a href="input.html#salinity_conditions"><code>salinity_conditions</code></a></li>
+</ul>
+<p>The example above redefines the Manning coefficient of the <code>smooth</code>
+<a href="input.html#materials">material</a> defined elsewhere in the file. In plain language,
+the example varies the smoothness of the <code>smooth</code> material between ensemble
+members. Additionally, the file used to initialize the <code>domain_flow_ic</code>
+condition is overridden for the third member (<code>member2</code>).</p>
+<p>This syntax is a bit cumbersome for assembling ensembles by hand, but it's a
+simple mechanism for overriding parameters within ensemble members without
+creating any new syntax for simulation input.</p>
 <h2 id="flow_conditions"><code>flow_conditions</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">flow_conditions</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
@@ -1033,7 +1139,7 @@ to set the water height and momentum. This can be done in one of two ways:</p>
 </li>
 <li>
 <p>By specifying a file from which data for these parameters is to be read. The
-   data will be read into the components of the solution vector that correspond
+   data is read into the components of the solution vector that correspond
    to the cells belonging to the region to which this flow condition is
    assigned:</p>
 </li>
@@ -1055,6 +1161,21 @@ has only a single parameter:</p>
   This grid must be stored in a format supported by PETSc's <a href="https://petsc.org/release/manual/dmplex/">DMPlex</a>
   data structure.</li>
 </ul>
+<h2 id="initial_conditions"><code>initial_conditions</code></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">initial_conditions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">downstream</span>
+<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_ic</span>
+</code></pre></div>
+<p>The <code>initial_conditions</code> section is a sequence (list) associating <code>flow</code>,
+<code>sediment</code>, and <code>salinity</code> conditions (as defined in their respective sections)
+with regions (as defined in the <code>regions</code> section). A region must have exactly
+one set of initial conditions associated with it. The above example shows a valid
+configuration for a simulation in which sediments and salinity are not modeled,
+so only the <code>flow</code> parameter is required. The presence of sediment concentrations
+requires the <code>sediment</code> parameter, as the presence of salinity concentrations
+requires the <code>salinity</code> parameter.</p>
 <h2 id="logging"><code>logging</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">logging</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rdycore.log</span>
@@ -1203,41 +1324,6 @@ which contains the following parameters:</p>
   in the <code>grid</code> section, a fatal error occurs.</li>
 </ul>
 <p>Region definitions can appear in any order within the sequence.</p>
-<h2 id="initial_conditions"><code>initial_conditions</code></h2>
-<div class="highlight"><pre><span></span><code><span class="nt">initial_conditions</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
-<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">downstream</span>
-<span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_ic</span>
-</code></pre></div>
-<p>The <code>initial_conditions</code> section is a sequence (list) associating <code>flow</code>,
-<code>sediment</code>, and <code>salinity</code> conditions (as defined in their respective sections)
-with regions (as defined in the <code>regions</code> section). A region must have exactly
-one set of initial conditions associated with it. The above example shows a valid
-configuration for a simulation in which sediments and salinity are not modeled,
-so only the <code>flow</code> parameter is required. The presence of sediment concentrations
-requires the <code>sediment</code> parameter, as the presence of salinity concentrations
-requires the <code>salinity</code> parameter.</p>
-<h2 id="checkpoint"><code>checkpoint</code></h2>
-<div class="highlight"><pre><span></span><code><span class="nt">checkpoint</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdf5</span>
-<span class="w">  </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
-</code></pre></div>
-<p>The <code>checkpoint</code> section contains fields that specify whether and how RDycore
-writes checkpoint files, which can be used to restart simulations using
-parameters in the <code>restart</code> section.</p>
-<ul>
-<li><code>format</code>: the format of the checkpoint files to be written. This can be either
-  <code>binary</code> (the default) or <code>hdf5</code>.</li>
-<li><code>interval</code>: the number of time steps taken between writing checkpoint files.
-  This must be a positive integer.</li>
-<li><code>prefix</code>: an optional prefix for checkpoint files. If omitted, the prefix for
-  checkpoint files is the prefix of the YAML input file name for the simulation.</li>
-</ul>
-<p>The name of a checkpoint file written at time step <code>N</code> is <code>&lt;prefix&gt;.rdycore.r.&lt;N&gt;.&lt;format&gt;</code>,
-where <code>&lt;prefix&gt;</code> is the checkpoint prefix and <code>&lt;format&gt;</code> is <code>bin</code> for a binary
-file and <code>h5</code> for an HDF5 file.</p>
-<p>This section is optional. If omitted, no checkpoint files are written.</p>
 <h2 id="restart"><code>restart</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">restart</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">checkpoint-100.h5</span>
@@ -1284,7 +1370,7 @@ providing one or more parameters. This can be done in one of two ways:</p>
 </li>
 <li>
 <p>By specifying a file from which concentration data is to be read. The
-   data will be read into the components of the solution vector that correspond
+   data is read into the components of the solution vector that correspond
    to the cells belonging to the region to which this flow condition is
    assigned:</p>
 </li>
@@ -1328,7 +1414,7 @@ providing one or more parameters. This can be done in one of two ways:</p>
 </li>
 <li>
 <p>By specifying a file from which concentration data is to be read. The
-   data will be read into the components of the solution vector that correspond
+   data is read into the components of the solution vector that correspond
    to the cells belonging to the region to which this flow condition is
    assigned:</p>
 </li>
