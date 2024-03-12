@@ -68,6 +68,9 @@ broad categories:
     * [salinity_conditions](input.md#salinity_conditions): defines salinity-related
       parameters that can be used to specify initial/boundary conditions and
       sources
+* **Running Ensembles**
+    * [ensemble](input.md#ensemble): defines sets of parameters that vary
+      between ensemble members so RDycore can run several simulations at once
 
 Each of these sections is described below, with a motivating example.
 
@@ -124,6 +127,100 @@ Like the `boundaries` section, the `boundary_conditions` section is optional.
 If no boundary conditions are specified, all boundaries are assumed to have a
 reflecting boundary condition.
 
+## `checkpoint`
+
+```yaml
+checkpoint:
+  format: hdf5
+  interval: 100
+```
+
+The `checkpoint` section contains fields that specify whether and how RDycore
+writes checkpoint files, which can be used to restart simulations using
+parameters in the `restart` section.
+
+* `format`: the format of the checkpoint files to be written. This can be either
+  `binary` (the default) or `hdf5`.
+* `interval`: the number of time steps taken between writing checkpoint files.
+  This must be a positive integer.
+* `prefix`: an optional prefix for checkpoint files. If omitted, the prefix for
+  checkpoint files is the prefix of the YAML input file name for the simulation.
+
+The name of a checkpoint file written at time step `N` is `<prefix>.rdycore.r.<N>.<format>`,
+where `<prefix>` is the checkpoint prefix and `<format>` is `bin` for a binary
+file and `h5` for an HDF5 file.
+
+This section is optional. If omitted, no checkpoint files are written.
+
+## `ensemble`
+
+```yaml
+ensemble:
+  size: 3
+  members:
+  - name: member0
+    materials:
+    - name: smooth
+      properties:
+        manning:
+          value: 0.15
+  - name: member1
+    materials:
+    - name: smooth
+      properties:
+        manning:
+          value: 0.20
+  - name: member2
+    materials:
+    - name: smooth
+      properties:
+        manning:
+          value: 0.25
+    flow_conditions:
+    - name: domain_flow_ic
+      type: dirichlet
+      file: Differnt.Houston1km.ic.${PETSC_ID_TYPE}.bin
+      format: binary
+```
+
+The `ensemble` section defines parameter sets used to construct an ensemble
+of simulations with different parameters.
+
+Currently, this section lists all ensemble members, each with
+specific parameters overridden. This explicit approach to constructing ensembles
+allows the parameter sampling procedure to be performed by external tools.
+Here are the fields of the `ensemble` section:
+
+* `size`: the number of ensemble members. This parameter is redundant in the
+  sense that the number of ensemble members can be determined by the `members`
+  field (below), but RDycore throws an error if the actual number of members
+  does not match this parameter.
+* `members`: a list of ensemble members, specified using YAML's sequence syntax
+  (`-`). An ensemble member is just a collection of sections containing
+  overridden parameters. An optional `name` field provides a name for each
+  ensemble member; if omitted, the ensemble is automatically named in
+  relation to its index within the list of members.
+
+Use the syntax (`-`) to add a member to the ensemble's `members` field. The
+member consists of a set of sections with specific overridden parameters.
+Sections that can be overridden in an ensemble member are:
+
+* [`grid`](input.md#grid)
+* [`materials`](input.md#materials)
+* [`flow_conditions`](input.md#flow_conditions)
+* [`sediment_conditions`](input.md#sediment_conditions)
+* [`salinity_conditions`](input.md#salinity_conditions)
+
+The example above redefines the Manning coefficient of the `smooth`
+[material](input.md#materials) defined elsewhere in the file. In plain language,
+the example varies the smoothness of the `smooth` material between ensemble
+members. Additionally, the file used to initialize the `domain_flow_ic`
+condition is overridden for the third member (`member2`).
+
+This syntax is a bit cumbersome for assembling ensembles by hand, but it's a
+simple mechanism for overriding parameters within ensemble members without
+creating any new syntax for simulation input.
+
 ## `flow_conditions`
 
 ```yaml
@@ -176,7 +273,7 @@ to set the water height and momentum. This can be done in one of two ways:
       boundary)
 
 2. By specifying a file from which data for these parameters is to be read. The
-   data will be read into the components of the solution vector that correspond
+   data is read into the components of the solution vector that correspond
    to the cells belonging to the region to which this flow condition is
    assigned:
 
@@ -198,6 +295,25 @@ has only a single parameter:
 * `file`: the file containing the grid representing the computational domain.
   This grid must be stored in a format supported by PETSc's [DMPlex](https://petsc.org/release/manual/dmplex/)
   data structure.
+
+## `initial_conditions`
+
+```yaml
+initial_conditions:
+  - region: upstream
+    flow: dam_top_ic
+  - region: downstream
+    flow: dam_bottom_ic
+```
+
+The `initial_conditions` section is a sequence (list) associating `flow`,
+`sediment`, and `salinity` conditions (as defined in their respective sections)
+with regions (as defined in the `regions` section). A region must have exactly
+one set of initial conditions associated with it. The above example shows a valid
+configuration for a simulation in which sediments and salinity are not modeled,
+so only the `flow` parameter is required. The presence of sediment concentrations
+requires the `sediment` parameter, as the presence of salinity concentrations
+requires the `salinity` parameter.
 
 ## `logging`
 
@@ -361,50 +477,6 @@ which contains the following parameters:
 
 Region definitions can appear in any order within the sequence.
 
-## `initial_conditions`
-
-```yaml
-initial_conditions:
-  - region: upstream
-    flow: dam_top_ic
-  - region: downstream
-    flow: dam_bottom_ic
-```
-
-The `initial_conditions` section is a sequence (list) associating `flow`,
-`sediment`, and `salinity` conditions (as defined in their respective sections)
-with regions (as defined in the `regions` section). A region must have exactly
-one set of initial conditions associated with it. The above example shows a valid
-configuration for a simulation in which sediments and salinity are not modeled,
-so only the `flow` parameter is required. The presence of sediment concentrations
-requires the `sediment` parameter, as the presence of salinity concentrations
-requires the `salinity` parameter.
-
-## `checkpoint`
-
-```yaml
-checkpoint:
-  format: hdf5
-  interval: 100
-```
-
-The `checkpoint` section contains fields that specify whether and how RDycore
-writes checkpoint files, which can be used to restart simulations using
-parameters in the `restart` section.
-
-* `format`: the format of the checkpoint files to be written. This can be either
-  `binary` (the default) or `hdf5`.
-* `interval`: the number of time steps taken between writing checkpoint files.
-  This must be a positive integer.
-* `prefix`: an optional prefix for checkpoint files. If omitted, the prefix for
-  checkpoint files is the prefix of the YAML input file name for the simulation.
-
-The name of a checkpoint file written at time step `N` is `<prefix>.rdycore.r.<N>.<format>`,
-where `<prefix>` is the checkpoint prefix and `<format>` is `bin` for a binary
-file and `h5` for an HDF5 file.
-
-This section is optional. If omitted, no checkpoint files are written.
-
 ## `restart`
 
 ```yaml
@@ -453,7 +525,7 @@ providing one or more parameters. This can be done in one of two ways:
 1. By specifying the concentration directly using the `concentration` parameter
 
 2. By specifying a file from which concentration data is to be read. The
-   data will be read into the components of the solution vector that correspond
+   data is read into the components of the solution vector that correspond
    to the cells belonging to the region to which this flow condition is
    assigned:
 
@@ -494,7 +566,7 @@ providing one or more parameters. This can be done in one of two ways:
 1. By specifying the concentration directly using the `concentration` parameter
 
 2. By specifying a file from which concentration data is to be read. The
-   data will be read into the components of the solution vector that correspond
+   data is read into the components of the solution vector that correspond
    to the cells belonging to the region to which this flow condition is
    assigned:
 

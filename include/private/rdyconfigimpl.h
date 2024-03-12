@@ -285,6 +285,35 @@ typedef struct {
   PetscViewerFormat format;
 } RDySalinityCondition;
 
+// ----------------
+// ensemble section
+// ----------------
+
+// specification of an ensemble member with overridable parameters
+typedef struct {
+  char                 name[MAX_NAME_LEN + 1];
+  RDyGridSection       grid;
+  PetscInt             num_overridden_materials;
+  RDyMaterialSpec      materials[MAX_NUM_MATERIALS];
+  PetscInt             num_overridden_flow_conditions;
+  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_overridden_sediment_conditions;
+  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_overridden_salinity_conditions;
+  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
+} RDyEnsembleMember;
+
+// specification of an ensemble
+typedef struct {
+  PetscInt           size;
+  RDyEnsembleMember *members;
+  PetscInt           members_count;  // set automatically; must be equal to size!
+} RDyEnsembleSection;
+
+// =======================================
+// Intermediate Config File Representation
+// =======================================
+
 // a representation of the config file itself
 typedef struct {
   // Each of these fields represents a section of the YAML config file.
@@ -327,6 +356,11 @@ typedef struct {
   PetscInt             num_salinity_conditions;
   RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
+  RDyEnsembleSection ensemble;
+
 } RDyConfig;
+
+// ensemble member configuration (see ensemble.c)
+PETSC_INTERN PetscErrorCode ConfigureEnsembleMember(RDy);
 
 #endif

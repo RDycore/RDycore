@@ -192,15 +192,10 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
 
     // append the data to the boundary fluxes file (or, if this is our first
     // step, overwrite the existing file)
-    char dir[PETSC_MAX_PATH_LEN];
-    PetscCall(GetOutputDir(rdy, dir));
-    char path[PETSC_MAX_PATH_LEN];
-
-    size_t config_len = strlen(rdy->config_file);
-    char   prefix[config_len + 1];
+    char output_dir[PETSC_MAX_PATH_LEN], prefix[PETSC_MAX_PATH_LEN], path[PETSC_MAX_PATH_LEN];
+    PetscCall(GetOutputDirectory(rdy, output_dir));
     PetscCall(DetermineConfigPrefix(rdy, prefix));
-
-    snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/%s-boundary_fluxes.dat", dir, prefix);
+    snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/%s-boundary_fluxes.dat", output_dir, prefix);
     FILE *fp = NULL;
     if (step == 0) {  // write a header on the first step
       PetscCall(PetscFOpen(rdy->comm, path, "w", &fp));

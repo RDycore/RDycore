@@ -99,12 +99,18 @@ struct _p_RDy {
 
   // MPI communicator used for the simulation
   MPI_Comm comm;
+  // global MPI communicator, used for ensemble analysis (equivalent to comm for
+  // single simulations)
+  MPI_Comm global_comm;
   // MPI rank of local process
   PetscMPIInt rank;
-  // Number of processes in the communicator
+  // number of processes in the communicator
   PetscMPIInt nproc;
   // file storing input data for the simulation
   char config_file[PETSC_MAX_PATH_LEN];
+
+  // index of the ensemble member for the local process
+  PetscInt ensemble_member_index;
 
   // configuration data read from config_file
   RDyConfig config;
@@ -198,7 +204,7 @@ PETSC_INTERN PetscErrorCode InitSWE(RDy);
 PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 
 // output functions
-PETSC_INTERN PetscErrorCode GetOutputDir(RDy, char dir[PETSC_MAX_PATH_LEN]);
+PETSC_INTERN PetscErrorCode GetOutputDirectory(RDy, char dir[PETSC_MAX_PATH_LEN]);
 PETSC_INTERN PetscErrorCode GenerateIndexedFilename(const char *, const char *, PetscInt, PetscInt, const char *, char *);
 PETSC_INTERN PetscErrorCode DetermineOutputFile(RDy, PetscInt, PetscReal, const char *, char *);
 PETSC_INTERN PetscErrorCode WriteXDMFOutput(TS, PetscInt, PetscReal, Vec, void *);

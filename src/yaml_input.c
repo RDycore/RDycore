@@ -494,6 +494,44 @@ static const cyaml_schema_value_t salinity_condition_entry = {
 };
 
 // ----------------
+// ensemble section
+// ----------------
+//   size: <number-of-ensemble-members>
+//   members:
+//   - name: <name-of-first-member> # optional
+//     <set-of-overridden-sections-for-first-member>
+//   - name: <name-of-second-member> # optional
+//     <set-of-overridden-sections-for-second-member>
+//   ...
+//   - name: <name-of-last-member> # optional
+//     <set-of-overridden-sections-for-last-member>
+
+// schema for individual ensemble members
+static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, name, 1),
+    CYAML_FIELD_MAPPING("grid", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, grid, grid_fields_schema),
+    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, materials, num_overridden_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, flow_conditions, num_overridden_flow_conditions, &flow_condition_entry, 0,
+                               MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, sediment_conditions, num_overridden_sediment_conditions,
+                               &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, salinity_conditions, num_overridden_salinity_conditions,
+                               &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_END
+};
+
+// a single ensemble member entry
+static const cyaml_schema_value_t ensemble_member_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyEnsembleMember, ensemble_member_fields_schema),
+};
+
+// ensemble specification
+static const cyaml_schema_field_t ensemble_fields_schema[] = {
+    CYAML_FIELD_INT("size", CYAML_FLAG_DEFAULT, RDyEnsembleSection, size),
+    CYAML_FIELD_SEQUENCE("members", CYAML_FLAG_POINTER, RDyEnsembleSection, members, &ensemble_member_entry, 0, CYAML_UNLIMITED),
+};
+
+// ----------------
 // top-level schema
 // ----------------
 
@@ -523,6 +561,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -576,6 +615,19 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
 // checks config for any invalid or omitted parameters
 static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionBegin;
+
+  // check ensemble settings
+  PetscCheck(config->ensemble.size == 0 || config->ensemble.size > 1, comm, PETSC_ERR_USER,
+             "Ensemble size (%" PetscInt_FMT ") must be greater than 1", config->ensemble.size);
+  PetscCheck(config->ensemble.size == config->ensemble.members_count, comm, PETSC_ERR_USER,
+             "Declared ensemble size (%" PetscInt_FMT ") does not match the number of members (%" PetscInt_FMT ")", config->ensemble.size,
+             config->ensemble.members_count);
+  if (config->ensemble.size) {
+    PetscMPIInt nproc;
+    MPI_Comm_size(comm, &nproc);
+    PetscCheck((nproc % config->ensemble.size) == 0, comm, PETSC_ERR_USER,
+               "In ensemble mode, the ensemble size must evenly divide the number of processes.");
+  }
 
   // check numerics settings
   if (config->numerics.spatial != SPATIAL_FV) {
@@ -877,7 +929,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
   } else {
     // other processes: read the size of the content
-    MPI_Bcast(&config_size, 1, MPI_LONG, 0, rdy->comm);
+    MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
 
     // recreate the configuration string.
     PetscCall(PetscCalloc1(config_size, &config_str));
@@ -889,9 +941,17 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscCall(ParseYaml(rdy->comm, config_str, &config));
   PetscCall(ValidateConfig(rdy->comm, config));
 
-  // copy the config into place and dispose of it
+  // copy the config into place and dispose of the original
   rdy->config = *config;
   PetscFree(config);
+
+  // if this is an ensemble run, split our communicator, assign ranks to
+  // ensemble members, and override parameters
+  if (rdy->config.ensemble.size > 1) {
+    ConfigureEnsembleMember(rdy);
+  } else {
+    rdy->ensemble_member_index = -1;  // not a member of an ensemble
+  }
 
   // set any additional options needed in PETSc's options database
   PetscCall(SetAdditionalOptions(rdy));
@@ -907,6 +967,15 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
 // =============
 
 static const char *FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
+
+static PetscErrorCode PrintEnsemble(RDy rdy) {
+  PetscFunctionBegin;
+  if (rdy->config.ensemble.size) {
+    RDyLogDetail(rdy, "Ensemble:");
+    RDyLogDetail(rdy, "  Size: %" PetscInt_FMT, rdy->config.ensemble.size);
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
@@ -997,7 +1066,7 @@ static PetscErrorCode PrintLogging(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Prints config information at the requested log level.
+// prints config information at the requested log level (single-run mode only)
 PetscErrorCode PrintConfig(RDy rdy) {
   PetscFunctionBegin;
 
@@ -1005,6 +1074,7 @@ PetscErrorCode PrintConfig(RDy rdy) {
   RDyLogDetail(rdy, "RDycore (input read from %s)", rdy->config_file);
   RDyLogDetail(rdy, "==========================================================");
 
+  PetscCall(PrintEnsemble(rdy));
   PetscCall(PrintPhysics(rdy));
   PetscCall(PrintNumerics(rdy));
   PetscCall(PrintTime(rdy));

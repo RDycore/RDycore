@@ -7,25 +7,40 @@
 // we can remove this and any guarded logic if/when PetscBag supports HDF5
 #define PETSCBAG_DOESNT_SUPPORT_HDF5 1
 
-// checkpoint directory name (relative to current working directory)
-static const char *checkpoint_dir = "checkpoints";
+/// Returns the name of the checkpoint directory:
+/// * "checkpoints"                        (single-run mode)
+/// * "checkpoints/<ensemble-member-name>" (ensemble mode)
+static PetscErrorCode GetCheckpointDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
+  PetscFunctionBegin;
+  static char checkpoint_dir[PETSC_MAX_PATH_LEN] = {0};
+  if (!checkpoint_dir[0]) {
+    if (rdy->config.ensemble.size > 1) {
+      sprintf(checkpoint_dir, "checkpoints/%s", rdy->config.ensemble.members[rdy->ensemble_member_index].name);
+    } else {
+      strcpy(checkpoint_dir, "checkpoints");
+    }
+  }
+  strncpy(dir, checkpoint_dir, PETSC_MAX_PATH_LEN - 1);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// defined in rdyadvance.c
+extern PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory);
 
 // creates the checkpoint directory if it doesn't exist
-static PetscErrorCode CreateCheckpointDir(RDy rdy) {
+static PetscErrorCode CreateCheckpointDirectory(RDy rdy) {
   PetscFunctionBegin;
 
-  RDyLogDebug(rdy, "Creating output directory %s...", checkpoint_dir);
+  char checkpoint_dir[PETSC_MAX_PATH_LEN];
+  PetscCall(GetCheckpointDirectory(rdy, checkpoint_dir));
+  RDyLogDebug(rdy, "Creating checkpoint directory %s...", checkpoint_dir);
 
-  PetscMPIInt result_and_errno[2];
-  if (rdy->rank == 0) {
-    result_and_errno[0] = mkdir(checkpoint_dir, 0755);
-    result_and_errno[1] = errno;
+  // create the checkpoints/ directory on global rank 0
+  if (rdy->config.ensemble.size > 1) {
+    PetscCall(CreateDirectory(rdy->global_comm, "checkpoints"));
   }
-  MPI_Bcast(&result_and_errno, 2, MPI_INT, 0, rdy->comm);
-  int result = result_and_errno[0];
-  int err_no = result_and_errno[1];
-  PetscCheck((result == 0) || (err_no == EEXIST), rdy->comm, PETSC_ERR_USER, "Could not create checkpoint directory: %s (errno = %d)", checkpoint_dir,
-             err_no);
+  PetscCall(CreateDirectory(rdy->comm, checkpoint_dir));
+  MPI_Barrier(rdy->global_comm);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -144,6 +159,8 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
 
     PetscViewer             viewer;
     const PetscViewerFormat format = rdy->config.checkpoint.format;
+    char                    checkpoint_dir[PETSC_MAX_PATH_LEN];
+    PetscCall(GetCheckpointDirectory(rdy, checkpoint_dir));
     if (format == PETSC_VIEWER_NATIVE) {  // binary
       PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "bin", filename));
       PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
@@ -182,7 +199,7 @@ PetscErrorCode InitCheckpoints(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->config.checkpoint.interval) {
     // make sure the checkpoint directory exists
-    PetscCall(CreateCheckpointDir(rdy));
+    PetscCall(CreateCheckpointDirectory(rdy));
 
     const PetscViewerFormat format = rdy->config.checkpoint.format;
     PetscCheck((format == PETSC_VIEWER_NATIVE) || (format == PETSC_VIEWER_HDF5_PETSC), rdy->comm, PETSC_ERR_USER, "Invalid checkpoint format!");

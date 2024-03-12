@@ -1,9 +1,13 @@
 #include <petscdmceed.h>
 #include <petscdmplex.h>
+#include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
+#include <stdio.h>      // for getchar()
+#include <sys/types.h>  // for getpid()
+#include <unistd.h>     // for getpid() and gethostname()
 
 // time conversion factors
 static const PetscReal secs_in_min = 60.0;
@@ -802,7 +806,10 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscInt nblocks_nat;
       PetscCall(VecGetBlockSize(natural, &nblocks_nat));
       PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
-                 "The block size of the initial condition ('%d') does not match with the number of DOFs ('%d')", nblocks_nat, ndof);
+                 "The block size of the initial condition ('%" PetscInt_FMT
+                 "') "
+                 "does not match with the number of DOFs ('%" PetscInt_FMT "')",
+                 nblocks_nat, ndof);
 
       // scatter natural-to-global
       PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
@@ -903,10 +910,48 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// checks for the -pause option, which pauses RDycore and prints out the PIDs
+// of the MPI processes so that a debugger may be attached
+static PetscErrorCode PauseIfRequested(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscBool pause = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-pause", &pause, NULL));
+  if (pause) {
+    pid_t pid          = getpid();  // local process ID
+    char  hostname[65] = {0};       // local hostname (64 characters + null terminator)
+    gethostname(hostname, 64);
+    PetscFPrintf(rdy->comm, stderr, "Pausing... press Enter to resume.\n");
+    if (rdy->nproc > 1) {
+      pid_t pids[rdy->nproc];
+      char  hostnames[rdy->nproc * 65];
+      MPI_Gather(&pid, 1, MPI_INT, pids, 1, MPI_INT, 0, rdy->comm);
+      MPI_Gather(hostname, 65, MPI_CHAR, hostnames, 65, MPI_CHAR, 0, rdy->comm);
+      PetscFPrintf(rdy->comm, stderr, "  PIDs (host):\n");
+      for (PetscMPIInt p = 0; p < rdy->nproc; ++p) {
+        PetscFPrintf(rdy->comm, stderr, "    rank %d (%s): %d:\n", p, &hostnames[p * 65], pids[p]);
+      }
+
+      // wait for input on rank 0
+      if (rdy->rank == 0) {
+        getchar();
+      }
+      MPI_Barrier(rdy->comm);
+    } else {
+      PetscFPrintf(rdy->comm, stderr, "  PID on host %s: %d\n", hostname, pid);
+      getchar();
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file.
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
+
+  PetscCall(PauseIfRequested(rdy));
 
   // note: default config values are specified in the YAML input schema!
   PetscCall(ReadConfigFile(rdy));
