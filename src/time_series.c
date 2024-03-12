@@ -195,7 +195,12 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     char dir[PETSC_MAX_PATH_LEN];
     PetscCall(GetOutputDir(rdy, dir));
     char path[PETSC_MAX_PATH_LEN];
-    snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/boundary_fluxes.dat", dir);
+
+    size_t config_len = strlen(rdy->config_file);
+    char   prefix[config_len + 1];
+    PetscCall(DetermineConfigPrefix(rdy, prefix));
+
+    snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/%s-boundary_fluxes.dat", dir, prefix);
     FILE *fp = NULL;
     if (step == 0) {  // write a header on the first step
       PetscCall(PetscFOpen(rdy->comm, path, "w", &fp));
