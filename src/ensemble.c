@@ -1,16 +1,16 @@
 #include <private/rdycoreimpl.h>
 
-// in ensemble mode: configures the ensemble member residing on the local process
+// in ensemble mode: configures the ensemble member residing on the local process,
+// copying overridden sections from the member's configuration
 PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   PetscFunctionBegin;
 
   // split the global communicator (evenly)
   PetscMPIInt procs_per_ensemble = rdy->nproc / rdy->config.ensemble.size;
-  PetscMPIInt color              = rdy->rank / procs_per_ensemble;  // ensemble index
+  PetscMPIInt color              = rdy->rank / procs_per_ensemble;  // ensemble member index
   PetscMPIInt key                = 0;                               // let MPI decide how to order ranks
   MPI_Comm_free(&rdy->comm);
   MPI_Comm_split(rdy->global_comm, color, key, &rdy->comm);
-  printf("Global rank %d -> ensemble %d\n", rdy->rank, color);
   MPI_Comm_size(rdy->comm, &rdy->nproc);
   MPI_Comm_rank(rdy->comm, &rdy->rank);
   rdy->ensemble_member_index = color;

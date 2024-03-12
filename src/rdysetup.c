@@ -806,7 +806,8 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscInt nblocks_nat;
       PetscCall(VecGetBlockSize(natural, &nblocks_nat));
       PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
-                 "The block size of the initial condition ('%" PetscInt_FMT "') "
+                 "The block size of the initial condition ('%" PetscInt_FMT
+                 "') "
                  "does not match with the number of DOFs ('%" PetscInt_FMT "')",
                  nblocks_nat, ndof);
 
@@ -911,7 +912,7 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
 
 // checks for the -pause option, which pauses RDycore and prints out the PIDs
 // of the MPI processes so that a debugger may be attached
-PetscErrorCode PauseIfRequested(RDy rdy) {
+static PetscErrorCode PauseIfRequested(RDy rdy) {
   PetscFunctionBegin;
 
   PetscBool pause = PETSC_FALSE;
