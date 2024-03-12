@@ -948,7 +948,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // if this is an ensemble run, split our communicator, assign ranks to
   // ensemble members, and override parameters
   if (rdy->config.ensemble.size > 1) {
-    ConfigureEnsembleMember(rdy);
+    PetscCall(ConfigureEnsembleMember(rdy));
   } else {
     rdy->ensemble_member_index = -1;  // not a member of an ensemble
   }
