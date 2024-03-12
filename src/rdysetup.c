@@ -931,7 +931,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // initialize CEED if needed
   if (rdy->ceed_resource[0]) {
-    CeedInit(rdy->ceed_resource, &rdy->ceed);
+    PetscCallCEED(CeedInit(rdy->ceed_resource, &rdy->ceed));
   }
 
   RDyLogDebug(rdy, "Creating DMs...");
@@ -975,10 +975,10 @@ PetscErrorCode RDySetup(RDy rdy) {
 
     // create associated vectors for storage
     int num_comp = 3;
-    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed);
-    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed);
-    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed);
-    CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed);
+    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed));
 
     // reset the time step size
     rdy->ceed_rhs.dt = 0.0;

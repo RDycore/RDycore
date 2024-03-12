@@ -1,3 +1,4 @@
+#include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
@@ -104,22 +105,22 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     CeedVector f_ceed       = rdy->ceed_rhs.f_ceed;
 
     PetscCall(VecGetArrayAndMemType(U_local, &u_local, &mem_type));
-    CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local);
+    PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local));
 
     PetscCall(DMGetLocalVector(rdy->dm, &F_local));
     PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
-    CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
+    PetscCallCEED(CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
 
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    CeedOperatorApply(rdy->ceed_rhs.op_edges, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE);
+    PetscCallCEED(CeedOperatorApply(rdy->ceed_rhs.op_edges, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
-    CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u_local);
+    PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u_local));
     PetscCall(VecRestoreArrayAndMemType(U_local, &u_local));
 
-    CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f);
+    PetscCallCEED(CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f));
     PetscCall(VecRestoreArrayAndMemType(F_local, &f));
 
     PetscCall(VecZeroEntries(F));
@@ -132,7 +133,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     SWESourceOperatorGetRiemannFlux(rdy->ceed_rhs.op_src, &riemannf_field);
 
     CeedVector riemannf_ceed;
-    CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed);
+    PetscCallCEED(CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed));
 
     PetscScalar *u, *f, *f_dup;
     PetscMemType mem_type;
@@ -140,27 +141,27 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     CeedVector   s_ceed = rdy->ceed_rhs.s_ceed;
 
     PetscCall(VecGetArrayAndMemType(rdy->Soln, &u, &mem_type));
-    CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u);
+    PetscCallCEED(CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u));
 
     Vec F_dup;
     PetscCall(VecDuplicate(F, &F_dup));
     PetscCall(VecCopy(F, F_dup));
     PetscCall(VecGetArrayAndMemType(F_dup, &f_dup, &mem_type));
-    CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f_dup);
+    PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f_dup));
 
     PetscCall(VecGetArrayAndMemType(F, &f, &mem_type));
-    CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f);
+    PetscCallCEED(CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
 
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, s_ceed, CEED_REQUEST_IMMEDIATE);
+    PetscCallCEED(CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, s_ceed, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
-    CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u);
+    PetscCallCEED(CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u));
     PetscCall(VecRestoreArrayAndMemType(rdy->Soln, &u));
-    CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &f_dup);
-    CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f);
+    PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &f_dup));
+    PetscCallCEED(CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f));
     PetscCall(VecRestoreArrayAndMemType(F, &f));
     PetscCall(VecDestroy(&F_dup));
   }

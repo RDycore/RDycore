@@ -1,3 +1,4 @@
+#include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdysweimpl.h>  // for CEED boundary flux accumulation
 
@@ -243,16 +244,16 @@ static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
 
     // get the vector storing the boundary data and make it available on the host
     CeedVector bflux_vec;
-    CeedOperatorFieldGetVector(bflux, &bflux_vec);
+    PetscCallCEED(CeedOperatorFieldGetVector(bflux, &bflux_vec));
     int num_comp = 3;  // SWE
     CeedScalar(*bflux_data)[num_comp];
-    CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data);
+    PetscCallCEED(CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data));
 
     // hand over the boundary fluxes and zero the flux vector
     PetscInt size = boundary.num_edges;
     PetscCall(AccumulateBoundaryFluxes(rdy, boundary, size, num_comp, bflux_data));
-    CeedVectorRestoreArray(bflux_vec, (CeedScalar **)&bflux_data);
-    CeedVectorSetValue(bflux_vec, 0.0);  // reset flux accumulation
+    PetscCallCEED(CeedVectorRestoreArray(bflux_vec, (CeedScalar **)&bflux_data));
+    PetscCallCEED(CeedVectorSetValue(bflux_vec, 0.0));  // reset flux accumulation
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
