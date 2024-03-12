@@ -806,7 +806,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscInt nblocks_nat;
       PetscCall(VecGetBlockSize(natural, &nblocks_nat));
       PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
-                 "The block size of the initial condition ('%d') does not match with the number of DOFs ('%d')", nblocks_nat, ndof);
+                 "The block size of the initial condition ('%" PetscInt_FMT "') "
+                 "does not match with the number of DOFs ('%" PetscInt_FMT "')",
+                 nblocks_nat, ndof);
 
       // scatter natural-to-global
       PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
