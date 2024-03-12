@@ -360,4 +360,7 @@ typedef struct {
 
 } RDyConfig;
 
+// ensemble member configuration (see ensemble.c)
+PETSC_INTERN PetscErrorCode ConfigureEnsembleMember(RDy);
+
 #endif
