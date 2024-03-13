@@ -11,7 +11,7 @@ display_help() {
     echo "   --pm <cpu|gpu>         Type of Perlmutter nodes (cpu or gpu)"
     echo "   --64bit                With 64bit support (optional)"
     echo
-    exit 1
+    return 1
 }
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -82,7 +82,7 @@ if [ "$mach" = "pm" ]; then
   else
     echo "The only supported options for -pm are cpu or gpu."
     display_help
-    exit 1
+    return 1
   fi
 
 elif [ "$mach" = "frontier"  ]; then
@@ -95,6 +95,12 @@ elif [ "$mach" = "frontier"  ]; then
      export PETSC_ARCH=frontier-gpu-opt-64bit-gcc-11-2-0-fc288817
   fi
 
+  if [[ ! -z "$pm_node" ]]; then
+     echo "The --pm_node <$pm_node> was specified, which is applicable is only for Perlmutter,"
+     echo "but the machine detected is Frontier."
+     return 1
+  fi
+
 elif [ "$mach" = "aurora"  ]; then
 
   MODULE_FILE=$DIR/modules.aurora.oneapi
@@ -105,10 +111,16 @@ elif [ "$mach" = "aurora"  ]; then
      export PETSC_ARCH=aurora-opt-64bit-oneapi-ifx-fc288817
   fi
 
+  if [[ ! -z "$pm_node" ]]; then
+     echo "The --pm_node <$pm_node> was specified, which is applicable is only for Perlmutter,"
+     echo "but the machine detected is Aurora."
+     return 1
+  fi
+
 else
   echo "Could not determine the machine. mach=$mach"
   display_help
-  exit 1
+  return 1
 fi
 
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
