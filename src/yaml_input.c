@@ -510,12 +510,12 @@ static const cyaml_schema_value_t salinity_condition_entry = {
 static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, name, 1),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, grid, grid_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, materials, num_overridden_materials, &material_entry, 0, MAX_NUM_MATERIALS),
-    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, flow_conditions, num_overridden_flow_conditions, &flow_condition_entry, 0,
+    CYAML_FIELD_SEQUENCE("materials", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE("flow_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),
-    CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, sediment_conditions, num_overridden_sediment_conditions,
+    CYAML_FIELD_SEQUENCE("sediment_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, sediment_conditions,
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
-    CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, salinity_conditions, num_overridden_salinity_conditions,
+    CYAML_FIELD_SEQUENCE("salinity_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_END
 };
