@@ -836,12 +836,13 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 
   // determine the file's size and read it into a buffer
   fseek(file, 0, SEEK_END);
-  PetscMPIInt raw_size = (PetscMPIInt)ftell(file);
+  PetscMPIInt raw_size = (PetscMPIInt)ftell(file) + 1;
   rewind(file);
   char *raw_content;
   PetscCall(PetscCalloc1(raw_size, &raw_content));
   fread(raw_content, sizeof(char), raw_size, file);
   PetscCall(PetscFClose(comm, file));
+  raw_content[raw_size] = 0;  // null termination for C string
 
   // determine the size of the content with all substitutions applied
   PetscInt num_substitutions = 0;
