@@ -529,6 +529,7 @@ static const cyaml_schema_value_t ensemble_member_entry = {
 static const cyaml_schema_field_t ensemble_fields_schema[] = {
     CYAML_FIELD_INT("size", CYAML_FLAG_DEFAULT, RDyEnsembleSection, size),
     CYAML_FIELD_SEQUENCE("members", CYAML_FLAG_POINTER, RDyEnsembleSection, members, &ensemble_member_entry, 0, CYAML_UNLIMITED),
+    CYAML_FIELD_END
 };
 
 // ----------------

@@ -89,6 +89,10 @@ foreach(np 1 2) # test on 1, 2 processes
   endforeach()
 endforeach()
 
+# ex2b ensemble test -- (file copy only for now)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b-ensemble.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 # four_mounds_60x24
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/four_mounds_60x24.yaml
