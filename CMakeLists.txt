@@ -4,6 +4,7 @@ cmake_minimum_required (VERSION 3.14.0)
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
 option(ENABLE_TESTS    "Enable unit (and possibly driver) tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
+option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
@@ -55,6 +56,12 @@ endif()
 # Set linker flags where appropriate
 if (APPLE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_compact_unwind")
+endif()
+
+if (ENABLE_ASAN)
+  message(STATUS "Enabling Address Sanitizer...")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 endif()
 
 # Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.

@@ -510,12 +510,12 @@ static const cyaml_schema_value_t salinity_condition_entry = {
 static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, name, 1),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, grid, grid_fields_schema),
-    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, materials, num_overridden_materials, &material_entry, 0, MAX_NUM_MATERIALS),
-    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, flow_conditions, num_overridden_flow_conditions, &flow_condition_entry, 0,
+    CYAML_FIELD_SEQUENCE("materials", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE("flow_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, flow_conditions, &flow_condition_entry, 0,
                                MAX_NUM_CONDITIONS),
-    CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, sediment_conditions, num_overridden_sediment_conditions,
+    CYAML_FIELD_SEQUENCE("sediment_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, sediment_conditions,
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
-    CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyEnsembleMember, salinity_conditions, num_overridden_salinity_conditions,
+    CYAML_FIELD_SEQUENCE("salinity_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_END
 };
@@ -529,6 +529,7 @@ static const cyaml_schema_value_t ensemble_member_entry = {
 static const cyaml_schema_field_t ensemble_fields_schema[] = {
     CYAML_FIELD_INT("size", CYAML_FLAG_DEFAULT, RDyEnsembleSection, size),
     CYAML_FIELD_SEQUENCE("members", CYAML_FLAG_POINTER, RDyEnsembleSection, members, &ensemble_member_entry, 0, CYAML_UNLIMITED),
+    CYAML_FIELD_END
 };
 
 // ----------------
@@ -839,9 +840,10 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   PetscMPIInt raw_size = (PetscMPIInt)ftell(file);
   rewind(file);
   char *raw_content;
-  PetscCall(PetscCalloc1(raw_size, &raw_content));
+  PetscCall(PetscCalloc1(raw_size + 1, &raw_content));
   fread(raw_content, sizeof(char), raw_size, file);
   PetscCall(PetscFClose(comm, file));
+  raw_content[raw_size] = 0;  // null termination for C string
 
   // determine the size of the content with all substitutions applied
   PetscInt num_substitutions = 0;
@@ -863,7 +865,7 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 
   // perform any needed string substitutions or just use the raw input
   if (num_substitutions > 0) {
-    PetscCall(PetscCalloc1(*content_size, content));
+    PetscCall(PetscCalloc1(*content_size + 1, content));
     for (PetscInt s = 0; substitutions[s].pattern; ++s) {
       const Substitution sub         = substitutions[s];
       PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
@@ -889,6 +891,7 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   } else {
     *content = raw_content;
   }
+  (*content)[*content_size] = 0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

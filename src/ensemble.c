@@ -37,7 +37,7 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   // FIXME: this a bit more carefully as things evolve.
 
   // materials
-  for (PetscInt m = 0; m < member_config.num_overridden_materials; ++m) {
+  for (PetscInt m = 0; m < member_config.materials_count; ++m) {
     // find the specified material
     for (PetscInt mm = 0; mm < rdy->config.num_materials; ++mm) {
       if (!strcmp(rdy->config.materials[mm].name, member_config.materials[m].name)) {
@@ -48,7 +48,7 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   }
 
   // flow conditions
-  for (PetscInt c = 0; c < member_config.num_overridden_flow_conditions; ++c) {
+  for (PetscInt c = 0; c < member_config.flow_conditions_count; ++c) {
     // find the specified flow condition
     for (PetscInt cc = 0; cc < rdy->config.num_flow_conditions; ++cc) {
       if (!strcmp(rdy->config.flow_conditions[cc].name, member_config.flow_conditions[c].name)) {
@@ -59,7 +59,7 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   }
 
   // sediment conditions
-  for (PetscInt c = 0; c < member_config.num_overridden_sediment_conditions; ++c) {
+  for (PetscInt c = 0; c < member_config.sediment_conditions_count; ++c) {
     // find the specified sediment condition
     for (PetscInt cc = 0; cc < rdy->config.num_sediment_conditions; ++cc) {
       if (!strcmp(rdy->config.sediment_conditions[cc].name, member_config.sediment_conditions[c].name)) {
@@ -70,7 +70,7 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   }
 
   // salinity conditions
-  for (PetscInt c = 0; c < member_config.num_overridden_salinity_conditions; ++c) {
+  for (PetscInt c = 0; c < member_config.salinity_conditions_count; ++c) {
     // find the specified salinity condition
     for (PetscInt cc = 0; cc < rdy->config.num_salinity_conditions; ++cc) {
       if (!strcmp(rdy->config.salinity_conditions[cc].name, member_config.salinity_conditions[c].name)) {
