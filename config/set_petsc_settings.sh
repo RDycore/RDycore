@@ -20,7 +20,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     --pm ) pm_node="$2"; shift ;;
-    --64bit ) with64bit=1; shift ;;
+    --64bit ) with64bit=1 ;;
     -*)
       display_help
       exit 0
