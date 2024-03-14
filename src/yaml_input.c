@@ -601,7 +601,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
       .log_fn    = YamlLog,
       .log_ctx   = &comm,
       .mem_fn    = YamlAlloc,
-      .log_level = CYAML_LOG_WARNING,
+      .log_level = CYAML_LOG_DEBUG,  // CYAML_LOG_WARNING
   };
 
   const uint8_t *yaml_data     = (const uint8_t *)yaml_str;
@@ -836,10 +836,10 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 
   // determine the file's size and read it into a buffer
   fseek(file, 0, SEEK_END);
-  PetscMPIInt raw_size = (PetscMPIInt)ftell(file) + 1;
+  PetscMPIInt raw_size = (PetscMPIInt)ftell(file);
   rewind(file);
   char *raw_content;
-  PetscCall(PetscCalloc1(raw_size, &raw_content));
+  PetscCall(PetscCalloc1(raw_size + 1, &raw_content));
   fread(raw_content, sizeof(char), raw_size, file);
   PetscCall(PetscFClose(comm, file));
   raw_content[raw_size] = 0;  // null termination for C string
@@ -864,7 +864,7 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 
   // perform any needed string substitutions or just use the raw input
   if (num_substitutions > 0) {
-    PetscCall(PetscCalloc1(*content_size, content));
+    PetscCall(PetscCalloc1(*content_size + 1, content));
     for (PetscInt s = 0; substitutions[s].pattern; ++s) {
       const Substitution sub         = substitutions[s];
       PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
@@ -890,6 +890,7 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   } else {
     *content = raw_content;
   }
+  (*content)[*content_size] = 0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
