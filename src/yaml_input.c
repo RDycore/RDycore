@@ -602,7 +602,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
       .log_fn    = YamlLog,
       .log_ctx   = &comm,
       .mem_fn    = YamlAlloc,
-      .log_level = CYAML_LOG_DEBUG,  // CYAML_LOG_WARNING
+      .log_level = CYAML_LOG_WARNING,
   };
 
   const uint8_t *yaml_data     = (const uint8_t *)yaml_str;
