@@ -118,7 +118,10 @@ elif [ "$mach" = "frontier"  ]; then
     if [ "$with_debugging" -eq 0 ]; then
       export PETSC_ARCH=frontier-gpu-opt-64bit-gcc-11-2-0-fc288817
     else
-      export PETSC_ARCH=frontier-gpu-debug-64bit-gcc-11-2-0-fc288817
+      # Got installation error
+      #export PETSC_ARCH=frontier-gpu-debug-64bit-gcc-11-2-0-fc288817
+       echo "On Frontier, PETSc with 64bit and debugging turned on has not been installed."
+       return 1
     fi
   fi
 
