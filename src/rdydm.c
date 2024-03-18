@@ -217,7 +217,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This function creates an auxillary (or secondary) DM
+/// This function creates an auxiliary (secondary) DM
 PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
@@ -227,6 +227,19 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   char     aux_field_names[1][20] = {"Parameter"};
 
   PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, n_cc_field, n_cc_field_dof, 20, &aux_field_names[0], &rdy->aux_dm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Creates global and local solution vectors and residuals
+PetscErrorCode CreateVectors(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
+  PetscCall(VecDuplicate(rdy->X, &rdy->R));
+  PetscCall(VecDuplicate(rdy->X, &rdy->Soln));
+  PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
+  PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
