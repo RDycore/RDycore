@@ -40,6 +40,7 @@ PETSC_EXTERN PetscErrorCode RDySetLogFile(RDy, const char*);
 // RDycore setup/breakdown
 PETSC_EXTERN PetscErrorCode RDyCreate(MPI_Comm, const char*, RDy*);
 PETSC_EXTERN PetscErrorCode RDySetup(RDy);
+PETSC_EXTERN PetscErrorCode RDySetupMMS(RDy); // for MMS driver only!
 PETSC_EXTERN PetscErrorCode RDyDestroy(RDy*);
 
 // time integration

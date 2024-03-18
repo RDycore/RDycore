@@ -532,11 +532,21 @@ static const cyaml_schema_field_t ensemble_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// ----------------
-// top-level schema
-// ----------------
+//-------------------------------
+// mms section (MMS driver only!)
+//-------------------------------
 
-// schema for top-level configuration fields
+// mms specification
+static const cyaml_schema_field_t mms_fields_schema[] = {
+  // TODO TODO TODO
+    CYAML_FIELD_END
+};
+
+// -----------------
+// top-level schemas
+// -----------------
+
+// RDycore's schema for top-level configuration fields
 static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("physics", CYAML_FLAG_DEFAULT, RDyConfig, physics, physics_fields_schema),
     CYAML_FIELD_MAPPING("numerics", CYAML_FLAG_DEFAULT, RDyConfig, numerics, numerics_fields_schema),
@@ -571,6 +581,42 @@ static const cyaml_schema_value_t config_schema = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_POINTER, RDyConfig, config_fields_schema),
 };
 
+// MMS driver's schema for top-level configuration fields
+static const cyaml_schema_field_t mms_config_fields_schema[] = {
+    CYAML_FIELD_MAPPING("physics", CYAML_FLAG_DEFAULT, RDyConfig, physics, physics_fields_schema),
+    CYAML_FIELD_MAPPING("numerics", CYAML_FLAG_DEFAULT, RDyConfig, numerics, numerics_fields_schema),
+    CYAML_FIELD_MAPPING("time", CYAML_FLAG_DEFAULT, RDyConfig, time, time_fields_schema),
+    CYAML_FIELD_MAPPING("logging", CYAML_FLAG_OPTIONAL, RDyConfig, logging, logging_fields_schema),
+    CYAML_FIELD_MAPPING("checkpoint", CYAML_FLAG_OPTIONAL, RDyConfig, checkpoint, checkpoint_fields_schema),
+    CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
+    CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
+    CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
+    CYAML_FIELD_SEQUENCE_COUNT("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, num_material_assignments, &surface_composition_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("materials", CYAML_FLAG_DEFAULT, RDyConfig, materials, num_materials, &material_entry, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_SEQUENCE_COUNT("regions", CYAML_FLAG_DEFAULT, RDyConfig, regions, num_regions,
+                               &region_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("initial_conditions", CYAML_FLAG_DEFAULT, RDyConfig, initial_conditions, num_initial_conditions, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_OPTIONAL, RDyConfig, boundaries, num_boundaries,
+                               &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
+    CYAML_FIELD_SEQUENCE_COUNT("boundary_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, boundary_conditions, num_boundary_conditions,
+                               &boundary_condition_spec_entry, 0, MAX_NUM_BOUNDARIES),
+    CYAML_FIELD_SEQUENCE_COUNT("sources", CYAML_FLAG_OPTIONAL, RDyConfig, sources, num_sources, &region_condition_spec_entry, 0, MAX_NUM_REGIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("flow_conditions", CYAML_FLAG_DEFAULT, RDyConfig, flow_conditions, num_flow_conditions, &flow_condition_entry, 0,
+                               MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("sediment_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, sediment_conditions, num_sediment_conditions,
+                               &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
+                               &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
+    CYAML_FIELD_MAPPING("mms", CYAML_FLAG_DEFAULT, RDyConfig, mms, mms_fields_schema),
+    CYAML_FIELD_END
+};
+
+// schema for top-level MMS configuration datum itself
+static const cyaml_schema_value_t mms_config_schema = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_POINTER, RDyConfig, mms_config_fields_schema),
+};
+
 // clang-format on
 
 // CYAML log function (of type cyaml_log_fn_t)
@@ -593,8 +639,9 @@ static void *YamlAlloc(void *ctx, void *ptr, size_t size) {
   }
 }
 
-// parses the given YAML string into the given config representation
-static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig **config) {
+// parses the given YAML string into the given config representation using the
+// given configuration schema
+static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, const cyaml_schema_value_t *config_schema, RDyConfig **config) {
   PetscFunctionBegin;
 
   // configure our YAML parser
@@ -607,7 +654,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, RDyConfig *
 
   const uint8_t *yaml_data     = (const uint8_t *)yaml_str;
   size_t         yaml_data_len = strlen(yaml_str);
-  cyaml_err_t    err           = cyaml_load_data(yaml_data, yaml_data_len, &yaml_config, &config_schema, (void **)config, NULL);
+  cyaml_err_t    err           = cyaml_load_data(yaml_data, yaml_data_len, &yaml_config, config_schema, (void **)config, NULL);
   PetscCheck(err == CYAML_OK, comm, PETSC_ERR_USER, "Error parsing config file: %s", cyaml_strerror(err));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -915,33 +962,72 @@ PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
 }
 
 // reads the config file on process 0, broadcasts it as a string to all other
-// processes, and parses the string into rdy->config
-PetscErrorCode ReadConfigFile(RDy rdy) {
+// processes, making it available as config_str
+static PetscErrorCode ReadAndBroadcastConfigFile(RDy rdy, char **config_str) {
   PetscFunctionBegin;
-
-  // open the config file on process 0, determine its size, and broadcast its
-  // contents to all other processes.
-  char       *config_str;
   PetscMPIInt config_size;
   if (rdy->rank == 0) {
     // process 0: read the file and perform substitutions
-    PetscCall(ReadAndSubstitute(rdy->comm, rdy->config_file, substitutions, &config_str, &config_size));
+    PetscCall(ReadAndSubstitute(rdy->comm, rdy->config_file, substitutions, config_str, &config_size));
 
     // broadcast the size of the content and then the content itself
     MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
-    MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
+    MPI_Bcast(*config_str, config_size, MPI_CHAR, 0, rdy->comm);
   } else {
     // other processes: read the size of the content
     MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
 
     // recreate the configuration string.
-    PetscCall(PetscCalloc1(config_size, &config_str));
-    MPI_Bcast(config_str, config_size, MPI_CHAR, 0, rdy->comm);
+    PetscCall(PetscCalloc1(config_size, config_str));
+    MPI_Bcast(*config_str, config_size, MPI_CHAR, 0, rdy->comm);
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// reads the config file into a string and parses the string into rdy->config
+PetscErrorCode ReadConfigFile(RDy rdy) {
+  PetscFunctionBegin;
+
+  char *config_str;
+  PetscCall(ReadAndBroadcastConfigFile(rdy, &config_str));
 
   // parse the YAML config file into a new config struct and validate it
   RDyConfig *config;
-  PetscCall(ParseYaml(rdy->comm, config_str, &config));
+  PetscCall(ParseYaml(rdy->comm, config_str, &config_schema, &config));
+  PetscCall(ValidateConfig(rdy->comm, config));
+
+  // copy the config into place and dispose of the original
+  rdy->config = *config;
+  PetscFree(config);
+
+  // if this is an ensemble run, split our communicator, assign ranks to
+  // ensemble members, and override parameters
+  if (rdy->config.ensemble.size > 1) {
+    PetscCall(ConfigureEnsembleMember(rdy));
+  } else {
+    rdy->ensemble_member_index = -1;  // not a member of an ensemble
+  }
+
+  // set any additional options needed in PETSc's options database
+  PetscCall(SetAdditionalOptions(rdy));
+
+  // clean up
+  PetscFree(config_str);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// reads the config file for the MMS driver into a string and parses the string
+// into rdy->config
+PetscErrorCode ReadMMSConfigFile(RDy rdy) {
+  PetscFunctionBegin;
+
+  char *config_str;
+  PetscCall(ReadAndBroadcastConfigFile(rdy, &config_str));
+
+  // parse the YAML config file into a new config struct and validate it
+  RDyConfig *config;
+  PetscCall(ParseYaml(rdy->comm, config_str, &mms_config_schema, &config));
   PetscCall(ValidateConfig(rdy->comm, config));
 
   // copy the config into place and dispose of the original
