@@ -197,6 +197,7 @@ struct _p_RDy {
 
 PETSC_INTERN PetscErrorCode DetermineConfigPrefix(RDy, char *);
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
+PETSC_INTERN PetscErrorCode ReadMMSConfigFile(RDy);  // for MMS driver only!
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 
 // shallow water equations functions

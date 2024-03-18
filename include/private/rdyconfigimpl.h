@@ -10,7 +10,7 @@
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
 //
-// https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
+// https://rdycore.github.io/RDycore/user/input.html
 //
 
 // sentinel values for uninitialized/invalid data
@@ -307,6 +307,44 @@ typedef struct {
   PetscInt           members_count;  // set automatically; must be equal to size!
 } RDyEnsembleSection;
 
+// -------------------------------------
+// mms section (used only by MMS driver)
+// -------------------------------------
+
+// the maximum length of a mathematical expression to be parsed
+#define MAX_EXPRESSION_LEN 128
+
+// the maximum number allowed each for constants and functions
+#define MAX_NUM_SYMBOLS 32
+
+// a named (scalar-valued) constant for MMS
+typedef struct {
+  char      name[MAX_NAME_LEN + 1];
+  PetscReal value;
+} RDyMMSConstant;
+
+// a named function of (x, y, t) that can be parsed by muparser for MMS
+typedef struct {
+  char name[MAX_NAME_LEN + 1];
+  char expression[MAX_EXPRESSION_LEN + 1];
+} RDyMMSFunction;
+
+// specification of a set of named constants for the MMS driver
+typedef struct {
+  RDyMMSConstant constants[MAX_NUM_SYMBOLS];
+} RDyMMSConstantsSection;
+
+// specification of a set of named functions for the MMS driver
+typedef struct {
+  RDyMMSFunction functions[MAX_NUM_SYMBOLS];
+} RDyMMSFunctionsSection;
+
+// specification of an ensemble
+typedef struct {
+  RDyMMSConstantsSection constants;
+  RDyMMSFunctionsSection functions;
+} RDyMMSSection;
+
 // =======================================
 // Intermediate Config File Representation
 // =======================================
@@ -354,6 +392,9 @@ typedef struct {
   RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
   RDyEnsembleSection ensemble;
+
+  // MMS-specific section (not used in mainline RDycore simulations)
+  RDyMMSSection mms;
 
 } RDyConfig;
 
