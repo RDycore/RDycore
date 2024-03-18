@@ -39,8 +39,8 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   PetscCall(InitRegions(rdy));
 
   RDyLogDebug(rdy, "Initializing initial conditions and sources...");
-  PetscCall(InitMMSInitialConditions(rdy));
-  PetscCall(InitMMSSources(rdy));
+  PetscCall(InitInitialConditions(rdy));
+  PetscCall(InitSources(rdy));
 
   RDyLogDebug(rdy, "Creating solvers and vectors...");
   PetscCall(CreateSolvers(rdy));
@@ -52,41 +52,13 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
-  PetscCall(InitMMSBoundaryConditions(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Initializing solution data...");
-  PetscCall(InitMMSSolution(rdy));
+  PetscCall(InitSolution(rdy));
 
-  PetscCall(CreateSWEOperators(rdy));
-  if (rdy->ceed_resource[0]) {
-    RDyLogDebug(rdy, "Setting up CEED Operators...");
-
-    // create the operators themselves
-    PetscCall(CreateSWEFluxOperator(rdy->ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                    rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_edges));
-
-    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
-                                      &rdy->ceed_rhs.op_src));
-
-    // create associated vectors for storage
-    int num_comp = 3;
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed));
-
-    // reset the time step size
-    rdy->ceed_rhs.dt = 0.0;
-  } else {
-    // allocate storage for our PETSc implementation of the  flux and
-    // source terms
-    RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
-    PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
-    PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
-  }
-
-  // make sure any Dirichlet boundary conditions are properly specified
-  PetscCall(InitDirichletBoundaryConditions(rdy));
+  RDyLogDebug(rdy, "Initializing shallow water equations solver...");
+  PetscCall(InitSWE(rdy));
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
