@@ -1,7 +1,7 @@
 // This code supports the C and Fortran MMS drivers and is not used in
 // mainline RDycore (though it is built into the library).
 
-#include <private/rdymms.h>
+#include <private/rdycoreimpl.h>
 
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
@@ -33,6 +33,7 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
+  PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));

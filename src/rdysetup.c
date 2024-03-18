@@ -743,60 +743,6 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// create solvers and vectors
-static PetscErrorCode CreateSolvers(RDy rdy) {
-  PetscFunctionBegin;
-
-  // set up vectors
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
-  PetscCall(VecDuplicate(rdy->X, &rdy->R));
-  PetscCall(VecDuplicate(rdy->X, &rdy->Soln));
-  PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
-  PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
-
-  if (!rdy->ceed_resource[0]) {
-    // swe_src is only needed for PETSc source operator
-    PetscCall(VecDuplicate(rdy->X, &rdy->swe_src));
-    PetscCall(VecZeroEntries(rdy->swe_src));
-  }
-
-  PetscInt n_dof;
-  PetscCall(VecGetSize(rdy->X, &n_dof));
-
-  // set up a TS solver
-  PetscCall(TSCreate(rdy->comm, &rdy->ts));
-  PetscCall(TSSetProblemType(rdy->ts, TS_NONLINEAR));
-  switch (rdy->config.numerics.temporal) {
-    case TEMPORAL_EULER:
-      PetscCall(TSSetType(rdy->ts, TSEULER));
-      break;
-    case TEMPORAL_RK4:
-      PetscCall(TSSetType(rdy->ts, TSRK));
-      PetscCall(TSRKSetType(rdy->ts, TSRK4));
-      break;
-    case TEMPORAL_BEULER:
-      PetscCall(TSSetType(rdy->ts, TSBEULER));
-      break;
-  }
-  PetscCall(TSSetDM(rdy->ts, rdy->dm));
-
-  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
-  PetscCall(InitSWE(rdy));  // initialize SWE physics
-  PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
-
-  PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
-  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
-  PetscCall(TSSetSolution(rdy->ts, rdy->X));
-  PetscCall(TSSetTime(rdy->ts, 0.0));
-  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
-
-  // apply any solver-related options supplied on the command line
-  PetscCall(TSSetFromOptions(rdy->ts));
-  PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 // initializes solution vector data
 //   unsafe for refinement if file is given with initial conditions
 static PetscErrorCode InitSolution(RDy rdy) {
@@ -1014,6 +960,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
+  PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
@@ -1022,12 +969,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitInitialConditions(rdy));
   PetscCall(InitSources(rdy));
 
-  RDyLogDebug(rdy, "Creating solvers and vectors...");
-  PetscCall(CreateSolvers(rdy));
-
   RDyLogDebug(rdy, "Creating FV mesh...");
-  // note: this must be done after global vectors are created so a global
-  // note: section exists for the DM
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
@@ -1040,32 +982,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  if (rdy->ceed_resource[0]) {
-    RDyLogDebug(rdy, "Setting up CEED Operators...");
-
-    // create the operators themselves
-    PetscCall(CreateSWEFluxOperator(rdy->ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                    rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_edges));
-
-    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
-                                      &rdy->ceed_rhs.op_src));
-
-    // create associated vectors for storage
-    int num_comp = 3;
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed));
-
-    // reset the time step size
-    rdy->ceed_rhs.dt = 0.0;
-  } else {
-    // allocate storage for our PETSc implementation of the  flux and
-    // source terms
-    RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
-    PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
-    PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
-  }
+  RDyLogDebug(rdy, "Initializing shallow water equations machinery...");
+  PetscCall(InitSWE(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));
