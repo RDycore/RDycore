@@ -6,6 +6,7 @@ nav:
     - 'Overview': 'user/index.md'
     - 'Installation': 'installation.md'
     - 'YAML Input Specification': 'user/input.md'
+    - 'MMS Driver': 'user/mms.md'
   - 'Developer Guide':
     - 'Overview': 'developer/index.md'
 
