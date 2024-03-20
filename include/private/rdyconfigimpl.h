@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <petscviewer.h>
 #include <private/rdylogimpl.h>
+#include <private/rdymmsconfigimpl.h>
 #include <rdycore.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
@@ -316,43 +317,6 @@ typedef struct {
   RDyEnsembleMember *members;
   PetscInt           members_count;  // set automatically; must be equal to size!
 } RDyEnsembleSection;
-
-// -------------------------------------
-// mms section (used only by MMS driver)
-// -------------------------------------
-
-// the maximum number allowed each for constants and functions
-#define MAX_NUM_SYMBOLS 32
-
-// a named (scalar-valued) constant for MMS
-typedef struct {
-  char           name[MAX_NAME_LEN + 1];
-  MathExpression expression;
-  PetscReal      value;
-} RDyMMSConstant;
-
-// a named function of (x, y, t) that can be parsed by muparser for MMS
-typedef struct {
-  char           name[MAX_NAME_LEN + 1];
-  MathExpression expression;
-  void          *function;
-} RDyMMSFunction;
-
-// specification of a set of named constants for the MMS driver
-typedef struct {
-  RDyMMSConstant constants[MAX_NUM_SYMBOLS];
-} RDyMMSConstantsSection;
-
-// specification of a set of named functions for the MMS driver
-typedef struct {
-  RDyMMSFunction functions[MAX_NUM_SYMBOLS];
-} RDyMMSFunctionsSection;
-
-// specification of an ensemble
-typedef struct {
-  RDyMMSConstantsSection constants;
-  RDyMMSFunctionsSection functions;
-} RDyMMSSection;
 
 // =======================================
 // Intermediate Config File Representation
