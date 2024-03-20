@@ -317,6 +317,27 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     PetscCall(DMLabelGetValueIS(label, &boundary_id_is));
     PetscCall(ISGetIndices(boundary_id_is, &boundary_ids));
 
+    // before we proceed, check that all boundaries in our configuration
+    // exist in the grid file
+    if (rdy->config.num_boundaries > 0) {
+      PetscMPIInt boundary_in_file[rdy->config.num_boundaries];
+      memset(boundary_in_file, 0, sizeof(PetscMPIInt) * rdy->config.num_boundaries);
+      for (PetscInt bc = 0; bc < rdy->config.num_boundaries; ++bc) {
+        for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
+          if (rdy->config.boundaries[bc].grid_boundary_id == boundary_ids[b]) {
+            boundary_in_file[bc] = 1;
+            break;
+          }
+        }
+      }
+      MPI_Allreduce(MPI_IN_PLACE, boundary_in_file, rdy->config.num_boundaries, MPI_INT, MPI_MAX, rdy->comm);
+      for (PetscInt b = 0; b < rdy->config.num_boundaries; ++b) {
+        PetscCheck(boundary_in_file[b] > 0, rdy->comm, PETSC_ERR_USER, "The boundary '%s' was not found in the grid file '%s'.",
+                   rdy->config.boundaries[b].name, rdy->config.grid.file);
+      }
+    }
+
+    // process boundary data
     for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
       PetscInt boundary_id = boundary_ids[b];
       IS       edge_is;
@@ -344,6 +365,17 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
     }
     PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
     PetscCall(ISDestroy(&boundary_id_is));
+  } else {
+    // no Face Tags label, but we might still need the Allreduce
+    if (rdy->config.num_boundaries > 0) {
+      PetscMPIInt boundary_in_file[rdy->config.num_boundaries];
+      memset(boundary_in_file, 0, sizeof(PetscMPIInt) * rdy->config.num_boundaries);
+      MPI_Allreduce(boundary_in_file, boundary_in_file, rdy->config.num_boundaries, MPI_INT, MPI_SUM, rdy->comm);
+      for (PetscInt b = 0; b < rdy->config.num_boundaries; ++b) {
+        PetscCheck(boundary_in_file[b] > 0, rdy->comm, PETSC_ERR_USER, "The boundary '%s' was not found in the grid file '%s'.",
+                   rdy->config.boundaries[b].name, rdy->config.grid.file);
+      }
+    }
   }
 
   // add an additional boundary for unassigned boundary edges if needed
@@ -420,7 +452,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
 
   // make sure we have at least one region and boundary across all mpi ranks
   PetscMPIInt num_global_boundaries = 0;
-  MPI_Allreduce(&rdy->num_boundaries, &num_global_boundaries, 1, MPI_INT, MPI_SUM, rdy->comm);
+  MPI_Allreduce(&rdy->num_boundaries, &num_global_boundaries, 1, MPI_INT, MPI_MAX, rdy->comm);
   PetscCheck(num_global_boundaries > 0, rdy->comm, PETSC_ERR_USER, "No boundaries were found in the grid!");
 
   PetscFunctionReturn(PETSC_SUCCESS);
