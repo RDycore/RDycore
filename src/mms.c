@@ -329,14 +329,5 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   RDyLogDebug(rdy, "Initializing shallow water equations solver...");
   PetscCall(InitSWE(rdy));
 
-  RDyLogDebug(rdy, "Initializing checkpoints...");
-  PetscCall(InitCheckpoints(rdy));
-
-  // if a restart has been requested, read the specified checkpoint file
-  // and overwrite the necessary data
-  if (rdy->config.restart.file[0]) {
-    PetscCall(ReadCheckpointFile(rdy, rdy->config.restart.file));
-  }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 };
