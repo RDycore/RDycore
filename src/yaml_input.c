@@ -582,9 +582,10 @@ static const cyaml_schema_field_t mms_swe_fields_schema[] = {
     CYAML_FIELD_STRING("z", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, z, 1),
     CYAML_FIELD_STRING("dzdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dzdx, 1),
     CYAML_FIELD_STRING("dzdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dzdy, 1),
+    CYAML_FIELD_STRING("n", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, n, 1),
     CYAML_FIELD_END
 };
-// mms specification
+
 static const cyaml_schema_field_t mms_fields_schema[] = {
     CYAML_FIELD_MAPPING("constants", CYAML_FLAG_OPTIONAL, RDyMMSSection, constants, mms_constants_fields_schema),
     CYAML_FIELD_MAPPING("swe", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_swe_fields_schema),

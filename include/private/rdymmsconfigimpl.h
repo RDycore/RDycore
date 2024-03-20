@@ -37,6 +37,9 @@ typedef struct {
 
   // elevation z(x, y) and partial derivatives
   ManufacturedSolution z, dzdx, dzdy;
+
+  // Manning's roughness coefficient n(x, y)
+  ManufacturedSolution n;
 } RDyMMSSWESolutions;
 
 // specification of an ensemble
