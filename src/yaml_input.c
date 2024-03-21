@@ -1,5 +1,6 @@
 #include <cyaml/cyaml.h>
 #include <float.h>
+#include <muParserDLL.h>
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 
@@ -268,7 +269,7 @@ static const cyaml_schema_value_t surface_composition_entry = {
 
 // mapping of material property fields to RDyMaterialPropertySpec
 static const cyaml_schema_field_t material_property_fields_schema[] = {
-    CYAML_FIELD_FLOAT("value", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, value),
+    CYAML_FIELD_STRING("value", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, expression, 1),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyMaterialPropertySpec, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -420,15 +421,15 @@ static const cyaml_strval_t condition_types[] = {
 
 // schema for momentum component (as specified in a 2-item sequence)
 static const cyaml_schema_value_t momentum_component_entry = {
-    CYAML_VALUE(FLOAT, CYAML_FLAG_DEFAULT, PetscReal, {.missing = INVALID_REAL}),
+    CYAML_VALUE_STRING(CYAML_FLAG_DEFAULT, char, 1, MAX_EXPRESSION_LEN),
 };
 
 // schema for flow condition fields
 static const cyaml_schema_field_t flow_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD(FLOAT, "height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height, {.missing = INVALID_REAL}),
-    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentum, &momentum_component_entry, 2),
+    CYAML_FIELD_STRING("height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, heightExpression, 1),
+    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentumExpression, &momentum_component_entry, 2),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyFlowCondition, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyFlowCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -455,7 +456,7 @@ static const cyaml_schema_value_t flow_condition_entry = {
 static const cyaml_schema_field_t sediment_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySedimentCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySedimentCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_OPTIONAL, RDySedimentCondition, concentration),
+    CYAML_FIELD_STRING("concentration", CYAML_FLAG_OPTIONAL, RDySedimentCondition, expression, 1),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDySedimentCondition, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDySedimentCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -482,7 +483,7 @@ static const cyaml_schema_value_t sediment_condition_entry = {
 static const cyaml_schema_field_t salinity_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDySalinityCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDySalinityCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_FLOAT("concentration", CYAML_FLAG_OPTIONAL, RDySalinityCondition, concentration),
+    CYAML_FIELD_STRING("concentration", CYAML_FLAG_OPTIONAL, RDySedimentCondition, expression, 1),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDySalinityCondition, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDySalinityCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -737,9 +738,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
-      PetscCheck(flow_cond->height != INVALID_REAL || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
+      PetscCheck(flow_cond->heightExpression[0] || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
                  flow_cond->name);
-      PetscCheck(flow_cond->file[0] || ((flow_cond->momentum[0] != INVALID_REAL) && (flow_cond->momentum[1] != INVALID_REAL)), comm, PETSC_ERR_USER,
+      PetscCheck(flow_cond->file[0] || (flow_cond->momentumExpression[0][0] && flow_cond->momentumExpression[1][0]), comm, PETSC_ERR_USER,
                  "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }
   }
@@ -748,16 +749,14 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   for (PetscInt i = 0; i < config->num_sediment_conditions; ++i) {
     const RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
     PetscCheck(sed_cond->type >= 0, comm, PETSC_ERR_USER, "Sediment condition type not set in sediment_conditions.%s", sed_cond->name);
-    PetscCheck(sed_cond->concentration != INVALID_REAL, comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s",
-               sed_cond->name);
+    PetscCheck(sed_cond->expression[0], comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s", sed_cond->name);
   }
 
   // validate salinity conditions
   for (PetscInt i = 0; i < config->num_salinity_conditions; ++i) {
     const RDySalinityCondition *sal_cond = &config->salinity_conditions[i];
     PetscCheck(sal_cond->type >= 0, comm, PETSC_ERR_USER, "Salinity condition type not set in salinity_conditions.%s", sal_cond->name);
-    PetscCheck(sal_cond->concentration != INVALID_REAL, comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s",
-               sal_cond->name);
+    PetscCheck(sal_cond->expression[0], comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s", sal_cond->name);
   }
 
   // validate output options
@@ -768,6 +767,46 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
     config->output.batch_size = 1;
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// parses mathematical expressions given for material properties and
+// initial/boundary conditions, etc
+static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
+  PetscFunctionBegin;
+
+  // material properties
+  for (PetscInt m = 0; m < config->num_materials; ++m) {
+    RDyMaterialPropertiesSpec *properties = &config->materials[m].properties;
+    properties->manning.value             = mupCreate(muBASETYPE_FLOAT);
+    mupSetExpr(properties->manning.value, properties->manning.expression);
+  }
+
+  // flow conditions
+  for (PetscInt f = 0; f < config->num_flow_conditions; ++f) {
+    RDyFlowCondition *flow_cond = &config->flow_conditions[f];
+    flow_cond->height           = mupCreate(muBASETYPE_FLOAT);
+    mupSetExpr(flow_cond->height, flow_cond->heightExpression);
+    for (PetscInt p = 0; p < 2; ++p) {
+      flow_cond->momentum[p] = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(flow_cond->momentum[p], flow_cond->momentumExpression[p]);
+    }
+  }
+
+  // sediment conditions
+  for (PetscInt s = 0; s < config->num_sediment_conditions; ++s) {
+    RDySedimentCondition *sed_cond = &config->sediment_conditions[s];
+    sed_cond->concentration        = mupCreate(muBASETYPE_FLOAT);
+    mupSetExpr(sed_cond->concentration, sed_cond->expression);
+  }
+
+  // salinity conditions
+  for (PetscInt s = 0; s < config->num_salinity_conditions; ++s) {
+    RDySalinityCondition *sal_cond = &config->salinity_conditions[s];
+    sal_cond->concentration        = mupCreate(muBASETYPE_FLOAT);
+    mupSetExpr(sal_cond->concentration, sal_cond->expression);
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -995,6 +1034,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &config_schema, &config));
   PetscCall(ValidateConfig(rdy->comm, config));
+  PetscCall(ParseMathExpressions(rdy->comm, config));
 
   // copy the config into place and dispose of the original
   rdy->config = *config;
@@ -1029,6 +1069,7 @@ PetscErrorCode ReadMMSConfigFile(RDy rdy) {
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &mms_config_schema, &config));
   PetscCall(ValidateConfig(rdy->comm, config));
+  PetscCall(ParseMathExpressions(rdy->comm, config));
 
   // copy the config into place and dispose of the original
   rdy->config = *config;
