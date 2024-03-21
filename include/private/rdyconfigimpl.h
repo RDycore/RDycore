@@ -33,6 +33,11 @@
 // the maximum length of a string referring to a name in the config file
 #define MAX_NAME_LEN 128
 
+// the maximum length of a string containing a mathematical expression
+#define MAX_EXPRESSION_LEN 128
+
+typedef char MathExpression[MAX_EXPRESSION_LEN + 1];
+
 // The data structures below are intermediate representations of the sections
 // in the YAML configuration file. We parse this file with a YAML parser that
 // populates these data structures using a YAML schema. The parser is implemented
@@ -183,7 +188,8 @@ typedef struct {
 // the specification of a single material property, given by a value to be read
 // from a file
 typedef struct {
-  PetscReal         value;                     // specified value of the material property
+  MathExpression    expression;                // expression for property value
+  void             *value;                     // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];  // file from which data is to be read
   PetscViewerFormat format;                    // file format
 } RDyMaterialPropertySpec;
@@ -250,8 +256,10 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  PetscReal         height;
-  PetscReal         momentum[2];
+  MathExpression    heightExpression;       // expression for water height
+  MathExpression    momentumExpression[2];  // expression for water momenta
+  void             *height;                 // muparser-backed functional form
+  void             *momentum[2];            // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyFlowCondition;
@@ -264,7 +272,8 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  PetscReal         concentration;
+  MathExpression    expression;     // expression for concentration
+  void             *concentration;  // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDySedimentCondition;
@@ -277,7 +286,8 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  PetscReal         concentration;
+  MathExpression    expression;     // expression for concentration
+  void             *concentration;  // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDySalinityCondition;
@@ -311,22 +321,21 @@ typedef struct {
 // mms section (used only by MMS driver)
 // -------------------------------------
 
-// the maximum length of a mathematical expression to be parsed
-#define MAX_EXPRESSION_LEN 128
-
 // the maximum number allowed each for constants and functions
 #define MAX_NUM_SYMBOLS 32
 
 // a named (scalar-valued) constant for MMS
 typedef struct {
-  char      name[MAX_NAME_LEN + 1];
-  PetscReal value;
+  char           name[MAX_NAME_LEN + 1];
+  MathExpression expression;
+  PetscReal      value;
 } RDyMMSConstant;
 
 // a named function of (x, y, t) that can be parsed by muparser for MMS
 typedef struct {
-  char name[MAX_NAME_LEN + 1];
-  char expression[MAX_EXPRESSION_LEN + 1];
+  char           name[MAX_NAME_LEN + 1];
+  MathExpression expression;
+  void          *function;
 } RDyMMSFunction;
 
 // specification of a set of named constants for the MMS driver

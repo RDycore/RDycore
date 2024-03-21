@@ -1,3 +1,4 @@
+#include <muParserDLL.h>
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <petscsys.h>
@@ -515,7 +516,7 @@ static PetscErrorCode ReadOneDOFVecFromFile(RDy rdy, const char filename[], Vec 
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
               PetscInt cell                    = region.cell_ids[c];                                   \
-              materials_by_cell[cell].property = mat_props_spec.property.value;                        \
+              materials_by_cell[cell].property = mupEval(mat_props_spec.property.value);               \
             }                                                                                          \
           }                                                                                            \
         }                                                                                              \
@@ -823,9 +824,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
-              x_ptr[3 * cell_id]     = flow_ic.height;
-              x_ptr[3 * cell_id + 1] = flow_ic.momentum[0];
-              x_ptr[3 * cell_id + 2] = flow_ic.momentum[1];
+              x_ptr[3 * cell_id]     = mupEval(flow_ic.height);
+              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.momentum[0]);
+              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.momentum[1]);
             }
           }
         }
@@ -855,9 +856,9 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
 
         // initialize the relevant boundary values
         for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-          boundary_values[3 * e]     = flow_bc->height;
-          boundary_values[3 * e + 1] = flow_bc->momentum[0];
-          boundary_values[3 * e + 2] = flow_bc->momentum[1];
+          boundary_values[3 * e]     = mupEval(flow_bc->height);
+          boundary_values[3 * e + 1] = mupEval(flow_bc->momentum[0]);
+          boundary_values[3 * e + 2] = mupEval(flow_bc->momentum[1]);
         }
         PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
         break;
