@@ -99,7 +99,7 @@ PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit) {
 }
 
 // overrides parameters with command line arguments
-static PetscErrorCode OverrideParameters(RDy rdy) {
+PetscErrorCode OverrideParameters(RDy rdy) {
   PetscFunctionBegin;
 
   if (rdy->dt <= 0.0) {
@@ -179,7 +179,7 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
 
 // initializes mesh region data
 //   can be run after refinement
-static PetscErrorCode InitRegions(RDy rdy) {
+PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionBegin;
 
   // Count and fetch regions.
@@ -241,7 +241,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
 
 // initializes mesh boundary data
 //   can be run after refinement
-static PetscErrorCode InitBoundaries(RDy rdy) {
+PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionBegin;
 
   // Extract edges on the domain boundary.

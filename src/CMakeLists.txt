@@ -2,6 +2,7 @@
 add_library(rdycore
   checkpoint.c
   ensemble.c
+  mms.c
   rdycore.c
   rdydata.c
   rdydm.c
