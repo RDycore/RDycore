@@ -14,3 +14,6 @@ endforeach()
 
 # shallow water equations with roe riemann solver
 add_subdirectory(swe_roe)
+
+# regression tests for bad input
+add_subdirectory(bad_input)
