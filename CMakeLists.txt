@@ -124,7 +124,7 @@ configure_file(
 )
 
 # Inherit libraries from PETSc.
-set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED)
+set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m)
 
 if (ENABLE_TESTS)
   include(CTest)
