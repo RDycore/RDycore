@@ -16,11 +16,24 @@ typedef enum {
   SPATIALLY_HETEROGENEOUS
 } RainType;
 
+typedef struct {
+  PetscInt yy;
+  PetscInt mo;
+  PetscInt dd;
+  PetscInt hh;
+  PetscInt mm;
+} Date;
+
 typedef struct
 {
   RainType type;
+
   char sp_homo_filename[PETSC_MAX_PATH_LEN];
-  char sp_hetro_dir[PETSC_MAX_PATH_LEN];
+
+
+  char sp_hetero_dir[PETSC_MAX_PATH_LEN];
+  Date sp_hetero_start_date;
+
 } Rain;
 
 
@@ -148,6 +161,26 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-spatially_homogeneous_rain", rain_dataset.sp_homo_filename, sizeof(rain_dataset.sp_homo_filename), &flag));
     if (flag) {
       rain_dataset.type = SPATIALLY_HOMOGENEOUS;
+    }
+
+    PetscBool sp_hetero_dir_flag;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-spatially_heterogeneous_rain_dir", rain_dataset.sp_hetero_dir, sizeof(rain_dataset.sp_hetero_dir), &sp_hetero_dir_flag));
+    PetscInt nvalues = 5;
+    PetscInt date[nvalues];
+    PetscInt ndate = nvalues;
+    PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-spatially_heterogenous_start_date", date, &ndate, &flag));
+    if (flag) {
+      PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -spatially_heterogenous_start_date YY,MO,DD,HH,MM");
+      PetscCheck(rain_dataset.type != SPATIALLY_HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER, "Can only specify homogenous or heterogeneous rainfall datasets.");
+      PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify path to spatially heterogenous rainfall via -spatially_heterogeneous_rain_dir <dir>");
+
+      rain_dataset.type == SPATIALLY_HETEROGENEOUS;
+
+      rain_dataset.sp_hetero_start_date.yy = date[0];
+      rain_dataset.sp_hetero_start_date.mo = date[1];
+      rain_dataset.sp_hetero_start_date.dd = date[2];
+      rain_dataset.sp_hetero_start_date.hh = date[3];
+      rain_dataset.sp_hetero_start_date.mm = date[4];
     }
 
     PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
