@@ -70,6 +70,38 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// set a constant rainfall for all grid cells
+PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
+  PetscFunctionBegin;
+
+  // apply a 1 mm/hr rain over the entire domain
+  PetscReal rain_rate = 1.0 / 3600.0 / 1000.0; // mm/hr --> m/s
+
+  for (PetscInt icell = 0; icell < ncells; icell++) {
+    rain[icell] = rain_rate;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// set spatially homogenous rainfall rate for all grid cells
+PetscErrorCode SetSpatiallyHomogenousRainfall(PetscScalar *rain_ptr, PetscInt nrain, PetscReal cur_time, PetscBool temporally_interpolate, PetscInt *cur_rain_idx,
+                              PetscInt *prev_rain_idx, PetscInt ncells, PetscReal rain[ncells]) {
+  PetscFunctionBegin;
+
+  PetscReal cur_rain;
+  PetscCall(GetCurrentData(rain_ptr, nrain, cur_time, temporally_interpolate, cur_rain_idx, &cur_rain));
+
+  if (temporally_interpolate || *cur_rain_idx != *prev_rain_idx) {  // is it time to update the source term?
+    *prev_rain_idx = *cur_rain_idx;
+    for (PetscInt icell = 0; icell < ncells; icell++) {
+      rain[icell] = cur_rain;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
   // print usage info if no arguments given
   if (argc < 2) {
@@ -167,23 +199,12 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetTime(rdy, &time));
 
       if (!rain_specified) {
-        // apply a 1 mm/hr rain over the entire domain
-        for (PetscInt icell = 0; icell < n; icell++) {
-          rain[icell] = 1.0 / 3600.0 / 1000.0;  // mm/hr --> m/s
-        }
-        PetscCall(RDySetWaterSourceForLocalCell(rdy, n, rain));
+        PetscCall(SetConstantRainfall(n, rain));
       } else {
-        PetscReal cur_rain;
-        PetscCall(GetCurrentData(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &cur_rain));
-
-        if (interpolate_rain || cur_rain_idx != prev_rain_idx) {  // is it time to update the source term?
-          prev_rain_idx = cur_rain_idx;
-          for (PetscInt icell = 0; icell < n; icell++) {
-            rain[icell] = cur_rain;
-          }
-          PetscCall(RDySetWaterSourceForLocalCell(rdy, n, rain));
-        }
+        PetscCall(SetSpatiallyHomogenousRainfall(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &prev_rain_idx, n, rain));
       }
+
+      PetscCall(RDySetWaterSourceForLocalCell(rdy, n, rain));
 
       if (bc_specified && num_edges_dirc_bc > 0) {
         PetscReal cur_bc;
