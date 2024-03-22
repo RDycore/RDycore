@@ -6,6 +6,10 @@ option(ENABLE_TESTS    "Enable unit (and possibly driver) tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
 
+# MPI-related options
+set(MPIEXEC       "mpiexec" CACHE STRING "Executable used to run MPI programs")
+set(MPIEXEC_FLAGS ""        CACHE STRING "Flags passed to MPIEXEC (apart from -n)")
+
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -17,13 +21,21 @@ enable_language(Fortran)
 
 project(rdycore)
 
-# Find PETSc (must be placed after the project command)
+# Make sure PETSc can be found with pkgconfig
 set(PETSC_DIR $ENV{PETSC_DIR})
 set(PETSC_ARCH $ENV{PETSC_ARCH})
-find_package(PETSc COMPONENTS C)
 set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${PETSC_DIR}/${PETSC_ARCH}/lib/pkgconfig")
 
 find_package(PkgConfig REQUIRED)
+
+# PETSc
+pkg_check_modules(PETSc REQUIRED IMPORTED_TARGET petsc)
+pkg_get_variable(PETSc_C_COMPILER PETSc ccompiler)
+pkg_get_variable(PETSc_Fortran_COMPILER PETSc fcompiler)
+include_directories(${PETSc_INCLUDE_DIRS})
+link_directories(${PETSc_LIBRARY_DIRS})
+
+# CEED
 pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
 include_directories(${CEED_INCLUDE_DIRS})
 
@@ -40,8 +52,7 @@ endif()
 
 # Use PETSc's compiler config.
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_COMPILER ${PETSC_COMPILER})
-set(CMAKE_C_FLAGS    "${PETSC_DEFINITIONS}")
+set(CMAKE_C_COMPILER ${PETSc_C_COMPILER})
 
 # Add some compiler flags of our own.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
@@ -64,19 +75,8 @@ if (ENABLE_ASAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 endif()
 
-# Sometimes PETSC_MPIEXEC has options embedded in it, which confuses CTest.
-# If we find a space in this variable, we break things up into PETSC_MPIEXEC
-# and PETSC_MPIEXEC_FLAGS.
-string(FIND ${PETSC_MPIEXEC} " " PETSC_MPIEXEC_SPACE)
-if (NOT PETSC_MPIEXEC_SPACE EQUAL -1)
-  string(SUBSTRING ${PETSC_MPIEXEC} 0 ${PETSC_MPIEXEC_SPACE} PETSC_MPIEXEC)
-  string(SUBSTRING ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_SPACE} -1 PETSC_MPIEXEC_FLAGS)
-endif()
-
-# Default Fortran compiler (if not specified)
-if (NOT CMAKE_Fortran_COMPILER)
-  set(CMAKE_Fortran_COMPILER gfortran)
-endif()
+# Fortran settings
+set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
 
 # flags
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
@@ -113,7 +113,6 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 message(STATUS "Installation prefix is ${CMAKE_INSTALL_PREFIX}")
 
 # We look for headers in these directories.
-include_directories(${PETSC_INCLUDES})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
@@ -125,7 +124,7 @@ configure_file(
 )
 
 # Inherit libraries from PETSc.
-set(RDYCORE_LIBRARIES ${PETSC_LIBRARIES} PkgConfig::CEED)
+set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m)
 
 if (ENABLE_TESTS)
   include(CTest)
