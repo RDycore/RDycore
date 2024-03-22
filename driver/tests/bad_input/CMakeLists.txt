@@ -8,5 +8,5 @@ file (COPY
       ${MESH_DIR}/Houston1km_with_z.exo
       ${CONDITION_DIR}/Houston1km.ic.${PETSC_ID_TYPE}.bin
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-add_test(nonexistent_boundary ${PETSC_MPIEXEC} ${PETSC_MPIEXEC_FLAGS} -n 1 ${rdycore_driver} nonexistent_boundary.yaml)
+add_test(nonexistent_boundary ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_driver} nonexistent_boundary.yaml)
 set_property(TEST nonexistent_boundary PROPERTY WILL_FAIL TRUE)

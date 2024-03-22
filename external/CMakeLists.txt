@@ -68,11 +68,9 @@ if (ENABLE_TESTS)
   #----------------------------------------
   # Build cmocka, a C unit testing library.
   #----------------------------------------
-  set(CMOCKA_C_FLAGS ${CMAKE_C_FLAGS})
   set(CMOCKA_CMAKE_OPTS
     -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -DCMAKE_C_FLAGS=${CMOCKA_C_FLAGS}
     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
     -DBUILD_SHARED_LIBS=OFF
     -DWITH_EXAMPLES=OFF)
