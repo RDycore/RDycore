@@ -10,6 +10,20 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
+typedef enum {
+  CONSTANT = 0,
+  SPATIALLY_HOMOGENEOUS,
+  SPATIALLY_HETEROGENEOUS
+} RainType;
+
+typedef struct
+{
+  RainType type;
+  char sp_homo_filename[PETSC_MAX_PATH_LEN];
+  char sp_hetro_dir[PETSC_MAX_PATH_LEN];
+} Rain;
+
+
 // open a Vec that contains data in the following format:
 //
 // time_1 value_1
@@ -122,9 +136,20 @@ int main(int argc, char *argv[]) {
     // Currently, these datasets need to be opened before calling
     // RDySetup to avoid an error. Possible issue for the error could
     // be that RDySetup is setting a default DM for all VecLoads.
-    PetscBool rain_specified, bc_specified;
-    char      rainfile[PETSC_MAX_PATH_LEN], bcfile[PETSC_MAX_PATH_LEN];
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-rain", rainfile, sizeof(rainfile), &rain_specified));
+    PetscBool flag, bc_specified;
+
+    Rain rain_dataset;
+
+    // set default rainfall
+    rain_dataset.type = CONSTANT;
+
+    char bcfile[PETSC_MAX_PATH_LEN];
+
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-spatially_homogeneous_rain", rain_dataset.sp_homo_filename, sizeof(rain_dataset.sp_homo_filename), &flag));
+    if (flag) {
+      rain_dataset.type = SPATIALLY_HOMOGENEOUS;
+    }
+
     PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
 
     PetscBool interpolate_rain = PETSC_FALSE, interpolate_bc = PETSC_FALSE;
@@ -135,9 +160,15 @@ int main(int argc, char *argv[]) {
     PetscScalar *rain_ptr = NULL, *bc_ptr = NULL;
     PetscInt     nrain, nbc;
 
-    if (rain_specified) {
-      PetscCall(OpenData(rainfile, &rain_vec, &nrain));
-      PetscCall(VecGetArray(rain_vec, &rain_ptr));
+    switch (rain_dataset.type) {
+      case CONSTANT:
+        break;
+      case SPATIALLY_HOMOGENEOUS:
+        PetscCall(OpenData(rain_dataset.sp_homo_filename, &rain_vec, &nrain));
+        PetscCall(VecGetArray(rain_vec, &rain_ptr));
+        break;
+      case SPATIALLY_HETEROGENEOUS:
+        break;
     }
 
     if (bc_specified) {
@@ -198,10 +229,15 @@ int main(int argc, char *argv[]) {
       PetscReal time, time_step;
       PetscCall(RDyGetTime(rdy, &time));
 
-      if (!rain_specified) {
-        PetscCall(SetConstantRainfall(n, rain));
-      } else {
-        PetscCall(SetSpatiallyHomogenousRainfall(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &prev_rain_idx, n, rain));
+      switch (rain_dataset.type) {
+        case CONSTANT:
+          PetscCall(SetConstantRainfall(n, rain));
+          break;
+        case SPATIALLY_HOMOGENEOUS:
+          PetscCall(SetSpatiallyHomogenousRainfall(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &prev_rain_idx, n, rain));
+          break;
+        case SPATIALLY_HETEROGENEOUS:
+          break;
       }
 
       PetscCall(RDySetWaterSourceForLocalCell(rdy, n, rain));
@@ -248,9 +284,15 @@ int main(int argc, char *argv[]) {
     }
 
     // clean up
-    if (rain_specified) {
+    switch (rain_dataset.type) {
+      case CONSTANT:
+        break;
+      case SPATIALLY_HOMOGENEOUS:
       PetscCall(VecRestoreArray(rain_vec, &rain_ptr));
       PetscCall(VecDestroy(&rain_vec));
+        break;
+      case SPATIALLY_HETEROGENEOUS:
+        break;
     }
 
     if (bc_specified) {
