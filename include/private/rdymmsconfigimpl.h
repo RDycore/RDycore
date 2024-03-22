@@ -11,35 +11,49 @@
 // https://rdycore.github.io/RDycore/user/mms.html
 //
 
-// the maximum length of a string referring to a name in the config file
-#define MAX_MMS_EXPRESSION_LEN 128
+// the maximum length of a string containing a mathematical expression
+#define MAX_EXPRESSION_LEN 128
 
-// a string containing an expression for a manufactured solution
-typedef char ManufacturedSolution[MAX_MMS_EXPRESSION_LEN + 1];
+typedef char MathExpression[MAX_EXPRESSION_LEN + 1];
 
 // specification of a set of named constants for the MMS driver, each
 // represented by a single capital letter
 typedef struct {
-  PetscReal A, B, C, D, E, F, G, H, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
+  struct {
+    MathExpression A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
+  } expressions;
+  struct {
+    PetscReal A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
+  } values;
 } RDyMMSConstants;
 
 // specification of a set of manufactured solutions for the
 // shallow water equations (SWE)
 typedef struct {
-  // water height h(x, y, t) and partial derivatives
-  ManufacturedSolution h, dhdx, dhdy, dhdt;
-
-  // flow x-velocity u(x, y, t) and partial derivatives
-  ManufacturedSolution u, dudx, dudy, dudt;
-
-  // flow y-velocity v(x, y, t) and partial derivatives
-  ManufacturedSolution v, dvdx, dvdy, dvdt;
-
-  // elevation z(x, y) and partial derivatives
-  ManufacturedSolution z, dzdx, dzdy;
-
-  // Manning's roughness coefficient n(x, y)
-  ManufacturedSolution n;
+  struct {
+    // water height h(x, y, t) and partial derivatives
+    MathExpression h, dhdx, dhdy, dhdt;
+    // flow x-velocity u(x, y, t) and partial derivatives
+    MathExpression u, dudx, dudy, dudt;
+    // flow y-velocity v(x, y, t) and partial derivatives
+    MathExpression v, dvdx, dvdy, dvdt;
+    // elevation z(x, y) and partial derivatives
+    MathExpression z, dzdx, dzdy;
+    // Manning's roughness coefficient n(x, y)
+    MathExpression n;
+  } expressions;
+  struct {
+    // water height h(x, y, t) and partial derivatives
+    void *h, *dhdx, *dhdy, *dhdt;
+    // flow x-velocity u(x, y, t) and partial derivatives
+    void *u, *dudx, *dudy, *dudt;
+    // flow y-velocity v(x, y, t) and partial derivatives
+    void *v, *dvdx, *dvdy, *dvdt;
+    // elevation z(x, y) and partial derivatives
+    void *z, *dzdx, *dzdy;
+    // Manning's roughness coefficient n(x, y)
+    void *n;
+  } solutions;
 } RDyMMSSWESolutions;
 
 // specification of an ensemble

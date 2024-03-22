@@ -34,11 +34,6 @@
 // the maximum length of a string referring to a name in the config file
 #define MAX_NAME_LEN 128
 
-// the maximum length of a string containing a mathematical expression
-#define MAX_EXPRESSION_LEN 128
-
-typedef char MathExpression[MAX_EXPRESSION_LEN + 1];
-
 // The data structures below are intermediate representations of the sections
 // in the YAML configuration file. We parse this file with a YAML parser that
 // populates these data structures using a YAML schema. The parser is implemented
