@@ -17,13 +17,13 @@ enable_language(Fortran)
 
 project(rdycore)
 
-# Find PETSc (must be placed after the project command)
+# Make sure PETSc can be found with pkgconfig
 set(PETSC_DIR $ENV{PETSC_DIR})
 set(PETSC_ARCH $ENV{PETSC_ARCH})
-find_package(PETSc COMPONENTS C)
 set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${PETSC_DIR}/${PETSC_ARCH}/lib/pkgconfig")
 
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(PETSc REQUIRED IMPORTED_TARGET petsc)
 pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
 include_directories(${CEED_INCLUDE_DIRS})
 
