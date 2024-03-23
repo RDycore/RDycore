@@ -24,13 +24,20 @@ typedef struct {
   PetscInt mm;
 } Date;
 
+typedef struct {
+  char filename[PETSC_MAX_PATH_LEN];
+  Vec data_vec;
+  PetscInt ndata;
+  PetscScalar *data_ptr;
+  PetscBool temporally_interpolate;
+  PetscInt cur_idx, prev_idx;
+} HomogeneousRainData;
+
 typedef struct
 {
   RainType type;
 
-  char sp_homo_filename[PETSC_MAX_PATH_LEN];
-
-
+  HomogeneousRainData homogenous;
   char sp_hetero_dir[PETSC_MAX_PATH_LEN];
   Date sp_hetero_start_date;
 
@@ -97,6 +104,29 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// loads the binary data in a Vec
+static PetscErrorCode OpenSpatiallyHomogenousRainData(HomogeneousRainData *homogeneous_rain) {
+  PetscFunctionBegin;
+
+  PetscCall(OpenData(homogeneous_rain->filename, &homogeneous_rain->data_vec, &homogeneous_rain->ndata));
+  PetscCall(VecGetArray(homogeneous_rain->data_vec, &homogeneous_rain->data_ptr));
+  homogeneous_rain->cur_idx = -1;
+  homogeneous_rain->prev_idx = -1;
+  homogeneous_rain->temporally_interpolate = PETSC_FALSE;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// close and destroys the Vec
+static PetscErrorCode CloseSpatiallyHomogeneousRainData(HomogeneousRainData *homogeneous_rain) {
+  PetscFunctionBegin;
+
+  PetscCall(VecRestoreArray(homogeneous_rain->data_vec, &homogeneous_rain->data_ptr));
+  PetscCall(VecDestroy(&homogeneous_rain->data_vec));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // set a constant rainfall for all grid cells
 PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
@@ -112,11 +142,15 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
 }
 
 // set spatially homogenous rainfall rate for all grid cells
-PetscErrorCode SetSpatiallyHomogenousRainfall(PetscScalar *rain_ptr, PetscInt nrain, PetscReal cur_time, PetscBool temporally_interpolate, PetscInt *cur_rain_idx,
-                              PetscInt *prev_rain_idx, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetSpatiallyHomogenousRainfall(HomogeneousRainData *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
-  PetscReal cur_rain;
+  PetscReal   cur_rain;
+  PetscScalar *rain_ptr = homogeneous_rain->data_ptr;
+  PetscInt     nrain = homogeneous_rain->ndata;
+  PetscBool    temporally_interpolate = homogeneous_rain->temporally_interpolate;
+  PetscInt    *cur_rain_idx = &homogeneous_rain->cur_idx;
+  PetscInt    *prev_rain_idx = &homogeneous_rain->prev_idx;
   PetscCall(GetCurrentData(rain_ptr, nrain, cur_time, temporally_interpolate, cur_rain_idx, &cur_rain));
 
   if (temporally_interpolate || *cur_rain_idx != *prev_rain_idx) {  // is it time to update the source term?
@@ -158,10 +192,11 @@ int main(int argc, char *argv[]) {
 
     char bcfile[PETSC_MAX_PATH_LEN];
 
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-spatially_homogeneous_rain", rain_dataset.sp_homo_filename, sizeof(rain_dataset.sp_homo_filename), &flag));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-spatially_homogeneous_rain", rain_dataset.homogenous.filename, sizeof(rain_dataset.homogenous.filename), &flag));
     if (flag) {
       rain_dataset.type = SPATIALLY_HOMOGENEOUS;
     }
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogeneous_rain", &rain_dataset.homogenous.temporally_interpolate, NULL));
 
     PetscBool sp_hetero_dir_flag;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-spatially_heterogeneous_rain_dir", rain_dataset.sp_hetero_dir, sizeof(rain_dataset.sp_hetero_dir), &sp_hetero_dir_flag));
@@ -185,20 +220,18 @@ int main(int argc, char *argv[]) {
 
     PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
 
-    PetscBool interpolate_rain = PETSC_FALSE, interpolate_bc = PETSC_FALSE;
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_rain", &interpolate_rain, NULL));
+    PetscBool interpolate_bc = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_bc", &interpolate_bc, NULL));
 
-    Vec          rain_vec = NULL, bc_vec = NULL;
-    PetscScalar *rain_ptr = NULL, *bc_ptr = NULL;
-    PetscInt     nrain, nbc;
+    Vec          bc_vec = NULL;
+    PetscScalar *bc_ptr = NULL;
+    PetscInt     nbc;
 
     switch (rain_dataset.type) {
       case CONSTANT:
         break;
       case SPATIALLY_HOMOGENEOUS:
-        PetscCall(OpenData(rain_dataset.sp_homo_filename, &rain_vec, &nrain));
-        PetscCall(VecGetArray(rain_vec, &rain_ptr));
+        PetscCall(OpenSpatiallyHomogenousRainData(&rain_dataset.homogenous));
         break;
       case SPATIALLY_HETEROGENEOUS:
         break;
@@ -254,7 +287,6 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-coupling_interval", &coupling_interval, NULL));
     RDySetCouplingInterval(rdy, coupling_interval);
 
-    PetscInt cur_rain_idx = -1, prev_rain_idx = -1;
     PetscInt cur_bc_idx = -1, prev_bc_idx = -1;
 
     while (!RDyFinished(rdy)) {  // returns true based on stopping criteria
@@ -267,7 +299,7 @@ int main(int argc, char *argv[]) {
           PetscCall(SetConstantRainfall(n, rain));
           break;
         case SPATIALLY_HOMOGENEOUS:
-          PetscCall(SetSpatiallyHomogenousRainfall(rain_ptr, nrain, time, interpolate_rain, &cur_rain_idx, &prev_rain_idx, n, rain));
+          PetscCall(SetSpatiallyHomogenousRainfall(&rain_dataset.homogenous, time, n, rain));
           break;
         case SPATIALLY_HETEROGENEOUS:
           break;
@@ -321,8 +353,7 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case SPATIALLY_HOMOGENEOUS:
-      PetscCall(VecRestoreArray(rain_vec, &rain_ptr));
-      PetscCall(VecDestroy(&rain_vec));
+        PetscCall(CloseSpatiallyHomogeneousRainData(&rain_dataset.homogenous));
         break;
       case SPATIALLY_HETEROGENEOUS:
         break;
