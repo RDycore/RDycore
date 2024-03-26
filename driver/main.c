@@ -49,6 +49,7 @@ typedef struct {
   PetscScalar *data_ptr;
 
   PetscInt ndata;
+  PetscInt header_offset;
 
   // header of data
   PetscInt ncols, nrows; // number of columns and rows
@@ -176,6 +177,8 @@ static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *
   PetscCall(OpenData(hetero_rain->file, &hetero_rain->data_vec, &hetero_rain->ndata));
   PetscCall(VecGetArray(hetero_rain->data_vec, &hetero_rain->data_ptr));
 
+  hetero_rain->header_offset = 5;
+
   hetero_rain->ncols    = (PetscInt) hetero_rain->data_ptr[0];
   hetero_rain->nrows    = (PetscInt) hetero_rain->data_ptr[1];
   hetero_rain->xlc      = hetero_rain->data_ptr[2];
@@ -242,6 +245,20 @@ static PetscErrorCode SetupSpatiallyHeterogeneousRainDataMapping(RDy rdy, Hetero
       PetscInt idx = hetero_rain->data2mesh_idx[icell];
       printf("%04d %f %f %02d %f %f\n",icell, xc, yc, idx, hetero_rain->data_xc[idx], hetero_rain->data_yc[idx]);
     }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// set spatially heterogenous rainfall rate
+PetscErrorCode SetSpatiallyHeterogenousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+  PetscFunctionBegin;
+
+  PetscInt offset = hetero_rain->header_offset;
+
+  for (PetscInt icell = 0; icell < ncells; icell++) {
+    PetscInt idx = hetero_rain->data2mesh_idx[icell];
+    rain[icell] = hetero_rain->data_ptr[idx + offset];
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -419,6 +436,7 @@ int main(int argc, char *argv[]) {
           PetscCall(SetSpatiallyHomogenousRainfall(&rain_dataset.homogenous, time, n, rain));
           break;
         case SPATIALLY_HETEROGENEOUS:
+          PetscCall(SetSpatiallyHeterogenousRainfall(&rain_dataset.heterogeneous, time, n, rain));
           break;
       }
 
