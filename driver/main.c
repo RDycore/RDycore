@@ -53,7 +53,12 @@ typedef struct {
   // header of data
   PetscInt ncols, nrows; // number of columns and rows
   PetscReal xlc, ylc;    // cell centroid coordinates
-  PetscReal cellsize;    // dx = dy of cell
+  PetscReal cellsize;    // dx = dy of cell  
+
+  PetscInt *data2mesh_idx;
+  PetscReal *data_xc, *data_yc;
+  PetscReal *mesh_xc, *mesh_yc;
+  PetscInt mesh_ncells_local;
 
 } HeterogeneousRainData;
 
@@ -188,6 +193,60 @@ static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode SetupSpatiallyHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRainData *hetero_rain) {
+  PetscFunctionBegin;
+
+  PetscCall(RDyGetNumLocalCells(rdy, &hetero_rain->mesh_ncells_local));
+  PetscCalloc1(hetero_rain->mesh_ncells_local, &hetero_rain->mesh_xc);
+  PetscCalloc1(hetero_rain->mesh_ncells_local, &hetero_rain->mesh_yc);
+  PetscCalloc1(hetero_rain->mesh_ncells_local, &hetero_rain->data2mesh_idx);
+
+  PetscCalloc1(hetero_rain->ncols * hetero_rain->nrows, &hetero_rain->data_xc);
+  PetscCalloc1(hetero_rain->ncols * hetero_rain->nrows, &hetero_rain->data_yc);
+
+  PetscInt idx = 0;
+  for (PetscInt irow = 0; irow < hetero_rain->nrows; irow++) {
+    for (PetscInt icol = 0; icol < hetero_rain->ncols; icol++) {
+      hetero_rain->data_xc[idx] = hetero_rain->xlc + icol * hetero_rain->cellsize;
+      hetero_rain->data_yc[idx] = hetero_rain->ylc + (hetero_rain->nrows - irow) * hetero_rain->cellsize;
+      idx++;
+    }
+  }
+  
+  PetscCall(RDyGetLocalCellXCentroids(rdy, hetero_rain->mesh_ncells_local, hetero_rain->mesh_xc));
+  PetscCall(RDyGetLocalCellYCentroids(rdy, hetero_rain->mesh_ncells_local, hetero_rain->mesh_yc));
+
+  for (PetscInt icell = 0; icell < hetero_rain->mesh_ncells_local; icell++) {
+
+    PetscReal min_dist = (PetscMax(hetero_rain->ncols, hetero_rain->nrows) + 1)*hetero_rain->cellsize;    
+    PetscReal xc = hetero_rain->mesh_xc[icell];
+    PetscReal yc = hetero_rain->mesh_yc[icell];
+
+    PetscInt idx = 0;
+    for (PetscInt irow = 0; irow < hetero_rain->nrows; irow++) {
+      for (PetscInt icol = 0; icol < hetero_rain->ncols; icol++) {
+
+        PetscReal dx = xc - hetero_rain->data_xc[idx];
+        PetscReal dy = yc - hetero_rain->data_yc[idx];
+
+        PetscReal dist = PetscPowReal(dx * dx + dy * dy, 0.5);
+        if (dist < min_dist) {
+          min_dist = dist;
+          hetero_rain->data2mesh_idx[icell] = idx;
+        }
+        idx++;
+      }
+    }
+
+    if (0) {
+      PetscInt idx = hetero_rain->data2mesh_idx[icell];
+      printf("%04d %f %f %02d %f %f\n",icell, xc, yc, idx, hetero_rain->data_xc[idx], hetero_rain->data_yc[idx]);
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // set spatially homogenous rainfall rate for all grid cells
 PetscErrorCode SetSpatiallyHomogenousRainfall(HomogeneousRainData *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
@@ -283,6 +342,13 @@ int main(int argc, char *argv[]) {
     PetscScalar *bc_ptr = NULL;
     PetscInt     nbc;
 
+    if (bc_specified) {
+      PetscCall(OpenData(bcfile, &bc_vec, &nbc));
+      PetscCall(VecGetArray(bc_vec, &bc_ptr));
+    }
+
+    PetscCall(RDySetup(rdy));
+
     switch (rain_dataset.type) {
       case CONSTANT:
         break;
@@ -291,15 +357,9 @@ int main(int argc, char *argv[]) {
         break;
       case SPATIALLY_HETEROGENEOUS:
         PetscCall(OpenSpatiallyHeterogeneousRainData(&rain_dataset.heterogeneous));
+        PetscCall(SetupSpatiallyHeterogeneousRainDataMapping(rdy, &rain_dataset.heterogeneous));
         break;
     }
-
-    if (bc_specified) {
-      PetscCall(OpenData(bcfile, &bc_vec, &nbc));
-      PetscCall(VecGetArray(bc_vec, &bc_ptr));
-    }
-
-    PetscCall(RDySetup(rdy));
 
     // allocate arrays for inspecting simulation data
     PetscInt n;
