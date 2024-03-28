@@ -169,10 +169,11 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
   // apply a 1 mm/hr rain over the entire domain
-  PetscReal rain_rate = 1.0 / 3600.0 / 1000.0;  // mm/hr --> m/s
+  PetscReal rain_rate             = 1.0;
+  PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
   for (PetscInt icell = 0; icell < ncells; icell++) {
-    rain[icell] = rain_rate;
+    rain[icell] = rain_rate * mm_per_hr_2_m_per_sec;;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -361,10 +362,11 @@ PetscErrorCode SetSpatiallyHeterogenousRainfall(HeterogeneousRainData *hetero_ra
 
 
   PetscInt offset = hetero_rain->header_offset;
+  PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
   for (PetscInt icell = 0; icell < ncells; icell++) {
     PetscInt idx = hetero_rain->data2mesh_idx[icell];
-    rain[icell]  = hetero_rain->data_ptr[idx + offset];
+    rain[icell]  = hetero_rain->data_ptr[idx + offset] * mm_per_hr_2_m_per_sec;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
