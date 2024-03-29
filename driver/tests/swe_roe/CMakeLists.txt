@@ -108,7 +108,7 @@ foreach(np 1 2)
   endforeach()
 endforeach()
 
-# houston-harvey test
+# houston-harvey test with spatially homogenous rainfall
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.yaml
       ${MESH_DIR}/Houston1km_with_z.exo
@@ -119,6 +119,17 @@ file (COPY
 foreach(np 1 2)
   foreach(config basic)
     add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -rain Houston1km.rain.${PETSC_ID_TYPE}.bin -bc Houston1km.bc.${PETSC_ID_TYPE}.bin -interpolate_bc ${${config}_args})
+  endforeach()
+endforeach()
+
+# houston-harvey test with spatially heterogeneous rainfall
+file (COPY
+      ${CONDITION_DIR}/2017-08-26:00-00.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/2017-08-26:01-00.${PETSC_ID_TYPE}.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config basic)
+    add_test(houston_hetro_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -spatially_heterogenous_start_date 2017,8,26,0,0 -spatially_heterogeneous_rain_dir ./ ${${config}_args})
   endforeach()
 endforeach()
 
