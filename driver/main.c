@@ -25,7 +25,6 @@ typedef enum { CONSTANT = 0, SPATIALLY_HOMOGENEOUS, SPATIALLY_HETEROGENEOUS } Ra
 #define NOV 11
 #define DEC 12
 
-
 typedef struct {
   PetscInt yy;
   PetscInt mo;
@@ -61,7 +60,7 @@ typedef struct {
 
   // temporal duration of the rainfall dataset
   PetscReal dtime_in_hour;
-  PetscInt ndata_file;
+  PetscInt  ndata_file;
 
   // header of data
   PetscInt  ncols, nrows;  // number of columns and rows
@@ -173,7 +172,8 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
   PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
   for (PetscInt icell = 0; icell < ncells; icell++) {
-    rain[icell] = rain_rate * mm_per_hr_2_m_per_sec;;
+    rain[icell] = rain_rate * mm_per_hr_2_m_per_sec;
+    ;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -186,8 +186,8 @@ static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *
            hetero_rain->current_date.mo, hetero_rain->current_date.dd, hetero_rain->current_date.hh, hetero_rain->current_date.mm);
 
   printf("Opening %s \n", hetero_rain->file);
-  hetero_rain->dtime_in_hour = 1.0; // assume an hourly dataset
-  hetero_rain->ndata_file = 1;
+  hetero_rain->dtime_in_hour = 1.0;  // assume an hourly dataset
+  hetero_rain->ndata_file    = 1;
 
   PetscCall(OpenData(hetero_rain->file, &hetero_rain->data_vec, &hetero_rain->ndata));
   PetscCall(VecGetArray(hetero_rain->data_vec, &hetero_rain->data_ptr));
@@ -224,37 +224,37 @@ static PetscErrorCode IncrementDateByAnHour(Date *date) {
     if (date->mo == JAN && date->dd > 31) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == FEB && date->dd > 28) {
+    } else if (date->mo == FEB && date->dd > 28) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == MAR && date->dd > 31) {
+    } else if (date->mo == MAR && date->dd > 31) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == APR && date->dd > 30) {
+    } else if (date->mo == APR && date->dd > 30) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == MAY && date->dd > 31) {
+    } else if (date->mo == MAY && date->dd > 31) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == JUN && date->dd > 30) {
+    } else if (date->mo == JUN && date->dd > 30) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == JUL && date->dd > 31) {
+    } else if (date->mo == JUL && date->dd > 31) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == AUG && date->dd > 31) {
+    } else if (date->mo == AUG && date->dd > 31) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == SEP && date->dd > 30) {
+    } else if (date->mo == SEP && date->dd > 30) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == OCT && date->dd > 31) {
+    } else if (date->mo == OCT && date->dd > 31) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == NOV && date->dd > 30) {
+    } else if (date->mo == NOV && date->dd > 30) {
       date->mo++;
       date->dd = 1;
-    } else if  (date->mo == DEC && date->dd > 31) {
+    } else if (date->mo == DEC && date->dd > 31) {
       date->yy++;
       date->mo = 1;
       date->dd = 1;
@@ -287,14 +287,16 @@ static PetscErrorCode OpenANewSpatiallyHeterognenousRainfallData(HeterogeneousRa
 
   // check to ensure the size and header information of the new rainfall data is the same as the older one
   PetscCheck(ndata == hetero_rain->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER, "The ndata of previous and new rainfal do not match");
-  PetscCheck(hetero_rain->ncols == (PetscInt)hetero_rain->data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER, "The number of columns in the previous and new rainfal do not match");
-  PetscCheck(hetero_rain->nrows == (PetscInt)hetero_rain->data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER, "The number of rows in the previous and new rainfal do not match");
+  PetscCheck(hetero_rain->ncols == (PetscInt)hetero_rain->data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The number of columns in the previous and new rainfal do not match");
+  PetscCheck(hetero_rain->nrows == (PetscInt)hetero_rain->data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The number of rows in the previous and new rainfal do not match");
   PetscCheck(hetero_rain->xlc == hetero_rain->data_ptr[2], PETSC_COMM_WORLD, PETSC_ERR_USER, "The xc of the previous and new rainfal do not match");
   PetscCheck(hetero_rain->ylc == hetero_rain->data_ptr[3], PETSC_COMM_WORLD, PETSC_ERR_USER, "The yc of the previous and new rainfal do not match");
-  PetscCheck(hetero_rain->cellsize == hetero_rain->data_ptr[4], PETSC_COMM_WORLD, PETSC_ERR_USER, "The cellsize of the previous and new rainfal do not match");
+  PetscCheck(hetero_rain->cellsize == hetero_rain->data_ptr[4], PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The cellsize of the previous and new rainfal do not match");
 
   hetero_rain->ndata_file++;
-
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -356,12 +358,11 @@ PetscErrorCode SetSpatiallyHeterogenousRainfall(HeterogeneousRainData *hetero_ra
   PetscFunctionBegin;
 
   // Is it time to open a new file?
-  if (cur_time/3600.0 >= (hetero_rain->ndata_file)*hetero_rain->dtime_in_hour) {
+  if (cur_time / 3600.0 >= (hetero_rain->ndata_file) * hetero_rain->dtime_in_hour) {
     OpenANewSpatiallyHeterognenousRainfallData(hetero_rain);
   }
 
-
-  PetscInt offset = hetero_rain->header_offset;
+  PetscInt  offset                = hetero_rain->header_offset;
   PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
   for (PetscInt icell = 0; icell < ncells; icell++) {
@@ -601,7 +602,7 @@ int main(int argc, char *argv[]) {
 
     if (0 && rain_dataset.type == SPATIALLY_HETEROGENEOUS) {
       for (PetscInt icell = 0; icell < n; icell++) {
-        printf("%d %f %f %f\n",icell, rain_dataset.heterogeneous.mesh_xc[icell], rain_dataset.heterogeneous.mesh_yc[icell], accum_rain[icell]);
+        printf("%d %f %f %f\n", icell, rain_dataset.heterogeneous.mesh_xc[icell], rain_dataset.heterogeneous.mesh_yc[icell], accum_rain[icell]);
       }
     }
 
