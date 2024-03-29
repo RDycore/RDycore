@@ -182,7 +182,7 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
 // open the binary file
 static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d_%02d-%02d.bin", hetero_rain->dir, hetero_rain->current_date.yy,
+  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.bin", hetero_rain->dir, hetero_rain->current_date.yy,
            hetero_rain->current_date.mo, hetero_rain->current_date.dd, hetero_rain->current_date.hh, hetero_rain->current_date.mm);
 
   printf("Opening %s \n", hetero_rain->file);
@@ -276,7 +276,7 @@ static PetscErrorCode OpenANewSpatiallyHeterognenousRainfallData(HeterogeneousRa
   PetscCall(IncrementDateByAnHour(&hetero_rain->current_date));
 
   // determine the new file
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d_%02d-%02d.bin", hetero_rain->dir, hetero_rain->current_date.yy,
+  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.bin", hetero_rain->dir, hetero_rain->current_date.yy,
            hetero_rain->current_date.mo, hetero_rain->current_date.dd, hetero_rain->current_date.hh, hetero_rain->current_date.mm);
 
   printf("Opening %s \n", hetero_rain->file);
@@ -313,8 +313,8 @@ static PetscErrorCode SetupSpatiallyHeterogeneousRainDataMapping(RDy rdy, Hetero
   PetscInt idx = 0;
   for (PetscInt irow = 0; irow < hetero_rain->nrows; irow++) {
     for (PetscInt icol = 0; icol < hetero_rain->ncols; icol++) {
-      hetero_rain->data_xc[idx] = hetero_rain->xlc + icol * hetero_rain->cellsize;
-      hetero_rain->data_yc[idx] = hetero_rain->ylc + (hetero_rain->nrows - irow) * hetero_rain->cellsize;
+      hetero_rain->data_xc[idx] = hetero_rain->xlc + icol * hetero_rain->cellsize + hetero_rain->cellsize / 2.0;
+      hetero_rain->data_yc[idx] = hetero_rain->ylc + (hetero_rain->nrows - 1 - irow) * hetero_rain->cellsize + hetero_rain->cellsize / 2.0;
       idx++;
     }
   }
@@ -492,11 +492,14 @@ int main(int argc, char *argv[]) {
     // allocate arrays for inspecting simulation data
     PetscInt n;
     PetscCall(RDyGetNumLocalCells(rdy, &n));
-    PetscReal *h, *hu, *hv, *rain;
+    PetscReal *h, *hu, *hv, *rain, *accum_rain;
     PetscCalloc1(n, &h);
     PetscCalloc1(n, &hu);
     PetscCalloc1(n, &hv);
     PetscCalloc1(n, &rain);
+    PetscCalloc1(n, &accum_rain);
+
+    for (PetscInt i = 0; i < n; i++) accum_rain[0];
 
     // get information about boundary conditions
     PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
@@ -577,6 +580,8 @@ int main(int argc, char *argv[]) {
       PetscCheck(time > prev_time, comm, PETSC_ERR_USER, "Non-increasing time!");
       PetscCheck(time_step > 0.0, comm, PETSC_ERR_USER, "Non-positive time step!");
 
+      for (PetscInt icell = 0; icell < n; icell++) accum_rain[icell] += rain[icell] * time_step;
+
       if (!RDyRestarted(rdy)) {
         PetscCheck(fabs(time - prev_time - coupling_interval) < 1e-12, comm, PETSC_ERR_USER, "RDyAdvance advanced time improperly (%g, %g, %g)!",
                    prev_time, time, fabs(time - prev_time + coupling_interval));
@@ -592,6 +597,12 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetLocalCellHeights(rdy, n, h));
       PetscCall(RDyGetLocalCellXMomentums(rdy, n, hu));
       PetscCall(RDyGetLocalCellYMomentums(rdy, n, hv));
+    }
+
+    if (0 && rain_dataset.type == SPATIALLY_HETEROGENEOUS) {
+      for (PetscInt icell = 0; icell < n; icell++) {
+        printf("%d %f %f %f\n",icell, rain_dataset.heterogeneous.mesh_xc[icell], rain_dataset.heterogeneous.mesh_yc[icell], accum_rain[icell]);
+      }
     }
 
     // clean up
