@@ -361,7 +361,7 @@ typedef struct {
 
   RDyEnsembleSection ensemble;
 
-  // MMS-specific section (not used in mainline RDycore simulations)
+  // MMS-specific section (used only by the MMS driver)
   RDyMMSSection mms;
 
 } RDyConfig;

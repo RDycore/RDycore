@@ -546,6 +546,7 @@ static const cyaml_schema_field_t mms_constants_fields_schema[] = {
     CYAML_FIELD_FLOAT("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, F),
     CYAML_FIELD_FLOAT("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, G),
     CYAML_FIELD_FLOAT("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, H),
+    CYAML_FIELD_FLOAT("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, I_),
     CYAML_FIELD_FLOAT("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, J),
     CYAML_FIELD_FLOAT("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, K),
     CYAML_FIELD_FLOAT("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, L),
