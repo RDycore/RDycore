@@ -122,8 +122,8 @@ static PetscErrorCode SetAnalyticSolution(RDy rdy) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
               x_ptr[3 * cell_id]     = mupEval(flow_ic.height);
-              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.momentum[0]);
-              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.momentum[1]);
+              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
+              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
             }
           }
         }

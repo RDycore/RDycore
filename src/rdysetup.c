@@ -825,8 +825,8 @@ static PetscErrorCode InitSolution(RDy rdy) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
               x_ptr[3 * cell_id]     = mupEval(flow_ic.height);
-              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.momentum[0]);
-              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.momentum[1]);
+              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
+              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
             }
           }
         }
@@ -857,8 +857,8 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
         // initialize the relevant boundary values
         for (PetscInt e = 0; e < boundary.num_edges; ++e) {
           boundary_values[3 * e]     = mupEval(flow_bc->height);
-          boundary_values[3 * e + 1] = mupEval(flow_bc->momentum[0]);
-          boundary_values[3 * e + 2] = mupEval(flow_bc->momentum[1]);
+          boundary_values[3 * e + 1] = mupEval(flow_bc->x_momentum);
+          boundary_values[3 * e + 2] = mupEval(flow_bc->y_momentum);
         }
         PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
         break;

@@ -252,10 +252,12 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  MathExpression    heightExpression;       // expression for water height
-  MathExpression    momentumExpression[2];  // expression for water momenta
+  MathExpression    height_expression;      // expression for water height
+  MathExpression    x_momentum_expression;  // expression for water y-momentum
+  MathExpression    y_momentum_expression;  // expression for water y-momentum
   void             *height;                 // muparser-backed functional form
-  void             *momentum[2];            // muparser-backed functional form
+  void             *x_momentum;             // muparser-backed functional form
+  void             *y_momentum;             // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyFlowCondition;

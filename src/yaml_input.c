@@ -419,17 +419,13 @@ static const cyaml_strval_t condition_types[] = {
     {"critical-outflow", CONDITION_CRITICAL_OUTFLOW},
 };
 
-// schema for momentum component (as specified in a 2-item sequence)
-static const cyaml_schema_value_t momentum_component_entry = {
-    CYAML_VALUE_STRING(CYAML_FLAG_DEFAULT, char, 1, MAX_EXPRESSION_LEN),
-};
-
 // schema for flow condition fields
 static const cyaml_schema_field_t flow_condition_fields_schema[] = {
     CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyFlowCondition, name, 1),
     CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyFlowCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
-    CYAML_FIELD_STRING("height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, heightExpression, 1),
-    CYAML_FIELD_SEQUENCE_FIXED("momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, momentumExpression, &momentum_component_entry, 2),
+    CYAML_FIELD_STRING("height", CYAML_FLAG_OPTIONAL, RDyFlowCondition, height_expression, 1),
+    CYAML_FIELD_STRING("x_momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, x_momentum_expression, 1),
+    CYAML_FIELD_STRING("y_momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, y_momentum_expression, 1),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyFlowCondition, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyFlowCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -538,52 +534,52 @@ static const cyaml_schema_field_t ensemble_fields_schema[] = {
 //-------------------------------
 
 static const cyaml_schema_field_t mms_constants_fields_schema[] = {
-    CYAML_FIELD_FLOAT("A", CYAML_FLAG_OPTIONAL, RDyMMSConstants, A),
-    CYAML_FIELD_FLOAT("B", CYAML_FLAG_OPTIONAL, RDyMMSConstants, B),
-    CYAML_FIELD_FLOAT("C", CYAML_FLAG_OPTIONAL, RDyMMSConstants, C),
-    CYAML_FIELD_FLOAT("D", CYAML_FLAG_OPTIONAL, RDyMMSConstants, D),
-    CYAML_FIELD_FLOAT("E", CYAML_FLAG_OPTIONAL, RDyMMSConstants, E),
-    CYAML_FIELD_FLOAT("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, F),
-    CYAML_FIELD_FLOAT("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, G),
-    CYAML_FIELD_FLOAT("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, H),
-    CYAML_FIELD_FLOAT("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, I_),
-    CYAML_FIELD_FLOAT("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, J),
-    CYAML_FIELD_FLOAT("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, K),
-    CYAML_FIELD_FLOAT("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, L),
-    CYAML_FIELD_FLOAT("M", CYAML_FLAG_OPTIONAL, RDyMMSConstants, M),
-    CYAML_FIELD_FLOAT("N", CYAML_FLAG_OPTIONAL, RDyMMSConstants, N),
-    CYAML_FIELD_FLOAT("O", CYAML_FLAG_OPTIONAL, RDyMMSConstants, O),
-    CYAML_FIELD_FLOAT("P", CYAML_FLAG_OPTIONAL, RDyMMSConstants, P),
-    CYAML_FIELD_FLOAT("Q", CYAML_FLAG_OPTIONAL, RDyMMSConstants, Q),
-    CYAML_FIELD_FLOAT("R", CYAML_FLAG_OPTIONAL, RDyMMSConstants, R),
-    CYAML_FIELD_FLOAT("S", CYAML_FLAG_OPTIONAL, RDyMMSConstants, S),
-    CYAML_FIELD_FLOAT("T", CYAML_FLAG_OPTIONAL, RDyMMSConstants, T),
-    CYAML_FIELD_FLOAT("U", CYAML_FLAG_OPTIONAL, RDyMMSConstants, U),
-    CYAML_FIELD_FLOAT("V", CYAML_FLAG_OPTIONAL, RDyMMSConstants, V),
-    CYAML_FIELD_FLOAT("W", CYAML_FLAG_OPTIONAL, RDyMMSConstants, W),
-    CYAML_FIELD_FLOAT("X", CYAML_FLAG_OPTIONAL, RDyMMSConstants, X),
-    CYAML_FIELD_FLOAT("Y", CYAML_FLAG_OPTIONAL, RDyMMSConstants, Y),
-    CYAML_FIELD_FLOAT("Z", CYAML_FLAG_OPTIONAL, RDyMMSConstants, Z),
+    CYAML_FIELD_FLOAT("A", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.A),
+    CYAML_FIELD_FLOAT("B", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.B),
+    CYAML_FIELD_FLOAT("C", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.C),
+    CYAML_FIELD_FLOAT("D", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.D),
+    CYAML_FIELD_FLOAT("E", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.E),
+    CYAML_FIELD_FLOAT("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.F),
+    CYAML_FIELD_FLOAT("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.G),
+    CYAML_FIELD_FLOAT("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.H),
+    CYAML_FIELD_FLOAT("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.I_),
+    CYAML_FIELD_FLOAT("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.J),
+    CYAML_FIELD_FLOAT("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.K),
+    CYAML_FIELD_FLOAT("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.L),
+    CYAML_FIELD_FLOAT("M", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.M),
+    CYAML_FIELD_FLOAT("N", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.N),
+    CYAML_FIELD_FLOAT("O", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.O),
+    CYAML_FIELD_FLOAT("P", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.P),
+    CYAML_FIELD_FLOAT("Q", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Q),
+    CYAML_FIELD_FLOAT("R", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.R),
+    CYAML_FIELD_FLOAT("S", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.S),
+    CYAML_FIELD_FLOAT("T", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.T),
+    CYAML_FIELD_FLOAT("U", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.U),
+    CYAML_FIELD_FLOAT("V", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.V),
+    CYAML_FIELD_FLOAT("W", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.W),
+    CYAML_FIELD_FLOAT("X", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.X),
+    CYAML_FIELD_FLOAT("Y", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Y),
+    CYAML_FIELD_FLOAT("Z", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Z),
     CYAML_FIELD_END
 };
 
 static const cyaml_schema_field_t mms_swe_fields_schema[] = {
-    CYAML_FIELD_STRING("h", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, h, 1),
-    CYAML_FIELD_STRING("dhdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dhdx, 1),
-    CYAML_FIELD_STRING("dhdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dhdy, 1),
-    CYAML_FIELD_STRING("dhdt", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dhdt, 1),
-    CYAML_FIELD_STRING("u", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, u, 1),
-    CYAML_FIELD_STRING("dudx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dudx, 1),
-    CYAML_FIELD_STRING("dudy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dudy, 1),
-    CYAML_FIELD_STRING("dudt", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dudt, 1),
-    CYAML_FIELD_STRING("v", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, v, 1),
-    CYAML_FIELD_STRING("dvdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dvdx, 1),
-    CYAML_FIELD_STRING("dvdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dvdy, 1),
-    CYAML_FIELD_STRING("dvdt", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dvdt, 1),
-    CYAML_FIELD_STRING("z", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, z, 1),
-    CYAML_FIELD_STRING("dzdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dzdx, 1),
-    CYAML_FIELD_STRING("dzdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, dzdy, 1),
-    CYAML_FIELD_STRING("n", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, n, 1),
+    CYAML_FIELD_STRING("h", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.h, 1),
+    CYAML_FIELD_STRING("dhdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dhdx, 1),
+    CYAML_FIELD_STRING("dhdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dhdy, 1),
+    CYAML_FIELD_STRING("dhdt", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dhdt, 1),
+    CYAML_FIELD_STRING("u", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.u, 1),
+    CYAML_FIELD_STRING("dudx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dudx, 1),
+    CYAML_FIELD_STRING("dudy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dudy, 1),
+    CYAML_FIELD_STRING("dudt", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dudt, 1),
+    CYAML_FIELD_STRING("v", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.v, 1),
+    CYAML_FIELD_STRING("dvdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dvdx, 1),
+    CYAML_FIELD_STRING("dvdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dvdy, 1),
+    CYAML_FIELD_STRING("dvdt", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dvdt, 1),
+    CYAML_FIELD_STRING("z", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.z, 1),
+    CYAML_FIELD_STRING("dzdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dzdx, 1),
+    CYAML_FIELD_STRING("dzdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dzdy, 1),
+    CYAML_FIELD_STRING("n", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.n, 1),
     CYAML_FIELD_END
 };
 
@@ -774,9 +770,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
-      PetscCheck(flow_cond->heightExpression[0] || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
+      PetscCheck(flow_cond->height_expression[0] || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
                  flow_cond->name);
-      PetscCheck(flow_cond->file[0] || (flow_cond->momentumExpression[0][0] && flow_cond->momentumExpression[1][0]), comm, PETSC_ERR_USER,
+      PetscCheck(flow_cond->file[0] || (flow_cond->x_momentum_expression[0] && flow_cond->y_momentum_expression[0]), comm, PETSC_ERR_USER,
                  "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }
   }
@@ -822,11 +818,11 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
   for (PetscInt f = 0; f < config->num_flow_conditions; ++f) {
     RDyFlowCondition *flow_cond = &config->flow_conditions[f];
     flow_cond->height           = mupCreate(muBASETYPE_FLOAT);
-    mupSetExpr(flow_cond->height, flow_cond->heightExpression);
-    for (PetscInt p = 0; p < 2; ++p) {
-      flow_cond->momentum[p] = mupCreate(muBASETYPE_FLOAT);
-      mupSetExpr(flow_cond->momentum[p], flow_cond->momentumExpression[p]);
-    }
+    mupSetExpr(flow_cond->height, flow_cond->height_expression);
+    flow_cond->x_momentum = mupCreate(muBASETYPE_FLOAT);
+    flow_cond->y_momentum = mupCreate(muBASETYPE_FLOAT);
+    mupSetExpr(flow_cond->x_momentum, flow_cond->x_momentum_expression);
+    mupSetExpr(flow_cond->y_momentum, flow_cond->y_momentum_expression);
   }
 
   // sediment conditions
