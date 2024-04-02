@@ -439,7 +439,8 @@ int main(int argc, char *argv[]) {
     PetscInt ndate = nvalues;
     PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-spatially_heterogenous_rain_start_date", date, &ndate, &flag));
     if (flag) {
-      PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -spatially_heterogenous_rain_start_date YY,MO,DD,HH,MM");
+      PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Expect 5 values when using -spatially_heterogenous_rain_start_date YY,MO,DD,HH,MM");
       PetscCheck(rain_dataset.type != SPATIALLY_HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
                  "Can only specify homogenous or heterogeneous rainfall datasets.");
       PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
