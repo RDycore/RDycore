@@ -7,8 +7,8 @@ option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
 
 # MPI-related options
-set(MPIEXEC       "mpiexec" CACHE STRING "Executable used to run MPI programs")
-set(MPIEXEC_FLAGS ""        CACHE STRING "Flags passed to MPIEXEC (apart from -n)")
+set(MPIEXEC       "" CACHE STRING "Executable used to run MPI programs")
+set(MPIEXEC_FLAGS "" CACHE STRING "Flags passed to MPIEXEC (apart from -n)")
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
@@ -50,6 +50,13 @@ else()
   set(PETSC_ID_TYPE "int64")
 endif()
 
+# If needed, determine MPIEXEC using PETSc's configuration. It would be nice
+# if this were included in PETSc.pc
+if ("${MPIEXEC}" STREQUAL "")
+  include(extract_petsc_variable)
+  extract_petsc_variable("MPIEXEC" MPIEXEC)
+endif()
+
 # Use PETSc's compiler config.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_COMPILER ${PETSc_C_COMPILER})
@@ -77,11 +84,16 @@ endif()
 
 # Fortran settings
 set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
-
-# flags
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ffree-line-length-none")
+
+  # make sure libgfortran appears in our rpath
+  execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
+                  OUTPUT_VARIABLE gfortran_library_location)
+  get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
+  list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
+  list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
 endif()
 
 # By default, we build a Debug configuration.
@@ -106,8 +118,8 @@ message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
 # For now, we build static libraries only.
 set(BUILD_SHARED_LIBS OFF)
 # ...but for external shared libraries, we set RPATH.
-set(CMAKE_BUILD_RPATH ${PROJECT_BINARY_DIR}/lib)
-set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
+list(APPEND CMAKE_BUILD_RPATH ${PROJECT_BINARY_DIR}/lib)
+list(APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
 # Report the installation prefix.
 message(STATUS "Installation prefix is ${CMAKE_INSTALL_PREFIX}")
