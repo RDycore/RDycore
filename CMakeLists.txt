@@ -52,8 +52,8 @@ endif()
 
 # If needed, determine MPIEXEC using PETSc's configuration. It would be nice
 # if this were included in PETSc.pc
+include(extract_petsc_variable)
 if ("${MPIEXEC}" STREQUAL "")
-  include(extract_petsc_variable)
   extract_petsc_variable("MPIEXEC" MPIEXEC)
 endif()
 
@@ -135,8 +135,13 @@ configure_file(
   @ONLY
 )
 
-# Inherit libraries from PETSc.
-set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m)
+# Inherit libraries from PETSc for shared or static libs.
+extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)
+if (petsc_shared STREQUAL "yes")
+  set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m)
+else()
+  set(RDYCORE_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m)
+endif()
 
 if (ENABLE_TESTS)
   include(CTest)
