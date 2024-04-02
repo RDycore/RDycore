@@ -77,11 +77,16 @@ endif()
 
 # Fortran settings
 set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
-
-# flags
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ffree-line-length-none")
+
+  # make sure libgfortran appears in our rpath
+  execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
+                  OUTPUT_VARIABLE gfortran_library_location)
+  get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
+  list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
+  list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
 endif()
 
 # By default, we build a Debug configuration.
@@ -106,8 +111,8 @@ message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
 # For now, we build static libraries only.
 set(BUILD_SHARED_LIBS OFF)
 # ...but for external shared libraries, we set RPATH.
-set(CMAKE_BUILD_RPATH ${PROJECT_BINARY_DIR}/lib)
-set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
+list(APPEND CMAKE_BUILD_RPATH ${PROJECT_BINARY_DIR}/lib)
+list(APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
 # Report the installation prefix.
 message(STATUS "Installation prefix is ${CMAKE_INSTALL_PREFIX}")
