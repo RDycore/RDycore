@@ -129,7 +129,7 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_hetro_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -spatially_heterogenous_rain_start_date 2017,8,26,0,0 -spatially_heterogeneous_rain_dir ./ ${${config}_args})
+    add_test(houston_hetro_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -heterogenous_rain_start_date 2017,8,26,0,0 -heterogeneous_rain_dir ./ ${${config}_args})
   endforeach()
 endforeach()
 
