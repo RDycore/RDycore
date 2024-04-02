@@ -1,4 +1,5 @@
-# This function extracts a variable from the petscvariables file
+# This function extracts a variable named varname from the petscvariables file,
+# storing its value in the variable var.
 function(extract_petsc_variable varname var)
   # read petscvariables
   file(READ "${PETSC_DIR}/${PETSC_ARCH}/lib/petsc/conf/petscvariables" petscvariables)

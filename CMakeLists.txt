@@ -34,7 +34,6 @@ pkg_get_variable(PETSc_C_COMPILER PETSc ccompiler)
 pkg_get_variable(PETSc_Fortran_COMPILER PETSc fcompiler)
 include_directories(${PETSc_INCLUDE_DIRS})
 link_directories(${PETSc_LIBRARY_DIRS})
-message(STATUS "PETSc stuffs: ${PETSc_STATIC_LIBRARIES}")
 
 # CEED
 pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
