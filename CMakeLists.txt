@@ -53,16 +53,8 @@ endif()
 # If needed, determine MPIEXEC using PETSc's configuration. It would be nice
 # if this were included in PETSc.pc
 if ("${MPIEXEC}" STREQUAL "")
-  file(READ "${PETSC_DIR}/${PETSC_ARCH}/lib/petsc/conf/petscvariables" petscvariables)
-  string(FIND ${petscvariables} "\nMPIEXEC = " start)
-  if (${start} EQUAL -1)
-    message(FATAL_ERROR "Could not extract MPIEXEC from PETSc. Please set MPIEXEC using -DMPIEXEC=...")
-  endif()
-  math(EXPR start "${start} + 11")
-  string(SUBSTRING ${petscvariables} ${start} -1 petsc_mpiexec)
-  string(FIND ${petsc_mpiexec} "\n" end)
-  string(SUBSTRING ${petsc_mpiexec} 0 ${end} MPIEXEC)
-  message(STATUS "Using PETSc-provided MPIEXEC: ${MPIEXEC}")
+  include(extract_petsc_variable)
+  extract_petsc_variable("MPIEXEC" MPIEXEC)
 endif()
 
 # Use PETSc's compiler config.
