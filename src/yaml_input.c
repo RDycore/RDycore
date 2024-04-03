@@ -802,10 +802,77 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// parses mathematical expressions given for material properties and
-// initial/boundary conditions, etc
+#define DEFINE_CONSTANTS_FOR_FUNCTION(model, constants, function)       \
+  mupDefineConst(model->solutions.function, "A", constants->values.A);  \
+  mupDefineConst(model->solutions.function, "B", constants->values.B);  \
+  mupDefineConst(model->solutions.function, "C", constants->values.C);  \
+  mupDefineConst(model->solutions.function, "D", constants->values.D);  \
+  mupDefineConst(model->solutions.function, "E", constants->values.E);  \
+  mupDefineConst(model->solutions.function, "F", constants->values.F);  \
+  mupDefineConst(model->solutions.function, "G", constants->values.G);  \
+  mupDefineConst(model->solutions.function, "H", constants->values.H);  \
+  mupDefineConst(model->solutions.function, "I", constants->values.I_); \
+  mupDefineConst(model->solutions.function, "J", constants->values.J);  \
+  mupDefineConst(model->solutions.function, "K", constants->values.K);  \
+  mupDefineConst(model->solutions.function, "L", constants->values.L);  \
+  mupDefineConst(model->solutions.function, "M", constants->values.M);  \
+  mupDefineConst(model->solutions.function, "N", constants->values.N);  \
+  mupDefineConst(model->solutions.function, "O", constants->values.O);  \
+  mupDefineConst(model->solutions.function, "P", constants->values.P);  \
+  mupDefineConst(model->solutions.function, "Q", constants->values.Q);  \
+  mupDefineConst(model->solutions.function, "R", constants->values.R);  \
+  mupDefineConst(model->solutions.function, "S", constants->values.S);  \
+  mupDefineConst(model->solutions.function, "T", constants->values.T);  \
+  mupDefineConst(model->solutions.function, "U", constants->values.U);  \
+  mupDefineConst(model->solutions.function, "V", constants->values.V);  \
+  mupDefineConst(model->solutions.function, "W", constants->values.W);  \
+  mupDefineConst(model->solutions.function, "X", constants->values.X);  \
+  mupDefineConst(model->solutions.function, "Y", constants->values.Y);  \
+  mupDefineConst(model->solutions.function, "Z", constants->values.Z)
+
+#define DEFINE_FUNCTION(model, constants, function)                   \
+  model->solutions.function = mupCreate(muBASETYPE_FLOAT);            \
+  mupSetExpr(model->solutions.function, model->expressions.function); \
+  DEFINE_CONSTANTS_FOR_FUNCTION(model, constants, function)
+
+static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSWESolutions *swe) {
+  PetscFunctionBegin;
+
+  // NOTE: you must define the relavent variables (e.g. x, y or x, y, t)
+  // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
+
+  DEFINE_FUNCTION(swe, constants, h);
+  DEFINE_FUNCTION(swe, constants, dhdx);
+  DEFINE_FUNCTION(swe, constants, dhdy);
+  DEFINE_FUNCTION(swe, constants, dhdt);
+
+  DEFINE_FUNCTION(swe, constants, u);
+  DEFINE_FUNCTION(swe, constants, dudx);
+  DEFINE_FUNCTION(swe, constants, dudy);
+  DEFINE_FUNCTION(swe, constants, dudt);
+
+  DEFINE_FUNCTION(swe, constants, v);
+  DEFINE_FUNCTION(swe, constants, dvdx);
+  DEFINE_FUNCTION(swe, constants, dvdy);
+  DEFINE_FUNCTION(swe, constants, dvdt);
+
+  DEFINE_FUNCTION(swe, constants, u);
+  DEFINE_FUNCTION(swe, constants, dzdx);
+  DEFINE_FUNCTION(swe, constants, dzdy);
+
+  DEFINE_FUNCTION(swe, constants, n);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// parses mathematical expressions given for manufactured solutions, material
+// properties, initial/boundary conditions, etc
 static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
   PetscFunctionBegin;
+
+  if (config->mms.swe.expressions.h[0]) {
+    PetscCall(ParseSWEManufacturedSolutions(comm, &config->mms.constants, &config->mms.swe));
+  }
 
   // material properties
   for (PetscInt m = 0; m < config->num_materials; ++m) {

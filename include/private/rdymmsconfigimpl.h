@@ -56,7 +56,7 @@ typedef struct {
   } solutions;
 } RDyMMSSWESolutions;
 
-// specification of an ensemble
+// constants and expressions for manufactured solutions
 typedef struct {
   RDyMMSConstants    constants;
   RDyMMSSWESolutions swe;

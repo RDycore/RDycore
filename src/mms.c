@@ -31,7 +31,6 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
 
   // We only need a single Dirichlet boundary condition, populated with
   // manufactured solution data.
-
   RDyCondition analytic_bc = {};
 
   // Assign the boundary condition to each boundary.
@@ -43,96 +42,87 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+#define SET_SPATIAL_VARIABLES(func) \
+  mupDefineBulkVar(func, "x", x);   \
+  mupDefineBulkVar(func, "y", y)
+
+// evaluates the given expression at all given x, y, placing the results into values
+static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal x[n], PetscReal y[n], PetscReal values[n]) {
+  PetscFunctionBegin;
+
+  SET_SPATIAL_VARIABLES(expr);
+  mupEvalBulk(expr, values, n);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+#define SET_SPATIOTEMPORAL_VARIABLES(func) \
+  SET_SPATIAL_VARIABLES(func);             \
+  mupDefineBulkVar(func, "t", t)
+
+// evaluates the given expression at all given x, y, t, placing the results into values
+static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal x[n], PetscReal y[n], PetscReal t[n], PetscReal values[n]) {
+  PetscFunctionBegin;
+
+  SET_SPATIOTEMPORAL_VARIABLES(expr);
+  mupEvalBulk(expr, values, n);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+#undef SET_SPATIAL_VARIABLES
+#undef SET_SPATIOTEMPORAL_VARIABLES
+
 static PetscErrorCode SetAnalyticSolution(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(VecZeroEntries(rdy->X));
 
-  // check that each region has an initial condition
-  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyRegion    region = rdy->regions[r];
-    RDyCondition ic     = rdy->initial_conditions[r];
-    PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER, "No initial condition specified for region '%s'", region.name);
-  }
-
-  // now initialize or override initial conditions for each region
+  // initialize the manufactured solution on each region
   PetscInt n_local, ndof;
   PetscCall(VecGetLocalSize(rdy->X, &n_local));
   PetscCall(VecGetBlockSize(rdy->X, &ndof));
   PetscScalar *x_ptr;
   PetscCall(VecGetArray(rdy->X, &x_ptr));
 
-  // initialize flow conditions
-  for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
-    RDyFlowCondition flow_ic = rdy->config.flow_conditions[f];
-    Vec              local   = NULL;
-    if (flow_ic.file[0]) {  // read flow data from file
-      PetscViewer viewer;
-      PetscCall(PetscViewerBinaryOpen(rdy->comm, flow_ic.file, FILE_MODE_READ, &viewer));
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion region = rdy->regions[r];
 
-      Vec natural, global;
-      PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-      PetscCall(DMCreateGlobalVector(rdy->dm, &global));
-      PetscCall(DMCreateLocalVector(rdy->dm, &local));
-
-      PetscCall(VecLoad(natural, viewer));
-      PetscCall(PetscViewerDestroy(&viewer));
-
-      // check the block size of the initial condition vector agrees with the block size of rdy->X
-      PetscInt nblocks_nat;
-      PetscCall(VecGetBlockSize(natural, &nblocks_nat));
-      PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
-                 "The block size of the initial condition ('%" PetscInt_FMT
-                 "') "
-                 "does not match with the number of DOFs ('%" PetscInt_FMT "')",
-                 nblocks_nat, ndof);
-
-      // scatter natural-to-global
-      PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
-      PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, global));
-
-      // scatter global-to-local
-      PetscCall(DMGlobalToLocalBegin(rdy->dm, global, INSERT_VALUES, local));
-      PetscCall(DMGlobalToLocalEnd(rdy->dm, global, INSERT_VALUES, local));
-
-      // free up memory
-      PetscCall(VecDestroy(&natural));
-      PetscCall(VecDestroy(&global));
+    // Create vectorized (x, y, t) triples for bulk expression evaluation
+    PetscReal cell_x[region.num_cells], cell_y[region.num_cells], t[region.num_cells];
+    PetscInt  N = 0;  // number of bulk evaluations
+    for (PetscInt c = 0; c < region.num_cells; ++c) {
+      PetscInt cell_id = region.cell_ids[c];
+      if (3 * cell_id < n_local) {
+        cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
+        cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
+        t[N]      = 0.0;  // initial time
+        ++N;
+      }
     }
 
-    // set regional flow as needed
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyRegion    region = rdy->regions[r];
-      RDyCondition ic     = rdy->initial_conditions[r];
-      if (!strcmp(ic.flow->name, flow_ic.name)) {
-        if (local) {
-          PetscScalar *local_ptr;
-          PetscCall(VecGetArray(local, &local_ptr));
-          for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id = region.cell_ids[c];
-            if (ndof * cell_id < n_local) {  // skip ghost cells
-              for (PetscInt idof = 0; idof < ndof; idof++) {
-                x_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
-              }
-            }
-          }
-          PetscCall(VecRestoreArray(local, &local_ptr));
-        } else {
-          for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id = region.cell_ids[c];
-            if (ndof * cell_id < n_local) {  // skip ghost cells
-              x_ptr[3 * cell_id]     = mupEval(flow_ic.height);
-              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
-              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
-            }
-          }
+    if (rdy->config.physics.flow.mode == FLOW_SWE) {
+      PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "SWE solution vector has %" PetscInt_FMT " DOF (should have 3)", ndof);
+
+      // evaluate the manufactured ѕolutions at all (x, y, t)
+      PetscReal h[N], u[N], v[N];
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, t, h));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, t, u));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, t, v));
+
+      // TODO: salinity and sediment initial conditions go here.
+
+      PetscInt l = 0;
+      for (PetscInt c = 0; c < region.num_cells; ++c) {
+        PetscInt cell_id = region.cell_ids[c];
+        if (3 * cell_id < n_local) {  // skip ghost cells
+          x_ptr[3 * cell_id]     = h[l];
+          x_ptr[3 * cell_id + 1] = h[l] * u[l];
+          x_ptr[3 * cell_id + 2] = h[l] * v[l];
         }
       }
     }
-    PetscCall(VecDestroy(&local));
   }
-
-  // TODO: salinity and sediment initial conditions go here.
 
   PetscCall(VecRestoreArray(rdy->X, &x_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -185,4 +175,4 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   PetscCall(InitSWE(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
-};
+}
