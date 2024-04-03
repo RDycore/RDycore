@@ -1,14 +1,10 @@
 cmake_minimum_required (VERSION 3.14.0)
 
 # Configurable options
-option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program" ON)
-option(ENABLE_TESTS    "Enable unit (and possibly driver) tests" ON)
+option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
+option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
-
-# MPI-related options
-set(MPIEXEC       "" CACHE STRING "Executable used to run MPI programs")
-set(MPIEXEC_FLAGS "" CACHE STRING "Flags passed to MPIEXEC (apart from -n)")
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
@@ -50,11 +46,17 @@ else()
   set(PETSC_ID_TYPE "int64")
 endif()
 
-# If needed, determine MPIEXEC using PETSc's configuration. It would be nice
-# if this were included in PETSc.pc
+# Determine MPIEXEC and MPIEXEC_FLAGS using PETSc's configuration.
+# (It would be nice if this were included in PETSc.pc)
 include(extract_petsc_variable)
-if ("${MPIEXEC}" STREQUAL "")
-  extract_petsc_variable("MPIEXEC" MPIEXEC)
+extract_petsc_variable("MPIEXEC" MPIEXEC)
+# If MPIEXEC includes spaces, put anything after the first space into
+# MPIEXEC_FLAGS
+string(FIND ${MPIEXEC} " " space)
+if (NOT space EQUAL -1)
+  math(EXPR start "${space} + 1")
+  string(SUBSTRING ${MPIEXEC} ${start} -1 MPIEXEC_FLAGS)
+  string(SUBSTRING ${MPIEXEC} 0 ${space} MPIEXEC)
 endif()
 
 # Use PETSc's compiler config.
