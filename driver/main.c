@@ -20,7 +20,7 @@ typedef struct {
   PetscScalar *data_ptr;
   PetscBool    temporally_interpolate;
   PetscInt     cur_idx, prev_idx;
-} HomogenousRainData;
+} HomogeneousRainData;
 
 typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
@@ -55,7 +55,7 @@ typedef struct {
 
 typedef struct {
   RainType              type;
-  HomogenousRainData    homogenous;
+  HomogeneousRainData   homogeneous;
   HeterogeneousRainData heterogeneous;
 } Rain;
 
@@ -120,24 +120,24 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
 }
 
 // loads the binary data in a Vec
-static PetscErrorCode OpenHomogenousRainData(HomogenousRainData *homogenous_rain) {
+static PetscErrorCode OpenHomogeneousRainData(HomogeneousRainData *homogeneous_rain) {
   PetscFunctionBegin;
 
-  PetscCall(OpenData(homogenous_rain->filename, &homogenous_rain->data_vec, &homogenous_rain->ndata));
-  PetscCall(VecGetArray(homogenous_rain->data_vec, &homogenous_rain->data_ptr));
-  homogenous_rain->cur_idx                = -1;
-  homogenous_rain->prev_idx               = -1;
-  homogenous_rain->temporally_interpolate = PETSC_FALSE;
+  PetscCall(OpenData(homogeneous_rain->filename, &homogeneous_rain->data_vec, &homogeneous_rain->ndata));
+  PetscCall(VecGetArray(homogeneous_rain->data_vec, &homogeneous_rain->data_ptr));
+  homogeneous_rain->cur_idx                = -1;
+  homogeneous_rain->prev_idx               = -1;
+  homogeneous_rain->temporally_interpolate = PETSC_FALSE;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // close and destroys the Vec
-static PetscErrorCode CloseHomogenousRainData(HomogenousRainData *homogenous_rain) {
+static PetscErrorCode CloseHomogeneousRainData(HomogeneousRainData *homogeneous_rain) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(homogenous_rain->data_vec, &homogenous_rain->data_ptr));
-  PetscCall(VecDestroy(&homogenous_rain->data_vec));
+  PetscCall(VecRestoreArray(homogeneous_rain->data_vec, &homogeneous_rain->data_ptr));
+  PetscCall(VecDestroy(&homogeneous_rain->data_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -193,7 +193,7 @@ static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_ra
 }
 
 // close the currently open rain dataset and open a new dataset file
-static PetscErrorCode OpenANewHeterognenousRainfallData(HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode OpenANewHeterogeneousRainfallData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
   // close the existing file
@@ -283,13 +283,13 @@ static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRa
 }
 
 // set spatially heterogeneous rainfall rate
-PetscErrorCode SetHeterogenousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetHeterogeneousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
   // Is it time to open a new file?
   printf("hetero_rain->dtime_in_hour = %f\n", hetero_rain->dtime_in_hour);
   if (cur_time / 3600.0 >= (hetero_rain->ndata_file) * hetero_rain->dtime_in_hour) {
-    OpenANewHeterognenousRainfallData(hetero_rain);
+    OpenANewHeterogeneousRainfallData(hetero_rain);
     exit(0);
   }
 
@@ -304,16 +304,16 @@ PetscErrorCode SetHeterogenousRainfall(HeterogeneousRainData *hetero_rain, Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// set spatially homogenous rainfall rate for all grid cells
-PetscErrorCode SetHomogenousRainfall(HomogenousRainData *homogenous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+// set spatially homogeneous rainfall rate for all grid cells
+PetscErrorCode SetHomogeneousRainfall(HomogeneousRainData *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
   PetscReal    cur_rain;
-  PetscScalar *rain_ptr               = homogenous_rain->data_ptr;
-  PetscInt     nrain                  = homogenous_rain->ndata;
-  PetscBool    temporally_interpolate = homogenous_rain->temporally_interpolate;
-  PetscInt    *cur_rain_idx           = &homogenous_rain->cur_idx;
-  PetscInt    *prev_rain_idx          = &homogenous_rain->prev_idx;
+  PetscScalar *rain_ptr               = homogeneous_rain->data_ptr;
+  PetscInt     nrain                  = homogeneous_rain->ndata;
+  PetscBool    temporally_interpolate = homogeneous_rain->temporally_interpolate;
+  PetscInt    *cur_rain_idx           = &homogeneous_rain->cur_idx;
+  PetscInt    *prev_rain_idx          = &homogeneous_rain->prev_idx;
   PetscCall(GetCurrentData(rain_ptr, nrain, cur_time, temporally_interpolate, cur_rain_idx, &cur_rain));
 
   if (temporally_interpolate || *cur_rain_idx != *prev_rain_idx) {  // is it time to update the source term?
@@ -356,11 +356,11 @@ int main(int argc, char *argv[]) {
     char bcfile[PETSC_MAX_PATH_LEN];
 
     PetscCall(
-        PetscOptionsGetString(NULL, NULL, "-homogenous_rain", rain_dataset.homogenous.filename, sizeof(rain_dataset.homogenous.filename), &flag));
+        PetscOptionsGetString(NULL, NULL, "-homogeneous_rain", rain_dataset.homogeneous.filename, sizeof(rain_dataset.homogeneous.filename), &flag));
     if (flag) {
       rain_dataset.type = HOMOGENEOUS;
     }
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogenous_rain", &rain_dataset.homogenous.temporally_interpolate, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogeneous_rain", &rain_dataset.homogeneous.temporally_interpolate, NULL));
 
     PetscBool sp_hetero_dir_flag;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset.heterogeneous.dir, sizeof(rain_dataset.heterogeneous.dir),
@@ -372,7 +372,7 @@ int main(int argc, char *argv[]) {
     if (flag) {
       PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
       PetscCheck(rain_dataset.type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
-                 "Can only specify homogenous or heterogeneous rainfall datasets.");
+                 "Can only specify homogeneous or heterogeneous rainfall datasets.");
       PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
                  "Need to specify path to spatially heterogeneous rainfall via -heterogeneous_rain_dir <dir>");
 
@@ -413,7 +413,7 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case HOMOGENEOUS:
-        PetscCall(OpenHomogenousRainData(&rain_dataset.homogenous));
+        PetscCall(OpenHomogeneousRainData(&rain_dataset.homogeneous));
         break;
       case HETEROGENEOUS:
         PetscCall(OpenHeterogeneousRainData(&rain_dataset.heterogeneous));
@@ -479,10 +479,10 @@ int main(int argc, char *argv[]) {
           PetscCall(SetConstantRainfall(n, rain));
           break;
         case HOMOGENEOUS:
-          PetscCall(SetHomogenousRainfall(&rain_dataset.homogenous, time, n, rain));
+          PetscCall(SetHomogeneousRainfall(&rain_dataset.homogeneous, time, n, rain));
           break;
         case HETEROGENEOUS:
-          PetscCall(SetHeterogenousRainfall(&rain_dataset.heterogeneous, time, n, rain));
+          PetscCall(SetHeterogeneousRainfall(&rain_dataset.heterogeneous, time, n, rain));
           break;
       }
 
@@ -542,7 +542,7 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case HOMOGENEOUS:
-        PetscCall(CloseHomogenousRainData(&rain_dataset.homogenous));
+        PetscCall(CloseHomogeneousRainData(&rain_dataset.homogeneous));
         break;
       case HETEROGENEOUS:
         break;
