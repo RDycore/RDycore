@@ -158,13 +158,24 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// compute the file name of the rainfall given the current data
+static PetscErrorCode DetermineHeterogeneousRainfallDataFilename(HeterogeneousRainData *hetero_rain) {
+  PetscFunctionBegin;
+
+  struct tm *current_date = &hetero_rain->current_date;
+
+  mktime(current_date);
+  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, current_date->tm_year + 1900,
+           current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // open the binary file
 static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
-  struct tm *current_date = &hetero_rain->current_date;
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, current_date->tm_year + 1900,
-           current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
+  PetscCall(DetermineHeterogeneousRainfallDataFilename(hetero_rain));
   printf("Opening %s \n", hetero_rain->file);
 
   hetero_rain->dtime_in_hour = 1.0;  // assume an hourly dataset
@@ -206,8 +217,7 @@ static PetscErrorCode OpenANewHeterogeneousRainfallData(HeterogeneousRainData *h
   mktime(current_date);
 
   // determine the new file
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, current_date->tm_year + 1900,
-           current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
+  PetscCall(DetermineHeterogeneousRainfallDataFilename(hetero_rain));
   printf("Opening %s \n", hetero_rain->file);
 
   PetscInt ndata;
