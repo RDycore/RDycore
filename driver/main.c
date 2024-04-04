@@ -367,9 +367,9 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   if (flag) {
     PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
     PetscCheck(rain_dataset->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
-                "Can only specify homogeneous or heterogeneous rainfall datasets.");
+               "Can only specify homogeneous or heterogeneous rainfall datasets.");
     PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
-                "Need to specify path to spatially heterogeneous rainfall via -heterogeneous_rain_dir <dir>");
+               "Need to specify path to spatially heterogeneous rainfall via -heterogeneous_rain_dir <dir>");
 
     rain_dataset->type = HETEROGENEOUS;
 
@@ -419,8 +419,8 @@ int main(int argc, char *argv[]) {
     // be that RDySetup is setting a default DM for all VecLoads.
     PetscBool bc_specified;
 
-    Rain rain_dataset;
-    char bcfile[PETSC_MAX_PATH_LEN];
+    Rain      rain_dataset;
+    char      bcfile[PETSC_MAX_PATH_LEN];
     PetscBool interpolate_bc = PETSC_FALSE;
 
     PetscCall(ParseRainfallDataOptions(&rain_dataset));
