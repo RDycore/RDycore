@@ -287,10 +287,8 @@ PetscErrorCode SetHeterogeneousRainfall(HeterogeneousRainData *hetero_rain, Pets
   PetscFunctionBegin;
 
   // Is it time to open a new file?
-  printf("hetero_rain->dtime_in_hour = %f\n", hetero_rain->dtime_in_hour);
   if (cur_time / 3600.0 >= (hetero_rain->ndata_file) * hetero_rain->dtime_in_hour) {
     OpenANewHeterogeneousRainfallData(hetero_rain);
-    exit(0);
   }
 
   PetscInt  offset                = hetero_rain->header_offset;
