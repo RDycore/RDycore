@@ -398,7 +398,7 @@ int main(int argc, char *argv[]) {
           .tm_year = date[0] - 1900,
           .tm_mon  = date[1] - 1,
           .tm_mday = date[2],
-          .tm_hour = date[3] - 1,
+          .tm_hour = date[3],
           .tm_min  = date[4],
       };
 
@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) {
           .tm_year = date[0] - 1900,
           .tm_mon  = date[1] - 1,
           .tm_mday = date[2],
-          .tm_hour = date[3] - 1,
+          .tm_hour = date[3],
           .tm_min  = date[4],
       };
 
