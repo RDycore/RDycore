@@ -1,5 +1,6 @@
 #include <petscsys.h>
 #include <rdycore.h>
+#include <time.h>
 
 static const char *help_str =
     "rdycore - a standalone driver for RDycore\n"
@@ -11,27 +12,6 @@ static void usage(const char *exe_name) {
 }
 
 typedef enum { CONSTANT = 0, HOMOGENEOUS, HETEROGENEOUS } RainType;
-
-#define JAN 1
-#define FEB 2
-#define MAR 3
-#define APR 4
-#define MAY 5
-#define JUN 6
-#define JUL 7
-#define AUG 8
-#define SEP 9
-#define OCT 10
-#define NOV 11
-#define DEC 12
-
-typedef struct {
-  PetscInt yy;
-  PetscInt mo;
-  PetscInt dd;
-  PetscInt hh;
-  PetscInt mm;
-} Date;
 
 typedef struct {
   char         filename[PETSC_MAX_PATH_LEN];
@@ -46,8 +26,7 @@ typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
   char file[PETSC_MAX_PATH_LEN];
 
-  Date start_date;    // start data of dataset
-  Date current_date;  // date of the dataset currently opened
+  struct tm start_date, current_date;  // start and current date for rainfall dataset
 
   PetscInt dataset_id_opened;
 
@@ -76,7 +55,7 @@ typedef struct {
 
 typedef struct {
   RainType              type;
-  HomogenousRainData   homogenous;
+  HomogenousRainData    homogenous;
   HeterogeneousRainData heterogeneous;
 } Rain;
 
@@ -167,7 +146,7 @@ static PetscErrorCode CloseSpatiallyHomogenousRainData(HomogenousRainData *homog
 PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
-  // apply a 1 mm/hr rain over the entire domain
+  // apply a 1 minute/hr rain over the entire domain
   PetscReal rain_rate             = 1.0;
   PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
@@ -182,10 +161,12 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
 // open the binary file
 static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, hetero_rain->current_date.yy,
-           hetero_rain->current_date.mo, hetero_rain->current_date.dd, hetero_rain->current_date.hh, hetero_rain->current_date.mm, PETSC_ID_TYPE);
 
+  struct tm *current_date = &hetero_rain->current_date;
+  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, current_date->tm_year + 1900,
+           current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
   printf("Opening %s \n", hetero_rain->file);
+
   hetero_rain->dtime_in_hour = 1.0;  // assume an hourly dataset
   hetero_rain->ndata_file    = 1;
 
@@ -211,59 +192,6 @@ static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// increment the date by one hour
-static PetscErrorCode IncrementDateByAnHour(Date *date) {
-  PetscFunctionBegin;
-
-  date->hh++;
-
-  if (date->hh == 24) {
-    date->hh = 0;
-    date->dd++;
-
-    if (date->mo == JAN && date->dd > 31) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == FEB && date->dd > 28) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == MAR && date->dd > 31) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == APR && date->dd > 30) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == MAY && date->dd > 31) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == JUN && date->dd > 30) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == JUL && date->dd > 31) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == AUG && date->dd > 31) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == SEP && date->dd > 30) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == OCT && date->dd > 31) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == NOV && date->dd > 30) {
-      date->mo++;
-      date->dd = 1;
-    } else if (date->mo == DEC && date->dd > 31) {
-      date->yy++;
-      date->mo = 1;
-      date->dd = 1;
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 // close the currently open rain dataset and open a new dataset file
 static PetscErrorCode OpenANewSpatiallyHeterognenousRainfallData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
@@ -273,12 +201,13 @@ static PetscErrorCode OpenANewSpatiallyHeterognenousRainfallData(HeterogeneousRa
   PetscCall(VecDestroy(&hetero_rain->data_vec));
 
   // increase the date
-  PetscCall(IncrementDateByAnHour(&hetero_rain->current_date));
+  struct tm *current_date = &hetero_rain->current_date;
+  current_date->tm_hour++;
+  mktime(current_date);
 
   // determine the new file
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, hetero_rain->current_date.yy,
-           hetero_rain->current_date.mo, hetero_rain->current_date.dd, hetero_rain->current_date.hh, hetero_rain->current_date.mm, PETSC_ID_TYPE);
-
+  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, current_date->tm_year + 1900,
+           current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
   printf("Opening %s \n", hetero_rain->file);
 
   PetscInt ndata;
@@ -358,8 +287,10 @@ PetscErrorCode SetSpatiallyHeterogenousRainfall(HeterogeneousRainData *hetero_ra
   PetscFunctionBegin;
 
   // Is it time to open a new file?
+  printf("hetero_rain->dtime_in_hour = %f\n", hetero_rain->dtime_in_hour);
   if (cur_time / 3600.0 >= (hetero_rain->ndata_file) * hetero_rain->dtime_in_hour) {
     OpenANewSpatiallyHeterognenousRainfallData(hetero_rain);
+    exit(0);
   }
 
   PetscInt  offset                = hetero_rain->header_offset;
@@ -424,23 +355,22 @@ int main(int argc, char *argv[]) {
 
     char bcfile[PETSC_MAX_PATH_LEN];
 
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-homogenous_rain", rain_dataset.homogenous.filename,
-                                    sizeof(rain_dataset.homogenous.filename), &flag));
+    PetscCall(
+        PetscOptionsGetString(NULL, NULL, "-homogenous_rain", rain_dataset.homogenous.filename, sizeof(rain_dataset.homogenous.filename), &flag));
     if (flag) {
       rain_dataset.type = HOMOGENEOUS;
     }
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogenous_rain", &rain_dataset.homogenous.temporally_interpolate, NULL));
 
     PetscBool sp_hetero_dir_flag;
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset.heterogeneous.dir,
-                                    sizeof(rain_dataset.heterogeneous.dir), &sp_hetero_dir_flag));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset.heterogeneous.dir, sizeof(rain_dataset.heterogeneous.dir),
+                                    &sp_hetero_dir_flag));
     PetscInt nvalues = 5;
     PetscInt date[nvalues];
     PetscInt ndate = nvalues;
     PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-heterogeneous_rain_start_date", date, &ndate, &flag));
     if (flag) {
-      PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER,
-                 "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
+      PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
       PetscCheck(rain_dataset.type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
                  "Can only specify homogenous or heterogeneous rainfall datasets.");
       PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
@@ -448,17 +378,17 @@ int main(int argc, char *argv[]) {
 
       rain_dataset.type = HETEROGENEOUS;
 
-      rain_dataset.heterogeneous.start_date.yy = date[0];
-      rain_dataset.heterogeneous.start_date.mo = date[1];
-      rain_dataset.heterogeneous.start_date.dd = date[2];
-      rain_dataset.heterogeneous.start_date.hh = date[3];
-      rain_dataset.heterogeneous.start_date.mm = date[4];
+      rain_dataset.heterogeneous.start_date.tm_year = date[0] - 1900;
+      rain_dataset.heterogeneous.start_date.tm_mon  = date[1] - 1;
+      rain_dataset.heterogeneous.start_date.tm_mday = date[2];
+      rain_dataset.heterogeneous.start_date.tm_hour = date[3];
+      rain_dataset.heterogeneous.start_date.tm_min  = date[4];
 
-      rain_dataset.heterogeneous.current_date.yy = date[0];
-      rain_dataset.heterogeneous.current_date.mo = date[1];
-      rain_dataset.heterogeneous.current_date.dd = date[2];
-      rain_dataset.heterogeneous.current_date.hh = date[3];
-      rain_dataset.heterogeneous.current_date.mm = date[4];
+      rain_dataset.heterogeneous.current_date.tm_year = date[0] - 1900;
+      rain_dataset.heterogeneous.current_date.tm_mon  = date[1] - 1;
+      rain_dataset.heterogeneous.current_date.tm_mday = date[2];
+      rain_dataset.heterogeneous.current_date.tm_hour = date[3];
+      rain_dataset.heterogeneous.current_date.tm_min  = date[4];
 
       rain_dataset.heterogeneous.ndata = 0;
     }
