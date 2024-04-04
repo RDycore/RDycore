@@ -8,12 +8,29 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 
+// Our boundary conditions are expressed in terms of momenta and not flow
+// velocities, so we define x and y momentum functions in terms of water
+// height and flow velocities.
+
+static PetscReal x_momentum(void *data, PetscReal x, PetscReal y, PetscReal t) {
+  RDy rdy = data;
+  return 0.0;
+}
+
 static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   PetscFunctionBegin;
 
   // We only need a single Dirichlet boundary condition, populated with
   // manufactured solution data.
-  RDyCondition analytic_bc = {};
+  RDyCondition analytic_bc = {
+    .flow = {
+      .name = "analytic_bc",
+      .type = CONDITION_DIRICHLET,
+      .height = rdy->config.mms.solutions.h,
+      .x_momentum = rdy->config.mms.solutions.u,
+      .y_momentum = rdy->config.mms.solutions.u,
+    },
+  };
 
   // Assign the boundary condition to each boundary.
   PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundary_conditions));
