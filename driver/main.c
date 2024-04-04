@@ -120,7 +120,7 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
 }
 
 // loads the binary data in a Vec
-static PetscErrorCode OpenSpatiallyHomogenousRainData(HomogenousRainData *homogenous_rain) {
+static PetscErrorCode OpenHomogenousRainData(HomogenousRainData *homogenous_rain) {
   PetscFunctionBegin;
 
   PetscCall(OpenData(homogenous_rain->filename, &homogenous_rain->data_vec, &homogenous_rain->ndata));
@@ -133,7 +133,7 @@ static PetscErrorCode OpenSpatiallyHomogenousRainData(HomogenousRainData *homoge
 }
 
 // close and destroys the Vec
-static PetscErrorCode CloseSpatiallyHomogenousRainData(HomogenousRainData *homogenous_rain) {
+static PetscErrorCode CloseHomogenousRainData(HomogenousRainData *homogenous_rain) {
   PetscFunctionBegin;
 
   PetscCall(VecRestoreArray(homogenous_rain->data_vec, &homogenous_rain->data_ptr));
@@ -159,7 +159,7 @@ PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
 }
 
 // open the binary file
-static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
   struct tm *current_date = &hetero_rain->current_date;
@@ -193,7 +193,7 @@ static PetscErrorCode OpenSpatiallyHeterogeneousRainData(HeterogeneousRainData *
 }
 
 // close the currently open rain dataset and open a new dataset file
-static PetscErrorCode OpenANewSpatiallyHeterognenousRainfallData(HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode OpenANewHeterognenousRainfallData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
   // close the existing file
@@ -230,7 +230,7 @@ static PetscErrorCode OpenANewSpatiallyHeterognenousRainfallData(HeterogeneousRa
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SetupSpatiallyHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
   PetscCall(RDyGetNumLocalCells(rdy, &hetero_rain->mesh_ncells_local));
@@ -283,13 +283,13 @@ static PetscErrorCode SetupSpatiallyHeterogeneousRainDataMapping(RDy rdy, Hetero
 }
 
 // set spatially heterogeneous rainfall rate
-PetscErrorCode SetSpatiallyHeterogenousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetHeterogenousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
   // Is it time to open a new file?
   printf("hetero_rain->dtime_in_hour = %f\n", hetero_rain->dtime_in_hour);
   if (cur_time / 3600.0 >= (hetero_rain->ndata_file) * hetero_rain->dtime_in_hour) {
-    OpenANewSpatiallyHeterognenousRainfallData(hetero_rain);
+    OpenANewHeterognenousRainfallData(hetero_rain);
     exit(0);
   }
 
@@ -305,7 +305,7 @@ PetscErrorCode SetSpatiallyHeterogenousRainfall(HeterogeneousRainData *hetero_ra
 }
 
 // set spatially homogenous rainfall rate for all grid cells
-PetscErrorCode SetSpatiallyHomogenousRainfall(HomogenousRainData *homogenous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetHomogenousRainfall(HomogenousRainData *homogenous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
 
   PetscReal    cur_rain;
@@ -413,11 +413,11 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case HOMOGENEOUS:
-        PetscCall(OpenSpatiallyHomogenousRainData(&rain_dataset.homogenous));
+        PetscCall(OpenHomogenousRainData(&rain_dataset.homogenous));
         break;
       case HETEROGENEOUS:
-        PetscCall(OpenSpatiallyHeterogeneousRainData(&rain_dataset.heterogeneous));
-        PetscCall(SetupSpatiallyHeterogeneousRainDataMapping(rdy, &rain_dataset.heterogeneous));
+        PetscCall(OpenHeterogeneousRainData(&rain_dataset.heterogeneous));
+        PetscCall(SetupHeterogeneousRainDataMapping(rdy, &rain_dataset.heterogeneous));
         break;
     }
 
@@ -479,10 +479,10 @@ int main(int argc, char *argv[]) {
           PetscCall(SetConstantRainfall(n, rain));
           break;
         case HOMOGENEOUS:
-          PetscCall(SetSpatiallyHomogenousRainfall(&rain_dataset.homogenous, time, n, rain));
+          PetscCall(SetHomogenousRainfall(&rain_dataset.homogenous, time, n, rain));
           break;
         case HETEROGENEOUS:
-          PetscCall(SetSpatiallyHeterogenousRainfall(&rain_dataset.heterogeneous, time, n, rain));
+          PetscCall(SetHeterogenousRainfall(&rain_dataset.heterogeneous, time, n, rain));
           break;
       }
 
@@ -542,7 +542,7 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case HOMOGENEOUS:
-        PetscCall(CloseSpatiallyHomogenousRainData(&rain_dataset.homogenous));
+        PetscCall(CloseHomogenousRainData(&rain_dataset.homogenous));
         break;
       case HETEROGENEOUS:
         break;
