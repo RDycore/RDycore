@@ -171,7 +171,13 @@ static PetscErrorCode DetermineHeterogeneousRainfallDataFilename(HeterogeneousRa
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// open the binary file
+// open the binary rainfall file that has following information:
+// - ncols    : number of columns in the rainfall dataset
+// - nrows    : number of rowns in the rainfall dataset
+// - xlc      : x coordinate of the lower left corner [m]
+// - ylc      : y coordinate of the lower left corner [m]
+// - cellsize : size of grid cells in the rainfall dataset [m]
+// - data     : rainfall rate for ncols * nrows cells [mm/hr]
 static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
@@ -248,6 +254,7 @@ static PetscErrorCode OpenANewHeterogeneousRainfallData(HeterogeneousRainData *h
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// for each local RDycore grid cell, find the nearest neighbor cell in the rainfall dataset
 static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRainData *hetero_rain) {
   PetscFunctionBegin;
 
@@ -342,6 +349,62 @@ PetscErrorCode SetHomogeneousRainfall(HomogeneousRainData *homogeneous_rain, Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// save information about rainfall dataset from command line options
+PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
+  PetscFunctionBegin;
+
+  PetscBool flag;
+
+  // set default rainfall
+  rain_dataset->type = CONSTANT;
+
+  PetscCall(
+      PetscOptionsGetString(NULL, NULL, "-homogeneous_rain", rain_dataset->homogeneous.filename, sizeof(rain_dataset->homogeneous.filename), &flag));
+  if (flag) {
+    rain_dataset->type = HOMOGENEOUS;
+  }
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
+
+  PetscBool sp_hetero_dir_flag;
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset->heterogeneous.dir, sizeof(rain_dataset->heterogeneous.dir),
+                                  &sp_hetero_dir_flag));
+  PetscInt nvalues = 5;
+  PetscInt date[nvalues];
+  PetscInt ndate = nvalues;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-heterogeneous_rain_start_date", date, &ndate, &flag));
+  if (flag) {
+    PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
+    PetscCheck(rain_dataset->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                "Can only specify homogeneous or heterogeneous rainfall datasets.");
+    PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                "Need to specify path to spatially heterogeneous rainfall via -heterogeneous_rain_dir <dir>");
+
+    rain_dataset->type = HETEROGENEOUS;
+
+    rain_dataset->heterogeneous.start_date = (struct tm){
+        .tm_year  = date[0] - 1900,
+        .tm_mon   = date[1] - 1,
+        .tm_mday  = date[2],
+        .tm_hour  = date[3],
+        .tm_min   = date[4],
+        .tm_isdst = -1,
+    };
+
+    rain_dataset->heterogeneous.current_date = (struct tm){
+        .tm_year  = date[0] - 1900,
+        .tm_mon   = date[1] - 1,
+        .tm_mday  = date[2],
+        .tm_hour  = date[3],
+        .tm_min   = date[4],
+        .tm_isdst = -1,
+    };
+
+    rain_dataset->heterogeneous.ndata = 0;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
   // print usage info if no arguments given
   if (argc < 2) {
@@ -362,62 +425,14 @@ int main(int argc, char *argv[]) {
     // Currently, these datasets need to be opened before calling
     // RDySetup to avoid an error. Possible issue for the error could
     // be that RDySetup is setting a default DM for all VecLoads.
-    PetscBool flag, bc_specified;
+    PetscBool bc_specified;
 
     Rain rain_dataset;
-
-    // set default rainfall
-    rain_dataset.type = CONSTANT;
-
     char bcfile[PETSC_MAX_PATH_LEN];
-
-    PetscCall(
-        PetscOptionsGetString(NULL, NULL, "-homogeneous_rain", rain_dataset.homogeneous.filename, sizeof(rain_dataset.homogeneous.filename), &flag));
-    if (flag) {
-      rain_dataset.type = HOMOGENEOUS;
-    }
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogeneous_rain", &rain_dataset.homogeneous.temporally_interpolate, NULL));
-
-    PetscBool sp_hetero_dir_flag;
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset.heterogeneous.dir, sizeof(rain_dataset.heterogeneous.dir),
-                                    &sp_hetero_dir_flag));
-    PetscInt nvalues = 5;
-    PetscInt date[nvalues];
-    PetscInt ndate = nvalues;
-    PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-heterogeneous_rain_start_date", date, &ndate, &flag));
-    if (flag) {
-      PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
-      PetscCheck(rain_dataset.type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
-                 "Can only specify homogeneous or heterogeneous rainfall datasets.");
-      PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
-                 "Need to specify path to spatially heterogeneous rainfall via -heterogeneous_rain_dir <dir>");
-
-      rain_dataset.type = HETEROGENEOUS;
-
-      rain_dataset.heterogeneous.start_date = (struct tm){
-          .tm_year  = date[0] - 1900,
-          .tm_mon   = date[1] - 1,
-          .tm_mday  = date[2],
-          .tm_hour  = date[3],
-          .tm_min   = date[4],
-          .tm_isdst = -1,
-      };
-
-      rain_dataset.heterogeneous.current_date = (struct tm){
-          .tm_year  = date[0] - 1900,
-          .tm_mon   = date[1] - 1,
-          .tm_mday  = date[2],
-          .tm_hour  = date[3],
-          .tm_min   = date[4],
-          .tm_isdst = -1,
-      };
-
-      rain_dataset.heterogeneous.ndata = 0;
-    }
-
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
-
     PetscBool interpolate_bc = PETSC_FALSE;
+
+    PetscCall(ParseRainfallDataOptions(&rain_dataset));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_bc", &interpolate_bc, NULL));
 
     Vec          bc_vec = NULL;
