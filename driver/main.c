@@ -378,17 +378,21 @@ int main(int argc, char *argv[]) {
 
       rain_dataset.type = HETEROGENEOUS;
 
-      rain_dataset.heterogeneous.start_date.tm_year = date[0] - 1900;
-      rain_dataset.heterogeneous.start_date.tm_mon  = date[1] - 1;
-      rain_dataset.heterogeneous.start_date.tm_mday = date[2];
-      rain_dataset.heterogeneous.start_date.tm_hour = date[3];
-      rain_dataset.heterogeneous.start_date.tm_min  = date[4];
+      rain_dataset.heterogeneous.start_date = (struct tm){
+          .tm_year = date[0] - 1900,
+          .tm_mon  = date[1] - 1,
+          .tm_mday = date[2],
+          .tm_hour = date[3] - 1,
+          .tm_min  = date[4],
+      };
 
-      rain_dataset.heterogeneous.current_date.tm_year = date[0] - 1900;
-      rain_dataset.heterogeneous.current_date.tm_mon  = date[1] - 1;
-      rain_dataset.heterogeneous.current_date.tm_mday = date[2];
-      rain_dataset.heterogeneous.current_date.tm_hour = date[3];
-      rain_dataset.heterogeneous.current_date.tm_min  = date[4];
+      rain_dataset.heterogeneous.current_date = (struct tm){
+          .tm_year = date[0] - 1900,
+          .tm_mon  = date[1] - 1,
+          .tm_mday = date[2],
+          .tm_hour = date[3] - 1,
+          .tm_min  = date[4],
+      };
 
       rain_dataset.heterogeneous.ndata = 0;
     }
