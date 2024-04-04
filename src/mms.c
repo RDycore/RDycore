@@ -22,14 +22,19 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
 
   // We only need a single Dirichlet boundary condition, populated with
   // manufactured solution data.
+  static RDyFlowCondition analytic_flow = {
+    .name = "analytic_bc",
+    .type = CONDITION_DIRICHLET,
+  };
+  analytic_flow.height = rdy->config.mms.swe.solutions.h;
+  analytic_flow.x_momentum = mupCreate(muBASETYPE_FLOAT);
+  mupSetExpr(analytic_flow.x_momentum(
+    rdy->config.mms.swe.solutions.u;
+  analytic_flow.y_momentum = mupCreate(muBASETYPE_FLOAT);
+    rdy->config.mms.swe.solutions.v;
+
   RDyCondition analytic_bc = {
-    .flow = {
-      .name = "analytic_bc",
-      .type = CONDITION_DIRICHLET,
-      .height = rdy->config.mms.swe.solutions.h,
-      .x_momentum = rdy->config.mms.swe.solutions.u,
-      .y_momentum = rdy->config.mms.swe.solutions.u,
-    },
+    .flow = &analytic_flow,
   };
 
   // Assign the boundary condition to each boundary.
