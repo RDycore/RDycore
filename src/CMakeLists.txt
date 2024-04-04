@@ -15,6 +15,7 @@ add_library(rdycore
   xdmf_output.c
   yaml_input.c
 )
+target_link_libraries(rdycore cyaml yaml hdf5 petsc)
 add_dependencies(rdycore cyaml yaml)
 
 install(

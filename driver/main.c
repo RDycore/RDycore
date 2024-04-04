@@ -199,8 +199,8 @@ static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_ra
   hetero_rain->cellsize = hetero_rain->data_ptr[4];
 
   if (0) {
-    printf("ncols = %d\n", hetero_rain->ncols);
-    printf("nrows = %d\n", hetero_rain->nrows);
+    printf("ncols = %" PetscInt_FMT "\n", hetero_rain->ncols);
+    printf("nrows = %" PetscInt_FMT "\n", hetero_rain->nrows);
     printf("xlc   = %f\n", hetero_rain->xlc);
     printf("ylc   = %f\n", hetero_rain->ylc);
     printf("size  = %f\n", hetero_rain->cellsize);
@@ -292,7 +292,7 @@ static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRa
 
     if (0) {
       PetscInt idx = hetero_rain->data2mesh_idx[icell];
-      printf("%04d %f %f %02d %f %f\n", icell, xc, yc, idx, hetero_rain->data_xc[idx], hetero_rain->data_yc[idx]);
+      printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, hetero_rain->data_xc[idx], hetero_rain->data_yc[idx]);
     }
   }
 

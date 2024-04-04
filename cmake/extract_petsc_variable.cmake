@@ -1,5 +1,6 @@
 # This function extracts a variable named varname from the petscvariables file,
-# storing its value in the variable var.
+# storing its value in the variable var. The resulting value can contain spaces,
+# and must be interpreted properly by the caller.
 function(extract_petsc_variable varname var)
   # read petscvariables
   file(READ "${PETSC_DIR}/${PETSC_ARCH}/lib/petsc/conf/petscvariables" petscvariables)
@@ -13,14 +14,9 @@ function(extract_petsc_variable varname var)
   math(EXPR start "${start} + ${varname_length} + 4")
   string(SUBSTRING ${petscvariables} ${start} -1 petsc_var)
 
-  # truncate the value at a space or newline, whichever comes first
-  string(FIND ${petsc_var} " " space)
+  # truncate the value at the first newline encountered
   string(FIND ${petsc_var} "\n" newline)
-  if (space LESS newline)
-    string(SUBSTRING ${petsc_var} 0 ${space} petsc_var)
-  else()
-    string(SUBSTRING ${petsc_var} 0 ${newline} petsc_var)
-  endif()
+  string(SUBSTRING ${petsc_var} 0 ${newline} petsc_var)
 
   message(STATUS "Extracted PETSc variable: ${varname} = ${petsc_var}")
   set(${var} ${petsc_var} PARENT_SCOPE)
