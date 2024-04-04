@@ -424,14 +424,11 @@ int main(int argc, char *argv[]) {
     // allocate arrays for inspecting simulation data
     PetscInt n;
     PetscCall(RDyGetNumLocalCells(rdy, &n));
-    PetscReal *h, *hu, *hv, *rain, *accum_rain;
+    PetscReal *h, *hu, *hv, *rain;
     PetscCalloc1(n, &h);
     PetscCalloc1(n, &hu);
     PetscCalloc1(n, &hv);
     PetscCalloc1(n, &rain);
-    PetscCalloc1(n, &accum_rain);
-
-    for (PetscInt i = 0; i < n; i++) accum_rain[0];
 
     // get information about boundary conditions
     PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
@@ -512,8 +509,6 @@ int main(int argc, char *argv[]) {
       PetscCheck(time > prev_time, comm, PETSC_ERR_USER, "Non-increasing time!");
       PetscCheck(time_step > 0.0, comm, PETSC_ERR_USER, "Non-positive time step!");
 
-      for (PetscInt icell = 0; icell < n; icell++) accum_rain[icell] += rain[icell] * time_step;
-
       if (!RDyRestarted(rdy)) {
         PetscCheck(fabs(time - prev_time - coupling_interval) < 1e-12, comm, PETSC_ERR_USER, "RDyAdvance advanced time improperly (%g, %g, %g)!",
                    prev_time, time, fabs(time - prev_time + coupling_interval));
@@ -529,12 +524,6 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetLocalCellHeights(rdy, n, h));
       PetscCall(RDyGetLocalCellXMomentums(rdy, n, hu));
       PetscCall(RDyGetLocalCellYMomentums(rdy, n, hv));
-    }
-
-    if (0 && rain_dataset.type == HETEROGENEOUS) {
-      for (PetscInt icell = 0; icell < n; icell++) {
-        printf("%d %f %f %f\n", icell, rain_dataset.heterogeneous.mesh_xc[icell], rain_dataset.heterogeneous.mesh_yc[icell], accum_rain[icell]);
-      }
     }
 
     // clean up
