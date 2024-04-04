@@ -8,24 +8,6 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 
-static PetscErrorCode SetAnalyticSource(RDy rdy) {
-  PetscFunctionBegin;
-  if (rdy->config.num_sources > 0) {
-    // We only need a single Dirichlet boundary condition whose data can be
-    // set to the analytic solution as needed.
-    RDyCondition analytic_source = {};
-
-    // allocate storage for sources
-    PetscCall(PetscCalloc1(rdy->num_regions, &rdy->sources));
-
-    // assign all regions to the analytic source
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      rdy->sources[r] = analytic_source;
-    }
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   PetscFunctionBegin;
 
@@ -169,7 +151,6 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(SetAnalyticSolution(rdy));
-  PetscCall(SetAnalyticSource(rdy));
 
   RDyLogDebug(rdy, "Initializing shallow water equations solver...");
   PetscCall(InitSWE(rdy));
