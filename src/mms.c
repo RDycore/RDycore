@@ -8,14 +8,9 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 
-// Our boundary conditions are expressed in terms of momenta and not flow
-// velocities, so we define x and y momentum functions in terms of water
-// height and flow velocities.
-
-static PetscReal x_momentum(void *data, int bulkIdx, int threadInx, PetscReal x, PetscReal y, PetscReal t) {
-  RDy rdy = data;
-  return 0.0;
-}
+// NOTE: our boundary conditions are expressed in terms of momenta and not flow
+// velocities, so we have to chain together a few things to evaluate x and y
+// momenta.
 
 static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
   PetscFunctionBegin;
