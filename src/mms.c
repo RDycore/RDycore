@@ -12,12 +12,12 @@
 // velocities, so we define x and y momentum functions in terms of water
 // height and flow velocities.
 
-static PetscReal x_momentum(void *data, PetscReal x, PetscReal y, PetscReal t) {
+static PetscReal x_momentum(void *data, int bulkIdx, int threadInx, PetscReal x, PetscReal y, PetscReal t) {
   RDy rdy = data;
   return 0.0;
 }
 
-static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
+static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
   PetscFunctionBegin;
 
   // We only need a single Dirichlet boundary condition, populated with
@@ -26,9 +26,9 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
     .flow = {
       .name = "analytic_bc",
       .type = CONDITION_DIRICHLET,
-      .height = rdy->config.mms.solutions.h,
-      .x_momentum = rdy->config.mms.solutions.u,
-      .y_momentum = rdy->config.mms.solutions.u,
+      .height = rdy->config.mms.swe.solutions.h,
+      .x_momentum = rdy->config.mms.swe.solutions.u,
+      .y_momentum = rdy->config.mms.swe.solutions.u,
     },
   };
 
