@@ -176,7 +176,11 @@ static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_ra
   PetscFunctionBegin;
 
   PetscCall(DetermineHeterogeneousRainfallDataFilename(hetero_rain));
-  printf("Opening %s \n", hetero_rain->file);
+  PetscInt myrank;
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+  if (!myrank) {
+    printf("Opening %s \n", hetero_rain->file);
+  }
 
   hetero_rain->dtime_in_hour = 1.0;  // assume an hourly dataset
   hetero_rain->ndata_file    = 1;
@@ -218,7 +222,11 @@ static PetscErrorCode OpenANewHeterogeneousRainfallData(HeterogeneousRainData *h
 
   // determine the new file
   PetscCall(DetermineHeterogeneousRainfallDataFilename(hetero_rain));
-  printf("Opening %s \n", hetero_rain->file);
+  PetscInt myrank;
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+  if (!myrank) {
+    printf("Opening %s \n", hetero_rain->file);
+  }
 
   PetscInt ndata;
   PetscCall(OpenData(hetero_rain->file, &hetero_rain->data_vec, &ndata));
