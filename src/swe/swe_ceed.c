@@ -528,7 +528,8 @@ static PetscErrorCode SWESubOperatorGetOperatorField(CeedOperator op, CeedInt su
   CeedInt num_sub_op;
   PetscCallCEED(CeedCompositeOperatorGetNumSub(op, &num_sub_op));
   PetscCheck(sub_op_idx < num_sub_op, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "Trying to extract info about Ceed subporator = %d, but total number of Ceed operators = %d", sub_op_idx, num_sub_op);
+             "Trying to extract info about Ceed subporator = %" PetscInt_FMT ", but total number of Ceed operators = %" PetscInt_FMT "", sub_op_idx,
+             num_sub_op);
 
   // get the source sub-operator responsible for the water source (the first one)
   CeedOperator *sub_ops;

@@ -207,7 +207,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(TSGetStepNumber(ts, &nstep));
 
       char file[PETSC_MAX_PATH_LEN];
-      sprintf(file, "F_ceed_nstep%" PetscInt_FMT "_N%d.bin", nstep, rdy->nproc);
+      sprintf(file, "F_ceed_nstep%" PetscInt_FMT "_N%" PetscInt_FMT ".bin", nstep, rdy->nproc);
 
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
@@ -224,7 +224,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
       PetscCall(TSGetStepNumber(ts, &nstep));
 
       char file[PETSC_MAX_PATH_LEN];
-      sprintf(file, "F_petsc_nstep%" PetscInt_FMT "_N%d.bin", nstep, rdy->nproc);
+      sprintf(file, "F_petsc_nstep%" PetscInt_FMT "_N%" PetscInt_FMT ".bin", nstep, rdy->nproc);
 
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));

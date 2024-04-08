@@ -38,7 +38,8 @@ PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
   MPI_Bcast(&result_and_errno, 2, MPI_INT, 0, comm);
   int result = result_and_errno[0];
   int err_no = result_and_errno[1];
-  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create directory: %s (errno = %d)", directory, err_no);
+  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create directory: %s (errno = %" PetscInt_FMT ")", directory,
+             err_no);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -69,7 +70,7 @@ PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix
   PetscFunctionBegin;
   int  num_digits = (int)(log10((double)max_index_val)) + 1;
   char fmt[16]    = {0};
-  snprintf(fmt, 15, "-%%0%dd.%%s", num_digits);
+  snprintf(fmt, 15, "-%%0%" PetscInt_FMT "d.%%s", num_digits);
   char ending[PETSC_MAX_PATH_LEN];
   snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
   snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s%s", directory, prefix, ending);
@@ -116,7 +117,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
     }
   } else if (rdy->config.output.format == OUTPUT_CGNS) {
     // the CGNS viewer handles its own batching and only needs a format string
-    snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%%d.%s", output_dir, prefix, suffix);
+    snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%%" PetscInt_FMT ".%s", output_dir, prefix, suffix);
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported output format specified.");
   }
