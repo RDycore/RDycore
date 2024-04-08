@@ -19,7 +19,7 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
   if (!rdy->config.ensemble.members[color].name[0]) {
     int  num_digits = (int)(log10((double)rdy->config.ensemble.size)) + 1;
     char fmt[16]    = {0};
-    snprintf(fmt, 15, "%%0%dd", num_digits);
+    snprintf(fmt, 15, "%%0%" PetscInt_FMT "d", num_digits);
     char suffix[16];
     sprintf(suffix, fmt, color);
     sprintf(rdy->config.ensemble.members[color].name, "ensemble_%s", suffix);
