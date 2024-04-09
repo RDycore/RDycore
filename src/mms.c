@@ -18,18 +18,23 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
   // We only need a single Dirichlet boundary condition, populated with
   // manufactured solution data.
   static RDyFlowCondition analytic_flow = {
-    .name = "analytic_bc",
-    .type = CONDITION_DIRICHLET,
+      .name = "analytic_bc",
+      .type = CONDITION_DIRICHLET,
   };
   analytic_flow.height = rdy->config.mms.swe.solutions.h;
+
   analytic_flow.x_momentum = mupCreate(muBASETYPE_FLOAT);
-  mupSetExpr(analytic_flow.x_momentum(
-    rdy->config.mms.swe.solutions.u;
+  MathExpression x_momentum_expr;
+  snprintf(x_momentum_expr, MAX_EXPRESSION_LEN, "%s * %s", rdy->config.mms.swe.expressions.h, rdy->config.mms.swe.expressions.u);
+  mupSetExpr(analytic_flow.x_momentum, x_momentum_expr);
+
   analytic_flow.y_momentum = mupCreate(muBASETYPE_FLOAT);
-    rdy->config.mms.swe.solutions.v;
+  MathExpression y_momentum_expr;
+  snprintf(y_momentum_expr, MAX_EXPRESSION_LEN, "%s * %s", rdy->config.mms.swe.expressions.h, rdy->config.mms.swe.expressions.v);
+  mupSetExpr(analytic_flow.y_momentum, y_momentum_expr);
 
   RDyCondition analytic_bc = {
-    .flow = &analytic_flow,
+      .flow = &analytic_flow,
   };
 
   // Assign the boundary condition to each boundary.
@@ -164,7 +169,7 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
-  PetscCall(SetAnalyticBoundaryCondition(rdy));
+  PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(SetAnalyticSolution(rdy));
