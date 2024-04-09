@@ -77,7 +77,7 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
-static PetscErrorCode SetAnalyticSolution(RDy rdy) {
+static PetscErrorCode SetSWEAnalyticSolution(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(VecZeroEntries(rdy->X));
@@ -172,10 +172,50 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
-  PetscCall(SetAnalyticSolution(rdy));
+  PetscCall(SetSWEAnalyticSolution(rdy));
 
   RDyLogDebug(rdy, "Initializing shallow water equations solver...");
   PetscCall(InitSWE(rdy));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// call this to enforce analytical boundary conditions in the MMS driver
+PetscErrorCode RDyEnforceMMSBoundaryConditions(RDy rdy, PetscReal time) {
+  PetscFunctionBegin;
+
+  RDyLogDebug(rdy, "Enforcing MMS boundary conditions...");
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    // fetch x, y for each edge (and set t = time)
+    RDyBoundary boundary  = rdy->boundaries[b];
+    PetscInt    num_edges = boundary.num_edges;
+    PetscReal   x[num_edges], y[num_edges], t[num_edges];
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      PetscInt edge_id       = boundary.edge_ids[e];
+      RDyPoint edge_centroid = rdy->mesh.edges.centroids[edge_id];
+      x[e]                   = edge_centroid.X[0];
+      y[e]                   = edge_centroid.X[1];
+      t[e]                   = time;
+    }
+
+    // compute h, hu, hv on each edge (SWE-specific)
+    RDyFlowCondition *flow_bc = rdy->boundary_conditions[b].flow;
+    PetscReal         h[num_edges], hu[num_edges], hv[num_edges];
+    PetscCall(EvaluateTemporalSolution(flow_bc->height, num_edges, x, y, t, h));
+    PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, t, hu));
+    PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, t, hv));
+
+    // set the boundary values (SWE-specific)
+    // NOTE: ndof == 3 for SWE
+    PetscReal boundary_values[3 * num_edges];
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      boundary_values[3 * e]     = h[e];
+      boundary_values[3 * e + 1] = hu[e];
+      boundary_values[3 * e + 2] = hv[e];
+    }
+    PetscCall(RDySetDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
