@@ -243,16 +243,12 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscReal time;
   PetscCall(TSGetTime(rdy->ts, &time));
 
-  PetscReal interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
-  PetscCall(TSSetMaxTime(rdy->ts, time + interval));
+  PetscReal interval           = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
+  PetscReal next_coupling_time = time + interval;
+  PetscCall(TSSetMaxTime(rdy->ts, next_coupling_time));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
-
-  PetscReal next_coupling_time = interval;
-  while (next_coupling_time < time) {
-    next_coupling_time += interval;
-  }
 
   // advance the solution to the specified time (handling preloading if requested)
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
