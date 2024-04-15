@@ -51,7 +51,7 @@ contains
     ! !LOCAL VARIABLES:
     character(len=1024) :: log_file = 'rof_modelio.log'
     PetscViewer         :: viewer
-    PetscInt            :: size
+    PetscInt            :: num_cells_global
     PetscErrorCode      :: ierr
 
     ! initialize subsystems
@@ -65,6 +65,8 @@ contains
     ! allocate memory for grid-level rain data
     PetscCallA(RDyGetNumLocalCells(rdy_, num_cells_owned, ierr))
     allocate(rain_data(num_cells_owned))
+
+    PetscCallA(RDyGetNumLocalCells(rdy_, num_cells_global, ierr))
 
   end subroutine rdycore_init
 

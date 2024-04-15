@@ -54,6 +54,7 @@ PETSC_EXTERN PetscErrorCode RDyGetTimeStep(RDy, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetStep(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetCouplingInterval(RDy, PetscReal*);
 
+PETSC_EXTERN PetscErrorCode RDyGetNumGlobalCells(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt*);
