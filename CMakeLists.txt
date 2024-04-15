@@ -25,7 +25,7 @@ set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${PETSC_DIR}/${PETSC_ARCH}/lib/p
 find_package(PkgConfig REQUIRED)
 
 # PETSc
-pkg_check_modules(PETSc REQUIRED IMPORTED_TARGET petsc)
+pkg_check_modules(PETSc REQUIRED IMPORTED_TARGET PETSc)
 pkg_get_variable(PETSc_C_COMPILER PETSc ccompiler)
 pkg_get_variable(PETSc_Fortran_COMPILER PETSc fcompiler)
 include_directories(${PETSc_INCLUDE_DIRS})
@@ -85,10 +85,18 @@ if (ENABLE_ASAN)
 endif()
 
 # Fortran settings
+include(CheckFortranCompilerFlag)
 set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch")
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ffree-line-length-none")
+  list(APPEND fflags "-fallow-argument-mismatch")
+  list(APPEND fflags "-Wno-allow-argument-mismatch")
+  list(APPEND fflags "-ffree-line-length-none")
+  foreach(fflag ${fflags})
+    check_fortran_compiler_flag(${fflag} result)
+    if (result)
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${fflag}")
+    endif()
+  endforeach()
 
   # make sure libgfortran appears in our rpath
   execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
