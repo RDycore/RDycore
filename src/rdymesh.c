@@ -818,7 +818,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt rank) {
+static PetscErrorCode SaveNaturalCellIDs(DM dm, PetscInt num_cells, RDyCells *cells, PetscMPIInt rank) {
   PetscFunctionBegin;
 
   PetscBool useNatural;
@@ -878,6 +878,18 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, RDyCells *cells, PetscMPIInt ran
     PetscCall(VecDestroy(&natural));
     PetscCall(VecDestroy(&global));
     PetscCall(VecDestroy(&local));
+  } else {
+    PetscMPIInt commsize;
+    MPI_Comm    comm;
+    PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+    PetscCallMPI(MPI_Comm_size(comm, &commsize));
+
+    // if the running on a single proc, the natural cell ID is the same as the local ID
+    if (commsize == 1) {
+      for (PetscInt i = 0; i < num_cells; i++) {
+        cells->natural_ids[i] = i;
+      }
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1276,7 +1288,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
   PetscMPIInt rank;
   MPI_Comm_rank(comm, &rank);
-  PetscCall(SaveNaturalCellIDs(dm, &mesh->cells, rank));
+  PetscCall(SaveNaturalCellIDs(dm, mesh->num_cells, &mesh->cells, rank));
 
   PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
