@@ -79,7 +79,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
 
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%" PetscInt_FMT ")",
+             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)",
              boundary_index, boundary_cond.flow->type);
 
   // dispatch this call to CEED or PETSc

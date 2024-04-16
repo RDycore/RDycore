@@ -138,7 +138,7 @@ static PetscErrorCode GenerateE3SMCheckpointFilename(const char *directory, cons
   PetscFunctionBegin;
   int  num_digits = (int)(log10((double)max_index_val)) + 1;
   char fmt[16]    = {0};
-  snprintf(fmt, 15, ".%%0%" PetscInt_FMT "d.%%s", num_digits);
+  snprintf(fmt, 15, ".%%0%dd.%%s", num_digits);
   char ending[PETSC_MAX_PATH_LEN];
   snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
   snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.rdycore.r%s", directory, prefix, ending);

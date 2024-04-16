@@ -190,7 +190,7 @@ static PetscErrorCode InitRegions(RDy rdy) {
   PetscCheck(label, rdy->comm, PETSC_ERR_USER, "No regions (cell sets) found in grid! Cannot assign initial conditions.");
   PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
   PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
-             "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%" PetscInt_FMT ")", rdy->num_regions, MAX_NUM_REGIONS);
+             "Number of regions in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_REGIONS (%d)", rdy->num_regions, MAX_NUM_REGIONS);
 
   // fetch region IDs
   IS region_id_is;
@@ -311,7 +311,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   if (label) {  // found face sets!
     PetscCall(DMLabelGetNumValues(label, &num_boundaries_in_file));
     PetscCheck(num_boundaries_in_file <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER,
-               "Number of boundaries in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_BOUNDARIES (%" PetscInt_FMT ")", num_boundaries_in_file,
+               "Number of boundaries in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file,
                MAX_NUM_BOUNDARIES);
 
     // fetch boundary IDs
@@ -962,7 +962,7 @@ static PetscErrorCode PauseIfRequested(RDy rdy) {
       MPI_Gather(hostname, 65, MPI_CHAR, hostnames, 65, MPI_CHAR, 0, rdy->comm);
       PetscFPrintf(rdy->comm, stderr, "  PIDs (host):\n");
       for (PetscMPIInt p = 0; p < rdy->nproc; ++p) {
-        PetscFPrintf(rdy->comm, stderr, "    rank %" PetscInt_FMT " (%s): %" PetscInt_FMT ":\n", p, &hostnames[p * 65], pids[p]);
+        PetscFPrintf(rdy->comm, stderr, "    rank %d (%s): %d:\n", p, &hostnames[p * 65], pids[p]);
       }
 
       // wait for input on rank 0
@@ -971,7 +971,7 @@ static PetscErrorCode PauseIfRequested(RDy rdy) {
       }
       MPI_Barrier(rdy->comm);
     } else {
-      PetscFPrintf(rdy->comm, stderr, "  PID on host %s: %" PetscInt_FMT "\n", hostname, pid);
+      PetscFPrintf(rdy->comm, stderr, "  PID on host %s: %d\n", hostname, pid);
       getchar();
     }
   }
