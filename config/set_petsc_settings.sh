@@ -101,7 +101,7 @@ if [ "$mach" = "pm" ]; then
   else
     echo "The only supported options for -pm are cpu or gpu."
     display_help
-    return 1
+    exit 0
   fi
 
 elif [ "$mach" = "frontier"  ]; then
@@ -121,14 +121,14 @@ elif [ "$mach" = "frontier"  ]; then
       # Got installation error
       #export PETSC_ARCH=frontier-gpu-debug-64bit-gcc-11-2-0-fc288817
        echo "On Frontier, PETSc with 64bit and debugging turned on has not been installed."
-       return 1
+       exit 0
     fi
   fi
 
   if [[ ! -z "$pm_node" ]]; then
      echo "The --pm_node <$pm_node> was specified, which is applicable is only for Perlmutter,"
      echo "but the machine detected is Frontier."
-     return 1
+     exit 0
   fi
 
 elif [ "$mach" = "aurora"  ]; then
@@ -140,27 +140,27 @@ elif [ "$mach" = "aurora"  ]; then
       export PETSC_ARCH=aurora-opt-32bit-oneapi-ifx-fc288817
     else
        echo "On Aurora, --with-debugging 1 was selected, but PETSc has not been installed with debugging turned on."
-       return 1
+       exit 0
     fi
   else
     if [ "$with_debugging" -eq 0 ]; then
       export PETSC_ARCH=aurora-opt-64bit-oneapi-ifx-fc288817
     else
        echo "On Aurora, --with-debugging 1 was selected, but PETSc has not been installed with debugging turned on."
-       return 1
+       exit 0
     fi
   fi
 
   if [[ ! -z "$pm_node" ]]; then
      echo "The --pm_node <$pm_node> was specified, which is applicable is only for Perlmutter,"
      echo "but the machine detected is Aurora."
-     return 1
+     exit 0
   fi
 
 else
   echo "Could not determine the machine. mach=$mach"
   display_help
-  return 1
+  exit 0
 fi
 
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
