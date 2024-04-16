@@ -152,7 +152,7 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetSourceVecForLocalCell(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
+PetscErrorCode RDySetSourceVecForLocalCells(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscInt ndof;
@@ -171,7 +171,7 @@ PetscErrorCode RDySetSourceVecForLocalCell(RDy rdy, Vec src_vec, PetscInt idof, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -180,13 +180,13 @@ PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscInt size, Petsc
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed_rhs.op_src, values));
   } else {  // petsc
     PetscInt idof = 0;
-    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -195,12 +195,12 @@ PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, P
     PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed_rhs.op_src, values));
   } else {
     PetscInt idof = 1;
-    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -209,7 +209,7 @@ PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, P
     PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed_rhs.op_src, values));
   } else {
     PetscInt idof = 2;
-    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -389,7 +389,7 @@ PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
+PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));

@@ -295,7 +295,7 @@ int main(int argc, char *argv[]) {
     for (PetscInt icell = 0; icell < ncells; icell++) {
       PetscCall(Problem1_GetData(&pdata, 0.0, xc_cell[icell], yc_cell[icell], N, &mannings_n[icell]));
     }
-    PetscCall(RDySetManningsNForLocalCell(rdy, ncells, mannings_n));
+    PetscCall(RDySetManningsNForLocalCells(rdy, ncells, mannings_n));
 
     Vec          ic_vec;
     PetscScalar *ic_ptr;
@@ -325,9 +325,9 @@ int main(int argc, char *argv[]) {
       }
 
       // set the MMS source terms
-      PetscCall(RDySetWaterSourceForLocalCell(rdy, ncells, h_source));
-      PetscCall(RDySetXMomentumSourceForLocalCell(rdy, ncells, hu_source));
-      PetscCall(RDySetYMomentumSourceForLocalCell(rdy, ncells, hv_source));
+      PetscCall(RDySetWaterSourceForLocalCells(rdy, ncells, h_source));
+      PetscCall(RDySetXMomentumSourceForLocalCells(rdy, ncells, hu_source));
+      PetscCall(RDySetYMomentumSourceForLocalCells(rdy, ncells, hv_source));
 
       // set dirchlet BC
       if (nedges > 0) {

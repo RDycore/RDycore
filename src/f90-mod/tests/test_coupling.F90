@@ -89,7 +89,7 @@ contains
 
     ! Set spatially homogeneous rainfall for all grid cells
     rain_data(:) = 0.d0
-    PetscCallA(RDySetWaterSourceForLocalCell(rdy_, num_cells_owned, rain_data, ierr))
+    PetscCallA(RDySetWaterSourceForLocalCells(rdy_, num_cells_owned, rain_data, ierr))
 
     ! Set the coupling time step
     PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))

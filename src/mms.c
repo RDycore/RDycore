@@ -116,6 +116,11 @@ static PetscErrorCode SetSWEAnalyticSolution(RDy rdy) {
 
       // TODO: salinity and sediment initial conditions go here.
 
+      // evaluate and set material properties
+      PetscReal manning[N];
+      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, manning));
+      PetscCall(RDySetManningsNForLocalCells(rdy, N, manning));
+
       PetscInt l = 0;
       for (PetscInt c = 0; c < region.num_cells; ++c) {
         PetscInt cell_id = region.cell_ids[c];
@@ -162,20 +167,20 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
 
-  RDyLogDebug(rdy, "Creating FV mesh...");
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
+  RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
   PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
-  RDyLogDebug(rdy, "Initializing solution and source data...");
-  PetscCall(SetSWEAnalyticSolution(rdy));
-
   RDyLogDebug(rdy, "Initializing shallow water equations solver...");
   PetscCall(InitSWE(rdy));
+
+  RDyLogDebug(rdy, "Initializing solution and source data...");
+  PetscCall(SetSWEAnalyticSolution(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

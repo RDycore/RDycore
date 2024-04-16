@@ -301,7 +301,7 @@ program mms_f90
 
       PetscCallA(VecRestoreArrayF90(ic_vec, ic_ptr, ierr))
 
-      PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
+      PetscCallA(RDySetManningsNForLocalCells(rdy_, ncells, mannings_n, ierr));
       PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
 
       PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
@@ -314,9 +314,9 @@ program mms_f90
         endif
 
         ! set the MMS source terms
-        PetscCallA(RDySetWaterSourceForLocalCell(rdy_, ncells, h_source, ierr))
-        PetscCallA(RDySetXMomentumSourceForLocalCell(rdy_, ncells, hu_source, ierr))
-        PetscCallA(RDySetYMomentumSourceForLocalCell(rdy_, ncells, hv_source, ierr))
+        PetscCallA(RDySetWaterSourceForLocalCells(rdy_, ncells, h_source, ierr))
+        PetscCallA(RDySetXMomentumSourceForLocalCells(rdy_, ncells, hu_source, ierr))
+        PetscCallA(RDySetYMomentumSourceForLocalCells(rdy_, ncells, hv_source, ierr))
 
         if (nedges > 0) then
           ! set dirchlet BC
