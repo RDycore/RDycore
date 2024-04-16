@@ -10,7 +10,7 @@ module rdycore
   implicit none
 
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
-            RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
+            RDyCreate, RDySetup, RDyAdvance, RDyDestroy, RDyGetNumGlobalCells, &
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
@@ -62,6 +62,12 @@ module rdycore
     integer(c_int) function rdysetup_(rdy) bind(c, name="RDySetup")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    integer(c_int) function rdygetnumglobalcells_(rdy, num_cells_global) bind(c, name="RDyGetNumGlobalCells")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscInt,           intent(out) :: num_cells_global
     end function
 
     integer(c_int) function rdygetnumlocalcells_(rdy, num_cells) bind(c, name="RDyGetNumLocalCells")
@@ -370,6 +376,13 @@ contains
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
     ierr = rdysetup_(rdy_%c_rdy)
+  end subroutine
+
+  subroutine RDyGetNumGlobalCells(rdy_, num_cells_global, ierr)
+    type(RDy), intent(inout) :: rdy_
+    PetscInt,  intent(out)   :: num_cells_global
+    integer,   intent(out)   :: ierr
+    ierr = rdygetnumglobalcells_(rdy_%c_rdy, num_cells_global)
   end subroutine
 
   subroutine RDyGetNumLocalCells(rdy_, num_cells, ierr)

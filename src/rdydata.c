@@ -2,6 +2,12 @@
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
+PetscErrorCode RDyGetNumGlobalCells(RDy rdy, PetscInt *num_cells_global) {
+  PetscFunctionBegin;
+  *num_cells_global = rdy->mesh.num_cells_global;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
   *num_cells = rdy->mesh.num_cells_local;
