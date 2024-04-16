@@ -38,8 +38,7 @@ PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
   MPI_Bcast(&result_and_errno, 2, MPI_INT, 0, comm);
   int result = result_and_errno[0];
   int err_no = result_and_errno[1];
-  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create directory: %s (errno = %d)", directory,
-             err_no);
+  PetscCheck((result == 0) || (err_no == EEXIST), comm, PETSC_ERR_USER, "Could not create directory: %s (errno = %d)", directory, err_no);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

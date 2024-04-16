@@ -311,8 +311,7 @@ static PetscErrorCode InitBoundaries(RDy rdy) {
   if (label) {  // found face sets!
     PetscCall(DMLabelGetNumValues(label, &num_boundaries_in_file));
     PetscCheck(num_boundaries_in_file <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER,
-               "Number of boundaries in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file,
-               MAX_NUM_BOUNDARIES);
+               "Number of boundaries in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file, MAX_NUM_BOUNDARIES);
 
     // fetch boundary IDs
     PetscCall(DMLabelGetValueIS(label, &boundary_id_is));
