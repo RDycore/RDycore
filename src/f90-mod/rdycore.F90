@@ -14,8 +14,8 @@ module rdycore
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
-            RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyGetStep, &
-            RDyGetCouplingInterval, RDySetCouplingInterval, &
+            RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
+            RDyGetStep, RDyGetCouplingInterval, RDySetCouplingInterval, &
             RDyGetLocalCellHeights, RDyGetLocalCellXMomentums, RDyGetLocalCellYMomentums, &
             RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
             RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
@@ -132,6 +132,14 @@ module rdycore
       type(c_ptr),    value, intent(in)  :: rdy
       integer(c_int), value, intent(in)  :: time_unit
       real(c_double),        intent(out) :: dt
+    end function
+
+    integer(c_int) function rdyconverttime_(unit_from, t_from, unit_to, t_to) bind(c, name="RDyConvertTime")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      integer(c_int), value, intent(in)  :: unit_from
+      real(c_double), value, intent(in)  :: t_from
+      integer(c_int), value, intent(in)  :: unit_to
+      real(c_double),        intent(out) :: t_to
     end function
 
     integer(c_int) function rdygetstep_(rdy, step) bind(c, name="RDyGetStep")
@@ -465,6 +473,15 @@ contains
     real(RDyDouble),      intent(out)   :: timestep
     integer,              intent(out)   :: ierr
     ierr = rdygettimestep_(rdy_%c_rdy, time_unit, timestep)
+  end subroutine
+
+  subroutine RDyConvertTime(unit_from, t_from, unit_to, t_to, ierr)
+    integer(RDyTimeUnit), intent(in)    :: unit_from
+    real(RDyDouble),      intent(in)    :: t_from
+    integer(RDyTimeUnit), intent(in)    :: unit_to
+    real(RDyDouble),      intent(out)   :: t_to
+    integer,              intent(out)   :: ierr
+    ierr = rdyconverttime_(unit_from, t_from, unit_to, t_to)
   end subroutine
 
   subroutine RDyGetCouplingInterval(rdy_, time_unit, interval, ierr)

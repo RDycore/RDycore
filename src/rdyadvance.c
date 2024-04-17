@@ -313,6 +313,15 @@ PetscErrorCode RDyGetTimeStep(RDy rdy, RDyTimeUnit unit, PetscReal *time_step) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Converts the time t_from, expressed in units unit_from, to the time t_to,
+/// expressed in units unit_to.
+PetscErrorCode RDyConvertTime(RDyTimeUnit unit_from, PetscReal t_from, RDyTimeUnit unit_to, PetscReal *t_to) {
+  PetscFunctionBegin;
+  *t_to = ConvertTimeToSeconds(t_from, unit_from);
+  *t_to = ConvertTimeFromSeconds(*t_to, unit_to);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Stores the step index in step.
 PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
   PetscFunctionBegin;
@@ -324,8 +333,7 @@ PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
 PetscErrorCode RDyGetCouplingInterval(RDy rdy, RDyTimeUnit unit, PetscReal *interval) {
   PetscFunctionBegin;
   // convert the coupling interval from config file units to desired units
-  *interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
-  *interval = ConvertTimeFromSeconds(*interval, unit);
+  PetscCall(RDyConvertTime(rdy->config.time.unit, rdy->config.time.coupling_interval, unit, interval));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

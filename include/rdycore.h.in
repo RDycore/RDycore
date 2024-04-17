@@ -55,6 +55,7 @@ typedef enum { RDY_TIME_SECONDS = 0, RDY_TIME_MINUTES, RDY_TIME_HOURS, RDY_TIME_
 PETSC_EXTERN PetscErrorCode RDyGetTimeUnit(RDy, RDyTimeUnit*);
 PETSC_EXTERN PetscErrorCode RDyGetTime(RDy, RDyTimeUnit, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetTimeStep(RDy, RDyTimeUnit, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyConvertTime(RDyTimeUnit, PetscReal, RDyTimeUnit, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyGetStep(RDy, PetscInt*);
 PETSC_EXTERN PetscErrorCode RDyGetCouplingInterval(RDy, RDyTimeUnit, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, RDyTimeUnit, PetscReal);
