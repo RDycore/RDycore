@@ -214,22 +214,23 @@ program mms_f90
 
   implicit none
 
-  character(len=1024) :: config_file
-  type(RDy)           :: rdy_
-  PetscMPIInt         :: myrank
-  PetscInt            :: icell, ncells, nedges, nbcs, bc_type, idof
-  PetscMPIInt         :: ncells_glb
-  PetscInt, parameter :: bc_idx = 1
-  PetscReal           :: cur_time
-  PetscReal, pointer  :: xc_cell(:), yc_cell(:), area_cell(:)
-  PetscReal, pointer  :: h_source(:), hu_source(:), hv_source(:), mannings_n(:)
-  PetscReal, pointer  :: xc_edge(:), yc_edge(:), xc_bnd_cell(:), yc_bnd_cell(:), h_bnd(:), hu_bnd(:), hv_bnd(:), bc_values(:)
-  PetscReal, pointer  :: h_soln(:), hu_soln(:), hv_soln(:)
-  PetscReal, pointer  :: h_anal(:), hu_anal(:), hv_anal(:)
-  PetscInt, parameter :: ndof = 3
-  PetscReal           :: err(3), err1(3), err1_glb(3), err2(3), err2_glb(3), errm(3), errm_glb(3), area_cell_sum, area_cell_sum_glb
-  Vec                 :: ic_vec
-  PetscScalar, pointer:: ic_ptr(:)
+  character(len=1024)  :: config_file
+  type(RDy)            :: rdy_
+  PetscMPIInt          :: myrank
+  PetscInt             :: icell, ncells, nedges, nbcs, bc_type, idof
+  PetscMPIInt          :: ncells_glb
+  PetscInt, parameter  :: bc_idx = 1
+  integer(RDyTimeUnit) :: time_unit
+  PetscReal            :: cur_time
+  PetscReal, pointer   :: xc_cell(:), yc_cell(:), area_cell(:)
+  PetscReal, pointer   :: h_source(:), hu_source(:), hv_source(:), mannings_n(:)
+  PetscReal, pointer   :: xc_edge(:), yc_edge(:), xc_bnd_cell(:), yc_bnd_cell(:), h_bnd(:), hu_bnd(:), hv_bnd(:), bc_values(:)
+  PetscReal, pointer   :: h_soln(:), hu_soln(:), hv_soln(:)
+  PetscReal, pointer   :: h_anal(:), hu_anal(:), hv_anal(:)
+  PetscInt, parameter  :: ndof = 3
+  PetscReal            :: err(3), err1(3), err1_glb(3), err2(3), err2_glb(3), errm(3), errm_glb(3), area_cell_sum, area_cell_sum_glb
+  Vec                  :: ic_vec
+  PetscScalar, pointer :: ic_ptr(:)
   PetscErrorCode       :: ierr
 
   if (command_argument_count() < 1) then
@@ -303,8 +304,9 @@ program mms_f90
       PetscCallA(RDySetManningsNForLocalCell(rdy_, ncells, mannings_n, ierr));
       PetscCallA(RDySetInitialConditions(rdy_, ic_vec, ierr));
 
+      PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
-        PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
+        PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
 
         call problem1_sourceterm(cur_time, ncells, xc_cell, yc_cell, h_source, hu_source, hv_source)
         if (nedges > 0) then
@@ -332,7 +334,7 @@ program mms_f90
       PetscCallA(RDyGetLocalCellXMomentums(rdy_, ncells, hu_soln, ierr))
       PetscCallA(RDyGetLocalCellYMomentums(rdy_, ncells, hv_soln, ierr))
 
-      PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
+      PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
 
       err1(:) = 0.d0
       err2(:) = 0.d0

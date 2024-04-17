@@ -119,12 +119,12 @@ static const cyaml_schema_field_t numerics_fields_schema[] = {
 
 // mapping of strings to time units
 static const cyaml_strval_t time_units[] = {
-    {"seconds", TIME_SECONDS},
-    {"minutes", TIME_MINUTES},
-    {"hours",   TIME_HOURS  },
-    {"days",    TIME_DAYS   },
-    {"months",  TIME_MONTHS },
-    {"years",   TIME_YEARS  },
+    {"seconds", RDY_TIME_SECONDS},
+    {"minutes", RDY_TIME_MINUTES},
+    {"hours",   RDY_TIME_HOURS  },
+    {"days",    RDY_TIME_DAYS   },
+    {"months",  RDY_TIME_MONTHS },
+    {"years",   RDY_TIME_YEARS  },
 };
 
 // mapping of time fields to members of RDyTimeSection

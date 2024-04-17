@@ -487,18 +487,20 @@ int main(int argc, char *argv[]) {
 
     // run the simulation to completion using the time parameters in the
     // config file
+    RDyTimeUnit time_unit;
+    PetscCall(RDyGetTimeUnit(rdy, &time_unit));
     PetscReal prev_time, coupling_interval;
-    RDyGetTime(rdy, &prev_time);
-    RDyGetCouplingInterval(rdy, &coupling_interval);
+    PetscCall(RDyGetTime(rdy, time_unit, &prev_time));
+    PetscCall(RDyGetCouplingInterval(rdy, time_unit, &coupling_interval));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-coupling_interval", &coupling_interval, NULL));
-    RDySetCouplingInterval(rdy, coupling_interval);
+    PetscCall(RDySetCouplingInterval(rdy, time_unit, coupling_interval));
 
     PetscInt cur_bc_idx = -1, prev_bc_idx = -1;
 
     while (!RDyFinished(rdy)) {  // returns true based on stopping criteria
 
       PetscReal time, time_step;
-      PetscCall(RDyGetTime(rdy, &time));
+      PetscCall(RDyGetTime(rdy, time_unit, &time));
 
       switch (rain_dataset.type) {
         case CONSTANT:
@@ -533,8 +535,8 @@ int main(int argc, char *argv[]) {
 
       // the following just check that RDycore is doing the right thing
 
-      PetscCall(RDyGetTime(rdy, &time));
-      PetscCall(RDyGetTimeStep(rdy, &time_step));
+      PetscCall(RDyGetTime(rdy, time_unit, &time));
+      PetscCall(RDyGetTimeStep(rdy, time_unit, &time_step));
       PetscCheck(time > prev_time, comm, PETSC_ERR_USER, "Non-increasing time!");
       PetscCheck(time_step > 0.0, comm, PETSC_ERR_USER, "Non-positive time step!");
 

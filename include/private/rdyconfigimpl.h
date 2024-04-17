@@ -97,9 +97,6 @@ typedef struct {
 // time section
 // ------------
 
-// time units
-typedef enum { TIME_SECONDS = 0, TIME_MINUTES, TIME_HOURS, TIME_DAYS, TIME_MONTHS, TIME_YEARS } RDyTimeUnit;
-
 // all time parameters
 typedef struct {
   PetscReal   final_time;         // final simulation time [unit]

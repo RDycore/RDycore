@@ -81,6 +81,7 @@ contains
     ! !LOCAL VARIABLES:
     PetscScalar, pointer :: rain_p(:)
     PetscInt             :: t
+    integer(RDyTimeUnit) :: time_unit
     PetscReal            :: time_dn, time_up, cur_time, cur_rain
     PetscErrorCode       :: ierr
 
@@ -91,7 +92,8 @@ contains
     PetscCallA(RDySetWaterSourceForLocalCell(rdy_, num_cells_owned, rain_data, ierr))
 
     ! Set the coupling time step
-    PetscCallA(RDySetCouplingInterval(rdy_, dtime, ierr))
+    PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
+    PetscCallA(RDySetCouplingInterval(rdy_, time_unit, dtime, ierr))
 
     ! Run the simulation to completion.
     PetscCallA(RDyAdvance(rdy_, ierr))

@@ -38,22 +38,22 @@ PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit) {
 
   PetscReal time_in_sec;
   switch (time_unit) {
-    case TIME_SECONDS:
+    case RDY_TIME_SECONDS:
       time_in_sec = time;
       break;
-    case TIME_MINUTES:
+    case RDY_TIME_MINUTES:
       time_in_sec = time * secs_in_min;
       break;
-    case TIME_HOURS:
+    case RDY_TIME_HOURS:
       time_in_sec = time * mins_in_hr * secs_in_min;
       break;
-    case TIME_DAYS:
+    case RDY_TIME_DAYS:
       time_in_sec = time * hrs_in_day * mins_in_hr * secs_in_min;
       break;
-    case TIME_MONTHS:
+    case RDY_TIME_MONTHS:
       time_in_sec = time * days_in_mon * hrs_in_day * mins_in_hr * secs_in_min;
       break;
-    case TIME_YEARS:
+    case RDY_TIME_YEARS:
       time_in_sec = time * days_in_yr * hrs_in_day * mins_in_hr * secs_in_min;
       break;
     default:
@@ -71,22 +71,22 @@ PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit) {
   PetscFunctionBegin;
   PetscReal time_in_units;
   switch (time_unit) {
-    case TIME_SECONDS:
+    case RDY_TIME_SECONDS:
       time_in_units = time;
       break;
-    case TIME_MINUTES:
+    case RDY_TIME_MINUTES:
       time_in_units = time / secs_in_min;
       break;
-    case TIME_HOURS:
+    case RDY_TIME_HOURS:
       time_in_units = time / mins_in_hr / secs_in_min;
       break;
-    case TIME_DAYS:
+    case RDY_TIME_DAYS:
       time_in_units = time / hrs_in_day / mins_in_hr / secs_in_min;
       break;
-    case TIME_MONTHS:
+    case RDY_TIME_MONTHS:
       time_in_units = time / days_in_mon / hrs_in_day / mins_in_hr / secs_in_min;
       break;
-    case TIME_YEARS:
+    case RDY_TIME_YEARS:
       time_in_units = time / days_in_yr / hrs_in_day / mins_in_hr / secs_in_min;
       break;
     default:

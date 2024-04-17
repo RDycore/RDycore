@@ -14,8 +14,8 @@ module rdycore
             RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
-            RDyGetTime, RDyGetTimeStep, RDyGetStep, RDyGetCouplingInterval, &
-            RDySetCouplingInterval, &
+            RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
+            RDyGetStep, RDyGetCouplingInterval, RDySetCouplingInterval, &
             RDyGetLocalCellHeights, RDyGetLocalCellXMomentums, RDyGetLocalCellYMomentums, &
             RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
             RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
@@ -28,9 +28,18 @@ module rdycore
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
 
+  ! Supported time units (must be synchronized with RDyTimeUnit in rdycore.h)
+  integer, parameter :: RDyTimeUnit  = c_int
+  integer, parameter :: RDY_TIME_SECONDS = 0
+  integer, parameter :: RDY_TIME_MINUTES = 1
+  integer, parameter :: RDY_TIME_HOURS   = 2
+  integer, parameter :: RDY_TIME_DAYS    = 3
+  integer, parameter :: RDY_TIME_MONTHS  = 4
+  integer, parameter :: RDY_TIME_YEARS   = 5
+
   type :: RDy
     ! C pointer to RDy type
-    type(c_ptr)                  :: c_rdy
+    type(c_ptr) :: c_rdy
   end type RDy
 
   interface
@@ -105,16 +114,32 @@ module rdycore
       PetscInt,        intent(out) :: bnd_cond_type
     end function
 
-    integer(c_int) function rdygettime_(rdy, time) bind(c, name="RDyGetTime")
+    integer(c_int) function rdygettimeunit_(rdy, time_unit) bind(c, name="RDyGetTimeUnit")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in) :: rdy
+      integer(c_int), intent(out)       :: time_unit
+    end function
+
+    integer(c_int) function rdygettime_(rdy, time_unit, time) bind(c, name="RDyGetTime")
       use iso_c_binding, only: c_int, c_ptr, c_double
       type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int), value, intent(in)  :: time_unit
       real(c_double),        intent(out) :: time
     end function
 
-    integer(c_int) function rdygettimestep_(rdy, dt) bind(c, name="RDyGetTimeStep")
+    integer(c_int) function rdygettimestep_(rdy, time_unit, dt) bind(c, name="RDyGetTimeStep")
       use iso_c_binding, only: c_int, c_ptr, c_double
       type(c_ptr),    value, intent(in)  :: rdy
+      integer(c_int), value, intent(in)  :: time_unit
       real(c_double),        intent(out) :: dt
+    end function
+
+    integer(c_int) function rdyconverttime_(unit_from, t_from, unit_to, t_to) bind(c, name="RDyConvertTime")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      integer(c_int), value, intent(in)  :: unit_from
+      real(c_double), value, intent(in)  :: t_from
+      integer(c_int), value, intent(in)  :: unit_to
+      real(c_double),        intent(out) :: t_to
     end function
 
     integer(c_int) function rdygetstep_(rdy, step) bind(c, name="RDyGetStep")
@@ -123,15 +148,17 @@ module rdycore
       PetscInt,           intent(out) :: step
     end function
 
-    integer(c_int) function rdygetcouplinginterval_(rdy, interval) bind(c, name="RDyGetCouplingInterval")
-      use iso_c_binding, only: c_int, c_ptr, c_double
-      type(c_ptr),    value, intent(in)  :: rdy
-      real(c_double),        intent(out) :: interval
-    end function
-
-    integer(c_int) function rdysetcouplinginterval_(rdy, interval) bind(c, name="RDySetCouplingInterval")
+    integer(c_int) function rdygetcouplinginterval_(rdy, time_unit, interval) bind(c, name="RDyGetCouplingInterval")
       use iso_c_binding, only: c_int, c_ptr, c_double
       type(c_ptr),    value, intent(in) :: rdy
+      integer(c_int), value, intent(in) :: time_unit
+      real(c_double), intent(out)       :: interval
+    end function
+
+    integer(c_int) function rdysetcouplinginterval_(rdy, time_unit, interval) bind(c, name="RDySetCouplingInterval")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in) :: rdy
+      integer(c_int), value, intent(in) :: time_unit
       real(c_double), value, intent(in) :: interval
     end function
 
@@ -425,32 +452,52 @@ contains
     ierr = rdygetboundaryconditionflowtype_(rdy_%c_rdy, boundary_id-1, bnd_cond_type)
   end subroutine
 
-  subroutine RDyGetTime(rdy_, time, ierr)
-    type(RDy),       intent(inout) :: rdy_
-    real(RDyDouble), intent(out)   :: time
-    integer,         intent(out)   :: ierr
-    ierr = rdygettime_(rdy_%c_rdy, time)
+  subroutine RDyGetTimeUnit(rdy_, time_unit, ierr)
+    type(RDy),            intent(inout) :: rdy_
+    integer(RDyTimeUnit), intent(out)   :: time_unit
+    integer,              intent(out)   :: ierr
+    ierr = rdygettimeunit_(rdy_%c_rdy, time_unit)
   end subroutine
 
-  subroutine RDyGetTimeStep(rdy_, timestep, ierr)
-    type(RDy),       intent(inout) :: rdy_
-    real(RDyDouble), intent(out)   :: timestep
-    integer,         intent(out)   :: ierr
-    ierr = rdygettimestep_(rdy_%c_rdy, timestep)
+  subroutine RDyGetTime(rdy_, time_unit, time, ierr)
+    type(RDy),            intent(inout) :: rdy_
+    integer(RDyTimeUnit), intent(in)    :: time_unit
+    real(RDyDouble),      intent(out)   :: time
+    integer,              intent(out)   :: ierr
+    ierr = rdygettime_(rdy_%c_rdy, time_unit, time)
   end subroutine
 
-  subroutine RDyGetCouplingInterval(rdy_, interval, ierr)
-    type(RDy),       intent(inout) :: rdy_
-    real(RDyDouble), intent(out)   :: interval
-    integer,         intent(out)   :: ierr
-    ierr = rdygetcouplinginterval_(rdy_%c_rdy, interval)
+  subroutine RDyGetTimeStep(rdy_, time_unit, timestep, ierr)
+    type(RDy),            intent(inout) :: rdy_
+    integer(RDyTimeUnit), intent(in)    :: time_unit
+    real(RDyDouble),      intent(out)   :: timestep
+    integer,              intent(out)   :: ierr
+    ierr = rdygettimestep_(rdy_%c_rdy, time_unit, timestep)
   end subroutine
 
-  subroutine RDySetCouplingInterval(rdy_, interval, ierr)
-    type(RDy),       intent(inout) :: rdy_
-    real(RDyDouble), intent(in)    :: interval
-    integer,         intent(out)   :: ierr
-    ierr = rdysetcouplinginterval_(rdy_%c_rdy, interval)
+  subroutine RDyConvertTime(unit_from, t_from, unit_to, t_to, ierr)
+    integer(RDyTimeUnit), intent(in)    :: unit_from
+    real(RDyDouble),      intent(in)    :: t_from
+    integer(RDyTimeUnit), intent(in)    :: unit_to
+    real(RDyDouble),      intent(out)   :: t_to
+    integer,              intent(out)   :: ierr
+    ierr = rdyconverttime_(unit_from, t_from, unit_to, t_to)
+  end subroutine
+
+  subroutine RDyGetCouplingInterval(rdy_, time_unit, interval, ierr)
+    type(RDy),            intent(inout) :: rdy_
+    integer(RDyTimeUnit), intent(in)    :: time_unit
+    real(RDyDouble),      intent(out)   :: interval
+    integer,              intent(out)   :: ierr
+    ierr = rdygetcouplinginterval_(rdy_%c_rdy, time_unit, interval)
+  end subroutine
+
+  subroutine RDySetCouplingInterval(rdy_, time_unit, interval, ierr)
+    type(RDy),            intent(inout) :: rdy_
+    integer(RDyTimeUnit), intent(in)    :: time_unit
+    real(RDyDouble),      intent(in)    :: interval
+    integer,              intent(out)   :: ierr
+    ierr = rdysetcouplinginterval_(rdy_%c_rdy, time_unit, interval)
   end subroutine
 
   subroutine RDyGetStep(rdy_, step, ierr)
