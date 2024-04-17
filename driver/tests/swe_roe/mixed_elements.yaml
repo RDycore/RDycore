@@ -58,7 +58,8 @@ flow_conditions:
   - name: domain_flow_ic_whole_domain
     type: dirichlet
     height: 10
-    momentum: [0, 0]
+    x_momentum: 0
+    y_momentum: 0
 
 # we don't specify boundaries or boundary conditions, so all boundaries are
 # reflecting

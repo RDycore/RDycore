@@ -403,12 +403,13 @@ static const cyaml_schema_value_t boundary_condition_spec_entry = {
 // -----------------------
 // - name: <name-of-flow-condition-1>
 //   type: <dirichlet|neumann|reflecting|critical-outflow>
-//   height: <value> # used only by dirichlet
-//   momentum: <px, py> # use only by dirichlet
+//   height: <h>  # used only by initial conditions + dirichlet bcs
+//   x_momentum: <px> # used only by initial conditions + dirichlet bcs
+//   y_momentum: <py> # used only by initial conditions + dirichlet bcs
 // - name: <name-of-flow-condition-2>
 //   type: <dirichlet|neumann|reflecting|critical-outflow>
-//   file: <filename>      # used only by dirichlet
-//   format: <binary|hdf5> # used only by dirichlet
+//   file: <filename>      # used only by initial conditions + dirichlet bcs
+//   format: <binary|hdf5> # used only by initial conditions + dirichlet bcs
 //   ...
 
 // mapping of strings to types of conditions
