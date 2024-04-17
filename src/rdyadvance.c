@@ -242,7 +242,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscReal time;
   PetscCall(TSGetTime(rdy->ts, &time));
 
-  PetscReal interval           = rdy->config.time.coupling_interval;  // stored in seconds
+  PetscReal interval           = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
   PetscReal next_coupling_time = time + interval;
   PetscCall(TSSetMaxTime(rdy->ts, next_coupling_time));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
@@ -298,18 +298,18 @@ PetscErrorCode RDyGetTimeUnit(RDy rdy, RDyTimeUnit *unit) {
 }
 
 /// Retrieves the simulation time in the desired units
-PetscErrorCode RDyGetTime(RDy rdy, RDyTimeUnit units, PetscReal *time) {
+PetscErrorCode RDyGetTime(RDy rdy, RDyTimeUnit unit, PetscReal *time) {
   PetscFunctionBegin;
   PetscReal t;
   PetscCall(TSGetTime(rdy->ts, &t));
-  *time = ConvertTimeFromSeconds(t, units);
+  *time = ConvertTimeFromSeconds(t, unit);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Retrieves the internal time step size in the desired units
-PetscErrorCode RDyGetTimeStep(RDy rdy, RDyTimeUnit units, PetscReal *time_step) {
+PetscErrorCode RDyGetTimeStep(RDy rdy, RDyTimeUnit unit, PetscReal *time_step) {
   PetscFunctionBegin;
-  *time_step = ConvertTimeFromSeconds(rdy->dt, units);
+  *time_step = ConvertTimeFromSeconds(rdy->dt, unit);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -321,15 +321,19 @@ PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
 }
 
 /// Retrieves the coupling interval in the desired units
-PetscErrorCode RDyGetCouplingInterval(RDy rdy, RDyTimeUnit units, PetscReal *interval) {
+PetscErrorCode RDyGetCouplingInterval(RDy rdy, RDyTimeUnit unit, PetscReal *interval) {
   PetscFunctionBegin;
-  *interval = ConvertTimeFromSeconds(rdy->config.time.coupling_interval, units);
+  // convert the coupling interval from config file units to desired units
+  *interval = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
+  *interval = ConvertTimeFromSeconds(*interval, unit);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the coupling interval in the desired units
-PetscErrorCode RDySetCouplingInterval(RDy rdy, RDyTimeUnit units, PetscReal interval) {
+PetscErrorCode RDySetCouplingInterval(RDy rdy, RDyTimeUnit unit, PetscReal interval) {
   PetscFunctionBegin;
-  rdy->config.time.coupling_interval = ConvertTimeToSeconds(interval, units);
+  // we store the coupling interval in the units specified in the config file
+  rdy->config.time.coupling_interval = ConvertTimeToSeconds(interval, unit);
+  rdy->config.time.coupling_interval = ConvertTimeFromSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
