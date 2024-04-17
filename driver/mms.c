@@ -314,8 +314,10 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetInitialConditions(rdy, ic_vec));
     PetscCall(VecDestroy(&ic_vec));
 
+    RDyTimeUnit time_unit;
+    PetscCall(RDyGetTimeUnit(rdy, &time_unit));
     while (!RDyFinished(rdy)) {
-      PetscCall(RDyGetTime(rdy, &cur_time));
+      PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
 
       PetscCall(Problem1_SourceTerm(&pdata, cur_time, ncells, xc_cell, yc_cell, h_source, hu_source, hv_source));
       if (nedges > 0) {
@@ -349,7 +351,7 @@ int main(int argc, char *argv[]) {
       errm[idof] = 0.0;
     }
 
-    PetscCall(RDyGetTime(rdy, &cur_time));
+    PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
     for (PetscInt icell = 0; icell < ncells; icell++) {
       PetscCall(Problem1_GetData(&pdata, cur_time, xc_cell[icell], yc_cell[icell], H, &h_anal[icell]));
       PetscCall(Problem1_GetData(&pdata, cur_time, xc_cell[icell], yc_cell[icell], HU, &hu_anal[icell]));

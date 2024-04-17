@@ -86,26 +86,27 @@ program rdycore_f90
 
   implicit none
 
-  character(len=1024) :: config_file
-  type(RDy)           :: rdy_
-  PetscErrorCode      :: ierr
-  PetscInt            :: n, step, iedge
-  PetscInt            :: nbconds, ibcond, num_edges, bcond_type
-  PetscReal, pointer  :: h(:), hu(:), hv(:), rain(:), bc_values(:), values(:), values_bnd(:)
-  PetscInt, pointer   :: nat_id(:), nat_id_bnd_cell(:)
-  PetscReal           :: time, time_step, prev_time, coupling_interval, cur_time
+  character(len=1024)  :: config_file
+  type(RDy)            :: rdy_
+  PetscErrorCode       :: ierr
+  PetscInt             :: n, step, iedge
+  PetscInt             :: nbconds, ibcond, num_edges, bcond_type
+  PetscReal, pointer   :: h(:), hu(:), hv(:), rain(:), bc_values(:), values(:), values_bnd(:)
+  PetscInt,  pointer   :: nat_id(:), nat_id_bnd_cell(:)
+  integer(RDyTimeUnit) :: time_unit
+  PetscReal            :: time, time_step, prev_time, coupling_interval, cur_time
 
-  PetscBool           :: rain_specified, bc_specified
-  character(len=1024) :: rainfile, bcfile
-  Vec                 :: rain_vec, bc_vec
-  PetscScalar, pointer:: rain_ptr(:), bc_ptr(:)
-  PetscInt            :: nrain, nbc, num_edges_dirc_bc
-  PetscInt            :: dirc_bc_idx, global_dirc_bc_idx
-  PetscInt            :: cur_rain_idx, prev_rain_idx
-  PetscInt            :: cur_bc_idx, prev_bc_idx
-  PetscReal           :: cur_rain, cur_bc
-  PetscBool           :: interpolate_rain, interpolate_bc, flg
-  PetscInt, parameter :: ndof = 3
+  PetscBool            :: rain_specified, bc_specified
+  character(len=1024)  :: rainfile, bcfile
+  Vec                  :: rain_vec, bc_vec
+  PetscScalar, pointer :: rain_ptr(:), bc_ptr(:)
+  PetscInt             :: nrain, nbc, num_edges_dirc_bc
+  PetscInt             :: dirc_bc_idx, global_dirc_bc_idx
+  PetscInt             :: cur_rain_idx, prev_rain_idx
+  PetscInt             :: cur_bc_idx, prev_bc_idx
+  PetscReal            :: cur_rain, cur_bc
+  PetscBool            :: interpolate_rain, interpolate_bc, flg
+  PetscInt, parameter  :: ndof = 3
 
   if (command_argument_count() < 1) then
     call usage()
@@ -189,9 +190,10 @@ program rdycore_f90
 
       ! run the simulation to completion using the time parameters in the
       ! config file
-      PetscCallA(RDyGetTime(rdy_, prev_time, ierr))
-      PetscCallA(RDyGetCouplingInterval(rdy_, coupling_interval, ierr))
-      PetscCallA(RDySetCouplingInterval(rdy_, coupling_interval, ierr))
+      PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
+      PetscCallA(RDyGetTime(rdy_, time_unit, prev_time, ierr))
+      PetscCallA(RDyGetCouplingInterval(rdy_, time_unit, coupling_interval, ierr))
+      PetscCallA(RDySetCouplingInterval(rdy_, time_unit, coupling_interval, ierr))
 
       prev_rain_idx = 0
       prev_bc_idx = 0
@@ -203,7 +205,7 @@ program rdycore_f90
           rain(:) = 1.d0/3600.d0/1000.d0
           PetscCallA(RDySetWaterSourceForLocalCell(rdy_, n, rain, ierr))
         else
-          PetscCallA(RDyGetTime(rdy_, cur_time, ierr))
+          PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
           call getcurrentdata(rain_ptr, nrain, cur_time, interpolate_rain, cur_rain_idx, cur_rain)
           if (interpolate_rain .or. cur_rain_idx /= prev_rain_idx) then
             prev_rain_idx = cur_rain_idx
@@ -231,11 +233,11 @@ program rdycore_f90
         PetscCallA(RDyAdvance(rdy_, ierr))
 
         ! the following just check that RDycore is doing the right thing
-        PetscCallA(RDyGetTime(rdy_, time, ierr))
+        PetscCallA(RDyGetTime(rdy_, time_unit, time, ierr))
         if (time <= prev_time) then
           SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-increasing time!")
         end if
-        PetscCallA(RDyGetTimeStep(rdy_, time_step, ierr))
+        PetscCallA(RDyGetTimeStep(rdy_, time_unit, time_step, ierr))
         if (time_step <= 0.0) then
           SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive time step!")
         end if
