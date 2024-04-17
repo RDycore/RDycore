@@ -641,7 +641,6 @@ static const cyaml_schema_field_t mms_config_fields_schema[] = {
                                &region_spec_entry, 0, MAX_NUM_REGIONS),
     CYAML_FIELD_SEQUENCE_COUNT("boundaries", CYAML_FLAG_OPTIONAL, RDyConfig, boundaries, num_boundaries,
                                &boundary_spec_entry, 0, MAX_NUM_BOUNDARIES),
-    CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
     CYAML_FIELD_MAPPING("mms", CYAML_FLAG_DEFAULT, RDyConfig, mms, mms_fields_schema),
     CYAML_FIELD_END
 };

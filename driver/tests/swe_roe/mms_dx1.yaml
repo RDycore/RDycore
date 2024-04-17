@@ -2,45 +2,48 @@ physics:
   flow:
     mode: swe
 
-# this section contains analytic forms for the method of manufactured solutions
-mms:
-  constants:
-    A: 1
-    B: 1
-    C: 1
-  functions: # functions of x, y, t (non-normalized units)
-    # water height
-    h:    h0 * (1 + sin(x)*sin(y)) * exp(t)
-    dhdx: h0 * exp(t) * sin(y) * cos(x)
-    dhdy: h0 * exp(t) * sin(x) * cos(y)
-    dhdt: (h0/t0) * (1 + sin(x)*sin(y)) * exp(t)
-
-    # x velocity
-    u:     u0 * cos(x) * sin(y) * exp(t)
-    dudx: -u0 * sin(x) * sin(y) * exp(t)
-    dudy:  u0 * cos(x) * cos(y) * exp(t)
-    dudt:  u0 * cos(x) * sin(y) * exp(t)
-
-    # y velocity
-    v:     v0 * sin(x) * cos(y) * exp(t)
-    dvdx:  v0 * cos(x) * cos(y) * exp(t)
-    dvdy: -v0 * sin(x) * sin(y) * exp(t)
-    dvdt:  v0 * sin(x) * cos(y) * exp(t)
-
-    # (x and y momenta can be evaluated from h(x,y,t) * {u,v}(x,y,t))
-
-    # elevation as z(x, y)
-    z:     z0 * sin(x) * sin(y)
-    dzdx:  z0 * cos(x) * sin(y)
-    dzdy:  z0 * sin(x) * cos(y)
-
-    # source-related term n(x,y)
-    n:     n0 * (1 + sin(x) * sin(y))
-
 numerics:
   spatial : fv
   temporal: euler
   riemann : roe
+
+# this section contains analytic forms for the method of manufactured solutions
+mms:
+  constants: # any single capital letter can be used
+    H: 0.005  # water height scale factor
+    T: 20.0   # time scale
+    U: 0.025  # x-velocity scale factor
+    V: 0.025  # y-velocity scale factor
+    N: 0.01   # manning coefficient scale factor
+    Z: 0.0025 # elevation scale factor
+
+    K: 3.14159265357 / 5.0 # wave number in x and y
+  functions: # functions of x, y, t (non-normalized units)
+    # water height
+    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/T)
+    dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dhdt: H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+
+    # x velocity
+    u:     U * cos(K*x) * sin(K*y) * exp(t/T)
+    dudx: -U * K * sin(K*x) * sin(K*y) * exp(t/T)
+    dudy:  U * K * cos(K*x) * cos(K*y) * exp(t/T)
+    dudt:  U / T * cos(K*x) * sin(K*y) * exp(t/T)
+
+    # y velocity
+    v:     V * sin(K*x) * cos(K*y) * exp(t/T)
+    dvdx:  K * V * cos(x) * cos(y) * exp(t)
+    dvdy: -K * V * sin(x) * sin(y) * exp(t)
+    dvdt:  V / T * sin(x) * cos(y) * exp(t)
+
+    # elevation as z(x, y)
+    z:     Z * sin(K*x) * sin(K*y)
+    dzdx:  Z * K * cos(K*x) * sin(K*y)
+    dzdy:  Z * K * sin(K*x) * cos(K*y)
+
+    # source-related term n(x,y)
+    n:     N * (1 + sin(K*x) * sin(K*y))
 
 logging:
   level: none
