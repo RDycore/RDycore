@@ -30,16 +30,16 @@ module rdycore
 
   ! Supported time units (must be synchronized with RDyTimeUnit in rdycore.h)
   integer, parameter :: RDyTimeUnit  = c_int
-  integer, parameter :: TIME_SECONDS = 0
-  integer, parameter :: TIME_MINUTES = 1
-  integer, parameter :: TIME_HOURS   = 2
-  integer, parameter :: TIME_DAYS    = 3
-  integer, parameter :: TIME_MONTHS  = 4
-  integer, parameter :: TIME_YEARS   = 5
+  integer, parameter :: RDY_TIME_SECONDS = 0
+  integer, parameter :: RDY_TIME_MINUTES = 1
+  integer, parameter :: RDY_TIME_HOURS   = 2
+  integer, parameter :: RDY_TIME_DAYS    = 3
+  integer, parameter :: RDY_TIME_MONTHS  = 4
+  integer, parameter :: RDY_TIME_YEARS   = 5
 
   type :: RDy
     ! C pointer to RDy type
-    type(c_ptr)                  :: c_rdy
+    type(c_ptr) :: c_rdy
   end type RDy
 
   interface
