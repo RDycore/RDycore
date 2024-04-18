@@ -77,69 +77,9 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
-static PetscErrorCode SetSWEAnalyticSolution(RDy rdy) {
-  PetscFunctionBegin;
-
-  PetscCall(VecZeroEntries(rdy->X));
-
-  // initialize the manufactured solution on each region
-  PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->X, &n_local));
-  PetscCall(VecGetBlockSize(rdy->X, &ndof));
-  PetscScalar *x_ptr;
-  PetscCall(VecGetArray(rdy->X, &x_ptr));
-
-  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyRegion region = rdy->regions[r];
-
-    // Create vectorized (x, y, t) triples for bulk expression evaluation
-    PetscReal cell_x[region.num_cells], cell_y[region.num_cells], t[region.num_cells];
-    PetscInt  N = 0;  // number of bulk evaluations
-    for (PetscInt c = 0; c < region.num_cells; ++c) {
-      PetscInt cell_id = region.cell_ids[c];
-      if (3 * cell_id < n_local) {
-        cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
-        cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
-        t[N]      = 0.0;  // initial time
-        ++N;
-      }
-    }
-
-    if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "SWE solution vector has %" PetscInt_FMT " DOF (should have 3)", ndof);
-
-      // evaluate the manufactured ѕolutions at all (x, y, t)
-      PetscReal h[N], u[N], v[N];
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, t, h));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, t, u));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, t, v));
-
-      // TODO: salinity and sediment initial conditions go here.
-
-      // evaluate and set material properties
-      PetscReal manning[N];
-      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, manning));
-      PetscCall(RDySetManningsNForLocalCells(rdy, N, manning));
-
-      PetscInt l = 0;
-      for (PetscInt c = 0; c < region.num_cells; ++c) {
-        PetscInt cell_id = region.cell_ids[c];
-        if (3 * cell_id < n_local) {  // skip ghost cells
-          x_ptr[3 * cell_id]     = h[l];
-          x_ptr[3 * cell_id + 1] = h[l] * u[l];
-          x_ptr[3 * cell_id + 2] = h[l] * v[l];
-        }
-      }
-    }
-  }
-
-  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
-PetscErrorCode RDySetupMMS(RDy rdy) {
+PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(ReadMMSConfigFile(rdy));
@@ -180,13 +120,71 @@ PetscErrorCode RDySetupMMS(RDy rdy) {
   PetscCall(InitSWE(rdy));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
-  PetscCall(SetSWEAnalyticSolution(rdy));
+  PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->X));
+  PetscCall(RDyMMSUpdateMaterialProperties(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// evaluates the relevant manufactured solution at the given time, placing the
+// solution into the given vector
+PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
+  PetscFunctionBegin;
+
+  PetscCall(VecZeroEntries(solution));
+
+  // initialize the manufactured solution on each region
+  PetscInt n_local, ndof;
+  PetscCall(VecGetLocalSize(solution, &n_local));
+  PetscCall(VecGetBlockSize(solution, &ndof));
+  PetscScalar *x_ptr;
+  PetscCall(VecGetArray(solution, &x_ptr));
+
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion region = rdy->regions[r];
+
+    // Create vectorized (x, y, t) triples for bulk expression evaluation
+    PetscReal cell_x[region.num_cells], cell_y[region.num_cells], t[region.num_cells];
+    PetscInt  N = 0;  // number of bulk evaluations
+    for (PetscInt c = 0; c < region.num_cells; ++c) {
+      PetscInt cell_id = region.cell_ids[c];
+      if (3 * cell_id < n_local) {
+        cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
+        cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
+        t[N]      = time;
+        ++N;
+      }
+    }
+
+    if (rdy->config.physics.flow.mode == FLOW_SWE) {
+      PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "SWE solution vector has %" PetscInt_FMT " DOF (should have 3)", ndof);
+
+      // evaluate the manufactured ѕolutions at all (x, y, t)
+      PetscReal h[N], u[N], v[N];
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, t, h));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, t, u));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, t, v));
+
+      // TODO: salinity and sediment initial conditions go here.
+
+      PetscInt l = 0;
+      for (PetscInt c = 0; c < region.num_cells; ++c) {
+        PetscInt cell_id = region.cell_ids[c];
+        if (3 * cell_id < n_local) {  // skip ghost cells
+          x_ptr[3 * cell_id]     = h[l];
+          x_ptr[3 * cell_id + 1] = h[l] * u[l];
+          x_ptr[3 * cell_id + 2] = h[l] * v[l];
+        }
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(solution, &x_ptr));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // call this to enforce analytical boundary conditions in the MMS driver
-PetscErrorCode RDyEnforceMMSBoundaryConditions(RDy rdy, PetscReal time) {
+PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
   PetscFunctionBegin;
 
   RDyLogDebug(rdy, "Enforcing MMS boundary conditions...");
@@ -220,6 +218,41 @@ PetscErrorCode RDyEnforceMMSBoundaryConditions(RDy rdy, PetscReal time) {
       boundary_values[3 * e + 2] = hv[e];
     }
     PetscCall(RDySetDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// updates relevant material properties for the method of manufactured solutions
+// at the given time
+PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
+  PetscFunctionBegin;
+
+  // initialize the material properties on each region
+  PetscInt n_local;
+  PetscCall(VecGetLocalSize(rdy->X, &n_local));
+
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion region = rdy->regions[r];
+
+    // create vectorized (x, y) pairs for bulk expression evaluation
+    PetscReal cell_x[region.num_cells], cell_y[region.num_cells];
+    PetscInt  N = 0;  // number of bulk evaluations
+    for (PetscInt c = 0; c < region.num_cells; ++c) {
+      PetscInt cell_id = region.cell_ids[c];
+      if (3 * cell_id < n_local) {
+        cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
+        cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
+        ++N;
+      }
+    }
+
+    // evaluate and set material properties
+    if (rdy->config.physics.flow.mode == FLOW_SWE) {
+      PetscReal manning[N];
+      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, manning));
+      PetscCall(RDySetManningsNForLocalCells(rdy, N, manning));
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -40,8 +40,13 @@ PETSC_EXTERN PetscErrorCode RDySetLogFile(RDy, const char*);
 // RDycore setup/breakdown
 PETSC_EXTERN PetscErrorCode RDyCreate(MPI_Comm, const char*, RDy*);
 PETSC_EXTERN PetscErrorCode RDySetup(RDy);
-PETSC_EXTERN PetscErrorCode RDySetupMMS(RDy); // for MMS driver only!
 PETSC_EXTERN PetscErrorCode RDyDestroy(RDy*);
+
+// RDycore support for Method of Manufactured Solutions (MMS)
+PETSC_EXTERN PetscErrorCode RDyMMSSetup(RDy);
+PETSC_EXTERN PetscErrorCode RDyMMSComputeSolution(RDy, PetscReal, Vec);
+PETSC_EXTERN PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy, PetscReal);
+PETSC_EXTERN PetscErrorCode RDyMMSUpdateMaterialProperties(RDy);
 
 // time integration
 PETSC_EXTERN PetscErrorCode RDyAdvance(RDy);
@@ -88,7 +93,6 @@ PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellZCentroids(RDy rdy, const PetscInt
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt values[size]);
 
 PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof, PetscReal values[ndof * num_edges]);
-PETSC_EXTERN PetscErrorCode RDyEnforceMMSBoundaryConditions(RDy rdy, PetscReal time); // MMS driver only!
 PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]);
 PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]);
