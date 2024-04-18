@@ -257,3 +257,61 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+// Computes the componentwise L1, L2, and Linf error norms for the relevant
+// manufactured solution at the given time. L1_norms, L2_norms, and Linf_norms
+// are all arrays large enough to store the number of dof. If non-NULL,
+// num_global_cells stores the number of distinct global cells and global_area
+// stores the total area covered by distinct global cells.
+PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms,
+                                       PetscInt *num_global_cells, PetscReal *global_area) {
+  PetscFunctionBegin;
+
+  // compute the error vector
+  Vec error;
+  PetscCall(RDyCreatePrognosticVec(rdy, &error));
+  PetscCall(RDyMMSComputeSolution(rdy, time, error));
+  PetscCall(VecAYPX(error, -1.0, rdy->X));
+
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(error, &ndof));
+
+  // compute the componentwise error norms on local cells
+  PetscReal *e;
+  PetscCall(VecGetArray(error, &e));
+  PetscReal area_sum = 0.0;
+  memset(L1_norms, 0, ndof * sizeof(PetscReal));
+  memset(L2_norms, 0, ndof * sizeof(PetscReal));
+  memset(Linf_norms, 0, ndof * sizeof(PetscReal));
+  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+    PetscReal area = rdy->mesh.cells.areas[i];
+
+    for (PetscInt dof = 0; dof < ndof; ++dof) {
+      PetscReal e_dof = e[ndof * i + dof];
+      L1_norms[dof] += PetscAbsReal(e_dof) * area;
+      L2_norms[dof] += e_dof * e_dof * area;
+      Linf_norms[dof] = PetscMax(e_dof, Linf_norms[dof]);
+    }
+    area_sum += area;
+  }
+  PetscCall(VecRestoreArray(error, &e));
+  PetscCall(VecDestroy(&error));
+
+  // obtain global error norms
+  PetscCall(MPI_Reduce(MPI_IN_PLACE, L1_norms, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+  PetscCall(MPI_Reduce(MPI_IN_PLACE, L2_norms, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+  PetscCall(MPI_Reduce(MPI_IN_PLACE, Linf_norms, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+
+  for (PetscInt dof = 0; dof < ndof; ++dof) {
+    L2_norms[dof] = PetscSqrtReal(L2_norms[dof]);
+  }
+
+  // obtain optional diagnostics
+  if (num_global_cells) {
+    PetscCall(MPI_Reduce(&rdy->mesh.num_cells_local, &num_global_cells, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD));
+  }
+  if (global_area) {
+    PetscCall(MPI_Reduce(&area_sum, global_area, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

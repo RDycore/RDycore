@@ -47,6 +47,7 @@ PETSC_EXTERN PetscErrorCode RDyMMSSetup(RDy);
 PETSC_EXTERN PetscErrorCode RDyMMSComputeSolution(RDy, PetscReal, Vec);
 PETSC_EXTERN PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyMMSUpdateMaterialProperties(RDy);
+PETSC_EXTERN PetscErrorCode RDyMMSComputeErrorNorms(RDy, PetscReal, PetscReal*, PetscReal*, PetscReal*, PetscInt*, PetscReal*);
 
 // time integration
 PETSC_EXTERN PetscErrorCode RDyAdvance(RDy);

@@ -4,7 +4,7 @@
 PetscReal GRAVITY = 9.806;
 
 static const char *help_str =
-    "rdycore_mms - a standalone RDycore driver for various MMS problems\n"
+    "rdycore_mms - a standalone RDycore driver for MMS problems\n"
     "usage: rdycore_mms [options] <filename.yaml>\n";
 
 static void usage(const char *exe_name) {
@@ -12,6 +12,7 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
+/*
 typedef enum { H, DH_DX, DH_DY, DH_DT, U, DU_DX, DU_DY, DU_DT, V, DV_DX, DV_DY, DV_DT, HU, HV, Z, DZ_DX, DZ_DY, N } DataType;
 
 typedef struct {
@@ -192,6 +193,7 @@ static PetscErrorCode Problem1_DirichletValue(ProblemData *pdata, PetscReal t, P
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+*/
 
 int main(int argc, char *argv[]) {
   // print usage info if no arguments given
@@ -214,9 +216,9 @@ int main(int argc, char *argv[]) {
     RDy      rdy;
 
     PetscCall(RDyCreate(comm, argv[1], &rdy));
+    PetscCall(RDyMMSSetup(rdy));
 
-    PetscCall(RDySetup(rdy));
-
+    /*
     PetscInt   ncells = 0;
     PetscReal *xc_cell, *yc_cell, *area_cell;
     PetscInt  *nat_id_cell;
@@ -313,11 +315,14 @@ int main(int argc, char *argv[]) {
     PetscCall(VecRestoreArray(ic_vec, &ic_ptr));
     PetscCall(RDySetInitialConditions(rdy, ic_vec));
     PetscCall(VecDestroy(&ic_vec));
+    */
 
     RDyTimeUnit time_unit;
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
+    PetscReal cur_time;
     while (!RDyFinished(rdy)) {
       PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
+      /*
 
       PetscCall(Problem1_SourceTerm(&pdata, cur_time, ncells, xc_cell, yc_cell, h_source, hu_source, hv_source));
       if (nedges > 0) {
@@ -328,16 +333,22 @@ int main(int argc, char *argv[]) {
       PetscCall(RDySetWaterSourceForLocalCells(rdy, ncells, h_source));
       PetscCall(RDySetXMomentumSourceForLocalCells(rdy, ncells, hu_source));
       PetscCall(RDySetYMomentumSourceForLocalCells(rdy, ncells, hv_source));
+      */
 
-      // set dirchlet BC
-      if (nedges > 0) {
-        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, bc_values));
-      }
+      // enforce dirchlet BCs
+      PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time));
 
       // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
     }
 
+    // compute error norms for the final solution
+    PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
+    PetscReal L1_norms[3], L2_norms[3], Linf_norms[3], global_area;
+    PetscInt  num_global_cells;
+    PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
+
+    /*
     PetscCall(RDyGetLocalCellHeights(rdy, ncells, h_soln));
     PetscCall(RDyGetLocalCellXMomentums(rdy, ncells, hu_soln));
     PetscCall(RDyGetLocalCellYMomentums(rdy, ncells, hv_soln));
@@ -378,29 +389,33 @@ int main(int argc, char *argv[]) {
     PetscCall(MPI_Reduce(&errm, &errm_glb, 3, MPI_DOUBLE, MPI_MAX, 0, PETSC_COMM_WORLD));
 
     PetscCall(MPI_Reduce(&area_cell_sum, &area_cell_sum_glb, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+    */
 
     if (!myrank) {
+      /*
       for (PetscInt idof = 0; idof < 3; idof++) {
         err2_glb[idof] = PetscPowReal(err2_glb[idof], 0.5);
       }
+      */
 
-      printf("Avg-cell-area    : %18.16f\n", area_cell_sum_glb / ncells_glb);
-      printf("Avg-length-scale : %18.16f\n", PetscPowReal(area_cell_sum_glb / ncells_glb, 0.5));
+      printf("Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
+      printf("Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
 
       printf("Error-Norm-1     : ");
-      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", err1_glb[idof]);
+      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L1_norms[idof]);
       printf("\n");
 
       printf("Error-Norm-2     : ");
-      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", err2_glb[idof]);
+      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L2_norms[idof]);
       printf("\n");
 
       printf("Error-Norm-Max   : ");
-      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", errm_glb[idof]);
+      for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", Linf_norms[idof]);
       printf("\n");
     }
 
     // free up memory
+    /*
     PetscFree(xc_cell);
     PetscFree(yc_cell);
     PetscFree(area_cell);
@@ -423,6 +438,7 @@ int main(int argc, char *argv[]) {
       PetscFree(hu_bnd);
       PetscFree(hv_bnd);
     }
+    */
   }
 
   PetscCall(RDyFinalize());
