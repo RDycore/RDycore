@@ -19,12 +19,7 @@ typedef char MathExpression[MAX_EXPRESSION_LEN + 1];
 // specification of a set of named constants for the MMS driver, each
 // represented by a single capital letter
 typedef struct {
-  struct {
-    MathExpression A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
-  } expressions;
-  struct {
-    PetscReal A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
-  } values;
+  PetscReal A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
 } RDyMMSConstants;
 
 // specification of a set of manufactured solutions for the

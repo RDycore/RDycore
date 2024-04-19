@@ -21,17 +21,9 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
       .name = "analytic_bc",
       .type = CONDITION_DIRICHLET,
   };
-  analytic_flow.height = rdy->config.mms.swe.solutions.h;
-
-  analytic_flow.x_momentum = mupCreate(muBASETYPE_FLOAT);
-  MathExpression x_momentum_expr;
-  snprintf(x_momentum_expr, MAX_EXPRESSION_LEN, "%s * %s", rdy->config.mms.swe.expressions.h, rdy->config.mms.swe.expressions.u);
-  mupSetExpr(analytic_flow.x_momentum, x_momentum_expr);
-
-  analytic_flow.y_momentum = mupCreate(muBASETYPE_FLOAT);
-  MathExpression y_momentum_expr;
-  snprintf(y_momentum_expr, MAX_EXPRESSION_LEN, "%s * %s", rdy->config.mms.swe.expressions.h, rdy->config.mms.swe.expressions.v);
-  mupSetExpr(analytic_flow.y_momentum, y_momentum_expr);
+  analytic_flow.height     = rdy->config.mms.swe.solutions.h;
+  analytic_flow.x_momentum = rdy->config.mms.swe.solutions.u;  // NOTE: must multiply by h when enforcing!
+  analytic_flow.y_momentum = rdy->config.mms.swe.solutions.v;  // NOTE: must multiply by h when enforcing!
 
   RDyCondition analytic_bc = {
       .flow = &analytic_flow,
@@ -205,18 +197,18 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
 
     // compute h, hu, hv on each edge (SWE-specific)
     RDyFlowCondition *flow_bc = rdy->boundary_conditions[b].flow;
-    PetscReal         h[num_edges], hu[num_edges], hv[num_edges];
+    PetscReal         h[num_edges], u[num_edges], v[num_edges];
     PetscCall(EvaluateTemporalSolution(flow_bc->height, num_edges, x, y, t, h));
-    PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, t, hu));
-    PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, t, hv));
+    PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, t, u));
+    PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, t, v));
 
     // set the boundary values (SWE-specific)
     // NOTE: ndof == 3 for SWE
     PetscReal boundary_values[3 * num_edges];
     for (PetscInt e = 0; e < num_edges; ++e) {
       boundary_values[3 * e]     = h[e];
-      boundary_values[3 * e + 1] = hu[e];
-      boundary_values[3 * e + 2] = hv[e];
+      boundary_values[3 * e + 1] = h[e] * u[e];
+      boundary_values[3 * e + 2] = h[e] * v[e];
     }
     PetscCall(RDySetDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
   }

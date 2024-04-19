@@ -535,32 +535,32 @@ static const cyaml_schema_field_t ensemble_fields_schema[] = {
 //-------------------------------
 
 static const cyaml_schema_field_t mms_constants_fields_schema[] = {
-    CYAML_FIELD_STRING("A", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.A, 1),
-    CYAML_FIELD_STRING("B", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.B, 1),
-    CYAML_FIELD_STRING("C", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.C, 1),
-    CYAML_FIELD_STRING("D", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.D, 1),
-    CYAML_FIELD_STRING("E", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.E, 1),
-    CYAML_FIELD_STRING("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.F, 1),
-    CYAML_FIELD_STRING("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.G, 1),
-    CYAML_FIELD_STRING("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.H, 1),
-    CYAML_FIELD_STRING("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.I_, 1),
-    CYAML_FIELD_STRING("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.J, 1),
-    CYAML_FIELD_STRING("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.K, 1),
-    CYAML_FIELD_STRING("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.L, 1),
-    CYAML_FIELD_STRING("M", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.M, 1),
-    CYAML_FIELD_STRING("N", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.N, 1),
-    CYAML_FIELD_STRING("O", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.O, 1),
-    CYAML_FIELD_STRING("P", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.P, 1),
-    CYAML_FIELD_STRING("Q", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Q, 1),
-    CYAML_FIELD_STRING("R", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.R, 1),
-    CYAML_FIELD_STRING("S", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.S, 1),
-    CYAML_FIELD_STRING("T", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.T, 1),
-    CYAML_FIELD_STRING("U", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.U, 1),
-    CYAML_FIELD_STRING("V", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.V, 1),
-    CYAML_FIELD_STRING("W", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.W, 1),
-    CYAML_FIELD_STRING("X", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.X, 1),
-    CYAML_FIELD_STRING("Y", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Y, 1),
-    CYAML_FIELD_STRING("Z", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Z, 1),
+    CYAML_FIELD_FLOAT("A", CYAML_FLAG_OPTIONAL, RDyMMSConstants, A),
+    CYAML_FIELD_FLOAT("B", CYAML_FLAG_OPTIONAL, RDyMMSConstants, B),
+    CYAML_FIELD_FLOAT("C", CYAML_FLAG_OPTIONAL, RDyMMSConstants, C),
+    CYAML_FIELD_FLOAT("D", CYAML_FLAG_OPTIONAL, RDyMMSConstants, D),
+    CYAML_FIELD_FLOAT("E", CYAML_FLAG_OPTIONAL, RDyMMSConstants, E),
+    CYAML_FIELD_FLOAT("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, F),
+    CYAML_FIELD_FLOAT("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, G),
+    CYAML_FIELD_FLOAT("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, H),
+    CYAML_FIELD_FLOAT("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, I_),
+    CYAML_FIELD_FLOAT("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, J),
+    CYAML_FIELD_FLOAT("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, K),
+    CYAML_FIELD_FLOAT("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, L),
+    CYAML_FIELD_FLOAT("M", CYAML_FLAG_OPTIONAL, RDyMMSConstants, M),
+    CYAML_FIELD_FLOAT("N", CYAML_FLAG_OPTIONAL, RDyMMSConstants, N),
+    CYAML_FIELD_FLOAT("O", CYAML_FLAG_OPTIONAL, RDyMMSConstants, O),
+    CYAML_FIELD_FLOAT("P", CYAML_FLAG_OPTIONAL, RDyMMSConstants, P),
+    CYAML_FIELD_FLOAT("Q", CYAML_FLAG_OPTIONAL, RDyMMSConstants, Q),
+    CYAML_FIELD_FLOAT("R", CYAML_FLAG_OPTIONAL, RDyMMSConstants, R),
+    CYAML_FIELD_FLOAT("S", CYAML_FLAG_OPTIONAL, RDyMMSConstants, S),
+    CYAML_FIELD_FLOAT("T", CYAML_FLAG_OPTIONAL, RDyMMSConstants, T),
+    CYAML_FIELD_FLOAT("U", CYAML_FLAG_OPTIONAL, RDyMMSConstants, U),
+    CYAML_FIELD_FLOAT("V", CYAML_FLAG_OPTIONAL, RDyMMSConstants, V),
+    CYAML_FIELD_FLOAT("W", CYAML_FLAG_OPTIONAL, RDyMMSConstants, W),
+    CYAML_FIELD_FLOAT("X", CYAML_FLAG_OPTIONAL, RDyMMSConstants, X),
+    CYAML_FIELD_FLOAT("Y", CYAML_FLAG_OPTIONAL, RDyMMSConstants, Y),
+    CYAML_FIELD_FLOAT("Z", CYAML_FLAG_OPTIONAL, RDyMMSConstants, Z),
     CYAML_FIELD_END
 };
 
@@ -765,6 +765,23 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     // validate our materials
     PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
+  } else {  // mms mode
+    // check that we have expressions for our manufactured solutions
+    if (config->physics.flow.mode == FLOW_SWE) {
+      PetscCheck(config->mms.swe.expressions.h[0], comm, PETSC_ERR_USER, "No expression for h was specified!");
+      PetscCheck(config->mms.swe.expressions.dhdx[0], comm, PETSC_ERR_USER, "No expression for dh/dx was specified!");
+      PetscCheck(config->mms.swe.expressions.dhdy[0], comm, PETSC_ERR_USER, "No expression for dh/dy was specified!");
+      PetscCheck(config->mms.swe.expressions.dhdt[0], comm, PETSC_ERR_USER, "No expression for dh/dt was specified!");
+      PetscCheck(config->mms.swe.expressions.u[0], comm, PETSC_ERR_USER, "No expression for u was specified!");
+      PetscCheck(config->mms.swe.expressions.dudx[0], comm, PETSC_ERR_USER, "No expression for du/dx was specified!");
+      PetscCheck(config->mms.swe.expressions.dudy[0], comm, PETSC_ERR_USER, "No expression for du/dy was specified!");
+      PetscCheck(config->mms.swe.expressions.dudt[0], comm, PETSC_ERR_USER, "No expression for du/dt was specified!");
+      PetscCheck(config->mms.swe.expressions.v[0], comm, PETSC_ERR_USER, "No expression for v was specified!");
+      PetscCheck(config->mms.swe.expressions.dvdx[0], comm, PETSC_ERR_USER, "No expression for dv/dx was specified!");
+      PetscCheck(config->mms.swe.expressions.dvdy[0], comm, PETSC_ERR_USER, "No expression for dv/dy was specified!");
+      PetscCheck(config->mms.swe.expressions.dvdt[0], comm, PETSC_ERR_USER, "No expression for dv/dt was specified!");
+      PetscCheck(config->mms.swe.expressions.n[0], comm, PETSC_ERR_USER, "No expression for n was specified!");
+    }
   }
 
   // validate our flow conditions
@@ -804,38 +821,42 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define DEFINE_CONSTANTS_FOR_FUNCTION(model, constants, function)       \
-  mupDefineConst(model->solutions.function, "A", constants->values.A);  \
-  mupDefineConst(model->solutions.function, "B", constants->values.B);  \
-  mupDefineConst(model->solutions.function, "C", constants->values.C);  \
-  mupDefineConst(model->solutions.function, "D", constants->values.D);  \
-  mupDefineConst(model->solutions.function, "E", constants->values.E);  \
-  mupDefineConst(model->solutions.function, "F", constants->values.F);  \
-  mupDefineConst(model->solutions.function, "G", constants->values.G);  \
-  mupDefineConst(model->solutions.function, "H", constants->values.H);  \
-  mupDefineConst(model->solutions.function, "I", constants->values.I_); \
-  mupDefineConst(model->solutions.function, "J", constants->values.J);  \
-  mupDefineConst(model->solutions.function, "K", constants->values.K);  \
-  mupDefineConst(model->solutions.function, "L", constants->values.L);  \
-  mupDefineConst(model->solutions.function, "M", constants->values.M);  \
-  mupDefineConst(model->solutions.function, "N", constants->values.N);  \
-  mupDefineConst(model->solutions.function, "O", constants->values.O);  \
-  mupDefineConst(model->solutions.function, "P", constants->values.P);  \
-  mupDefineConst(model->solutions.function, "Q", constants->values.Q);  \
-  mupDefineConst(model->solutions.function, "R", constants->values.R);  \
-  mupDefineConst(model->solutions.function, "S", constants->values.S);  \
-  mupDefineConst(model->solutions.function, "T", constants->values.T);  \
-  mupDefineConst(model->solutions.function, "U", constants->values.U);  \
-  mupDefineConst(model->solutions.function, "V", constants->values.V);  \
-  mupDefineConst(model->solutions.function, "W", constants->values.W);  \
-  mupDefineConst(model->solutions.function, "X", constants->values.X);  \
-  mupDefineConst(model->solutions.function, "Y", constants->values.Y);  \
-  mupDefineConst(model->solutions.function, "Z", constants->values.Z)
+#define DEFINE_CONSTANT(model, function, constants, name) mupDefineConst(model->solutions.function, #name, constants->name)
+
+#define DEFINE_CONSTANT_I(model, function, constants) mupDefineConst(model->solutions.function, "I", constants->I_)
+
+#define DEFINE_CONSTANTS_FOR_FUNCTION(model, function, constants) \
+  DEFINE_CONSTANT(model, function, constants, A);                 \
+  DEFINE_CONSTANT(model, function, constants, B);                 \
+  DEFINE_CONSTANT(model, function, constants, C);                 \
+  DEFINE_CONSTANT(model, function, constants, D);                 \
+  DEFINE_CONSTANT(model, function, constants, E);                 \
+  DEFINE_CONSTANT(model, function, constants, F);                 \
+  DEFINE_CONSTANT(model, function, constants, G);                 \
+  DEFINE_CONSTANT(model, function, constants, H);                 \
+  DEFINE_CONSTANT_I(model, function, constants);                  \
+  DEFINE_CONSTANT(model, function, constants, J);                 \
+  DEFINE_CONSTANT(model, function, constants, K);                 \
+  DEFINE_CONSTANT(model, function, constants, L);                 \
+  DEFINE_CONSTANT(model, function, constants, M);                 \
+  DEFINE_CONSTANT(model, function, constants, N);                 \
+  DEFINE_CONSTANT(model, function, constants, O);                 \
+  DEFINE_CONSTANT(model, function, constants, P);                 \
+  DEFINE_CONSTANT(model, function, constants, Q);                 \
+  DEFINE_CONSTANT(model, function, constants, R);                 \
+  DEFINE_CONSTANT(model, function, constants, S);                 \
+  DEFINE_CONSTANT(model, function, constants, T);                 \
+  DEFINE_CONSTANT(model, function, constants, U);                 \
+  DEFINE_CONSTANT(model, function, constants, V);                 \
+  DEFINE_CONSTANT(model, function, constants, W);                 \
+  DEFINE_CONSTANT(model, function, constants, X);                 \
+  DEFINE_CONSTANT(model, function, constants, Y);                 \
+  DEFINE_CONSTANT(model, function, constants, Z)
 
 #define DEFINE_FUNCTION(model, constants, function)                   \
   model->solutions.function = mupCreate(muBASETYPE_FLOAT);            \
   mupSetExpr(model->solutions.function, model->expressions.function); \
-  DEFINE_CONSTANTS_FOR_FUNCTION(model, constants, function)
+  DEFINE_CONSTANTS_FOR_FUNCTION(model, function, constants)
 
 static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSWESolutions *swe) {
   PetscFunctionBegin;
