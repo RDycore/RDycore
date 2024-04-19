@@ -74,8 +74,13 @@ letter (`A` through `Z`) can be used as a constant. In the above example, the
 solutions reference the constants `H`, `T`, `U`, `V`, `N`, `Z`, and `K`, which
 are defined as shown.
 
-The `solutions` subsection defines a set of manufactured solutions in terms of
-functions of the coordinates `x` and `y` and the time `t`. These solutions are
-parsed and compiled at runtime so they can be evaluated as needed by the model.
-This means you can define a new manufactured solution in every MMS driver input
-file, without developing code and rebuilding RDycore.
+The `swe` subsection defines a set of manufactured solutions to the 2D shallow
+water equations (SWE) in terms of a water height `h` with a flow velocity
+`(u, v)`. Each of the components `h, u, v` are represented by a function of the
+coordinates `x` and `y` and the time `t`. Other model parameters (`z`, the
+elevation function, and `n`, the Manning coefficient) are functions of `x` and
+`y` only.
+
+These analytic forms are parsed and compiled at runtime so they can be evaluated
+as needed by the model. This means you can define a new manufactured solution in
+every MMS driver input file, without developing code and rebuilding RDycore.
