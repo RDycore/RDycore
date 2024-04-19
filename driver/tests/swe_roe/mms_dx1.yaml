@@ -17,7 +17,7 @@ mms:
     N: 0.01   # manning coefficient scale factor
     Z: 0.0025 # elevation scale factor
 
-    K: 3.14159265357 / 5.0 # wave number in x and y
+    K: 0.6283185307179586 # wave number in x and y (pi/5)
   swe: # functions of x, y, t (non-normalized units)
     # water height
     h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
