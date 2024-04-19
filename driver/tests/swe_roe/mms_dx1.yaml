@@ -18,7 +18,7 @@ mms:
     Z: 0.0025 # elevation scale factor
 
     K: 3.14159265357 / 5.0 # wave number in x and y
-  functions: # functions of x, y, t (non-normalized units)
+  swe: # functions of x, y, t (non-normalized units)
     # water height
     h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
     dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/T)

@@ -535,32 +535,32 @@ static const cyaml_schema_field_t ensemble_fields_schema[] = {
 //-------------------------------
 
 static const cyaml_schema_field_t mms_constants_fields_schema[] = {
-    CYAML_FIELD_FLOAT("A", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.A),
-    CYAML_FIELD_FLOAT("B", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.B),
-    CYAML_FIELD_FLOAT("C", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.C),
-    CYAML_FIELD_FLOAT("D", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.D),
-    CYAML_FIELD_FLOAT("E", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.E),
-    CYAML_FIELD_FLOAT("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.F),
-    CYAML_FIELD_FLOAT("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.G),
-    CYAML_FIELD_FLOAT("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.H),
-    CYAML_FIELD_FLOAT("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.I_),
-    CYAML_FIELD_FLOAT("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.J),
-    CYAML_FIELD_FLOAT("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.K),
-    CYAML_FIELD_FLOAT("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.L),
-    CYAML_FIELD_FLOAT("M", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.M),
-    CYAML_FIELD_FLOAT("N", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.N),
-    CYAML_FIELD_FLOAT("O", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.O),
-    CYAML_FIELD_FLOAT("P", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.P),
-    CYAML_FIELD_FLOAT("Q", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Q),
-    CYAML_FIELD_FLOAT("R", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.R),
-    CYAML_FIELD_FLOAT("S", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.S),
-    CYAML_FIELD_FLOAT("T", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.T),
-    CYAML_FIELD_FLOAT("U", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.U),
-    CYAML_FIELD_FLOAT("V", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.V),
-    CYAML_FIELD_FLOAT("W", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.W),
-    CYAML_FIELD_FLOAT("X", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.X),
-    CYAML_FIELD_FLOAT("Y", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Y),
-    CYAML_FIELD_FLOAT("Z", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Z),
+    CYAML_FIELD_STRING("A", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.A, 1),
+    CYAML_FIELD_STRING("B", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.B, 1),
+    CYAML_FIELD_STRING("C", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.C, 1),
+    CYAML_FIELD_STRING("D", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.D, 1),
+    CYAML_FIELD_STRING("E", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.E, 1),
+    CYAML_FIELD_STRING("F", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.F, 1),
+    CYAML_FIELD_STRING("G", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.G, 1),
+    CYAML_FIELD_STRING("H", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.H, 1),
+    CYAML_FIELD_STRING("I", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.I_, 1),
+    CYAML_FIELD_STRING("J", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.J, 1),
+    CYAML_FIELD_STRING("K", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.K, 1),
+    CYAML_FIELD_STRING("L", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.L, 1),
+    CYAML_FIELD_STRING("M", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.M, 1),
+    CYAML_FIELD_STRING("N", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.N, 1),
+    CYAML_FIELD_STRING("O", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.O, 1),
+    CYAML_FIELD_STRING("P", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.P, 1),
+    CYAML_FIELD_STRING("Q", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Q, 1),
+    CYAML_FIELD_STRING("R", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.R, 1),
+    CYAML_FIELD_STRING("S", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.S, 1),
+    CYAML_FIELD_STRING("T", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.T, 1),
+    CYAML_FIELD_STRING("U", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.U, 1),
+    CYAML_FIELD_STRING("V", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.V, 1),
+    CYAML_FIELD_STRING("W", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.W, 1),
+    CYAML_FIELD_STRING("X", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.X, 1),
+    CYAML_FIELD_STRING("Y", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Y, 1),
+    CYAML_FIELD_STRING("Z", CYAML_FLAG_OPTIONAL, RDyMMSConstants, expressions.Z, 1),
     CYAML_FIELD_END
 };
 
@@ -694,7 +694,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, const cyaml
 }
 
 // checks config for any invalid or omitted parameters
-static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
+static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool mms_mode) {
   PetscFunctionBegin;
 
   // check ensemble settings
@@ -751,19 +751,21 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config) {
                "time.coupling_interval must not exceed time.final_time");
   }
 
-  // we need initial conditions specified for each region
-  PetscCheck(config->num_initial_conditions > 0, comm, PETSC_ERR_USER, "No initial conditions were specified!");
-  PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
-             "%" PetscInt_FMT " initial conditions were specified in initial_conditions (exactly %" PetscInt_FMT " needed)",
-             config->num_initial_conditions, config->num_regions);
+  // we need initial conditions and material properties specified for each
+  // region for non-MMS runs
+  if (!mms_mode) {
+    PetscCheck(config->num_initial_conditions > 0, comm, PETSC_ERR_USER, "No initial conditions were specified!");
+    PetscCheck(config->num_initial_conditions == config->num_regions, comm, PETSC_ERR_USER,
+               "%" PetscInt_FMT " initial conditions were specified in initial_conditions (exactly %" PetscInt_FMT " needed)",
+               config->num_initial_conditions, config->num_regions);
 
-  // we need material properties for each region as well
-  PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
-             "Only %" PetscInt_FMT " material <-> region assignments were found in surface_composition (%" PetscInt_FMT " needed)",
-             config->num_material_assignments, config->num_regions);
+    PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
+               "Only %" PetscInt_FMT " material <-> region assignments were found in surface_composition (%" PetscInt_FMT " needed)",
+               config->num_material_assignments, config->num_regions);
 
-  // validate our materials
-  PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
+    // validate our materials
+    PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
+  }
 
   // validate our flow conditions
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
@@ -1132,7 +1134,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // parse the YAML config file into a new config struct and validate it
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &config_schema, &config));
-  PetscCall(ValidateConfig(rdy->comm, config));
+  PetscCall(ValidateConfig(rdy->comm, config, PETSC_FALSE));
   PetscCall(ParseMathExpressions(rdy->comm, config));
 
   // copy the config into place and dispose of the original
@@ -1167,7 +1169,7 @@ PetscErrorCode ReadMMSConfigFile(RDy rdy) {
   // parse the YAML config file into a new config struct and validate it
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &mms_config_schema, &config));
-  PetscCall(ValidateConfig(rdy->comm, config));
+  PetscCall(ValidateConfig(rdy->comm, config, PETSC_TRUE));
   PetscCall(ParseMathExpressions(rdy->comm, config));
 
   // copy the config into place and dispose of the original
