@@ -666,11 +666,15 @@ in the analytic forms for the manufactured solutions. Any single capital roman
 letter (<code>A</code> through <code>Z</code>) can be used as a constant. In the above example, the
 solutions reference the constants <code>H</code>, <code>T</code>, <code>U</code>, <code>V</code>, <code>N</code>, <code>Z</code>, and <code>K</code>, which
 are defined as shown.</p>
-<p>The <code>solutions</code> subsection defines a set of manufactured solutions in terms of
-functions of the coordinates <code>x</code> and <code>y</code> and the time <code>t</code>. These solutions are
-parsed and compiled at runtime so they can be evaluated as needed by the model.
-This means you can define a new manufactured solution in every MMS driver input
-file, without developing code and rebuilding RDycore.</p>
+<p>The <code>swe</code> subsection defines a set of manufactured solutions to the 2D shallow
+water equations (SWE) in terms of a water height <code>h</code> with a flow velocity
+<code>(u, v)</code>. Each of the components <code>h, u, v</code> are represented by a function of the
+coordinates <code>x</code> and <code>y</code> and the time <code>t</code>. Other model parameters (<code>z</code>, the
+elevation function, and <code>n</code>, the Manning coefficient) are functions of <code>x</code> and
+<code>y</code> only.</p>
+<p>These analytic forms are parsed and compiled at runtime so they can be evaluated
+as needed by the model. This means you can define a new manufactured solution in
+every MMS driver input file, without developing code and rebuilding RDycore.</p>
 
 
 
