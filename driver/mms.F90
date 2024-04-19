@@ -25,11 +25,12 @@ program mms_f90
 
   character(len=1024)  :: config_file
   type(RDy)            :: rdy_
-  PetscMPIInt          :: myrank, num_global_cells
+  PetscMPIInt          :: myrank
   integer(RDyTimeUnit) :: time_unit
   PetscReal            :: cur_time
   PetscInt, parameter  :: ndof = 3
   PetscReal, target    :: L1_norms(3), L2_norms(3), Linf_norms(3), global_area
+  PetscInt             :: num_global_cells
   PetscErrorCode       :: ierr
 
   if (command_argument_count() < 1) then
