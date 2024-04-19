@@ -28,7 +28,7 @@ cd docker-build
 for id_type in int32 int64
 do
   TAG=$PETSC_HASH-$id_type
-  docker buildx build -t $IMAGE_NAME:$TAG --network=host \
+  docker buildx build --platform linux/amd64 -t $IMAGE_NAME:$TAG --network=host \
     --build-arg PETSC_HASH=$PETSC_HASH \
     --build-arg PETSC_ID=$id_type \
     .
