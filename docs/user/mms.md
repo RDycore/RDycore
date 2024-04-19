@@ -28,48 +28,50 @@ a convergent manufactured solution. So these sections are replaced by a single
 
 ```yaml
 mms:
-  constants:
-    h0: 1
-    n0: 1
-    u0: 1
-    v0: 1
-    z0: 1
-  solutions: # functions of x, y, t for the shallow water equations (non-normalized units)
+  constants: # any single capital letter can be used
+    H: 0.005  # water height scale factor
+    T: 20.0   # time scale
+    U: 0.025  # x-velocity scale factor
+    V: 0.025  # y-velocity scale factor
+    N: 0.01   # manning coefficient scale factor
+    Z: 0.0025 # elevation scale factor
+
+    K: 0.6283185307179586 # wave number in x and y (pi/5)
+  swe: # functions of x, y, t (non-normalized units)
     # water height
-    h:    h0 * (1 + sin(x)*sin(y)) * exp(t)
-    dhdx: h0 * exp(t) * sin(y) * cos(x)
-    dhdy: h0 * exp(t) * sin(x) * cos(y)
-    dhdt: h0 * (1 + sin(x)*sin(y)) * exp(t)
+    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/T)
+    dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dhdt: H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
 
     # x velocity
-    u:     u0 * cos(x) * sin(y) * exp(t)
-    dudx: -u0 * sin(x) * sin(y) * exp(t)
-    dudy:  u0 * cos(x) * cos(y) * exp(t)
-    dudt:  u0 * cos(x) * sin(y) * exp(t)
+    u:     U * cos(K*x) * sin(K*y) * exp(t/T)
+    dudx: -U * K * sin(K*x) * sin(K*y) * exp(t/T)
+    dudy:  U * K * cos(K*x) * cos(K*y) * exp(t/T)
+    dudt:  U / T * cos(K*x) * sin(K*y) * exp(t/T)
 
     # y velocity
-    v:     v0 * sin(x) * cos(y) * exp(t)
-    dvdx:  v0 * cos(x) * cos(y) * exp(t)
-    dvdy: -v0 * sin(x) * sin(y) * exp(t)
-    dvdt:  v0 * sin(x) * cos(y) * exp(t)
-
-    # (x and y momenta can be evaluated from h(x,y,t) * {u,v}(x,y,t))
+    v:     V * sin(K*x) * cos(K*y) * exp(t/T)
+    dvdx:  K * V * cos(x) * cos(y) * exp(t)
+    dvdy: -K * V * sin(x) * sin(y) * exp(t)
+    dvdt:  V / T * sin(x) * cos(y) * exp(t)
 
     # elevation as z(x, y)
-    z:     z0 * sin(x) * sin(y)
-    dzdx:  z0 * cos(x) * sin(y)
-    dzdy:  z0 * sin(x) * cos(y)
+    z:     Z * sin(K*x) * sin(K*y)
+    dzdx:  Z * K * cos(K*x) * sin(K*y)
+    dzdy:  Z * K * sin(K*x) * cos(K*y)
 
     # source-related term n(x,y)
-    n:     n0 * (1 + sin(x) * sin(y))
+    n:     N * (1 + sin(K*x) * sin(K*y))
 ```
 
 The `mms` section defines the forms of the manufactured solutions for the
 model equations corresponding to parameters set in the `physics` section.
 
 The `constants` subsection defineѕ a set of named constants that can be used
-in the analytic forms for the manufactured solutions. In the above example, the
-solutions reference the constants `h0`, `u0`, `v0`, `z0`, and `n0`, which
+in the analytic forms for the manufactured solutions. Any single capital roman
+letter (`A` through `Z`) can be used as a constant. In the above example, the
+solutions reference the constants `H`, `T`, `U`, `V`, `N`, `Z`, and `K`, which
 are defined as shown.
 
 The `solutions` subsection defines a set of manufactured solutions in terms of
