@@ -291,9 +291,9 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscCall(VecDestroy(&error));
 
   // obtain global error norms
-  PetscCall(MPI_Reduce(MPI_IN_PLACE, L1_norms, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
-  PetscCall(MPI_Reduce(MPI_IN_PLACE, L2_norms, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
-  PetscCall(MPI_Reduce(MPI_IN_PLACE, Linf_norms, 3, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
 
   for (PetscInt dof = 0; dof < ndof; ++dof) {
     L2_norms[dof] = PetscSqrtReal(L2_norms[dof]);
