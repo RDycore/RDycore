@@ -623,46 +623,48 @@ a convergent manufactured solution. So these sections are replaced by a single
 <code>mms</code> section that defines these analytic forms.</p>
 <h3 id="mms-section"><code>mms</code> section</h3>
 <div class="highlight"><pre><span></span><code><span class="nt">mms</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">constants</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">h0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">    </span><span class="nt">n0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">    </span><span class="nt">u0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">    </span><span class="nt">v0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">    </span><span class="nt">z0</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">  </span><span class="nt">solutions</span><span class="p">:</span><span class="w"> </span><span class="c1"># functions of x, y, t for the shallow water equations (non-normalized units)</span>
+<span class="w">  </span><span class="nt">constants</span><span class="p">:</span><span class="w"> </span><span class="c1"># any single capital letter can be used</span>
+<span class="w">    </span><span class="nt">H</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.005</span><span class="w">  </span><span class="c1"># water height scale factor</span>
+<span class="w">    </span><span class="nt">T</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20.0</span><span class="w">   </span><span class="c1"># time scale</span>
+<span class="w">    </span><span class="nt">U</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.025</span><span class="w">  </span><span class="c1"># x-velocity scale factor</span>
+<span class="w">    </span><span class="nt">V</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.025</span><span class="w">  </span><span class="c1"># y-velocity scale factor</span>
+<span class="w">    </span><span class="nt">N</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span><span class="w">   </span><span class="c1"># manning coefficient scale factor</span>
+<span class="w">    </span><span class="nt">Z</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0025</span><span class="w"> </span><span class="c1"># elevation scale factor</span>
+
+<span class="w">    </span><span class="nt">K</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.6283185307179586</span><span class="w"> </span><span class="c1"># wave number in x and y (pi/5)</span>
+<span class="w">  </span><span class="nt">swe</span><span class="p">:</span><span class="w"> </span><span class="c1"># functions of x, y, t (non-normalized units)</span>
 <span class="w">    </span><span class="c1"># water height</span>
-<span class="w">    </span><span class="nt">h</span><span class="p">:</span><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">h0 * (1 + sin(x)*sin(y)) * exp(t)</span>
-<span class="w">    </span><span class="nt">dhdx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">h0 * exp(t) * sin(y) * cos(x)</span>
-<span class="w">    </span><span class="nt">dhdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">h0 * exp(t) * sin(x) * cos(y)</span>
-<span class="w">    </span><span class="nt">dhdt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">h0 * (1 + sin(x)*sin(y)) * exp(t)</span>
+<span class="w">    </span><span class="nt">h</span><span class="p">:</span><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dhdx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H * K * sin(K*y) * cos(K*x) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dhdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H * K * sin(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dhdt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)</span>
 
 <span class="w">    </span><span class="c1"># x velocity</span>
-<span class="w">    </span><span class="nt">u</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">u0 * cos(x) * sin(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dudx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-u0 * sin(x) * sin(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dudy</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">u0 * cos(x) * cos(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dudt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">u0 * cos(x) * sin(y) * exp(t)</span>
+<span class="w">    </span><span class="nt">u</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">U * cos(K*x) * sin(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dudx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-U * K * sin(K*x) * sin(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dudy</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">U * K * cos(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dudt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">U / T * cos(K*x) * sin(K*y) * exp(t/T)</span>
 
 <span class="w">    </span><span class="c1"># y velocity</span>
-<span class="w">    </span><span class="nt">v</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">v0 * sin(x) * cos(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dvdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">v0 * cos(x) * cos(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dvdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-v0 * sin(x) * sin(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dvdt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">v0 * sin(x) * cos(y) * exp(t)</span>
-
-<span class="w">    </span><span class="c1"># (x and y momenta can be evaluated from h(x,y,t) * {u,v}(x,y,t))</span>
+<span class="w">    </span><span class="nt">v</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">V * sin(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dvdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">K * V * cos(x) * cos(y) * exp(t)</span>
+<span class="w">    </span><span class="nt">dvdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-K * V * sin(x) * sin(y) * exp(t)</span>
+<span class="w">    </span><span class="nt">dvdt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">V / T * sin(x) * cos(y) * exp(t)</span>
 
 <span class="w">    </span><span class="c1"># elevation as z(x, y)</span>
-<span class="w">    </span><span class="nt">z</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">z0 * sin(x) * sin(y)</span>
-<span class="w">    </span><span class="nt">dzdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">z0 * cos(x) * sin(y)</span>
-<span class="w">    </span><span class="nt">dzdy</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">z0 * sin(x) * cos(y)</span>
+<span class="w">    </span><span class="nt">z</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">Z * sin(K*x) * sin(K*y)</span>
+<span class="w">    </span><span class="nt">dzdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">Z * K * cos(K*x) * sin(K*y)</span>
+<span class="w">    </span><span class="nt">dzdy</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">Z * K * sin(K*x) * cos(K*y)</span>
 
 <span class="w">    </span><span class="c1"># source-related term n(x,y)</span>
-<span class="w">    </span><span class="nt">n</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">n0 * (1 + sin(x) * sin(y))</span>
+<span class="w">    </span><span class="nt">n</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">N * (1 + sin(K*x) * sin(K*y))</span>
 </code></pre></div>
 <p>The <code>mms</code> section defines the forms of the manufactured solutions for the
 model equations corresponding to parameters set in the <code>physics</code> section.</p>
 <p>The <code>constants</code> subsection defineѕ a set of named constants that can be used
-in the analytic forms for the manufactured solutions. In the above example, the
-solutions reference the constants <code>h0</code>, <code>u0</code>, <code>v0</code>, <code>z0</code>, and <code>n0</code>, which
+in the analytic forms for the manufactured solutions. Any single capital roman
+letter (<code>A</code> through <code>Z</code>) can be used as a constant. In the above example, the
+solutions reference the constants <code>H</code>, <code>T</code>, <code>U</code>, <code>V</code>, <code>N</code>, <code>Z</code>, and <code>K</code>, which
 are defined as shown.</p>
 <p>The <code>solutions</code> subsection defines a set of manufactured solutions in terms of
 functions of the coordinates <code>x</code> and <code>y</code> and the time <code>t</code>. These solutions are
