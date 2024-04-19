@@ -301,7 +301,9 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
 
   // obtain optional diagnostics
   if (num_global_cells) {
-    PetscCall(MPI_Reduce(&rdy->mesh.num_cells_local, &num_global_cells, 1, MPI_INTEGER, MPI_SUM, 0, PETSC_COMM_WORLD));
+    PetscMPIInt ncells;
+    PetscCall(MPI_Reduce(&rdy->mesh.num_cells_local, &ncells, 1, MPI_INT, MPI_SUM, 0, PETSC_COMM_WORLD));
+    *num_global_cells = (PetscInt)ncells;
   }
   if (global_area) {
     PetscCall(MPI_Reduce(&area_sum, global_area, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
