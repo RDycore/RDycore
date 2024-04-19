@@ -1,8 +1,6 @@
 #include <petscsys.h>
 #include <rdycore.h>
 
-PetscReal GRAVITY = 9.806;
-
 static const char *help_str =
     "rdycore_mms - a standalone RDycore driver for MMS problems\n"
     "usage: rdycore_mms [options] <filename.yaml>\n";

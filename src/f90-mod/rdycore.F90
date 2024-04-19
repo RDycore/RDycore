@@ -10,8 +10,10 @@ module rdycore
   implicit none
 
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
-            RDyCreate, RDySetup, RDyAdvance, RDyDestroy, RDyGetNumGlobalCells, &
-            RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
+            RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
+            RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
+            RDyMMSUpdateMaterialProperties, RDyMMSComputeErrorNorms, &
+            RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
             RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
@@ -71,6 +73,40 @@ module rdycore
     integer(c_int) function rdysetup_(rdy) bind(c, name="RDySetup")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    integer(c_int) function rdymmssetup_(rdy) bind(c, name="RDyMMSSetup")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    integer(c_int) function rdymmscomputesolution_(rdy, time, soln) bind(c, name="RDyMMSComputeSolution")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr),    value, intent(in)   :: rdy
+      real(c_double), value, intent(in)   :: time
+      PetscFortranAddr, value, intent(in) :: soln
+    end function
+
+    integer(c_int) function rdymmsenforceboundaryconditions_(rdy, time) bind(c, name="RDyMMSEnforceBoundaryConditions")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)   :: rdy
+      real(c_double), value, intent(in)   :: time
+    end function
+
+    integer(c_int) function rdymmsupdatematerialproperties_(rdy) bind(c, name="RDyMMSUpdateMaterialProperties")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+    end function
+
+    integer(c_int) function rdymmscomputeerrornorms_(rdy, time, l1_norms, l2_norms, linf_norms, &
+                                                     num_global_cells, global_area) bind(c, name="RDyMMSComputeErrorNorms")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)  :: rdy
+      real(c_double), value, intent(in)  :: time
+      type(c_ptr),    value, intent(in)  :: l1_norms, l2_norms, linf_norms
+      PetscInt,              intent(out) :: num_global_cells
+      real(c_double),        intent(out) :: global_area
     end function
 
     integer(c_int) function rdygetnumglobalcells_(rdy, num_cells_global) bind(c, name="RDyGetNumGlobalCells")
@@ -403,6 +439,46 @@ contains
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
     ierr = rdysetup_(rdy_%c_rdy)
+  end subroutine
+
+  subroutine RDyMMSSetup(rdy_, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(out)   :: ierr
+    ierr = rdymmssetup_(rdy_%c_rdy)
+  end subroutine
+
+  subroutine RDyMMSComputeSolution(rdy_, time, solution, ierr)
+    use petscvec
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(in)    :: time
+    type(tVec),      intent(in)    :: solution  ! Vec
+    integer,         intent(out)   :: ierr
+    ierr = rdymmscomputesolution_(rdy_%c_rdy, time, solution%v)
+  end subroutine
+
+  subroutine RDyMMSEnforceBoundaryConditions(rdy_, time, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(in)    :: time
+    integer,         intent(out)   :: ierr
+    ierr = rdymmsenforceboundaryconditions_(rdy_%c_rdy, time)
+  end subroutine
+
+  subroutine RDyMMSUpdateMaterialProperties(rdy_, ierr)
+    type(RDy), intent(inout) :: rdy_
+    integer,   intent(out)   :: ierr
+    ierr = rdymmsupdatematerialproperties_(rdy_%c_rdy)
+  end subroutine
+
+  subroutine RDyMMSComputeErrorNorms(rdy_, time, l1_norms, l2_norms, linf_norms, &
+                                     num_global_cells, global_area, ierr)
+    type(RDy),                intent(inout) :: rdy_
+    real(RDyDouble),          intent(in)    :: time
+    real(RDyDouble), pointer, intent(in)    :: l1_norms(:), l2_norms(:), linf_norms(:)
+    integer,                  intent(out)   :: num_global_cells
+    real(RDyDouble),          intent(out)   :: global_area
+    integer,                  intent(out)   :: ierr
+    ierr = rdymmscomputeerrornorms_(rdy_%c_rdy, time, c_loc(l1_norms), c_loc(l2_norms), c_loc(linf_norms), &
+                                    num_global_cells, global_area)
   end subroutine
 
   subroutine RDyGetNumGlobalCells(rdy_, num_cells_global, ierr)
