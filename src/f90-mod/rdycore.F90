@@ -474,7 +474,7 @@ contains
     type(RDy),                intent(inout) :: rdy_
     real(RDyDouble),          intent(in)    :: time
     real(RDyDouble), pointer, intent(in)    :: l1_norms(:), l2_norms(:), linf_norms(:)
-    integer,                  intent(out)   :: num_global_cells
+    PetscInt,                 intent(out)   :: num_global_cells
     real(RDyDouble),          intent(out)   :: global_area
     integer,                  intent(out)   :: ierr
     ierr = rdymmscomputeerrornorms_(rdy_%c_rdy, time, c_loc(l1_norms), c_loc(l2_norms), c_loc(linf_norms), &
