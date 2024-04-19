@@ -42,7 +42,7 @@ mms:
     dzdx:  Z * K * cos(K*x) * sin(K*y)
     dzdy:  Z * K * sin(K*x) * cos(K*y)
 
-    # source-related term n(x,y)
+    # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
 
 logging:
