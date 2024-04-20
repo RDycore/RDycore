@@ -647,9 +647,9 @@ a convergent manufactured solution. So these sections are replaced by a single
 
 <span class="w">    </span><span class="c1"># y velocity</span>
 <span class="w">    </span><span class="nt">v</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">V * sin(K*x) * cos(K*y) * exp(t/T)</span>
-<span class="w">    </span><span class="nt">dvdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">K * V * cos(x) * cos(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dvdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-K * V * sin(x) * sin(y) * exp(t)</span>
-<span class="w">    </span><span class="nt">dvdt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">V / T * sin(x) * cos(y) * exp(t)</span>
+<span class="w">    </span><span class="nt">dvdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">K * V * cos(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dvdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-K * V * sin(K*x) * sin(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dvdt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">V / T * sin(K*x) * cos(K*y) * exp(t/T)</span>
 
 <span class="w">    </span><span class="c1"># elevation as z(x, y)</span>
 <span class="w">    </span><span class="nt">z</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">Z * sin(K*x) * sin(K*y)</span>
