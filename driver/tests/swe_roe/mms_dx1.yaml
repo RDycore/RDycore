@@ -33,9 +33,9 @@ mms:
 
     # y velocity
     v:     V * sin(K*x) * cos(K*y) * exp(t/T)
-    dvdx:  K * V * cos(x) * cos(y) * exp(t)
-    dvdy: -K * V * sin(x) * sin(y) * exp(t)
-    dvdt:  V / T * sin(x) * cos(y) * exp(t)
+    dvdx:  K * V * cos(K*x) * cos(K*y) * exp(t/T)
+    dvdy: -K * V * sin(K*x) * sin(K*y) * exp(t/T)
+    dvdt:  V / T * sin(K*x) * cos(K*y) * exp(t/T)
 
     # elevation as z(x, y)
     z:     Z * sin(K*x) * sin(K*y)
