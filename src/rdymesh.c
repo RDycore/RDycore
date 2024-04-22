@@ -348,8 +348,6 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex,
         PetscInt ivertex = v - v_start;
         if (local) PetscCall(PetscFindInt(v, Nl, local, &v));
         PetscCheck(v >= 0, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Vertex %" PetscInt_FMT " not found in migration SF", v);
-        PetscCheck(!natural[v].rank, PETSC_COMM_SELF, PETSC_ERR_PLIB,
-                   "Natural ID for vertex %" PetscInt_FMT " should come from rank 0 not %" PetscInt_FMT, v, natural[v].rank);
         vertices->global_ids[ivertex] = natural[v].index;
 
         if (v == v_start) {
