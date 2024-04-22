@@ -14,10 +14,9 @@ logging:
   level: detail
 
 time:
-  time_step: 0.005
+  final_time: 0.005
   unit: hours
   max_step: 1000
-  coupling_interval: 0.005
 
 output:
   format: xdmf
