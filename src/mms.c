@@ -171,6 +171,7 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
           x_ptr[3 * cell_id]     = h[l];
           x_ptr[3 * cell_id + 1] = h[l] * u[l];
           x_ptr[3 * cell_id + 2] = h[l] * v[l];
+          ++l;
         }
       }
     }
