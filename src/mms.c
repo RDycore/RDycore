@@ -183,7 +183,7 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 }
 
 // evaluates the source terms associated with the manufactured solutions
-PetscErrorCode RDyMMSEnforceSourceTerm(RDy rdy, PetscReal time) {
+PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
   PetscFunctionBegin;
 
   RDyMesh  *mesh  = &rdy->mesh;
