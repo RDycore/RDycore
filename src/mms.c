@@ -189,7 +189,8 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
   RDyMesh  *mesh  = &rdy->mesh;
   RDyCells *cells = &mesh->cells;
 
-  PetscInt  N = mesh->num_cells;
+  PetscInt N;
+  PetscCall(RDyGetNumLocalCells(rdy, &N));
   PetscReal cell_x[N], cell_y[N];
 
   PetscInt l = 0;
