@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     while (!RDyFinished(rdy)) {
       PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
 
-      // enforce dirchlet BCs
+      // enforce dirichlet BCs
       PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time));
 
       // advance the solution by the coupling interval specified in the config file

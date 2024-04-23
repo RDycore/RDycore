@@ -61,9 +61,11 @@ static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal 
   mupDefineBulkVar(func, "t", t)
 
 // evaluates the given expression at all given x, y, t, placing the results into values
-static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal x[n], PetscReal y[n], PetscReal t[n], PetscReal values[n]) {
+static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal x[n], PetscReal y[n], PetscReal time, PetscReal values[n]) {
   PetscFunctionBegin;
 
+  PetscReal t[n];
+  for (PetscInt i = 0; i < n; ++i) t[i] = time;
   SET_SPATIOTEMPORAL_VARIABLES(expr);
   mupEvalBulk(expr, values, n);
 
@@ -141,14 +143,13 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
     RDyRegion region = rdy->regions[r];
 
     // Create vectorized (x, y, t) triples for bulk expression evaluation
-    PetscReal cell_x[region.num_cells], cell_y[region.num_cells], t[region.num_cells];
+    PetscReal cell_x[region.num_cells], cell_y[region.num_cells];
     PetscInt  N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_cells; ++c) {
       PetscInt cell_id = region.cell_ids[c];
       if (3 * cell_id < n_local) {
         cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
         cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
-        t[N]      = time;
         ++N;
       }
     }
@@ -158,9 +159,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
       // evaluate the manufactured ѕolutions at all (x, y, t)
       PetscReal h[N], u[N], v[N];
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, t, h));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, t, u));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, t, v));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
 
       // TODO: salinity and sediment initial conditions go here.
 
@@ -188,55 +189,52 @@ PetscErrorCode RDyMMSEnforceSourceTerm(RDy rdy, PetscReal time) {
   RDyMesh  *mesh  = &rdy->mesh;
   RDyCells *cells = &mesh->cells;
 
-  PetscInt N = mesh->num_cells;
-  PetscReal cell_x[N], cell_y[N], t[N];
+  PetscInt  N = mesh->num_cells;
+  PetscReal cell_x[N], cell_y[N];
 
   PetscInt l = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
     if (cells->is_local[icell]) {
       cell_x[l] = rdy->mesh.cells.centroids[icell].X[0];
       cell_y[l] = rdy->mesh.cells.centroids[icell].X[1];
-      t[l]      = time;
       ++l;
     }
   }
 
   if (rdy->config.physics.flow.mode == FLOW_SWE) {
-
     // evaluate the manufactured ѕolutions at all (x, y, t)
     PetscReal h[N], u[N], v[N];
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, t, h));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, t, u));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, t, v));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
 
     PetscReal dhdx[N], dhdy[N], dhdt[N];
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdx, N, cell_x, cell_y, t, dhdx));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdy, N, cell_x, cell_y, t, dhdy));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdt, N, cell_x, cell_y, t, dhdt));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdx, N, cell_x, cell_y, time, dhdx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdy, N, cell_x, cell_y, time, dhdy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdt, N, cell_x, cell_y, time, dhdt));
 
     PetscReal dudx[N], dudy[N], dudt[N];
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudx, N, cell_x, cell_y, t, dudx));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudy, N, cell_x, cell_y, t, dudy));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudt, N, cell_x, cell_y, t, dudt));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudx, N, cell_x, cell_y, time, dudx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudy, N, cell_x, cell_y, time, dudy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudt, N, cell_x, cell_y, time, dudt));
 
     PetscReal dvdx[N], dvdy[N], dvdt[N];
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdx, N, cell_x, cell_y, t, dvdx));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdy, N, cell_x, cell_y, t, dvdy));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdt, N, cell_x, cell_y, t, dvdt));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdx, N, cell_x, cell_y, time, dvdx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdy, N, cell_x, cell_y, time, dvdy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdt, N, cell_x, cell_y, time, dvdt));
 
     PetscReal n[N];
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, t, n));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, time, n));
 
     PetscReal dzdx[N], dzdy[N];
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdx, N, cell_x, cell_y, t, dzdx));
-    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdy, N, cell_x, cell_y, t, dzdy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdx, N, cell_x, cell_y, time, dzdx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdy, N, cell_x, cell_y, time, dzdy));
 
     PetscReal h_source[N], hu_source[N], hv_source[N];
 
     l = 0;
     for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
       if (cells->is_local[icell]) {
-
         PetscReal Cd = GRAVITY * Square(n[l]) * PetscPowReal(h[l], -1.0 / 3.0);
 
         h_source[l] = dhdt[l] + u[l] * dhdx[l] + h[l] * dudx[l] + v[l] * dhdy[l] + h[l] * dvdy[l];
@@ -248,7 +246,7 @@ PetscErrorCode RDyMMSEnforceSourceTerm(RDy rdy, PetscReal time) {
         hu_source[l] += Cd * u[l] * PetscSqrtReal(u[l] * u[l] + v[l] * v[l]);
 
         hv_source[l] = v[l] * dhdt[l] + h[l] * dvdt[l];
-        hv_source[l] += u[l] * h[l] * dvdx[l] + v[l] * h[l] * dudx[l] + u[l]* v[l] * dhdx[l];
+        hv_source[l] += u[l] * h[l] * dvdx[l] + v[l] * h[l] * dudx[l] + u[l] * v[l] * dhdx[l];
         hv_source[l] += v[l] * v[l] * dhdy[l] + 2.0 * v[l] * h[l] * dvdy[l] + GRAVITY * h[l] * dhdy[l];
         hv_source[l] += dzdy[l] * GRAVITY * h[l];
         hv_source[l] += Cd * v[l] * PetscSqrtReal(u[l] * u[l] + v[l] * v[l]);
@@ -256,9 +254,9 @@ PetscErrorCode RDyMMSEnforceSourceTerm(RDy rdy, PetscReal time) {
       }
     }
 
-    //PetscCall(RDySetWaterSourceForLocalCell(rdy, N, h_source));
-    //PetscCall(RDySetXMomentumSourceForLocalCell(rdy, N, hu_source));
-    //PetscCall(RDySetYMomentumSourceForLocalCell(rdy, N, hv_source));
+    PetscCall(RDySetWaterSourceForLocalCells(rdy, N, h_source));
+    PetscCall(RDySetXMomentumSourceForLocalCells(rdy, N, hu_source));
+    PetscCall(RDySetYMomentumSourceForLocalCells(rdy, N, hv_source));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -274,21 +272,20 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     // fetch x, y for each edge (and set t = time)
     RDyBoundary boundary  = rdy->boundaries[b];
     PetscInt    num_edges = boundary.num_edges;
-    PetscReal   x[num_edges], y[num_edges], t[num_edges];
+    PetscReal   x[num_edges], y[num_edges];
     for (PetscInt e = 0; e < num_edges; ++e) {
       PetscInt edge_id       = boundary.edge_ids[e];
       RDyPoint edge_centroid = rdy->mesh.edges.centroids[edge_id];
       x[e]                   = edge_centroid.X[0];
       y[e]                   = edge_centroid.X[1];
-      t[e]                   = time;
     }
 
     // compute h, hu, hv on each edge (SWE-specific)
     RDyFlowCondition *flow_bc = rdy->boundary_conditions[b].flow;
     PetscReal         h[num_edges], u[num_edges], v[num_edges];
-    PetscCall(EvaluateTemporalSolution(flow_bc->height, num_edges, x, y, t, h));
-    PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, t, u));
-    PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, t, v));
+    PetscCall(EvaluateTemporalSolution(flow_bc->height, num_edges, x, y, time, h));
+    PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, time, u));
+    PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, time, v));
 
     // set the boundary values (SWE-specific)
     // NOTE: ndof == 3 for SWE
