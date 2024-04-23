@@ -2,12 +2,12 @@
 add_library(rdycore
   checkpoint.c
   ensemble.c
-  mms.c
+  rdyadvance.c
   rdycore.c
   rdydata.c
   rdydm.c
   rdymesh.c
-  rdyadvance.c
+  rdymms.c
   rdysetup.c
   swe/physics_swe.c
   swe/swe_petsc.c
