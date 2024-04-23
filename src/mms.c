@@ -7,6 +7,10 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdymathimpl.h>
+
+// gravitational acceleration [m/s/s]
+static const PetscReal GRAVITY = 9.806;
 
 // NOTE: our boundary conditions are expressed in terms of momenta and not flow
 // velocities, so we have to chain together a few things to evaluate x and y
@@ -173,6 +177,89 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
   }
 
   PetscCall(VecRestoreArray(solution, &x_ptr));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// evaluates the source terms associated with the manufactured solutions
+PetscErrorCode RDyMMSEnforceSourceTerm(RDy rdy, PetscReal time) {
+  PetscFunctionBegin;
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  PetscInt N = mesh->num_cells;
+  PetscReal cell_x[N], cell_y[N], t[N];
+
+  PetscInt l = 0;
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    if (cells->is_local[icell]) {
+      cell_x[l] = rdy->mesh.cells.centroids[icell].X[0];
+      cell_y[l] = rdy->mesh.cells.centroids[icell].X[1];
+      t[l]      = time;
+      ++l;
+    }
+  }
+
+  if (rdy->config.physics.flow.mode == FLOW_SWE) {
+
+    // evaluate the manufactured ѕolutions at all (x, y, t)
+    PetscReal h[N], u[N], v[N];
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, t, h));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, t, u));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, t, v));
+
+    PetscReal dhdx[N], dhdy[N], dhdt[N];
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdx, N, cell_x, cell_y, t, dhdx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdy, N, cell_x, cell_y, t, dhdy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdt, N, cell_x, cell_y, t, dhdt));
+
+    PetscReal dudx[N], dudy[N], dudt[N];
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudx, N, cell_x, cell_y, t, dudx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudy, N, cell_x, cell_y, t, dudy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudt, N, cell_x, cell_y, t, dudt));
+
+    PetscReal dvdx[N], dvdy[N], dvdt[N];
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdx, N, cell_x, cell_y, t, dvdx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdy, N, cell_x, cell_y, t, dvdy));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdt, N, cell_x, cell_y, t, dvdt));
+
+    PetscReal n[N];
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, t, n));
+
+    PetscReal dzdx[N], dzdy[N];
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdx, N, cell_x, cell_y, t, dzdx));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdy, N, cell_x, cell_y, t, dzdy));
+
+    PetscReal h_source[N], hu_source[N], hv_source[N];
+
+    l = 0;
+    for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+      if (cells->is_local[icell]) {
+
+        PetscReal Cd = GRAVITY * Square(n[l]) * PetscPowReal(h[l], -1.0 / 3.0);
+
+        h_source[l] = dhdt[l] + u[l] * dhdx[l] + h[l] * dudx[l] + v[l] * dhdy[l] + h[l] * dvdy[l];
+
+        hu_source[l] = u[l] * dhdt[l] + h[l] * dudt[l];
+        hu_source[l] += 2.0 * u[l] * h[l] * dudx[l] + u[l] * u[l] * dhdx[l] + GRAVITY * h[l] * dhdx[l];
+        hu_source[l] += u[l] * h[l] * dvdy[l] + v[l] * h[l] * dudy[l] + u[l] * v[l] * dhdy[l];
+        hu_source[l] += dzdx[l] * GRAVITY * h[l];
+        hu_source[l] += Cd * u[l] * PetscSqrtReal(u[l] * u[l] + v[l] * v[l]);
+
+        hv_source[l] = v[l] * dhdt[l] + h[l] * dvdt[l];
+        hv_source[l] += u[l] * h[l] * dvdx[l] + v[l] * h[l] * dudx[l] + u[l]* v[l] * dhdx[l];
+        hv_source[l] += v[l] * v[l] * dhdy[l] + 2.0 * v[l] * h[l] * dvdy[l] + GRAVITY * h[l] * dhdy[l];
+        hv_source[l] += dzdy[l] * GRAVITY * h[l];
+        hv_source[l] += Cd * v[l] * PetscSqrtReal(u[l] * u[l] + v[l] * v[l]);
+        ++l;
+      }
+    }
+
+    //PetscCall(RDySetWaterSourceForLocalCell(rdy, N, h_source));
+    //PetscCall(RDySetXMomentumSourceForLocalCell(rdy, N, hu_source));
+    //PetscCall(RDySetYMomentumSourceForLocalCell(rdy, N, hv_source));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
