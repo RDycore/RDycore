@@ -35,13 +35,14 @@ int main(int argc, char *argv[]) {
 
     RDyTimeUnit time_unit;
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
-    PetscReal cur_time;
+    PetscReal dt, cur_time;
+    PetscCall(RDyGetTimeStep(rdy, time_unit, &dt));
     while (!RDyFinished(rdy)) {
       PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
 
-      // enforce dirichlet BCs and compute source terms
-      PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time));
-      PetscCall(RDyMMSComputeSourceTerms(rdy, cur_time));
+      // enforce dirichlet BCs and compute source terms at half steps
+      PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time + 0.5*dt));
+      PetscCall(RDyMMSComputeSourceTerms(rdy, cur_time + 0.5*dt));
 
       // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
