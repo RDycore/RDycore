@@ -21,12 +21,14 @@ macro(add_formatting_targets)
         find ${PROJECT_SOURCE_DIR}/include -name "*.h" -exec ${CLANG_FORMAT} -i {} \+;
         COMMAND find ${PROJECT_SOURCE_DIR}/src -name "*.c" -exec ${CLANG_FORMAT} -i {} \+;
         COMMAND find ${PROJECT_SOURCE_DIR}/src -name "*.h" -exec ${CLANG_FORMAT} -i {} \+;
+        COMMAND find ${PROJECT_SOURCE_DIR}/driver -name "*.c" -exec ${CLANG_FORMAT} -i {} \+;
         VERBATIM
         COMMENT "Auto-formatting C code...")
       add_custom_target(format-c-check
         find ${PROJECT_SOURCE_DIR}/include -name "*.h" -exec ${CLANG_FORMAT} -n --Werror -ferror-limit=1 {} \+;
         COMMAND find ${PROJECT_SOURCE_DIR}/src -name "*.c" -exec ${CLANG_FORMAT} -n --Werror -ferror-limit=1 {} \+;
         COMMAND find ${PROJECT_SOURCE_DIR}/src -name "*.h" -exec ${CLANG_FORMAT} -n --Werror -ferror-limit=1 {} \+;
+        COMMAND find ${PROJECT_SOURCE_DIR}/driver -name "*.c" -exec ${CLANG_FORMAT} -n --Werror -ferror-limit=1 {} \+;
         VERBATIM
         COMMENT "Checking C formatting...")
     endif()

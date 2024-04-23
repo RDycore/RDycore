@@ -41,8 +41,8 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
 
       // enforce dirichlet BCs and compute source terms at half steps
-      PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time + 0.5*dt));
-      PetscCall(RDyMMSComputeSourceTerms(rdy, cur_time + 0.5*dt));
+      PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time + 0.5 * dt));
+      PetscCall(RDyMMSComputeSourceTerms(rdy, cur_time + 0.5 * dt));
 
       // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
