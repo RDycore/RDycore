@@ -48,12 +48,13 @@ program mms_f90
       PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
       PetscCallA(RDyMMSSetup(rdy_, ierr))
 
+      ! run the problem to completion
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
-        ! advance the solution by the coupling interval
         PetscCallA(RDyAdvance(rdy_, ierr))
       enddo
 
       ! compute error norms
+      PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
       PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
       PetscCallA(RDyMMSComputeErrorNorms(rdy_, cur_time, l1_norms, l2_norms, linf_norms, num_global_cells, global_area, ierr))
 

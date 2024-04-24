@@ -30,11 +30,12 @@ int main(int argc, char *argv[]) {
     MPI_Comm comm = PETSC_COMM_WORLD;
     RDy      rdy;
 
+    // set things up
     PetscCall(RDyCreate(comm, argv[1], &rdy));
     PetscCall(RDyMMSSetup(rdy));
 
+    // run the problem to completion
     while (!RDyFinished(rdy)) {
-      // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
     }
 
