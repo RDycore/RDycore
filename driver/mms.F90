@@ -52,8 +52,9 @@ program mms_f90
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
         PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
 
-        ! enforce dirchlet BCs
+        ! enforce dirichlet BCs and compute source terms at half steps
         PetscCallA(RDyMMSEnforceBoundaryConditions(rdy_, cur_time, ierr))
+        PetscCallA(RDyMMSComputeSourceTerms(rdy_, cur_time, ierr))
 
         ! advance the solution by the coupling interval
         PetscCallA(RDyAdvance(rdy_, ierr))

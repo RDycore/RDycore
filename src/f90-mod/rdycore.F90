@@ -12,7 +12,7 @@ module rdycore
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
-            RDyMMSUpdateMaterialProperties, RDyMMSComputeErrorNorms, &
+            RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, RDyMMSComputeErrorNorms, &
             RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
@@ -89,6 +89,12 @@ module rdycore
     end function
 
     integer(c_int) function rdymmsenforceboundaryconditions_(rdy, time) bind(c, name="RDyMMSEnforceBoundaryConditions")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr),    value, intent(in)   :: rdy
+      real(c_double), value, intent(in)   :: time
+    end function
+
+    integer(c_int) function rdymmscomputesourceterms_(rdy, time) bind(c, name="RDyMMSComputeSourceTerms")
       use iso_c_binding, only: c_int, c_ptr, c_double
       type(c_ptr),    value, intent(in)   :: rdy
       real(c_double), value, intent(in)   :: time
@@ -461,6 +467,13 @@ contains
     real(RDyDouble), intent(in)    :: time
     integer,         intent(out)   :: ierr
     ierr = rdymmsenforceboundaryconditions_(rdy_%c_rdy, time)
+  end subroutine
+
+  subroutine RDyMMSComputeSourceTerms(rdy_, time, ierr)
+    type(RDy),       intent(inout) :: rdy_
+    real(RDyDouble), intent(in)    :: time
+    integer,         intent(out)   :: ierr
+    ierr = rdymmscomputesourceterms_(rdy_%c_rdy, time)
   end subroutine
 
   subroutine RDyMMSUpdateMaterialProperties(rdy_, ierr)
