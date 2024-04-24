@@ -12,7 +12,7 @@
         <link rel="prev" href="../installation.html">
       
       
-        <link rel="next" href="../developer/index.html">
+        <link rel="next" href="mms.html">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -580,6 +580,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mms.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MMS Driver
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1090,7 +1111,8 @@ creating any new syntax for simulation input.</p>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_top_ic</span>
 <span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
 <span class="w">    </span><span class="nt">height</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">    </span><span class="nt">momentum</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">x_momentum</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">    </span><span class="nt">y_momentum</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_ic</span>
 <span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
 <span class="w">    </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_ics.dat</span>
@@ -1132,9 +1154,10 @@ to set the water height and momentum. This can be done in one of two ways:</p>
 <ul>
 <li><code>height</code>: the height of water [m] at the relevant point (within a cell
   or on its boundary)</li>
-<li><code>momentum</code>: a 2-component sequence/list containing the <code>x</code> and <code>y</code> components
-  of the momentum [kg m/s] at the relevant point (within a cell or on its
-  boundary)</li>
+<li><code>x_momentum</code>: the <code>x</code> component of the momentum [kg m/s] at the relevant
+  point (within a cell or on its boundary)</li>
+<li><code>y_momentum</code>: the <code>y</code> component of the momentum [kg m/s] at the relevant
+  point (within a cell or on its boundary)</li>
 </ul>
 </li>
 <li>

@@ -9,23 +9,25 @@
       
       
       
+        <link rel="prev" href="input.html">
       
-        <link rel="next" href="user/index.html">
+      
+        <link rel="next" href="../developer/index.html">
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.18">
     
     
       
-        <title>RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>MMS Driver - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.66ac8b77.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.66ac8b77.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -44,7 +46,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -70,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#overview" class="md-skip">
+        <a href="#the-method-of-manufactured-solutions-mms-verification-driver" class="md-skip">
           Skip to content
         </a>
       
@@ -86,7 +88,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
@@ -106,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              MMS Driver
             
           </span>
         </div>
@@ -219,7 +221,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
@@ -246,6 +248,131 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="input.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    YAML Input Specification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -262,18 +389,18 @@
           
   
   <span class="md-ellipsis">
-    Home
+    MMS Driver
   </span>
   
 
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+      <a href="mms.html" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
-    Home
+    MMS Driver
   </span>
   
 
@@ -295,11 +422,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#acknowledgements" class="md-nav__link">
+  <a href="#input" class="md-nav__link">
     <span class="md-ellipsis">
-      Acknowledgements
+      Input
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Input">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mms-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      mms section
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -307,129 +449,6 @@
   
 </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-      
-        
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
-            
-  
-  <span class="md-ellipsis">
-    User Guide
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            User Guide
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user/index.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Overview
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="installation.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Installation
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user/input.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    YAML Input Specification
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="user/mms.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    MMS Driver
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -489,7 +508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer/index.html" class="md-nav__link">
+      <a href="../developer/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -537,11 +556,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#acknowledgements" class="md-nav__link">
+  <a href="#input" class="md-nav__link">
     <span class="md-ellipsis">
-      Acknowledgements
+      Input
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Input">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mms-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      mms section
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -560,24 +594,87 @@
                   
 
 
-<h1 id="overview">Overview</h1>
-<p>RDycore is a performance-portable, GPU-capable river model used to study
-compound flooding, intended for use with the Department of Energy's <a href="https://e3sm.org">Energy
-Exascale Earth System Model (E3SM)</a>.</p>
+<h1 id="the-method-of-manufactured-solutions-mms-verification-driver">The Method of Manufactured Solutions (MMS) Verification Driver</h1>
+<h2 id="input">Input</h2>
+<p>The MMS driver accepts input in YAML form, like the main RDycore driver. However,
+the MMS driver's input has a ѕlightly different form. Like the <a href="input.html">main driver input</a>,
+it's organized into several sections. Many of these sections are identical to
+those in the main driver's input:</p>
 <ul>
-<li>The <a href="installation.html">Installation Guide</a> shows you how to build and install
-  RDycore on your own machine or on a supported high-performance platform.</li>
-<li>The <a href="user/index.html">User Guide</a> describes how to use RDycore in its standalone and
-  E3SM-integrated forms.</li>
-<li>The <a href="developer/index.html">Developer Guide</a> lays out some basic principles and
-  guidelines we use in developing RDycore.</li>
+<li><strong>Model equations and discretizations</strong><ul>
+<li><a href="input.html#physics">physics</a></li>
+<li><a href="input.html#numerics">numerics</a></li>
+<li><a href="input.html#grid">grid</a></li>
+<li><a href="input.html#regions">regions</a></li>
+<li><a href="input.html#boundaries">boundaries</a></li>
+<li><a href="input.html#time">time</a></li>
 </ul>
-<h3 id="acknowledgements">Acknowledgements</h3>
-<p>RDycore is funded by the US Department of Energy's (DOE) <a href="https://www.scidac.gov/">Scientific Discovery
-Through Advanced Computing (SciDAC)</a> program through a
-joint parternship between the DOE Office of Science's <a href="https://science.osti.gov/ber">Biological and
-Environmental Research</a> and <a href="https://science/osti.gov/ascr">Advanced
-Scientific Computing Research</a> programs.</p>
+</li>
+<li><strong>Simulation diagnostics, output, and restarts</strong><ul>
+<li><a href="input.html#logging">logging</a></li>
+<li><a href="input.html#output">output</a></li>
+</ul>
+</li>
+</ul>
+<p>However, the other sections, which define material properties, initial/boundary
+conditions, and sources, are not present in the MMS input. This is because the
+method manufactured solutions requires analytic forms for these terms to produce
+a convergent manufactured solution. So these sections are replaced by a single
+<code>mms</code> section that defines these analytic forms.</p>
+<h3 id="mms-section"><code>mms</code> section</h3>
+<div class="highlight"><pre><span></span><code><span class="nt">mms</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">constants</span><span class="p">:</span><span class="w"> </span><span class="c1"># any single capital letter can be used</span>
+<span class="w">    </span><span class="nt">H</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.005</span><span class="w">  </span><span class="c1"># water height scale factor</span>
+<span class="w">    </span><span class="nt">T</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20.0</span><span class="w">   </span><span class="c1"># time scale</span>
+<span class="w">    </span><span class="nt">U</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.025</span><span class="w">  </span><span class="c1"># x-velocity scale factor</span>
+<span class="w">    </span><span class="nt">V</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.025</span><span class="w">  </span><span class="c1"># y-velocity scale factor</span>
+<span class="w">    </span><span class="nt">N</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span><span class="w">   </span><span class="c1"># manning coefficient scale factor</span>
+<span class="w">    </span><span class="nt">Z</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0025</span><span class="w"> </span><span class="c1"># elevation scale factor</span>
+
+<span class="w">    </span><span class="nt">K</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.6283185307179586</span><span class="w"> </span><span class="c1"># wave number in x and y (pi/5)</span>
+<span class="w">  </span><span class="nt">swe</span><span class="p">:</span><span class="w"> </span><span class="c1"># functions of x, y, t (non-normalized units)</span>
+<span class="w">    </span><span class="c1"># water height</span>
+<span class="w">    </span><span class="nt">h</span><span class="p">:</span><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dhdx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H * K * sin(K*y) * cos(K*x) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dhdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H * K * sin(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dhdt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)</span>
+
+<span class="w">    </span><span class="c1"># x velocity</span>
+<span class="w">    </span><span class="nt">u</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">U * cos(K*x) * sin(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dudx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-U * K * sin(K*x) * sin(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dudy</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">U * K * cos(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dudt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">U / T * cos(K*x) * sin(K*y) * exp(t/T)</span>
+
+<span class="w">    </span><span class="c1"># y velocity</span>
+<span class="w">    </span><span class="nt">v</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">V * sin(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dvdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">K * V * cos(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dvdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-K * V * sin(K*x) * sin(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dvdt</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">V / T * sin(K*x) * cos(K*y) * exp(t/T)</span>
+
+<span class="w">    </span><span class="c1"># elevation as z(x, y)</span>
+<span class="w">    </span><span class="nt">z</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">Z * sin(K*x) * sin(K*y)</span>
+<span class="w">    </span><span class="nt">dzdx</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">Z * K * cos(K*x) * sin(K*y)</span>
+<span class="w">    </span><span class="nt">dzdy</span><span class="p">:</span><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">Z * K * sin(K*x) * cos(K*y)</span>
+
+<span class="w">    </span><span class="c1"># Manning coefficient n(x,y)</span>
+<span class="w">    </span><span class="nt">n</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">N * (1 + sin(K*x) * sin(K*y))</span>
+</code></pre></div>
+<p>The <code>mms</code> section defines the forms of the manufactured solutions for the
+model equations corresponding to parameters set in the <code>physics</code> section.</p>
+<p>The <code>constants</code> subsection defineѕ a set of named constants that can be used
+in the analytic forms for the manufactured solutions. Any single capital roman
+letter (<code>A</code> through <code>Z</code>) can be used as a constant. In the above example, the
+solutions reference the constants <code>H</code>, <code>T</code>, <code>U</code>, <code>V</code>, <code>N</code>, <code>Z</code>, and <code>K</code>, which
+are defined as shown.</p>
+<p>The <code>swe</code> subsection defines a set of manufactured solutions to the 2D shallow
+water equations (SWE) in terms of a water height <code>h</code> with a flow velocity
+<code>(u, v)</code>. Each of the components <code>h, u, v</code> are represented by a function of the
+coordinates <code>x</code> and <code>y</code> and the time <code>t</code>. Other model parameters (<code>z</code>, the
+elevation function, and <code>n</code>, the Manning coefficient) are functions of <code>x</code> and
+<code>y</code> only.</p>
+<p>These analytic forms are parsed and compiled at runtime so they can be evaluated
+as needed by the model. This means you can define a new manufactured solution in
+every MMS driver input file, without developing code and rebuilding RDycore.</p>
 
 
 
@@ -630,12 +727,12 @@ Scientific Computing Research</a> programs.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="assets/javascripts/bundle.3220b9d7.min.js"></script>
+      <script src="../assets/javascripts/bundle.3220b9d7.min.js"></script>
       
-        <script src="javascript/mathjax.js"></script>
+        <script src="../javascript/mathjax.js"></script>
       
         <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
       
