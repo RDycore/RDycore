@@ -27,6 +27,7 @@
 --with-cuda-arch=80 \
 --download-parmetis \
 --download-metis \
+--download-muparser \
 --download-zlib \
 --download-scalapack \
 --download-sowing \

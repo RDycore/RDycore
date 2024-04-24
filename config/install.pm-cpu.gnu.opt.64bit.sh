@@ -25,6 +25,7 @@
 --with-hdf5-dir=/opt/cray/pe/hdf5-parallel/1.12.2.3/gnu/9.1 \
 --download-parmetis \
 --download-metis \
+--download-muparser \
 --download-zlib \
 --download-scalapack \
 --download-sowing \
