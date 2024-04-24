@@ -23,7 +23,7 @@ do
   case "$1" in
     --pm ) pm_node="$2"; shift ;;
     --64bit ) with64bit=1 ;;
-    ----with-debugging) with_debugging="$2"; shift ;;
+    --with-debugging) with_debugging="$2"; shift ;;
     -*)
       display_help
       exit 0
