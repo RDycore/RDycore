@@ -48,14 +48,7 @@ program mms_f90
       PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
       PetscCallA(RDyMMSSetup(rdy_, ierr))
 
-      PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
-        PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
-
-        ! enforce dirichlet BCs and compute source terms at half steps
-        PetscCallA(RDyMMSEnforceBoundaryConditions(rdy_, cur_time, ierr))
-        PetscCallA(RDyMMSComputeSourceTerms(rdy_, cur_time, ierr))
-
         ! advance the solution by the coupling interval
         PetscCallA(RDyAdvance(rdy_, ierr))
       enddo

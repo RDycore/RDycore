@@ -75,6 +75,24 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
+// this function gets called at the beginning of each time step, updating
+// source terms and boundary conditions at a properly centered time
+static PetscErrorCode MMSPreStep(TS ts) {
+  PetscFunctionBegin;
+
+  RDy rdy;
+  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
+
+  PetscReal t, dt;
+  PetscCall(TSGetTime(ts, &t));
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t + 0.5 * dt));
+  PetscCall(RDyMMSComputeSourceTerms(rdy, t + 0.5 * dt));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
 PetscErrorCode RDyMMSSetup(RDy rdy) {
@@ -116,6 +134,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing shallow water equations solver...");
   PetscCall(InitSWE(rdy));
+  PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->X));
