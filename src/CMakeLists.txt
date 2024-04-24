@@ -2,11 +2,12 @@
 add_library(rdycore
   checkpoint.c
   ensemble.c
+  rdyadvance.c
   rdycore.c
   rdydata.c
   rdydm.c
   rdymesh.c
-  rdyadvance.c
+  rdymms.c
   rdysetup.c
   swe/physics_swe.c
   swe/swe_petsc.c
@@ -22,7 +23,7 @@ install(
   TARGETS rdycore
   DESTINATION lib
 )
-set(RDYCORE_LIBRARIES rdycore;cyaml;yaml;hdf5;${RDYCORE_LIBRARIES})
+set(RDYCORE_LIBRARIES rdycore;cyaml;yaml;muparser;hdf5;${RDYCORE_LIBRARIES})
 
 # Unit tests for the main library
 if (ENABLE_TESTS)

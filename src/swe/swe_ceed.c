@@ -518,9 +518,9 @@ PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator source_op, PetscReal dt
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-// Given a shallow water equations source operator created by
-// CreateSWESourceOperator, fetches the field associated with the field_name.
-// This can be used to implement a time-dependent water source.
+// Given an operator and a sub-operator index, fetches the field associated
+// with the field_name for the given sub-operator
+// (this can be used to implement time-dependent operators)
 static PetscErrorCode SWESubOperatorGetOperatorField(CeedOperator op, CeedInt sub_op_idx, const char *field_name, CeedOperatorField *op_field) {
   PetscFunctionBeginUser;
 
@@ -547,11 +547,11 @@ static PetscErrorCode SWESubOperatorGetOperatorField(CeedOperator op, CeedInt su
 /// @param [inout]  op The Ceed source operator
 /// @param [in] sub_op_idx Index of the Ceed sub-operator
 /// @param [in] field_name Name of the field in the Ceed sub-operator
-/// @param [in]  icomp The component of the field whose values will be set
-/// @param [in]  *swe_src The array containing values for the source term
+/// @param [in] icomp The component of the field whose values will be set
+/// @param [in] values The array containing values for the sub-operator
 ///
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_idx, const char *field_name, CeedInt icomp, PetscReal *value) {
+static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_idx, const char *field_name, CeedInt icomp, PetscReal *values) {
   PetscFunctionBeginUser;
 
   CeedOperatorField swe_field;
@@ -572,7 +572,7 @@ static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_
   CeedSize len;
   PetscCallCEED(CeedVectorGetLength(swe_vec, &len));
   for (CeedInt i = 0; i < len / num_comp; ++i) {
-    data_ceed[i][icomp] = value[i];
+    data_ceed[i][icomp] = values[i];
   }
 
   PetscCallCEED(CeedVectorRestoreArray(swe_vec, (CeedScalar **)&data_ceed));

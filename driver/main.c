@@ -514,7 +514,7 @@ int main(int argc, char *argv[]) {
           break;
       }
 
-      PetscCall(RDySetWaterSourceForLocalCell(rdy, n, rain));
+      PetscCall(RDySetWaterSourceForLocalCells(rdy, n, rain));
 
       if (bc_specified && num_edges_dirc_bc > 0) {
         PetscReal cur_bc;

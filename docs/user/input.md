@@ -228,7 +228,8 @@ flow_conditions:
   - name: dam_top_ic
     type: dirichlet
     height: 10
-    momentum: [0, 0]
+    x_momentum: 0
+    y_momentum: 0
   - name: dam_bottom_ic
     type: dirichlet
     file: dam_ics.dat
@@ -268,9 +269,10 @@ to set the water height and momentum. This can be done in one of two ways:
 
     * `height`: the height of water [m] at the relevant point (within a cell
       or on its boundary)
-    * `momentum`: a 2-component sequence/list containing the `x` and `y` components
-      of the momentum [kg m/s] at the relevant point (within a cell or on its
-      boundary)
+    * `x_momentum`: the `x` component of the momentum [kg m/s] at the relevant
+      point (within a cell or on its boundary)
+    * `y_momentum`: the `y` component of the momentum [kg m/s] at the relevant
+      point (within a cell or on its boundary)
 
 2. By specifying a file from which data for these parameters is to be read. The
    data is read into the components of the solution vector that correspond

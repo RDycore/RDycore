@@ -5,12 +5,13 @@
 #include <limits.h>
 #include <petscviewer.h>
 #include <private/rdylogimpl.h>
+#include <private/rdymmsconfigimpl.h>
 #include <rdycore.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
 //
-// https://rdycore.atlassian.net/wiki/spaces/PD/pages/24576001/RDycore+configuration+file
+// https://rdycore.github.io/RDycore/user/input.html
 //
 
 // sentinel values for uninitialized/invalid data
@@ -183,7 +184,8 @@ typedef struct {
 // the specification of a single material property, given by a value to be read
 // from a file
 typedef struct {
-  PetscReal         value;                     // specified value of the material property
+  MathExpression    expression;                // expression for property value
+  void             *value;                     // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];  // file from which data is to be read
   PetscViewerFormat format;                    // file format
 } RDyMaterialPropertySpec;
@@ -250,8 +252,12 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  PetscReal         height;
-  PetscReal         momentum[2];
+  MathExpression    height_expression;      // expression for water height
+  MathExpression    x_momentum_expression;  // expression for water y-momentum
+  MathExpression    y_momentum_expression;  // expression for water y-momentum
+  void             *height;                 // muparser-backed functional form
+  void             *x_momentum;             // muparser-backed functional form
+  void             *y_momentum;             // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyFlowCondition;
@@ -264,7 +270,8 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  PetscReal         concentration;
+  MathExpression    expression;     // expression for concentration
+  void             *concentration;  // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDySedimentCondition;
@@ -277,7 +284,8 @@ typedef struct {
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  PetscReal         concentration;
+  MathExpression    expression;     // expression for concentration
+  void             *concentration;  // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDySalinityCondition;
@@ -354,6 +362,9 @@ typedef struct {
   RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
 
   RDyEnsembleSection ensemble;
+
+  // MMS-specific section (used only by the MMS driver)
+  RDyMMSSection mms;
 
 } RDyConfig;
 

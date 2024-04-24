@@ -195,8 +195,13 @@ struct _p_RDy {
   void *petsc_rhs;
 };
 
+// these are used by both the main (RDycore) driver and the MMS driver
 PETSC_INTERN PetscErrorCode DetermineConfigPrefix(RDy, char *);
-PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);
+PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);     // for RDycore driver only!
+PETSC_INTERN PetscErrorCode ReadMMSConfigFile(RDy);  // for MMS driver only!
+PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
+PETSC_INTERN PetscErrorCode InitRegions(RDy);
+PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 
 // shallow water equations functions

@@ -61,6 +61,7 @@ RUN \
     --download-cgns \
     --download-libceed \
     --download-metis \
+    --download-muparser \
     --download-netcdf \
     --download-parmetis \
     --download-pnetcdf \

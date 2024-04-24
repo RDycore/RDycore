@@ -8,5 +8,6 @@ PETSC_INTERN PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, PetscInt n_aux_f
                                                          char aux_field_names[n_aux_field][m], DM *aux_dm);
 PETSC_INTERN PetscErrorCode CreateDM(RDy rdy);
 PETSC_INTERN PetscErrorCode CreateAuxiliaryDM(RDy rdy);
+PETSC_INTERN PetscErrorCode CreateVectors(RDy rdy);
 
 #endif

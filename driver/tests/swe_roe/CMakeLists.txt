@@ -5,6 +5,7 @@
 find_program(H5DIFF h5diff REQUIRED
              PATHS ${PETSC_DIR}/${PETSC_ARCH}/bin)
 set(rdycore_c_driver ${rdycore_driver})
+set(mms_c_driver ${mms_driver})
 
 # arguments for specific configurations ("basic" config has no options)
 set(ceed_args -ceed /cpu/self)
@@ -133,28 +134,18 @@ foreach(np 1 2)
   endforeach()
 endforeach()
 
-# mms
+# mms driver (C and Fortran)
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/mms_dx1.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic)
-    add_test(mms_file_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_driver} mms_dx1.yaml ${${config}_args})
+    foreach(lang c f90)
+      add_test(mms_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_dx1.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
-
-# mms_f90
-file(COPY
-     ${CMAKE_CURRENT_SOURCE_DIR}/mms_dx1.yaml
-     ${MESH_DIR}/mms_triangles_dx1.exo
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2) # test on 1, 2 processes
-  foreach(config basic)
-    add_test(mms_file_f90_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_f90_driver} mms_dx1.yaml ${${config}_args})
-  endforeach()
-endforeach()
-
 
 # Exodus II mesh with mixed element types (quads and triangles), IC specified by a binary file, and material property specified by a binary file
 file(COPY

@@ -64,8 +64,8 @@ PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, const PetscInt boundary_
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt size, const PetscInt ndof,
-                                             PetscReal values[size]) {
+PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
+                                             PetscReal values[num_edges * ndof]) {
   PetscFunctionBegin;
 
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
@@ -73,9 +73,9 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%" PetscInt_FMT ") for the boundary condition need to be three.", ndof);
 
   RDyBoundary boundary = rdy->boundaries[boundary_index];
-  PetscCheck(boundary.num_edges == size, rdy->comm, PETSC_ERR_USER,
+  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
              "The given number of edges (%" PetscInt_FMT ") for boundary with index %" PetscInt_FMT " is incorrect (should be %" PetscInt_FMT ")",
-             size, boundary_index, boundary.num_edges);
+             num_edges, boundary_index, boundary.num_edges);
 
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
@@ -85,7 +85,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
   if (rdy->ceed_resource[0]) {  // ceed
-    PetscInt size = 3 * rdy->boundaries[boundary_index].num_edges;
+    PetscInt size = ndof * num_edges;
     PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed_rhs.op_edges, &rdy->mesh, rdy->boundaries[boundary_index], size, values));
   } else {  // petsc
     // fetch the boundary data
@@ -152,7 +152,7 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetSourceVecForLocalCell(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
+PetscErrorCode RDySetSourceVecForLocalCells(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscInt ndof;
@@ -171,7 +171,7 @@ PetscErrorCode RDySetSourceVecForLocalCell(RDy rdy, Vec src_vec, PetscInt idof, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -180,13 +180,13 @@ PetscErrorCode RDySetWaterSourceForLocalCell(RDy rdy, const PetscInt size, Petsc
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed_rhs.op_src, values));
   } else {  // petsc
     PetscInt idof = 0;
-    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -195,12 +195,12 @@ PetscErrorCode RDySetXMomentumSourceForLocalCell(RDy rdy, const PetscInt size, P
     PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed_rhs.op_src, values));
   } else {
     PetscInt idof = 1;
-    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, PetscReal values[size]) {
+PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
@@ -209,7 +209,7 @@ PetscErrorCode RDySetYMomentumSourceForLocalCell(RDy rdy, const PetscInt size, P
     PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed_rhs.op_src, values));
   } else {
     PetscInt idof = 2;
-    PetscCall(RDySetSourceVecForLocalCell(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -389,7 +389,7 @@ PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetManningsNForLocalCell(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
+PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal n_values[size]) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));

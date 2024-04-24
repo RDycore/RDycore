@@ -66,5 +66,6 @@ flow_conditions:
   - name: outflow_bc
     type: dirichlet
     height: 0
-    momentum: [0, 0]
+    x_momentum: 0
+    y_momentum: 0
 
