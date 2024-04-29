@@ -2,6 +2,7 @@
 // mainline RDycore (though it is built into the library).
 
 #include <muParserDLL.h>
+#include <petscconvest.h>
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <petscsys.h>
@@ -356,20 +357,14 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Computes the componentwise L1, L2, and Linf error norms for the relevant
-// manufactured solution at the given time. L1_norms, L2_norms, and Linf_norms
-// are all arrays large enough to store the number of dof. If non-NULL,
-// num_global_cells stores the number of distinct global cells and global_area
-// stores the total area covered by distinct global cells.
-PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms,
-                                       PetscInt *num_global_cells, PetscReal *global_area) {
+static PetscErrorCode ComputeErrorNorms(RDy rdy, Vec solution, PetscReal time, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms,
+                                        PetscInt *num_global_cells, PetscReal *global_area) {
   PetscFunctionBegin;
-
   // compute the error vector
   Vec error;
   PetscCall(RDyCreatePrognosticVec(rdy, &error));
   PetscCall(RDyMMSComputeSolution(rdy, time, error));
-  PetscCall(VecAYPX(error, -1.0, rdy->X));
+  PetscCall(VecAYPX(error, -1.0, solution));
 
   PetscInt ndof;
   PetscCall(VecGetBlockSize(error, &ndof));
@@ -413,5 +408,115 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   if (global_area) {
     PetscCall(MPI_Reduce(&area_sum, global_area, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Computes the componentwise L1, L2, and Linf error norms for the relevant
+// manufactured solution at the given time. L1_norms, L2_norms, and Linf_norms
+// are all arrays large enough to store the number of dof. If non-NULL,
+// num_global_cells stores the number of distinct global cells and global_area
+// stores the total area covered by distinct global cells.
+PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms,
+                                       PetscInt *num_global_cells, PetscReal *global_area) {
+  PetscFunctionBegin;
+  PetscCall(ComputeErrorNorms(rdy, rdy->X, time, L1_norms, L2_norms, Linf_norms, num_global_cells, global_area));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// performs a temporo-spatial convergence study using the given instance of RDy
+// as a coarse grid, uniformly refining it the specified number of times,
+// evolving the solution to the given time, computing error norms for each
+// component, and calculating rates of convergence (and variances) with linear
+// regression
+PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal final_time, PetscInt num_refinements, PetscReal *L1_conv_rates,
+                                              PetscReal *L2_conv_rates, PetscReal *Linf_conv_rates) {
+  PetscFunctionBegin;
+
+  /*
+  PetscConvEst conv_est;
+  PetscCall(PetscConvEstCreate(rdy->comm, &conv_est));
+  PetscCall(PetscConvEstUseTS(conv_est, PETSC_FALSE)); // spatial convergence
+  PetscCall(PetscConvEstSetSolver(conv_est, rdy->ts));
+  */
+  TS        ts  = rdy->ts;
+  PetscReal dt0 = rdy->dt;
+
+  PetscInt dim;
+  PetscCall(DMGetDimension(rdy->dm, &dim));
+
+  // error norm storage
+  PetscInt  num_comps = 3;  // SWE only!
+  PetscReal L1_norms[num_refinements + 1][num_comps], L2_norms[num_refinements + 1][num_comps], Linf_norms[num_refinements + 1][num_comps];
+
+  DM dms[num_refinements + 1];
+  dms[0] = rdy->dm;
+  PetscCall(DMPlexSetRefinementUniform(dms[0], PETSC_TRUE));
+  for (PetscInt r = 0; r <= num_refinements; ++r) {
+    if (r > 0) {
+      // refine the next-coarser DM uniformly to create this one
+      PetscCall(DMRefine(dms[r - 1], MPI_COMM_NULL, &dms[r]));
+      PetscCall(DMSetCoarseDM(dms[r], dms[r - 1]));
+      PetscCall(DMCopyTransform(dms[r - 1], dms[r]));
+
+      const char *dm_name;
+      PetscCall(PetscObjectGetName((PetscObject)dms[r - 1], &dm_name));
+      PetscCall(PetscObjectSetName((PetscObject)dms[r], dm_name));
+
+      PetscErrorCode (*rhs_func)(DM, PetscReal, Vec, Vec, void *);
+      void *rhs_ctx;
+      PetscCall(DMTSGetRHSFunctionLocal(dms[r - 1], &rhs_func, &rhs_ctx));
+      PetscCall(DMTSSetRHSFunctionLocal(dms[r], rhs_func, rhs_ctx));
+    }
+
+    // get the initial solution
+    Vec u;
+    PetscCall(DMCreateGlobalVector(dms[r], &u));
+    PetscCall(VecCopy(rdy->X, u));
+    PetscObject disc;
+    PetscCall(DMGetField(dms[r], 0, NULL, &disc));
+    const char *u_name;
+    PetscCall(PetscObjectGetName(disc, &u_name));
+    PetscCall(PetscObjectSetName((PetscObject)u, u_name));
+
+    // set up the solver
+    PetscCall(TSReset(ts));
+    PetscCall(TSSetDM(ts, dms[r]));
+    PetscCall(TSSetTime(ts, 0.0));
+    PetscCall(TSSetTimeStep(ts, dt0 * pow(2.0, -r)));
+    PetscCall(TSSetStepNumber(ts, 0));
+    PetscCall(TSSetMaxTime(ts, final_time));
+    PetscCall(TSSetSolution(ts, u));
+
+    // solve the thing
+    PetscCall(TSSolve(ts, NULL));
+
+    // compute error norms for this refinement level
+    PetscCall(RDyMMSComputeErrorNorms(rdy, final_time, L1_norms[r], L2_norms[r], Linf_norms[r], NULL, NULL));
+  }
+
+  // clean up grids
+  for (PetscInt r = 1; r <= num_refinements; ++r) {
+    PetscCall(DMDestroy(&dms[r]));
+  }
+
+  // fit convergence rates
+  PetscReal x[num_refinements + 1], y1[num_refinements + 1], y2[num_refinements + 1], yinf[num_refinements + 1];
+  for (PetscInt c = 0; c < num_comps; ++c) {
+    for (PetscInt r = 0; r <= num_refinements; ++r) {
+      x[r]    = PetscLog10Real(dt0 * pow(2.0, -r));
+      y1[r]   = PetscLog10Real(L1_norms[c][r]);
+      y2[r]   = PetscLog10Real(L2_norms[c][r]);
+      yinf[r] = PetscLog10Real(Linf_norms[c][r]);
+    }
+    PetscReal slope, intercept;
+    PetscCall(PetscLinearRegression(num_refinements + 1, x, y1, &slope, &intercept));
+    L1_conv_rates[c] = -slope * dim;
+    PetscCall(PetscLinearRegression(num_refinements + 1, x, y2, &slope, &intercept));
+    L2_conv_rates[c] = -slope * dim;
+    PetscCall(PetscLinearRegression(num_refinements + 1, x, yinf, &slope, &intercept));
+    Linf_conv_rates[c] = -slope * dim;
+  }
+
+  // PetscCall(PetscConvEstDestroy(&convEst));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
