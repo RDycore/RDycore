@@ -12,7 +12,8 @@ module rdycore
   public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
-            RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, RDyMMSComputeErrorNorms, &
+            RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, &
+            RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, &
             RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
@@ -113,6 +114,14 @@ module rdycore
       type(c_ptr),    value, intent(in)  :: l1_norms, l2_norms, linf_norms
       PetscInt,              intent(out) :: num_global_cells
       real(c_double),        intent(out) :: global_area
+    end function
+
+    integer(c_int) function rdymmsestimateconvergencerates_(rdy, num_refinements, l1_rates, l2_rates, linf_rates) &
+                            bind(c, name="RDyMMSEstimateConvergenceRates")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr), value, intent(in)  :: rdy
+      PetscInt,    value, intent(in)  :: num_refinements
+      type(c_ptr), value, intent(in)  :: l1_rates, l2_rates, linf_rates
     end function
 
     integer(c_int) function rdygetnumglobalcells_(rdy, num_cells_global) bind(c, name="RDyGetNumGlobalCells")
@@ -492,6 +501,16 @@ contains
     integer,                  intent(out)   :: ierr
     ierr = rdymmscomputeerrornorms_(rdy_%c_rdy, time, c_loc(l1_norms), c_loc(l2_norms), c_loc(linf_norms), &
                                     num_global_cells, global_area)
+  end subroutine
+
+  subroutine RDyMMSEstimateConvergenceRates(rdy_, num_refinements, &
+                                            l1_conv_rates, l2_conv_rates, linf_conv_rates, ierr)
+    type(RDy),                intent(inout) :: rdy_
+    PetscInt,                 intent(in)    :: num_refinements
+    real(RDyDouble), pointer, intent(in)    :: l1_conv_rates(:), l2_conv_rates(:), linf_conv_rates(:)
+    integer,                  intent(out)   :: ierr
+    ierr = rdymmsestimateconvergencerates_(rdy_%c_rdy, num_refinements, &
+                                           c_loc(l1_conv_rates), c_loc(l2_conv_rates), c_loc(linf_conv_rates))
   end subroutine
 
   subroutine RDyGetNumGlobalCells(rdy_, num_cells_global, ierr)

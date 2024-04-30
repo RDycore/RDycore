@@ -396,9 +396,9 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscCall(VecDestroy(&error));
 
   // obtain global error norms
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
 
   for (PetscInt dof = 0; dof < ndof; ++dof) {
     L2_norms[dof] = PetscSqrtReal(L2_norms[dof]);
@@ -469,22 +469,30 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
     PetscPrintf(rdys[r]->comm, "\n");
   }
 
+  // calculate the spatial discretization parameter N, where h^{-dim} = N.
+  PetscReal x[num_refinements + 1];
+  for (PetscInt r = 0; r <= num_refinements; ++r) {
+    PetscInt N = rdys[r]->mesh.num_cells_global;
+    x[r]       = PetscLog10Real(N);
+  }
+
   // fit convergence rates
-  PetscReal x[num_refinements + 1], y1[num_refinements + 1], y2[num_refinements + 1], yinf[num_refinements + 1];
+  PetscReal y1[num_refinements + 1], y2[num_refinements + 1], yinf[num_refinements + 1];
   for (PetscInt c = 0; c < num_comps; ++c) {
     for (PetscInt r = 0; r <= num_refinements; ++r) {
-      x[r]    = PetscLog10Real(rdys[r]->config.time.time_step);
-      y1[r]   = PetscLog10Real(L1_norms[c][r]);
-      y2[r]   = PetscLog10Real(L2_norms[c][r]);
-      yinf[r] = PetscLog10Real(Linf_norms[c][r]);
+      y1[r]   = PetscLog10Real(L1_norms[r][c]);
+      y2[r]   = PetscLog10Real(L2_norms[r][c]);
+      yinf[r] = PetscLog10Real(Linf_norms[r][c]);
     }
+
+    // since h^{-dim} = N, log err = s log N + b = -s dim log h + b
     PetscReal slope, intercept;
     PetscCall(PetscLinearRegression(num_refinements + 1, x, y1, &slope, &intercept));
-    L1_conv_rates[c] = slope;  // -slope * dim;
+    L1_conv_rates[c] = -slope * dim;
     PetscCall(PetscLinearRegression(num_refinements + 1, x, y2, &slope, &intercept));
-    L2_conv_rates[c] = slope;  // -slope * dim;
+    L2_conv_rates[c] = -slope * dim;
     PetscCall(PetscLinearRegression(num_refinements + 1, x, yinf, &slope, &intercept));
-    Linf_conv_rates[c] = slope;  //-slope * dim;
+    Linf_conv_rates[c] = -slope * dim;
   }
 
   // clean up
