@@ -76,7 +76,8 @@ program mms_f90
       !endif
 
     endif
-    ! shut off
+    ! clean up and shut off
+    PetscCallA(RDyDestroy(rdy_, ierr))
     PetscCallA(RDyFinalize(ierr))
   endif
 
