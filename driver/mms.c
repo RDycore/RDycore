@@ -34,6 +34,21 @@ int main(int argc, char *argv[]) {
     PetscCall(RDyCreate(comm, argv[1], &rdy));
     PetscCall(RDyMMSSetup(rdy));
 
+    // run a convergence study
+    PetscInt  num_comps       = 3;
+    PetscInt  num_refinements = 3;
+    PetscReal L1_conv_rates[num_comps], L2_conv_rates[num_comps], Linf_conv_rates[num_comps];
+    PetscCall(RDyMMSEstimateConvergenceRates(rdy, num_refinements, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
+
+    const char *comp_names[3] = {" h", "hu", "hv"};
+    PetscPrintf(comm, "Convergence rates:\n");
+    for (PetscInt idof = 0; idof < 3; idof++) {
+      PetscPrintf(comm, "  %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[idof], L1_conv_rates[idof], L2_conv_rates[idof], Linf_conv_rates[idof]);
+    }
+
+    PetscCall(RDyDestroy(&rdy));
+
+    /*
     // run the problem to completion
     while (!RDyFinished(rdy)) {
       PetscCall(RDyAdvance(rdy));
@@ -62,6 +77,7 @@ int main(int argc, char *argv[]) {
     PetscPrintf(comm, "Error-Norm-Max   : ");
     for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", Linf_norms[idof]);
     PetscPrintf(comm, "\n");
+    */
   }
 
   PetscCall(RDyFinalize());
