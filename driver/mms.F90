@@ -25,11 +25,6 @@ program mms_f90
 
   character(len=1024)  :: config_file
   type(RDy)            :: rdy_
-  PetscMPIInt          :: myrank
-  integer(RDyTimeUnit) :: time_unit
-  PetscReal            :: cur_time
-  PetscInt, parameter  :: ndof = 3, num_refinements = 3
-  PetscReal, target    :: L1_conv_rates(3), L2_conv_rates(3), Linf_conv_rates(3)
   PetscErrorCode       :: ierr
 
   if (command_argument_count() < 1) then
@@ -39,8 +34,6 @@ program mms_f90
 
     ! initialize subsystems
     PetscCallA(RDyInit(ierr))
-
-    PetscCallMPIA(MPI_Comm_rank(PETSC_COMM_WORLD, myrank, ierr))
 
     if (trim(config_file) /= trim('-help')) then
       ! create rdycore and set it up with the given file

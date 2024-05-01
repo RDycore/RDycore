@@ -2,7 +2,6 @@
 // mainline RDycore (though it is built into the library).
 
 #include <muParserDLL.h>
-#include <petscconvest.h>
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <petscsys.h>
