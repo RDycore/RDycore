@@ -32,7 +32,7 @@ typedef struct {
 
 typedef struct {
   PetscInt                  num_refinements;
-  RDyMMSSWEConvergenceRates expected_convergence_rates;
+  RDyMMSSWEConvergenceRates expected_rates;
 } RDyMMSSWEConvergence;
 
 // specification of a set of manufactured solutions for the

@@ -504,6 +504,12 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+#define CheckConvergence(comp, comp_index, norm)                                                                                            \
+  if (norm##_conv_rates[comp_index] <= rdy->config.mms.swe.convergence.expected_rates.comp.norm) {                                          \
+    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, #comp, norm##_conv_rates[comp_index], \
+            rdy->config.mms.swe.convergence.expected_rates.comp.norm);                                                                      \
+  }
+
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
@@ -523,19 +529,16 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     }
 
     // check the convergence rates and print PASS or FAIL
-    if ((L1_conv_rates[0] >= rdy->config.mms.swe.convergence.expected_convergence_rates.h.L1) &&
-        (L1_conv_rates[1] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hu.L1) &&
-        (L1_conv_rates[2] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hv.L1) &&
-        (L2_conv_rates[0] >= rdy->config.mms.swe.convergence.expected_convergence_rates.h.L2) &&
-        (L2_conv_rates[1] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hu.L2) &&
-        (L2_conv_rates[2] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hv.L2) &&
-        (Linf_conv_rates[0] >= rdy->config.mms.swe.convergence.expected_convergence_rates.h.Linf) &&
-        (Linf_conv_rates[1] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hu.Linf) &&
-        (Linf_conv_rates[2] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hv.Linf)) {
-      PetscPrintf(rdy->comm, "PASS\n");
-    } else {
-      PetscPrintf(rdy->comm, "FAIL\n");
-    }
+    CheckConvergence(h, 0, L1);
+    CheckConvergence(h, 0, L2);
+    CheckConvergence(h, 0, Linf);
+    CheckConvergence(hu, 1, L1);
+    CheckConvergence(hu, 1, L2);
+    CheckConvergence(hu, 1, Linf);
+    CheckConvergence(hv, 2, L1);
+    CheckConvergence(hv, 2, L2);
+    CheckConvergence(hv, 2, Linf);
+    PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
     // run the problem to completion and print error norms
     while (!RDyFinished(rdy)) {

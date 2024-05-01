@@ -67,7 +67,7 @@ mms:
     # Convergence study parameters (optional)
     convergence:
       num_refinements: 3
-      expected_convergence_rates:
+      expected_rates:
         h:
           L1: 1
           L2: 1
@@ -110,6 +110,6 @@ problem has been solved successfully for each solution component:
 
 * `num_refinements`: the number of times the domain (and timestep) are refined
   uniformly to test the rate of convergence of the solution error
-* `expected_convergence_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
+* `expected_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
   entries giving the expected rates of convergence for the appropriate error
   norms.

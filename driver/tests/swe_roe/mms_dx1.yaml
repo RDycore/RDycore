@@ -48,7 +48,7 @@ mms:
     # Convergence study parameters (optional)
     convergence:
       num_refinements: 3
-      expected_convergence_rates:
+      expected_rates:
         h:
           L1: 1
           L2: 1
