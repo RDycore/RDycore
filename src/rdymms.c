@@ -503,3 +503,69 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
   // PetscCall(PetscConvEstDestroy(&convEst));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+PetscErrorCode RDyMMSRun(RDy rdy) {
+  PetscFunctionBegin;
+
+  // FIXME: SWE only at the moment
+  if (rdy->config.mms.swe.convergence.num_refinements) {
+    // run a convergence study
+    PetscInt  num_comps       = 3;
+    PetscInt  num_refinements = 3;
+    PetscReal L1_conv_rates[num_comps], L2_conv_rates[num_comps], Linf_conv_rates[num_comps];
+    PetscCall(RDyMMSEstimateConvergenceRates(rdy, num_refinements, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
+
+    const char *comp_names[3] = {" h", "hu", "hv"};
+    PetscPrintf(rdy->comm, "Convergence rates:\n");
+    for (PetscInt idof = 0; idof < 3; idof++) {
+      PetscPrintf(rdy->comm, "  %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[idof], L1_conv_rates[idof], L2_conv_rates[idof],
+                  Linf_conv_rates[idof]);
+    }
+
+    // check the convergence rates and print PASS or FAIL
+    if ((L1_conv_rates[0] >= rdy->config.mms.swe.convergence.expected_convergence_rates.h.L1) &&
+        (L1_conv_rates[1] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hu.L1) &&
+        (L1_conv_rates[2] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hv.L1) &&
+        (L2_conv_rates[0] >= rdy->config.mms.swe.convergence.expected_convergence_rates.h.L2) &&
+        (L2_conv_rates[1] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hu.L2) &&
+        (L2_conv_rates[2] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hv.L2) &&
+        (Linf_conv_rates[0] >= rdy->config.mms.swe.convergence.expected_convergence_rates.h.Linf) &&
+        (Linf_conv_rates[1] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hu.Linf) &&
+        (Linf_conv_rates[2] >= rdy->config.mms.swe.convergence.expected_convergence_rates.hv.Linf)) {
+      PetscPrintf(rdy->comm, "PASS\n");
+    } else {
+      PetscPrintf(rdy->comm, "FAIL\n");
+    }
+  } else {
+    // run the problem to completion and print error norms
+    while (!RDyFinished(rdy)) {
+      PetscCall(RDyAdvance(rdy));
+    }
+
+    // compute error norms for the final solution
+    RDyTimeUnit time_unit;
+    PetscCall(RDyGetTimeUnit(rdy, &time_unit));
+    PetscReal cur_time;
+    PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
+    PetscReal L1_norms[3], L2_norms[3], Linf_norms[3], global_area;
+    PetscInt  num_global_cells;
+    PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
+
+    PetscPrintf(rdy->comm, "Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
+    PetscPrintf(rdy->comm, "Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
+
+    PetscPrintf(rdy->comm, "Error-Norm-1     : ");
+    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L1_norms[idof]);
+    PetscPrintf(rdy->comm, "\n");
+
+    PetscPrintf(rdy->comm, "Error-Norm-2     : ");
+    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L2_norms[idof]);
+    PetscPrintf(rdy->comm, "\n");
+
+    PetscPrintf(rdy->comm, "Error-Norm-Max   : ");
+    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", Linf_norms[idof]);
+    PetscPrintf(rdy->comm, "\n");
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

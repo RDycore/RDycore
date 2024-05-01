@@ -22,6 +22,19 @@ typedef struct {
   PetscReal A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
 } RDyMMSConstants;
 
+typedef struct {
+  PetscReal L1, L2, Linf;
+} RDyMMSSWEErrorNorms;
+
+typedef struct {
+  RDyMMSSWEErrorNorms h, hu, hv;
+} RDyMMSSWEConvergenceRates;
+
+typedef struct {
+  PetscInt                  num_refinements;
+  RDyMMSSWEConvergenceRates expected_convergence_rates;
+} RDyMMSSWEConvergence;
+
 // specification of a set of manufactured solutions for the
 // shallow water equations (SWE)
 typedef struct {
@@ -37,6 +50,7 @@ typedef struct {
     // Manning's roughness coefficient n(x, y)
     MathExpression n;
   } expressions;
+
   struct {
     // water height h(x, y, t) and partial derivatives
     void *h, *dhdx, *dhdy, *dhdt;
@@ -49,6 +63,8 @@ typedef struct {
     // Manning's roughness coefficient n(x, y)
     void *n;
   } solutions;
+
+  RDyMMSSWEConvergence convergence;
 } RDyMMSSWESolutions;
 
 // constants and expressions for manufactured solutions

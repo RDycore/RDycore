@@ -564,6 +564,27 @@ static const cyaml_schema_field_t mms_constants_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_schema_field_t mms_swe_error_norms_fields_schema[] = {
+    CYAML_FIELD_FLOAT("L1", CYAML_FLAG_DEFAULT, RDyMMSSWEErrorNorms, L1),
+    CYAML_FIELD_FLOAT("L2", CYAML_FLAG_DEFAULT, RDyMMSSWEErrorNorms, L2),
+    CYAML_FIELD_FLOAT("Linf", CYAML_FLAG_DEFAULT, RDyMMSSWEErrorNorms, Linf),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t mms_swe_convergence_rates_fields_schema[] = {
+    CYAML_FIELD_MAPPING("h", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergenceRates, h, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hu", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergenceRates, hu, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hv", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergenceRates, hv, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t mms_swe_convergence_fields_schema[] = {
+    CYAML_FIELD_INT("num_refinements", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergence, num_refinements),
+    CYAML_FIELD_MAPPING("expected_convergence_rates", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergence,
+                        expected_convergence_rates, mms_swe_convergence_rates_fields_schema),
+    CYAML_FIELD_END
+};
+
 static const cyaml_schema_field_t mms_swe_fields_schema[] = {
     CYAML_FIELD_STRING("h", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.h, 1),
     CYAML_FIELD_STRING("dhdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dhdx, 1),
@@ -581,6 +602,7 @@ static const cyaml_schema_field_t mms_swe_fields_schema[] = {
     CYAML_FIELD_STRING("dzdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dzdx, 1),
     CYAML_FIELD_STRING("dzdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dzdy, 1),
     CYAML_FIELD_STRING("n", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.n, 1),
+    CYAML_FIELD_MAPPING("convergence", CYAML_FLAG_OPTIONAL, RDyMMSSWESolutions, convergence, mms_swe_convergence_fields_schema),
     CYAML_FIELD_END
 };
 

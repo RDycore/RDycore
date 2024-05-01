@@ -13,7 +13,7 @@ module rdycore
             RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
             RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, &
-            RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, &
+            RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, RDyMMSRun, &
             RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetDirichletBoundaryValues, &
@@ -122,6 +122,11 @@ module rdycore
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,    value, intent(in)  :: num_refinements
       type(c_ptr), value, intent(in)  :: l1_rates, l2_rates, linf_rates
+    end function
+
+    integer(c_int) function rdymmsrun_(rdy) bind(c, name="RDyMMSRun")
+      use iso_c_binding, only: c_int, c_ptr, c_double
+      type(c_ptr), value, intent(in)  :: rdy
     end function
 
     integer(c_int) function rdygetnumglobalcells_(rdy, num_cells_global) bind(c, name="RDyGetNumGlobalCells")
@@ -511,6 +516,12 @@ contains
     integer,                  intent(out)   :: ierr
     ierr = rdymmsestimateconvergencerates_(rdy_%c_rdy, num_refinements, &
                                            c_loc(l1_conv_rates), c_loc(l2_conv_rates), c_loc(linf_conv_rates))
+  end subroutine
+
+  subroutine RDyMMSRun(rdy_, ierr)
+    type(RDy),                intent(inout) :: rdy_
+    integer,                  intent(out)   :: ierr
+    ierr = rdymmsrun_(rdy_%c_rdy)
   end subroutine
 
   subroutine RDyGetNumGlobalCells(rdy_, num_cells_global, ierr)

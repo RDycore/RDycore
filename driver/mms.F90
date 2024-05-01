@@ -47,37 +47,11 @@ program mms_f90
       PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
       PetscCallA(RDyMMSSetup(rdy_, ierr))
 
-      ! run a convergence study
-      PetscCallA(RDyMMSEstimateConvergenceRates(rdy_, num_refinements, L1_conv_rates, L2_conv_rates, Linf_conv_rates, ierr))
-
-      if (myrank == 0) then
-        write(*,*) 'Convergence rates:'
-        write(*,*) '   h: L1 = ', L1_conv_rates(1), ', L2 = ', L2_conv_rates(1), ', Linf = ', Linf_conv_rates(1)
-        write(*,*) '  hu: L1 = ', L1_conv_rates(2), ', L2 = ', L2_conv_rates(2), ', Linf = ', Linf_conv_rates(2)
-        write(*,*) '  hv: L1 = ', L1_conv_rates(3), ', L2 = ', L2_conv_rates(3), ', Linf = ', Linf_conv_rates(3)
-      endif
-
-      ! run the problem to completion
-      !do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
-      !  PetscCallA(RDyAdvance(rdy_, ierr))
-      !enddo
-      !
-      ! compute error norms
-      !PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
-      !PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
-      !PetscCallA(RDyMMSComputeErrorNorms(rdy_, cur_time, l1_norms, l2_norms, linf_norms, num_global_cells, global_area, ierr))
-      !
-      !if (myrank == 0) then
-      !  write(*,*)'Avg-cell-area    :', global_area/num_global_cells
-      !  write(*,*)'Avg-length-scale :', (global_area/num_global_cells) ** 0.5d0
-      !  write(*,*)'Error-Norm-1     :', l1_norms(:)
-      !  write(*,*)'Error-Norm-2     :', l2_norms(:)
-      !  write(*,*)'Error-Norm-Max   :', linf_norms(:)
-      !endif
-
+      ! run the problem according to the given configuration
+      PetscCallA(RDyMMSRun(rdy_, ierr));
+      PetscCallA(RDyDestroy(rdy_, ierr))
     endif
-    ! clean up and shut off
-    PetscCallA(RDyDestroy(rdy_, ierr))
+    ! shut off
     PetscCallA(RDyFinalize(ierr))
   endif
 

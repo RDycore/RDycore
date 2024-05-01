@@ -143,6 +143,8 @@ foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic)
     foreach(lang c f90)
       add_test(mms_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_dx1.yaml ${${config}_args})
+      set_tests_properties(mms_file_${lang}_np_${np}_${config}
+        PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
     endforeach()
   endforeach()
 endforeach()

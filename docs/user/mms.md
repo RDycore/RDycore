@@ -63,6 +63,23 @@ mms:
 
     # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
+
+    # Convergence study parameters (optional)
+    convergence:
+      num_refinements: 3
+      expected_convergence_rates:
+        h:
+          L1: 1
+          L2: 1
+          Linf: 0.48
+        hu:
+          L1: 0.73
+          L2: 0.78
+          Linf: 0.62
+        hv:
+          L1: 0.73
+          L2: 0.78
+          Linf: 0.62
 ```
 
 The `mms` section defines the forms of the manufactured solutions for the
@@ -84,3 +101,15 @@ elevation function, and `n`, the Manning coefficient) are functions of `x` and
 These analytic forms are parsed and compiled at runtime so they can be evaluated
 as needed by the model. This means you can define a new manufactured solution in
 every MMS driver input file, without developing code and rebuilding RDycore.
+
+### Convergence studies
+
+The `convergence` sub-subsection is optional and contains the following
+parameters for performing convergence studies that determine whether the MMS
+problem has been solved successfully for each solution component:
+
+* `num_refinements`: the number of times the domain (and timestep) are refined
+  uniformly to test the rate of convergence of the solution error
+* `expected_convergence_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
+  entries giving the expected rates of convergence for the appropriate error
+  norms.
