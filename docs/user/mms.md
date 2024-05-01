@@ -104,12 +104,15 @@ every MMS driver input file, without developing code and rebuilding RDycore.
 
 ### Convergence studies
 
-The `convergence` sub-subsection is optional and contains the following
-parameters for performing convergence studies that determine whether the MMS
-problem has been solved successfully for each solution component:
+The optional `convergence` sub-subsection contains the following parameters for
+performing convergence studies that determine whether the MMS problem has been
+solved successfully for each solution component:
 
 * `num_refinements`: the number of times the domain (and timestep) are refined
-  uniformly to test the rate of convergence of the solution error
+  uniformly to test the rate of convergence of the solution error. This
+  parameter is required if your input file has a `convergence` section.
 * `expected_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
-  entries giving the expected rates of convergence for the appropriate error
-  norms.
+  entries for each relevant component name giving the expected rates of
+  convergence for the appropriate error norms. Each of the component names and
+  expected rates are optional, so you can specify only those you want to use
+  as pass/fail criteria.
