@@ -1161,8 +1161,9 @@ static PetscErrorCode ReadAndBroadcastConfigFile(RDy rdy, char **config_str) {
     MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
 
     // recreate the configuration string.
-    PetscCall(PetscCalloc1(config_size, config_str));
+    PetscCall(PetscCalloc1(config_size + 1, config_str));
     MPI_Bcast(*config_str, config_size, MPI_CHAR, 0, rdy->comm);
+    (*config_str)[config_size] = 0;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

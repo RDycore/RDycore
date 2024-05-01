@@ -891,7 +891,7 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
 
 // checks for the -pause option, which pauses RDycore and prints out the PIDs
 // of the MPI processes so that a debugger may be attached
-static PetscErrorCode PauseIfRequested(RDy rdy) {
+PetscErrorCode PauseIfRequested(RDy rdy) {
   PetscFunctionBegin;
 
   static PetscBool already_paused = PETSC_FALSE;

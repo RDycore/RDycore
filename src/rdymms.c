@@ -94,10 +94,14 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
+
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
 PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscFunctionBegin;
+
+  PetscCall(PauseIfRequested(rdy));
 
   PetscCall(ReadMMSConfigFile(rdy));
 
