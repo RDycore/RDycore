@@ -521,7 +521,7 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
   if (rdy->config.mms.swe.convergence.num_refinements) {
     // run a convergence study
     PetscInt  num_comps       = 3;
-    PetscInt  num_refinements = 3;
+    PetscInt  num_refinements = rdy->config.mms.swe.convergence.num_refinements;
     PetscReal L1_conv_rates[num_comps], L2_conv_rates[num_comps], Linf_conv_rates[num_comps];
     PetscCall(RDyMMSEstimateConvergenceRates(rdy, num_refinements, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
