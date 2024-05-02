@@ -401,7 +401,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   // obtain global error norms
   PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
   PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, ndof, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD));
 
   for (PetscInt dof = 0; dof < ndof; ++dof) {
     L2_norms[dof] = PetscSqrtReal(L2_norms[dof]);
