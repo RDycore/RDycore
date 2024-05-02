@@ -1,5 +1,6 @@
 # RDycore User Guide
 
-* [YAML input specification](input.md)
+* [Standalone YAML input specification](input.md)
+* [MMS driver YAML input specification](mms.md)
 
 More soon!
