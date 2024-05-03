@@ -458,9 +458,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
     PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r);
 
     // run the problem to completion
-    while (!RDyFinished(rdys[r])) {
-      PetscCall(RDyAdvance(rdys[r]));
-    }
+    PetscCall(TSSolve(rdys[r]->ts, rdys[r]->X));
 
     // compute error norms for this refinement level
     PetscCall(RDyMMSComputeErrorNorms(rdys[r], final_time, L1_norms[r], L2_norms[r], Linf_norms[r], NULL, NULL));
