@@ -448,8 +448,8 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
     PetscCall(RDyMMSSetup(rdys[r]));
 
     // override timestepping info (no good way to do this currently)
-    rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step / 2.0;
-    rdys[r]->config.time.max_step  = rdys[r - 1]->config.time.max_step * 2;
+    rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step;
+    rdys[r]->config.time.max_step  = rdys[r - 1]->config.time.max_step;
     TSSetTimeStep(rdys[r]->ts, rdys[r]->config.time.time_step);
     TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.max_step);
   }
