@@ -391,7 +391,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
       PetscReal e_dof = e[ndof * i + dof];
       L1_norms[dof] += PetscAbsReal(e_dof) * area;
       L2_norms[dof] += e_dof * e_dof * area;
-      Linf_norms[dof] = PetscMax(e_dof, Linf_norms[dof]);
+      Linf_norms[dof] = PetscMax(PetscAbsReal(e_dof), Linf_norms[dof]);
     }
     area_sum += area;
   }
