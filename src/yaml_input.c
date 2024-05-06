@@ -901,7 +901,7 @@ static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstan
   DEFINE_FUNCTION(swe, constants, dvdy);
   DEFINE_FUNCTION(swe, constants, dvdt);
 
-  DEFINE_FUNCTION(swe, constants, u);
+  DEFINE_FUNCTION(swe, constants, z);
   DEFINE_FUNCTION(swe, constants, dzdx);
   DEFINE_FUNCTION(swe, constants, dzdy);
 
