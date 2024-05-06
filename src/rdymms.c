@@ -75,6 +75,36 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
+// sets the z coordinate of refined mesh vertices to match the analytic value
+// z(x, y)
+static PetscErrorCode SnapRefinedVerticesToBathymetry(RDy rdy) {
+  PetscFunctionBegin;
+
+  Vec          coordinates;
+  PetscSection coordSection;
+  PetscScalar *coords;
+  PetscInt     v, vStart, vEnd, offset;
+  PetscReal    x, y, z;
+
+  PetscCall(DMGetCoordinateSection(rdy->dm, &coordSection));
+  PetscCall(DMGetCoordinatesLocal(rdy->dm, &coordinates));
+  PetscCall(DMPlexGetDepthStratum(rdy->dm, 0, &vStart, &vEnd));
+
+  PetscCall(VecGetArray(coordinates, &coords));
+  for (v = vStart; v < vEnd; v++) {
+    PetscCall(PetscSectionGetOffset(coordSection, v, &offset));
+    x = coords[offset];
+    y = coords[offset + 1];
+    mupDefineVar(rdy->config.mms.swe.solutions.z, "x", &x);
+    mupDefineVar(rdy->config.mms.swe.solutions.z, "y", &y);
+    z                  = mupEval(rdy->config.mms.swe.solutions.z);
+    coords[offset + 2] = z;
+  }
+  PetscCall(VecRestoreArray(coordinates, &coords));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // this function gets called at the beginning of each time step, updating
 // source terms and boundary conditions at a properly centered time
 static PetscErrorCode MMSPreStep(TS ts) {
@@ -123,6 +153,14 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
   PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
+
+  // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
+  // (necessary because DMRefine linearly interpolates vertices by default)
+  PetscInt refine_level = 0;
+  PetscOptionsGetInt(NULL, NULL, "-dm_refine", &refine_level, NULL);
+  if (refine_level > 0) {
+    PetscCall(SnapRefinedVerticesToBathymetry(rdy));
+  }
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
@@ -419,34 +457,6 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SnapRefinedVerticesToBathymetry(RDy rdy) {
-  PetscFunctionBegin;
-
-  Vec          coordinates;
-  PetscSection coordSection;
-  PetscScalar *coords;
-  PetscInt     v, vStart, vEnd, offset;
-  PetscReal    x, y, z;
-
-  PetscCall(DMGetCoordinateSection(rdy->dm, &coordSection));
-  PetscCall(DMGetCoordinatesLocal(rdy->dm, &coordinates));
-  PetscCall(DMPlexGetDepthStratum(rdy->dm, 0, &vStart, &vEnd));
-
-  PetscCall(VecGetArray(coordinates, &coords));
-  for (v = vStart; v < vEnd; v++) {
-    PetscCall(PetscSectionGetOffset(coordSection, v, &offset));
-    x = coords[offset];
-    y = coords[offset + 1];
-    mupDefineVar(rdy->config.mms.swe.solutions.z, "x", &x);
-    mupDefineVar(rdy->config.mms.swe.solutions.z, "y", &y);
-    z                  = mupEval(rdy->config.mms.swe.solutions.z);
-    coords[offset + 2] = z;
-  }
-  PetscCall(VecRestoreArray(coordinates, &coords));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 // performs a temporo-spatial convergence study using the given instance of RDy
 // as a coarse grid, uniformly refining it the specified number of times,
 // evolving the solution to the given time, computing error norms for each
@@ -474,10 +484,6 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
     snprintf(num_refinements, 4, "%" PetscInt_FMT, r);
     PetscOptionsSetValue(NULL, "-dm_refine", num_refinements);
     PetscCall(RDyMMSSetup(rdys[r]));
-
-    // adjust the vertices of the mesh to conform to our analytical z(x, y)
-    // (necessary because DMRefine linearly interpolates vertices by default)
-    PetscCall(SnapRefinedVerticesToBathymetry(rdys[r]));
 
     // override timestepping info (no good way to do this currently)
     rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step;
