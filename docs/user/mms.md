@@ -116,3 +116,8 @@ solved successfully for each solution component:
   convergence for the appropriate error norms. Each of the component names and
   expected rates are optional, so you can specify only those you want to use
   as pass/fail criteria.
+
+**NOTE: When the MMS driver performs a convergence study, it writes no output.
+If you need to write a mesh or solution data, you can always use an input file
+without the `convergence` section to compute error norms for a single spatial
+resolution, writing output as needed.**
