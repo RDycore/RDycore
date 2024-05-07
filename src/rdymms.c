@@ -457,6 +457,17 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, const char *comp_names[num_comps], PetscReal L1_norms[num_comps],
+                                      PetscReal L2_norms[num_comps], PetscReal Linf_norms[num_comps]) {
+  PetscFunctionBegin;
+  PetscPrintf(comm, "  Error norms at t = %g:\n", time);
+  for (PetscInt c = 0; c < num_comps; ++c) {
+    PetscPrintf(comm, "    %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[c], L1_norms[c], L2_norms[c], Linf_norms[c]);
+  }
+  PetscPrintf(comm, "\n");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // performs a temporo-spatial convergence study using the given instance of RDy
 // as a coarse grid, uniformly refining it the specified number of times,
 // evolving the solution to the given time, computing error norms for each
@@ -500,12 +511,8 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
 
     // compute error norms for this refinement level
     PetscCall(RDyMMSComputeErrorNorms(rdys[r], final_time, L1_norms[r], L2_norms[r], Linf_norms[r], NULL, NULL));
-    PetscPrintf(rdys[r]->comm, "  Error norms at t = %g:\n", final_time);
     const char *comp_names[3] = {" h", "hu", "hv"};
-    for (PetscInt c = 0; c < num_comps; ++c) {
-      PetscPrintf(rdys[r]->comm, "    %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[c], L1_norms[r][c], L2_norms[r][c], Linf_norms[r][c]);
-    }
-    PetscPrintf(rdys[r]->comm, "\n");
+    PrintErrorNorms(rdys[r]->comm, final_time, 3, comp_names, L1_norms[r], L2_norms[r], Linf_norms[r]);
   }
 
   // calculate the spatial discretization parameter N, where h^{-dim} = N.
@@ -593,20 +600,11 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     PetscInt  num_global_cells;
     PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
 
-    PetscPrintf(rdy->comm, "Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
-    PetscPrintf(rdy->comm, "Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
+    const char *comp_names[3] = {" h", "hu", "hv"};
+    PrintErrorNorms(rdy->comm, cur_time, 3, comp_names, L1_norms, L2_norms, Linf_norms);
 
-    PetscPrintf(rdy->comm, "Error-Norm-1     : ");
-    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L1_norms[idof]);
-    PetscPrintf(rdy->comm, "\n");
-
-    PetscPrintf(rdy->comm, "Error-Norm-2     : ");
-    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L2_norms[idof]);
-    PetscPrintf(rdy->comm, "\n");
-
-    PetscPrintf(rdy->comm, "Error-Norm-Max   : ");
-    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", Linf_norms[idof]);
-    PetscPrintf(rdy->comm, "\n");
+    PetscPrintf(rdy->comm, "  Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
+    PetscPrintf(rdy->comm, "  Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
