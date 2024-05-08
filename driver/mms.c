@@ -30,44 +30,13 @@ int main(int argc, char *argv[]) {
     MPI_Comm comm = PETSC_COMM_WORLD;
     RDy      rdy;
 
+    // set things up
     PetscCall(RDyCreate(comm, argv[1], &rdy));
     PetscCall(RDyMMSSetup(rdy));
 
-    RDyTimeUnit time_unit;
-    PetscCall(RDyGetTimeUnit(rdy, &time_unit));
-    PetscReal dt, cur_time;
-    PetscCall(RDyGetTimeStep(rdy, time_unit, &dt));
-    while (!RDyFinished(rdy)) {
-      PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
-
-      // enforce dirichlet BCs and compute source terms at half steps
-      PetscCall(RDyMMSEnforceBoundaryConditions(rdy, cur_time + 0.5 * dt));
-      PetscCall(RDyMMSComputeSourceTerms(rdy, cur_time + 0.5 * dt));
-
-      // advance the solution by the coupling interval specified in the config file
-      PetscCall(RDyAdvance(rdy));
-    }
-
-    // compute error norms for the final solution
-    PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
-    PetscReal L1_norms[3], L2_norms[3], Linf_norms[3], global_area;
-    PetscInt  num_global_cells;
-    PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
-
-    PetscPrintf(comm, "Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
-    PetscPrintf(comm, "Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
-
-    PetscPrintf(comm, "Error-Norm-1     : ");
-    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L1_norms[idof]);
-    PetscPrintf(comm, "\n");
-
-    PetscPrintf(comm, "Error-Norm-2     : ");
-    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", L2_norms[idof]);
-    PetscPrintf(comm, "\n");
-
-    PetscPrintf(comm, "Error-Norm-Max   : ");
-    for (PetscInt idof = 0; idof < 3; idof++) printf("%18.16f ", Linf_norms[idof]);
-    PetscPrintf(comm, "\n");
+    // run the problem according to the given configuration
+    PetscCall(RDyMMSRun(rdy));
+    PetscCall(RDyDestroy(&rdy));
   }
 
   PetscCall(RDyFinalize());

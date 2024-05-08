@@ -75,10 +75,62 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
+// sets the z coordinate of refined mesh vertices to match the analytic value
+// z(x, y)
+static PetscErrorCode SnapRefinedVerticesToBathymetry(RDy rdy) {
+  PetscFunctionBegin;
+
+  Vec          coordinates;
+  PetscSection coordSection;
+  PetscScalar *coords;
+  PetscInt     v, vStart, vEnd, offset;
+  PetscReal    x, y, z;
+
+  PetscCall(DMGetCoordinateSection(rdy->dm, &coordSection));
+  PetscCall(DMGetCoordinatesLocal(rdy->dm, &coordinates));
+  PetscCall(DMPlexGetDepthStratum(rdy->dm, 0, &vStart, &vEnd));
+
+  PetscCall(VecGetArray(coordinates, &coords));
+  for (v = vStart; v < vEnd; v++) {
+    PetscCall(PetscSectionGetOffset(coordSection, v, &offset));
+    x = coords[offset];
+    y = coords[offset + 1];
+    mupDefineVar(rdy->config.mms.swe.solutions.z, "x", &x);
+    mupDefineVar(rdy->config.mms.swe.solutions.z, "y", &y);
+    z                  = mupEval(rdy->config.mms.swe.solutions.z);
+    coords[offset + 2] = z;
+  }
+  PetscCall(VecRestoreArray(coordinates, &coords));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// this function gets called at the beginning of each time step, updating
+// source terms and boundary conditions at a properly centered time
+static PetscErrorCode MMSPreStep(TS ts) {
+  PetscFunctionBegin;
+
+  RDy rdy;
+  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
+
+  PetscReal t, dt;
+  PetscCall(TSGetTime(ts, &t));
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t + 0.5 * dt));
+  PetscCall(RDyMMSComputeSourceTerms(rdy, t + 0.5 * dt));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
+
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
 PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscFunctionBegin;
+
+  PetscCall(PauseIfRequested(rdy));
 
   PetscCall(ReadMMSConfigFile(rdy));
 
@@ -97,10 +149,28 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
     PetscCallCEED(CeedInit(rdy->ceed_resource, &rdy->ceed));
   }
 
+  // if a refinement level is not specified, set the base refinement level
+  PetscInt refine_level = 0;
+  PetscOptionsGetInt(NULL, NULL, "-dm_refine", &refine_level, NULL);
+  if (!refine_level) {
+    int  base_refinement = rdy->config.mms.swe.convergence.base_refinement;
+    char refinement[5];
+    snprintf(refinement, 4, "%" PetscInt_FMT, base_refinement);
+    PetscOptionsSetValue(NULL, "-dm_refine", refinement);
+    // the following line is apparently needed when we give -dm_refine above
+    PetscOptionsSetValue(NULL, "-dm_plex_transform_label_match_strata", "1");
+  }
+
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
   PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
+
+  // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
+  // (necessary because DMRefine linearly interpolates vertices by default)
+  if (refine_level > 0) {
+    PetscCall(SnapRefinedVerticesToBathymetry(rdy));
+  }
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
@@ -116,6 +186,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing shallow water equations solver...");
   PetscCall(InitSWE(rdy));
+  PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->X));
@@ -345,7 +416,6 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms,
                                        PetscInt *num_global_cells, PetscReal *global_area) {
   PetscFunctionBegin;
-
   // compute the error vector
   Vec error;
   PetscCall(RDyCreatePrognosticVec(rdy, &error));
@@ -369,7 +439,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
       PetscReal e_dof = e[ndof * i + dof];
       L1_norms[dof] += PetscAbsReal(e_dof) * area;
       L2_norms[dof] += e_dof * e_dof * area;
-      Linf_norms[dof] = PetscMax(e_dof, Linf_norms[dof]);
+      Linf_norms[dof] = PetscMax(PetscAbsReal(e_dof), Linf_norms[dof]);
     }
     area_sum += area;
   }
@@ -377,9 +447,9 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscCall(VecDestroy(&error));
 
   // obtain global error norms
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, 3, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, ndof, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD));
 
   for (PetscInt dof = 0; dof < ndof; ++dof) {
     L2_norms[dof] = PetscSqrtReal(L2_norms[dof]);
@@ -394,5 +464,159 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   if (global_area) {
     PetscCall(MPI_Reduce(&area_sum, global_area, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, const char *comp_names[num_comps], PetscReal L1_norms[num_comps],
+                                      PetscReal L2_norms[num_comps], PetscReal Linf_norms[num_comps]) {
+  PetscFunctionBegin;
+  PetscPrintf(comm, "  Error norms at t = %g:\n", time);
+  for (PetscInt c = 0; c < num_comps; ++c) {
+    PetscPrintf(comm, "    %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[c], L1_norms[c], L2_norms[c], Linf_norms[c]);
+  }
+  PetscPrintf(comm, "\n");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// performs a temporo-spatial convergence study using the given instance of RDy
+// as a coarse grid, uniformly refining it the number of times specific in the
+// mms section of the configuration and evolving the solution to the given time,
+// computing error norms for each component, and calculating rates of
+// convergence (and variances) with linear regression
+PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates, PetscReal *L2_conv_rates, PetscReal *Linf_conv_rates) {
+  PetscFunctionBegin;
+
+  PetscReal final_time = rdy->config.time.final_time;
+
+  PetscInt dim;
+  PetscCall(DMGetDimension(rdy->dm, &dim));
+
+  int num_refinements = rdy->config.mms.swe.convergence.num_refinements;
+  int base_refinement = rdy->config.mms.swe.convergence.base_refinement;
+
+  // error norm storage
+  PetscInt  num_comps = 3;  // SWE only!
+  PetscReal L1_norms[num_refinements + 1][num_comps], L2_norms[num_refinements + 1][num_comps], Linf_norms[num_refinements + 1][num_comps];
+
+  // create refined RDy objects and set them up (dumb, but easy)
+  RDy rdys[num_refinements + 1];
+  rdys[0] = rdy;
+  for (PetscInt r = 1; r <= num_refinements; ++r) {
+    PetscCall(RDyCreate(rdy->comm, rdy->config_file, &rdys[r]));
+    char num_refinements[5];
+    snprintf(num_refinements, 4, "%" PetscInt_FMT, r + base_refinement);
+    PetscCall(PetscOptionsSetValue(NULL, "-dm_refine", num_refinements));
+    PetscCall(RDyMMSSetup(rdys[r]));
+
+    // override timestepping info (no good way to do this currently)
+    rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step;
+    rdys[r]->config.time.max_step  = rdys[r - 1]->config.time.max_step;
+    TSSetTimeStep(rdys[r]->ts, rdys[r]->config.time.time_step);
+    TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.max_step);
+  }
+
+  for (PetscInt r = 0; r <= num_refinements; ++r) {
+    PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r + base_refinement);
+
+    // run the problem to completion
+    PetscCall(TSSolve(rdys[r]->ts, rdys[r]->X));
+
+    // compute error norms for this refinement level
+    PetscCall(RDyMMSComputeErrorNorms(rdys[r], final_time, L1_norms[r], L2_norms[r], Linf_norms[r], NULL, NULL));
+    const char *comp_names[3] = {" h", "hu", "hv"};
+    PrintErrorNorms(rdys[r]->comm, final_time, 3, comp_names, L1_norms[r], L2_norms[r], Linf_norms[r]);
+  }
+
+  // calculate the spatial discretization parameter N, where h^{-dim} = N.
+  PetscReal x[num_refinements + 1];
+  for (PetscInt r = 0; r <= num_refinements; ++r) {
+    PetscInt N = rdys[r]->mesh.num_cells_global;
+    x[r]       = PetscLog10Real(N);
+  }
+
+  // fit convergence rates
+  PetscReal y1[num_refinements + 1], y2[num_refinements + 1], yinf[num_refinements + 1];
+  for (PetscInt c = 0; c < num_comps; ++c) {
+    for (PetscInt r = 0; r <= num_refinements; ++r) {
+      y1[r]   = PetscLog10Real(L1_norms[r][c]);
+      y2[r]   = PetscLog10Real(L2_norms[r][c]);
+      yinf[r] = PetscLog10Real(Linf_norms[r][c]);
+    }
+
+    // since h^{-dim} = N, log err = s log N + b = -s dim log h + b
+    PetscReal slope, intercept;
+    PetscCall(PetscLinearRegression(num_refinements + 1, x, y1, &slope, &intercept));
+    L1_conv_rates[c] = -slope * dim;
+    PetscCall(PetscLinearRegression(num_refinements + 1, x, y2, &slope, &intercept));
+    L2_conv_rates[c] = -slope * dim;
+    PetscCall(PetscLinearRegression(num_refinements + 1, x, yinf, &slope, &intercept));
+    Linf_conv_rates[c] = -slope * dim;
+  }
+
+  // clean up
+  for (PetscInt r = 1; r <= num_refinements; ++r) {
+    PetscCall(RDyDestroy(&rdys[r]));
+  }
+
+  // PetscCall(PetscConvEstDestroy(&convEst));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+#define CheckConvergence(comp, comp_index, norm)                                                                                            \
+  if (norm##_conv_rates[comp_index] <= rdy->config.mms.swe.convergence.expected_rates.comp.norm) {                                          \
+    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, #comp, norm##_conv_rates[comp_index], \
+            rdy->config.mms.swe.convergence.expected_rates.comp.norm);                                                                      \
+  }
+
+PetscErrorCode RDyMMSRun(RDy rdy) {
+  PetscFunctionBegin;
+
+  // FIXME: SWE only at the moment
+  if (rdy->config.mms.swe.convergence.num_refinements) {
+    // run a convergence study
+    PetscInt  num_comps = 3;
+    PetscReal L1_conv_rates[num_comps], L2_conv_rates[num_comps], Linf_conv_rates[num_comps];
+    PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
+
+    const char *comp_names[3] = {" h", "hu", "hv"};
+    PetscPrintf(rdy->comm, "Convergence rates:\n");
+    for (PetscInt idof = 0; idof < 3; idof++) {
+      PetscPrintf(rdy->comm, "  %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[idof], L1_conv_rates[idof], L2_conv_rates[idof],
+                  Linf_conv_rates[idof]);
+    }
+
+    // check the convergence rates and print PASS or FAIL
+    CheckConvergence(h, 0, L1);
+    CheckConvergence(h, 0, L2);
+    CheckConvergence(h, 0, Linf);
+    CheckConvergence(hu, 1, L1);
+    CheckConvergence(hu, 1, L2);
+    CheckConvergence(hu, 1, Linf);
+    CheckConvergence(hv, 2, L1);
+    CheckConvergence(hv, 2, L2);
+    CheckConvergence(hv, 2, Linf);
+    PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
+  } else {
+    // run the problem to completion and print error norms
+    while (!RDyFinished(rdy)) {
+      PetscCall(RDyAdvance(rdy));
+    }
+
+    // compute error norms for the final solution
+    RDyTimeUnit time_unit;
+    PetscCall(RDyGetTimeUnit(rdy, &time_unit));
+    PetscReal cur_time;
+    PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
+    PetscReal L1_norms[3], L2_norms[3], Linf_norms[3], global_area;
+    PetscInt  num_global_cells;
+    PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
+
+    const char *comp_names[3] = {" h", "hu", "hv"};
+    PrintErrorNorms(rdy->comm, cur_time, 3, comp_names, L1_norms, L2_norms, Linf_norms);
+
+    PetscPrintf(rdy->comm, "  Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
+    PetscPrintf(rdy->comm, "  Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }

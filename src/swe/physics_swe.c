@@ -47,23 +47,29 @@ static void DestroyCourantNumberDiagnostics(void) {
 static PetscErrorCode InitMPITypesAndOps(void) {
   PetscFunctionBegin;
 
-  // create an MPI data type for the CourantNumberDiagnostics struct
-  const int      num_blocks             = 3;
-  const int      block_lengths[3]       = {1, 1, 1};
-  const MPI_Aint block_displacements[3] = {
-      offsetof(CourantNumberDiagnostics, max_courant_num),
-      offsetof(CourantNumberDiagnostics, global_edge_id),
-      offsetof(CourantNumberDiagnostics, global_cell_id),
-  };
-  MPI_Datatype block_types[3] = {MPI_DOUBLE, MPI_INT, MPI_INT};
-  MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
-  MPI_Type_commit(&courant_num_diags_type);
+  static PetscBool initialized = PETSC_FALSE;
 
-  // create a corresponding reduction operator for the new type
-  MPI_Op_create(FindCourantNumberDiagnostics, 1, &courant_num_diags_op);
+  if (!initialized) {
+    // create an MPI data type for the CourantNumberDiagnostics struct
+    const int      num_blocks             = 3;
+    const int      block_lengths[3]       = {1, 1, 1};
+    const MPI_Aint block_displacements[3] = {
+        offsetof(CourantNumberDiagnostics, max_courant_num),
+        offsetof(CourantNumberDiagnostics, global_edge_id),
+        offsetof(CourantNumberDiagnostics, global_cell_id),
+    };
+    MPI_Datatype block_types[3] = {MPI_DOUBLE, MPI_INT, MPI_INT};
+    MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
+    MPI_Type_commit(&courant_num_diags_type);
 
-  // make sure the operator and the type are destroyed upon exit
-  PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
+    // create a corresponding reduction operator for the new type
+    MPI_Op_create(FindCourantNumberDiagnostics, 1, &courant_num_diags_op);
+
+    // make sure the operator and the type are destroyed upon exit
+    PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
+
+    initialized = PETSC_TRUE;
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -97,6 +103,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
       break;
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
+  PetscCall(TSSetApplicationContext(rdy->ts, rdy));
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));

@@ -564,6 +564,28 @@ static const cyaml_schema_field_t mms_constants_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_schema_field_t mms_swe_error_norms_fields_schema[] = {
+    CYAML_FIELD_FLOAT("L1", CYAML_FLAG_OPTIONAL, RDyMMSSWEErrorNorms, L1),
+    CYAML_FIELD_FLOAT("L2", CYAML_FLAG_OPTIONAL, RDyMMSSWEErrorNorms, L2),
+    CYAML_FIELD_FLOAT("Linf", CYAML_FLAG_OPTIONAL, RDyMMSSWEErrorNorms, Linf),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t mms_swe_convergence_rates_fields_schema[] = {
+    CYAML_FIELD_MAPPING("h", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, h, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hu", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, hu, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, hv, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t mms_swe_convergence_fields_schema[] = {
+    CYAML_FIELD_INT("num_refinements", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergence, num_refinements),
+    CYAML_FIELD_INT("base_refinement", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergence, base_refinement),
+    CYAML_FIELD_MAPPING("expected_rates", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergence,
+                        expected_rates, mms_swe_convergence_rates_fields_schema),
+    CYAML_FIELD_END
+};
+
 static const cyaml_schema_field_t mms_swe_fields_schema[] = {
     CYAML_FIELD_STRING("h", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.h, 1),
     CYAML_FIELD_STRING("dhdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dhdx, 1),
@@ -581,6 +603,7 @@ static const cyaml_schema_field_t mms_swe_fields_schema[] = {
     CYAML_FIELD_STRING("dzdx", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dzdx, 1),
     CYAML_FIELD_STRING("dzdy", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.dzdy, 1),
     CYAML_FIELD_STRING("n", CYAML_FLAG_DEFAULT, RDyMMSSWESolutions, expressions.n, 1),
+    CYAML_FIELD_MAPPING("convergence", CYAML_FLAG_OPTIONAL, RDyMMSSWESolutions, convergence, mms_swe_convergence_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -879,7 +902,7 @@ static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstan
   DEFINE_FUNCTION(swe, constants, dvdy);
   DEFINE_FUNCTION(swe, constants, dvdt);
 
-  DEFINE_FUNCTION(swe, constants, u);
+  DEFINE_FUNCTION(swe, constants, z);
   DEFINE_FUNCTION(swe, constants, dzdx);
   DEFINE_FUNCTION(swe, constants, dzdy);
 
@@ -1139,8 +1162,9 @@ static PetscErrorCode ReadAndBroadcastConfigFile(RDy rdy, char **config_str) {
     MPI_Bcast(&config_size, 1, MPI_INT, 0, rdy->comm);
 
     // recreate the configuration string.
-    PetscCall(PetscCalloc1(config_size, config_str));
+    PetscCall(PetscCalloc1(config_size + 1, config_str));
     MPI_Bcast(*config_str, config_size, MPI_CHAR, 0, rdy->comm);
+    (*config_str)[config_size] = 0;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
