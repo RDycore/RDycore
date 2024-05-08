@@ -37,7 +37,7 @@ mms:
     dvdy: -K * V * sin(K*x) * sin(K*y) * exp(t/T)
     dvdt:  V / T * sin(K*x) * cos(K*y) * exp(t/T)
 
-    # elevation as z(x, y)
+    # elevation as z(x, y) <-- overwrites mesh z coordinates
     z:     Z * sin(K*x) * sin(K*y)
     dzdx:  Z * K * cos(K*x) * sin(K*y)
     dzdy:  Z * K * sin(K*x) * cos(K*y)
@@ -51,17 +51,17 @@ mms:
       base_refinement: 1 # <-- start at this refinement level
       expected_rates:
         h:
-          L1: 0.92
-          L2: 0.92
-          Linf: 0.92
+          L1: 0.94
+          L2: 0.95
+          Linf: 0.94
         hu:
-          L1: 0.94
-          L2: 0.95
-          Linf: 0.79
+          L1: 0.91
+          L2: 0.93
+          Linf: 0.77
         hv:
-          L1: 0.94
-          L2: 0.95
-          Linf: 0.79
+          L1: 0.91
+          L2: 0.93
+          Linf: 0.77
 
 logging:
   level: none
@@ -77,7 +77,7 @@ output:
   interval: 500
 
 grid:
-  file: mms_triangles_dx1.exo
+  file: mms_triangles_dx1.exo # z coordinates overwritten by z(x, y) above
 
 # one region represents the whole domain
 regions:
