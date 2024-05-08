@@ -149,6 +149,18 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
     PetscCallCEED(CeedInit(rdy->ceed_resource, &rdy->ceed));
   }
 
+  // if a refinement level is not specified, set the base refinement level
+  PetscInt refine_level = 0;
+  PetscOptionsGetInt(NULL, NULL, "-dm_refine", &refine_level, NULL);
+  if (!refine_level) {
+    int  base_refinement = rdy->config.mms.swe.convergence.base_refinement;
+    char refinement[5];
+    snprintf(refinement, 4, "%" PetscInt_FMT, base_refinement);
+    PetscOptionsSetValue(NULL, "-dm_refine", refinement);
+    // the following line is apparently needed when we give -dm_refine above
+    PetscOptionsSetValue(NULL, "-dm_plex_transform_label_match_strata", "1");
+  }
+
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
@@ -156,8 +168,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
   // (necessary because DMRefine linearly interpolates vertices by default)
-  PetscInt refine_level = 0;
-  PetscOptionsGetInt(NULL, NULL, "-dm_refine", &refine_level, NULL);
   if (refine_level > 0) {
     PetscCall(SnapRefinedVerticesToBathymetry(rdy));
   }
@@ -469,18 +479,20 @@ static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_com
 }
 
 // performs a temporo-spatial convergence study using the given instance of RDy
-// as a coarse grid, uniformly refining it the specified number of times,
-// evolving the solution to the given time, computing error norms for each
-// component, and calculating rates of convergence (and variances) with linear
-// regression
-PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements, PetscReal *L1_conv_rates, PetscReal *L2_conv_rates,
-                                              PetscReal *Linf_conv_rates) {
+// as a coarse grid, uniformly refining it the number of times specific in the
+// mms section of the configuration and evolving the solution to the given time,
+// computing error norms for each component, and calculating rates of
+// convergence (and variances) with linear regression
+PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates, PetscReal *L2_conv_rates, PetscReal *Linf_conv_rates) {
   PetscFunctionBegin;
 
   PetscReal final_time = rdy->config.time.final_time;
 
   PetscInt dim;
   PetscCall(DMGetDimension(rdy->dm, &dim));
+
+  int num_refinements = rdy->config.mms.swe.convergence.num_refinements;
+  int base_refinement = rdy->config.mms.swe.convergence.base_refinement;
 
   // error norm storage
   PetscInt  num_comps = 3;  // SWE only!
@@ -492,8 +504,8 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
   for (PetscInt r = 1; r <= num_refinements; ++r) {
     PetscCall(RDyCreate(rdy->comm, rdy->config_file, &rdys[r]));
     char num_refinements[5];
-    snprintf(num_refinements, 4, "%" PetscInt_FMT, r);
-    PetscOptionsSetValue(NULL, "-dm_refine", num_refinements);
+    snprintf(num_refinements, 4, "%" PetscInt_FMT, r + base_refinement);
+    PetscCall(PetscOptionsSetValue(NULL, "-dm_refine", num_refinements));
     PetscCall(RDyMMSSetup(rdys[r]));
 
     // override timestepping info (no good way to do this currently)
@@ -504,7 +516,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscInt num_refinements,
   }
 
   for (PetscInt r = 0; r <= num_refinements; ++r) {
-    PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r);
+    PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r + base_refinement);
 
     // run the problem to completion
     PetscCall(TSSolve(rdys[r]->ts, rdys[r]->X));
@@ -562,10 +574,9 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
   // FIXME: SWE only at the moment
   if (rdy->config.mms.swe.convergence.num_refinements) {
     // run a convergence study
-    PetscInt  num_comps       = 3;
-    PetscInt  num_refinements = rdy->config.mms.swe.convergence.num_refinements;
+    PetscInt  num_comps = 3;
     PetscReal L1_conv_rates[num_comps], L2_conv_rates[num_comps], Linf_conv_rates[num_comps];
-    PetscCall(RDyMMSEstimateConvergenceRates(rdy, num_refinements, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
+    PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
     const char *comp_names[3] = {" h", "hu", "hv"};
     PetscPrintf(rdy->comm, "Convergence rates:\n");

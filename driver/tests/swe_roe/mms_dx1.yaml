@@ -48,19 +48,20 @@ mms:
     # Convergence study parameters (optional)
     convergence:
       num_refinements: 3
-      expected_rates: # FIXME: we should be getting closer to 1st-order convergence
+      base_refinement: 1 # <-- start at this refinement level
+      expected_rates:
         h:
-          L1: 0.87
-          L2: 0.89
-          Linf: 0.90
+          L1: 0.92
+          L2: 0.92
+          Linf: 0.92
         hu:
-          L1: 0.86
-          L2: 0.90
-          Linf: 0.71
+          L1: 0.94
+          L2: 0.95
+          Linf: 0.79
         hv:
-          L1: 0.86
-          L2: 0.90
-          Linf: 0.71
+          L1: 0.94
+          L2: 0.95
+          Linf: 0.79
 
 logging:
   level: none

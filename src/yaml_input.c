@@ -580,6 +580,7 @@ static const cyaml_schema_field_t mms_swe_convergence_rates_fields_schema[] = {
 
 static const cyaml_schema_field_t mms_swe_convergence_fields_schema[] = {
     CYAML_FIELD_INT("num_refinements", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergence, num_refinements),
+    CYAML_FIELD_INT("base_refinement", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergence, base_refinement),
     CYAML_FIELD_MAPPING("expected_rates", CYAML_FLAG_DEFAULT, RDyMMSSWEConvergence,
                         expected_rates, mms_swe_convergence_rates_fields_schema),
     CYAML_FIELD_END

@@ -49,7 +49,7 @@ PETSC_EXTERN PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyMMSComputeSourceTerms(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyMMSUpdateMaterialProperties(RDy);
 PETSC_EXTERN PetscErrorCode RDyMMSComputeErrorNorms(RDy, PetscReal, PetscReal*, PetscReal*, PetscReal*, PetscInt*, PetscReal*);
-PETSC_EXTERN PetscErrorCode RDyMMSEstimateConvergenceRates(RDy, PetscInt, PetscReal*, PetscReal*, PetscReal*);
+PETSC_EXTERN PetscErrorCode RDyMMSEstimateConvergenceRates(RDy, PetscReal*, PetscReal*, PetscReal*);
 PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
 
 // time integration

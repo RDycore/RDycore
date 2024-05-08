@@ -109,8 +109,13 @@ performing convergence studies that determine whether the MMS problem has been
 solved successfully for each solution component:
 
 * `num_refinements`: the number of times the domain (and timestep) are refined
-  uniformly to test the rate of convergence of the solution error. This
-  parameter is required if your input file has a `convergence` section.
+  uniformly from the base resolution to test the rate of convergence of the
+  solution error. This parameter is required.
+* `base_refinement`: this optional parameter specifies the number of times the
+  mesh should be refined to establish the coarsest resolution to be used in the
+  convergence study. For example, a `base_refinement` of 2 indicates that a
+  mesh loaded from a file should be refined twice before performing a
+  convergence study.
 * `expected_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
   entries for each relevant component name giving the expected rates of
   convergence for the appropriate error norms. Each of the component names and
