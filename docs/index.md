@@ -15,6 +15,6 @@ Exascale Earth System Model (E3SM)](https://e3sm.org).
 
 RDycore is funded by the US Department of Energy's (DOE) [Scientific Discovery
 Through Advanced Computing (SciDAC)](https://www.scidac.gov/) program through a
-joint parternship between the DOE Office of Science's [Biological and
+joint partnership between the DOE Office of Science's [Biological and
 Environmental Research](https://science.osti.gov/ber) and [Advanced
 Scientific Computing Research](https://science/osti.gov/ascr) programs.

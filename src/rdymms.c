@@ -77,7 +77,7 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 
 // sets the z coordinate of refined mesh vertices to match the analytic value
 // z(x, y)
-static PetscErrorCode SnapRefinedVerticesToBathymetry(RDy rdy) {
+static PetscErrorCode SnapVerticesToBathymetry(RDy rdy) {
   PetscFunctionBegin;
 
   Vec          coordinates;
@@ -153,8 +153,8 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscInt refine_level = 0;
   PetscOptionsGetInt(NULL, NULL, "-dm_refine", &refine_level, NULL);
   if (!refine_level) {
-    int  base_refinement = rdy->config.mms.swe.convergence.base_refinement;
-    char refinement[5];
+    PetscInt base_refinement = rdy->config.mms.swe.convergence.base_refinement;
+    char     refinement[5];
     snprintf(refinement, 4, "%" PetscInt_FMT, base_refinement);
     PetscOptionsSetValue(NULL, "-dm_refine", refinement);
     // the following line is apparently needed when we give -dm_refine above
@@ -167,10 +167,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
 
   // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
-  // (necessary because DMRefine linearly interpolates vertices by default)
-  if (refine_level > 0) {
-    PetscCall(SnapRefinedVerticesToBathymetry(rdy));
-  }
+  PetscCall(SnapVerticesToBathymetry(rdy));
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
