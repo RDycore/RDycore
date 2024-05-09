@@ -416,3 +416,35 @@ PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
   PetscCall(VecDuplicate(rdy->X, prog_vec));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+// reads data for a single DOF from a binary file into a local Vec
+PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char filename[], Vec *local) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+
+  // create a naturally-ordered vector with a stride equal to the number of
+  Vec natural, global;
+
+  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
+  PetscCall(DMCreateLocalVector(rdy->aux_dm, local));
+
+  // load the properties into the vector and copy them into place
+  PetscCall(VecLoad(natural, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  // scatter natural-to-global
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, global));
+
+  // scatter global-to-local
+  PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, *local));
+
+  PetscCall(VecDestroy(&natural));
+  PetscCall(VecDestroy(&global));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
