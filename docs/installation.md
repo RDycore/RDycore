@@ -1,6 +1,6 @@
 # Installation
 
-RDycore builds and runs on the following platforms:
+You can build and run RDycore on the following platforms:
 
 * Linux and Mac laptops and workstations
 * [Frontier](https://www.olcf.ornl.gov/frontier/) (Oak Ridge National Laboratory)
@@ -23,6 +23,7 @@ To build RDycore, you need:
     * hdf5
     * libceed
     * metis
+    * muparser
     * netcdf
     * parmetis
     * pnetcdf
