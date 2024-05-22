@@ -27,7 +27,8 @@ respectively) are all that is needed.
 
 ## Contents
 
-* [Building and Installing RDycore](installation.md)
+* [Building and Installing RDycore](../common/installation.md)
 * [Development Process](development.md)
 * [Code Structure and Organization](organization.md)
 * [Developer Tools](tools.md)
+* [Integrating RDycore with E3SM](e3sm.md)
