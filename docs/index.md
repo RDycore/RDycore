@@ -4,7 +4,7 @@ RDycore is a performance-portable, GPU-capable river model used to study
 compound flooding, intended for use with the Department of Energy's [Energy
 Exascale Earth System Model (E3SM)](https://e3sm.org).
 
-* The [Installation Guide](installation.md) shows you how to build and install
+* The [Installation Guide](common/installation.md) shows you how to build and install
   RDycore on your own machine or on a supported high-performance platform.
 * The [User Guide](user/index.md) describes how to use RDycore in its standalone and
   E3SM-integrated forms.

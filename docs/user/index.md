@@ -1,14 +1,12 @@
-# RDycore User Guide
+# RDycore User Guide - Overview
 
 RDycore's primary purpose is to provide the DOE E3SM climate model with the
 capability to model coastal compound flooding. Accordingly, it has been
 constructed as a performance-portable library that makes efficient use of
 DOE's leadership-class computing facilities and is invoked by E3SM Fortran code.
-This guide explains how we integrate RDycore to E3SM to perform coupled
-simulations of compound flooding.
 
-Aside from the RDycore library, we provide standalone drivers that provide
-convenient ways of testing and evaluating the model's capabilities:
+Aside from the library, RDycore provides standalone drivers that can help you
+test and evaluate the model's capabilities:
 
 * standalone C and Fortran driver programs for running uncoupled flood
   simulations given appropriate initial and boundary conditions, source terms,
@@ -21,15 +19,16 @@ convenient ways of testing and evaluating the model's capabilities:
   convergence rates, which are useful for identifying algorithmic and
   programming errors.
 
-This guide also describes these standalone programs and their features.
+This guide also describes these standalone programs and their features. It also
+explains how we integrate RDycore to E3SM to perform coupled simulations of
+compound flooding.
 
-## Coupling RDycore to E3SM
+## Integrating RDycore into E3SM
 
 ## The Standalone C and Fortran Drivers
 
-* [Standalone YAML input specification](input.md)
+* [Standalone YAML input specification](../common/input.md)
 
 ## The MMS C and Fortran Drivers
 
-* [MMS driver YAML input specification](mms.md)
-
+* [MMS driver YAML input specification](../common/mms.md)
