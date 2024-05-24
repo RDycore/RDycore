@@ -160,7 +160,6 @@ struct _p_RDy {
 
   // solution vectors (global and local)
   Vec X, X_local;
-  Vec Soln;
 
   // residual vector
   Vec R;
