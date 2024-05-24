@@ -93,7 +93,7 @@ static void TestRDyMeshCreateFromDM(void **state) {
   assert_int_equal(0, RDyMeshCreateFromDM(dm, &mesh));
   // I expected the following statement to be true, but it's not (for nproc > 1)
   //  assert_int_equal(Nx * Ny, mesh.num_cells);
-  assert_true(mesh.num_cells_local <= Nx * Ny);  // (== iff nproc == 1)
+  assert_true(mesh.num_owned_cells <= Nx * Ny);  // (== iff nproc == 1)
 
   // Clean up.
   assert_int_equal(0, DMDestroy(&dm));

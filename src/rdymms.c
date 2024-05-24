@@ -429,7 +429,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   memset(L1_norms, 0, ndof * sizeof(PetscReal));
   memset(L2_norms, 0, ndof * sizeof(PetscReal));
   memset(Linf_norms, 0, ndof * sizeof(PetscReal));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+  for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
     PetscReal area = rdy->mesh.cells.areas[i];
 
     for (PetscInt dof = 0; dof < ndof; ++dof) {
@@ -455,7 +455,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   // obtain optional diagnostics
   if (num_global_cells) {
     PetscMPIInt ncells;
-    PetscCall(MPI_Reduce(&rdy->mesh.num_cells_local, &ncells, 1, MPI_INT, MPI_SUM, 0, PETSC_COMM_WORLD));
+    PetscCall(MPI_Reduce(&rdy->mesh.num_owned_cells, &ncells, 1, MPI_INT, MPI_SUM, 0, PETSC_COMM_WORLD));
     *num_global_cells = (PetscInt)ncells;
   }
   if (global_area) {

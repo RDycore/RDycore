@@ -426,7 +426,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedInt *offset_c, *offset_q;
       CeedScalar(*g)[num_comp_geom];
       CeedScalar(*n)[num_comp_mannings_n];
-      CeedInt num_owned_cells = mesh->num_cells_local;
+      CeedInt num_owned_cells = mesh->num_owned_cells;
       CeedInt num_cells       = mesh->num_cells;
 
       CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};

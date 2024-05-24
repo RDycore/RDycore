@@ -106,7 +106,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   PetscInt num_cells = c_end - c_start;
   PetscCall(RDyCellsCreate(num_cells, nvertices_per_cell, nedges_per_cell, cells));
 
-  PetscInt num_cells_local = 0;
+  PetscInt num_owned_cells = 0;
   for (PetscInt c = c_start; c < c_end; c++) {
     PetscInt  icell = c - c_start;
     PetscReal centroid[dim], normal[dim];
@@ -128,7 +128,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
     PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
     if (gref >= 0) {
       cells->is_local[icell] = PETSC_TRUE;
-      num_cells_local++;
+      num_owned_cells++;
     } else {
       cells->is_local[icell] = PETSC_FALSE;
     }
@@ -151,8 +151,8 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   }
 
   // make a first pass to put all local cells at the beginning
-  PetscCall(PetscCalloc1(num_cells_local, &cells->owned_to_local));
-  FILL(num_cells_local, cells->owned_to_local, -1);
+  PetscCall(PetscCalloc1(num_owned_cells, &cells->owned_to_local));
+  FILL(num_owned_cells, cells->owned_to_local, -1);
 
   PetscInt count = 0;
   for (PetscInt icell = 0; icell < num_cells; icell++) {
@@ -1015,7 +1015,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
-  for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
+  for (PetscInt c = 0; c < mesh->num_owned_cells; c++) {
     PetscInt icell = cells->owned_to_local[c];
     for (PetscInt v = 0; v < cells->num_vertices[icell]; v++) {
       PetscInt offset    = cells->vertex_offsets[icell];
@@ -1142,7 +1142,7 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(VecGetArray(global_vec, &vec_ptr));
 
     // pack up the idim-th coordinates in global order
-    for (PetscInt c = 0; c < mesh->num_cells_local; c++) {
+    for (PetscInt c = 0; c < mesh->num_owned_cells; c++) {
       PetscInt icell = cells->owned_to_local[c];
       vec_ptr[c]     = cells->centroids[icell].X[idim];
     }
@@ -1283,10 +1283,10 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
   // Count up local cells.
-  mesh->num_cells_local = 0;
+  mesh->num_owned_cells = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; ++icell) {
     if (mesh->cells.is_local[icell]) {
-      ++mesh->num_cells_local;
+      ++mesh->num_owned_cells;
     }
   }
 
@@ -1295,7 +1295,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
   PetscCall(SaveNaturalCellIDs(dm, mesh->num_cells, &mesh->cells));
 
-  PetscCall(MPI_Allreduce(&mesh->num_cells_local, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
+  PetscCall(MPI_Allreduce(&mesh->num_owned_cells, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
   if (!mesh->refine_level) {
     PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));

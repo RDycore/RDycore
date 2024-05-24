@@ -138,8 +138,8 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     int num_comp = 3;
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed));
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.s_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells_local * num_comp, &rdy->ceed_rhs.u_ceed));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.s_ceed));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.u_ceed));
 
     // reset the time step size
     rdy->ceed_rhs.dt = 0.0;

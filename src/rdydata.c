@@ -10,7 +10,7 @@ PetscErrorCode RDyGetNumGlobalCells(RDy rdy, PetscInt *num_cells_global) {
 
 PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
-  *num_cells = rdy->mesh.num_cells_local;
+  *num_cells = rdy->mesh.num_owned_cells;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -44,7 +44,7 @@ static PetscErrorCode CheckBoundaryNumEdges(RDy rdy, const PetscInt boundary_ind
 
 static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
-  PetscAssert(rdy->mesh.num_cells_local == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -121,7 +121,7 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
 
   PetscReal *x;
   PetscCall(VecGetArray(rdy->X, &x));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+  for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
     values[i] = x[3 * i + idof];
   }
   PetscCall(VecRestoreArray(rdy->X, &x));
@@ -163,7 +163,7 @@ PetscErrorCode RDySetSourceVecForLocalCells(RDy rdy, Vec src_vec, PetscInt idof,
 
   PetscReal *s;
   PetscCall(VecGetArray(src_vec, &s));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells_local; ++i) {
+  for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
     s[i * ndof + idof] = values[i];
   }
   PetscCall(VecRestoreArray(src_vec, &s));
@@ -381,7 +381,7 @@ PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal
   if (rdy->ceed_resource[0]) {  // ceed
     PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));
   } else {  // petsc
-    for (PetscInt icell = 0; icell < rdy->mesh.num_cells_local; ++icell) {
+    for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
       n_values[icell] = rdy->materials_by_cell[icell].manning;
     }
   }
@@ -397,7 +397,7 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
   if (rdy->ceed_resource[0]) {  // ceed
     PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));
   } else {  // petsc
-    for (PetscInt icell = 0; icell < rdy->mesh.num_cells_local; ++icell) {
+    for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
       rdy->materials_by_cell[icell].manning = n_values[icell];
     }
   }

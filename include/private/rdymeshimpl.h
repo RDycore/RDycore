@@ -159,7 +159,7 @@ typedef struct RDyMesh {
   // number of cells in the mesh (across ghost cells owned by other processes)
   PetscInt num_cells;
   // number of cells in the mesh owned by the local process
-  PetscInt num_cells_local;
+  PetscInt num_owned_cells;
   // number of total cells in the global mesh
   PetscInt num_cells_global;
   // number of edges in the mesh attached to locally stored cells
