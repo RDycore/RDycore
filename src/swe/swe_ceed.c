@@ -427,6 +427,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       CeedScalar(*g)[num_comp_geom];
       CeedScalar(*n)[num_comp_mannings_n];
       CeedInt num_owned_cells = mesh->num_cells_local;
+      CeedInt num_cells       = mesh->num_cells;
 
       CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
       PetscCallCEED(
@@ -471,8 +472,8 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       }
       PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
       PetscCallCEED(CeedVectorRestoreArray(mannings_n, (CeedScalar **)&n));
-      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                              offset_q, &restrict_q));
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_q,
+                                              &restrict_q));
       PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                               offset_c, &restrict_c));
       PetscCall(PetscFree(offset_c));

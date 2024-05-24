@@ -227,11 +227,11 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
     PetscScalar *u, *f, *f_dup;
     PetscMemType mem_type;
-    CeedVector   u_ceed = rdy->ceed_rhs.u_ceed;
-    CeedVector   s_ceed = rdy->ceed_rhs.s_ceed;
+    CeedVector   u_local_ceed = rdy->ceed_rhs.u_local_ceed;
+    CeedVector   s_ceed       = rdy->ceed_rhs.s_ceed;
 
-    PetscCall(VecGetArrayAndMemType(rdy->Soln, &u, &mem_type));
-    PetscCallCEED(CeedVectorSetArray(u_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u));
+    PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u));
 
     Vec F_dup;
     PetscCall(VecDuplicate(F, &F_dup));
@@ -244,12 +244,12 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(rdy->ceed_rhs.op_src, u_ceed, s_ceed, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApply(rdy->ceed_rhs.op_src, u_local_ceed, s_ceed, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
-    PetscCallCEED(CeedVectorTakeArray(u_ceed, MemTypeP2C(mem_type), &u));
-    PetscCall(VecRestoreArrayAndMemType(rdy->Soln, &u));
+    PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u));
+    PetscCall(VecRestoreArrayAndMemType(U_local, &u));
     PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &f_dup));
     PetscCallCEED(CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f));
     PetscCall(VecRestoreArrayAndMemType(F, &f));
@@ -290,7 +290,6 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   };
 
   if (rdy->ceed_resource[0]) {
-    PetscCall(VecCopy(X, rdy->Soln));
     PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->X_local, F));
     if (0) {
       PetscInt nstep;
