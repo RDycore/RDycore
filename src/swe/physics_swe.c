@@ -12,6 +12,7 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
 PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
 PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy);
 PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F);
+PetscErrorCode AddSWESourceTermXia2018(RDy rdy, Vec F);
 
 //-----------------------
 // Debugging diagnostics

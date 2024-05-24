@@ -614,6 +614,95 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// adds source terms to the right hand side vector F
+PetscErrorCode AddSWESourceTermXia2018(RDy rdy, Vec F) {
+  PetscFunctionBeginUser;
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  // Get access to Vec
+  PetscScalar *x_ptr, *f_ptr, *swe_src_ptr;
+  PetscCall(VecGetArray(rdy->X_local, &x_ptr));
+  PetscCall(VecGetArray(rdy->swe_src, &swe_src_ptr));
+  PetscCall(VecGetArray(F, &f_ptr));
+
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  RiemannDataSWE      *data     = &data_swe->data_cells;
+
+  PetscReal xia2018_threshold = 1.e-10;
+
+  PetscReal dt = rdy->dt;
+
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    if (cells->is_local[icell]) {
+      PetscReal h  = data->h[icell];
+      PetscReal hu = data->hu[icell];
+      PetscReal hv = data->hv[icell];
+
+      PetscReal dz_dx = cells->dz_dx[icell];
+      PetscReal dz_dy = cells->dz_dy[icell];
+
+      PetscReal bedx = dz_dx * GRAVITY * h;
+      PetscReal bedy = dz_dy * GRAVITY * h;
+
+      PetscInt  idx    = cells->local_to_owned[icell];
+      PetscReal Fsum_x = f_ptr[idx * ndof + 1];
+      PetscReal Fsum_y = f_ptr[idx * ndof + 2];
+
+      PetscReal tbx = 0.0, tby = 0.0;
+
+      if (h >= rdy->config.physics.flow.tiny_h) {
+        // Manning's coefficient
+        PetscReal N_mannings = rdy->materials_by_cell[icell].manning;
+
+        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
+
+        PetscReal Ax = Fsum_x - bedx;
+        PetscReal Ay = Fsum_y - bedy;
+
+        PetscReal mx = hu + dt * Ax;
+        PetscReal my = hv + dt * Ay;
+
+        PetscReal factor_1 = Cd / h * PetscSqrtReal(Square(mx / h) + Square(my / h));
+
+        PetscReal hu_ext, hv_ext;
+        if (dt * factor_1 < xia2018_threshold) {
+          hu_ext = mx; // eqn 36a
+          hv_ext = my; // eqn 37a
+        } else {
+          PetscReal a = PetscSqrtReal(1.0 + 4.0 * dt * factor_1);
+          PetscReal b = (-2.0 * dt * factor_1);
+
+          hu_ext = (mx - mx * a) / b; // eqn 36b
+          hv_ext = (my - my * a) / b; // eqn 37b
+        }
+
+        PetscReal factor_2 = Cd / h * PetscSqrtReal(Square(hu_ext) + Square(hv_ext));
+
+        tbx = factor_2 * hu_ext;
+        tby = factor_2 * hv_ext;
+      }
+
+      f_ptr[idx * ndof + 0] += swe_src_ptr[idx * ndof + 0];
+      f_ptr[idx * ndof + 1] += -bedx - tbx + swe_src_ptr[idx * ndof + 1];
+      f_ptr[idx * ndof + 2] += -bedy - tby + swe_src_ptr[idx * ndof + 2];
+    }
+  }
+
+  // Restore vectors
+  PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->swe_src, &swe_src_ptr));
+  PetscCall(VecRestoreArray(F, &f_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Sets Dirichlet boundary values on the boundary with the given index. NOTE
 // that the boundary index b identifies the bth boundary in RDycore's array of
 // boundaries and boundary conditions, and NOT the boundary with ID b.
