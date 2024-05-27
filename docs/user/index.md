@@ -17,18 +17,16 @@ test and evaluate the model's capabilities:
   underlying numerical methods by computing error norms of simulation results
   measured against analytical solutions. These MMS programs can also compute
   convergence rates, which are useful for identifying algorithmic and
-  programming errors.
+  programming errors. Because these programs are more technical and used to
+  identify defects, they are described in [the Developer Guide](../developer/index.md).
 
 This guide also describes these standalone programs and their features. It also
 explains how we integrate RDycore to E3SM to perform coupled simulations of
 compound flooding.
 
-## Integrating RDycore into E3SM
+## Running RDycore within E3SM
 
 ## The Standalone C and Fortran Drivers
 
 * [Standalone YAML input specification](../common/input.md)
 
-## The MMS C and Fortran Drivers
-
-* [MMS driver YAML input specification](../common/mms.md)

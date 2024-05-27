@@ -6,17 +6,161 @@ be easily understood separately from one another.
 
 ## A Brief Tour of RDycore's Source Tree
 
+The root level of the [RDycore](https://github.com/RDycore/RDycore) source tree
+contains a `README.md` file, a `CMakeLists.txt` file that defines the build
+system, and some configuration files for documentation and tooling.
+
+There are several folders at the root of the source tree:
+
+```
++ RDyore +- [.github/workflows](https://github.com/RDycore/RDycore/tree/main/.github/workflows]
+         |
+         +- [cmake](https://github.com/RDycore/RDycore/tree/main/cmake)
+         |
+         +- [config](https://github.com/RDycore/RDycore/tree/main/config)
+         |
+         +- [docs](https://github.com/RDycore/RDycore/tree/main/docs)
+         |
+         +- [driver](https://github.com/RDycore/RDycore/tree/main/driver)
+         |
+         +- [external](https://github.com/RDycore/RDycore/tree/main/external)
+         |
+         +- [include](https://github.com/RDycore/RDycore/tree/main/include)
+         |
+         +- [share](https://github.com/RDycore/RDycore/tree/main/share)
+         |
+         +- [src](https://github.com/RDycore/RDycore/tree/main/src)
+         |
+         +- [tools](https://github.com/RDycore/RDycore/tree/main/src)
+```
+
+* `.github/workflows`: workflows that support our [GitHub Continuous Integration
+  Environment](development.md#GitHub-Continuous-Integration-Environment)
+* `cmake`: CMake scripts that support the build system, testing, etc.
+* `config`: shell scripts to help with running RDycore on our target platforms
+* `docs`: Markdown source files for our [mkdocs](https://squidfunk.github.io/mkdocs-material/)-based
+  documentation
+* `driver`: C and Fortran driver programs, including the standalone RDycore
+  drivers and a few other development tools
+* `external`: third-party libraries used by RDycore that aren't provided by
+  PETSc
+* `include`: the `rdycore.h` API header file, and all private header files
+  (located within the `private` subfolder)
+* `share`: data files for initial conditions, material properties, and
+  unstructured grids (used mainly for testing)
+* `src`: the source code for RDycore
+* `tools`: miscellaneous tools and scripts for building and deploying Docker
+  images
+
+Take a look at each of these folders to familiarize yourself with their
+contents. In particular, the `src` folder has a few important subfolders:
+
+* `src/f90-mod`: the RDycore Fortran module that mirrors the C library's
+  capabilities
+* `src/swe`: functions and data structures specific to the solution of the
+  2D shallow water equations
+* `src/tests`: unit tests for subsystems within RDycore
+
+The private headers in the `include` folder contain definitions of opaque types
+and functions that are helpful throughout RDycore but are not part of the API.
+
+The `driver` folder also has its own `tests` subfolder that defines tests
+that run the standalone drivers and perform convergence tests for selected
+problems.
+
 ## The RDycore Object and its Lifecycle
 
-### Initialization
+RDycore (the "river dynamical core") is represented in code by a data structure
+called `RDy`, declared as an opaque type in [include/rdycore.h](https://github.com/RDycore/RDycore/tree/main/include/rdycore.h).
+It is defined in [include/private/rdycoreimpl.h](https://github.com/RDycore/RDycore/tree/main/include/private/rdycoreimpl.h).
+In this section, we describe how to manipulate `RDy` to set up and run
+simulations. It may be helpful to refer to the [standalone C driver](https://github.com/RDycore/RDycore/tree/main/driver/main.c)
+(and or the corresponding [Fortran driver](https://github.com/RDycore/RDycore/tree/main/driver/main.F90))
+as you read this section.
 
-### Setup
+1. **Initialization**
 
-### Timestepping
+Before RDycore can be used in any program, the supporting systems must be
+initialized with a call to `RDyInit`:
 
-### Post-processing
+```
+  // initialize RDycore subsystems
+  PetscCall(RDyInit(argc, argv, helpString));
+```
 
-### Finalization
+This function accepts the `argc` and `argv` command line argument parameters
+accepted by any C program, plus a string printed to display help/usage
+information.
+
+Next, create an `RDy` object, passing it an MPI communicator, the path to a
+[YAML input file](../common/input.md), and the pointer to the desired `RDy`
+object:
+
+```
+  // create an RDy on the given communicator with the given input
+  RDy rdy;
+  PetscCall(RDyCreate(MPI_COMM_WORLD, "my-input.yaml", &rdy));
+```
+
+This only creates the object--it does not read input or allocate any resources
+for the problem described within the input.
+
+2. **Setup**
+
+To read the input file and ready your `RDy` object to run the simulation
+defined therein, call `RDySetup`:
+
+```
+  // read input and set up the dycore
+  PetscCall(RDySetup(rdy));
+```
+
+After this call, you're ready to run a simulation. You can also all any query
+or utility functions on your `RDy` object to do whatever you need for your own
+simulation. For example, you might need information about the unstructured grid,
+or perhaps you are specifying specific boundary values for a Dirichlet boundary
+condition. See the API header file for all the possibilities.
+
+3. **Timestepping**
+
+The simplest way to start running your simulation after setup is to run
+`RDyAdvance` (which takes a single step) within a `while` loop that uses
+`RDyFinished` as termination condition:
+
+```
+  // run the simulation to completion
+  while (!RDyFinished(rdy)) {
+    // ... pre-step logic here ...
+
+    // advance the simulation by a single step
+    PetscCall(RDyAdvance(rdy));
+
+    // ... post-step logic here ...
+  }
+```
+
+If you look in the standalone C driver, you can see various pre- and post-step
+logic to accommodate data transfer, restarts, etc.
+
+4. **Finalization**
+
+At the end of an RDycore-enabled program, you must destroy the `RDy` object with
+a call to `RDyDestroy`:
+
+```
+  // destroy the dycore
+  PetscCall(RDyDestroy(&rdy));
+```
+
+Finally, call `RDyFinalize` to reclaim all resources used by RDycore and its
+subsystems:
+
+```
+  // clean up
+  PetscCall(RDyFinalize());
+```
+
+
 
 ## Computational Domain
 

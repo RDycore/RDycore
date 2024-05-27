@@ -71,6 +71,9 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format-truncation")
 elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
+
+  # emit compile_commands.json for use with clangd
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
 # Set linker flags where appropriate
