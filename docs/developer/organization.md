@@ -160,13 +160,59 @@ subsystems:
   PetscCall(RDyFinalize());
 ```
 
-
-
 ## Computational Domain
+
+RDycore solves equations on a topologically-two-dimensional domain with
+topography represented by an elevation coordinate $z(x, y)$.
+
+RDycore uses two objects to represent the computional domain:
+
+* [DMPlex](https://petsc.org/release/manual/dmplex/): a PETSc data structure
+  that stores the minimum set of information needed to define an unstructured
+  grid
+* [RDyMesh](https://github.com/RDycore/RDycore/blob/main/include/private/rdymeshimpl.h):
+  An RDycore-specific data structure (implementation [here](https://github.com/RDycore/RDycore/blob/main/src/rdymesh.c))
+  that stores data for cells, edges, and vertices, constructed using the
+  `DMPlex` object
+
+Both of these objects are created by a call to `RDySetup`. The `RDyMesh` object
+is a simple container with
+
+* metadata like numbers of cells, edges, vertices
+* a `cells` field that stores cell data in an `RDyCells` data structure
+* an `edges` field that stores edge data in an `RDyEdges` data structure
+* a `vertices` field that stores vertex data in an `RDyVertices` data structure
+* metadata useful for output/visualization
+
+The domain is partitioned into disjoint _regions_, each of which consists of a
+set of contiguous _cells_, usually triangles or quads. Additionally, the domain
+is bounded by one or more _boundaries_, each of which consists of a set of
+edges (which can be thought of as two-dimensional "faces"). We describe how
+regions and boundaries work below.
 
 ### Regions
 
+When a mesh file is read to create a `DMPlex` object during [RDySetup](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c),
+[DMLabel](https://petsc.org/release/manualpages/DMLabel/) objects are created
+that represent disjoint sets of cells. Each cell set represents a region. From
+each label/cell set, RDycore constructs an [RDyRegion](https://github.com/RDycore/RDycore/blob/main/include/private/rdycoreimpl.h#L20),
+which is basically a named array of local cell IDs.
+
+RDycore then uses information in the [YAML input file](../common/input.md) to
+associate initial condition and source data with each region by name. This
+process is implemented in [InitRegions](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L182).
+
+
 ### Boundaries
+
+Similarly to regions, the `DMPlex` object created during `RDySetup` constructs
+`DMLabel` objects represents disjoint sets of edges, each of which represents a
+boundary. From each label/edge set, RDycore constructs an [RDyBoundary](https://github.com/RDycore/RDycore/blob/main/include/private/rdycoreimpl.h#L29),
+a named array of local edge IDs.
+
+RDycore then uses information in the [YAML input file](../common/input.md) to
+associate boundary condition data with each boundary by name. This process is
+implemented in [InitBoundaries](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L244).
 
 ## Operators
 
@@ -179,6 +225,16 @@ equations.
 ### Source operator
 
 ## Input
+
+The parsing of input is dispatched from [RDySetup](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L244)
+and implemented in [ReadConfigFile](https://github.com/RDycore/RDycore/blob/main/src/yaml_input.c#L1173).
+At the top of `yaml_input.c`, several structs are defined that represent a YAML
+"schema". In this "schema," each struct represents a YAML mapping object, with
+fields in the mapping corresponding to fields in the struct. Accordinglhy, YAML
+arrays within mappings are represented by array fields.
+
+For a more detailed explanation of how this YAML schema is parsed, see the
+[libcyaml documentation](https://github.com/tlsa/libcyaml/blob/main/docs/guide.md).
 
 ## Output
 
