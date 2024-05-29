@@ -5,12 +5,11 @@ team is a small interdisciplinary team, and our development process is tailored
 to its particular needs. These needs necessarily evolve over the lifecycle of
 the project, so this process is likely to change from time to time.
 
-No matter what you may hear from those who prefer to follow dogma: _there is no
-single process that works best in every situation._ This is as true for software
-development as it is for the approximations used in basic science and
-mathematical modeling, and for rules of engagement in all human activites. The
-working styles, expertise, and needs of individual team members determine the
-shape of the process that makes them most productive.
+_There is no single process that works best in every situation._ This is as true
+for software development as it is for the approximations used in basic science
+and mathematical modeling, and for rules of engagement in all human activites.
+The working styles, expertise, and needs of individual team members determine
+the shape of the process that makes them most productive.
 
 ## Git Code Repository and Workflow
 

@@ -4,6 +4,10 @@ In this section, we describe the organization of RDycore's source files. We have
 attempted to group functions and data types together into subsystems that can
 be easily understood separately from one another.
 
+Because RDycore's behavior is determined entirely by input parameters specified
+in the [YAML input format](../common/input.md), it's a good idea to familiarize
+yourself with this format as you read this section.
+
 ## A Brief Tour of RDycore's Source Tree
 
 The root level of the [RDycore](https://github.com/RDycore/RDycore) source tree
@@ -13,44 +17,52 @@ system, and some configuration files for documentation and tooling.
 There are several folders at the root of the source tree:
 
 ```
-+ RDyore +- [.github/workflows](https://github.com/RDycore/RDycore/tree/main/.github/workflows]
++ RDyore +- .github/workflows
          |
-         +- [cmake](https://github.com/RDycore/RDycore/tree/main/cmake)
+         +- cmake
          |
-         +- [config](https://github.com/RDycore/RDycore/tree/main/config)
+         +- config
          |
-         +- [docs](https://github.com/RDycore/RDycore/tree/main/docs)
+         +- docs
          |
-         +- [driver](https://github.com/RDycore/RDycore/tree/main/driver)
+         +- driver
          |
-         +- [external](https://github.com/RDycore/RDycore/tree/main/external)
+         +- external
          |
-         +- [include](https://github.com/RDycore/RDycore/tree/main/include)
+         +- include
          |
-         +- [share](https://github.com/RDycore/RDycore/tree/main/share)
+         +- share
          |
-         +- [src](https://github.com/RDycore/RDycore/tree/main/src)
+         +- src
          |
-         +- [tools](https://github.com/RDycore/RDycore/tree/main/src)
+         +- tools
 ```
 
-* `.github/workflows`: workflows that support our [GitHub Continuous Integration
+* [`.github/workflows`](https://github.com/RDycore/RDycore/tree/main/.github/workflows): workflows
+  that support our [GitHub Continuous Integration
   Environment](development.md#GitHub-Continuous-Integration-Environment)
-* `cmake`: CMake scripts that support the build system, testing, etc.
-* `config`: shell scripts to help with running RDycore on our target platforms
-* `docs`: Markdown source files for our [mkdocs](https://squidfunk.github.io/mkdocs-material/)-based
+* [`cmake`](https://github.com/RDycore/RDycore/tree/main/cmake): CMake scripts
+  that support the build system, testing, etc.
+* [`config`](https://github.com/RDycore/RDycore/tree/main/config): shell scripts
+  to help with running RDycore on our target platforms
+* [`docs`](https://github.com/RDycore/RDycore/tree/main/docs): Markdown source
+  files for our [mkdocs](https://squidfunk.github.io/mkdocs-material/)-based
   documentation
-* `driver`: C and Fortran driver programs, including the standalone RDycore
-  drivers and a few other development tools
-* `external`: third-party libraries used by RDycore that aren't provided by
-  PETSc
-* `include`: the `rdycore.h` API header file, and all private header files
-  (located within the `private` subfolder)
-* `share`: data files for initial conditions, material properties, and
-  unstructured grids (used mainly for testing)
-* `src`: the source code for RDycore
-* `tools`: miscellaneous tools and scripts for building and deploying Docker
-  images
+* [`driver`](https://github.com/RDycore/RDycore/tree/main/driver): C and Fortran
+  driver programs, including the standalone RDycore drivers and a few other
+  development tools
+* [`external`](https://github.com/RDycore/RDycore/tree/main/external): third-
+  party libraries used by RDycore that aren't provided by PETSc
+* [`include`](https://github.com/RDycore/RDycore/tree/main/include): the
+  `rdycore.h` API header file, and all private header files (located within the
+  `private` subfolder)
+* [`share`](https://github.com/RDycore/RDycore/tree/main/share): data files for
+  initial conditions, material properties, and unstructured grids (used mainly
+  for testing)
+* [`src`](https://github.com/RDycore/RDycore/tree/main/src): the source code for
+  RDycore
+* [`tools`](https://github.com/RDycore/RDycore/tree/main/src): miscellaneous
+  tools and scripts for building and deploying Docker images
 
 Take a look at each of these folders to familiarize yourself with their
 contents. In particular, the `src` folder has a few important subfolders:
@@ -175,8 +187,8 @@ RDycore uses two objects to represent the computional domain:
   that stores data for cells, edges, and vertices, constructed using the
   `DMPlex` object
 
-Both of these objects are created by a call to `RDySetup`. The `RDyMesh` object
-is a simple container with
+Both of these objects are created by a call to [RDySetup](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c).
+The `RDyMesh` object is a simple container with
 
 * metadata like numbers of cells, edges, vertices
 * a `cells` field that stores cell data in an `RDyCells` data structure
@@ -200,29 +212,70 @@ which is basically a named array of local cell IDs.
 
 RDycore then uses information in the [YAML input file](../common/input.md) to
 associate initial condition and source data with each region by name. This
-process is implemented in [InitRegions](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L182).
+process is implemented in the `InitRegions` function (https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L182).
 
 
 ### Boundaries
 
-Similarly to regions, the `DMPlex` object created during `RDySetup` constructs
-`DMLabel` objects represents disjoint sets of edges, each of which represents a
-boundary. From each label/edge set, RDycore constructs an [RDyBoundary](https://github.com/RDycore/RDycore/blob/main/include/private/rdycoreimpl.h#L29),
+Similarly to regions, the `DMPlex` object created during [RDySetup](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c)
+constructs `DMLabel` objects represents disjoint sets of edges, each of which
+represents a boundary. From each label/edge set, RDycore constructs an
+[RDyBoundary](https://github.com/RDycore/RDycore/blob/main/include/private/rdycoreimpl.h#L29),
 a named array of local edge IDs.
 
 RDycore then uses information in the [YAML input file](../common/input.md) to
 associate boundary condition data with each boundary by name. This process is
-implemented in [InitBoundaries](https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L244).
+implemented in the `InitBoundaries` function, which is called in `RDySetup`.
 
 ## Operators
 
-**NOTE**: at the time of writing, RDycore solves the shallow water equations
+For purposes of our discussion, an "operator" is a mathematical construct for
+computing interior and boundary fluxes and source terms. Each operator is
+represented by a specific data structure associated with functions that
+implement its operations.
+
+_**NOTE**: at the time of writing, RDycore solves the shallow water equations
 exclusively, so everything here refers to operators pertaining only to these
-equations.
+equations._
 
-### Riemann Flux operator
+### Shallow Water Equations (SWE) operators
+All shallow-water-equations-specific code lives within the [swe source subfolder](https://github.com/RDycore/RDycore/blob/main/src/swe/)
+and is initialized by the `InitSWE` function, which is called in `RDySetup`.
+The interface for the "SWE operator" is visible in the private header
+[rdysweimpl.h](https://github.com/RDycore/RDycore/blob/main/include/private/rsdysweimpl.h).
 
-### Source operator
+All operator code has two parts:
+
+* "host" code that runs on the CPU and dispatches calls to the "device" (a CPU
+  or GPU, depending on your runtime configuration) to create, update,
+  manipulate, and destroy the operator
+* "device" code that performs the mathematical operators associated with the
+  operator using the [libceed](https://ceed.exascaleproject.org/libceed/)
+  exascale library.
+
+The SWE operators are created and configured in the `InitSWE` function, which
+lives in [`swe/physics_swe.c`](https://github.com/RDycore/RDycore/blob/main/src/swe/physics_swe.c).
+
+The `libceed`-based "device" code for these operators is defined within [`swe/swe_ceed.c`](https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed.c)
+and the header file [`swe/swe_ceed_impl.h`](https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed_impl.h).
+The latter file defines inline [`CeedQFunction`](https://libceed.org/en/latest/api/CeedQFunction/#ceedqfunction)s
+that run on the device.
+
+We also implement a host-only version of the operators in [`swe/swe_petsc.c`](https://github.com/RDycore/RDycore/blob/main/src/swe/swe_petsc.c),
+which we use mostly as a simple mechanism for troubleshoots our CEED
+implementation.
+
+We implement the following SWE operators:
+
+* **Riemann Flux operator**: computes finite-volume fluxes between interior
+  cells and on the boundaries, according to specified boundary conditions
+
+* **Source operator**: computes the source term for the shallow water equations
+
+In the CEED implementation, these two operators are combined into a
+[composite operator](https://libceed.org/en/latest/api/CeedOperator/#c.CeedCompositeOperatorCreate)
+that is called using in-place device data. In the PETSc version, these operators
+are implemented by CPU code that is applied sequentially to relevant data.
 
 ## Input
 
@@ -238,17 +291,84 @@ For a more detailed explanation of how this YAML schema is parsed, see the
 
 ## Output
 
+RDycore can produce output for visualization, as well as diagnostic output
+helpful for troubleshooting and debugging.
+
 ### Visualization
 
-### Time series
+RDycore supports two visualizable output formats:
+
+* [XDMF](https://www.xdmf.org/index.php/Main_Page): an ancient,
+  marginally-supported format, popular in the earth science community, that
+  stores data in HDF5 files and metadata in XML files
+* [CFD General Notational System (CGNS)](https://cgns.github.io/): a standard
+  format with lots of traction in the CFD community but less visibility within
+  the earth science community
+* PETSc's binary output format, which is better than nothing but probably not
+  very full-featured.
+
+The writing of XDMF files is implemented in [`xdmf_output.c`](https://github.com/RDycore/RDycore/blob/main/src/xdmf_output.c)
+in the `WriteXDMFOutput` function. CGNS and binary output are handled mostly by
+PETSc's built-in output machinery.
+
+All output functions are registered using PETSc's
+[TSMonitor](https://petsc.org/release/manualpages/TS/TSMonitor) feature and
+called in `RDyAdvance` (within [rdyadvance.c](https://github.com/RDycore/RDycore/blob/main/src/rdyadvance.c))
+at the frequency specified in the YAML input file.
+
+### Diagnostics: time series
+
+RDycore can write out time series data useful for debugging simulations.
+Currently, the only quantity that can be recorded as a time series is the
+"boundary flux"--the total flux through the domain boundary, which is needed to
+account for mass non-conservation in simulations with open boundaries.
+
+Time series data are accumulated and written by logic in [`time_series.c`](https://github.com/RDycore/RDycore/blob/main/src/time_series.c).
+The function `InitTimeSeries` initializes this subsystem, and is called in
+`RDyAdvance`.
+
+These time series diagnostics are invasive, and can negatively affect simulation
+performance, particularly when using GPUs. Therefore they are intended only for
+debugging and troubleshooting.
 
 ## Checkpoints and Restarts
 
+The writing of _checkpoint files_ (which store all state data necessary to
+restart a simulation) and the process of restarting a previously-running
+simulation are largely handled by PETSc:
+
+* `InitCheckpoints` (defined in [checkpoint.c](https://github.com/RDycore/RDycore/blob/main/src/checkpoint.c)
+  sets up a [TSMonitor](https://petsc.org/release/manualpages/TS/TSMonitor) that
+  calls the `WriteCheckpoint` function at an interval specified in the YAML
+  input file. This function is called in `RDySetup`.
+* `ReadCheckpointFile` (also defined in `checkpoint.c`) reads the checkpoint
+  file (in a format specified within the YAML input. This function is called
+  in `RDySetup` if the input file specifieѕ that a simulation should be
+  restarted.
+
 ## Running Ensembles
 
-### Ensemble configuration process
+RDycore can run _ensembles_, which are sets of concurrently-running simulations
+("ensemble members") with variations in selected input parameters. RDycore uses
+an extremely simple mechanism to run these simulations within a single MPI job:
 
-### Differences between "ensemble mode" and "single-simulation mode"
+* on initialization, RDycore splits its "world" communicator into a number of
+  smaller, communicators of equal size
+* each of these smaller communicators is assigned to a single ensemble member
+* each ensemble member is configured according to the ensemble specification
+  in the [YAML input file](../common/input.md)
+* all ensemble members are run concurrently to completion
+
+Currently, ensemble calculations only run ensemble members, possibly generating
+member-specific output. No post-processing or analysis has been implemented,
+though it would likely be simple to do so.
+
+### Ensemble member configuration
+
+The data for each ensemble member is listed explicitly in the [ensemble section](../common/input.md#ensemble)
+of the YAML input specification. All parameters for ensemble members override
+the corresponding parameters in other sections of the file. This logic is
+implemented in the `ConfigEnsembleMember` function within [ensemble.c](https://github.com/RDycore/RDycore/blob/main/src/ensemble.c).
 
 ## Support for Fortran
 
