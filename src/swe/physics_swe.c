@@ -274,12 +274,10 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
     // 3. Make a duplicate copy of the F as the values will be used as input for the CeedOperator
     //    corresponding to the source-sink term
-    Vec F_dup;
-    PetscCall(VecDuplicate(F, &F_dup));
-    PetscCall(VecCopy(F, F_dup));
+    PetscCall(VecCopy(F, rdy->F_dup));
 
     // 4. Sets the pointer of a CeedVector to a PETSc Vec: F_dup --> riemannf_ceed
-    PetscCall(VecGetArrayAndMemType(F_dup, &f_dup, &mem_type));
+    PetscCall(VecGetArrayAndMemType(rdy->F_dup, &f_dup, &mem_type));
     PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f_dup));
 
     // 5. Sets the pointer of a CeedVector to a PETSc Vec: F --> s_ceed
@@ -301,9 +299,6 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     // 8. Restore pointers to the PETSc Vecs
     PetscCall(VecRestoreArrayAndMemType(U_local, &u));
     PetscCall(VecRestoreArrayAndMemType(F, &f));
-
-    // 9. Clean up memory
-    PetscCall(VecDestroy(&F_dup));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

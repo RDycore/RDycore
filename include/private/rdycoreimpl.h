@@ -164,6 +164,9 @@ struct _p_RDy {
   // residual vector
   Vec R;
 
+  // vector to store fluxes through internal and boundary edges
+  Vec F_dup;
+
   // source-sink vector
   Vec swe_src;
 
