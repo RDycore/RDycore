@@ -1,6 +1,6 @@
 # Installation
 
-RDycore builds and runs on the following platforms:
+You can build and run RDycore on the following platforms:
 
 * Linux and Mac laptops and workstations
 * [Frontier](https://www.olcf.ornl.gov/frontier/) (Oak Ridge National Laboratory)
@@ -15,14 +15,15 @@ To build RDycore, you need:
 * reliable C, C++, and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
   or [MPICH](https://www.mpich.org/))
-* [PETSc](https://petsc.org/release/) (Git revision `b3128c15e0e`), built with
-  the following third-party libraries:
+* [PETSc](https://petsc.org/release/), built with the following third-party
+  libraries:
     * cgns
     * exodusii
     * fblaslapack
     * hdf5
     * libceed
     * metis
+    * muparser
     * netcdf
     * parmetis
     * pnetcdf
@@ -33,6 +34,27 @@ just use your favorite package manager. On a Mac, you can get the Clang C/C++
 compiler by installing XCode, and then use a package manager like
 [Homebrew](https://brew.sh/) or [MacPorts](https://www.macports.org/) to get
 the rest.
+
+### Which version of PETSc?
+
+Check [our automated testing workflow](https://github.com/RDycore/RDycore/blob/main/.github/workflows/auto_test.yml#L24)
+for the proper Git hash to use to build RDycore. The linked line specifies a
+Docker image containing the "blessed" version of PETSc, which can be read as
+follows:
+
+```
+coherellc/rdycore-petsc:fc288817-int32
+```
+
+* `coherellc` is the name of the DockerHub organization hosting the image
+* `rdycore-petsc` is the the name of the Docker image
+* `fc288817` is the Git hash within the [PETSc repository](https://gitlab.com/petsc/petsc)
+  used to build RDycore
+* `int32` (or `int64`) indicates whether the PETSc installation within the image
+  uses 32-bit or 64-bit integers for the `PetscInt` data type.
+
+See our [PETSc Dockerfile](https://github.com/RDycore/RDycore/blob/main/tools/Dockerfile.petsc)
+for the commands we use to build PETSc in our continous integration environment.
 
 ## Clone the Repository
 

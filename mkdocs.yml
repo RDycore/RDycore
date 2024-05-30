@@ -4,11 +4,14 @@ nav:
   - 'Home': 'index.md'
   - 'User Guide':
     - 'Overview': 'user/index.md'
-    - 'Installation': 'installation.md'
-    - 'YAML Input Specification': 'user/input.md'
-    - 'MMS Driver': 'user/mms.md'
+    - 'Installation': 'common/installation.md'
+    - 'YAML Input Specification': 'common/input.md'
+    - 'MMS Driver': 'common/mms.md'
   - 'Developer Guide':
     - 'Overview': 'developer/index.md'
+    - 'Installation': 'common/installation.md'
+    - 'Development Process': 'developer/development.md'
+    - 'Code Structure and Organization': 'developer/organization.md'
 
 edit_uri: ""
 
