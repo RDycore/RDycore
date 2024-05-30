@@ -54,8 +54,8 @@ There are several folders at the root of the source tree:
 * [`external`](https://github.com/RDycore/RDycore/tree/main/external): third-
   party libraries used by RDycore that aren't provided by PETSc
 * [`include`](https://github.com/RDycore/RDycore/tree/main/include): the
-  `rdycore.h` API header file, and all private header files (located within the
-  `private` subfolder)
+  `rdycore.h.in` template that generates the `rdycore.h` API header file, and
+  all private header files (located within the `private` subfolder)
 * [`share`](https://github.com/RDycore/RDycore/tree/main/share): data files for
   initial conditions, material properties, and unstructured grids (used mainly
   for testing)
@@ -382,19 +382,72 @@ The mapping from a C function to a Fortran subroutine (or function) is
 accomplished in two parts:
 
 1. A C function is made available to Fortran by defining a Fortran function
-   (or function) using a `bind(C)` annotation specifying the case-sensitive name
-   of the C function. All data types in this Fortran function must correspond to
-   supported C data types via the `iso_c_binding` module. The function returns
-   an integer corresponding to the `PetscErrorCode` return type of the C
-   function. We refer to such a function as a "C-bound Fortran function".
+   within an `interface` block that uses a `bind(C)` annotation specifying the
+   case-sensitive name of the C function. All data types in this Fortran
+   function must correspond to supported C data types via the `iso_c_binding`
+   module. The function returns an integer corresponding to the `PetscErrorCode`
+   return type of the C function. We refer to such a function as a "C-bound
+   Fortran function".
 
 2. A Fortran "wrapper" subroutine is defined that calls the C-bound Fortran
    function defined in item 1. This subroutine follows the PETSc convention in
    which the last argument (`ierr`) gets the return value of the C-bound Fortran
    function.
 
+For example, let's take a look at the Fortran function for `RDyCreate`, which
+calls the C function `RDyCreateF90`. This separate C function is required
+because `RDyCreate` accepts an `MPI_Comm` input parameter, and Fortran uses
+integers for MPI communicators.
+
+First, we create a C-bound Fortran function `rdycreate_` and associate it with
+the C function `RDyCreateF90` within the `interface` block near the top of
+[`f90-mod/rdycore.F90`](https://github.com/RDycore/RDycore/blob/main/src/f90-mod/rdycore.F90):
+
+```
+  interface
+    ...
+    integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name="RDyCreateF90")
+      use iso_c_binding, only: c_int, c_ptr
+      integer,            intent(in)  :: comm
+      type(c_ptr), value, intent(in)  :: filename
+      type(c_ptr),        intent(out) :: rdy
+    end function
+    ...
+  end interface
+```
+
+Then we define a subroutine `RDyCreate` that calls `rdycreate_` and sets `ierr`
+to its return value:
+
+```
+  subroutine RDyCreate(comm, filename, rdy_, ierr)
+    use iso_c_binding, only: c_null_char
+    character(len=1024), intent(in) :: filename
+    integer,   intent(in)  :: comm
+    type(RDy), intent(out) :: rdy_
+    integer,   intent(out) :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: config_file
+
+    n = len_trim(filename)
+    allocate(config_file)
+    config_file(1:n) = filename(1:n)
+    config_file(n+1:n+1) = c_null_char
+    ierr = rdycreate_(comm, c_loc(config_file), rdy_%c_rdy)
+    deallocate(config_file)
+  end subroutine
+```
+
+Notice that we have to do some things to construct a NULL-terminated C string
+for the filename with a character array and `c_null_char`, and then pass a
+pointer to this array with `c_loc`. This is how things are done with Fortran's
+`iso_c_binding` module, which you can learn about in the link at the top of this
+section.
+
 Whenever a new C function is added to the public interface in `rdycore.h`, these
-two corresponding Fortran items must be added to support its use in Fortran.
+two corresponding Fortran items must be added to the [template from which it is generated](https://github.com/RDycore/RDycore/blob/main/include/rdycore.h.in)
+to support its use in Fortran.
 
 ### Special considerations
 

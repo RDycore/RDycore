@@ -23,8 +23,11 @@ with the following deviations:
   mechanism
 * we prefer C++-style code comments (`//`) to C-style comments (`/* */`) even
   for multi-line comments
-* we use `if (foo)` instead of `if (foo != NULL)` and `if (cond)` instead of
-  `if (cond == PETSC_TRUE)`, and their corresponding negations
+* we use C conventions for logical expressions, e.g.
+    * `if (cond)` instead of `if (cond == PETSC_TRUE)`
+    * `if (!cond)` instead of `if (cond == PETSC_FALSE)`
+    * `if (foo)` instead of `if (foo != NULL)` for pointers
+    * `if (!foo)` instead of `if (foo == NULL)` for pointers
 
 These deviations reflect certain facts about RDycore relative to PETSc:
 

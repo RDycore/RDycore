@@ -1,6 +1,6 @@
 # RDycore User Guide - Overview
 
-RDycore's primary purpose is to provide the DOE E3SM climate model with the
+RDycore's primary purpose is to provide [E3SM](https://e3sm.org/) with the
 capability to model coastal compound flooding. Accordingly, it has been
 constructed as a performance-portable library that makes efficient use of
 DOE's leadership-class computing facilities and is invoked by E3SM Fortran code.
