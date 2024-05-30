@@ -1004,8 +1004,8 @@ system, and some configuration files for documentation and tooling.</p>
 <li><a href="https://github.com/RDycore/RDycore/tree/main/external"><code>external</code></a>: third-
   party libraries used by RDycore that aren't provided by PETSc</li>
 <li><a href="https://github.com/RDycore/RDycore/tree/main/include"><code>include</code></a>: the
-  <code>rdycore.h</code> API header file, and all private header files (located within the
-  <code>private</code> subfolder)</li>
+  <code>rdycore.h.in</code> template that generates the <code>rdycore.h</code> API header file, and
+  all private header files (located within the <code>private</code> subfolder)</li>
 <li><a href="https://github.com/RDycore/RDycore/tree/main/share"><code>share</code></a>: data files for
   initial conditions, material properties, and unstructured grids (used mainly
   for testing)</li>
@@ -1277,11 +1277,12 @@ accomplished in two parts:</p>
 <ol>
 <li>
 <p>A C function is made available to Fortran by defining a Fortran function
-   (or function) using a <code>bind(C)</code> annotation specifying the case-sensitive name
-   of the C function. All data types in this Fortran function must correspond to
-   supported C data types via the <code>iso_c_binding</code> module. The function returns
-   an integer corresponding to the <code>PetscErrorCode</code> return type of the C
-   function. We refer to such a function as a "C-bound Fortran function".</p>
+   within an <code>interface</code> block that uses a <code>bind(C)</code> annotation specifying the
+   case-sensitive name of the C function. All data types in this Fortran
+   function must correspond to supported C data types via the <code>iso_c_binding</code>
+   module. The function returns an integer corresponding to the <code>PetscErrorCode</code>
+   return type of the C function. We refer to such a function as a "C-bound
+   Fortran function".</p>
 </li>
 <li>
 <p>A Fortran "wrapper" subroutine is defined that calls the C-bound Fortran
@@ -1290,8 +1291,52 @@ accomplished in two parts:</p>
    function.</p>
 </li>
 </ol>
+<p>For example, let's take a look at the Fortran function for <code>RDyCreate</code>, which
+calls the C function <code>RDyCreateF90</code>. This separate C function is required
+because <code>RDyCreate</code> accepts an <code>MPI_Comm</code> input parameter, and Fortran uses
+integers for MPI communicators.</p>
+<p>First, we create a C-bound Fortran function <code>rdycreate_</code> and associate it with
+the C function <code>RDyCreateF90</code> within the <code>interface</code> block near the top of
+<a href="https://github.com/RDycore/RDycore/blob/main/src/f90-mod/rdycore.F90"><code>f90-mod/rdycore.F90</code></a>:</p>
+<div class="highlight"><pre><span></span><code>  interface
+    ...
+    integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name=&quot;RDyCreateF90&quot;)
+      use iso_c_binding, only: c_int, c_ptr
+      integer,            intent(in)  :: comm
+      type(c_ptr), value, intent(in)  :: filename
+      type(c_ptr),        intent(out) :: rdy
+    end function
+    ...
+  end interface
+</code></pre></div>
+<p>Then we define a subroutine <code>RDyCreate</code> that calls <code>rdycreate_</code> and sets <code>ierr</code>
+to its return value:</p>
+<div class="highlight"><pre><span></span><code>  subroutine RDyCreate(comm, filename, rdy_, ierr)
+    use iso_c_binding, only: c_null_char
+    character(len=1024), intent(in) :: filename
+    integer,   intent(in)  :: comm
+    type(RDy), intent(out) :: rdy_
+    integer,   intent(out) :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: config_file
+
+    n = len_trim(filename)
+    allocate(config_file)
+    config_file(1:n) = filename(1:n)
+    config_file(n+1:n+1) = c_null_char
+    ierr = rdycreate_(comm, c_loc(config_file), rdy_%c_rdy)
+    deallocate(config_file)
+  end subroutine
+</code></pre></div>
+<p>Notice that we have to do some things to construct a NULL-terminated C string
+for the filename with a character array and <code>c_null_char</code>, and then pass a
+pointer to this array with <code>c_loc</code>. This is how things are done with Fortran's
+<code>iso_c_binding</code> module, which you can learn about in the link at the top of this
+section.</p>
 <p>Whenever a new C function is added to the public interface in <code>rdycore.h</code>, these
-two corresponding Fortran items must be added to support its use in Fortran.</p>
+two corresponding Fortran items must be added to the <a href="https://github.com/RDycore/RDycore/blob/main/include/rdycore.h.in">template from which it is generated</a>
+to support its use in Fortran.</p>
 <h3 id="special-considerations">Special considerations</h3>
 <ul>
 <li><strong>C pointers</strong>: Perhaps counterintuitively, C pointers must be passed by value

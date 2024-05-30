@@ -644,8 +644,13 @@ with the following deviations:</p>
   mechanism</li>
 <li>we prefer C++-style code comments (<code>//</code>) to C-style comments (<code>/* */</code>) even
   for multi-line comments</li>
-<li>we use <code>if (foo)</code> instead of <code>if (foo != NULL)</code> and <code>if (cond)</code> instead of
-  <code>if (cond == PETSC_TRUE)</code>, and their corresponding negations</li>
+<li>we use C conventions for logical expressions, e.g.<ul>
+<li><code>if (cond)</code> instead of <code>if (cond == PETSC_TRUE)</code></li>
+<li><code>if (!cond)</code> instead of <code>if (cond == PETSC_FALSE)</code></li>
+<li><code>if (foo)</code> instead of <code>if (foo != NULL)</code> for pointers</li>
+<li><code>if (!foo)</code> instead of <code>if (foo == NULL)</code> for pointers</li>
+</ul>
+</li>
 </ul>
 <p>These deviations reflect certain facts about RDycore relative to PETSc:</p>
 <ul>
