@@ -57,6 +57,22 @@ Function inputs and outputs are passed as arguments to a function. Because C
 passes arguments by value and not by reference (like Fortan), output parameters
 are typically pointers.
 
+### PETSc Data Types
+
+We use data types defined by PETSc, which are configured according to RDycore's
+build parameters:
+
+* `PetscInt` is a 32-bit or 64-bit integer, depending on whether your PETSc
+  installation is configured to use 32-bit or 64-bit indices. Use this for all
+  integers **except** those transmitted via MPI (see below).
+* `PetscMPIInt` is a 32-bit integer corresponding to the `MPI_INT` type, and
+  should be used for all integers in MPI messages, even in 64-bit builds.
+* `PetscReal` represents all real-valued quantities (usually double precision)
+* `PetscBool` is PETSc's boolean type, which assumes one of the values
+  `PETSC_TRUE` or `PETSC_FALSE`. It provides this type to provide compatibility
+  with older revisions of the C language that don't include the standard C
+  `bool` type.
+
 ### Header files
 
 RDycore has one public header file that defines the interface for its C library:
