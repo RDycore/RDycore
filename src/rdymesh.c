@@ -438,8 +438,10 @@ static PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   PetscFunctionBegin;
 
-  MPI_Comm comm;
+  MPI_Comm    comm;
+  PetscMPIInt commsize;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+  PetscCallMPI(MPI_Comm_size(comm, &commsize));
 
   PetscInt dim;
   PetscCall(DMGetCoordinateDim(dm, &dim));
@@ -491,9 +493,12 @@ static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   }
 
   // fetch global edge IDs.
-  ISLocalToGlobalMapping map;
-  PetscCall(DMGetLocalToGlobalMapping(dm, &map));
-  PetscCall(ISLocalToGlobalMappingApply(map, num_edges, edges->ids, edges->global_ids));
+  if (commsize == 1) {
+    for (PetscInt e = e_start; e < e_end; e++) {
+      PetscInt iedge           = e - e_start;
+      edges->global_ids[iedge] = iedge;
+    }
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
