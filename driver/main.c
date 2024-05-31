@@ -14,6 +14,10 @@ static void usage(const char *exe_name) {
 typedef enum { CONSTANT = 0, HOMOGENEOUS, HETEROGENEOUS } RainType;
 
 typedef struct {
+  PetscReal rate;
+} ConstantRainData;
+
+typedef struct {
   char         filename[PETSC_MAX_PATH_LEN];
   Vec          data_vec;
   PetscInt     ndata;
@@ -55,6 +59,7 @@ typedef struct {
 
 typedef struct {
   RainType              type;
+  ConstantRainData      constant;
   HomogeneousRainData   homogeneous;
   HeterogeneousRainData heterogeneous;
 } Rain;
@@ -143,16 +148,10 @@ static PetscErrorCode CloseHomogeneousRainData(HomogeneousRainData *homogeneous_
 }
 
 // set a constant rainfall for all grid cells
-PetscErrorCode SetConstantRainfall(PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscReal rain[ncells]) {
   PetscFunctionBegin;
-
-  // apply a 1 minute/hr rain over the entire domain
-  PetscReal rain_rate             = 1.0;
-  PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
-
   for (PetscInt icell = 0; icell < ncells; icell++) {
-    rain[icell] = rain_rate * mm_per_hr_2_m_per_sec;
-    ;
+    rain[icell] = rain_rate;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -348,7 +347,10 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   PetscBool flag;
 
   // set default rainfall
-  rain_dataset->type = CONSTANT;
+  rain_dataset->type          = CONSTANT;
+  rain_dataset->constant.rate = 0.0;
+
+  PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, NULL));
 
   PetscCall(
       PetscOptionsGetString(NULL, NULL, "-homogeneous_rain", rain_dataset->homogeneous.filename, sizeof(rain_dataset->homogeneous.filename), &flag));
@@ -504,7 +506,7 @@ int main(int argc, char *argv[]) {
 
       switch (rain_dataset.type) {
         case CONSTANT:
-          PetscCall(SetConstantRainfall(n, rain));
+          PetscCall(SetConstantRainfall(rain_dataset.constant.rate, n, rain));
           break;
         case HOMOGENEOUS:
           PetscCall(SetHomogeneousRainfall(&rain_dataset.homogeneous, time, n, rain));
