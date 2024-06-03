@@ -237,8 +237,8 @@ PetscErrorCode CreateVectors(RDy rdy) {
 
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
   PetscCall(VecDuplicate(rdy->X, &rdy->R));
-  PetscCall(VecDuplicate(rdy->X, &rdy->Soln));
   PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
+  PetscCall(VecDuplicate(rdy->X, &rdy->F_dup));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
