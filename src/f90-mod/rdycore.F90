@@ -26,7 +26,7 @@ module rdycore
             RDyGetBoundaryCellNaturalIDs, &
             RDySetWaterSourceForLocalCells, RDySetXMomentumSourceForLocalCells, RDySetYMomentumSourceForLocalCells, &
             RDyGetLocalCellManningsNs, RDySetManningsNForLocalCells, RDySetInitialConditions, &
-            RDyCreatePrognosticVec
+            RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -377,6 +377,22 @@ module rdycore
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       PetscFortranAddr,   intent(out) :: prog_vec
+    end function
+
+    integer(c_int) function rdyreadonedoflocalvecfrombinaryfile_(rdy, filename, local_vec) bind(c, name="RDyReadOneDOFLocalVecFromBinaryFile")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      type(c_ptr), value, intent(in)  :: filename
+      PetscFortranAddr,   intent(out) :: local_vec
+    end function
+
+    integer(c_int) function rdyreadonedofglobalvecfrombinaryfile_(rdy, filename, global_vec) bind(c, name="RDyReadOneDOFGlobalVecFromBinaryFile")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      type(c_ptr), value, intent(in)  :: filename
+      PetscFortranAddr,   intent(out) :: global_vec
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -807,6 +823,42 @@ contains
     type(tVec), intent(inout) :: prog_vec  ! Vec
     integer,    intent(out)   :: ierr
     ierr = rdycreateprognosticvec_(rdy_%c_rdy, prog_vec%v)
+  end subroutine
+
+  subroutine RDyReadOneDOFLocalVecFromBinaryFile(rdy_, filename, local_vec, ierr)
+    use petscvec
+    type(RDy),  intent(inout) :: rdy_
+    character(len=1024), intent(in) :: filename
+    type(tVec), intent(inout) :: local_vec  ! Vec
+    integer,    intent(out)   :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: binary_file
+
+    n = len_trim(filename)
+    allocate(binary_file)
+    binary_file(1:n) = filename(1:n)
+    binary_file(n+1:n+1) = c_null_char
+    ierr = rdyreadonedoflocalvecfrombinaryfile_(rdy_%c_rdy, c_loc(binary_file), local_vec%v)
+    deallocate(binary_file)
+  end subroutine
+
+  subroutine RDyReadOneDOFGlobalVecFromBinaryFile(rdy_, filename, global_vec, ierr)
+    use petscvec
+    type(RDy),  intent(inout) :: rdy_
+    character(len=1024), intent(in) :: filename
+    type(tVec), intent(inout) :: global_vec  ! Vec
+    integer,    intent(out)   :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: binary_file
+
+    n = len_trim(filename)
+    allocate(binary_file)
+    binary_file(1:n) = filename(1:n)
+    binary_file(n+1:n+1) = c_null_char
+    ierr = rdyreadonedofglobalvecfrombinaryfile_(rdy_%c_rdy, c_loc(binary_file), global_vec%v)
+    deallocate(binary_file)
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

@@ -104,6 +104,7 @@ PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt
 PETSC_EXTERN PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic);
 
 PETSC_EXTERN PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec);
+PETSC_EXTERN PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char*, Vec *local_vec);
 
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {
