@@ -13,7 +13,7 @@ nav:
     - 'Development Process': 'developer/development.md'
     - 'Code Structure and Organization': 'developer/organization.md'
     - 'Style Guide': 'developer/style.md'
-    - 'Develeper Tools': 'developer/tools.md'
+    - 'Developer Tools': 'developer/tools.md'
 
 edit_uri: ""
 
