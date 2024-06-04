@@ -35,8 +35,17 @@ To configure, build, and install RDycore:
    ```
    git submodule update --init --recursive
    ```
-2. Make sure you set your `PETSC_DIR` and `PETSC_ARCH` environment variables
-   to refer to your existing installation of PETSc.
+2. Make sure you set your `PETSC_DIR` and `PETSC_ARCH` environment variables to
+   refer to your existing installation of PETSc.
+   * PETSc must be configured with `--download-muparser`.
+   * If you intend to use [libCEED](https://libceed.org) (higher performance and
+     allows targeting GPUs), please configure PETSc with `--download-libceed`.
+   * Make sure to [configure PETSc
+     appropriately](https://petsc.org/main/install/install/#installing-petsc-to-use-gpus-and-accelerators)
+     if you intend to target GPUs.
+   * You may also consider configuring PETSc with a mesh partitioner and
+     relevant file format support. See
+     [Dockerfile.petsc](tools/Dockerfile.petsc) for further suggestions.
 3. Create a directory in which you'll build RDycore (a "build directory").
    For example:
    ```
