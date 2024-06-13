@@ -132,9 +132,9 @@ on their CMake website.
 You might hear a CMake enthusiast refer to "Modern CMake". This refers to the
 practice of setting build properties on specific targets (with commands like
 [target_include_directories](https://cmake.org/cmake/help/latest/command/target_include_directories.html)
-and [target_link_libraries](https://cmake.org/cmake/help/latest/command/target_link_libraries.html)
+and [target_link_libraries](https://cmake.org/cmake/help/latest/command/target_link_libraries.html))
 instead of setting these properties globally (with [include_directories](https://cmake.org/cmake/help/latest/command/include_directories.html)
-and [link_libraries](https://cmake.org/cmake/help/latest/command/link_libraries.html).
+and [link_libraries](https://cmake.org/cmake/help/latest/command/link_libraries.html)).
 
 Using target-specific properties makes it easier to find issues with the build
 system. We adhere as much as possible to this practice in the development of
