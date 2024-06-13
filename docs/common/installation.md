@@ -53,8 +53,9 @@ coherellc/rdycore-petsc:fc288817-int32
 * `int32` (or `int64`) indicates whether the PETSc installation within the image
   uses 32-bit or 64-bit integers for the `PetscInt` data type.
 
-See our [PETSc Dockerfile](https://github.com/RDycore/RDycore/blob/main/tools/Dockerfile.petsc)
-for the commands we use to build PETSc in our continous integration environment.
+See our [PETSc Dockerfile](https://github.com/RDycore/RDycore/blob/main/tools/Dockerfile.petsc#L50)
+for an example of the `configure` command we use to build PETSc in our continous
+integration environment.
 
 ## Clone the Repository
 
