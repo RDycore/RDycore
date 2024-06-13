@@ -119,11 +119,12 @@ If you have, these tools should be located in
 
 ## Build, Test, and Install RDycore
 
-After you've configured RDycore, you can build it
+After you've configured RDycore, you can build it:
 
-1. From the build directory, type `make -j` to build the library.
-2. To run tests for the library (and the included drivers), type `make test`.
-3. To install the model to the location (indicated by your `CMAKE_INSTALL_PREFIX`,
+1. Change to your build directory (e.g. `cd build`)
+2. Type `make -j` to build the library.
+3. To run tests for the library (and the included drivers), type `make test`.
+4. To install the model to the location (indicated by your `CMAKE_INSTALL_PREFIX`,
    if you specified it), type `make install`. By default, products are installed
    in the `include`, `lib`, `bin`, and `share` subdirectories of this prefix.
 
