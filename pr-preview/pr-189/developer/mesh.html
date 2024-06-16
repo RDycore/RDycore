@@ -651,17 +651,17 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#domain-decomposition" class="md-nav__link">
-    <span class="md-ellipsis">
-      Domain Decomposition
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mesh-decomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mesh Decomposition
+    </span>
+  </a>
   
 </li>
       
@@ -914,7 +914,7 @@ how DMPlex number mesh elements.</p>
                    ├── cones       (D, INTEGER, size = 4 * nquads + 3 * ntri)
                    ├── orientation (D, INTEGER, size = 4 * nquads + 3 * ntri)
 </code></pre></div>
-<h3 id="domain-decomposition">Domain Decomposition</h3>
+<h2 id="mesh-decomposition">Mesh Decomposition</h2>
 <p>Below is the decomposition of the example mesh with mixed element types across two MPI ranks.</p>
 <p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N2.png" /></p>
 <p>The SWE physics in RDycore is currently implmented in two versions:</p>
