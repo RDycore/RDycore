@@ -627,6 +627,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#domain-decomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      Domain Decomposition
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -720,15 +729,15 @@ in 3D.</p>
 <p>The <code>.exo</code> mesh file uses NetCDF. The cells corresponding to the two element types
 (i.e. quadrilaterals and triangles) must be saved as two different data fields
 in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <code>connect2</code> for triangles.</p>
-<p>```:text
- # quadrilateral cells
+<div class="highlight"><pre><span></span><code> # quadrilateral cells
  connect1 =
   1, 2, 6, 5,
   3, 4, 8, 7,
   5, 6, 10, 9,
-  7, 8, 12, 11 ;</p>
-<h1 id="triangular-cells">triangular cells</h1>
-<p>connect2 =
+  7, 8, 12, 11 ;
+
+# triangular cells
+ connect2 =
   2, 3, 13,
   3, 7, 13,
   7, 6, 13,
@@ -736,16 +745,15 @@ in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <
   6, 7, 14,
   7, 11, 14,
   11, 10, 14,
-  10, 6, 14 ;<br />
-<div class="highlight"><pre><span></span><code>Each sideset is defined via two data fields:
-
-- `elem_ss&lt;ID&gt;`: Corresponds to the cell (or element) ID
-- `side_ss&lt;ID&gt;`: Correponds to the edge sideset
-
-The five edge sets for the above mesh are defined as
-
-```text
- # right boundary
+  10, 6, 14 ;  
+</code></pre></div>
+<p>Each sideset is defined via two data fields:</p>
+<ul>
+<li><code>elem_ss&lt;ID&gt;</code>: Corresponds to the cell (or element) ID</li>
+<li><code>side_ss&lt;ID&gt;</code>: Correponds to the edge sideset</li>
+</ul>
+<p>The five edge sets for the above mesh are defined as</p>
+<div class="highlight"><pre><span></span><code> # right boundary
  elem_ss1 = 2, 4 ;
  side_ss1 = 4, 4 ;
 
@@ -887,7 +895,7 @@ DMPlex gives the following ID:
                    ├── cone_sizes  (D, INTEGER, size = ncells)
                    ├── cones       (D, INTEGER, size = 4 * nquads + 3 * ntri)
                    ├── orientation (D, INTEGER, size = 4 * nquads + 3 * ntri)
-</code></pre></div></p>
+</code></pre></div>
 <h3 id="domain-decomposition">Domain Decomposition</h3>
 <p>Below is the decomposition of the example mesh with mixed element types across two MPI ranks.</p>
 <p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N2.png" /></p>
