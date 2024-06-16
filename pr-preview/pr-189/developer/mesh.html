@@ -648,8 +648,7 @@
 
 
 <h1 id="mesh">Mesh</h1>
-<p>Here we describe the two mesh formarts that we use in RDycore. Additionally, we
-explain how the mesh information is internally saved in RDycore. The two mesh
+<p>Here we describe the two mesh formarts that are used in RDycore. The two mesh
 formats that we use are:</p>
 <ol>
 <li>Exodus II</li>
@@ -659,7 +658,7 @@ formats that we use are:</p>
 both triangular and quadrilateral cells. The vertices of cells have coordinates
 in 3D.</p>
 <h2 id="exodus-ii-mesh-format">Exodus II Mesh Format</h2>
-<p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices. </p>
+<p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices.</p>
 <h3 id="triangular-elements">Triangular elements</h3>
 <div class="highlight"><pre><span></span><code>     Triangular
         cell
@@ -721,7 +720,7 @@ in 3D.</p>
 <p>The <code>.exo</code> mesh file uses NetCDF. The cells corresponding to the two element types
 (i.e. quadrilaterals and triangles) must be saved as two different data fields
 in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <code>connect2</code> for triangles.</p>
-<p>```:bash
+<p>```:text
  # quadrilateral cells
  connect1 =
   1, 2, 6, 5,
