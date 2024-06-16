@@ -627,6 +627,30 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dmplex-hdf5-v300" class="md-nav__link">
+    <span class="md-ellipsis">
+      DMPlex HDF5 v3.0.0
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DMPlex HDF5 v3.0.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dmplex-mesh-numbering-for-a-serial-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      DMPlex mesh numbering for a serial run
+    </span>
+  </a>
+  
+</li>
+        
           <li class="md-nav__item">
   <a href="#domain-decomposition" class="md-nav__link">
     <span class="md-ellipsis">
@@ -772,32 +796,26 @@ in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <
  # river
  elem_ss5 = 4, 9, 9, 8, 8 ;
  side_ss5 = 3, 4, 5, 5, 4 ;
- ```
-
-## DMPlex HDF5 v3.0.0
-
-Before understanding the DMPlex&#39;s HDF5 storage version v3.0.0
-(i.e. `-dm_plex_view_hdf5_storage_version 3.0.0`), it is important to understand
-how DMPlex number mesh elements.
-
-### DMPlex mesh numbering for a serial run
-
-DMPlex uses 0-based numbering. The mesh elements are numbered in the following order:
-
-1. Cells
-2. Vertices
-3. Edges. 
-
-DMPlex gives the following ID:
-
-- Cell ID: `0`-`11`
-- Vertex ID: `12` to `25`
-- Edge ID: `26` to `50`
-
-![image](figures/quad_tri_mesh_dmplex_numbering_N1.png)
-
-```text
-#
+</code></pre></div>
+<h2 id="dmplex-hdf5-v300">DMPlex HDF5 v3.0.0</h2>
+<p>Before understanding the DMPlex's HDF5 storage version v3.0.0
+(i.e. <code>-dm_plex_view_hdf5_storage_version 3.0.0</code>), it is important to understand
+how DMPlex number mesh elements.</p>
+<h3 id="dmplex-mesh-numbering-for-a-serial-run">DMPlex mesh numbering for a serial run</h3>
+<p>DMPlex uses 0-based numbering. The mesh elements are numbered in the following order:</p>
+<ol>
+<li>Cells</li>
+<li>Vertices</li>
+<li>Edges. </li>
+</ol>
+<p>DMPlex gives the following ID:</p>
+<ul>
+<li>Cell ID: <code>0</code>-<code>11</code></li>
+<li>Vertex ID: <code>12</code> to <code>25</code></li>
+<li>Edge ID: <code>26</code> to <code>50</code></li>
+</ul>
+<p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N1.png" /></p>
+<div class="highlight"><pre><span></span><code>#
 # ncells    = Number of cells
 #           = nquad (number of quadrilaterals) + ntri (number of trinagles)
 #           = 4 + 8 = 12
