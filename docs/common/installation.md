@@ -53,8 +53,9 @@ coherellc/rdycore-petsc:fc288817-int32
 * `int32` (or `int64`) indicates whether the PETSc installation within the image
   uses 32-bit or 64-bit integers for the `PetscInt` data type.
 
-See our [PETSc Dockerfile](https://github.com/RDycore/RDycore/blob/main/tools/Dockerfile.petsc)
-for the commands we use to build PETSc in our continous integration environment.
+See our [PETSc Dockerfile](https://github.com/RDycore/RDycore/blob/main/tools/Dockerfile.petsc#L50)
+for an example of the `configure` command we use to build PETSc in our continous
+integration environment.
 
 ## Clone the Repository
 
@@ -93,16 +94,81 @@ using the `CMAKE_INSTALL_PREFIX` parameter:
 cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/path/to/install
 ```
 
+### Supported configuration options
+
+CMake allows you to specify build options with the `-D` flag, as indicated in
+Step 3 above. Here are the options supported by RDycore:
+
+* **`CMAKE_INSTALL_PREFIX=/path/to/install`**: a path to which the RDycore library
+  and driver are installed with `make install` (as in Step 7)
+* **`CMAKE_BUILD_TYPE=Debug|Release`**: controls whether a build has debugging
+  information or whether it is optimized
+* **`CMAKE_VERBOSE_MAKEFILE=ON|OFF`**: if `ON`, displays compiler and linker
+  output while building. Otherwise displays only the file being built.
+* **`ENABLE_COVERAGE=ON|OFF`**: if `ON`, enables code coverage instrumentation.
+
+Since RDycore gets most of its configuration information from PETSc, we don't
+need to use most other CMake options.
+
+### Considerations for Apple hardware
+
+If you're on a Mac, make sure you have installed the XCode Command Line Tools.
+If you have, these tools should be located in
+`/Library/Developer/CommandLineTools/usr/bin/`, so add this directory to your
+`PATH`.
+
 ## Build, Test, and Install RDycore
 
 After you've configured RDycore, you can build it:
 
-1. From the build directory, type `make -j` to build the library.
-4. To run tests for the library (and the included drivers), type
-   `make test`.
-5. To install the model to the location (indicated by your `CMAKE_INSTALL_PREFIX`,
+1. Change to your build directory (e.g. `cd build`)
+2. Type `make -j` to build the library.
+3. To run tests for the library (and the included drivers), type `make test`.
+4. To install the model to the location (indicated by your `CMAKE_INSTALL_PREFIX`,
    if you specified it), type `make install`. By default, products are installed
    in the `include`, `lib`, `bin`, and `share` subdirectories of this prefix.
+
+### Running Tests
+
+RDycore uses [CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html),
+CMake's testing program, to run its tests. CTest is very fancy and allows us to
+run tests selectively and in various ways, but all you need to do to run all the
+tests for RDycore is to change to your build directory and type
+
+```
+make test
+```
+
+This runs every test defined in your build configuration and dumps the results
+to `Testing/Temporary/LastTest.log`.
+
+### Measuring Code Coverage
+
+RDycore can use [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html) or
+[lcov](https://lcov.readthedocs.io/en/latest/index.html) to analyze code
+coverage (the fraction of source code that is exercised by programs and tests)
+with the GCC or Clang compilers.
+
+To instrument the `rdycore` library and unit tests for code coverage analysis,
+pass the `-DENABLE_COVERAGE=ON` flag to CMake when configuring your build. Then,
+after building and running tests, type
+
+```
+make coverage
+```
+
+to generate a single report (`coverage.info`) containing all coverage
+information. See the documentation for `gcov` and `lcov` (linked above) for
+details on how to interpret thіs information.
+
+### Checking for memory errors and leaks with Valgrind
+
+If you're using a Linux system and have [Valgrind](https://valgrind.org/)
+installed, you can run our tests using Valgrind's `memcheck` tool with
+
+```
+make memcheck
+```
 
 ## Making code changes and rebuilding
 
