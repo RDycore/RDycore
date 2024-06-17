@@ -30,6 +30,8 @@ pkg_get_variable(PETSc_C_COMPILER PETSc ccompiler)
 pkg_get_variable(PETSc_Fortran_COMPILER PETSc fcompiler)
 include_directories(${PETSc_INCLUDE_DIRS})
 link_directories(${PETSc_LIBRARY_DIRS})
+list(APPEND CMAKE_BUILD_RPATH ${PETSC_DIR}/${PETSC_ARCH}/lib)
+list(APPEND CMAKE_INSTALL_RPATH ${PETSC_DIR}/${PETSC_ARCH}/lib)
 
 # CEED
 pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
