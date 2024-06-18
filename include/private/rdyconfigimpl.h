@@ -52,9 +52,8 @@ typedef enum {
 
 // physics flow parameters
 typedef struct {
-  RDyPhysicsFlowMode mode;          // flow mode
-  PetscBool          bed_friction;  // bed friction enabled?
-  PetscReal          tiny_h;        // depth below which no flow occurs
+  RDyPhysicsFlowMode mode;    // flow mode
+  PetscReal          tiny_h;  // depth below which no flow occurs
 } RDyPhysicsFlow;
 
 // all physics parameters

@@ -63,7 +63,6 @@ static void TestFullSpec(void **state) {
       "physics:\n"
       "  flow:\n"
       "    mode: swe\n"
-      "    bed_friction: true\n"
       "  sediment: true\n"
       "  salinity: false\n\n"
       "numerics:\n"
