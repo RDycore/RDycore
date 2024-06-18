@@ -46,7 +46,6 @@
 // physics:
 //   flow:
 //     mode: <swe|diffusion> # swe by default
-//     bed_friction: <true|false> # off by default
 //     tiny_h: <value> # 1e-7 by default
 //   sediment: <true|false> # off by default
 //   salinity: <true|false> # off by default
@@ -60,7 +59,6 @@ static const cyaml_strval_t physics_flow_modes[] = {
 // mapping of physics.flow fields to members of RDyPhysicsFlow
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
-    CYAML_FIELD(BOOL, "bed_friction", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, bed_friction, {.missing = false}),
     CYAML_FIELD(FLOAT, "tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h, {.missing = 1e-7}),
     CYAML_FIELD_END
 };
@@ -1257,7 +1255,6 @@ static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Physics:");
   RDyLogDetail(rdy, "  Flow:");
-  RDyLogDetail(rdy, "    Bed friction: %s", FlagString(rdy->config.physics.flow.bed_friction));
   RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment));
   RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
   PetscFunctionReturn(PETSC_SUCCESS);

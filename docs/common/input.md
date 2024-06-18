@@ -431,7 +431,6 @@ time series data (and excluding checkpoint data). Relevant parameters are
 physics:
   flow:
     mode: swe
-    bed_friction: false
     tiny: 1e-7
   sediment: false
   salinity: false
@@ -448,8 +447,6 @@ parameters in this subsection are:
    parameters are `swe` ([shallow water equations](https://en.wikipedia.org/wiki/Shallow_water_equations))
    and `diffusive` ([diffusive wave approximation](https://en.wikipedia.org/wiki/Shallow_water_equations#Diffusive_wave),
    not yet supported). This parameter is required and has no default value.
-* `bed_friction`, which can be set to `true` or `false` to enable/disable
-  riverbed friction. Default value: `false`
 * `tiny_h`, which is the water height below which a given point is assumed to
   be dry. Default value: `1e-7`
 
