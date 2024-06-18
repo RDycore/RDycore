@@ -1,14 +1,14 @@
 # Mesh
 
-Here we describe the two mesh formarts that are used in RDycore. The two mesh
+Here we describe the two mesh formats that are used in RDycore. The two mesh
 formats that we use are:
 
 1. Exodus II
-2. DMPlex HDF5 v3.0.0
+2. PETSc's DMPlex-specific, HDF5-based mesh format (version 3.0.0)
 
 RDycore has been tested for meshes that include triangular, quadrilateral, or
-both triangular and quadrilateral cells. The vertices of cells have coordinates
-in 3D.
+both triangular and quadrilateral cells. The cell vertices have three-dimensional
+coordinates that incorporate topographic information.
 
 ## Exodus II Mesh Format
 
@@ -28,15 +28,15 @@ The Exodus II mesh format (`.exo`) uses 1-based indices.
   v1 --- e3 --- v2
 ```
 
-- The `elem_type` of the triangular cell, `c1`, is `TRI3`
-- It comprises of three vertices (i.e. `v1`, `v2`, `v3`)
+- The triangular cell `c1` consists of the three vertices `v1`, `v2`, and `v3`
+- The elem_type of `c1` is `TRI3`
 - It has five edges sets. The first two edge sets form a plane and the remaining
   three edge sets are lines as follows:
-  - `e1`: Comprises of the plane formed by `v1`, `v2`, `v3` (not shown above)
-  - `e2`: Comprises of the plane formed by `v1`, `v3`, `v2` (not shown above)
-  - `e3`: Line from `v1` to `v2`
-  - `e4`: Line from `v2` to `v3`
-  - `e5`: Line from `v3` to `v1`
+  - `e1`: an oriented plane formed by `v1`, `v2`, `v3` (not shown above)
+  - `e2`: an oriented plane formed by `v1`, `v3`, `v2` (not shown above)
+  - `e3`: a directed line from `v1` to `v2`
+  - `e4`: a directed line from `v2` to `v3`
+  - `e5`: a directed line from `v3` to `v1`
 
 ### Quadrilateral elements
 
@@ -56,18 +56,18 @@ The Exodus II mesh format (`.exo`) uses 1-based indices.
 - It comprises of four vertices (i.e. `v1`, `v2`, `v3`, `v4`)
 - It has six edges sets. The first two edge sets form a plane and the remaining
   four edge sets are lines as follows:
-  - `e1`: Comprises of the plane formed by `v1`, `v2`, `v3`, `v4` (not shown above)
-  - `e2`: Comprises of the plane formed by `v1`, `v4`, `v3`, `v2` (not shown above)
+  - `e1`: an oriented plane formed by `v1`, `v2`, `v3`, `v4` (not shown above)
+  - `e2`: an oriented plane formed by `v1`, `v4`, `v3`, `v2` (not shown above)
   - `e3`: Line from `v1` to `v2`
-  - `e4`: Line from `v2` to `v3`
-  - `e5`: Line from `v3` to `v4`
-  - `e6`: Line from `v4` to `v1`
+  - `e4`: a directed line from `v2` to `v3`
+  - `e5`: a directed line from `v3` to `v4`
+  - `e6`: a directed line from `v4` to `v1`
 
 ### Example mesh with mixed element types
 
 ![image](figures/quad_tri_mesh_exodus_ii.png)
 
-Above is an example of mesh that comprises of:
+An example of mesh that comprises of:
 
 - 12 cells with 4 quadrilaterals and 8 triangles
 - 14 vertices
@@ -78,8 +78,7 @@ Above is an example of mesh that comprises of:
   4. Bottom boundary
   5. River
 
-The `.exo` mesh file uses NetCDF. The cells corresponding to the two element types
-(i.e. quadrilaterals and triangles) must be saved as two different data fields
+The `.exo` mesh file uses NetCDF. Cells of different types (e.g. quadrilaterals and triangles) must be saved as two different data fields
 in the `.exo` file (e.g `connect1` for quadrilateral and `connect2` for triangles.
 
 ```text
@@ -145,7 +144,7 @@ DMPlex uses 0-based numbering. The mesh elements are numbered in the following o
 2. Vertices
 3. Edges. 
 
-DMPlex gives the following ID:
+For the mesh shown in the figure, DMPlex assigns IDs for cells, vertices, and edges thus:
 
 - Cell ID: `0`-`11`
 - Vertex ID: `12` to `25`
@@ -261,7 +260,7 @@ Below is the decomposition of the example mesh with mixed element types across t
 
 ![image](figures/quad_tri_mesh_dmplex_numbering_N2.png)
 
-The SWE physics in RDycore is currently implmented in two versions:
+The physics in RDycore is currently implmented in two versions:
 
 1. A PETSc only implementation without support for libCEED
 2. An implementation with support for libCEED
