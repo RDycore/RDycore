@@ -12,7 +12,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.26">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.27">
     
     
       
@@ -681,15 +681,15 @@
 
 
 <h1 id="mesh">Mesh</h1>
-<p>Here we describe the two mesh formarts that are used in RDycore. The two mesh
+<p>Here we describe the two mesh formats that are used in RDycore. The two mesh
 formats that we use are:</p>
 <ol>
 <li>Exodus II</li>
-<li>DMPlex HDF5 v3.0.0</li>
+<li>PETSc's DMPlex-specific, HDF5-based mesh format (version 3.0.0)</li>
 </ol>
 <p>RDycore has been tested for meshes that include triangular, quadrilateral, or
-both triangular and quadrilateral cells. The vertices of cells have coordinates
-in 3D.</p>
+both triangular and quadrilateral cells. The cell vertices have three-dimensional
+coordinates that incorporate topographic information.</p>
 <h2 id="exodus-ii-mesh-format">Exodus II Mesh Format</h2>
 <p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices.</p>
 <h3 id="triangular-elements">Triangular elements</h3>
@@ -704,15 +704,15 @@ in 3D.</p>
   v1 --- e3 --- v2
 </code></pre></div>
 <ul>
-<li>The <code>elem_type</code> of the triangular cell, <code>c1</code>, is <code>TRI3</code></li>
-<li>It comprises of three vertices (i.e. <code>v1</code>, <code>v2</code>, <code>v3</code>)</li>
+<li>The triangular cell <code>c1</code> consists of the three vertices <code>v1</code>, <code>v2</code>, and <code>v3</code></li>
+<li>The elem_type of <code>c1</code> is <code>TRI3</code></li>
 <li>It has five edges sets. The first two edge sets form a plane and the remaining
   three edge sets are lines as follows:</li>
-<li><code>e1</code>: Comprises of the plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code> (not shown above)</li>
-<li><code>e2</code>: Comprises of the plane formed by <code>v1</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
-<li><code>e3</code>: Line from <code>v1</code> to <code>v2</code></li>
-<li><code>e4</code>: Line from <code>v2</code> to <code>v3</code></li>
-<li><code>e5</code>: Line from <code>v3</code> to <code>v1</code></li>
+<li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code> (not shown above)</li>
+<li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
+<li><code>e3</code>: a directed line from <code>v1</code> to <code>v2</code></li>
+<li><code>e4</code>: a directed line from <code>v2</code> to <code>v3</code></li>
+<li><code>e5</code>: a directed line from <code>v3</code> to <code>v1</code></li>
 </ul>
 <h3 id="quadrilateral-elements">Quadrilateral elements</h3>
 <div class="highlight"><pre><span></span><code>    Quadrilateral
@@ -730,16 +730,16 @@ in 3D.</p>
 <li>It comprises of four vertices (i.e. <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code>)</li>
 <li>It has six edges sets. The first two edge sets form a plane and the remaining
   four edge sets are lines as follows:</li>
-<li><code>e1</code>: Comprises of the plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code> (not shown above)</li>
-<li><code>e2</code>: Comprises of the plane formed by <code>v1</code>, <code>v4</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
+<li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code> (not shown above)</li>
+<li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v4</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
 <li><code>e3</code>: Line from <code>v1</code> to <code>v2</code></li>
-<li><code>e4</code>: Line from <code>v2</code> to <code>v3</code></li>
-<li><code>e5</code>: Line from <code>v3</code> to <code>v4</code></li>
-<li><code>e6</code>: Line from <code>v4</code> to <code>v1</code></li>
+<li><code>e4</code>: a directed line from <code>v2</code> to <code>v3</code></li>
+<li><code>e5</code>: a directed line from <code>v3</code> to <code>v4</code></li>
+<li><code>e6</code>: a directed line from <code>v4</code> to <code>v1</code></li>
 </ul>
 <h3 id="example-mesh-with-mixed-element-types">Example mesh with mixed element types</h3>
 <p><img alt="image" src="figures/quad_tri_mesh_exodus_ii.png" /></p>
-<p>Above is an example of mesh that comprises of:</p>
+<p>An example of mesh that comprises of:</p>
 <ul>
 <li>12 cells with 4 quadrilaterals and 8 triangles</li>
 <li>14 vertices</li>
@@ -750,8 +750,7 @@ in 3D.</p>
 <li>Bottom boundary</li>
 <li>River</li>
 </ul>
-<p>The <code>.exo</code> mesh file uses NetCDF. The cells corresponding to the two element types
-(i.e. quadrilaterals and triangles) must be saved as two different data fields
+<p>The <code>.exo</code> mesh file uses NetCDF. Cells of different types (e.g. quadrilaterals and triangles) must be saved as two different data fields
 in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <code>connect2</code> for triangles.</p>
 <div class="highlight"><pre><span></span><code> # quadrilateral cells
  connect1 =
@@ -808,7 +807,7 @@ how DMPlex number mesh elements.</p>
 <li>Vertices</li>
 <li>Edges. </li>
 </ol>
-<p>DMPlex gives the following ID:</p>
+<p>For the mesh shown in the figure, DMPlex assigns IDs for cells, vertices, and edges thus:</p>
 <ul>
 <li>Cell ID: <code>0</code>-<code>11</code></li>
 <li>Vertex ID: <code>12</code> to <code>25</code></li>
@@ -917,7 +916,7 @@ how DMPlex number mesh elements.</p>
 <h2 id="domain-decomposition">Domain Decomposition</h2>
 <p>Below is the decomposition of the example mesh with mixed element types across two MPI ranks.</p>
 <p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N2.png" /></p>
-<p>The SWE physics in RDycore is currently implmented in two versions:</p>
+<p>The physics in RDycore is currently implmented in two versions:</p>
 <ol>
 <li>A PETSc only implementation without support for libCEED</li>
 <li>An implementation with support for libCEED</li>
