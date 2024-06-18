@@ -7,12 +7,14 @@ formats that we use are:
 2. PETSc's DMPlex-specific, HDF5-based mesh format (version 3.0.0)
 
 RDycore has been tested for meshes that include triangular, quadrilateral, or
-both triangular and quadrilateral cells. The cell vertices have three-dimensional
-coordinates that incorporate topographic information.
+both triangular and quadrilateral cells. Each cell consists of edges
+(3 for triangles and 4 for quadrilaterals) with vertices at the edges' endpoints.
+The cell vertices have three-dimensional coordinates that incorporate topographic information.
 
 ## Exodus II Mesh Format
 
-The Exodus II mesh format (`.exo`) uses 1-based indices.
+The Exodus II mesh format (`.exo`) uses 1-based indices. Exodus files are 
+written in the netCDF file format.
 
 ### Triangular elements
 
@@ -30,8 +32,8 @@ The Exodus II mesh format (`.exo`) uses 1-based indices.
 
 - The triangular cell `c1` consists of the three vertices `v1`, `v2`, and `v3`
 - The elem_type of `c1` is `TRI3`
-- It has five edges sets. The first two edge sets form a plane and the remaining
-  three edge sets are lines as follows:
+- It has five edges sidesets. The first two edge sidesets form a plane and the remaining
+  three edge sidesets are lines as follows:
   - `e1`: an oriented plane formed by `v1`, `v2`, `v3` (not shown above)
   - `e2`: an oriented plane formed by `v1`, `v3`, `v2` (not shown above)
   - `e3`: a directed line from `v1` to `v2`
@@ -54,8 +56,8 @@ The Exodus II mesh format (`.exo`) uses 1-based indices.
 
 - The `elem_type` of the quadrilateral cell, `c1`, is `SHELL4`
 - It comprises of four vertices (i.e. `v1`, `v2`, `v3`, `v4`)
-- It has six edges sets. The first two edge sets form a plane and the remaining
-  four edge sets are lines as follows:
+- It has six edges sidesets. The first two edge sidesets form a plane and the remaining
+  four edge sidesets are lines as follows:
   - `e1`: an oriented plane formed by `v1`, `v2`, `v3`, `v4` (not shown above)
   - `e2`: an oriented plane formed by `v1`, `v4`, `v3`, `v2` (not shown above)
   - `e3`: Line from `v1` to `v2`
@@ -101,12 +103,12 @@ in the `.exo` file (e.g `connect1` for quadrilateral and `connect2` for triangle
   10, 6, 14 ;  
 ```
 
-Each sideset is defined via two data fields:
+Each edge sideset is defined via two data fields:
 
 - `elem_ss<ID>`: Corresponds to the cell (or element) ID
 - `side_ss<ID>`: Correponds to the edge sideset
 
-The five edge sets for the above mesh are defined as
+The five edge sidesets for the above mesh are defined as
 
 ```text
  # right boundary
