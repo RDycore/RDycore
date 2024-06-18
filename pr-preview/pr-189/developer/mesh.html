@@ -688,10 +688,12 @@ formats that we use are:</p>
 <li>PETSc's DMPlex-specific, HDF5-based mesh format (version 3.0.0)</li>
 </ol>
 <p>RDycore has been tested for meshes that include triangular, quadrilateral, or
-both triangular and quadrilateral cells. The cell vertices have three-dimensional
-coordinates that incorporate topographic information.</p>
+both triangular and quadrilateral cells. Each cell consists of edges
+(3 for triangles and 4 for quadrilaterals) with vertices at the edges' endpoints.
+The cell vertices have three-dimensional coordinates that incorporate topographic information.</p>
 <h2 id="exodus-ii-mesh-format">Exodus II Mesh Format</h2>
-<p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices.</p>
+<p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices. Exodus files are 
+written in the netCDF file format.</p>
 <h3 id="triangular-elements">Triangular elements</h3>
 <div class="highlight"><pre><span></span><code>     Triangular
         cell
@@ -706,8 +708,8 @@ coordinates that incorporate topographic information.</p>
 <ul>
 <li>The triangular cell <code>c1</code> consists of the three vertices <code>v1</code>, <code>v2</code>, and <code>v3</code></li>
 <li>The elem_type of <code>c1</code> is <code>TRI3</code></li>
-<li>It has five edges sets. The first two edge sets form a plane and the remaining
-  three edge sets are lines as follows:</li>
+<li>It has five edges sidesets. The first two edge sidesets form a plane and the remaining
+  three edge sidesets are lines as follows:</li>
 <li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code> (not shown above)</li>
 <li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
 <li><code>e3</code>: a directed line from <code>v1</code> to <code>v2</code></li>
@@ -728,8 +730,8 @@ coordinates that incorporate topographic information.</p>
 <ul>
 <li>The <code>elem_type</code> of the quadrilateral cell, <code>c1</code>, is <code>SHELL4</code></li>
 <li>It comprises of four vertices (i.e. <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code>)</li>
-<li>It has six edges sets. The first two edge sets form a plane and the remaining
-  four edge sets are lines as follows:</li>
+<li>It has six edges sidesets. The first two edge sidesets form a plane and the remaining
+  four edge sidesets are lines as follows:</li>
 <li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code> (not shown above)</li>
 <li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v4</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
 <li><code>e3</code>: Line from <code>v1</code> to <code>v2</code></li>
@@ -770,12 +772,12 @@ in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <
   11, 10, 14,
   10, 6, 14 ;  
 </code></pre></div>
-<p>Each sideset is defined via two data fields:</p>
+<p>Each edge sideset is defined via two data fields:</p>
 <ul>
 <li><code>elem_ss&lt;ID&gt;</code>: Corresponds to the cell (or element) ID</li>
 <li><code>side_ss&lt;ID&gt;</code>: Correponds to the edge sideset</li>
 </ul>
-<p>The five edge sets for the above mesh are defined as</p>
+<p>The five edge sidesets for the above mesh are defined as</p>
 <div class="highlight"><pre><span></span><code> # right boundary
  elem_ss1 = 2, 4 ;
  side_ss1 = 4, 4 ;
