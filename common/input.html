@@ -1412,7 +1412,6 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
 <div class="highlight"><pre><span></span><code><span class="nt">physics</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">flow</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swe</span>
-<span class="w">    </span><span class="nt">bed_friction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <span class="w">    </span><span class="nt">tiny</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
 <span class="w">  </span><span class="nt">sediment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <span class="w">  </span><span class="nt">salinity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
@@ -1427,8 +1426,6 @@ parameters in this subsection are:</p>
    parameters are <code>swe</code> (<a href="https://en.wikipedia.org/wiki/Shallow_water_equations">shallow water equations</a>)
    and <code>diffusive</code> (<a href="https://en.wikipedia.org/wiki/Shallow_water_equations#Diffusive_wave">diffusive wave approximation</a>,
    not yet supported). This parameter is required and has no default value.</li>
-<li><code>bed_friction</code>, which can be set to <code>true</code> or <code>false</code> to enable/disable
-  riverbed friction. Default value: <code>false</code></li>
 <li><code>tiny_h</code>, which is the water height below which a given point is assumed to
   be dry. Default value: <code>1e-7</code></li>
 </ul>
