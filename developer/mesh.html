@@ -9,10 +9,6 @@
       
       
       
-        <link rel="prev" href="../common/mms.html">
-      
-      
-        <link rel="next" href="../common/installation.html">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -20,7 +16,7 @@
     
     
       
-        <title>Overview - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Mesh - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -72,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rdycore-developer-guide-overview" class="md-skip">
+        <a href="#mesh" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              Mesh
             
           </span>
         </div>
@@ -399,8 +395,6 @@
       
   
   
-    
-  
   
   
     
@@ -412,11 +406,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -430,7 +424,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -441,30 +435,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Overview
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -473,44 +447,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-rdycore-library" class="md-nav__link">
-    <span class="md-ellipsis">
-      The RDycore library
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contents" class="md-nav__link">
-    <span class="md-ellipsis">
-      Contents
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -655,18 +591,75 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-rdycore-library" class="md-nav__link">
+  <a href="#exodus-ii-mesh-format" class="md-nav__link">
     <span class="md-ellipsis">
-      The RDycore library
+      Exodus II Mesh Format
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Exodus II Mesh Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#triangular-elements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Triangular elements
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#quadrilateral-elements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quadrilateral elements
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-mesh-with-mixed-element-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example mesh with mixed element types
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#contents" class="md-nav__link">
+  <a href="#dmplex-hdf5-v300" class="md-nav__link">
     <span class="md-ellipsis">
-      Contents
+      DMPlex HDF5 v3.0.0
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DMPlex HDF5 v3.0.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dmplex-mesh-numbering-for-a-serial-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      DMPlex mesh numbering for a serial run
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#domain-decomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      Domain Decomposition
     </span>
   </a>
   
@@ -687,38 +680,251 @@
                   
 
 
-<h1 id="rdycore-developer-guide-overview">RDycore Developer Guide - Overview</h1>
-<p>This document contains information for anyone interested in helping to
-develop and/or maintain RDycore.</p>
-<p>RDycore compriseѕ several related components:</p>
+<h1 id="mesh">Mesh</h1>
+<p>Here we describe the two mesh formats that are used in RDycore. The two mesh
+formats that we use are:</p>
+<ol>
+<li>Exodus II</li>
+<li>PETSc's DMPlex-specific, HDF5-based mesh format (version 3.0.0)</li>
+</ol>
+<p>RDycore has been tested for meshes that include triangular, quadrilateral, or
+both triangular and quadrilateral cells. Each cell consists of edges
+(3 for triangles and 4 for quadrilaterals) with vertices at the edges' endpoints.
+The cell vertices have three-dimensional coordinates that incorporate topographic information.</p>
+<h2 id="exodus-ii-mesh-format">Exodus II Mesh Format</h2>
+<p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices. Exodus files are 
+written in the netCDF file format.</p>
+<h3 id="triangular-elements">Triangular elements</h3>
+<div class="highlight"><pre><span></span><code>     Triangular
+        cell
+         v3
+         / \
+        /   \
+      e5     e4
+     /   c1   \
+    /          \
+  v1 --- e3 --- v2
+</code></pre></div>
 <ul>
-<li>a C library that implements the actual river dynamical core model using
-  <a href="https://petsc.org/release/">PETSc</a>, which provides performance portable
-  numerical solvers, data structures like unstructured grids and vectors,
-  and basic system-level utilities</li>
-<li>a Fortran library consisting of a thin wrapper around the C library, with
-  exactly the same functionality</li>
-<li>standalone C and Fortran driver programs that demonstrate the capabilities of
-  the RDycore library using RDycore's <a href="../common/input.html">YAML input format</a></li>
-<li>various other programs and tools, including C and Fortran drivers that
-  can evaluate rates of convergence in the solution error for RDycore when
-  applied to specific analytical problems</li>
+<li>The triangular cell <code>c1</code> consists of the three vertices <code>v1</code>, <code>v2</code>, and <code>v3</code></li>
+<li>The elem_type of <code>c1</code> is <code>TRI3</code></li>
+<li>It has five edges sidesets. The first two edge sidesets form a plane and the remaining
+  three edge sidesets are lines as follows:</li>
+<li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code> (not shown above)</li>
+<li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
+<li><code>e3</code>: a directed line from <code>v1</code> to <code>v2</code></li>
+<li><code>e4</code>: a directed line from <code>v2</code> to <code>v3</code></li>
+<li><code>e5</code>: a directed line from <code>v3</code> to <code>v1</code></li>
 </ul>
-<p>Most of these components are interesting only to RDycore developers. For those
-who wish to incorporate RDycore within a larger framework like <a href="https://e3sm.org">E3SM</a>,
-the C and Fortran RDycore libraries (<code>librdycore.a</code> and <code>librdycore_f90.a</code>, when
-built) and their corresponding header/module files (<code>rdycore.h</code> and <code>rdycore.mod</code>,
-respectively) are all that is needed.</p>
-<h3 id="the-rdycore-library">The RDycore library</h3>
-<h2 id="contents">Contents</h2>
+<h3 id="quadrilateral-elements">Quadrilateral elements</h3>
+<div class="highlight"><pre><span></span><code>    Quadrilateral
+        cell
+  v4 --- e5 --- v3
+  |             |
+  |             | 
+  e6     c1     e4
+  |             | 
+  |             | 
+  v1 --- e3 --- v2
+</code></pre></div>
 <ul>
-<li><a href="../common/installation.html">Building and Installing RDycore</a></li>
-<li><a href="development.html">Development Process</a></li>
-<li><a href="organization.html">Code Structure and Organization</a></li>
-<li><a href="tools.html">Developer Tools</a></li>
-<li><a href="e3sm.html">Integrating RDycore with E3SM</a></li>
-<li><a href="mesh.html">Mesh Description</a></li>
+<li>The <code>elem_type</code> of the quadrilateral cell, <code>c1</code>, is <code>SHELL4</code></li>
+<li>It comprises of four vertices (i.e. <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code>)</li>
+<li>It has six edges sidesets. The first two edge sidesets form a plane and the remaining
+  four edge sidesets are lines as follows:</li>
+<li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code> (not shown above)</li>
+<li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v4</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
+<li><code>e3</code>: Line from <code>v1</code> to <code>v2</code></li>
+<li><code>e4</code>: a directed line from <code>v2</code> to <code>v3</code></li>
+<li><code>e5</code>: a directed line from <code>v3</code> to <code>v4</code></li>
+<li><code>e6</code>: a directed line from <code>v4</code> to <code>v1</code></li>
 </ul>
+<h3 id="example-mesh-with-mixed-element-types">Example mesh with mixed element types</h3>
+<p><img alt="image" src="figures/quad_tri_mesh_exodus_ii.png" /></p>
+<p>An example of mesh that comprises of:</p>
+<ul>
+<li>12 cells with 4 quadrilaterals and 8 triangles</li>
+<li>14 vertices</li>
+<li>Five edge sidesets</li>
+<li>Right boundary</li>
+<li>Left boundary</li>
+<li>Top boundary</li>
+<li>Bottom boundary</li>
+<li>River</li>
+</ul>
+<p>The <code>.exo</code> mesh file uses NetCDF. Cells of different types (e.g. quadrilaterals and triangles) must be saved as two different data fields
+in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <code>connect2</code> for triangles.</p>
+<div class="highlight"><pre><span></span><code> # quadrilateral cells
+ connect1 =
+  1, 2, 6, 5,
+  3, 4, 8, 7,
+  5, 6, 10, 9,
+  7, 8, 12, 11 ;
+
+# triangular cells
+ connect2 =
+  2, 3, 13,
+  3, 7, 13,
+  7, 6, 13,
+  6, 2, 13,
+  6, 7, 14,
+  7, 11, 14,
+  11, 10, 14,
+  10, 6, 14 ;  
+</code></pre></div>
+<p>Each edge sideset is defined via two data fields:</p>
+<ul>
+<li><code>elem_ss&lt;ID&gt;</code>: Corresponds to the cell (or element) ID</li>
+<li><code>side_ss&lt;ID&gt;</code>: Correponds to the edge sideset</li>
+</ul>
+<p>The five edge sidesets for the above mesh are defined as</p>
+<div class="highlight"><pre><span></span><code> # right boundary
+ elem_ss1 = 2, 4 ;
+ side_ss1 = 4, 4 ;
+
+ # left boundary
+ elem_ss2 = 1, 3 ;
+ side_ss2 = 6, 6 ;
+
+ # top boundary
+ elem_ss3 = 3, 11, 4 ;
+ side_ss3 = 5, 3, 5 ;
+
+ # bottom boundary
+ elem_ss4 = 1, 5, 2 ;
+ side_ss4 = 3, 3, 3 ;
+
+ # river
+ elem_ss5 = 4, 9, 9, 8, 8 ;
+ side_ss5 = 3, 4, 5, 5, 4 ;
+</code></pre></div>
+<h2 id="dmplex-hdf5-v300">DMPlex HDF5 v3.0.0</h2>
+<p>Before understanding the DMPlex's HDF5 storage version v3.0.0
+(i.e. <code>-dm_plex_view_hdf5_storage_version 3.0.0</code>), it is important to understand
+how DMPlex number mesh elements.</p>
+<h3 id="dmplex-mesh-numbering-for-a-serial-run">DMPlex mesh numbering for a serial run</h3>
+<p>DMPlex uses 0-based numbering. The mesh elements are numbered in the following order:</p>
+<ol>
+<li>Cells</li>
+<li>Vertices</li>
+<li>Edges. </li>
+</ol>
+<p>For the mesh shown in the figure, DMPlex assigns IDs for cells, vertices, and edges thus:</p>
+<ul>
+<li>Cell ID: <code>0</code>-<code>11</code></li>
+<li>Vertex ID: <code>12</code> to <code>25</code></li>
+<li>Edge ID: <code>26</code> to <code>50</code></li>
+</ul>
+<p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N1.png" /></p>
+<div class="highlight"><pre><span></span><code>#
+# ncells    = Number of cells
+#           = nquad (number of quadrilaterals) + ntri (number of trinagles)
+#           = 4 + 8 = 12
+#
+# nvertices = Number of vertices = 14
+#
+# nedges    = Number of unique edges
+#           = nedges_internal (number of internal edges) + nedges_bnd (number of boundary edges)
+#           = 15 + 10 = 25
+#
+# ntotal    = ncells + nvertices + nedges
+#           = 12 + 14 + 25 = 51
+
+├── topologies (G)
+    ├── Parallel Mesh (G) Attributes: (1) coordinateDMName (STRING), (2) coordinatesName (STRING)
+        ├── dms (G)
+        |   ├── coordinateDM (G)
+        |       |
+        |       ├── order (D, INTEGER, size = ntotal)
+        |       |
+        |       ├── section (G) Attributes: (1) hasConstraints (INTEGER) (2) includesConstraint (INTEGER), (3) numFields (INTEGER)
+        |       |   |
+        |       |   ├── atlasDof (D, INTEGER, size = ntotal) [zeros(0:ncells,1); 3*ones(nvertices,1);   zeros(nedges,1)]
+        |       |   |
+        |       |   ├── atlasOff (D, INTEGER, size = ntotal) [zeros(0:ncells,1); [0:3:(nvertices-1)*3]; ones(nedges,1)*nvertices*3]
+        |       |   |
+        |       |   ├── field0 (G) Attributes: (1) fieldComponents (INTEGER) (2) fieldName (STRING) (3) hasConstraints (INTEGER) (4) includesConstraint (INTEGER)
+        |       |       |
+        |       |       ├── atlasDof   (D, INTEGER, size = ntotal) [zeros(0:ncells,1); 3*ones(nvertices,1);   zeros(nedges,1)]
+        |       |       ├── atlasOff   (D, INTEGER, size = ntotal) [zeros(0:ncells,1); [0:3:(nvertices-1)*3]; ones(nedges,1)*nvertices*3]
+        |       |       |
+        |       |       ├── component0 (G) Attribute (1) componentName (STRING)
+        |       |       ├── component1 (G) Attribute (1) componentName (STRING)
+        |       |       ├── component2 (G) Attribute (1) componentName (STRING)
+        |       |
+        |       ├── vecs (G)
+        |          ├── coordinates (G) Attribute (1) blockSize
+        |             |
+        |             ├── coordinates (D, FLOAT, size = 3 * nvertices) Note: Each vertex has 3 coordinates in x,y,z
+        |
+        ├── labels
+        |   ├── Cell Sets (G)
+        |   |  ├── 1 (G)
+        |   |     ├── indicies (D, INTEGER, size = ncells) [0:ncells-1]
+        |   |
+        |   ├── Face Sets (G, OPTIONAL)
+        |   |  ├── 1 (G)
+        |   |  |  ├── indicies (D, INTEGER) (e.g. [31 37] for right boundary)
+        |   |  |
+        |   |  ├── 2 (G)
+        |   |     ├── indicies (D, INTEGER) (e.g. [28 36] for left boundary)
+        |   |  |
+        |   |  ├── 3 (G)
+        |   |     ├── indicies (D, INTEGER) (e.g. [35 38 49] for top boundary)
+        |   |  |
+        |   |  ├── 4 (G)
+        |   |     ├── indicies (D, INTEGER) (e.g. [26 30 40] for bottom boundary)
+        |   |  |
+        |   |  ├── 5 (G)
+        |   |     ├── indicies (D, INTEGER) (e.g. [32 42 45 46 47] for river)
+        |   |
+        |   ├── boundary_edges (G)
+        |   |  ├── 1 (G)
+        |   |     ├── indicies (D, INTEGER, size = nedges_bnd)
+        |   |
+        |   ├── celltype (G)
+        |      ├── 0 (G)
+        |      |  ├── indicies (D, INTEGER, size = num_verrtices) [ncells:ncells+nvertices-1]
+        |      |
+        |      ├── 1 (G)
+        |      |  ├── indicies (D, INTEGER, size = num_edges)     [ncells+nvertices:ncells+nvertices+nedges-1]
+        |      |
+        |      ├── 3 (G, OPTIONAL, TRIANGULAR)
+        |      |  ├── indicies (D, INTEGER, size = num_tri)       [nquads:nquads+ntri-1]
+        |      |
+        |      ├── 4 (G, OPTIONAL, QUADRILATERALS)
+        |         ├── indicies (D, INTEGER, size = num_quads)     [0:nquads]
+        |
+        ├── topology (G) Attributes: (1) cell_dim (INTEGER) (2) depth (INTEGER)
+            |
+            ├── permutation (D, INTEGER, size = 3)
+            |
+            ├── strata (G)
+               ├── 0 (G)
+               |   ├── cone_sizes  (D, INTEGER, size = num_vertices)
+               |   ├── cones       (D, INTEGER)
+               |   ├── orientation (D, INTEGER)
+               |
+               ├── 1 (G)
+               |   ├── cone_sizes  (D, INTEGER, size = num_edges)
+               |   ├── cones       (D, INTEGER, size = 2 * num_edges)
+               |   ├── orientation (D, INTEGER, size = 2 * num_edges)
+               |
+               ├── 2 (G)
+                   ├── cone_sizes  (D, INTEGER, size = ncells)
+                   ├── cones       (D, INTEGER, size = 4 * nquads + 3 * ntri)
+                   ├── orientation (D, INTEGER, size = 4 * nquads + 3 * ntri)
+</code></pre></div>
+<h2 id="domain-decomposition">Domain Decomposition</h2>
+<p>Below is the decomposition of the example mesh with mixed element types across two MPI ranks.</p>
+<p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N2.png" /></p>
+<p>The physics in RDycore is currently implmented in two versions:</p>
+<ol>
+<li>A PETSc only implementation without support for libCEED</li>
+<li>An implementation with support for libCEED</li>
+</ol>
+<p>In the libCEED version of RDycore, the edges between an owned and ghost cell are only present on the
+rank with a lower ID.</p>
 
 
 
