@@ -92,7 +92,7 @@ elif [ "$mach" = "frontier"  ]; then
   elif [ "$config" -eq 2 ]; then
       export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc288817
   elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc288817
+      export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
   fi
 
 #elif [ "$mach" = "aurora"  ]; then
