@@ -37,9 +37,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     --pm ) pm_node="$2"; shift ;;
-    #--64bit ) with64bit=1 shift ;;
     --with-debugging) with_debugging="$2"; shift ;;
-    #--hdf5_1_14_3) with_hdf5_1_14_3=1; shift ;;
     -*)
       display_help
       exit 0
@@ -83,52 +81,10 @@ if [ "$mach" = "pm" ]; then
     MODULE_FILE=$DIR/modules.pm-cpu.gnu
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
 
-    if [ "$with64bit" -eq 0 ]; then
-      #
-      # 32-bit configuration
-      #
-
-      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
-        #
-        # Default HDF5
-        #
-        if [ "$with_debugging" -eq 0 ]; then
-          export PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
-        else
-          export PETSC_ARCH=pm-cpu-debug-32bit-gcc-11-2-0-fc2888174f5
-        fi
-      else
-        #
-        # HDF5 1.14.3
-        #
-        echo "Currently HDF5 1.14.3 is only supported for 64bit, so --hdf5_1_14_3 requires --64bit"
-        exit 0
-      fi
-
+    if [ "$with_debugging" -eq 0 ]; then
+        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
     else
-      #
-      # 64-bit configuration
-      #
-      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
-        #
-        # Default HDF5
-        #
-        if [ "$with_debugging" -eq 0 ]; then
-          export PETSC_ARCH=pm-cpu-opt-64bit-gcc-11-2-0-fc2888174f5
-        else
-          export PETSC_ARCH=pm-cpu-debug-64bit-gcc-11-2-0-fc2888174f5
-        fi
-     else
-        #
-        # HDF5 1.14.3
-        #
-        if [ "$with_debugging" -eq 0 ]; then
-          export PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
-        else
-          export PETSC_ARCH=pm-cpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
-        fi
-     fi
-
+        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
     fi
 
   elif [ "$pm_node" = "gpu" ]; then
@@ -136,51 +92,10 @@ if [ "$mach" = "pm" ]; then
     MODULE_FILE=$DIR/modules.pm-gpu.gnugpu
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
 
-    if [ "$with64bit" -eq 0 ]; then
-      #
-      # 32-bit configuration
-      #
-      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
-        #
-        # Default HDF5
-        #
-        if [ "$with_debugging" -eq 0 ]; then
-          export PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
-        else
-          export PETSC_ARCH=pm-gpu-debug-32bit-gcc-11-2-0-fc2888174f5
-        fi
-      else
-        #
-        # HDF5 1.14.3
-        #
-        echo "Currently HDF5 1.14.3 is only supported for 64bit, so --hdf5_1_14_3 requires --64bit"
-        exit 0
-      fi
-
+    if [ "$with_debugging" -eq 0 ]; then
+        export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
     else
-      #
-      # 32-bit configuration
-      #
-      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
-        #
-        # Default HDF5
-        #
-        if [ "$with_debugging" -eq 0 ]; then
-          export PETSC_ARCH=pm-gpu-opt-64bit-gcc-11-2-0-fc2888174f5
-        else
-          export PETSC_ARCH=pm-gpu-debug-64bit-gcc-11-2-0-fc2888174f5
-        fi
-      else
-        #
-        # HDF5 1.14.3
-        #
-        if [ "$with_debugging" -eq 0 ]; then
-          export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
-        else
-          export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
-        fi
-      fi
-
+        export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
     fi
 
   else
@@ -194,49 +109,16 @@ elif [ "$mach" = "frontier"  ]; then
   MODULE_FILE=$DIR/modules.frontier.gnugpu
   export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc
 
-  if [ "$with64bit" -eq 0 ]; then
-    #
-    # 32-bit configuration
-    #
-    if [ "$with_hdf5_1_14_3" -eq 0 ]; then
-      if [ "$with_debugging" -eq 0 ]; then
-        export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
-      else
-        export PETSC_ARCH=frontier-gpu-debug-32bit-gcc-11-2-0-fc288817
-      fi
-    else
-      #
-      # HDF5 1.14.3
-      #
-      echo "Currently HDF5 1.14.3 is only supported for 64bit, so --hdf5_1_14_3 requires --64bit"
-      exit 0
-    fi
+  if [ "$with_debugging" -eq 0 ]; then
+      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc288817
   else
-    #
-    # 64-bit configuration
-    #
-    if [ "$with_hdf5_1_14_3" -eq 0 ]; then
-      if [ "$with_debugging" -eq 0 ]; then
-        export PETSC_ARCH=frontier-gpu-opt-64bit-gcc-11-2-0-fc288817
-      else
-        export PETSC_ARCH=frontier-gpu-debug-64bit-gcc-11-2-0-fc288817
-      fi
-    else
-      #
-      # HDF5 1.14.3
-      #
-      if [ "$with_debugging" -eq 0 ]; then
-        export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc288817
-      else
-        export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc288817
-      fi
-    fi
+      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc288817
   fi
 
   if [[ ! -z "$pm_node" ]]; then
-     echo "The --pm_node <$pm_node> was specified, which is applicable is only for Perlmutter,"
-     echo "but the machine detected is Frontier."
-     exit 0
+      echo "The --pm_node <$pm_node> was specified, which is applicable is only for Perlmutter,"
+      echo "but the machine detected is Frontier."
+      exit 0
   fi
 
 elif [ "$mach" = "aurora"  ]; then
