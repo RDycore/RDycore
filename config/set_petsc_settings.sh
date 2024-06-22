@@ -26,6 +26,7 @@ display_help() {
     echo "For Frontier (--mach frontier): "
     echo "  --config 1: With debugging, 64bit indices, and HDF5 1.14.3"
     echo "  --config 2: Without debugging, 64bit indices, and HDF5 1.14.3"
+    echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.12.2.1"
     echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
     echo
 
