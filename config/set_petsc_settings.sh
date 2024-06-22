@@ -11,10 +11,23 @@ display_help() {
     echo
     echo "   -h, --help             Display this message"
     echo "   --pm <cpu|gpu>         Type of Perlmutter nodes (cpu or gpu)"
-    #echo "   --64bit                With 64bit support (optional)"
-    #echo "   --hdf5_1_14_3          With HDF5 1.14.3 (optional and requires --64bit)"
     echo "   --with-debugging <0|1> Without (default) or with debugging version (optional)"
     echo
+    echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    echo "Supported PETSc configurations"
+    echo
+    echo "On Perlmutter: "
+    echo "  1. For CPU nodes and with debugging.    (Uses 64bit indices and HDF5 1.14.3.)"
+    echo "  2. For CPU nodes and without debugging. (Uses 64bit indices and HDF5 1.14.3.)"
+    echo "  3. For GPU nodes and with debugging.    (Uses 64bit indices and HDF5 1.14.3.)"
+    echo "  4. For GPU nodes and without debugging. (Uses 64bit indices and HDF5 1.14.3.)"
+    echo
+    echo "On Frontier: "
+    echo "  1. With debugging.    (Uses 64bit indices and HDF5 1.14.3.)"
+    echo "  2. Without debugging. (Uses 64bit indices and HDF5 1.14.3.)"
+    echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+    echo
+
     return 1
 }
 
