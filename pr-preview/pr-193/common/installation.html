@@ -1353,7 +1353,8 @@ cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>
 make<span class="w"> </span>-j4<span class="w"> </span>install
 
 <span class="c1"># Use an interactive job queue</span>
-salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>cpu<span class="w"> </span>--account<span class="o">=</span>&lt;project-id&gt;
+salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>cpu<span class="w"> </span><span class="se">\</span>
+--account<span class="o">=</span>&lt;project-id&gt;
 
 <span class="c1"># Change to the directory containing tests</span>
 <span class="nb">cd</span><span class="w"> </span>driver/tests/swe_roe
@@ -1373,13 +1374,15 @@ cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>
 make<span class="w"> </span>-j4<span class="w"> </span>install
 
 <span class="c1"># Use an interactive job queue</span>
-salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>gpu<span class="w"> </span>--gpus<span class="w"> </span><span class="m">4</span><span class="w"> </span>--account<span class="o">=</span>&lt;project-id&gt;_g
+salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>gpu<span class="w"> </span><span class="se">\</span>
+--gpus<span class="w"> </span><span class="m">4</span><span class="w"> </span>--account<span class="o">=</span>&lt;project-id&gt;_g
 
 <span class="c1"># Change to the directory containing tests</span>
 <span class="nb">cd</span><span class="w"> </span>driver/tests/swe_roe
 
 <span class="c1"># Run on 4 GPUs using CUDA</span>
-srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>-c<span class="w"> </span><span class="m">32</span><span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span>-ceed<span class="w"> </span>/gpu/cuda<span class="w"> </span>-dm_vec_type<span class="w"> </span>cuda<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
+srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>-c<span class="w"> </span><span class="m">32</span><span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span><span class="se">\</span>
+-ceed<span class="w"> </span>/gpu/cuda<span class="w"> </span>-dm_vec_type<span class="w"> </span>cuda<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
 </code></pre></div>
 <h3 id="example-of-building-and-running-rdycore-on-frontier">Example of building and running RDycore on Frontier</h3>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
@@ -1402,7 +1405,8 @@ salloc<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span>
 srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n8<span class="w"> </span>-c1<span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span>-ceed<span class="w"> </span>/cpu/self<span class="w"> </span>-log_view
 
 <span class="c1"># Run on 8 GPUs using HIP</span>
-srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n8<span class="w"> </span>-c1<span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span>-ceed<span class="w"> </span>/gpu/hip<span class="w"> </span>-dm_vec_type<span class="w"> </span>hip<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
+srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n8<span class="w"> </span>-c1<span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span><span class="se">\</span>
+-ceed<span class="w"> </span>/gpu/hip<span class="w"> </span>-dm_vec_type<span class="w"> </span>hip<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
 </code></pre></div>
 
 
