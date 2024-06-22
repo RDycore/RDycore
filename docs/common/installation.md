@@ -163,7 +163,8 @@ cd build-$PETSC_ARCH
 make -j4 install
 
 # Use an interactive job queue
-salloc --nodes 1 --qos interactive --time 00:30:00 --constraint cpu --account=<project-id>
+salloc --nodes 1 --qos interactive --time 00:30:00 --constraint cpu \
+--account=<project-id>
 
 # Change to the directory containing tests
 cd driver/tests/swe_roe
@@ -186,13 +187,15 @@ cd build-$PETSC_ARCH
 make -j4 install
 
 # Use an interactive job queue
-salloc --nodes 1 --qos interactive --time 00:30:00 --constraint gpu --gpus 4 --account=<project-id>_g
+salloc --nodes 1 --qos interactive --time 00:30:00 --constraint gpu \
+--gpus 4 --account=<project-id>_g
 
 # Change to the directory containing tests
 cd driver/tests/swe_roe
 
 # Run on 4 GPUs using CUDA
-srun -N 1 -n 4 -c 32 ../../rdycore ex2b_ic_file.yaml -ceed /gpu/cuda -dm_vec_type cuda -log_view -log_view_gpu_time
+srun -N 1 -n 4 -c 32 ../../rdycore ex2b_ic_file.yaml \
+-ceed /gpu/cuda -dm_vec_type cuda -log_view -log_view_gpu_time
 ```
 
 ### Example of building and running RDycore on Frontier
@@ -218,5 +221,6 @@ cd driver/tests/swe_roe
 srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml -ceed /cpu/self -log_view
 
 # Run on 8 GPUs using HIP
-srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml -ceed /gpu/hip -dm_vec_type hip -log_view -log_view_gpu_time
+srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml \
+-ceed /gpu/hip -dm_vec_type hip -log_view -log_view_gpu_time
 ```
