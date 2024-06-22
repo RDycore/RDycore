@@ -141,10 +141,10 @@ The RDycore team supports installation of the model at following DOE machines:
 2. [Frontier](https://docs.olcf.ornl.gov/systems/frontier_user_guide.html) at OLCF
 
 First, run the shell script, `source config/set_petsc_settings.sh --mach <machine_name> --config <configuration>`,
-to set PETSc-related environmental variables for the pre-installed PETSc on these supported machines
-and load appropriate modules. Multiple configurations of PETSc has been pre-installed
-on these supported machines under RDycore's project directories. Information about the
-available PETSc configurations is can be obtained via `./config/set_petsc_settings.sh`.
+to set PETSc-related environmental variables and load appropriate modules. 
+Multiple configurations of PETSc have been pre-installed on these supported machines
+under RDycore's project directories. Information about the available PETSc configurations
+can be obtained via `./config/set_petsc_settings.sh`.
 
 The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
 RDycore needs to be build spearately for each compute node type.
