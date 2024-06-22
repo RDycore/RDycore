@@ -2,18 +2,18 @@
 
 pm_node=
 mach=
-with64bit=0
+with64bit=1
 with_debugging=0
-with_hdf5_1_14_3=0
+with_hdf5_1_14_3=1
 
 display_help() {
     echo "Usage: $0 " >&2
     echo
     echo "   -h, --help             Display this message"
     echo "   --pm <cpu|gpu>         Type of Perlmutter nodes (cpu or gpu)"
-    echo "   --64bit                With 64bit support (optional)"
-    echo "   --hdf5_1_14_3          With HDF5 1.14.3 (optional and requires --64bit)"
-    echo "   --with-debugging <0|1> With or without debugging version (optional)"
+    #echo "   --64bit                With 64bit support (optional)"
+    #echo "   --hdf5_1_14_3          With HDF5 1.14.3 (optional and requires --64bit)"
+    echo "   --with-debugging <0|1> Without (default) or with debugging version (optional)"
     echo
     return 1
 }
@@ -24,9 +24,9 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     --pm ) pm_node="$2"; shift ;;
-    --64bit ) with64bit=1 shift ;;
+    #--64bit ) with64bit=1 shift ;;
     --with-debugging) with_debugging="$2"; shift ;;
-    --hdf5_1_14_3) with_hdf5_1_14_3=1; shift ;;
+    #--hdf5_1_14_3) with_hdf5_1_14_3=1; shift ;;
     -*)
       display_help
       exit 0
@@ -75,7 +75,7 @@ if [ "$mach" = "pm" ]; then
       # 32-bit configuration
       #
 
-      if [ "with_hdf5_1_14_3" -eq 0 ]; then
+      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
         #
         # Default HDF5
         #
@@ -96,7 +96,7 @@ if [ "$mach" = "pm" ]; then
       #
       # 64-bit configuration
       #
-      if [ "with_hdf5_1_14_3" -eq 0 ]; then
+      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
         #
         # Default HDF5
         #
@@ -127,7 +127,7 @@ if [ "$mach" = "pm" ]; then
       #
       # 32-bit configuration
       #
-      if [ "with_hdf5_1_14_3" -eq 0 ]; then
+      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
         #
         # Default HDF5
         #
@@ -148,7 +148,7 @@ if [ "$mach" = "pm" ]; then
       #
       # 32-bit configuration
       #
-      if [ "with_hdf5_1_14_3" -eq 0 ]; then
+      if [ "$with_hdf5_1_14_3" -eq 0 ]; then
         #
         # Default HDF5
         #
@@ -185,7 +185,7 @@ elif [ "$mach" = "frontier"  ]; then
     #
     # 32-bit configuration
     #
-    if [ "with_hdf5_1_14_3" -eq 0 ]; then
+    if [ "$with_hdf5_1_14_3" -eq 0 ]; then
       if [ "$with_debugging" -eq 0 ]; then
         export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
       else
@@ -202,7 +202,7 @@ elif [ "$mach" = "frontier"  ]; then
     #
     # 64-bit configuration
     #
-    if [ "with_hdf5_1_14_3" -eq 0 ]; then
+    if [ "$with_hdf5_1_14_3" -eq 0 ]; then
       if [ "$with_debugging" -eq 0 ]; then
         export PETSC_ARCH=frontier-gpu-opt-64bit-gcc-11-2-0-fc288817
       else
