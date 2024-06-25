@@ -152,12 +152,12 @@ have 128 cores (2 x 64-core AMD EPYC CPUs), while the CPU-GPU nodes have
 1 x 64-core AMD EPYC CPU and 4 x NVIDIA A100. RDycore uses PETSc's and libCEED's support
 of CUDA to run on Perlmutter GPUs.
 
-The Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
+Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
 Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-core,
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.
 
-### Exmaple of building and running RDycore on Perlmutter CPUs nodes
+### Example: Building and running RDycore on Perlmutter CPU nodes
 
 ```bash
 cd /path/to/RDycore
@@ -181,7 +181,7 @@ cd driver/tests/swe_roe
 srun -N 1 -n 4 ../../rdycore ex2b_ic_file.yaml -ceed /cpu/self -log_view
 ```
 
-### Exmaple of building and running RDycore on Perlmutter GPUs nodes
+### Example: Building and running RDycore on Perlmutter GPU nodes
 
 ```bash
 cd /path/to/RDycore
@@ -206,12 +206,12 @@ srun -N 1 -n 4 -c 32 ../../rdycore ex2b_ic_file.yaml \
 -ceed /gpu/cuda -dm_vec_type cuda -log_view -log_view_gpu_time
 ```
 
-### Example of building and running RDycore on Frontier
+### Example: Building and running RDycore on Frontier
 
 ```bash
 cd /path/to/RDycore
 
-# Set PETSc environment variables for Perlmutter CPU nodes
+# Set PETSc environment variables for Frontier
 source config/set_petsc_settings.sh --mach frontier --config 1
 
 # Build RDycore
