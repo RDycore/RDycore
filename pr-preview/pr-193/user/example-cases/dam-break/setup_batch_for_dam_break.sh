@@ -127,7 +127,7 @@ if [ "$mach" == "pm-cpu" ] || [ "$mach" == "pm-gpu" ]
 then
   if [ ! -f DamBreak_grid5120x2560.v3.0.0.h5 ]
   then
-    ln -s /global/cfs/projectdirs/m4267/gbisht/benchmark-problems/dam-break/data_files/meshes/DamBreak_grid5120x2560.v3.0.0.h5 ./
+    ln -s /global/cfs/projectdirs/m4267/shared/data/dam-break/DamBreak_grid5120x2560.v3.0.0.h5 ./
   fi
 
   cp -f perlmutter.batch.base ${batch_filename}
@@ -145,7 +145,7 @@ elif [ "$mach" == "frontier" ]
 then
   if [ ! -f DamBreak_grid5120x2560.v3.0.0.h5 ]
   then
-    ln -s /lustre/orion/cli192/proj-shared/gb9/benchmark-problems/dam-break/data_files/meshes/DamBreak_grid5120x2560.v3.0.0.h5 ./
+    ln -s /lustre/orion/cli192/proj-shared/data/dam-break/DamBreak_grid5120x2560.v3.0.0.h5 ./
   fi
 
   cp -f frontier.batch.base ${batch_filename}
