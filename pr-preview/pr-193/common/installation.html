@@ -1355,9 +1355,10 @@ practice, though, it's safest to always build from the top of the build tree.</p
 <li><a href="https://docs.nersc.gov/systems/perlmutter/">Perlmutter</a> at NERSC</li>
 <li><a href="https://docs.olcf.ornl.gov/systems/frontier_user_guide.html">Frontier</a> at OLCF</li>
 </ol>
-<p>First, run the shell script, <code>source config/set_petsc_settings.sh --mach &lt;machine_name&gt; --config &lt;configuration&gt;</code>,
-to set PETSc-related environmental variables and load appropriate modules. 
-Multiple configurations of PETSc have been pre-installed on these supported machines
+<p>First, run the following shell script to set PETSc-related environmental variables and load appropriate modules.</p>
+<div class="highlight"><pre><span></span><code><span class="sb">`</span><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>&lt;machine_name&gt;<span class="w"> </span>--config<span class="w"> </span>&lt;configuration&gt;<span class="sb">`</span>,
+</code></pre></div>
+<p>Multiple configurations of PETSc have been pre-installed on these supported machines
 under RDycore's project directories. Information about the available PETSc configurations
 can be obtained via <code>./config/set_petsc_settings.sh</code>.</p>
 <p>The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
