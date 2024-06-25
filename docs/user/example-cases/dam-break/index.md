@@ -7,24 +7,23 @@ domain.
 
 <img src="dam-break-initial-condition.png" width="80%" height="80%">
 
-The input YAML file (`inputdeck_5120x2560`) corresponds to a mesh with
+The input YAML file ([`inputdeck_5120x2560.yaml`](inputdeck_5120x2560.yaml)) corresponds to a mesh with
 `dx = dy = 0.002` m and has 11,534,336 grid cells. Reflective boundary
 condition is assumed for all boundaries of the mesh. The problem is setup
-to take 100 timesteps. The mesh is in DMPlex's PETSc v3.0.0 format.
-
+to take 100 timesteps. The mesh is in DMPlex's HDF5 v3.0.0 format.
 It is asssumed that the user has access the RDycore's project direcotries
 on the DOE supercomputers, which contains the mesh and pre-installed PETSc.
-The supported DOE supercomputers are:
+The supported DOE supercomputers for this case are:
 
   1. Perlmutter (CPU-nodes and GPU-nodes)
   2. Frontier
   
 The project directories on these supported machines additionally contain
-following meshes for the idealized dam break problem
+ meshes for the idealized dam break problem at few additional resolutions:
 
-1. `DamBreak_grid2560x1280.v3.0.0.h5`: 2,883,584 grid cells
-2. `DamBreak_grid10240x5120.v3.0.0.h5`: 46,137,344 grid cells
-3. `DamBreak_grid20480x10240.v3.0.0.h5`: 184,549,376 grid cells
+1. `DamBreak_grid2560x1280.v3.0.0.h5`: has 2,883,584 grid cells
+2. `DamBreak_grid10240x5120.v3.0.0.h5`: has 46,137,344 grid cells
+3. `DamBreak_grid20480x10240.v3.0.0.h5`: has 184,549,376 grid cells
 
 ## Script 
 
