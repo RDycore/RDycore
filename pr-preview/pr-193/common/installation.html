@@ -505,27 +505,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#exmaple-of-building-and-running-rdycore-on-perlmutter-cpus-nodes" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-cpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
-      Exmaple of building and running RDycore on Perlmutter CPUs nodes
+      Example: Building and running RDycore on Perlmutter CPU nodes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#exmaple-of-building-and-running-rdycore-on-perlmutter-gpus-nodes" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-gpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
-      Exmaple of building and running RDycore on Perlmutter GPUs nodes
+      Example: Building and running RDycore on Perlmutter GPU nodes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#example-of-building-and-running-rdycore-on-frontier" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-frontier" class="md-nav__link">
     <span class="md-ellipsis">
-      Example of building and running RDycore on Frontier
+      Example: Building and running RDycore on Frontier
     </span>
   </a>
   
@@ -578,6 +578,27 @@
   
   <span class="md-ellipsis">
     MMS Driver
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Running RDycore Examples on Supported DOE Machines
   </span>
   
 
@@ -837,27 +858,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#exmaple-of-building-and-running-rdycore-on-perlmutter-cpus-nodes" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-cpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
-      Exmaple of building and running RDycore on Perlmutter CPUs nodes
+      Example: Building and running RDycore on Perlmutter CPU nodes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#exmaple-of-building-and-running-rdycore-on-perlmutter-gpus-nodes" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-gpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
-      Exmaple of building and running RDycore on Perlmutter GPUs nodes
+      Example: Building and running RDycore on Perlmutter GPU nodes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#example-of-building-and-running-rdycore-on-frontier" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-frontier" class="md-nav__link">
     <span class="md-ellipsis">
-      Example of building and running RDycore on Frontier
+      Example: Building and running RDycore on Frontier
     </span>
   </a>
   
@@ -1122,27 +1143,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#exmaple-of-building-and-running-rdycore-on-perlmutter-cpus-nodes" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-cpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
-      Exmaple of building and running RDycore on Perlmutter CPUs nodes
+      Example: Building and running RDycore on Perlmutter CPU nodes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#exmaple-of-building-and-running-rdycore-on-perlmutter-gpus-nodes" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-gpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
-      Exmaple of building and running RDycore on Perlmutter GPUs nodes
+      Example: Building and running RDycore on Perlmutter GPU nodes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#example-of-building-and-running-rdycore-on-frontier" class="md-nav__link">
+  <a href="#example-building-and-running-rdycore-on-frontier" class="md-nav__link">
     <span class="md-ellipsis">
-      Example of building and running RDycore on Frontier
+      Example: Building and running RDycore on Frontier
     </span>
   </a>
   
@@ -1344,11 +1365,11 @@ RDycore needs to be build spearately for each type of compute node. The CPU-only
 have 128 cores (2 x 64-core AMD EPYC CPUs), while the CPU-GPU nodes have
 1 x 64-core AMD EPYC CPU and 4 x NVIDIA A100. RDycore uses PETSc's and libCEED's support
 of CUDA to run on Perlmutter GPUs.</p>
-<p>The Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
+<p>Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
 Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-core,
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.</p>
-<h3 id="exmaple-of-building-and-running-rdycore-on-perlmutter-cpus-nodes">Exmaple of building and running RDycore on Perlmutter CPUs nodes</h3>
+<h3 id="example-building-and-running-rdycore-on-perlmutter-cpu-nodes">Example: Building and running RDycore on Perlmutter CPU nodes</h3>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
 
 <span class="c1"># Set PETSc environment variables for Perlmutter CPU nodes</span>
@@ -1369,7 +1390,7 @@ salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</
 <span class="c1"># Run on 4 MPI tasks on CPUs</span>
 srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span>-ceed<span class="w"> </span>/cpu/self<span class="w"> </span>-log_view
 </code></pre></div>
-<h3 id="exmaple-of-building-and-running-rdycore-on-perlmutter-gpus-nodes">Exmaple of building and running RDycore on Perlmutter GPUs nodes</h3>
+<h3 id="example-building-and-running-rdycore-on-perlmutter-gpu-nodes">Example: Building and running RDycore on Perlmutter GPU nodes</h3>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
 
 <span class="c1"># Set PETSc environment variables for Perlmutter GPU nodes</span>
@@ -1391,10 +1412,10 @@ salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</
 srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>-c<span class="w"> </span><span class="m">32</span><span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span><span class="se">\</span>
 -ceed<span class="w"> </span>/gpu/cuda<span class="w"> </span>-dm_vec_type<span class="w"> </span>cuda<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
 </code></pre></div>
-<h3 id="example-of-building-and-running-rdycore-on-frontier">Example of building and running RDycore on Frontier</h3>
+<h3 id="example-building-and-running-rdycore-on-frontier">Example: Building and running RDycore on Frontier</h3>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
 
-<span class="c1"># Set PETSc environment variables for Perlmutter CPU nodes</span>
+<span class="c1"># Set PETSc environment variables for Frontier</span>
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
