@@ -205,29 +205,100 @@ The RDycore team supports installation of the model at following DOE machines:
 
 1. [Perlmutter](https://docs.nersc.gov/systems/perlmutter/) at NERSC
 2. [Frontier](https://docs.olcf.ornl.gov/systems/frontier_user_guide.html) at OLCF
-3. [Aurora](https://www.alcf.anl.gov/support-center/aurora/getting-started-aurora) at ALCF
 
-
-First, run the shell script, `config/set_petsc_settings.sh`, to set PETSc-related environmental
-variables for the pre-installed PETSc on these supported machines and load appropriate modules.
-PETSc has been pre-installed with support for 32-bit and 64-bit integers on these supported machines,
-and the 32-bit PETSc installation is the default setting. The 64-bit PETSc installation can be used
-by passing the optional command line argument `--64bit` to `config/set_petsc_settings.sh`.
-
-The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes.
-   The PETSc settings for CPU or GPU nodes can be selected via `--pm cpu` or `--pm gpu`, respectively.
+First, run the following shell script to set PETSc-related environmental variables and load appropriate modules.
 
 ```bash
-source config/set_petsc_settings.sh --pm <cpu|gpu> <--64bit>
-
+`source config/set_petsc_settings.sh --mach <machine_name> --config <configuration>`,
 ```
 
-On all other systems, the script can be run as
+Multiple configurations of PETSc have been pre-installed on these supported machines
+under RDycore's project directories. Information about the available PETSc configurations
+can be obtained via `./config/set_petsc_settings.sh`.
+
+The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
+RDycore needs to be build separately for each type of compute node. The CPU-only nodes
+have 128 cores (2 x 64-core AMD EPYC CPUs), while the CPU-GPU nodes have
+1 x 64-core AMD EPYC CPU and 4 x NVIDIA A100. RDycore uses PETSc's and libCEED's support
+of CUDA to run on Perlmutter GPUs.
+
+Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
+Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-cores,
+only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
+support of HIP to run on AMD GPUs.
+
+### Example: Building and running RDycore on Perlmutter CPU nodes
 
 ```bash
-source config/set_petsc_settings.sh <--64bit>
+cd /path/to/RDycore
 
+# Set PETSc environment variables for Perlmutter CPU nodes
+source config/set_petsc_settings.sh --mach pm-cpu --config 1
+
+# Build RDycore
+cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cd build-$PETSC_ARCH
+make -j4 install
+
+# Use an interactive job queue
+salloc --nodes 1 --qos interactive --time 00:30:00 --constraint cpu \
+--account=<project-id>
+
+# Change to the directory containing tests
+cd driver/tests/swe_roe
+
+# Run on 4 MPI tasks on CPUs
+srun -N 1 -n 4 ../../rdycore ex2b_ic_file.yaml -ceed /cpu/self -log_view
 ```
 
-After setting PETSc variables and loading the appropriate modules, follow the
-steps outlined in the [previous section](#build-test-and-install-rdycore) to build the code.
+### Example: Building and running RDycore on Perlmutter GPU nodes
+
+```bash
+cd /path/to/RDycore
+
+# Set PETSc environment variables for Perlmutter GPU nodes
+source config/set_petsc_settings.sh --mach pm-gpu --config 1
+
+# Build RDycore
+cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cd build-$PETSC_ARCH
+make -j4 install
+
+# Use an interactive job queue
+salloc --nodes 1 --qos interactive --time 00:30:00 --constraint gpu \
+--gpus 4 --account=<project-id>_g
+
+# Change to the directory containing tests
+cd driver/tests/swe_roe
+
+# Run on 4 GPUs using CUDA
+srun -N 1 -n 4 -c 32 ../../rdycore ex2b_ic_file.yaml \
+-ceed /gpu/cuda -dm_vec_type cuda -log_view -log_view_gpu_time
+```
+
+### Example: Building and running RDycore on Frontier
+
+```bash
+cd /path/to/RDycore
+
+# Set PETSc environment variables for Frontier
+source config/set_petsc_settings.sh --mach frontier --config 1
+
+# Build RDycore
+cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cd build-$PETSC_ARCH
+make -j4 install
+
+# Use an interactive job queue
+salloc -N 1 -A <project-id> -t 0:30:00 -p batch
+
+# Change to the directory containing tests
+cd driver/tests/swe_roe
+
+# Run on CPUs
+srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml -ceed /cpu/self -log_view
+
+# Run on 8 GPUs using HIP
+srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml \
+-ceed /gpu/hip -dm_vec_type hip -log_view -log_view_gpu_time
+```
