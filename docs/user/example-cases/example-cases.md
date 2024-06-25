@@ -1,4 +1,4 @@
-# Example Cases on Few DOE Supercomputers
+# Running Examples on Supported DOE Machines
 
 Here we provide a few examples cases for running RDycore on DOE's supercomputers.
 Each case directory contains the following:
