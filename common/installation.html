@@ -501,6 +501,39 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Preinstalled PETSc for RDycore on certain DOE machines">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-cpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Perlmutter CPU nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-gpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Perlmutter GPU nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-frontier" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Frontier
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -545,6 +578,27 @@
   
   <span class="md-ellipsis">
     MMS Driver
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Running RDycore Examples on Supported DOE Machines
   </span>
   
 
@@ -800,6 +854,39 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Preinstalled PETSc for RDycore on certain DOE machines">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-cpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Perlmutter CPU nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-gpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Perlmutter GPU nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-frontier" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Frontier
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1052,6 +1139,39 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Preinstalled PETSc for RDycore on certain DOE machines">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-cpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Perlmutter CPU nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-perlmutter-gpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Perlmutter GPU nodes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-building-and-running-rdycore-on-frontier" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example: Building and running RDycore on Frontier
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1234,22 +1354,89 @@ practice, though, it's safest to always build from the top of the build tree.</p
 <ol>
 <li><a href="https://docs.nersc.gov/systems/perlmutter/">Perlmutter</a> at NERSC</li>
 <li><a href="https://docs.olcf.ornl.gov/systems/frontier_user_guide.html">Frontier</a> at OLCF</li>
-<li><a href="https://www.alcf.anl.gov/support-center/aurora/getting-started-aurora">Aurora</a> at ALCF</li>
 </ol>
-<p>First, run the shell script, <code>config/set_petsc_settings.sh</code>, to set PETSc-related environmental
-variables for the pre-installed PETSc on these supported machines and load appropriate modules.
-PETSc has been pre-installed with support for 32-bit and 64-bit integers on these supported machines,
-and the 32-bit PETSc installation is the default setting. The 64-bit PETSc installation can be used
-by passing the optional command line argument <code>--64bit</code> to <code>config/set_petsc_settings.sh</code>.</p>
-<p>The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes.
-   The PETSc settings for CPU or GPU nodes can be selected via <code>--pm cpu</code> or <code>--pm gpu</code>, respectively.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--pm<span class="w"> </span>&lt;cpu<span class="p">|</span>gpu&gt;<span class="w"> </span>&lt;--64bit&gt;
+<p>First, run the following shell script to set PETSc-related environmental variables and load appropriate modules.</p>
+<div class="highlight"><pre><span></span><code><span class="sb">`</span><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>&lt;machine_name&gt;<span class="w"> </span>--config<span class="w"> </span>&lt;configuration&gt;<span class="sb">`</span>,
 </code></pre></div>
-<p>On all other systems, the script can be run as</p>
-<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>&lt;--64bit&gt;
+<p>Multiple configurations of PETSc have been pre-installed on these supported machines
+under RDycore's project directories. Information about the available PETSc configurations
+can be obtained via <code>./config/set_petsc_settings.sh</code>.</p>
+<p>The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
+RDycore needs to be build separately for each type of compute node. The CPU-only nodes
+have 128 cores (2 x 64-core AMD EPYC CPUs), while the CPU-GPU nodes have
+1 x 64-core AMD EPYC CPU and 4 x NVIDIA A100. RDycore uses PETSc's and libCEED's support
+of CUDA to run on Perlmutter GPUs.</p>
+<p>Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
+Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-cores,
+only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
+support of HIP to run on AMD GPUs.</p>
+<h3 id="example-building-and-running-rdycore-on-perlmutter-cpu-nodes">Example: Building and running RDycore on Perlmutter CPU nodes</h3>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
+
+<span class="c1"># Set PETSc environment variables for Perlmutter CPU nodes</span>
+<span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>pm-cpu<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
+
+<span class="c1"># Build RDycore</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+<span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
+make<span class="w"> </span>-j4<span class="w"> </span>install
+
+<span class="c1"># Use an interactive job queue</span>
+salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>cpu<span class="w"> </span><span class="se">\</span>
+--account<span class="o">=</span>&lt;project-id&gt;
+
+<span class="c1"># Change to the directory containing tests</span>
+<span class="nb">cd</span><span class="w"> </span>driver/tests/swe_roe
+
+<span class="c1"># Run on 4 MPI tasks on CPUs</span>
+srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span>-ceed<span class="w"> </span>/cpu/self<span class="w"> </span>-log_view
 </code></pre></div>
-<p>After setting PETSc variables and loading the appropriate modules, follow the
-steps outlined in the <a href="#build-test-and-install-rdycore">previous section</a> to build the code.</p>
+<h3 id="example-building-and-running-rdycore-on-perlmutter-gpu-nodes">Example: Building and running RDycore on Perlmutter GPU nodes</h3>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
+
+<span class="c1"># Set PETSc environment variables for Perlmutter GPU nodes</span>
+<span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>pm-gpu<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
+
+<span class="c1"># Build RDycore</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+<span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
+make<span class="w"> </span>-j4<span class="w"> </span>install
+
+<span class="c1"># Use an interactive job queue</span>
+salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>gpu<span class="w"> </span><span class="se">\</span>
+--gpus<span class="w"> </span><span class="m">4</span><span class="w"> </span>--account<span class="o">=</span>&lt;project-id&gt;_g
+
+<span class="c1"># Change to the directory containing tests</span>
+<span class="nb">cd</span><span class="w"> </span>driver/tests/swe_roe
+
+<span class="c1"># Run on 4 GPUs using CUDA</span>
+srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n<span class="w"> </span><span class="m">4</span><span class="w"> </span>-c<span class="w"> </span><span class="m">32</span><span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span><span class="se">\</span>
+-ceed<span class="w"> </span>/gpu/cuda<span class="w"> </span>-dm_vec_type<span class="w"> </span>cuda<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
+</code></pre></div>
+<h3 id="example-building-and-running-rdycore-on-frontier">Example: Building and running RDycore on Frontier</h3>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
+
+<span class="c1"># Set PETSc environment variables for Frontier</span>
+<span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
+
+<span class="c1"># Build RDycore</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+<span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
+make<span class="w"> </span>-j4<span class="w"> </span>install
+
+<span class="c1"># Use an interactive job queue</span>
+salloc<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-A<span class="w"> </span>&lt;project-id&gt;<span class="w"> </span>-t<span class="w"> </span><span class="m">0</span>:30:00<span class="w"> </span>-p<span class="w"> </span>batch
+
+<span class="c1"># Change to the directory containing tests</span>
+<span class="nb">cd</span><span class="w"> </span>driver/tests/swe_roe
+
+<span class="c1"># Run on CPUs</span>
+srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n8<span class="w"> </span>-c1<span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span>-ceed<span class="w"> </span>/cpu/self<span class="w"> </span>-log_view
+
+<span class="c1"># Run on 8 GPUs using HIP</span>
+srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n8<span class="w"> </span>-c1<span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span><span class="se">\</span>
+-ceed<span class="w"> </span>/gpu/hip<span class="w"> </span>-dm_vec_type<span class="w"> </span>hip<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
+</code></pre></div>
 
 
 
