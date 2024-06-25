@@ -1362,12 +1362,12 @@ practice, though, it's safest to always build from the top of the build tree.</p
 under RDycore's project directories. Information about the available PETSc configurations
 can be obtained via <code>./config/set_petsc_settings.sh</code>.</p>
 <p>The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
-RDycore needs to be build spearately for each type of compute node. The CPU-only nodes
+RDycore needs to be build separately for each type of compute node. The CPU-only nodes
 have 128 cores (2 x 64-core AMD EPYC CPUs), while the CPU-GPU nodes have
 1 x 64-core AMD EPYC CPU and 4 x NVIDIA A100. RDycore uses PETSc's and libCEED's support
 of CUDA to run on Perlmutter GPUs.</p>
 <p>Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250X GPUs.
-Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-core,
+Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-cores,
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.</p>
 <h3 id="example-building-and-running-rdycore-on-perlmutter-cpu-nodes">Example: Building and running RDycore on Perlmutter CPU nodes</h3>

@@ -639,18 +639,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-for-frontiner-using-cpus" class="md-nav__link">
+  <a href="#example-for-frontier-using-cpus" class="md-nav__link">
     <span class="md-ellipsis">
-      Example for Frontiner using CPUs
+      Example for Frontier using CPUs
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-for-frontiner-using-gpus" class="md-nav__link">
+  <a href="#example-for-frontier-using-gpus" class="md-nav__link">
     <span class="md-ellipsis">
-      Example for Frontiner using GPUs
+      Example for Frontier using GPUs
     </span>
   </a>
   
@@ -681,7 +681,7 @@ domain.</p>
 <code>dx = dy = 0.002</code> m and has 11,534,336 grid cells. Reflective boundary
 condition is assumed for all boundaries of the mesh. The problem is setup
 to take 100 timesteps. The mesh is in DMPlex's HDF5 v3.0.0 format.
-It is asssumed that the user has access the RDycore's project direcotries
+It is assumed that the user has access the RDycore's project directories
 on the DOE supercomputers, which contains the mesh and pre-installed PETSc.
 The supported DOE supercomputers for this case are:</p>
 <ol>
@@ -691,9 +691,9 @@ The supported DOE supercomputers for this case are:</p>
 <p>The project directories on these supported machines additionally contain
  meshes for the idealized dam break problem at few additional resolutions:</p>
 <ol>
-<li><code>DamBreak_grid2560x1280.v3.0.0.h5</code>: has 2,883,584 grid cells</li>
-<li><code>DamBreak_grid10240x5120.v3.0.0.h5</code>: has 46,137,344 grid cells</li>
-<li><code>DamBreak_grid20480x10240.v3.0.0.h5</code>: has 184,549,376 grid cells</li>
+<li><code>DamBreak_grid2560x1280.v3.0.0.h5</code>: 2,883,584 grid cells</li>
+<li><code>DamBreak_grid10240x5120.v3.0.0.h5</code>: 46,137,344 grid cells</li>
+<li><code>DamBreak_grid20480x10240.v3.0.0.h5</code>: 184,549,376 grid cells</li>
 </ol>
 <h2 id="script">Script</h2>
 <p><code>setup_batch_for_dam_break.sh</code> Will create symbolic link to the mesh
@@ -725,12 +725,12 @@ Usage:<span class="w"> </span>./setup_batch_for_dam_break.sh
 <div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>pm-gpu<span class="w"> </span>--project<span class="w"> </span>m4267_g<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 --rdycore-dir<span class="w"> </span>/global/cfs/projectdirs/m4267/gbisht/rdycore
 </code></pre></div>
-<h2 id="example-for-frontiner-using-cpus">Example for Frontiner using CPUs</h2>
+<h2 id="example-for-frontier-using-cpus">Example for Frontier using CPUs</h2>
 <div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--frontier-node-type<span class="w"> </span>cpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 --project<span class="w"> </span>cli192<span class="w"> </span><span class="se">\</span>
 --rdycore-dir<span class="w"> </span>/lustre/orion/cli192/proj-shared/gb9/rdycore/rdycore<span class="w"> </span>
 </code></pre></div>
-<h2 id="example-for-frontiner-using-gpus">Example for Frontiner using GPUs</h2>
+<h2 id="example-for-frontier-using-gpus">Example for Frontier using GPUs</h2>
 <div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--frontier-node-type<span class="w"> </span>gpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 --project<span class="w"> </span>cli192<span class="w"> </span><span class="se">\</span>
 --rdycore-dir<span class="w"> </span>/lustre/orion/cli192/proj-shared/gb9/rdycore/rdycore<span class="w"> </span>
