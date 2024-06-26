@@ -12,8 +12,14 @@ in binary format that contain the following information:
 
 - `time_*` has the unit of `seconds` and should start from `0.0`.
 - The unit of `value_*` is
-    - `m/s` for rainfall,
-    - `m` for ocean water height.
+    - `m/s` for the rainfall dataset, and
+    - `m` for ocean water height boundary condition dataset.
+
+The rainfall and boundary condition dataset can be specified to the RDycore driver through
+the following command line options:
+
+1. `-rain <binary-rainfall-dataset>`
+2. `-bc <binary-bc-dataset>` and
 
 ## Script
 

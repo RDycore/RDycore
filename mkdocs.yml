@@ -7,7 +7,7 @@ nav:
     - 'Installation': 'common/installation.md'
     - 'YAML Input Specification': 'common/input.md'
     - 'MMS Driver': 'common/mms.md'
-    - 'Running RDycore Examples on Supported DOE Machines':
+    - 'Examples Cases':
       - 'Overview': 'user/example-cases/example-cases.md'
       - 'Idealized dam break problem': 'user/example-cases/dam-break/index.md'
       - 'Hurricane Harvey':
