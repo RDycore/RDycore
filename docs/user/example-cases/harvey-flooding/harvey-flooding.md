@@ -6,8 +6,7 @@ Houston Harvey flooding problem is in the Exodus II format and consist of
 is includes 13 (`=num_side_ss1`) edges, which are identified by `elem_ss1` and
 `side_ss1` in the mesh file.
 
-
-<img src="houston-domain.jpg" width="80%" height="80%">
+![image](houston-domain.jpg)
 
 The topography based on the 30m DEM dataset for the study domain is shown above.
 The white crosses denote the locations of high water mark measurements from USGS,
