@@ -23,10 +23,6 @@ source ${RDYCORE_DIR}/config/set_petsc_settings.sh --mach ${MACH} --config 1
 # in the <RDYCORE_DIR>/build-${PETSC_ARCH}.
 export RDYCORE_EXE=${RDYCORE_DIR}/build-${PETSC_ARCH}/bin/rdycore
 
-# Create a directory for the slurm job in which all log files would be saved
-export DEST_DIR=cpu.N_${N}.${SLURM_JOB_ID}
-mkdir ${DEST_DIR}
-
 # Set LD_LIBRARY_PATH (not sure if this is needed anymore)
 export LD_LIBRARY_PATH=$PETSC_DIR/$PETSC_ARCH/lib:$LD_LIBRARY_PATH
 
@@ -39,10 +35,18 @@ env > env.${SLURM_JOB_ID}.txt
 # Run the code
 if [ $is_cpu_run -eq 1 ]; then
 
+  # Create a directory for the slurm job in which all log files would be saved
+  export DEST_DIR=cpu.N_${N}.${SLURM_JOB_ID}
+  mkdir ${DEST_DIR}
+
   LOG_FILE=${MACH}.cpu.N_${N}.${PETSC_ARCH}.ceed_cpu.${SLURM_JOB_ID}.log
   srun -N${N} -n${n} -c1 ${RDYCORE_EXE} ${YAML_FILE} -bc Houston1km.bc.int64.bin -rain Houston1km.rain.int64.bin -ceed /cpu/self -ts_monitor -log_view -options_left 2>&1 | tee ${LOG_FILE}
 
 elif [ $is_gpu_run -eq 1 ]; then
+
+  # Create a directory for the slurm job in which all log files would be saved
+  export DEST_DIR=gpu.N_${N}.${SLURM_JOB_ID}
+  mkdir ${DEST_DIR}
 
   export GPU_AWARE_MPI=1
   export MPICH_GPU_SUPPORT_ENABLED=1
