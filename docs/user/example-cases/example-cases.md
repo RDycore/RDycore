@@ -14,6 +14,7 @@ The files for the meshes, boundary conditions, and source-sink terms are not inc
 in the repository and are instead available in RDycore shared project directory on the
 supported DOE's supercomputers.
 
-The following case is supported:
+The following cases are supported:
 
 1. [Idealized dam break problem](dam-break/index.md)
+2. [Flooding of Houston during Hurricane Harvey](harvey-flooding/harvey-flooding.md)
