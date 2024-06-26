@@ -415,7 +415,7 @@
             
   
   <span class="md-ellipsis">
-    Running RDycore Examples on Supported DOE Machines
+    Examples Cases
   </span>
   
 
@@ -425,7 +425,7 @@
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_5">
             <span class="md-nav__icon md-icon"></span>
-            Running RDycore Examples on Supported DOE Machines
+            Examples Cases
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -951,11 +951,17 @@ in binary format that contain the following information:</p>
 <ul>
 <li><code>time_*</code> has the unit of <code>seconds</code> and should start from <code>0.0</code>.</li>
 <li>The unit of <code>value_*</code> is<ul>
-<li><code>m/s</code> for rainfall,</li>
-<li><code>m</code> for ocean water height.</li>
+<li><code>m/s</code> for the rainfall dataset, and</li>
+<li><code>m</code> for ocean water height boundary condition dataset.</li>
 </ul>
 </li>
 </ul>
+<p>The rainfall and boundary condition dataset can be specified to the RDycore driver through
+the following command line options:</p>
+<ol>
+<li><code>-rain &lt;binary-rainfall-dataset&gt;</code></li>
+<li><code>-bc &lt;binary-bc-dataset&gt;</code> and</li>
+</ol>
 <h2 id="script">Script</h2>
 <p><code>setup_harvey_flooding_ocean_bc.sh</code> Will create symbolic link to the mesh
 and initial condition files locally, compile RDycore (if needed), and
