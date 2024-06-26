@@ -1,4 +1,61 @@
-# Overview
+# Hurricane Harvey Flooding using MRMS dataset and critical outflow BC
+
+The 1 km Multi-Radar Multi-Sensor System (MRMS) rainfall dataset is
+as the forcing dataset for the simulation. The hourly MRMS dataset files
+are PETSc Vec saved in the binary format that are named
+`YYYY-MM-DD:HH-SS.<int32|int64>.bin`. These binary files
+contains the following information:
+
+- `ncols`    : number of columns in the rainfall dataset
+- `nrows`    : number of rowns in the rainfall dataset
+- `xlc`      : x coordinate of the lower left corner [m]
+- `ylc`      : y coordinate of the lower left corner [m]
+- `cellsize` : size of grid cells in the rainfall dataset [m]
+- `data`     : rainfall rate for ncols * nrows cells [mm/hr]
+
+The start date and the location of MRMS dataset is specified to the RDycore
+driver through the following two command line options:
+
+1. `-heterogeneous_rain_start_date YYYY,MM,DD,HH,SS`, and
+2. `-heterogeneous_rain_dir <path/to/the/mrms/dataset>`
+
+The MRMS dataset and mesh is available on Perlmutter and Frontier under
+RDycore's project directoy. Apart from the MRMS dataset, following four
+spatially-distributed rainfall datasets are also available:
+
+1. Daymet,
+2. North American Land Data Assimilation System (NLDAS),
+3. Integrated multi-satellite retrievals for global precipitation measurement (IMERG), and
+4. Multi-Source Weighted-Ensemble Precipitation (MSWEP)
+
+Critical outflow boundary condition is applied to 13 edges that are identified
+in the mesh file by `elem_ss1` and `side_ss1`.
+
+## Script
+
+`setup_harvey_flooding_critical_outflow_bc.sh` Will create symbolic link to the mesh
+file locally, compile RDycore (if needed), and create a batch script
+for DOE supercomputers that can be submitted via `sbatch`.
+
+
+```bash
+ ./setup_harvey_flooding_critical_outflow_bc.sh -h
+Usage: ./setup_harvey_flooding_critical_outflow_bc.sh
+
+   -h, --help                        Display this message
+   --rdycore-dir                     Path to RDycore directory
+   --mach <pm-cpu|pm-gpu|frontier>   Supported machine name
+   --frontier-node-type <cpu|gpu>    To run on Frontier CPUs or GPUs
+   -N --node  <N>                    Number of nodes (default = 1)
+   --project <project-id>            Project ID that will charged for the job
+```
+
+- For Perlmutter:
+  - `--mach pm-cpu` Run RDycore on CPU nodes
+  - `--mach pm-gpu` Run RDycore GPU nodes using CUDA
+- For Frontier (`--mach frontier`):
+  - `--frontier-node-type cpu`: Run RDycore on CPUs
+  - `--frontier-node-type gpu`: Run RDycore on GPUs using HIP
 
 ## Example for Perlmutter CPU nodes
 
