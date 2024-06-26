@@ -34,8 +34,8 @@ in the mesh file by `elem_ss1` and `side_ss1`.
 ## Script
 
 `setup_harvey_flooding_critical_outflow_bc.sh` Will create symbolic link to the mesh
-file locally, compile RDycore (if needed), and create a batch script
-for DOE supercomputers that can be submitted via `sbatch`.
+and initial condition files locally, compile RDycore (if needed), and
+create a batch script for DOE supercomputers that can be submitted via `sbatch`.
 
 
 ```bash
