@@ -941,9 +941,9 @@
 
 
 <h1 id="hurricane-harvey-flooding-using-mrms-dataset-and-critical-outflow-bc">Hurricane Harvey Flooding using MRMS Dataset and Critical Outflow BC</h1>
-<p>The 1 km Multi-Radar Multi-Sensor System (MRMS) rainfall dataset is
-as the forcing dataset for the simulation. The hourly MRMS dataset files
-are PETSc Vec saved in the binary format that are named
+<p>The 1 km Multi-Radar Multi-Sensor System (MRMS) rainfall dataset is used
+in this simulation. The hourly MRMS dataset files
+are PETSc Vec that have been saved in the binary format and are named as
 <code>YYYY-MM-DD:HH-SS.&lt;int32|int64&gt;.bin</code>. These binary files
 contains the following information:</p>
 <ul>
@@ -960,8 +960,8 @@ driver through the following two command line options:</p>
 <li><code>-heterogeneous_rain_start_date YYYY,MM,DD,HH,SS</code>, and</li>
 <li><code>-heterogeneous_rain_dir &lt;path/to/the/mrms/dataset&gt;</code></li>
 </ol>
-<p>The MRMS dataset and mesh is available on Perlmutter and Frontier under
-RDycore's project directoy. Apart from the MRMS dataset, following four
+<p>The MRMS dataset and mesh are available on Perlmutter and Frontier under
+the RDycore's project directoy. Apart from the MRMS dataset, following four
 spatially-distributed rainfall datasets are also available:</p>
 <ol>
 <li>Daymet,</li>
@@ -969,7 +969,7 @@ spatially-distributed rainfall datasets are also available:</p>
 <li>Integrated multi-satellite retrievals for global precipitation measurement (IMERG), and</li>
 <li>Multi-Source Weighted-Ensemble Precipitation (MSWEP)</li>
 </ol>
-<p>Critical outflow boundary condition is applied to 13 edges that are identified
+<p>A critical outflow boundary condition is applied to 13 edges that are identified
 in the mesh file by <code>elem_ss1</code> and <code>side_ss1</code>.</p>
 <h2 id="script">Script</h2>
 <p><code>setup_harvey_flooding_critical_outflow_bc.sh</code> Will create symbolic link to the mesh
