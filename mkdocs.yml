@@ -7,7 +7,14 @@ nav:
     - 'Installation': 'common/installation.md'
     - 'YAML Input Specification': 'common/input.md'
     - 'MMS Driver': 'common/mms.md'
-    - 'Running RDycore Examples on Supported DOE Machines': 'user/example-cases/example-cases.md'
+    - 'Running RDycore Examples on Supported DOE Machines':
+      - 'Overview': 'user/example-cases/example-cases.md'
+      - 'Idealized dam break problem': 'user/example-cases/dam-break/index.md'
+      - 'Hurricane Harvey':
+        - 'Overview': 'user/example-cases/harvey-flooding/harvey-flooding.md'
+        - 'With MRMS rainfall and outflow BC': 'user/example-cases/harvey-flooding/critical-outflow-bc/harvey-critical-outflow-bc.md'
+        - 'With average rainfall and ocean BC': 'user/example-cases/harvey-flooding/ocean-bc/harvey-ocean-bc.md'
+
   - 'Developer Guide':
     - 'Overview': 'developer/index.md'
     - 'Installation': 'common/installation.md'
