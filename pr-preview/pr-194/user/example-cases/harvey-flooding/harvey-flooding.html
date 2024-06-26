@@ -619,26 +619,33 @@
 
 
 <h1 id="overview">Overview</h1>
-<p>The RDycore mesh, <code>Turning_30m_with_z.updated.with_sidesets.exo</code> for the
+<p>The RDycore mesh (<code>Turning_30m_with_z.updated.with_sidesets.exo</code>) for the
 Houston Harvey flooding problem is in the Exodus II format and consist of
 2,926,532 grid cells. The mesh also includes a single edge sideset that
 is includes 13 (<code>=num_side_ss1</code>) edges, which are identified by <code>elem_ss1</code> and
-<code>side_ss1</code> in the mesh file. The following two Hurricane Harvey examples
-showcase different capabilties of the RDycore driver:</p>
+<code>side_ss1</code> in the mesh file.</p>
+<p><img src="houston-domain.jpg" width="50%" height="50%"></p>
+<p>The topography based on the 30m DEM dataset for the study domain is shown above.
+The white crosses denote the locations of high water mark measurements from USGS,
+and the red asterisks are the USGS gauges with the gauge number. The black dashed
+lines represent two dams used as flood control reservoirs: Addicks (the upper one)
+and Barker (the lower one). The black solid line shows the extent of major channels.</p>
+<p>The following two RDycore examples for the Hurricane Harvey flooding showcase
+different capabilties of the RDycore driver:</p>
 <ol>
 <li>
-<p><a href="critical-outflow-bc/harvey-critical-outflow-bc.html"><code>critical-outflow-bc</code></a>: </p>
+<p><a href="critical-outflow-bc/harvey-critical-outflow-bc.html"><code>critical-outflow-bc</code></a>:</p>
 <ul>
-<li>Rainfall: Spatially-distributed and temporally-varying</li>
-<li>Boundary condition: Critical outflow</li>
+<li>Uses spatially-distributed and temporally-varying rainfall dataset.</li>
+<li>A critical outflow boundary condition is applied on the 13 edges.</li>
 </ul>
 </li>
 <li>
-<p><a href="ocean-bc/harvey-ocean-bc.html"><code>ocean-bc</code></a>: </p>
+<p><a href="ocean-bc/harvey-ocean-bc.html"><code>ocean-bc</code></a>:</p>
 <ul>
-<li>Rainfall: Spatially-averaged and temporally-varying</li>
-<li>Boundary condition: Spatially-homogeneous and temporally-varying
-  ocean water height</li>
+<li>Uses a spatially-averaged and temporally-varying rainfall dataset.</li>
+<li>A time-varying, but spatially-homogeneous ocean water height boundary
+  condition is applied on the 13 edges.</li>
 </ul>
 </li>
 </ol>
