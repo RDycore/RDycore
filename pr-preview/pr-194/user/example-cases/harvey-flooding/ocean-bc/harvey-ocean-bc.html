@@ -16,7 +16,7 @@
     
     
       
-        <title>Overview - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Hurricane Harvey Flooding Simulation using Spatially-Homogenous Rainfall and Time-varying Ocean BC dataset - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#overview" class="md-skip">
+        <a href="#hurricane-harvey-flooding-simulation-using-spatially-homogenous-rainfall-and-time-varying-ocean-bc-dataset" class="md-skip">
           Skip to content
         </a>
       
@@ -104,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              Hurricane Harvey Flooding Simulation using Spatially-Homogenous Rainfall and Time-varying Ocean BC dataset
             
           </span>
         </div>
@@ -612,6 +612,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    <span class="md-ellipsis">
+      Script
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#example-for-perlmutter-cpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       Example for Perlmutter CPU nodes
@@ -662,7 +671,44 @@
                   
 
 
-<h1 id="overview">Overview</h1>
+<h1 id="hurricane-harvey-flooding-simulation-using-spatially-homogenous-rainfall-and-time-varying-ocean-bc-dataset">Hurricane Harvey Flooding Simulation using Spatially-Homogenous Rainfall and Time-varying Ocean BC dataset</h1>
+<p>Both datasets, the spatially-homogeneous rainfall (<code>share/conditions/Houston1km.rain.&lt;int32|int64&gt;.bin</code>) and
+time-varying ocean boundary condition (<code>share/conditions/Houston1km.bc.&lt;int32|int64&gt;.bin</code>) are PETSc <code>Vec</code>
+in binary format that contain the following information:</p>
+<div class="highlight"><pre><span></span><code>// time_1 value_1
+// time_2 value_2
+// time_3 value_3
+</code></pre></div>
+<ul>
+<li><code>time_*</code> has the unit of <code>seconds</code> and should start from <code>0.0</code>.</li>
+<li>The unit of <code>value_*</code> is<ul>
+<li><code>m/s</code> for rainfall,</li>
+<li><code>m</code> for ocean water height.</li>
+</ul>
+</li>
+</ul>
+<h2 id="script">Script</h2>
+<p><code>setup_harvey_flooding_ocean_bc.sh</code> Will create symbolic link to the mesh
+and initial condition files locally, compile RDycore (if needed), and
+create a batch script for DOE supercomputers that can be submitted via <code>sbatch</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="w"> </span>./setup_harvey_flooding_ocean_bc.sh<span class="w"> </span>-h
+Usage:<span class="w"> </span>./setup_harvey_flooding_ocean_bc.sh
+
+<span class="w">   </span>-h,<span class="w"> </span>--help<span class="w">                        </span>Display<span class="w"> </span>this<span class="w"> </span>message
+<span class="w">   </span>--rdycore-dir<span class="w">                     </span>Path<span class="w"> </span>to<span class="w"> </span>RDycore<span class="w"> </span>directory
+<span class="w">   </span>--mach<span class="w"> </span>&lt;pm-cpu<span class="p">|</span>pm-gpu<span class="p">|</span>frontier&gt;<span class="w">   </span>Supported<span class="w"> </span>machine<span class="w"> </span>name
+<span class="w">   </span>--frontier-node-type<span class="w"> </span>&lt;cpu<span class="p">|</span>gpu&gt;<span class="w">    </span>To<span class="w"> </span>run<span class="w"> </span>on<span class="w"> </span>Frontier<span class="w"> </span>CPUs<span class="w"> </span>or<span class="w"> </span>GPUs
+<span class="w">   </span>-N<span class="w"> </span>--node<span class="w">  </span>&lt;N&gt;<span class="w">                    </span>Number<span class="w"> </span>of<span class="w"> </span>nodes<span class="w"> </span><span class="o">(</span><span class="nv">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="o">)</span>
+<span class="w">   </span>--project<span class="w"> </span>&lt;project-id&gt;<span class="w">            </span>Project<span class="w"> </span>ID<span class="w"> </span>that<span class="w"> </span>will<span class="w"> </span>charged<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>job
+</code></pre></div>
+<ul>
+<li>For Perlmutter:</li>
+<li><code>--mach pm-cpu</code> Run RDycore on CPU nodes</li>
+<li><code>--mach pm-gpu</code> Run RDycore GPU nodes using CUDA</li>
+<li>For Frontier (<code>--mach frontier</code>):</li>
+<li><code>--frontier-node-type cpu</code>: Run RDycore on CPUs</li>
+<li><code>--frontier-node-type gpu</code>: Run RDycore on GPUs using HIP</li>
+</ul>
 <h2 id="example-for-perlmutter-cpu-nodes">Example for Perlmutter CPU nodes</h2>
 <div class="highlight"><pre><span></span><code>./setup_harvey_flooding_ocean_bc.sh<span class="w"> </span><span class="se">\</span>
 <span class="w"> </span>--mach<span class="w"> </span>pm-cpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>--project<span class="w"> </span>m4267<span class="w"> </span><span class="se">\</span>
