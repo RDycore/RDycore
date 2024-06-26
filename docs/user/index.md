@@ -24,8 +24,6 @@ This guide also describes these standalone programs and their features. It also
 explains how we integrate RDycore to E3SM to perform coupled simulations of
 compound flooding.
 
-## Running RDycore within E3SM
-
 ## The Standalone C and Fortran Drivers
 
 * [Standalone YAML input specification](../common/input.md)
