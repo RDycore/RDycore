@@ -1,4 +1,4 @@
-# Hurricane Harvey Flooding using MRMS dataset and critical outflow BC
+# Hurricane Harvey Flooding using MRMS Dataset and Critical Outflow BC
 
 The 1 km Multi-Radar Multi-Sensor System (MRMS) rainfall dataset is
 as the forcing dataset for the simulation. The hourly MRMS dataset files
