@@ -16,7 +16,7 @@
     
     
       
-        <title>Overview - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Hurricane Harvey Flooding using MRMS dataset and critical outflow BC - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#overview" class="md-skip">
+        <a href="#hurricane-harvey-flooding-using-mrms-dataset-and-critical-outflow-bc" class="md-skip">
           Skip to content
         </a>
       
@@ -104,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              Hurricane Harvey Flooding using MRMS dataset and critical outflow BC
             
           </span>
         </div>
@@ -612,6 +612,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    <span class="md-ellipsis">
+      Script
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#example-for-perlmutter-cpu-nodes" class="md-nav__link">
     <span class="md-ellipsis">
       Example for Perlmutter CPU nodes
@@ -662,7 +671,59 @@
                   
 
 
-<h1 id="overview">Overview</h1>
+<h1 id="hurricane-harvey-flooding-using-mrms-dataset-and-critical-outflow-bc">Hurricane Harvey Flooding using MRMS dataset and critical outflow BC</h1>
+<p>The 1 km Multi-Radar Multi-Sensor System (MRMS) rainfall dataset is
+as the forcing dataset for the simulation. The hourly MRMS dataset files
+are PETSc Vec saved in the binary format that are named
+<code>YYYY-MM-DD:HH-SS.&lt;int32|int64&gt;.bin</code>. These binary files
+contains the following information:</p>
+<ul>
+<li><code>ncols</code>    : number of columns in the rainfall dataset</li>
+<li><code>nrows</code>    : number of rowns in the rainfall dataset</li>
+<li><code>xlc</code>      : x coordinate of the lower left corner [m]</li>
+<li><code>ylc</code>      : y coordinate of the lower left corner [m]</li>
+<li><code>cellsize</code> : size of grid cells in the rainfall dataset [m]</li>
+<li><code>data</code>     : rainfall rate for ncols * nrows cells [mm/hr]</li>
+</ul>
+<p>The start date and the location of MRMS dataset is specified to the RDycore
+driver through the following two command line options:</p>
+<ol>
+<li><code>-heterogeneous_rain_start_date YYYY,MM,DD,HH,SS</code>, and</li>
+<li><code>-heterogeneous_rain_dir &lt;path/to/the/mrms/dataset&gt;</code></li>
+</ol>
+<p>The MRMS dataset and mesh is available on Perlmutter and Frontier under
+RDycore's project directoy. Apart from the MRMS dataset, following four
+spatially-distributed rainfall datasets are also available:</p>
+<ol>
+<li>Daymet,</li>
+<li>North American Land Data Assimilation System (NLDAS),</li>
+<li>Integrated multi-satellite retrievals for global precipitation measurement (IMERG), and</li>
+<li>Multi-Source Weighted-Ensemble Precipitation (MSWEP)</li>
+</ol>
+<p>Critical outflow boundary condition is applied to 13 edges that are identified
+in the mesh file by <code>elem_ss1</code> and <code>side_ss1</code>.</p>
+<h2 id="script">Script</h2>
+<p><code>setup_harvey_flooding_critical_outflow_bc.sh</code> Will create symbolic link to the mesh
+file locally, compile RDycore (if needed), and create a batch script
+for DOE supercomputers that can be submitted via <code>sbatch</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="w"> </span>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span>-h
+Usage:<span class="w"> </span>./setup_harvey_flooding_critical_outflow_bc.sh
+
+<span class="w">   </span>-h,<span class="w"> </span>--help<span class="w">                        </span>Display<span class="w"> </span>this<span class="w"> </span>message
+<span class="w">   </span>--rdycore-dir<span class="w">                     </span>Path<span class="w"> </span>to<span class="w"> </span>RDycore<span class="w"> </span>directory
+<span class="w">   </span>--mach<span class="w"> </span>&lt;pm-cpu<span class="p">|</span>pm-gpu<span class="p">|</span>frontier&gt;<span class="w">   </span>Supported<span class="w"> </span>machine<span class="w"> </span>name
+<span class="w">   </span>--frontier-node-type<span class="w"> </span>&lt;cpu<span class="p">|</span>gpu&gt;<span class="w">    </span>To<span class="w"> </span>run<span class="w"> </span>on<span class="w"> </span>Frontier<span class="w"> </span>CPUs<span class="w"> </span>or<span class="w"> </span>GPUs
+<span class="w">   </span>-N<span class="w"> </span>--node<span class="w">  </span>&lt;N&gt;<span class="w">                    </span>Number<span class="w"> </span>of<span class="w"> </span>nodes<span class="w"> </span><span class="o">(</span><span class="nv">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="o">)</span>
+<span class="w">   </span>--project<span class="w"> </span>&lt;project-id&gt;<span class="w">            </span>Project<span class="w"> </span>ID<span class="w"> </span>that<span class="w"> </span>will<span class="w"> </span>charged<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>job
+</code></pre></div>
+<ul>
+<li>For Perlmutter:</li>
+<li><code>--mach pm-cpu</code> Run RDycore on CPU nodes</li>
+<li><code>--mach pm-gpu</code> Run RDycore GPU nodes using CUDA</li>
+<li>For Frontier (<code>--mach frontier</code>):</li>
+<li><code>--frontier-node-type cpu</code>: Run RDycore on CPUs</li>
+<li><code>--frontier-node-type gpu</code>: Run RDycore on GPUs using HIP</li>
+</ul>
 <h2 id="example-for-perlmutter-cpu-nodes">Example for Perlmutter CPU nodes</h2>
 <div class="highlight"><pre><span></span><code>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span><span class="se">\</span>
 --mach<span class="w"> </span>pm-cpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>--project<span class="w"> </span>m4267<span class="w"> </span><span class="se">\</span>
