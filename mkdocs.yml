@@ -12,8 +12,8 @@ nav:
       - 'Idealized dam break problem': 'user/example-cases/dam-break/index.md'
       - 'Hurricane Harvey':
         - 'Overview': 'user/example-cases/harvey-flooding/harvey-flooding.md'
-        - 'With MRMS rainfall and outflow BC': 'user/example-cases/harvey-flooding/critical-outflow-bc/harvey-critical-outflow-bc.md'
-        - 'With average rainfall and ocean BC': 'user/example-cases/harvey-flooding/ocean-bc/harvey-ocean-bc.md'
+        - 'With MRMS rainfall and outflow BC': 'user/example-cases/harvey-flooding/critical-outflow-bc/index.md'
+        - 'With average rainfall and ocean BC': 'user/example-cases/harvey-flooding/ocean-bc/index.md'
 
   - 'Developer Guide':
     - 'Overview': 'developer/index.md'
