@@ -66,6 +66,9 @@ elif [ "$mach" == "pm-gpu" ]; then
   rain_dir="/global/cfs/projectdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mrms/bin"
 
 elif [ "$mach" == "frontier" ]; then
+
+  rain_dir="/lustre/orion/cli192/proj-shared/data/harvey/spatially-distributed-rainfall/mrms/bin"
+
   # Make sure both CPU and GPU options were not specified
   if [ "$frontier_node_type" == "cpu" ]
   then
