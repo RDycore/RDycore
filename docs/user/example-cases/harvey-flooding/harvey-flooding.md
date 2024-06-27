@@ -3,8 +3,8 @@
 The RDycore mesh (`Turning_30m_with_z.updated.with_sidesets.exo`) for the
 Houston Harvey flooding problem is in the Exodus II format and consist of
 2,926,532 grid cells. The mesh also includes a single edge sideset that
-consists of 13 (`=num_side_ss1`) edges, which are identified by `elem_ss1` and
-`side_ss1` in the mesh file.
+consists of 13 (`=num_side_ss1`) edges, which are identified with the labels
+`elem_ss1` and `side_ss1` in the mesh file.
 
 ![image](houston-domain.jpg)
 
