@@ -23,7 +23,7 @@ source ${RDYCORE_DIR}/config/set_petsc_settings.sh --mach ${MACH} --config 1
 # in the <RDYCORE_DIR>/build-${PETSC_ARCH}.
 export RDYCORE_EXE=${RDYCORE_DIR}/build-${PETSC_ARCH}/bin/rdycore
 
-# Set LD_LIBRARY_PATH (not sure if this is needed anymore)
+# Set LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$PETSC_DIR/$PETSC_ARCH/lib:$LD_LIBRARY_PATH
 
 export PE_MPICH_GTL_DIR_amd_gfx90a="-L${CRAY_MPICH_ROOTDIR}/gtl/lib"
