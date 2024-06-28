@@ -75,11 +75,19 @@ fi
 #
 device=""
 if [ "$mach" == "pm-cpu" ]; then
+  data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey
   device="cpu"
   ntasks=$((N*128))
+  macros_file_in=${PWD}/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
+  macros_file_out=gnu_pm-cpu.cmake
+  compiler=gnu
 elif [ "$mach" == "pm-gpu" ]; then
+  data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey
   device="gpu"
   ntasks=$((N*4))
+  macros_file_in=${PWD}/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
+  macros_file_out=gnugpu_pm-gpu.cmake
+  compiler=gnugpu
 elif [ "$mach" == "frontier" ]; then
 
   data_dir=/lustre/orion/cli192/proj-shared/data/harvey
@@ -115,7 +123,7 @@ fi
 
 domain_file=domain_Dlnd_2926x1_c240507.nc
 domain_path=${data_dir}/e3sm/Turning_30m
-RDYCORE_YAML_FILE=${data_dir}/e3sm/Turning_30m/Turning_30m.critical_flow_bc.yaml
+RDYCORE_YAML_FILE=${PWD}/Turning_30m.critical_flow_bc.yaml
 RDYCORE_IC_FILE=${data_dir}/Turning_30m/solution_219.int32.dat
 RDYCORE_MESH_FILE=${data_dir}/Turning_30m/Turning_30m_with_z.updated.with_sidesets.exo
 RDYCORE_BIN_MAP=${data_dir}/e3sm/Turning_30m/map_MOSART_to_RDycore_Turning_30_2926532x1.bin
@@ -131,7 +139,7 @@ rdycore_dir=$e3sm_dir/externals/rdycore/
 
 cd $rdycore_dir
 
-source config/set_petsc_settings.sh --mach frontier --config 3
+source config/set_petsc_settings.sh --mach $mach --config 3
 
 if [ ! -d "$rdycore_dir/build-$PETSC_ARCH" ]
 then
@@ -205,7 +213,8 @@ cp ${macros_file_in} cmake_macros/${macros_file_out}
 petsc_libs=`pkg-config --libs --static $PETSC_DIR/$PETSC_ARCH/lib/pkgconfig/petsc.pc`
 sed -i "s/PLACEHOLDER_PETSC_LIBS/${petsc_libs//\//\\/}/g" cmake_macros/${macros_file_out}
 sed -i "s/PLACEHOLDER_E3SM_DIR/${e3sm_dir//\//\\/}/g" cmake_macros/${macros_file_out}
-sed -i "s/PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${macros_file_out}
+sed -i "s/PLACEHOLDER_PETSC_DIR/${PETSC_DIR//\//\\/}/g" cmake_macros/${macros_file_out}
+sed -i "s/PLACEHOLDER_PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${macros_file_out}
 
 if [ "$mach" == "pm-cpu" ]; then
   ./xmlchange run_exe="\${EXEROOT}/e3sm.exe -ceed /cpu/self -log_view"
