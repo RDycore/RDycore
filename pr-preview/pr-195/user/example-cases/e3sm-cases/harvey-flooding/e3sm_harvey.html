@@ -1014,7 +1014,14 @@
 <p>Get the code:</p>
 <ul>
 <li>Clone the E3SM fork from <a href="https://github.com/rdycore/e3sm">https://github.com/rdycore/e3sm</a>.</li>
-<li>Switch to the E3SM-RDycore development branch and recursively initialize submodules.</li>
+<li>Switch to the E3SM-RDycore development branch and initialize submodules of E3SM <strong>and</strong> RDycore.
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:rdycore/e3sm
+<span class="nb">cd</span><span class="w"> </span>e3sm
+git<span class="w"> </span>checkout<span class="w"> </span>rdycore/mosart-rdycore/8b4c2d5df3-2024-04-05
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
+<span class="nb">cd</span><span class="w"> </span>externals/rdycore
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
+</code></pre></div></li>
 </ul>
 </li>
 <li>
@@ -1042,7 +1049,9 @@
 </li>
 </ul>
 <p>The steps a-e have been automated via the shell script via <a href="e3sm_rdycore_harvey_flooding.sh"><code>e3sm_rdycore_harvey_flooding.sh</code></a>.</p>
-<div class="highlight"><pre><span></span><code>./e3sm_rdycore_harvey_flooding.sh<span class="w"> </span>-h
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>&lt;e3sm-rdycore/externals/docs/user/example-cases/e3sm-cases/harvey-flooding&gt;
+
+./e3sm_rdycore_harvey_flooding.sh<span class="w"> </span>-h
 Usage:<span class="w"> </span>./e3sm_rdycore_harvey_flooding.sh
 
 <span class="w">   </span>-h,<span class="w"> </span>--help<span class="w">                        </span>Display<span class="w"> </span>this<span class="w"> </span>message
