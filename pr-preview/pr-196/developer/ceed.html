@@ -982,19 +982,14 @@ v00---e00---v01---e01---v02---e02---v03
 </li>
 </ol>
 <h3 id="computation-of-fluxes-across-internal-edges">Computation of Fluxes across Internal Edges</h3>
-<p>For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (<code>X</code>) with:</p>
-<ul>
-<li>
-<p><code>VecGetBlockSize = 3</code> corresponding to the following prognostic variables:</p>
+<p>For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (<code>X</code>).
+The block size of <code>X</code> would be <code>3</code> corresponding to the following prognostic variables:</p>
 <ul>
 <li>Height (<code>h</code>),</li>
 <li>Momentum in x-dir (<code>hu</code>), and</li>
-<li>Momentum in y-dir (<code>hv</code>).</li>
-<li><code>VecGetSize = 6 * 3</code> where <code>6</code> corresponds to number of cells in the mesh X</li>
+<li>Momentum in y-dir (<code>hv</code>).
+The size of <code>X</code> will <code>6 * 3</code> where <code>6</code> corresponds to number of cells in the mesh. The layout of <code>X</code> will be as follows:</li>
 </ul>
-</li>
-</ul>
-<p>The layout of <code>X</code> will be as follows:</p>
 <div class="highlight"><pre><span></span><code>X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
 </code></pre></div>
 <p>RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.</p>
@@ -1045,12 +1040,12 @@ v00---e00---v01---e01---v02---e02---v03
 </tbody>
 </table>
 <p>The steps involved in creating the <code>CeedOperator</code> associated with the internal edges are as follows:</p>
-<ol>
-<li>Create a <code>CeedQFunction</code>, <code>qf</code>, and add input and output fields.
+<ul>
+<li>First, create a <code>CeedQFunction</code>, <code>qf</code>, and add input and output fields.
 The input fields includes geometric attributes associated with the edges and the prognostic variables left and right of the edges.
 The output fields include contribution of fluxes to the cells left and right of the edge and a diagnostic variable that saves fluxes through the edge.
 The pointer to the user-defined function is specified at the time of creation.</li>
-</ol>
+</ul>
 <table>
 <thead>
 <tr>
@@ -1099,13 +1094,11 @@ The pointer to the user-defined function is specified at the time of creation.</
 </tr>
 </tbody>
 </table>
-<ol>
-<li>Create <code>CeedElemRestriction</code> for all the input and output fields of previously created <code>CeedQFunction</code>.
-A <code>CeedElemRistriction</code> tells libCEED the indices of a <code>CeedVec</code>:</li>
-<li>From which the values are extracted (for an input field), or</li>
-<li>To which the values are written (for an output field).</li>
-</ol>
-<p>The <code>CeedElemRestriction</code> for the fields and the example mesh is given below.</p>
+<ul>
+<li>Second, create <code>CeedElemRestriction</code> for all the input and output fields of previously created <code>CeedQFunction</code>.
+A <code>CeedElemRistriction</code> tells libCEED the indices of a <code>CeedVec</code> from/to which the values are to extracted/written
+for an input/output field. The <code>CeedElemRestriction</code> for the fields and the example mesh is given below.</li>
+</ul>
 <table>
 <thead>
 <tr>
@@ -1154,10 +1147,10 @@ A <code>CeedElemRistriction</code> tells libCEED the indices of a <code>CeedVec<
 </tr>
 </tbody>
 </table>
-<ol>
-<li>Finally, create the <code>CeedOperator</code> using the previously created <code>CeedQFunction</code> and all <code>CeedElementRestriction</code>.
+<ul>
+<li>Third,  create the <code>CeedOperator</code> using the previously created <code>CeedQFunction</code> and all <code>CeedElementRestriction</code>.
 The multiple fields are added via <code>CeedOperatorSetField</code>.</li>
-</ol>
+</ul>
 <table>
 <thead>
 <tr>
