@@ -219,7 +219,7 @@ sed -i "s/PLACEHOLDER_PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${macros_file_out
 if [ "$mach" == "pm-cpu" ]; then
   ./xmlchange run_exe="\${EXEROOT}/e3sm.exe -ceed /cpu/self -log_view"
 elif [ "$mach" == "pm-gpu" ]; then
-  ./xmlchange run_exe="\${EXEROOT}/e3sm.exe -ceed /gpu/cuda -dm_vec_type cuda -use_gpu_aware_mpi 1 -log_view -log_view_gpu_time"
+  ./xmlchange run_exe="-G4 \${EXEROOT}/e3sm.exe -ceed /gpu/cuda -dm_vec_type cuda -use_gpu_aware_mpi 1 -log_view -log_view_gpu_time"
 elif [ "$mach" == "frontier" ]; then
   # Make sure both CPU and GPU options were not specified
   if [ "$frontier_node_type" == "cpu" ]
