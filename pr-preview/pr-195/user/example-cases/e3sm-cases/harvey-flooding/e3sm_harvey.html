@@ -898,6 +898,40 @@
 
 
 <h1 id="overview">Overview</h1>
+<p>The E3SM-RDycore model has been tested on Perlmutter and Frontier for the RDycore's 5-day Hurricane Harvey benchmark. The E3SM-RDycore simulation uses a data-land configuration with an active river model. In an E3SM-RDycore run, RDycore can run on CPUs and GPUs. The overall workflow for an E3SM-RDycore run is as follows:</p>
+<ul>
+<li>
+<p>Get the code:</p>
+<ul>
+<li>Clone the E3SM fork from <a href="https://github.com/rdycore/e3sm">https://github.com/rdycore/e3sm</a>.</li>
+<li>Switch to the E3SM-RDycore development branch and recursively initialize submodules.</li>
+</ul>
+</li>
+<li>
+<p>Create, build, and run a case</p>
+<ol>
+<li>Compile RDycore to generate libraries (i.e. <code>librdycore.a</code>, <code>librdycore_f90.a</code>, <code>libcyaml.a</code>, <code>libyaml.a</code>, and <code>libcmocka.a</code>)</li>
+<li>Create a E3SM case. Presently, the coupled model has been tested for a case with <code>--comspet RMOSGPCC --res MOS_USRDAT</code>.</li>
+<li>Before building the case, make the following modifications:<ul>
+<li>Modify the Macros file to add settings for PETSc and RDycore</li>
+<li>Update the DLND streamfile (i.e <code>user_dlnd.streams.txt.lnd.gpcc</code>)</li>
+<li>In <code>user_nl_mosart</code>, specify a few settings for MOSART including providing a placeholder MOSART file via <code>frivinp_rtm</code></li>
+<li>In <code>user_nl_dlnd</code>, specify a few settings for DLND including a map from the DLND mesh to the placeholder MOSART mesh</li>
+</ul>
+</li>
+<li>Build the case</li>
+<li>Before submitting the case, do the following<ul>
+<li>In the rundir (<code>./xmlquerry RUNDIR</code>), copy or add symbolic links to a RDycore input YAML (as <code>rdycore.yaml</code>),
+ any files specified in the RDycore's YAML file (e.g. mesh, initial condition), and map file to exchange data
+ from the placeholder MOSART mesh to RDycore mesh.</li>
+<li>Change the value of <code>run_exe</code> in the <code>env_mach_specific.xml</code> to include commandline options for PETSc and libCEED.</li>
+</ul>
+</li>
+<li>Submit the case</li>
+</ol>
+</li>
+</ul>
+<p>The steps a-e have been automated via the shell script via <a href="e3sm_rdycore_harvey_flooding.sh"><code>e3sm_rdycore_harvey_flooding.sh</code></a>.</p>
 
 
 
