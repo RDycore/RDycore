@@ -4,7 +4,15 @@ The E3SM-RDycore model has been tested on Perlmutter and Frontier for the RDycor
 
 - Get the code:
     - Clone the E3SM fork from [https://github.com/rdycore/e3sm](https://github.com/rdycore/e3sm).
-    - Switch to the E3SM-RDycore development branch and recursively initialize submodules.
+    - Switch to the E3SM-RDycore development branch and initialize submodules of E3SM **and** RDycore.
+```bash
+git clone git@github.com:rdycore/e3sm
+cd e3sm
+git checkout rdycore/mosart-rdycore/8b4c2d5df3-2024-04-05
+git submodule update --init
+cd externals/rdycore
+git submodule update --init
+```
 
 - Create, build, and run a case
     1. Compile RDycore to generate libraries (i.e. `librdycore.a`, `librdycore_f90.a`, `libcyaml.a`, `libyaml.a`, and `libcmocka.a`)
@@ -25,6 +33,8 @@ The E3SM-RDycore model has been tested on Perlmutter and Frontier for the RDycor
 The steps a-e have been automated via the shell script via [`e3sm_rdycore_harvey_flooding.sh`](e3sm_rdycore_harvey_flooding.sh).
 
 ```bash
+cd <e3sm-rdycore/externals/docs/user/example-cases/e3sm-cases/harvey-flooding>
+
 ./e3sm_rdycore_harvey_flooding.sh -h
 Usage: ./e3sm_rdycore_harvey_flooding.sh
 
