@@ -30,6 +30,7 @@ do
   case "$1" in
     --mach ) mach="$2"; shift ;;
     --frontier-node-type) frontier_node_type="$2"; shift ;;
+    --project-id) project_id="$2"; shift ;;
     --e3sm-dir) e3sm_dir="$2"; shift ;;
     -N | --node) N="$2"; shift ;;
     --rainfall_dataset) rainfall_dataset="$2"; shift ;;
@@ -114,7 +115,7 @@ fi
 
 domain_file=domain_Dlnd_2926x1_c240507.nc
 domain_path=${data_dir}/e3sm/Turning_30m
-RDYCORE_YAML_FILE=${PWD}/Turning_30m.critical_flow_bc.yaml
+RDYCORE_YAML_FILE=${data_dir}/e3sm/Turning_30m/Turning_30m.critical_flow_bc.yaml
 RDYCORE_IC_FILE=${data_dir}/Turning_30m/solution_219.int32.dat
 RDYCORE_MESH_FILE=${data_dir}/Turning_30m/Turning_30m_with_z.updated.with_sidesets.exo
 RDYCORE_BIN_MAP=${data_dir}/e3sm/Turning_30m/map_MOSART_to_RDycore_Turning_30_2926532x1.bin
@@ -126,7 +127,9 @@ case_dir=${src_dir}/cime/scripts
 
 # Compile RDycore
 
-cd $e3sm_dir/externals/rdycore/
+rdycore_dir=$e3sm_dir/externals/rdycore/
+
+cd $rdycore_dir
 
 source config/set_petsc_settings.sh --mach frontier --config 3
 
@@ -147,15 +150,16 @@ make -j4 install
 # Determine the case name
 cd $src_dir
 git_hash=`git log -n 1 --format=%h`
-case_name=Dlnd.${mach}.${device}.Turning_30m_${rainfall_dataset}_${git_has}.NTASKS_${ntasks}.${compiler}.`date "+%Y-%m-%d"`
+case_name=Dlnd.${mach}.${device}.Turning_30m_${rainfall_dataset}_${git_hash}.NTASKS_${ntasks}.${compiler}.`date "+%Y-%m-%d"`
 
 # Create the case
 cd ${src_dir}/cime/scripts
-./create_newcase -case ${CASE_DIR}/${CASE_NAME} \
--res ${res} -mach ${mach} -compiler ${compiler} -compset ${compset} --project ${project_id}
+case_dir=${src_dir}/cime/scripts
+./create_newcase -case ${case_dir}/${case_name} \
+--res ${res} --mach ${mach} --compiler ${compiler} --compset ${compset} --project ${project_id}
 
 # Change to case dir
-cd ${CASE_DIR}/${CASE_NAME}
+cd ${case_dir}/${case_name}
 
 ./xmlchange CALENDAR=NO_LEAP
 
@@ -199,9 +203,9 @@ cp ${data_dir}/e3sm/dlnd//user_dlnd.streams.txt.lnd.${rainfall_dataset} user_dln
 cp ${macros_file_in} cmake_macros/${macros_file_out}
 
 petsc_libs=`pkg-config --libs --static $PETSC_DIR/$PETSC_ARCH/lib/pkgconfig/petsc.pc`
-sed -i "s/PLACEHOLDER_PETSC_LIBS/${petsc_libs//\//\\/}/g" cmake_macros/${MACROS_FILE_OUT}
-sed -i "s/PLACEHOLDER_E3SM_DIR/${e3sm_dir//\//\\/}/g" cmake_macros/${MACROS_FILE_OUT}
-sed -i "s/PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${MACROS_FILE_OUT}
+sed -i "s/PLACEHOLDER_PETSC_LIBS/${petsc_libs//\//\\/}/g" cmake_macros/${macros_file_out}
+sed -i "s/PLACEHOLDER_E3SM_DIR/${e3sm_dir//\//\\/}/g" cmake_macros/${macros_file_out}
+sed -i "s/PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${macros_file_out}
 
 if [ "$mach" == "pm-cpu" ]; then
   ./xmlchange run_exe="\${EXEROOT}/e3sm.exe -ceed /cpu/self -log_view"
@@ -231,7 +235,7 @@ ln -s $RDYCORE_IC_FILE   solution_219.dat
 ln -s $RDYCORE_MESH_FILE .
 ln -s $RDYCORE_BIN_MAP   map_MOSART_to_RDycore.bin
 
-cd ${CASE_DIR}/${CASE_NAME}
+cd ${case_dir}/${case_name}
 
 ./case.build
 
