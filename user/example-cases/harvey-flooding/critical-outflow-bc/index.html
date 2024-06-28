@@ -9,21 +9,25 @@
       
       
       
+        <link rel="prev" href="../harvey-flooding.html">
       
       
-      <link rel="icon" href="/assets/images/favicon.png">
+        <link rel="next" href="../ocean-bc/index.html">
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.27">
     
     
       
-        <title>RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>With MRMS rainfall and outflow BC - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
-      <link rel="stylesheet" href="/assets/stylesheets/main.6543a935.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.6543a935.min.css">
       
         
-        <link rel="stylesheet" href="/assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -42,7 +46,7 @@
       
     
     
-    <script>__md_scope=new URL("/",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -67,6 +71,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#hurricane-harvey-flooding-using-mrms-dataset-and-critical-outflow-bc" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -79,7 +88,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+    <a href="../../../../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
@@ -99,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              With MRMS rainfall and outflow BC
             
           </span>
         </div>
@@ -212,7 +221,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+    <a href="../../../../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
@@ -242,7 +251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/index.html" class="md-nav__link">
+      <a href="../../../../index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -259,8 +268,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -270,11 +281,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -288,7 +299,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             User Guide
@@ -302,7 +313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user/index.html" class="md-nav__link">
+      <a href="../../../index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -323,7 +334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/common/installation.html" class="md-nav__link">
+      <a href="../../../../common/installation.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -344,7 +355,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/common/input.html" class="md-nav__link">
+      <a href="../../../../common/input.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -365,7 +376,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/common/mms.html" class="md-nav__link">
+      <a href="../../../../common/mms.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -383,6 +394,8 @@
                 
   
   
+    
+  
   
   
     
@@ -391,11 +404,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" checked>
         
           
           <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
@@ -409,7 +422,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_5">
             <span class="md-nav__icon md-icon"></span>
             Example Cases
@@ -423,7 +436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user/example-cases/example-cases.html" class="md-nav__link">
+      <a href="../../example-cases.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -444,7 +457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user/example-cases/dam-break/index.html" class="md-nav__link">
+      <a href="../../dam-break/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -462,6 +475,8 @@
                 
   
   
+    
+  
   
   
     
@@ -470,11 +485,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" checked>
         
           
           <label class="md-nav__link" for="__nav_2_5_3" id="__nav_2_5_3_label" tabindex="0">
@@ -488,7 +503,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_5_3">
             <span class="md-nav__icon md-icon"></span>
             Hurricane Harvey
@@ -502,7 +517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
+      <a href="../harvey-flooding.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -520,10 +535,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    With MRMS rainfall and outflow BC
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="index.html" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -532,6 +567,71 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    <span class="md-ellipsis">
+      Script
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-perlmutter-cpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Perlmutter CPU nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-perlmutter-gpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Perlmutter GPU nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-frontier-using-cpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Frontier using CPUs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-frontier-using-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Frontier using GPUs
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -544,7 +644,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+      <a href="../ocean-bc/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -628,7 +728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer/index.html" class="md-nav__link">
+      <a href="../../../../developer/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -649,7 +749,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/common/installation.html" class="md-nav__link">
+      <a href="../../../../common/installation.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -670,7 +770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer/development.html" class="md-nav__link">
+      <a href="../../../../developer/development.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -691,7 +791,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer/organization.html" class="md-nav__link">
+      <a href="../../../../developer/organization.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -712,7 +812,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer/style.html" class="md-nav__link">
+      <a href="../../../../developer/style.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -733,7 +833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/developer/tools.html" class="md-nav__link">
+      <a href="../../../../developer/tools.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -771,6 +871,61 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    <span class="md-ellipsis">
+      Script
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-perlmutter-cpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Perlmutter CPU nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-perlmutter-gpu-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Perlmutter GPU nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-frontier-using-cpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Frontier using CPUs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-for-frontier-using-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example for Frontier using GPUs
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -782,8 +937,97 @@
             <div class="md-content" data-md-component="content">
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+<h1 id="hurricane-harvey-flooding-using-mrms-dataset-and-critical-outflow-bc">Hurricane Harvey Flooding using MRMS Dataset and Critical Outflow BC</h1>
+<p>The 1 km Multi-Radar Multi-Sensor System (MRMS) rainfall dataset (<a href="https://journals.ametsoc.org/view/journals/bams/97/4/bams-d-14-00174.1.xml">Zhang et al., 2016</a>), is used
+in this simulation. Each hourly MRMS dataset file is a PETSc Vec saved in
+the binary format, named as <code>YYYY-MM-DD:HH-SS.&lt;int32|int64&gt;.bin</code>. These
+binary files contains the following information:</p>
+<ul>
+<li><code>ncols</code>    : number of columns in the rainfall dataset</li>
+<li><code>nrows</code>    : number of rowns in the rainfall dataset</li>
+<li><code>xlc</code>      : x coordinate of the lower left corner [m]</li>
+<li><code>ylc</code>      : y coordinate of the lower left corner [m]</li>
+<li><code>cellsize</code> : size of grid cells in the rainfall dataset [m]</li>
+<li><code>data</code>     : rainfall rate for ncols * nrows cells [mm/hr]</li>
+</ul>
+<p>The start date and the location of MRMS dataset is specified to the RDycore
+driver through the following two command line options:</p>
+<ol>
+<li><code>-heterogeneous_rain_start_date YYYY,MM,DD,HH,SS</code>, and</li>
+<li><code>-heterogeneous_rain_dir &lt;path/to/the/mrms/dataset&gt;</code></li>
+</ol>
+<p>The MRMS dataset and mesh are available on Perlmutter and Frontier under
+the RDycore's project directoy. Apart from the MRMS dataset, following the four
+spatially-distributed rainfall datasets are also available:</p>
+<ol>
+<li>Daymet,</li>
+<li>North American Land Data Assimilation System (NLDAS),</li>
+<li>Integrated multi-satellite retrievals for global precipitation measurement (IMERG), and</li>
+<li>Multi-Source Weighted-Ensemble Precipitation (MSWEP)</li>
+</ol>
+<p>A critical outflow boundary condition is applied to the 13 edges within the
+<code>Turning_30m_with_z.updated.with_sidesets.exo</code> mesh file that are identified
+with the labels <code>elem_ss1</code> and <code>side_ss1</code>.</p>
+<h2 id="script">Script</h2>
+<p><code>setup_harvey_flooding_critical_outflow_bc.sh</code> Will create symbolic link to the mesh
+and initial condition files locally, compile RDycore (if needed), and
+create a batch script for DOE supercomputers that can be submitted via <code>sbatch</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="w"> </span>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span>-h
+Usage:<span class="w"> </span>./setup_harvey_flooding_critical_outflow_bc.sh
+
+<span class="w">   </span>-h,<span class="w"> </span>--help<span class="w">                        </span>Display<span class="w"> </span>this<span class="w"> </span>message
+<span class="w">   </span>--rdycore-dir<span class="w">                     </span>Path<span class="w"> </span>to<span class="w"> </span>RDycore<span class="w"> </span>directory
+<span class="w">   </span>--mach<span class="w"> </span>&lt;pm-cpu<span class="p">|</span>pm-gpu<span class="p">|</span>frontier&gt;<span class="w">   </span>Supported<span class="w"> </span>machine<span class="w"> </span>name
+<span class="w">   </span>--frontier-node-type<span class="w"> </span>&lt;cpu<span class="p">|</span>gpu&gt;<span class="w">    </span>To<span class="w"> </span>run<span class="w"> </span>on<span class="w"> </span>Frontier<span class="w"> </span>CPUs<span class="w"> </span>or<span class="w"> </span>GPUs
+<span class="w">   </span>-N<span class="w"> </span>--node<span class="w">  </span>&lt;N&gt;<span class="w">                    </span>Number<span class="w"> </span>of<span class="w"> </span>nodes<span class="w"> </span><span class="o">(</span><span class="nv">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="o">)</span>
+<span class="w">   </span>--project<span class="w"> </span>&lt;project-id&gt;<span class="w">            </span>Project<span class="w"> </span>ID<span class="w"> </span>that<span class="w"> </span>will<span class="w"> </span>charged<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>job
+</code></pre></div>
+<ul>
+<li>For Perlmutter:</li>
+<li><code>--mach pm-cpu</code> Run RDycore on CPU nodes</li>
+<li><code>--mach pm-gpu</code> Run RDycore GPU nodes using CUDA</li>
+<li>For Frontier (<code>--mach frontier</code>):</li>
+<li><code>--frontier-node-type cpu</code>: Run RDycore on CPUs</li>
+<li><code>--frontier-node-type gpu</code>: Run RDycore on GPUs using HIP</li>
+</ul>
+<h2 id="example-for-perlmutter-cpu-nodes">Example for Perlmutter CPU nodes</h2>
+<div class="highlight"><pre><span></span><code>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span><span class="se">\</span>
+--mach<span class="w"> </span>pm-cpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>--project<span class="w"> </span>m4267<span class="w"> </span><span class="se">\</span>
+--rdycore-dir<span class="w"> </span>/global/cfs/projectdirs/m4267/gbisht/rdycore
+</code></pre></div>
+<h2 id="example-for-perlmutter-gpu-nodes">Example for Perlmutter GPU nodes</h2>
+<div class="highlight"><pre><span></span><code>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span><span class="se">\</span>
+--mach<span class="w"> </span>pm-gpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>--project<span class="w"> </span>m4267_g<span class="w"> </span><span class="se">\</span>
+--rdycore-dir<span class="w"> </span>/global/cfs/projectdirs/m4267/gbisht/rdycore
+</code></pre></div>
+<h2 id="example-for-frontier-using-cpus">Example for Frontier using CPUs</h2>
+<div class="highlight"><pre><span></span><code>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span><span class="se">\</span>
+--mach<span class="w"> </span>frontier<span class="w"> </span>--frontier-node-type<span class="w"> </span>cpu<span class="w"> </span>-N<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+--project<span class="w"> </span>cli192<span class="w"> </span><span class="se">\</span>
+--rdycore-dir<span class="w"> </span>/lustre/orion/cli192/proj-shared/gb9/rdycore/rdycore<span class="w"> </span>
+</code></pre></div>
+<h2 id="example-for-frontier-using-gpus">Example for Frontier using GPUs</h2>
+<div class="highlight"><pre><span></span><code>./setup_harvey_flooding_critical_outflow_bc.sh<span class="w"> </span><span class="se">\</span>
+--mach<span class="w"> </span>frontier<span class="w"> </span>--frontier-node-type<span class="w"> </span>gpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+--project<span class="w"> </span>cli192<span class="w"> </span><span class="se">\</span>
+--rdycore-dir<span class="w"> </span>/lustre/orion/cli192/proj-shared/gb9/rdycore/rdycore<span class="w"> </span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -823,12 +1067,12 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "/", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "/assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../../../..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../../../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="/assets/javascripts/bundle.ad660dcc.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.ad660dcc.min.js"></script>
       
-        <script src="/javascript/mathjax.js"></script>
+        <script src="../../../../javascript/mathjax.js"></script>
       
         <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
       

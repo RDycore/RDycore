@@ -14,7 +14,7 @@ is_gpu_run=PLACEHOLDER_GPU_RUN
 export RDYCORE_DIR=PLACEHOLDER_RDYCORE_DIR
 
 # Inputdeck for RDycore
-export YAML_FILE=inputdeck_5120x2560.yaml
+export YAML_FILE=Turning_30m.ocean_bc.yaml
 
 # Load appropriate modules
 MACH=PLACEHOLDER_MACHINE_NAME
@@ -42,7 +42,7 @@ if [ $is_cpu_run -eq 1 ]; then
   mkdir ${DEST_DIR}
 
   LOG_FILE=${MACH}.${PETSC_ARCH}.ceed_cpu.N_${N}.${SLURM_JOB_ID}.log
-  srun -N $N -n $n -c 2 ${RDYCORE_EXE} ${YAML_FILE} -ceed /cpu/self -ts_monitor -dm_plex_name "Parallel Mesh" -log_view 2>&1 | tee ${LOG_FILE}
+  srun -N $N -n $n -c 2 ${RDYCORE_EXE} ${YAML_FILE} -bc Houston1km.bc.int64.bin -rain Houston1km.rain.int64.bin -ceed /cpu/self -ts_monitor -log_view 2>&1 | tee ${LOG_FILE}
 
 elif [ $is_gpu_run -eq 1 ]; then
 
@@ -54,7 +54,7 @@ elif [ $is_gpu_run -eq 1 ]; then
   export GPU_AWARE_MPI=1
   G=$n
   LOG_FILE=${MACH}.${PETSC_ARCH}.ceed_gpu.N_${N}.${SLURM_JOB_ID}.log
-  srun -G${G} -N $N -n $n -c 32 ${RDYCORE_EXE} ${YAML_FILE} -ceed /gpu/cuda -dm_vec_type cuda -ts_monitor -dm_plex_name "Parallel Mesh" -log_view -log_view_gpu_time -use_gpu_aware_mpi 1 2>&1 | tee ${LOG_FILE}
+  srun -G${G} -N $N -n $n -c 32 ${RDYCORE_EXE} ${YAML_FILE} -bc Houston1km.bc.int64.bin -rain Houston1km.rain.int64.bin -ceed /gpu/cuda -dm_vec_type cuda -ts_monitor -log_view -log_view_gpu_time -use_gpu_aware_mpi 1 2>&1 | tee ${LOG_FILE}
 
 fi 
 
