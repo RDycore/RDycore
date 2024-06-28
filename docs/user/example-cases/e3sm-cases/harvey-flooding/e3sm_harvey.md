@@ -23,3 +23,59 @@ The E3SM-RDycore model has been tested on Perlmutter and Frontier for the RDycor
     6. Submit the case
 
 The steps a-e have been automated via the shell script via [`e3sm_rdycore_harvey_flooding.sh`](e3sm_rdycore_harvey_flooding.sh).
+
+```bash
+./e3sm_rdycore_harvey_flooding.sh -h
+Usage: ./e3sm_rdycore_harvey_flooding.sh
+
+   -h, --help                        Display this message
+   --e3sm-dir                        Path to E3SM-RDycore directory
+   --mach <pm-cpu|pm-gpu|frontier>   Supported machine name
+   --frontier-node-type <cpu|gpu>    To run on Frontier CPUs or GPUs
+   -N, --node  <N>                   Number of nodes (default = 1)
+   --project <project-id>            Project ID that will charged for the job
+   --rainfall_dataset <name>  Supported dataset name (i.e. daymet|imerg|mrms|mswep|nldas)
+```
+
+## Example for Perlmutter CPU nodes
+
+```bash
+./e3sm_rdycore_harvey_flooding.sh \
+--e3sm-dir /global/cfs/projectdirs/m4267/gbisht/e3sm/ \
+--mach pm-cpu  \
+-N 1 \
+--project-id m4267 \
+--rainfall_dataset mrms
+```
+
+## Example for Perlmutter GPU nodes
+```bash
+./e3sm_rdycore_harvey_flooding.sh \
+--e3sm-dir /global/cfs/projectdirs/m4267/gbisht/e3sm/ \
+--mach pm-gpu  \
+-N 1 \
+--project-id m4267 \
+--rainfall_dataset mrms
+```
+
+## Example for Frontier using CPUs
+
+```bash
+./e3sm_rdycore_harvey_flooding.sh \
+--e3sm-dir /lustre/orion/cli192/proj-shared/gb9/e3sm \
+--mach frontier --frontier-node-type cpu \
+-N 1 \
+--project-id cli192 \
+--rainfall_dataset mrms
+```
+
+## Example for Frontier using GPUs
+
+```bash
+./e3sm_rdycore_harvey_flooding.sh \
+--e3sm-dir /lustre/orion/cli192/proj-shared/gb9/e3sm \
+--mach frontier --frontier-node-type gpu \
+-N 1 \
+--project-id cli192 \
+--rainfall_dataset mrms
+```
