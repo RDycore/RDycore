@@ -48,16 +48,13 @@ The libCEED version of RDycore's explicit time-integrator of the SWE solver has 
 
 ### Computation of Fluxes across Internal Edges
 
-For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (`X`) with:
+For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (`X`).
+The block size of `X` would be `3` corresponding to the following prognostic variables:
 
-- `VecGetBlockSize = 3` corresponding to the following prognostic variables:
-
-     - Height (`h`),
-     - Momentum in x-dir (`hu`), and
-     - Momentum in y-dir (`hv`).
-- `VecGetSize = 6 * 3` where `6` corresponds to number of cells in the mesh X
-
-The layout of `X` will be as follows:
+- Height (`h`),
+- Momentum in x-dir (`hu`), and
+- Momentum in y-dir (`hv`).
+The size of `X` will `6 * 3` where `6` corresponds to number of cells in the mesh. The layout of `X` will be as follows:
 
 ```text
 X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
@@ -77,7 +74,7 @@ RDycore uses first-order finite volume discretization to compute the flux across
 
 The steps involved in creating the `CeedOperator` associated with the internal edges are as follows:
 
-1. Create a `CeedQFunction`, `qf`, and add input and output fields.
+- First, create a `CeedQFunction`, `qf`, and add input and output fields.
 The input fields includes geometric attributes associated with the edges and the prognostic variables left and right of the edges.
 The output fields include contribution of fluxes to the cells left and right of the edge and a diagnostic variable that saves fluxes through the edge.
 The pointer to the user-defined function is specified at the time of creation.
@@ -91,12 +88,9 @@ The pointer to the user-defined function is specified at the time of creation.
 | cell_left  |  3   | Out    | Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right |
 | flux       |  3   | Out    | Flux through the edge [f_h f_hu f_hv] |
 
-2. Create `CeedElemRestriction` for all the input and output fields of previously created `CeedQFunction`.
-A `CeedElemRistriction` tells libCEED the indices of a `CeedVec`:
-  - From which the values are extracted (for an input field), or
-  - To which the values are written (for an output field).
-  
-The `CeedElemRestriction` for the fields and the example mesh is given below.
+- Second, create `CeedElemRestriction` for all the input and output fields of previously created `CeedQFunction`.
+A `CeedElemRistriction` tells libCEED the indices of a `CeedVec` from/to which the values are to extracted/written
+for an input/output field. The `CeedElemRestriction` for the fields and the example mesh is given below.
 
 | Variable name  | Size                            | Created via                        | Notes |
 | -------------- | ------------------------------- | ---------------------------------- | ----- |
@@ -107,7 +101,7 @@ The `CeedElemRestriction` for the fields and the example mesh is given below.
 | `c_restrict_r`   |  3 * num_cells                  | `CeedElemRestrictionCreate`        |  [ 1,  2,  3,  4,  5,  4,  5] |
 | `restrict_flux`  |  3 * num_owned_internal_edges   | `CeedElemRestrictionCreateStrided` |  [ 0,  3,  6,  9, 12, 15, 18] |
 
-3. Finally, create the `CeedOperator` using the previously created `CeedQFunction` and all `CeedElementRestriction`.
+- Third,  create the `CeedOperator` using the previously created `CeedQFunction` and all `CeedElementRestriction`.
 The multiple fields are added via `CeedOperatorSetField`.
 
 | Field name | Size             | CeedVector          | Notes |
