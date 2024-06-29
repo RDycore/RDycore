@@ -968,7 +968,7 @@
 
 
 <h1 id="rdycore-swe-physics-with-ceed">RDycore SWE physics with CEED</h1>
-<p>Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses <a href="https://github.com/CEED/libCEED">libCEED</a>. The combination of PETSc and libCEED provides <strong><em>algorithimic and hardware protability</em></strong>. </p>
+<p>Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses <a href="https://github.com/CEED/libCEED">libCEED</a>. The combination of PETSc and libCEED provides RDDycore algorithimic and hardware protability.</p>
 <ul>
 <li>RDycore uses PETSc's <code>TS</code> solvers that provide support for multiple time-integrators such as forward euler, RK4, etc., which can be selected at run time (e.g. <code>--ts_type euler</code>, <code>--ts_type rk4</code>, etc). </li>
 <li>The use libCEED allows RDycore to compute the RHS-function for the explicit time-integrators on CPU or GPU, which can also be selected at runtime via<ul>
@@ -982,9 +982,9 @@
 <p>Let's consider an example 3x2 mesh that consists of</p>
 <ul>
 <li>6 cells: <code>c00</code> to <code>c05</code></li>
-<li>17 edges: <code>e00</code> to <code>e11</code><ul>
+<li>17 edges: <code>e00</code> to <code>e16</code><ul>
 <li>Internal edges: <code>e04</code>, <code>e05</code>, <code>e07</code>, <code>e08</code>, <code>e09</code>, <code>e11</code>, and <code>e12</code>.</li>
-<li>Boundary edges: Remaining 10 edges.</li>
+<li>Boundary edges: <code>e00</code>, <code>e01</code>, <code>e02</code>, <code>e03</code>, <code>e06</code>, <code>e10</code>, <code>e13</code>, <code>e14</code>, <code>e15</code>, and <code>e16</code>.</li>
 </ul>
 </li>
 <li>12 vertices: <code>v00</code> to <code>v11</code></li>
@@ -1004,7 +1004,7 @@ e03   c00   e04   c01   e05   c02   e06
 v00---e00---v01---e01---v02---e02---v03
 </code></pre></div>
 <p>For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (<code>X</code>).
-The block size of <code>X</code> would be <code>3</code> corresponding to the following prognostic variables:</p>
+The block size of <code>X</code> is <code>3</code> corresponding to the following prognostic variables:</p>
 <ul>
 <li>Height (<code>h</code>),</li>
 <li>Momentum in x-dir (<code>hu</code>), and</li>
@@ -1158,28 +1158,28 @@ for an input/output field. The <code>CeedElemRestriction</code> for the fields a
 <td><code>nOwnedInEdges</code></td>
 <td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>offset = [ 0,  1,  0,  1,  2,  3,  4]</td>
+<td>offset = [ 0,  3,  0,  3,  6,  9, 12]</td>
 </tr>
 <tr>
 <td><code>q_restrict_r</code></td>
 <td><code>nOwnedInEdges</code></td>
 <td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>offset = [ 1,  2,  3,  4,  5,  4,  5]</td>
+<td>offset = [ 3,  6,  9, 12, 15, 12, 15]</td>
 </tr>
 <tr>
 <td><code>c_restrict_l</code></td>
 <td><code>nOwnedInEdges</code></td>
 <td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>offset = [ 0,  1,  0,  1,  2,  3,  4]</td>
+<td>offset = [ 0,  3,  0,  3,  6,  9, 12]</td>
 </tr>
 <tr>
 <td><code>c_restrict_r</code></td>
 <td><code>nOwnedInEdges</code></td>
 <td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>offset = [ 1,  2,  3,  4,  5,  4,  5]</td>
+<td>offset = [ 3,  6,  9, 12, 15, 12, 15]</td>
 </tr>
 <tr>
 <td><code>restrict_flux</code></td>
@@ -1332,6 +1332,12 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 <td>State left of the edge [h_left, hu_left, hv_left]</td>
 </tr>
 <tr>
+<td><code>q_dirichlet</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>(Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc]</td>
+</tr>
+<tr>
 <td><code>cell_left</code></td>
 <td><code>3</code></td>
 <td>Out</td>
@@ -1343,14 +1349,9 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 <td>Out</td>
 <td>Flux through the edge [f_h f_hu f_hv]</td>
 </tr>
-<tr>
-<td><code>q_dirichlet</code></td>
-<td><code>3</code></td>
-<td>In</td>
-<td>(Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc]</td>
-</tr>
 </tbody>
 </table>
+<p>The <code>CeedElemRestriction</code> for the boundary fields are listed below.</p>
 <table>
 <thead>
 <tr>
@@ -1374,21 +1375,21 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 <td><code>nOwnedBndEdges</code></td>
 <td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 0,  1,  2,  0,  2,  3,  3,  5,  3,  4,  5]</td>
-</tr>
-<tr>
-<td><code>c_restrict_l</code></td>
-<td><code>nOwnedBndEdges</code></td>
-<td><code>3 * nCells</code></td>
-<td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 0,  1,  0,  1,  2,  3,  4]</td>
+<td>[ 0,  3,  6,  0,  6,  9,  9, 15,  9, 12, 15]</td>
 </tr>
 <tr>
 <td><code>restrict_dirichlet</code></td>
 <td><code>nOwnedBndEdges</code></td>
 <td><code>3 * nOwnedBndEdges</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 1,  2,  3,  4,  5,  4,  5]</td>
+<td>[ 3,  6,  9, 12, 15, 12, 15]</td>
+</tr>
+<tr>
+<td><code>c_restrict_l</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 0,  3,  0,  3,  6,  9, 12]</td>
 </tr>
 <tr>
 <td><code>restrict_flux</code></td>
