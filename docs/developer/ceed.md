@@ -36,18 +36,6 @@ v00---e00---v01---e01---v02---e02---v03
 
 ```
 
-## SWE physics with libCEED
-
-The libCEED version of RDycore's explicit time-integrator of the SWE solver has two `CeedOperator`:
-
-1. `rdy->ceed_rhs.op_edges` : Computes fluxes across edges and it includes two sub-operators that correspond to:
-    - Internal edges,
-    - Boundary edges
-
-2. `rdy->ceed_rhs.src`: Opeator that computes the source terms including rainfall and terms associated with bed slope and bed friction.
-
-### Computation of Fluxes across Internal Edges
-
 For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (`X`).
 The block size of `X` would be `3` corresponding to the following prognostic variables:
 
@@ -59,6 +47,18 @@ The size of `X` will `6 * 3` where `6` corresponds to number of cells in the mes
 ```text
 X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
 ```
+
+## SWE physics with libCEED
+
+The libCEED version of RDycore's explicit time-integrator of the SWE solver has two `CeedOperator`:
+
+1. `rdy->ceed_rhs.op_edges` : Computes fluxes across edges and it includes two sub-operators that correspond to:
+    - Internal edges,
+    - Boundary edges
+
+2. `rdy->ceed_rhs.src`: Opeator that computes the source terms including rainfall and terms associated with bed slope and bed friction.
+
+### Computation of Fluxes across Internal Edges
 
 RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.
 
