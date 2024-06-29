@@ -836,6 +836,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#computation-of-fluxes-across-boundary-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      Computation of Fluxes across Boundary Edges
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -911,6 +920,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#computation-of-fluxes-across-boundary-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      Computation of Fluxes across Boundary Edges
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -967,6 +985,16 @@ e03   c00   e04   c01   e05   c02   e06
  |           |           |           |
 v00---e00---v01---e01---v02---e02---v03
 </code></pre></div>
+<p>For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (<code>X</code>).
+The block size of <code>X</code> would be <code>3</code> corresponding to the following prognostic variables:</p>
+<ul>
+<li>Height (<code>h</code>),</li>
+<li>Momentum in x-dir (<code>hu</code>), and</li>
+<li>Momentum in y-dir (<code>hv</code>).
+The size of <code>X</code> will <code>6 * 3</code> where <code>6</code> corresponds to number of cells in the mesh. The layout of <code>X</code> will be as follows:</li>
+</ul>
+<div class="highlight"><pre><span></span><code>X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
+</code></pre></div>
 <h2 id="swe-physics-with-libceed">SWE physics with libCEED</h2>
 <p>The libCEED version of RDycore's explicit time-integrator of the SWE solver has two <code>CeedOperator</code>:</p>
 <ol>
@@ -982,16 +1010,6 @@ v00---e00---v01---e01---v02---e02---v03
 </li>
 </ol>
 <h3 id="computation-of-fluxes-across-internal-edges">Computation of Fluxes across Internal Edges</h3>
-<p>For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (<code>X</code>).
-The block size of <code>X</code> would be <code>3</code> corresponding to the following prognostic variables:</p>
-<ul>
-<li>Height (<code>h</code>),</li>
-<li>Momentum in x-dir (<code>hu</code>), and</li>
-<li>Momentum in y-dir (<code>hv</code>).
-The size of <code>X</code> will <code>6 * 3</code> where <code>6</code> corresponds to number of cells in the mesh. The layout of <code>X</code> will be as follows:</li>
-</ul>
-<div class="highlight"><pre><span></span><code>X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
-</code></pre></div>
 <p>RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.</p>
 <table>
 <thead>
@@ -1081,7 +1099,7 @@ The pointer to the user-defined function is specified at the time of creation.</
 <td>Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left</td>
 </tr>
 <tr>
-<td>cell_left</td>
+<td>cell_right</td>
 <td>3</td>
 <td>Out</td>
 <td>Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right</td>
@@ -1103,7 +1121,8 @@ for an input/output field. The <code>CeedElemRestriction</code> for the fields a
 <thead>
 <tr>
 <th>Variable name</th>
-<th>Size</th>
+<th>Size of offset</th>
+<th>Size of CeedVector</th>
 <th>Created via</th>
 <th>Notes</th>
 </tr>
@@ -1111,42 +1130,49 @@ for an input/output field. The <code>CeedElemRestriction</code> for the fields a
 <tbody>
 <tr>
 <td><code>restrict_geom</code></td>
-<td>4 * num_owned_internal_edges</td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>4 * nOwnedInEdges</code></td>
 <td><code>CeedElemRestrictionCreateStrided</code></td>
-<td>[ 0,  4,  8, 12, 16, 20, 24]</td>
+<td>offset = [ 0,  4,  8, 12, 16, 20, 24]</td>
 </tr>
 <tr>
 <td><code>q_restrict_l</code></td>
-<td>3 * num_cells</td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 0,  1,  0,  1,  2,  3,  4]</td>
+<td>offset = [ 0,  1,  0,  1,  2,  3,  4]</td>
 </tr>
 <tr>
 <td><code>q_restrict_r</code></td>
-<td>3 * num_cells</td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 1,  2,  3,  4,  5,  4,  5]</td>
+<td>offset = [ 1,  2,  3,  4,  5,  4,  5]</td>
 </tr>
 <tr>
 <td><code>c_restrict_l</code></td>
-<td>3 * num_cells</td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 0,  1,  0,  1,  2,  3,  4]</td>
+<td>offset = [ 0,  1,  0,  1,  2,  3,  4]</td>
 </tr>
 <tr>
 <td><code>c_restrict_r</code></td>
-<td>3 * num_cells</td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
 <td><code>CeedElemRestrictionCreate</code></td>
-<td>[ 1,  2,  3,  4,  5,  4,  5]</td>
+<td>offset = [ 1,  2,  3,  4,  5,  4,  5]</td>
 </tr>
 <tr>
 <td><code>restrict_flux</code></td>
-<td>3 * num_owned_internal_edges</td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nOwnedInEdges</code></td>
 <td><code>CeedElemRestrictionCreateStrided</code></td>
-<td>[ 0,  3,  6,  9, 12, 15, 18]</td>
+<td>offset = [ 0,  3,  6,  9, 12, 15, 18]</td>
 </tr>
 </tbody>
 </table>
+<p>where <code>nOwnedInEdges</code> is the number of owned internal edges and <code>nCells</code> is the total number of cells ( = owned + ghost).</p>
 <ul>
 <li>Third,  create the <code>CeedOperator</code> using the previously created <code>CeedQFunction</code> and all <code>CeedElementRestriction</code>.
 The multiple fields are added via <code>CeedOperatorSetField</code>.</li>
@@ -1155,47 +1181,247 @@ The multiple fields are added via <code>CeedOperatorSetField</code>.</li>
 <thead>
 <tr>
 <th>Field name</th>
-<th>Size</th>
+<th>CeedElemRestriction</th>
 <th>CeedVector</th>
 <th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>geom</td>
-<td>restrict_geom</td>
 <td><code>geom</code></td>
-<td>This <code>CeedVector</code> has values <code>geom[:][0:3] = [sn cn L/A_l L/A_r]</code></td>
+<td><code>restrict_geom</code></td>
+<td><code>geom</code></td>
+<td><code>geom</code> has values <code>geom[:][0:3] = [sn cn L/A_l L/A_r]</code></td>
 </tr>
 <tr>
-<td>q_left</td>
-<td>q_restrict_l</td>
-<td>CEED_VECTOR_ACTIVE</td>
+<td><code>q_left</code></td>
+<td><code>q_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
 <td></td>
 </tr>
 <tr>
-<td>q_right</td>
-<td>q_restrict_r</td>
-<td>CEED_VECTOR_ACTIVE</td>
+<td><code>q_right</code></td>
+<td><code>q_restrict_r</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
 <td></td>
 </tr>
 <tr>
-<td>cell_left</td>
-<td>c_restrict_l</td>
-<td>CEED_VECTOR_ACTIVE</td>
+<td><code>cell_left</code></td>
+<td><code>c_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
 <td></td>
 </tr>
 <tr>
-<td>cell_left</td>
-<td>c_restrict_r</td>
-<td>CEED_VECTOR_ACTIVE</td>
+<td><code>cell_right</code></td>
+<td><code>c_restrict_r</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
 <td></td>
 </tr>
 <tr>
-<td>flux</td>
-<td>restrict_flux</td>
 <td><code>flux</code></td>
-<td>This <code>CeedVector</code> is initalized to <code>0.0</code></td>
+<td><code>restrict_flux</code></td>
+<td><code>flux</code></td>
+<td><code>flux</code> is initalized to <code>0.0</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="computation-of-fluxes-across-boundary-edges">Computation of Fluxes across Boundary Edges</h3>
+<p>The values right of the edge are provided if a Dirichlet boundary condition is applied on that edge
+For a reflective boundary condition, the value on the left of the edge is used as the value on right of the edge.
+Based on the mesh shown above, the boundary edges are listed in the table below.</p>
+<table>
+<thead>
+<tr>
+<th>Boundary Edge</th>
+<th>Left Cell</th>
+<th>(Optional) Dirichlet Right cell</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>e00</td>
+<td>c00</td>
+<td>d00</td>
+</tr>
+<tr>
+<td>e01</td>
+<td>c01</td>
+<td>d01</td>
+</tr>
+<tr>
+<td>e02</td>
+<td>c02</td>
+<td>d02</td>
+</tr>
+<tr>
+<td>e03</td>
+<td>c00</td>
+<td>d03</td>
+</tr>
+<tr>
+<td>e06</td>
+<td>c02</td>
+<td>d04</td>
+</tr>
+<tr>
+<td>e10</td>
+<td>c03</td>
+<td>d05</td>
+</tr>
+<tr>
+<td>e13</td>
+<td>c05</td>
+<td>d06</td>
+</tr>
+<tr>
+<td>e14</td>
+<td>c03</td>
+<td>d07</td>
+</tr>
+<tr>
+<td>e15</td>
+<td>c04</td>
+<td>d08</td>
+</tr>
+<tr>
+<td>e16</td>
+<td>c05</td>
+<td>d09</td>
+</tr>
+</tbody>
+</table>
+<p>The fields for the boundary condition <code>CeedQFunction</code> are listed below. It should be noted that the <code>geom</code> field for a boundary edge has one geometric attribute less than the <code>geom</code> field for an intenral edge because the value <code>L_edge/A_right</code> is not needed for a boundary edge. Similarly, <code>cell_right</code> field is omitted for a boundary edge.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Size</th>
+<th>In/Out</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>Geometric attrbutes [sn, cn, L_edge/Area_left]</td>
+</tr>
+<tr>
+<td><code>q_left</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>State left of the edge [h_left, hu_left, hv_left]</td>
+</tr>
+<tr>
+<td><code>cell_left</code></td>
+<td><code>3</code></td>
+<td>Out</td>
+<td>Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left</td>
+</tr>
+<tr>
+<td><code>flux</code></td>
+<td><code>3</code></td>
+<td>Out</td>
+<td>Flux through the edge [f_h f_hu f_hv]</td>
+</tr>
+<tr>
+<td><code>q_dirichlet</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>(Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc]</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Variable name</th>
+<th>Size of offset</th>
+<th>Size of CeedVector</th>
+<th>Created via</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>restrict_geom</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>[ 0,  3,  6,  9, 12, 15, 18, 21, 24, 27, 30]</td>
+</tr>
+<tr>
+<td><code>q_restrict_l</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 0,  1,  2,  0,  2,  3,  3,  5,  3,  4,  5]</td>
+</tr>
+<tr>
+<td><code>c_restrict_l</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 0,  1,  0,  1,  2,  3,  4]</td>
+</tr>
+<tr>
+<td><code>restrict_dirichlet</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 1,  2,  3,  4,  5,  4,  5]</td>
+</tr>
+<tr>
+<td><code>restrict_flux</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>[ 0,  3,  6,  9, 12, 15, 18]</td>
+</tr>
+</tbody>
+</table>
+<p>where <code>nOwnedBndEdges</code> is the number of owned boundary edges and <code>nCells</code> is the total number of cells ( = owned + ghost).
+The fields, <code>CeedElemRestriction</code>, and <code>CeedVector</code> that are used to create the boundary <code>CeedOperator</code> are summarized below.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>CeedElemRestriction</th>
+<th>CeedVector</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>restrict_geom</code></td>
+<td><code>geom</code></td>
+<td><code>geom</code> has values <code>geom[:][0:2] = [sn cn L/A_l]</code></td>
+</tr>
+<tr>
+<td><code>q_left</code></td>
+<td><code>q_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>q_dirichlet</code></td>
+<td><code>restrict_dirichlet</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cell_left</code></td>
+<td><code>c_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>flux</code></td>
+<td><code>restrict_flux</code></td>
+<td><code>flux</code></td>
+<td><code>flux</code> is initalized to <code>0.0</code></td>
 </tr>
 </tbody>
 </table>
