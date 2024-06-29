@@ -63,14 +63,14 @@ The libCEED version of RDycore's explicit time-integrator of the SWE solver has 
 RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.
 
 | Internal Edge | Left Cell | Right cell |
-| ---- | ---- | ---- |
-| e04  | c00  | c01  |
-| e05  | c01  | c02  |
-| e07  | c00  | c03  |
-| e08  | c01  | c04  |
-| e09  | c02  | c05  |
-| e11  | c03  | c04  |
-| e12  | c04  | c05  |
+| ------------- | --------- | ---------- |
+| e04           | c00       | c01        |
+| e05           | c01       | c02        |
+| e07           | c00       | c03        |
+| e08           | c01       | c04        |
+| e09           | c02       | c05        |
+| e11           | c03       | c04        |
+| e12           | c04       | c05        |
 
 The steps involved in creating the `CeedOperator` associated with the internal edges are as follows:
 
@@ -79,36 +79,86 @@ The input fields includes geometric attributes associated with the edges and the
 The output fields include contribution of fluxes to the cells left and right of the edge and a diagnostic variable that saves fluxes through the edge.
 The pointer to the user-defined function is specified at the time of creation.
 
-| Field name | Size | In/Out | Notes |
-| ---------- | ---- | ------ | ----- |
+| Field name | Size | In/Out | Notes                                                        |
+| ---------- | ---- | ------ | ------------------------------------------------------------ |
 | geom       |  4   | In     | Geometric attrbutes [sn, cn, L_edge/Area_left, L_edge/right] |
 | q_left     |  3   | In     | State left of the edge [h_left, hu_left, hv_left] |
 | q_right    |  3   | In     | State right of the edge [h_right, hu_right, hv_right] |
 | cell_left  |  3   | Out    | Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left |
-| cell_left  |  3   | Out    | Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right |
+| cell_right |  3   | Out    | Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right |
 | flux       |  3   | Out    | Flux through the edge [f_h f_hu f_hv] |
 
 - Second, create `CeedElemRestriction` for all the input and output fields of previously created `CeedQFunction`.
 A `CeedElemRistriction` tells libCEED the indices of a `CeedVec` from/to which the values are to extracted/written
 for an input/output field. The `CeedElemRestriction` for the fields and the example mesh is given below.
 
-| Variable name  | Size                            | Created via                        | Notes |
-| -------------- | ------------------------------- | ---------------------------------- | ----- |
-| `restrict_geom`  |  4 * num_owned_internal_edges   | `CeedElemRestrictionCreateStrided` |  [ 0,  4,  8, 12, 16, 20, 24] |
-| `q_restrict_l`   |  3 * num_cells                  | `CeedElemRestrictionCreate`        |  [ 0,  1,  0,  1,  2,  3,  4] |
-| `q_restrict_r`   |  3 * num_cells                  | `CeedElemRestrictionCreate`        |  [ 1,  2,  3,  4,  5,  4,  5] |
-| `c_restrict_l`   |  3 * num_cells                  | `CeedElemRestrictionCreate`        |  [ 0,  1,  0,  1,  2,  3,  4] |
-| `c_restrict_r`   |  3 * num_cells                  | `CeedElemRestrictionCreate`        |  [ 1,  2,  3,  4,  5,  4,  5] |
-| `restrict_flux`  |  3 * num_owned_internal_edges   | `CeedElemRestrictionCreateStrided` |  [ 0,  3,  6,  9, 12, 15, 18] |
+| Variable name    | Size of offset    | Size of CeedVector   | Created via                        | Notes |
+| ---------------- | ----------------- | -------------------- | ---------------------------------- | ----- |
+| `restrict_geom`  |  `nOwnedInEdges`  | `4 * nOwnedInEdges`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  4,  8, 12, 16, 20, 24] |
+| `q_restrict_l`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 0,  1,  0,  1,  2,  3,  4] |
+| `q_restrict_r`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 1,  2,  3,  4,  5,  4,  5] |
+| `c_restrict_l`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 0,  1,  0,  1,  2,  3,  4] |
+| `c_restrict_r`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 1,  2,  3,  4,  5,  4,  5] |
+| `restrict_flux`  |  `nOwnedInEdges`  | `3 * nOwnedInEdges`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  3,  6,  9, 12, 15, 18] |
+
+where `nOwnedInEdges` is the number of owned internal edges and `nCells` is the total number of cells ( = owned + ghost).
 
 - Third,  create the `CeedOperator` using the previously created `CeedQFunction` and all `CeedElementRestriction`.
 The multiple fields are added via `CeedOperatorSetField`.
 
-| Field name | Size             | CeedVector          | Notes |
-| ---------- | ---------------- | ------------------- | ----- |
-| geom       |  restrict_geom   | `geom`              | This `CeedVector` has values `geom[:][0:3] = [sn cn L/A_l L/A_r]` |
-| q_left     |  q_restrict_l    | CEED_VECTOR_ACTIVE  |  |
-| q_right    |  q_restrict_r    | CEED_VECTOR_ACTIVE  |  |
-| cell_left  |  c_restrict_l    | CEED_VECTOR_ACTIVE  |  |
-| cell_left  |  c_restrict_r    | CEED_VECTOR_ACTIVE  |  |
-| flux       |  restrict_flux   | `flux`              | This `CeedVector` is initalized to `0.0` |
+| Field name   | CeedElemRestriction | CeedVector           | Notes |
+| ------------ | ------------------- | -------------------- | ----- |
+| `geom`       |  `restrict_geom`    | `geom`               | `geom` has values `geom[:][0:3] = [sn cn L/A_l L/A_r]` |
+| `q_left`     |  `q_restrict_l`     | `CEED_VECTOR_ACTIVE` |  |
+| `q_right`    |  `q_restrict_r`     | `CEED_VECTOR_ACTIVE` |  |
+| `cell_left`  |  `c_restrict_l`     | `CEED_VECTOR_ACTIVE` |  |
+| `cell_right` |  `c_restrict_r`     | `CEED_VECTOR_ACTIVE` |  |
+| `flux`       |  `restrict_flux`    | `flux`               | `flux` is initalized to `0.0` |
+
+### Computation of Fluxes across Boundary Edges
+
+The values right of the edge are provided if a Dirichlet boundary condition is applied on that edge
+For a reflective boundary condition, the value on the left of the edge is used as the value on right of the edge.
+Based on the mesh shown above, the boundary edges are listed in the table below.
+
+| Boundary Edge | Left Cell | (Optional) Dirichlet Right cell |
+| ---- | ---- | ---- |
+| e00  | c00  | d00  |
+| e01  | c01  | d01  |
+| e02  | c02  | d02  |
+| e03  | c00  | d03  |
+| e06  | c02  | d04  |
+| e10  | c03  | d05  |
+| e13  | c05  | d06  |
+| e14  | c03  | d07  |
+| e15  | c04  | d08  |
+| e16  | c05  | d09  |
+
+The fields for the boundary condition `CeedQFunction` are listed below. It should be noted that the `geom` field for a boundary edge has one geometric attribute less than the `geom` field for an intenral edge because the value `L_edge/A_right` is not needed for a boundary edge. Similarly, `cell_right` field is omitted for a boundary edge.
+
+| Field name  | Size | In/Out | Notes |
+| ----------  | ---- | ------ | ----- |
+| `geom`        |  `3`   | In     | Geometric attrbutes [sn, cn, L_edge/Area_left] |
+| `q_left`      |  `3`   | In     | State left of the edge [h_left, hu_left, hv_left] |
+| `cell_left`   |  `3`   | Out    | Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left |
+| `flux`        |  `3`   | Out    | Flux through the edge [f_h f_hu f_hv] |
+| `q_dirichlet` |  `3`   | In     | (Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc] |
+
+| Variable name        | Size of offset    | Size of CeedVector   | Created via                        | Notes                                         |
+| -------------------- | ----------------- | ---------------------| ---------------------------------- | --------------------------------------------- |
+| `restrict_geom`      |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreateStrided` |  [ 0,  3,  6,  9, 12, 15, 18, 21, 24, 27, 30] |
+| `q_restrict_l`       |  `nOwnedBndEdges` | `3 * nCells`         | `CeedElemRestrictionCreate`        |  [ 0,  1,  2,  0,  2,  3,  3,  5,  3,  4,  5] |
+| `c_restrict_l`       |  `nOwnedBndEdges` | `3 * nCells`         | `CeedElemRestrictionCreate`        |  [ 0,  1,  0,  1,  2,  3,  4]                 |
+| `restrict_dirichlet` |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreate`        |  [ 1,  2,  3,  4,  5,  4,  5]                 |
+| `restrict_flux`      |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreateStrided` |  [ 0,  3,  6,  9, 12, 15, 18]                 |
+
+where `nOwnedBndEdges` is the number of owned boundary edges and `nCells` is the total number of cells ( = owned + ghost).
+The fields, `CeedElemRestriction`, and `CeedVector` that are used to create the boundary `CeedOperator` are summarized below.
+
+| Field name    | CeedElemRestriction   | CeedVector           | Notes                                            |
+| ------------- | --------------------- | -------------------- | ------------------------------------------------ |
+| `geom`        |  `restrict_geom`      | `geom`               | `geom` has values `geom[:][0:2] = [sn cn L/A_l]` |
+| `q_left`      |  `q_restrict_l`       | `CEED_VECTOR_ACTIVE` |  |
+| `q_dirichlet` |  `restrict_dirichlet` | `CEED_VECTOR_ACTIVE` |  |
+| `cell_left`   |  `c_restrict_l`       | `CEED_VECTOR_ACTIVE` |  |
+| `flux`        |  `restrict_flux`      | `flux`               | `flux` is initalized to `0.0` |
