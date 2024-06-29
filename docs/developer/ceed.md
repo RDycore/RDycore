@@ -1,7 +1,7 @@
 
 # RDycore SWE physics with CEED
 
-Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses [libCEED](https://github.com/CEED/libCEED). The combination of PETSc and libCEED provides ***algorithimic and hardware protability***. 
+Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses [libCEED](https://github.com/CEED/libCEED). The combination of PETSc and libCEED provides RDDycore algorithimic and hardware protability.
 
 - RDycore uses PETSc's `TS` solvers that provide support for multiple time-integrators such as forward euler, RK4, etc., which can be selected at run time (e.g. `--ts_type euler`, `--ts_type rk4`, etc). 
 - The use libCEED allows RDycore to compute the RHS-function for the explicit time-integrators on CPU or GPU, which can also be selected at runtime via
@@ -14,9 +14,9 @@ Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) 
 Let's consider an example 3x2 mesh that consists of
 
 - 6 cells: `c00` to `c05`
-- 17 edges: `e00` to `e11`
+- 17 edges: `e00` to `e16`
     - Internal edges: `e04`, `e05`, `e07`, `e08`, `e09`, `e11`, and `e12`.
-    - Boundary edges: Remaining 10 edges.
+    - Boundary edges: `e00`, `e01`, `e02`, `e03`, `e06`, `e10`, `e13`, `e14`, `e15`, and `e16`.
 - 12 vertices: `v00` to `v11`
 
 ```text
@@ -37,7 +37,7 @@ v00---e00---v01---e01---v02---e02---v03
 ```
 
 For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (`X`).
-The block size of `X` would be `3` corresponding to the following prognostic variables:
+The block size of `X` is `3` corresponding to the following prognostic variables:
 
 - Height (`h`),
 - Momentum in x-dir (`hu`), and
@@ -95,10 +95,10 @@ for an input/output field. The `CeedElemRestriction` for the fields and the exam
 | Variable name    | Size of offset    | Size of CeedVector   | Created via                        | Notes |
 | ---------------- | ----------------- | -------------------- | ---------------------------------- | ----- |
 | `restrict_geom`  |  `nOwnedInEdges`  | `4 * nOwnedInEdges`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  4,  8, 12, 16, 20, 24] |
-| `q_restrict_l`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 0,  1,  0,  1,  2,  3,  4] |
-| `q_restrict_r`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 1,  2,  3,  4,  5,  4,  5] |
-| `c_restrict_l`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 0,  1,  0,  1,  2,  3,  4] |
-| `c_restrict_r`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 1,  2,  3,  4,  5,  4,  5] |
+| `q_restrict_l`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 0,  3,  0,  3,  6,  9, 12] |
+| `q_restrict_r`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 3,  6,  9, 12, 15, 12, 15] |
+| `c_restrict_l`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 0,  3,  0,  3,  6,  9, 12] |
+| `c_restrict_r`   |  `nOwnedInEdges`  | `3 * nCells`         | `CeedElemRestrictionCreate`        |  offset = [ 3,  6,  9, 12, 15, 12, 15] |
 | `restrict_flux`  |  `nOwnedInEdges`  | `3 * nOwnedInEdges`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  3,  6,  9, 12, 15, 18] |
 
 where `nOwnedInEdges` is the number of owned internal edges and `nCells` is the total number of cells ( = owned + ghost).
@@ -140,16 +140,18 @@ The fields for the boundary condition `CeedQFunction` are listed below. It shoul
 | ------------- | ---- | ------ | -------------------------------------------------------------------------- |
 | `geom`        |  `3` | In     | Geometric attrbutes [sn, cn, L_edge/Area_left]                             |
 | `q_left`      |  `3` | In     | State left of the edge [h_left, hu_left, hv_left]                          |
+| `q_dirichlet` |  `3` | In     | (Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc] |
 | `cell_left`   |  `3` | Out    | Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left      |
 | `flux`        |  `3` | Out    | Flux through the edge [f_h f_hu f_hv]                                      |
-| `q_dirichlet` |  `3` | In     | (Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc] |
+
+The `CeedElemRestriction` for the boundary fields are listed below.
 
 | Variable name        | Size of offset    | Size of CeedVector   | Created via                        | Notes                                         |
 | -------------------- | ----------------- | ---------------------| ---------------------------------- | --------------------------------------------- |
 | `restrict_geom`      |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreateStrided` |  [ 0,  3,  6,  9, 12, 15, 18, 21, 24, 27, 30] |
-| `q_restrict_l`       |  `nOwnedBndEdges` | `3 * nCells`         | `CeedElemRestrictionCreate`        |  [ 0,  1,  2,  0,  2,  3,  3,  5,  3,  4,  5] |
-| `c_restrict_l`       |  `nOwnedBndEdges` | `3 * nCells`         | `CeedElemRestrictionCreate`        |  [ 0,  1,  0,  1,  2,  3,  4]                 |
-| `restrict_dirichlet` |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreate`        |  [ 1,  2,  3,  4,  5,  4,  5]                 |
+| `q_restrict_l`       |  `nOwnedBndEdges` | `3 * nCells`         | `CeedElemRestrictionCreate`        |  [ 0,  3,  6,  0,  6,  9,  9, 15,  9, 12, 15] |
+| `restrict_dirichlet` |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreate`        |  [ 3,  6,  9, 12, 15, 12, 15]                 |
+| `c_restrict_l`       |  `nOwnedBndEdges` | `3 * nCells`         | `CeedElemRestrictionCreate`        |  [ 0,  3,  0,  3,  6,  9, 12]                 |
 | `restrict_flux`      |  `nOwnedBndEdges` | `3 * nOwnedBndEdges` | `CeedElemRestrictionCreateStrided` |  [ 0,  3,  6,  9, 12, 15, 18]                 |
 
 where `nOwnedBndEdges` is the number of owned boundary edges and `nCells` is the total number of cells ( = owned + ghost).
