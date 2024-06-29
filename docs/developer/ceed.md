@@ -200,3 +200,7 @@ The fields, `CeedElemRestriction`, and `CeedVector` that are used to create the 
 | `riemannf`   |  `restrict_riemannf`   | `riemannf`           | `riemannf` has the sum of Riemann fluxes in a cell through internal and boundary edges |
 | `q`          |  `restrict_q`          | `CEED_VECTOR_ACTIVE` |  |
 | `cell`       |  `restrict_c`          | `CEED_VECTOR_ACTIVE` |  |
+
+### Schematic Represntation of RHSFunction with libCEED
+
+![image](figures/rhsfunction_swe.png)
