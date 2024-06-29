@@ -58,7 +58,7 @@ The libCEED version of RDycore's explicit time-integrator of the SWE solver has 
 
 2. `rdy->ceed_rhs.src`: Opeator that computes the source terms including rainfall and terms associated with bed slope and bed friction.
 
-### Computation of Fluxes across Internal Edges
+### `CeedOperator` for Internal Edges
 
 RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.
 
@@ -115,7 +115,7 @@ The multiple fields are added via `CeedOperatorSetField`.
 | `cell_right` |  `c_restrict_r`     | `CEED_VECTOR_ACTIVE` |  |
 | `flux`       |  `restrict_flux`    | `flux`               | `flux` is initalized to `0.0` |
 
-### Computation of Fluxes across Boundary Edges
+### `CeedOperator` for Boundary Edges
 
 The values right of the edge are provided if a Dirichlet boundary condition is applied on that edge
 For a reflective boundary condition, the value on the left of the edge is used as the value on right of the edge.
@@ -136,13 +136,13 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 
 The fields for the boundary condition `CeedQFunction` are listed below. It should be noted that the `geom` field for a boundary edge has one geometric attribute less than the `geom` field for an intenral edge because the value `L_edge/A_right` is not needed for a boundary edge. Similarly, `cell_right` field is omitted for a boundary edge.
 
-| Field name  | Size | In/Out | Notes |
-| ----------  | ---- | ------ | ----- |
-| `geom`        |  `3`   | In     | Geometric attrbutes [sn, cn, L_edge/Area_left] |
-| `q_left`      |  `3`   | In     | State left of the edge [h_left, hu_left, hv_left] |
-| `cell_left`   |  `3`   | Out    | Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left |
-| `flux`        |  `3`   | Out    | Flux through the edge [f_h f_hu f_hv] |
-| `q_dirichlet` |  `3`   | In     | (Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc] |
+| Field name    | Size | In/Out | Notes                                                                      |
+| ------------- | ---- | ------ | -------------------------------------------------------------------------- |
+| `geom`        |  `3` | In     | Geometric attrbutes [sn, cn, L_edge/Area_left]                             |
+| `q_left`      |  `3` | In     | State left of the edge [h_left, hu_left, hv_left]                          |
+| `cell_left`   |  `3` | Out    | Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left      |
+| `flux`        |  `3` | Out    | Flux through the edge [f_h f_hu f_hv]                                      |
+| `q_dirichlet` |  `3` | In     | (Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc] |
 
 | Variable name        | Size of offset    | Size of CeedVector   | Created via                        | Notes                                         |
 | -------------------- | ----------------- | ---------------------| ---------------------------------- | --------------------------------------------- |
@@ -162,3 +162,39 @@ The fields, `CeedElemRestriction`, and `CeedVector` that are used to create the 
 | `q_dirichlet` |  `restrict_dirichlet` | `CEED_VECTOR_ACTIVE` |  |
 | `cell_left`   |  `c_restrict_l`       | `CEED_VECTOR_ACTIVE` |  |
 | `flux`        |  `restrict_flux`      | `flux`               | `flux` is initalized to `0.0` |
+
+### `CeedOperator` for Source/Sink
+
+The fields for the source/sink `CeedQFunction` are listed below.
+
+| Field name    | Size | In/Out | Notes                                                |
+| ------------- | ---- | ------ | ---------------------------------------------------- |
+| `geom`        |  `2` | In     | Geometric attrbutes [dz/dx, dz/y]                    |
+| `swe_src`     |  `3` | In     | Source/sink value for the three prognostic variables |
+| `mannings_n`  |  `1` | In     | Mannings roughness coefficient                       |
+| `riemannf`    |  `3` | In     | Sum of fluxes in/out of a cell                       |
+| `q`           |  `3` | In     | The prognostic variables [h, hu, hv]                 |
+| `cell`        |  `3` | Out    | The RHS value of the ODE for the TS solver           |
+
+The `CeedElemRestriction` for the source/sink fields are listed below.
+
+| Variable name         | Size of offset | Size of CeedVector | Created via                        | Notes                              |
+| --------------------- | -------------- | -----------------  | ---------------------------------- | ---------------------------------- |
+| `restrict_geom`       |  `nOwnedCells` | `2 * nOwnedCells`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  3,  6,  9, 12, 15] |
+| `restrict_swe`        |  `nOwnedCells` | `3 * nOwnedCells`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  3,  6,  9, 12, 15] |
+| `restrict_mannings_n` |  `nOwnedCells` | `1 * nOwnedCells`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  3,  6,  9, 12, 15] |
+| `restrict_riemannf`   |  `nOwnedCells` | `3 * nOwnedCells`  | `CeedElemRestrictionCreateStrided` |  offset = [ 0,  3,  6,  9, 12, 15] |
+| `restrict_q`          |  `nOwnedCells` | `3 * nCells`       | `CeedElemRestrictionCreate`        |  offset = [ 0,  3,  6,  9, 12, 15] |
+| `restrict_c`          |  `nOwnedCells` | `3 * nOwnedCells`  | `CeedElemRestrictionCreate`        |  offset = [ 0,  3,  6,  9, 12, 15] |
+
+where `nOwnedCells` is the number of owned cells and `nCells` is the total (= owned + ghost) cells.
+The fields, `CeedElemRestriction`, and `CeedVector` that are used to create the source/sink `CeedOperator` are summarized below.
+
+| Field name   | CeedElemRestriction    | CeedVector           | Notes                                                                                  |
+| ------------ | ---------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `geom`       |  `restrict_geom`       | `geom`               | `geom` has values `geom[:][0:2] = [dz/dx dz/dy]`                                       |
+| `swe_src`    |  `restrict_swe`        | `swe_src`            | `swe_src` has values for the source/sink term                                          |
+| `mannings_n` |  `restrict_mannings_n` | `mannings_n`         | `mannings_n` has values corresponding to Mannings coefficient                          |
+| `riemannf`   |  `restrict_riemannf`   | `riemannf`           | `riemannf` has the sum of Riemann fluxes in a cell through internal and boundary edges |
+| `q`          |  `restrict_q`          | `CEED_VECTOR_ACTIVE` |  |
+| `cell`       |  `restrict_c`          | `CEED_VECTOR_ACTIVE` |  |
