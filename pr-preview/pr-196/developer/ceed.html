@@ -828,18 +828,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#computation-of-fluxes-across-internal-edges" class="md-nav__link">
+  <a href="#ceedoperator-for-internal-edges" class="md-nav__link">
     <span class="md-ellipsis">
-      Computation of Fluxes across Internal Edges
+      CeedOperator for Internal Edges
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#computation-of-fluxes-across-boundary-edges" class="md-nav__link">
+  <a href="#ceedoperator-for-boundary-edges" class="md-nav__link">
     <span class="md-ellipsis">
-      Computation of Fluxes across Boundary Edges
+      CeedOperator for Boundary Edges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ceedoperator-for-sourcesink" class="md-nav__link">
+    <span class="md-ellipsis">
+      CeedOperator for Source/Sink
     </span>
   </a>
   
@@ -912,18 +921,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#computation-of-fluxes-across-internal-edges" class="md-nav__link">
+  <a href="#ceedoperator-for-internal-edges" class="md-nav__link">
     <span class="md-ellipsis">
-      Computation of Fluxes across Internal Edges
+      CeedOperator for Internal Edges
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#computation-of-fluxes-across-boundary-edges" class="md-nav__link">
+  <a href="#ceedoperator-for-boundary-edges" class="md-nav__link">
     <span class="md-ellipsis">
-      Computation of Fluxes across Boundary Edges
+      CeedOperator for Boundary Edges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ceedoperator-for-sourcesink" class="md-nav__link">
+    <span class="md-ellipsis">
+      CeedOperator for Source/Sink
     </span>
   </a>
   
@@ -1009,7 +1027,7 @@ The size of <code>X</code> will <code>6 * 3</code> where <code>6</code> correspo
 <p><code>rdy-&gt;ceed_rhs.src</code>: Opeator that computes the source terms including rainfall and terms associated with bed slope and bed friction.</p>
 </li>
 </ol>
-<h3 id="computation-of-fluxes-across-internal-edges">Computation of Fluxes across Internal Edges</h3>
+<h3 id="ceedoperator-for-internal-edges"><code>CeedOperator</code> for Internal Edges</h3>
 <p>RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.</p>
 <table>
 <thead>
@@ -1225,7 +1243,7 @@ The multiple fields are added via <code>CeedOperatorSetField</code>.</li>
 </tr>
 </tbody>
 </table>
-<h3 id="computation-of-fluxes-across-boundary-edges">Computation of Fluxes across Boundary Edges</h3>
+<h3 id="ceedoperator-for-boundary-edges"><code>CeedOperator</code> for Boundary Edges</h3>
 <p>The values right of the edge are provided if a Dirichlet boundary condition is applied on that edge
 For a reflective boundary condition, the value on the left of the edge is used as the value on right of the edge.
 Based on the mesh shown above, the boundary edges are listed in the table below.</p>
@@ -1422,6 +1440,162 @@ The fields, <code>CeedElemRestriction</code>, and <code>CeedVector</code> that a
 <td><code>restrict_flux</code></td>
 <td><code>flux</code></td>
 <td><code>flux</code> is initalized to <code>0.0</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="ceedoperator-for-sourcesink"><code>CeedOperator</code> for Source/Sink</h3>
+<p>The fields for the source/sink <code>CeedQFunction</code> are listed below.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Size</th>
+<th>In/Out</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>2</code></td>
+<td>In</td>
+<td>Geometric attrbutes [dz/dx, dz/y]</td>
+</tr>
+<tr>
+<td><code>swe_src</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>Source/sink value for the three prognostic variables</td>
+</tr>
+<tr>
+<td><code>mannings_n</code></td>
+<td><code>1</code></td>
+<td>In</td>
+<td>Mannings roughness coefficient</td>
+</tr>
+<tr>
+<td><code>riemannf</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>Sum of fluxes in/out of a cell</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>The prognostic variables [h, hu, hv]</td>
+</tr>
+<tr>
+<td><code>cell</code></td>
+<td><code>3</code></td>
+<td>Out</td>
+<td>The RHS value of the ODE for the TS solver</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>CeedElemRestriction</code> for the source/sink fields are listed below.</p>
+<table>
+<thead>
+<tr>
+<th>Variable name</th>
+<th>Size of offset</th>
+<th>Size of CeedVector</th>
+<th>Created via</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>restrict_geom</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>2 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_swe</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_mannings_n</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>1 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_riemannf</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_q</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_c</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+</tbody>
+</table>
+<p>where <code>nOwnedCells</code> is the number of owned cells and <code>nCells</code> is the total (= owned + ghost) cells.
+The fields, <code>CeedElemRestriction</code>, and <code>CeedVector</code> that are used to create the source/sink <code>CeedOperator</code> are summarized below.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>CeedElemRestriction</th>
+<th>CeedVector</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>restrict_geom</code></td>
+<td><code>geom</code></td>
+<td><code>geom</code> has values <code>geom[:][0:2] = [dz/dx dz/dy]</code></td>
+</tr>
+<tr>
+<td><code>swe_src</code></td>
+<td><code>restrict_swe</code></td>
+<td><code>swe_src</code></td>
+<td><code>swe_src</code> has values for the source/sink term</td>
+</tr>
+<tr>
+<td><code>mannings_n</code></td>
+<td><code>restrict_mannings_n</code></td>
+<td><code>mannings_n</code></td>
+<td><code>mannings_n</code> has values corresponding to Mannings coefficient</td>
+</tr>
+<tr>
+<td><code>riemannf</code></td>
+<td><code>restrict_riemannf</code></td>
+<td><code>riemannf</code></td>
+<td><code>riemannf</code> has the sum of Riemann fluxes in a cell through internal and boundary edges</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td><code>restrict_q</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cell</code></td>
+<td><code>restrict_c</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
 </tr>
 </tbody>
 </table>
