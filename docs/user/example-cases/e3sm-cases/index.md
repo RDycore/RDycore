@@ -22,7 +22,7 @@ Date:   Fri Apr 5 09:05:36 2024 -0600
 (END)
 ```
 
-The E3SM-RDycore development branch is infrequently rebased on E3SM's master. After a rebase, the E3SM-RDycore development branch would named such that the new name correctly represents the starting commit hash and the commit date. The RDycore has been added in E3SM as a submodule at
+The E3SM-RDycore development branch is occasionally rebased on E3SM's master. After a rebase, the E3SM-RDycore development branch is named such that the new name correctly represents the starting commit hash and the commit date. The RDycore has been added in E3SM as a submodule at
 `externals/rdycore`. In the current model coupling, RDycore is part of the MOSART as shown below.
 
 ![image](e3sm-rdycore-via-mosart.png)

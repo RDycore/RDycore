@@ -16,7 +16,7 @@ git submodule update --init
 
 - Create, build, and run a case
     1. Compile RDycore to generate libraries (i.e. `librdycore.a`, `librdycore_f90.a`, `libcyaml.a`, `libyaml.a`, and `libcmocka.a`)
-    2. Create a E3SM case. Presently, the coupled model has been tested for a case with `--comspet RMOSGPCC --res MOS_USRDAT`.
+    2. Create an E3SM case. Currently, the coupled model has been tested for a case with `--comspet RMOSGPCC --res MOS_USRDAT`.
     3. Before building the case, make the following modifications:
         - Modify the Macros file to add settings for PETSc and RDycore
         - Update the DLND streamfile (i.e `user_dlnd.streams.txt.lnd.gpcc`)
