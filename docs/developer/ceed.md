@@ -4,7 +4,7 @@
 Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses [libCEED](https://github.com/CEED/libCEED). The combination of PETSc and libCEED provides RDDycore algorithimic and hardware protability.
 
 - RDycore uses PETSc's `TS` solvers that provide support for multiple time-integrators such as forward euler, RK4, etc., which can be selected at run time (e.g. `--ts_type euler`, `--ts_type rk4`, etc). 
-- The use libCEED allows RDycore to compute the RHS-function for the explicit time-integrators on CPU or GPU, which can also be selected at runtime via
+- Using libCEED allows RDycore to compute the [RHSFunction](https://petsc.org/main/manualpages/TS/TSSetRHSFunction/) for PETSc's explicit `TS` methods on CPU or GPU, which can also be selected at runtime via
      - For CPUs: `-ceed /cpu/self`
      - For NVIDIA GPUs: `-ceed /gpu/cuda -dm_vec_type cuda`
      - For AMD GPUs: `-ceed /gpu/hip -dm_vec_type hip`
@@ -15,8 +15,8 @@ Let's consider an example 3x2 mesh that consists of
 
 - 6 cells: `c00` to `c05`
 - 17 edges: `e00` to `e16`
-    - Internal edges: `e04`, `e05`, `e07`, `e08`, `e09`, `e11`, and `e12`.
-    - Boundary edges: `e00`, `e01`, `e02`, `e03`, `e06`, `e10`, `e13`, `e14`, `e15`, and `e16`.
+    - Internal edges: `e04`, `e05`, `e07`, `e08`, `e09`, `e11`, and `e12`
+    - Boundary edges: `e00`, `e01`, `e02`, `e03`, `e06`, `e10`, `e13`, `e14`, `e15`, and `e16`
 - 12 vertices: `v00` to `v11`
 
 ```text
@@ -36,7 +36,7 @@ v00---e00---v01---e01---v02---e02---v03
 
 ```
 
-For the mesh shown above, the prognostic variables of the 2D SWE are saved in a strided PETSc Vec (`X`).
+A PETSc Vec (`X`) with stride `3`, with components corresponding to the following prognostic variables:
 The block size of `X` is `3` corresponding to the following prognostic variables:
 
 - Height (`h`),
@@ -50,13 +50,11 @@ X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
 
 ## SWE physics with libCEED
 
-The libCEED version of RDycore's explicit time-integrator of the SWE solver has two `CeedOperator`:
+The libCEED version of RDycore's explicit time-integrator of the SWE solver has two [`CeedOperator`s](https://libceed.org/en/latest/api/CeedOperator/):
 
-1. `rdy->ceed_rhs.op_edges` : Computes fluxes across edges and it includes two sub-operators that correspond to:
-    - Internal edges,
-    - Boundary edges
+1. `rdy->ceed_rhs.op_edges` : This operator computes fluxes across edges, and includes "sub-operators" that handle internal edges and boundary edges separately.
 
-2. `rdy->ceed_rhs.src`: Opeator that computes the source terms including rainfall and terms associated with bed slope and bed friction.
+2. `rdy->ceed_rhs.src`: This operator computes source terms such as water added by rainfall and terms associated with bed slope and friction.
 
 ### `CeedOperator` for Internal Edges
 
@@ -74,8 +72,8 @@ RDycore uses first-order finite volume discretization to compute the flux across
 
 The steps involved in creating the `CeedOperator` associated with the internal edges are as follows:
 
-- First, create a `CeedQFunction`, `qf`, and add input and output fields.
-The input fields includes geometric attributes associated with the edges and the prognostic variables left and right of the edges.
+- First, create a [`CeedQFunction`](https://libceed.org/en/latest/api/CeedQFunction/), `qf`, and add input and output fields.
+The input fields include geometric attributes associated with the edges and the prognostic variables to the left left and right of the edges.
 The output fields include contribution of fluxes to the cells left and right of the edge and a diagnostic variable that saves fluxes through the edge.
 The pointer to the user-defined function is specified at the time of creation.
 
@@ -88,8 +86,8 @@ The pointer to the user-defined function is specified at the time of creation.
 | cell_right |  3   | Out    | Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right |
 | flux       |  3   | Out    | Flux through the edge [f_h f_hu f_hv] |
 
-- Second, create `CeedElemRestriction` for all the input and output fields of previously created `CeedQFunction`.
-A `CeedElemRistriction` tells libCEED the indices of a `CeedVec` from/to which the values are to extracted/written
+- Second, create [`CeedElemRestriction`](https://libceed.org/en/latest/api/CeedElemRestriction/) for all the input and output fields of previously created `CeedQFunction`.
+A `CeedElemRistriction` tells libCEED the indices of a [`CeedVector`](https://libceed.org/en/latest/api/CeedVector) from/to which the values are to extracted/written
 for an input/output field. The `CeedElemRestriction` for the fields and the example mesh is given below.
 
 | Variable name    | Size of offset    | Size of CeedVector   | Created via                        | Notes |
@@ -104,7 +102,7 @@ for an input/output field. The `CeedElemRestriction` for the fields and the exam
 where `nOwnedInEdges` is the number of owned internal edges and `nCells` is the total number of cells ( = owned + ghost).
 
 - Third,  create the `CeedOperator` using the previously created `CeedQFunction` and all `CeedElementRestriction`.
-The multiple fields are added via `CeedOperatorSetField`.
+The multiple fields are added via [`CeedOperatorSetField`](https://libceed.org/en/latest/api/CeedOperatorSetField).
 
 | Field name   | CeedElemRestriction | CeedVector           | Notes |
 | ------------ | ------------------- | -------------------- | ----- |
@@ -134,7 +132,7 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 | e15  | c04  | d08  |
 | e16  | c05  | d09  |
 
-The fields for the boundary condition `CeedQFunction` are listed below. It should be noted that the `geom` field for a boundary edge has one geometric attribute less than the `geom` field for an intenral edge because the value `L_edge/A_right` is not needed for a boundary edge. Similarly, `cell_right` field is omitted for a boundary edge.
+The fields for the boundary condition `CeedQFunction` are listed below. It should be noted that the `geom` field for a boundary edge has one geometric attribute fewer than the `geom` field for an intenral edge because the value `L_edge/A_right` is not needed for a boundary edge. Similarly, the `cell_right` field is omitted for a boundary edge.
 
 | Field name    | Size | In/Out | Notes                                                                      |
 | ------------- | ---- | ------ | -------------------------------------------------------------------------- |
@@ -201,6 +199,6 @@ The fields, `CeedElemRestriction`, and `CeedVector` that are used to create the 
 | `q`          |  `restrict_q`          | `CEED_VECTOR_ACTIVE` |  |
 | `cell`       |  `restrict_c`          | `CEED_VECTOR_ACTIVE` |  |
 
-### Schematic Represntation of RHSFunction with libCEED
+### Schematic Representation of RHSFunction with libCEED
 
 ![image](figures/rhsfunction_swe.png)

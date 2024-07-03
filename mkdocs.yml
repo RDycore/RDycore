@@ -22,7 +22,7 @@ nav:
     - 'Code Structure and Organization': 'developer/organization.md'
     - 'Style Guide': 'developer/style.md'
     - 'Developer Tools': 'developer/tools.md'
-    - 'libCEED for SWE': 'developer/ceed.md'
+    - 'SWE implementation using libCEED': 'developer/ceed.md'
 
 edit_uri: ""
 
