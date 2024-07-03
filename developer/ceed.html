@@ -9,6 +9,8 @@
       
       
       
+        <link rel="prev" href="tools.html">
+      
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -16,7 +18,7 @@
     
     
       
-        <title>Mesh - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>SWE implementation using libCEED - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -68,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mesh" class="md-skip">
+        <a href="#rdycore-swe-physics-with-ceed" class="md-skip">
           Skip to content
         </a>
       
@@ -104,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Mesh
+              SWE implementation using libCEED
             
           </span>
         </div>
@@ -677,8 +679,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -688,11 +692,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -706,7 +710,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -843,10 +847,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="ceed.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    SWE implementation using libCEED
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="ceed.html" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -855,6 +879,86 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#example-mesh" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Mesh
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#swe-physics-with-libceed" class="md-nav__link">
+    <span class="md-ellipsis">
+      SWE physics with libCEED
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SWE physics with libCEED">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ceedoperator-for-internal-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      CeedOperator for Internal Edges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ceedoperator-for-boundary-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      CeedOperator for Boundary Edges
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ceedoperator-for-sourcesink" class="md-nav__link">
+    <span class="md-ellipsis">
+      CeedOperator for Source/Sink
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schematic-representation-of-rhsfunction-with-libceed" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schematic Representation of RHSFunction with libCEED
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -894,37 +998,55 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#exodus-ii-mesh-format" class="md-nav__link">
+  <a href="#example-mesh" class="md-nav__link">
     <span class="md-ellipsis">
-      Exodus II Mesh Format
+      Example Mesh
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Exodus II Mesh Format">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#swe-physics-with-libceed" class="md-nav__link">
+    <span class="md-ellipsis">
+      SWE physics with libCEED
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SWE physics with libCEED">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#triangular-elements" class="md-nav__link">
+  <a href="#ceedoperator-for-internal-edges" class="md-nav__link">
     <span class="md-ellipsis">
-      Triangular elements
+      CeedOperator for Internal Edges
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#quadrilateral-elements" class="md-nav__link">
+  <a href="#ceedoperator-for-boundary-edges" class="md-nav__link">
     <span class="md-ellipsis">
-      Quadrilateral elements
+      CeedOperator for Boundary Edges
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#example-mesh-with-mixed-element-types" class="md-nav__link">
+  <a href="#ceedoperator-for-sourcesink" class="md-nav__link">
     <span class="md-ellipsis">
-      Example mesh with mixed element types
+      CeedOperator for Source/Sink
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schematic-representation-of-rhsfunction-with-libceed" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schematic Representation of RHSFunction with libCEED
     </span>
   </a>
   
@@ -932,39 +1054,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dmplex-hdf5-v300" class="md-nav__link">
-    <span class="md-ellipsis">
-      DMPlex HDF5 v3.0.0
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DMPlex HDF5 v3.0.0">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#dmplex-mesh-numbering-for-a-serial-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      DMPlex mesh numbering for a serial run
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#domain-decomposition" class="md-nav__link">
-    <span class="md-ellipsis">
-      Domain Decomposition
-    </span>
-  </a>
   
 </li>
       
@@ -983,251 +1072,637 @@
                   
 
 
-<h1 id="mesh">Mesh</h1>
-<p>Here we describe the two mesh formats that are used in RDycore. The two mesh
-formats that we use are:</p>
+<h1 id="rdycore-swe-physics-with-ceed">RDycore SWE physics with CEED</h1>
+<p>Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses <a href="https://github.com/CEED/libCEED">libCEED</a>. The combination of PETSc and libCEED provides RDDycore algorithimic and hardware protability.</p>
+<ul>
+<li>RDycore uses PETSc's <code>TS</code> solvers that provide support for multiple time-integrators such as forward euler, RK4, etc., which can be selected at run time (e.g. <code>--ts_type euler</code>, <code>--ts_type rk4</code>, etc). </li>
+<li>Using libCEED allows RDycore to compute the <a href="https://petsc.org/main/manualpages/TS/TSSetRHSFunction/">RHSFunction</a> for PETSc's explicit <code>TS</code> methods on CPU or GPU, which can also be selected at runtime via<ul>
+<li>For CPUs: <code>-ceed /cpu/self</code></li>
+<li>For NVIDIA GPUs: <code>-ceed /gpu/cuda -dm_vec_type cuda</code></li>
+<li>For AMD GPUs: <code>-ceed /gpu/hip -dm_vec_type hip</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="example-mesh">Example Mesh</h2>
+<p>Let's consider an example 3x2 mesh that consists of</p>
+<ul>
+<li>6 cells: <code>c00</code> to <code>c05</code></li>
+<li>17 edges: <code>e00</code> to <code>e16</code><ul>
+<li>Internal edges: <code>e04</code>, <code>e05</code>, <code>e07</code>, <code>e08</code>, <code>e09</code>, <code>e11</code>, and <code>e12</code></li>
+<li>Boundary edges: <code>e00</code>, <code>e01</code>, <code>e02</code>, <code>e03</code>, <code>e06</code>, <code>e10</code>, <code>e13</code>, <code>e14</code>, <code>e15</code>, and <code>e16</code></li>
+</ul>
+</li>
+<li>12 vertices: <code>v00</code> to <code>v11</code></li>
+</ul>
+<div class="highlight"><pre><span></span><code>v08---e14---v09---e15---v10---e16---v11
+ |           |           |           |
+ |           |           |           |
+e10   c03   e11   c04   e12   c05   e13
+ |           |           |           |
+ |           |           |           |
+v04---e07---v05---e08---v06---e09---v07
+ |           |           |           |
+ |           |           |           |
+e03   c00   e04   c01   e05   c02   e06
+ |           |           |           |
+ |           |           |           |
+v00---e00---v01---e01---v02---e02---v03
+</code></pre></div>
+<p>A PETSc Vec (<code>X</code>) with stride <code>3</code>, with components corresponding to the following prognostic variables:
+The block size of <code>X</code> is <code>3</code> corresponding to the following prognostic variables:</p>
+<ul>
+<li>Height (<code>h</code>),</li>
+<li>Momentum in x-dir (<code>hu</code>), and</li>
+<li>Momentum in y-dir (<code>hv</code>).
+The size of <code>X</code> will <code>6 * 3</code> where <code>6</code> corresponds to number of cells in the mesh. The layout of <code>X</code> will be as follows:</li>
+</ul>
+<div class="highlight"><pre><span></span><code>X = [[h0 hu0 hv0] [h1 hu1 hv1] ... [h5 hu5 hv5]]
+</code></pre></div>
+<h2 id="swe-physics-with-libceed">SWE physics with libCEED</h2>
+<p>The libCEED version of RDycore's explicit time-integrator of the SWE solver has two <a href="https://libceed.org/en/latest/api/CeedOperator/"><code>CeedOperator</code>s</a>:</p>
 <ol>
-<li>Exodus II</li>
-<li>PETSc's DMPlex-specific, HDF5-based mesh format (version 3.0.0)</li>
+<li>
+<p><code>rdy-&gt;ceed_rhs.op_edges</code> : This operator computes fluxes across edges, and includes "sub-operators" that handle internal edges and boundary edges separately.</p>
+</li>
+<li>
+<p><code>rdy-&gt;ceed_rhs.src</code>: This operator computes source terms such as water added by rainfall and terms associated with bed slope and friction.</p>
+</li>
 </ol>
-<p>RDycore has been tested for meshes that include triangular, quadrilateral, or
-both triangular and quadrilateral cells. Each cell consists of edges
-(3 for triangles and 4 for quadrilaterals) with vertices at the edges' endpoints.
-The cell vertices have three-dimensional coordinates that incorporate topographic information.</p>
-<h2 id="exodus-ii-mesh-format">Exodus II Mesh Format</h2>
-<p>The Exodus II mesh format (<code>.exo</code>) uses 1-based indices. Exodus files are 
-written in the netCDF file format.</p>
-<h3 id="triangular-elements">Triangular elements</h3>
-<div class="highlight"><pre><span></span><code>     Triangular
-        cell
-         v3
-         / \
-        /   \
-      e5     e4
-     /   c1   \
-    /          \
-  v1 --- e3 --- v2
-</code></pre></div>
+<h3 id="ceedoperator-for-internal-edges"><code>CeedOperator</code> for Internal Edges</h3>
+<p>RDycore uses first-order finite volume discretization to compute the flux across the edges, which requires values on the left and the right of the edge.</p>
+<table>
+<thead>
+<tr>
+<th>Internal Edge</th>
+<th>Left Cell</th>
+<th>Right cell</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>e04</td>
+<td>c00</td>
+<td>c01</td>
+</tr>
+<tr>
+<td>e05</td>
+<td>c01</td>
+<td>c02</td>
+</tr>
+<tr>
+<td>e07</td>
+<td>c00</td>
+<td>c03</td>
+</tr>
+<tr>
+<td>e08</td>
+<td>c01</td>
+<td>c04</td>
+</tr>
+<tr>
+<td>e09</td>
+<td>c02</td>
+<td>c05</td>
+</tr>
+<tr>
+<td>e11</td>
+<td>c03</td>
+<td>c04</td>
+</tr>
+<tr>
+<td>e12</td>
+<td>c04</td>
+<td>c05</td>
+</tr>
+</tbody>
+</table>
+<p>The steps involved in creating the <code>CeedOperator</code> associated with the internal edges are as follows:</p>
 <ul>
-<li>The triangular cell <code>c1</code> consists of the three vertices <code>v1</code>, <code>v2</code>, and <code>v3</code></li>
-<li>The elem_type of <code>c1</code> is <code>TRI3</code></li>
-<li>It has five edges sidesets. The first two edge sidesets form a plane and the remaining
-  three edge sidesets are lines as follows:</li>
-<li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code> (not shown above)</li>
-<li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
-<li><code>e3</code>: a directed line from <code>v1</code> to <code>v2</code></li>
-<li><code>e4</code>: a directed line from <code>v2</code> to <code>v3</code></li>
-<li><code>e5</code>: a directed line from <code>v3</code> to <code>v1</code></li>
+<li>First, create a <a href="https://libceed.org/en/latest/api/CeedQFunction/"><code>CeedQFunction</code></a>, <code>qf</code>, and add input and output fields.
+The input fields include geometric attributes associated with the edges and the prognostic variables to the left left and right of the edges.
+The output fields include contribution of fluxes to the cells left and right of the edge and a diagnostic variable that saves fluxes through the edge.
+The pointer to the user-defined function is specified at the time of creation.</li>
 </ul>
-<h3 id="quadrilateral-elements">Quadrilateral elements</h3>
-<div class="highlight"><pre><span></span><code>    Quadrilateral
-        cell
-  v4 --- e5 --- v3
-  |             |
-  |             | 
-  e6     c1     e4
-  |             | 
-  |             | 
-  v1 --- e3 --- v2
-</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Size</th>
+<th>In/Out</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>geom</td>
+<td>4</td>
+<td>In</td>
+<td>Geometric attrbutes [sn, cn, L_edge/Area_left, L_edge/right]</td>
+</tr>
+<tr>
+<td>q_left</td>
+<td>3</td>
+<td>In</td>
+<td>State left of the edge [h_left, hu_left, hv_left]</td>
+</tr>
+<tr>
+<td>q_right</td>
+<td>3</td>
+<td>In</td>
+<td>State right of the edge [h_right, hu_right, hv_right]</td>
+</tr>
+<tr>
+<td>cell_left</td>
+<td>3</td>
+<td>Out</td>
+<td>Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left</td>
+</tr>
+<tr>
+<td>cell_right</td>
+<td>3</td>
+<td>Out</td>
+<td>Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right</td>
+</tr>
+<tr>
+<td>flux</td>
+<td>3</td>
+<td>Out</td>
+<td>Flux through the edge [f_h f_hu f_hv]</td>
+</tr>
+</tbody>
+</table>
 <ul>
-<li>The <code>elem_type</code> of the quadrilateral cell, <code>c1</code>, is <code>SHELL4</code></li>
-<li>It comprises of four vertices (i.e. <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code>)</li>
-<li>It has six edges sidesets. The first two edge sidesets form a plane and the remaining
-  four edge sidesets are lines as follows:</li>
-<li><code>e1</code>: an oriented plane formed by <code>v1</code>, <code>v2</code>, <code>v3</code>, <code>v4</code> (not shown above)</li>
-<li><code>e2</code>: an oriented plane formed by <code>v1</code>, <code>v4</code>, <code>v3</code>, <code>v2</code> (not shown above)</li>
-<li><code>e3</code>: Line from <code>v1</code> to <code>v2</code></li>
-<li><code>e4</code>: a directed line from <code>v2</code> to <code>v3</code></li>
-<li><code>e5</code>: a directed line from <code>v3</code> to <code>v4</code></li>
-<li><code>e6</code>: a directed line from <code>v4</code> to <code>v1</code></li>
+<li>Second, create <a href="https://libceed.org/en/latest/api/CeedElemRestriction/"><code>CeedElemRestriction</code></a> for all the input and output fields of previously created <code>CeedQFunction</code>.
+A <code>CeedElemRistriction</code> tells libCEED the indices of a <a href="https://libceed.org/en/latest/api/CeedVector"><code>CeedVector</code></a> from/to which the values are to extracted/written
+for an input/output field. The <code>CeedElemRestriction</code> for the fields and the example mesh is given below.</li>
 </ul>
-<h3 id="example-mesh-with-mixed-element-types">Example mesh with mixed element types</h3>
-<p><img alt="image" src="figures/quad_tri_mesh_exodus_ii.png" /></p>
-<p>An example of mesh that comprises of:</p>
+<table>
+<thead>
+<tr>
+<th>Variable name</th>
+<th>Size of offset</th>
+<th>Size of CeedVector</th>
+<th>Created via</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>restrict_geom</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>4 * nOwnedInEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  4,  8, 12, 16, 20, 24]</td>
+</tr>
+<tr>
+<td><code>q_restrict_l</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 0,  3,  0,  3,  6,  9, 12]</td>
+</tr>
+<tr>
+<td><code>q_restrict_r</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 3,  6,  9, 12, 15, 12, 15]</td>
+</tr>
+<tr>
+<td><code>c_restrict_l</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 0,  3,  0,  3,  6,  9, 12]</td>
+</tr>
+<tr>
+<td><code>c_restrict_r</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 3,  6,  9, 12, 15, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_flux</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>3 * nOwnedInEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15, 18]</td>
+</tr>
+</tbody>
+</table>
+<p>where <code>nOwnedInEdges</code> is the number of owned internal edges and <code>nCells</code> is the total number of cells ( = owned + ghost).</p>
 <ul>
-<li>12 cells with 4 quadrilaterals and 8 triangles</li>
-<li>14 vertices</li>
-<li>Five edge sidesets</li>
-<li>Right boundary</li>
-<li>Left boundary</li>
-<li>Top boundary</li>
-<li>Bottom boundary</li>
-<li>River</li>
+<li>Third,  create the <code>CeedOperator</code> using the previously created <code>CeedQFunction</code> and all <code>CeedElementRestriction</code>.
+The multiple fields are added via <a href="https://libceed.org/en/latest/api/CeedOperatorSetField"><code>CeedOperatorSetField</code></a>.</li>
 </ul>
-<p>The <code>.exo</code> mesh file uses NetCDF. Cells of different types (e.g. quadrilaterals and triangles) must be saved as two different data fields
-in the <code>.exo</code> file (e.g <code>connect1</code> for quadrilateral and <code>connect2</code> for triangles.</p>
-<div class="highlight"><pre><span></span><code> # quadrilateral cells
- connect1 =
-  1, 2, 6, 5,
-  3, 4, 8, 7,
-  5, 6, 10, 9,
-  7, 8, 12, 11 ;
-
-# triangular cells
- connect2 =
-  2, 3, 13,
-  3, 7, 13,
-  7, 6, 13,
-  6, 2, 13,
-  6, 7, 14,
-  7, 11, 14,
-  11, 10, 14,
-  10, 6, 14 ;  
-</code></pre></div>
-<p>Each edge sideset is defined via two data fields:</p>
-<ul>
-<li><code>elem_ss&lt;ID&gt;</code>: Corresponds to the cell (or element) ID</li>
-<li><code>side_ss&lt;ID&gt;</code>: Correponds to the edge sideset</li>
-</ul>
-<p>The five edge sidesets for the above mesh are defined as</p>
-<div class="highlight"><pre><span></span><code> # right boundary
- elem_ss1 = 2, 4 ;
- side_ss1 = 4, 4 ;
-
- # left boundary
- elem_ss2 = 1, 3 ;
- side_ss2 = 6, 6 ;
-
- # top boundary
- elem_ss3 = 3, 11, 4 ;
- side_ss3 = 5, 3, 5 ;
-
- # bottom boundary
- elem_ss4 = 1, 5, 2 ;
- side_ss4 = 3, 3, 3 ;
-
- # river
- elem_ss5 = 4, 9, 9, 8, 8 ;
- side_ss5 = 3, 4, 5, 5, 4 ;
-</code></pre></div>
-<h2 id="dmplex-hdf5-v300">DMPlex HDF5 v3.0.0</h2>
-<p>Before understanding the DMPlex's HDF5 storage version v3.0.0
-(i.e. <code>-dm_plex_view_hdf5_storage_version 3.0.0</code>), it is important to understand
-how DMPlex number mesh elements.</p>
-<h3 id="dmplex-mesh-numbering-for-a-serial-run">DMPlex mesh numbering for a serial run</h3>
-<p>DMPlex uses 0-based numbering. The mesh elements are numbered in the following order:</p>
-<ol>
-<li>Cells</li>
-<li>Vertices</li>
-<li>Edges. </li>
-</ol>
-<p>For the mesh shown in the figure, DMPlex assigns IDs for cells, vertices, and edges thus:</p>
-<ul>
-<li>Cell ID: <code>0</code>-<code>11</code></li>
-<li>Vertex ID: <code>12</code> to <code>25</code></li>
-<li>Edge ID: <code>26</code> to <code>50</code></li>
-</ul>
-<p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N1.png" /></p>
-<div class="highlight"><pre><span></span><code>#
-# ncells    = Number of cells
-#           = nquad (number of quadrilaterals) + ntri (number of trinagles)
-#           = 4 + 8 = 12
-#
-# nvertices = Number of vertices = 14
-#
-# nedges    = Number of unique edges
-#           = nedges_internal (number of internal edges) + nedges_bnd (number of boundary edges)
-#           = 15 + 10 = 25
-#
-# ntotal    = ncells + nvertices + nedges
-#           = 12 + 14 + 25 = 51
-
-├── topologies (G)
-    ├── Parallel Mesh (G) Attributes: (1) coordinateDMName (STRING), (2) coordinatesName (STRING)
-        ├── dms (G)
-        |   ├── coordinateDM (G)
-        |       |
-        |       ├── order (D, INTEGER, size = ntotal)
-        |       |
-        |       ├── section (G) Attributes: (1) hasConstraints (INTEGER) (2) includesConstraint (INTEGER), (3) numFields (INTEGER)
-        |       |   |
-        |       |   ├── atlasDof (D, INTEGER, size = ntotal) [zeros(0:ncells,1); 3*ones(nvertices,1);   zeros(nedges,1)]
-        |       |   |
-        |       |   ├── atlasOff (D, INTEGER, size = ntotal) [zeros(0:ncells,1); [0:3:(nvertices-1)*3]; ones(nedges,1)*nvertices*3]
-        |       |   |
-        |       |   ├── field0 (G) Attributes: (1) fieldComponents (INTEGER) (2) fieldName (STRING) (3) hasConstraints (INTEGER) (4) includesConstraint (INTEGER)
-        |       |       |
-        |       |       ├── atlasDof   (D, INTEGER, size = ntotal) [zeros(0:ncells,1); 3*ones(nvertices,1);   zeros(nedges,1)]
-        |       |       ├── atlasOff   (D, INTEGER, size = ntotal) [zeros(0:ncells,1); [0:3:(nvertices-1)*3]; ones(nedges,1)*nvertices*3]
-        |       |       |
-        |       |       ├── component0 (G) Attribute (1) componentName (STRING)
-        |       |       ├── component1 (G) Attribute (1) componentName (STRING)
-        |       |       ├── component2 (G) Attribute (1) componentName (STRING)
-        |       |
-        |       ├── vecs (G)
-        |          ├── coordinates (G) Attribute (1) blockSize
-        |             |
-        |             ├── coordinates (D, FLOAT, size = 3 * nvertices) Note: Each vertex has 3 coordinates in x,y,z
-        |
-        ├── labels
-        |   ├── Cell Sets (G)
-        |   |  ├── 1 (G)
-        |   |     ├── indicies (D, INTEGER, size = ncells) [0:ncells-1]
-        |   |
-        |   ├── Face Sets (G, OPTIONAL)
-        |   |  ├── 1 (G)
-        |   |  |  ├── indicies (D, INTEGER) (e.g. [31 37] for right boundary)
-        |   |  |
-        |   |  ├── 2 (G)
-        |   |     ├── indicies (D, INTEGER) (e.g. [28 36] for left boundary)
-        |   |  |
-        |   |  ├── 3 (G)
-        |   |     ├── indicies (D, INTEGER) (e.g. [35 38 49] for top boundary)
-        |   |  |
-        |   |  ├── 4 (G)
-        |   |     ├── indicies (D, INTEGER) (e.g. [26 30 40] for bottom boundary)
-        |   |  |
-        |   |  ├── 5 (G)
-        |   |     ├── indicies (D, INTEGER) (e.g. [32 42 45 46 47] for river)
-        |   |
-        |   ├── boundary_edges (G)
-        |   |  ├── 1 (G)
-        |   |     ├── indicies (D, INTEGER, size = nedges_bnd)
-        |   |
-        |   ├── celltype (G)
-        |      ├── 0 (G)
-        |      |  ├── indicies (D, INTEGER, size = num_verrtices) [ncells:ncells+nvertices-1]
-        |      |
-        |      ├── 1 (G)
-        |      |  ├── indicies (D, INTEGER, size = num_edges)     [ncells+nvertices:ncells+nvertices+nedges-1]
-        |      |
-        |      ├── 3 (G, OPTIONAL, TRIANGULAR)
-        |      |  ├── indicies (D, INTEGER, size = num_tri)       [nquads:nquads+ntri-1]
-        |      |
-        |      ├── 4 (G, OPTIONAL, QUADRILATERALS)
-        |         ├── indicies (D, INTEGER, size = num_quads)     [0:nquads]
-        |
-        ├── topology (G) Attributes: (1) cell_dim (INTEGER) (2) depth (INTEGER)
-            |
-            ├── permutation (D, INTEGER, size = 3)
-            |
-            ├── strata (G)
-               ├── 0 (G)
-               |   ├── cone_sizes  (D, INTEGER, size = num_vertices)
-               |   ├── cones       (D, INTEGER)
-               |   ├── orientation (D, INTEGER)
-               |
-               ├── 1 (G)
-               |   ├── cone_sizes  (D, INTEGER, size = num_edges)
-               |   ├── cones       (D, INTEGER, size = 2 * num_edges)
-               |   ├── orientation (D, INTEGER, size = 2 * num_edges)
-               |
-               ├── 2 (G)
-                   ├── cone_sizes  (D, INTEGER, size = ncells)
-                   ├── cones       (D, INTEGER, size = 4 * nquads + 3 * ntri)
-                   ├── orientation (D, INTEGER, size = 4 * nquads + 3 * ntri)
-</code></pre></div>
-<h2 id="domain-decomposition">Domain Decomposition</h2>
-<p>Below is the decomposition of the example mesh with mixed element types across two MPI ranks.</p>
-<p><img alt="image" src="figures/quad_tri_mesh_dmplex_numbering_N2.png" /></p>
-<p>The physics in RDycore is currently implmented in two versions:</p>
-<ol>
-<li>A PETSc only implementation without support for libCEED</li>
-<li>An implementation with support for libCEED</li>
-</ol>
-<p>In the libCEED version of RDycore, the edges between an owned and ghost cell are only present on the
-rank with a lower ID.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>CeedElemRestriction</th>
+<th>CeedVector</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>restrict_geom</code></td>
+<td><code>geom</code></td>
+<td><code>geom</code> has values <code>geom[:][0:3] = [sn cn L/A_l L/A_r]</code></td>
+</tr>
+<tr>
+<td><code>q_left</code></td>
+<td><code>q_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>q_right</code></td>
+<td><code>q_restrict_r</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cell_left</code></td>
+<td><code>c_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cell_right</code></td>
+<td><code>c_restrict_r</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>flux</code></td>
+<td><code>restrict_flux</code></td>
+<td><code>flux</code></td>
+<td><code>flux</code> is initalized to <code>0.0</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="ceedoperator-for-boundary-edges"><code>CeedOperator</code> for Boundary Edges</h3>
+<p>The values right of the edge are provided if a Dirichlet boundary condition is applied on that edge
+For a reflective boundary condition, the value on the left of the edge is used as the value on right of the edge.
+Based on the mesh shown above, the boundary edges are listed in the table below.</p>
+<table>
+<thead>
+<tr>
+<th>Boundary Edge</th>
+<th>Left Cell</th>
+<th>(Optional) Dirichlet Right cell</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>e00</td>
+<td>c00</td>
+<td>d00</td>
+</tr>
+<tr>
+<td>e01</td>
+<td>c01</td>
+<td>d01</td>
+</tr>
+<tr>
+<td>e02</td>
+<td>c02</td>
+<td>d02</td>
+</tr>
+<tr>
+<td>e03</td>
+<td>c00</td>
+<td>d03</td>
+</tr>
+<tr>
+<td>e06</td>
+<td>c02</td>
+<td>d04</td>
+</tr>
+<tr>
+<td>e10</td>
+<td>c03</td>
+<td>d05</td>
+</tr>
+<tr>
+<td>e13</td>
+<td>c05</td>
+<td>d06</td>
+</tr>
+<tr>
+<td>e14</td>
+<td>c03</td>
+<td>d07</td>
+</tr>
+<tr>
+<td>e15</td>
+<td>c04</td>
+<td>d08</td>
+</tr>
+<tr>
+<td>e16</td>
+<td>c05</td>
+<td>d09</td>
+</tr>
+</tbody>
+</table>
+<p>The fields for the boundary condition <code>CeedQFunction</code> are listed below. It should be noted that the <code>geom</code> field for a boundary edge has one geometric attribute fewer than the <code>geom</code> field for an intenral edge because the value <code>L_edge/A_right</code> is not needed for a boundary edge. Similarly, the <code>cell_right</code> field is omitted for a boundary edge.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Size</th>
+<th>In/Out</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>Geometric attrbutes [sn, cn, L_edge/Area_left]</td>
+</tr>
+<tr>
+<td><code>q_left</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>State left of the edge [h_left, hu_left, hv_left]</td>
+</tr>
+<tr>
+<td><code>q_dirichlet</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>(Optional) Dirichlet boundary state right of the edge [h_bc, hu_bc, hv_bc]</td>
+</tr>
+<tr>
+<td><code>cell_left</code></td>
+<td><code>3</code></td>
+<td>Out</td>
+<td>Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left</td>
+</tr>
+<tr>
+<td><code>flux</code></td>
+<td><code>3</code></td>
+<td>Out</td>
+<td>Flux through the edge [f_h f_hu f_hv]</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>CeedElemRestriction</code> for the boundary fields are listed below.</p>
+<table>
+<thead>
+<tr>
+<th>Variable name</th>
+<th>Size of offset</th>
+<th>Size of CeedVector</th>
+<th>Created via</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>restrict_geom</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>[ 0,  3,  6,  9, 12, 15, 18, 21, 24, 27, 30]</td>
+</tr>
+<tr>
+<td><code>q_restrict_l</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 0,  3,  6,  0,  6,  9,  9, 15,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_dirichlet</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 3,  6,  9, 12, 15, 12, 15]</td>
+</tr>
+<tr>
+<td><code>c_restrict_l</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>[ 0,  3,  0,  3,  6,  9, 12]</td>
+</tr>
+<tr>
+<td><code>restrict_flux</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>3 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>[ 0,  3,  6,  9, 12, 15, 18]</td>
+</tr>
+</tbody>
+</table>
+<p>where <code>nOwnedBndEdges</code> is the number of owned boundary edges and <code>nCells</code> is the total number of cells ( = owned + ghost).
+The fields, <code>CeedElemRestriction</code>, and <code>CeedVector</code> that are used to create the boundary <code>CeedOperator</code> are summarized below.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>CeedElemRestriction</th>
+<th>CeedVector</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>restrict_geom</code></td>
+<td><code>geom</code></td>
+<td><code>geom</code> has values <code>geom[:][0:2] = [sn cn L/A_l]</code></td>
+</tr>
+<tr>
+<td><code>q_left</code></td>
+<td><code>q_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>q_dirichlet</code></td>
+<td><code>restrict_dirichlet</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cell_left</code></td>
+<td><code>c_restrict_l</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>flux</code></td>
+<td><code>restrict_flux</code></td>
+<td><code>flux</code></td>
+<td><code>flux</code> is initalized to <code>0.0</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="ceedoperator-for-sourcesink"><code>CeedOperator</code> for Source/Sink</h3>
+<p>The fields for the source/sink <code>CeedQFunction</code> are listed below.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Size</th>
+<th>In/Out</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>2</code></td>
+<td>In</td>
+<td>Geometric attrbutes [dz/dx, dz/y]</td>
+</tr>
+<tr>
+<td><code>swe_src</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>Source/sink value for the three prognostic variables</td>
+</tr>
+<tr>
+<td><code>mannings_n</code></td>
+<td><code>1</code></td>
+<td>In</td>
+<td>Mannings roughness coefficient</td>
+</tr>
+<tr>
+<td><code>riemannf</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>Sum of fluxes in/out of a cell</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td><code>3</code></td>
+<td>In</td>
+<td>The prognostic variables [h, hu, hv]</td>
+</tr>
+<tr>
+<td><code>cell</code></td>
+<td><code>3</code></td>
+<td>Out</td>
+<td>The RHS value of the ODE for the TS solver</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>CeedElemRestriction</code> for the source/sink fields are listed below.</p>
+<table>
+<thead>
+<tr>
+<th>Variable name</th>
+<th>Size of offset</th>
+<th>Size of CeedVector</th>
+<th>Created via</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>restrict_geom</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>2 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_swe</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_mannings_n</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>1 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_riemannf</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_q</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+<tr>
+<td><code>restrict_c</code></td>
+<td><code>nOwnedCells</code></td>
+<td><code>3 * nOwnedCells</code></td>
+<td><code>CeedElemRestrictionCreate</code></td>
+<td>offset = [ 0,  3,  6,  9, 12, 15]</td>
+</tr>
+</tbody>
+</table>
+<p>where <code>nOwnedCells</code> is the number of owned cells and <code>nCells</code> is the total (= owned + ghost) cells.
+The fields, <code>CeedElemRestriction</code>, and <code>CeedVector</code> that are used to create the source/sink <code>CeedOperator</code> are summarized below.</p>
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>CeedElemRestriction</th>
+<th>CeedVector</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>geom</code></td>
+<td><code>restrict_geom</code></td>
+<td><code>geom</code></td>
+<td><code>geom</code> has values <code>geom[:][0:2] = [dz/dx dz/dy]</code></td>
+</tr>
+<tr>
+<td><code>swe_src</code></td>
+<td><code>restrict_swe</code></td>
+<td><code>swe_src</code></td>
+<td><code>swe_src</code> has values for the source/sink term</td>
+</tr>
+<tr>
+<td><code>mannings_n</code></td>
+<td><code>restrict_mannings_n</code></td>
+<td><code>mannings_n</code></td>
+<td><code>mannings_n</code> has values corresponding to Mannings coefficient</td>
+</tr>
+<tr>
+<td><code>riemannf</code></td>
+<td><code>restrict_riemannf</code></td>
+<td><code>riemannf</code></td>
+<td><code>riemannf</code> has the sum of Riemann fluxes in a cell through internal and boundary edges</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td><code>restrict_q</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>cell</code></td>
+<td><code>restrict_c</code></td>
+<td><code>CEED_VECTOR_ACTIVE</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="schematic-representation-of-rhsfunction-with-libceed">Schematic Representation of RHSFunction with libCEED</h3>
+<p><img alt="image" src="figures/rhsfunction_swe.png" /></p>
 
 
 
