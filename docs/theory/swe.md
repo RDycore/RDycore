@@ -2,13 +2,13 @@
 
 The shallow water equations are given by
 
-\begin{equation}
-\label{eqn:swe}
+$$
 \frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}
-\end{equation}
+$$
 
 where 
 
+$$
 \begin{align}
   \mathbf{U}
   =
@@ -18,7 +18,9 @@ where
   hv
   \end{bmatrix}
 \end{align}
+$$
 
+$$
 \begin{align}
   \mathbf{E}
   =
@@ -28,7 +30,9 @@ where
   huv
   \end{bmatrix}
 \end{align}
+$$
 
+$$
 \begin{align}
   \mathbf{G}
   =
@@ -38,7 +42,9 @@ where
   hv^2 + \frac{1}{2}gh^2
   \end{bmatrix}
 \end{align}
+$$
 
+$$
 \begin{align}
   \mathbf{S}
   =
@@ -48,6 +54,7 @@ where
   -gh\frac{\partial z}{\partial y} - C_D v \sqrt{u^2 + v^2}
   \end{bmatrix}
 \end{align}
+$$
 
 $h$ is the flow depth,
 $u$ is the vertically-averaged velocity in x-direction,
@@ -195,13 +202,11 @@ The bed is assumed flat and Manning's coefficient is assumed to be zero, so $\ma
 
 
 ## References
-Bradford, S. F., & Sanders, B. F. (2002). Finite-volume model for shallow-water
-flooding of arbitrary topography. Journal of hydraulic engineering, 128(3), 289-298.
-[https://ascelibrary.org/doi/10.1061/%28ASCE%290733-9429%282002%29128%3A3%28289%29](https://ascelibrary.org/doi/10.1061/%28ASCE%290733-9429%282002%29128%3A3%28289%29)
 
-Kim, J., Warnock, A., Ivanov, V. Y., & Katopodes, N. D. (2012).
+* [Bradford, S. F., & Sanders, B. F. (2002). Finite-volume model for shallow-water flooding of arbitrary topography. Journal of hydraulic engineering, 128(3), 289-298.](https://ascelibrary.org/doi/10.1061/%28ASCE%290733-9429%282002%29128%3A3%28289%29)
+
+* [Kim, J., Warnock, A., Ivanov, V. Y., & Katopodes, N. D. (2012).
 Coupled modeling of hydrologic and hydrodynamic processes including
-overland and channel flow. Advances in water resources, 37, 104-126.
-[https://www.sciencedirect.com/science/article/pii/S0309170811002211?via%3Dihub](https://www.sciencedirect.com/science/article/pii/S0309170811002211?via%3Dihub)
+overland and channel flow. Advances in water resources, 37, 104-126.](https://www.sciencedirect.com/science/article/pii/S0309170811002211?via%3Dihub)
 
 
