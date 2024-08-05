@@ -7,7 +7,7 @@ $$
 \frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}\tag{1}\label{1}
 $$
 
-where 
+where
 
 \begin{align}
   \mathbf{U}
@@ -89,30 +89,71 @@ For a triangular grid cell
 
 ## Spatial Discretization
 
-We obtain a discrete _finite volume_ method from the shallow water equations by
-defining a computational domain $\Omega$ with a boundary $\partial Omega$,
-integrating $\ref{swe}$ over this domain, applying Stoke's theorem:
+We can place the shallow water equations into an appropriate form for numerical
+treatment by defining a computational domain $\Omega$ bounded by a piecewise
+linear closed curve $\partial Omega$, integrating $\ref{swe}$ over
+$\Omega$, and applying Stoke's theorem:
 
 \begin{eqnarray}
-\frac{\partial}{\partial t} \int_\Omega \mathbf{U} d\Omega + 
-\int_\Omega \frac{\partial\mathbf{E}}{\partial x}  d\Omega + 
+\frac{\partial}{\partial t} \int_\Omega \mathbf{U} d\Omega +
+\int_\Omega \frac{\partial\mathbf{E}}{\partial x}  d\Omega +
 \int_\Omega \frac{\partial\mathbf{G}}{\partial y}  d\Omega +  &=&
 \int_\Omega \mathbf{S} d\Omega \nonumber\\
-\frac{\partial}{\partial t} \int_\Omega \mathbf{U} d\Omega + 
+\frac{\partial}{\partial t} \int_\Omega \mathbf{U} d\Omega +
 \oint_{d\Omega} \left( \mathbf{E}dy  - \mathbf{G} dx \right) &=&
 \int_\Omega \mathbf{S} d\Omega \nonumber\\
- \frac{\partial}{\partial t} \int_\Omega \mathbf{U} d\Omega + 
+ \frac{\partial}{\partial t} \int_\Omega \mathbf{U} d\Omega +
 \int_{d\Omega} \left( \mathbf{F} \cdot \mathbf{n} \right) ds &=&
 \int_\Omega \mathbf{S} d\Omega
 \end{eqnarray}
 
 In the last step, we have defined a flux vector $\mathbf{F}$ and a unit normal
-vector $\mathbf{n}$ pointing outward along the boundary $\partial\Omega$. The
-outward normal flux $\mathbf{F \cdot n}$ is given by
+vector $\mathbf{n}$ pointing outward along the boundary $\partial\Omega$.
+The surface integral is written in terms of the non-oriented
+one-dimensional "surface differential" $ds$.
+
+So far, we have rewritten the shallow water equations in a suggestive but still
+continuous form. We can create a discrete representation by partitioning the
+domain $\Omega$ into disjoint cells, with $\Omega_i$ representing cell $i$:
+
+\begin{eqnarray}
+\Omega &=& \bigcup_i \Omega_i \\
+0 &=&\bigcap_i \Omega_i
+\end{eqnarray}
+
+Similarly, we partition the boundary into its disjoint line segments, each of
+which represents a boundary face $\partial\Omega_i$:
+
+\begin{eqnarray}
+\partial\Omega = \bigcup_i \partial\Omega_i \\
+0 = \bigcap_i \partial\Omega_i
+\end{eqnarray}
+
+The shallow water equations in cell $i$ are then
+
+$$
+\frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\int_{d\Omega_i} \left( \mathbf{F} \cdot \mathbf{n} \right) ds =
+\int_{\Omega_i}\mathbf{S} d\Omega_i.
+$$
+
+We can obtain a finite volume method for these equations by defining
+_horizontally-averaged_ quantities for water height and flow velocities:
+
+\begin{eqnarray}
+h_i &=& \frac{1}{A_i}\int_{\Omega_i} h d\Omega_i \\
+u_i &=& \frac{1}{A_i}\int_{\Omega_i} u d\Omega_i \\
+v_i &=& \frac{1}{A_i}\int_{\Omega_i} v d\Omega_i
+\end{eqnarray}
+
+where $A_i = \int_{Omega_i}d\Omega_i$ is the area of cell $i$. We also introduce
+the _horizontally-averaged solution vector_ $\mathbf{U}_i = (h_i, u_i, v_i)^T$.
+
+Finally, we define the _horizontally-averaged normal flux vector_ in terms of
+the flux between cell $i$ and an adjoining cell $j$:
 
 \begin{align}
-  \mathbf{F.n}
-  =
+\mathbf{F}_{ij} =
   \begin{bmatrix}
   hu_\perp  \\[.5em]
   huu_\perp + \frac{1}{2}gh^2 \cos\phi + \frac{1}{24}g\left(\Delta h\right)^2\cos\phi\\[.5em]
@@ -122,30 +163,14 @@ outward normal flux $\mathbf{F \cdot n}$ is given by
 
 where $u_\perp = u \cos\phi + v \sin\phi$ is the velocity perpendicular to the
 boundary and $\phi$ is the angle between the boundary normal vector and the $x$
-axis. The surface integral is written in terms of the non-oriented
-one-dimensional "surface differential" $ds$.
-
-So far, we have rewritten the shallow water equations in a suggestive but still
-continuous form. We can create a discrete representation by partitioning the
-domain $\Omega$ into disjoint cells $\{\Omega_i\}$, with $\Omega_i$
-corresponding to cell $i$:
-
-$$
-\Omega = \bigcup_i \Omega_i
+axis. 
 $$
 
-Similarly, we partition the boundary into disjoint line segments representing
-boundary faces $\{\partial\Omega_i\}$:
+With these definitions
+$i$ can be written
 
 $$
-\partial\Omega = \bigcup_i \partial\Omega_i.
-$$
-
-With these partitionings, the discrete shallow water equations are
-
-$$
-\frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i + 
-\int_{d\Omega_i} \left( \mathbf{F} \cdot \mathbf{n} \right) ds =
+\frac{\partial \mathbf{U}_i}{\partial t} + \left( \mathbf{F} \cdot \mathbf{n} \right) ds =
 \int_{\Omega_i}\mathbf{S} d\Omega_i.
 $$
 
