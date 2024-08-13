@@ -58,6 +58,16 @@ In the above expressions,
 * $C_D = g n^2/h^\frac{1}{3}$ is the drag coefficient
 * $n$ is the Manning's coefficient
 
+It is sometimes convenient to interpret the terms involving $\mathbf{E}$ and
+$\mathbf{G}$ as the (two-dimensional) divergence of a multi-component spatial
+vector called the _flux function_ $\mathbf{\vec{F}}$:
+
+$$
+\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}\tag{2}\label{2}
+$$
+
+where $\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})$.
+
 ## Spatial Discretization
 
 We can rewrite the shallow water equations in a form more convenient for
@@ -68,13 +78,13 @@ We create a discrete representation by partitioning $\Omega$ into disjoint
 cells, with $\Omega_i$ representing cell $i$:
 
 $$
-\bigcup_i \Omega_i = \Omega, ~~~\bigcap_i \Omega_i = 0
+\bigcup_i \Omega_i = \Omega, ~~~\bigcap_i \Omega_i = \varnothing
 $$
 
 The boundary of cell $i$, written $\partial\Omega_i$, is the set of faces
 separating it from its neighboring cells. Using this notation, we obtain a
-discrete set of equations for the solution in cell $i$ by integrating $\ref{1}$
-over $\Omega_i$ and using Green's theorem:
+discrete set of equations for the solution in cell $i$ by integrating
+$(\ref{1})$ over $\Omega_i$ and using Green's theorem:
 
 \begin{eqnarray}
 \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
@@ -82,34 +92,57 @@ over $\Omega_i$ and using Green's theorem:
 \frac{\partial\mathbf{G}}{\partial y} \right] d\Omega_i &=&
 \int_{\Omega_i} \mathbf{S} d\Omega_i \nonumber\\
 \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
-\oint_{\partial\Omega_i} \left( \mathbf{E}dy - \mathbf{G} dx \right) &=&
-\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{2}\label{2}
+\oint_{\partial\Omega_i} \left( \mathbf{E}~dy - \mathbf{G}~dx \right) &=&
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
 \end{eqnarray}
 
-This integral form permits discontinuities, whereas $\ref{1}$ does not.
+This equation can be used to approximate discontinuous flows, because all
+quantities appear under integrals. By contrast, $(\ref{1})$ cannot be used
+where derivatives of $\mathbf{U}$ don't exist.
 
-### Flux between cells
-
-It is convenient to interpret the line integral in $\ref{2}$ in terms of a
-_flux_ $\mathbf{F}$ between a cell $i$ and its neighboring cells:
+We can interpret the line integral in ($\ref{3}$) in terms of the flux
+$\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y)$ between a cell $i$ and its
+neighboring cells.
 
 $$
  \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
-\oint_{\partial\Omega_i} \left( \mathbf{F} \cdot \mathbf{n} \right) dl_i =
-\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
+\oint_{\partial\Omega_i} \mathbf{\vec{F}} \cdot \mathbf{\vec{n}}~dl =
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{4}\label{4}
 $$
 
-Here, we have defined a flux vector $\mathbf{F} = (\mathbf{F}_x, \mathbf{F}_y)$
-and a unit normal vector $\mathbf{n} = (n_x, n_y)$ pointing outward along the
-cell boundary $\partial\Omega_i$. Evidently
+Here, we have defined a unit normal vector $\mathbf{\vec{n}} = (n_x, n_y)$
+pointing outward along the cell boundary $\partial\Omega_i$. $(\ref{4})$ is a
+"surface integral" with a differential arc length $dl$ integrated over the
+boundary of cell $i$. One obtains this surface integral by integrating $(\ref{2})$
+over the domain $\Omega$ and applying the (two-dimensional) divergence theorem
+to the flux term.
+
+To compare these two integral forms, consider the line integral in $(\ref{3})$
+on a quadrilateral cell along a counterclockwise path connecting its vertices:
 
 \begin{eqnarray}
-\mathbf{F}_x n_x &=& &\mathbf{E}, \nonumber \\
-\mathbf{F}_y n_y &=& -&\mathbf{G}. \nonumber \\
+I_1 =  &\oint_{\partial\Omega_i}& \left( \mathbf{E}~dy - \mathbf{G}~dx \right) \\
+   = - &\int_{x_1}^{x_2}&\mathbf{G}|_{y_1}~dx ~~~~\mathrm{(bottom)} \\
+     + &\int_{y_1}^{y_2}&\mathbf{E}|_{x_2}~dy ~~~~\mathrm{(right)} \\
+     - &\int_{x_2}^{x_1}&\mathbf{G}|_{y_2}~dx ~~~~\mathrm{(top)} \\
+     + &\int_{y_2}^{y_1}&\mathbf{E}|_{x_1}~dy ~~~~\mathrm{(left)}
 \end{eqnarray}
 
-The line integral now resembles a "surface integral" and is written in terms of
-the differential arc length $dl_i$ of the boundary of cell $i$.
+Compare this to the corresponding term in $(\ref{4})$, a surface integral in
+which the areas (lengths) of the faces (edges) are always positive:
+
+\begin{eqnarray}
+I_2 = &\oint_{\partial\Omega_i}& \mathbf{\vec{F}} \cdot \mathbf{\vec{n}}~dl_i \\
+     - &\int_{x_1}^{x_2}&\mathbf{F}_y|_{y_1}~dx ~~~~\mathrm{(bottom)} \\
+     + &\int_{y_1}^{y_2}&\mathbf{F}_x|_{x_2}~dy ~~~~\mathrm{(right)} \\
+     + &\int_{x_1}^{x_2}&\mathbf{F}_y|_{y_2}~dx ~~~~\mathrm{(top)} \\
+     - &\int_{y_1}^{y_2}&\mathbf{F}_x|_{x_1}~dy ~~~~\mathrm{(left)}
+\end{eqnarray}
+
+Evidently $I_1 = I_2$ if $\mathbf{F}_x = \mathbf{E}$ and $\mathbf{F}_y = \mathbf{G}.$
+
+In the rest of this section, we use the flux form $(\ref{4})$ of the shallow
+water equations.
 
 ### Finite volume formulation
 
@@ -139,7 +172,7 @@ Finally, we define the _face-averaged normal flux vector_ between cell $i$ and
 an adjoining cell $j$:
 
 $$
-\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\bigcap\{\partial\Omega_i,~\partial\Omega_j\}}\mathbf{F}\cdot\mathbf{n}~dl_{i}
+\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\mathbf{\vec{n}}~dl \tag{5}\label{5}
 $$
 
 where $l_{ij}$ is the length of the face connecting cells $i$ and $j$.
@@ -147,34 +180,49 @@ where $l_{ij}$ is the length of the face connecting cells $i$ and $j$.
 With these definitions, the shallow water equations in cell $i$ are
 
 $$
-\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \tag{4}\label{4}
+\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \tag{6}\label{6}
 $$
 
-with the sum including all neighboring cells $\{j\}$ of cell $i$.
+where the index $j$ in each term of the sum refers to a neighboring cell of cell $i$.
 
 ### Boundary conditions
 
 To incorporate boundary conditions, we partition the domain boundary $\Gamma$
-into disjoint line segments, each of which represents a boundary face $\Gamma_i$:
+into disjoint line segments, each of which represents a _boundary face_ $\Gamma_i$:
 
 $$
-\bigcup_i \Gamma_i = \Gamma, ~~~\bigcap_i \Gamma_i = 0
+\bigcup_i \Gamma_i = \Gamma, ~~~\bigcap_i \Gamma_i = \varnothing
 $$
 
-Every cell $i$ that touches the boundary $\Gamma$ shares at least one face with
-it, so that $\bigcup \partial\Omega_i \Gamma \neq 0$. We such a cell a
-_boundary cell_. The boundary $\Gamma$ consists entirely of faces of boundary
-cells.
+Every cell $i$ that touches the boundary $\Gamma$ has at least one boundary face
+so that 
+
+$$
+\partial\Omega_i \bigcup \Gamma \neq \varnothing.
+$$
+
+Such a cell is a _boundary cell_. The boundary $\Gamma$ consists entirely of
+faces of boundary cells.
 
 In dealing with boundary conditions, we must distinguish between the faces a
 boundary cell $i$ _does_ and _does not_ share with the boundary $\Gamma$:
 
 $$
 \frac{\partial\mathbf{U}_i}{\partial t} +
-\sum_{j\in\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} +
-\sum_{j\notin\Gamma}\mathbf{F}_{ij} l_{ij}
-= \mathbf{S}_i. \tag{5}\label{5}
+\sum_{j: \partial\Omega_j\subset\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} +
+\sum_{j: \partial\Omega_j\not\subset\Gamma}\mathbf{F}_{ij} l_{ij}
+= \mathbf{S}_i. \tag{7}\label{7}
 $$
+
+To enforce boundary conditions, we must compute the effective boundary fluxes
+$\mathbf{F}_{ij}^{\Gamma}$ that appear in the first sum in $(\ref{7})$. These
+boundary fluxes have specific forms depending on their respective boundary
+conditions.
+
+### Evaluating normal fluxes
+
+We have reduced the spatial discretization of our finite volume method to the
+calculation of normal fluxes between neighboring cells and on boundary faces.
 
 \begin{align}
 \mathbf{F}_{ij} =
@@ -188,17 +236,7 @@ $$
 where $u_\perp = u \cos\phi + v \sin\phi$ is the velocity perpendicular to the
 boundary and $\phi$ is the angle between the boundary normal vector and the $x$
 axis. 
-$$
 
-With these definitions
-$i$ can be written
-
-$$
-\frac{\partial \mathbf{U}_i}{\partial t} + \left( \mathbf{F} \cdot \mathbf{n} \right) ds =
-\int_{\Omega_i}\mathbf{S} d\Omega_i.
-$$
-
-### Interface flux
 We evaluate the normal flux $\mathbf{F}\cdot\mathbf{n}$ at the (interior) face
 shared by cells $i$ and $j$ by computing the _interface flux_ $\mathbf{F}_\perp$
 using Roe's method:
@@ -289,6 +327,8 @@ For a triangular grid cell
 \begin{eqnarray}
 \int_{\Omega} C_D u \sqrt{u^2 + v^2}  d\Omega  &\approx& C_D u \sqrt{u^2 + v^2} \Omega
 \end{eqnarray}
+
+## Temporal Discretization
 
 ## References
 
