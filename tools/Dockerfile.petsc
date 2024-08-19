@@ -3,7 +3,7 @@
 # and with the USER removed (since GitHub Actions only support Docker images
 # with a root user).
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 RUN echo Etc/UTC > /etc/timezone && ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   make \
   patch \
   pkg-config \
-  python3-distutils \
+  python3.12 \
   zlib1g-dev \
   ca-certificates \
   && rm -rf /var/lib/apt/lists/*
@@ -47,7 +47,7 @@ RUN \
   git clone --branch=main https://gitlab.com/petsc/petsc && \
   cd petsc && \
   git reset --hard $PETSC_HASH && \
-  python3 configure \
+  python3.12 configure \
     --with-cc=mpicc \
     --with-cxx=mpic++ \
     --with-fc=mpif90 \
