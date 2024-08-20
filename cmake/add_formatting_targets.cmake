@@ -2,11 +2,11 @@
 # make format-c       <-- reformats C code to conform to desired style
 # make format-c-check <-- checks C code formatting, reporting any errors
 macro(add_formatting_targets)
-  find_program(CLANG_FORMAT clang-format)
+  find_program(CLANG_FORMAT NAMES clang-format-${CLANG_FORMAT_VERSION} clang-format)
   if (NOT CLANG_FORMAT STREQUAL "CLANG_FORMAT-NOTFOUND")
     # Is this our blessed version? If not, we create targets that warn the user
     # to obtain the right version.
-    execute_process(COMMAND clang-format --version
+    execute_process(COMMAND ${CLANG_FORMAT} --version
       OUTPUT_VARIABLE CF_VERSION)
     string(STRIP ${CF_VERSION} CF_VERSION)
     if (NOT ${CF_VERSION} MATCHES ${CLANG_FORMAT_VERSION})

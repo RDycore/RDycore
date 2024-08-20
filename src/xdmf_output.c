@@ -26,6 +26,8 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_APPEND, &viewer));
     PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
   }
+  // turn on collective MPI-IO transfers
+  PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));
 
   // write solution data to a new GROUP with components in separate datasets
   char group_name[1025];
