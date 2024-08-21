@@ -21,6 +21,6 @@ module load subversion/1.14.1
 module load git/2.36.1
 module load cmake/3.21.3
 module load zlib/1.2.11
-module load cray-hdf5-parallel/1.12.2.9
-module load cray-netcdf-hdf5parallel/4.9.0.9
+module load cray-hdf5-parallel/1.14.3.1
+module load cray-netcdf-hdf5parallel/4.9.0.13
 module load cray-parallel-netcdf/1.12.3.9
