@@ -153,9 +153,9 @@ configure_file(
 # Inherit libraries from PETSc for shared or static libs.
 extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)
 if (petsc_shared STREQUAL "yes")
-  set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m)
+  set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)           # adds stdc++ for Frontier
 else()
-  set(RDYCORE_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m)
+    set(RDYCORE_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)  # adds stdc++ for Frontier
 endif()
 
 if (ENABLE_TESTS)
