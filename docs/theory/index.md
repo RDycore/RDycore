@@ -5,11 +5,11 @@ RDycore to model compound flooding.
 
 ## Notation
 
-### Vectors: "multi-component" and "spatial"
+### Two types of vectors
 
 We write _multi-component quantities_ in $\mathbf{bold}$, sometimes referring to
 them as vectors. For example, we refer this way to the _solution vector_
-$\mathbf{U} = (h, hu, hv)^T$. These multi-component quantities are vectors in
+$\mathbf{U} = (h, hu, hv)^T$. These multi-component quantities are _vectors_ in
 the sense that they are used in matrix-vector expressions suitable for solving
 systems of equations. By convention, we write them as column vectors.
 
@@ -26,7 +26,7 @@ arrows overhead.
 
 Distinguishing between these "types" of vectors allows us to make use of
 concepts from vector calculus such as _divergence_ ($\vec{\nabla}\cdot\mathbf{\vec{F}}$)
-and _projections_ along vectors normal to surfaces ($\mathbf{\vec{F}}\cdot\mathbf{\vec{n}}$).
+and _projections_ along vectors normal to surfaces ($\mathbf{\vec{F}}\cdot\vec{n}$).
 This distinction is often not made in numerical analysis, which can confuse the
 reader who is trying to unpack a complicated expression.
 
@@ -53,6 +53,8 @@ Cells, faces, and vertices can be easily expressed in terms of these basic ideas
 * The intersection of two cells $i$ and $j$ (written $\Omega_i \bigcup \Omega_j$),
 is the face separating those two cells, consisting of all points contained in
 both cells.
+* We sometimes refer to a face $j \in \partial\Omega_i$, which reads "face $j$,
+which belongs to the set of faces bounding cell $i$."
 * The intersection of two adjacent faces in a cell is a vertex of that cell,
 consisting of the single point common to those faces.
 
@@ -60,8 +62,4 @@ The union of all cells $\Omega_i$ in a grid is the _computational domain_ $\Omeg
 over which the grid is defined. The boundary of this domain, which can be written
 $\partial\Omega$ but which we also sometimes write as $\Gamma$ for clarity,
 is the set of all faces attached to only one cell.
-
-### Discrete expressions
-
-* Sometimes we use $i$ to refer to cell $i$ instead of $\Omega_i$
 
