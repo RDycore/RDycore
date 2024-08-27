@@ -4,7 +4,7 @@ The two-dimensional shallow water equations can be written in the conservative
 form
 
 $$
-\frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}\tag{1}\label{1}
+\frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}\label{1}
 $$
 
 where
@@ -60,13 +60,16 @@ In the above expressions,
 
 It is sometimes convenient to interpret the terms involving $\mathbf{E}$ and
 $\mathbf{G}$ as the (two-dimensional) divergence of a multi-component spatial
-vector called the _flux function_ $\mathbf{\vec{F}}$:
+vector called the _flux function_ $\mathbf{\vec{F}}$.
 
 $$
-\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}\tag{2}\label{2}
+\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}(\mathbf{U})\label{2}
 $$
 
 where $\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})$.
+
+We have written $\mathbf{\vec{F}}$ and $\mathbf{S}$ in $(\ref{2})$ in a way that
+emphasizes that these functions depend on the solution vector $\mathbf{U}$.
 
 ## Spatial Discretization
 
@@ -75,16 +78,11 @@ numerical treatment by defining a computational domain $\Omega$ bounded by a
 piecewise linear closed curve $\Gamma = \partial\Omega$.
 
 We create a discrete representation by partitioning $\Omega$ into disjoint
-cells, with $\Omega_i$ representing cell $i$:
-
-$$
-\bigcup_i \Omega_i = \Omega, ~~~\bigcap_i \Omega_i = \varnothing
-$$
-
-The boundary of cell $i$, written $\partial\Omega_i$, is the set of faces
-separating it from its neighboring cells. Using this notation, we obtain a
-discrete set of equations for the solution in cell $i$ by integrating
-$(\ref{1})$ over $\Omega_i$ and using Green's theorem:
+cells, with $\Omega_i$ representing cell $i$. The boundary of cell $i$, written
+$\partial\Omega_i$, is the set of faces separating it from its neighboring
+cells. Using this notation, we obtain a discrete set of equations for the
+solution in cell $i$ by integrating $(\ref{1})$ over $\Omega_i$ and using
+Green's theorem:
 
 \begin{eqnarray}
 \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
@@ -93,7 +91,7 @@ $(\ref{1})$ over $\Omega_i$ and using Green's theorem:
 \int_{\Omega_i} \mathbf{S} d\Omega_i \nonumber\\
 \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
 \oint_{\partial\Omega_i} \left( \mathbf{E}~dy - \mathbf{G}~dx \right) &=&
-\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
+\int_{\Omega_i} \mathbf{S} d\Omega_i \label{3}
 \end{eqnarray}
 
 This equation can be used to approximate discontinuous flows, because all
@@ -106,45 +104,19 @@ neighboring cells.
 
 $$
  \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
-\oint_{\partial\Omega_i} \mathbf{\vec{F}} \cdot \mathbf{\vec{n}}~dl =
-\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{4}\label{4}
+\oint_{\partial\Omega_i} \mathbf{\vec{F}} \cdot \vec{n}~dl =
+\int_{\Omega_i} \mathbf{S} d\Omega_i \label{4}
 $$
 
-Here, we have defined a unit normal vector $\mathbf{\vec{n}} = (n_x, n_y)$
+Here, we have defined a unit normal vector $\vec{n} = (n_x, n_y)$
 pointing outward along the cell boundary $\partial\Omega_i$. $(\ref{4})$ is a
 "surface integral" with a differential arc length $dl$ integrated over the
 boundary of cell $i$. One obtains this surface integral by integrating $(\ref{2})$
 over the domain $\Omega$ and applying the (two-dimensional) divergence theorem
 to the flux term.
 
-To compare these two integral forms, consider the line integral in $(\ref{3})$
-on a quadrilateral cell along a counterclockwise path connecting its vertices:
-
-\begin{eqnarray}
-I_1 =  &\oint_{\partial\Omega_i}& \left( \mathbf{E}~dy - \mathbf{G}~dx \right) \\
-   = - &\int_{x_1}^{x_2}&\mathbf{G}|_{y_1}~dx ~~~~\mathrm{(bottom)} \\
-     + &\int_{y_1}^{y_2}&\mathbf{E}|_{x_2}~dy ~~~~\mathrm{(right)} \\
-     - &\int_{x_2}^{x_1}&\mathbf{G}|_{y_2}~dx ~~~~\mathrm{(top)} \\
-     + &\int_{y_2}^{y_1}&\mathbf{E}|_{x_1}~dy ~~~~\mathrm{(left)}
-\end{eqnarray}
-
-Compare this to the corresponding term in $(\ref{4})$, a surface integral in
-which the areas (lengths) of the faces (edges) are always positive:
-
-\begin{eqnarray}
-I_2 = &\oint_{\partial\Omega_i}& \mathbf{\vec{F}} \cdot \mathbf{\vec{n}}~dl_i \\
-     - &\int_{x_1}^{x_2}&\mathbf{F}_y|_{y_1}~dx ~~~~\mathrm{(bottom)} \\
-     + &\int_{y_1}^{y_2}&\mathbf{F}_x|_{x_2}~dy ~~~~\mathrm{(right)} \\
-     + &\int_{x_1}^{x_2}&\mathbf{F}_y|_{y_2}~dx ~~~~\mathrm{(top)} \\
-     - &\int_{y_1}^{y_2}&\mathbf{F}_x|_{x_1}~dy ~~~~\mathrm{(left)}
-\end{eqnarray}
-
-Evidently $I_1 = I_2$ if $\mathbf{F}_x = \mathbf{E}$ and $\mathbf{F}_y = \mathbf{G}.$
-
 In the rest of this section, we use the flux form $(\ref{4})$ of the shallow
 water equations.
-
-### Finite volume formulation
 
 We can obtain a finite volume method for these equations by defining
 _horizontally-averaged_ quantities for flow depth and velocities:
@@ -159,7 +131,7 @@ where $A_i = \int_{\Omega_i}d\Omega_i$ is the area enclosed within cell $i$. We
 also introduce the _horizontally-averaged solution vector_
 
 $$
-\mathbf{U}_i = (h_i, h_i u_i, h_i v_i)^T
+\mathbf{U}_i = [h_i, h_i u_i, h_i v_i]^T
 $$
 
 and the _horizontally-averaged source vector_
@@ -172,7 +144,7 @@ Finally, we define the _face-averaged normal flux vector_ between cell $i$ and
 an adjoining cell $j$:
 
 $$
-\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\mathbf{\vec{n}}~dl \tag{5}\label{5}
+\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\vec{n}~dl \label{5}
 $$
 
 where $l_{ij}$ is the length of the face connecting cells $i$ and $j$.
@@ -180,7 +152,7 @@ where $l_{ij}$ is the length of the face connecting cells $i$ and $j$.
 With these definitions, the shallow water equations in cell $i$ are
 
 $$
-\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \tag{6}\label{6}
+\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \label{6}
 $$
 
 where the index $j$ in each term of the sum refers to a neighboring cell of cell $i$.
@@ -188,21 +160,10 @@ where the index $j$ in each term of the sum refers to a neighboring cell of cell
 ### Boundary conditions
 
 To incorporate boundary conditions, we partition the domain boundary $\Gamma$
-into disjoint line segments, each of which represents a _boundary face_ $\Gamma_i$:
-
-$$
-\bigcup_i \Gamma_i = \Gamma, ~~~\bigcap_i \Gamma_i = \varnothing
-$$
-
-Every cell $i$ that touches the boundary $\Gamma$ has at least one boundary face
-so that 
-
-$$
-\partial\Omega_i \bigcup \Gamma \neq \varnothing.
-$$
-
-Such a cell is a _boundary cell_. The boundary $\Gamma$ consists entirely of
-faces of boundary cells.
+into disjoint line segments, each of which represents a _boundary face_
+$\Gamma_i$. Every cell $j$ that touches the boundary $\Gamma$ has at least one
+boundary face. Such a cell is a _boundary cell_. The boundary $\Gamma$ consists
+entirely of faces of boundary cells.
 
 In dealing with boundary conditions, we must distinguish between the faces a
 boundary cell $i$ _does_ and _does not_ share with the boundary $\Gamma$:
@@ -211,7 +172,7 @@ $$
 \frac{\partial\mathbf{U}_i}{\partial t} +
 \sum_{j: \partial\Omega_j\subset\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} +
 \sum_{j: \partial\Omega_j\not\subset\Gamma}\mathbf{F}_{ij} l_{ij}
-= \mathbf{S}_i. \tag{7}\label{7}
+= \mathbf{S}_i. \label{7}
 $$
 
 To enforce boundary conditions, we must compute the effective boundary fluxes
@@ -223,27 +184,21 @@ conditions.
 
 We have reduced the spatial discretization of our finite volume method to the
 calculation of normal fluxes between neighboring cells and on boundary faces.
-
-\begin{align}
-\mathbf{F}_{ij} =
-  \begin{bmatrix}
-  hu_\perp  \\[.5em]
-  huu_\perp + \frac{1}{2}gh^2 \cos\phi + \frac{1}{24}g\left(\Delta h\right)^2\cos\phi\\[.5em]
-  hvu_\perp + \frac{1}{2}gh^2 \sin\phi + \frac{1}{24}g\left(\Delta h\right)^2\sin\phi
-  \end{bmatrix}
-\end{align}
-
-where $u_\perp = u \cos\phi + v \sin\phi$ is the velocity perpendicular to the
-boundary and $\phi$ is the angle between the boundary normal vector and the $x$
-axis. 
-
-We evaluate the normal flux $\mathbf{F}\cdot\mathbf{n}$ at the (interior) face
-shared by cells $i$ and $j$ by computing the _interface flux_ $\mathbf{F}_\perp$
-using Roe's method:
+The normal flux function is
 
 \begin{equation}
-\mathbf{F}\cdot\mathbf{n} \approx \mathbf{F}_\perp^{i,j} =
-\frac{1}{2} \left( \mathbf{F}_\perp^{i} + \mathbf{F}_\perp^{j} - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right).
+\mathbf{\vec{F}}\cdot\vec{n} = \mathbf{E} n_x + \mathbf{G} n_y.
+\end{equation}
+
+We can evaluate $\mathbf{F}_{ij} \approx \mathbf{\vec{F}}\cdot\vec{n}$, the
+approximate normal flux at a face shared shared by _interior cells_ $i$ and $j$,
+by solving the relevant Riemann problem using Roe's method. If we designate
+$\phi$ as the angle between $\vec{n}$ and the $x$ axis and adopt $i$ and $j$
+subscripts for quantities respectively in cells $i$ and $j$, we can approximate
+the normal flux by the expression
+
+\begin{equation}
+\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right).
 \end{equation}
 
 Above,
@@ -262,9 +217,9 @@ Above,
   \mathbf{\Delta\hat{V}}
   =
   \begin{bmatrix}
-  \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
-  \hat{h}u_\parallel \\[.5em]
-  \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right)
+  \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right) \\[.5em]
+  \hat{h}u_\perp \\[.5em]
+  \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right)
   \end{bmatrix}
 \end{align}
 
@@ -272,20 +227,24 @@ Above,
   |\mathbf{\hat{\Lambda}}|
   =
   \begin{bmatrix}
-  | \hat{u}_\perp - \hat{a} |^* & 0 & 0  \\[.5em]
-  0                                     & |\hat{u}_\perp| & 0 \\[.5em]  
-  0                                     &                         & | \hat{u}_\perp + \hat{a} |^* 
+  | \hat{u}_\parallel - \hat{a} |^* & 0 & 0  \\[.5em]
+  0                                 & |\hat{u}_\parallel| & 0 \\[.5em]  
+  0                                 &                     & | \hat{u}_\parallel + \hat{a} |^* 
   \end{bmatrix}
 \end{align}
 
-with
+where
 
 \begin{eqnarray}
   \hat{h} & = & \sqrt{h_i h_j} \\
-  \hat{u} & = & \frac{ \sqrt{h_i} u_i + \sqrt{h_j} u_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
-  \hat{v} & = & \frac{ \sqrt{h_i} v_i + \sqrt{h_j} v_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
-  \hat{a} & = & \sqrt{\frac{g}{2} \left( h_i + h_j \right)}.
+  \hat{u} & = & \frac{ \sqrt{h_i} \vec{u}_i + \sqrt{h_j} \vec{u}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{v} & = & \frac{ \sqrt{h_i} \vec{v}_i + \sqrt{h_j} \vec{v}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{a} & = & \sqrt{\frac{g}{2} \left( h_i + h_j \right)},
 \end{eqnarray}
+
+$\Delta f = f_j - f_i$ is the change in the quantity $f$ moving from cell
+$i$ to $j$, and $w_\parallel = \vec{w}\cdot\vec{n}$ and
+$w_\perp = |\vec{w} - w_\parallel \vec{n}|$ for any vector $\vec{w}$.
 
 We have used asterisks in the expression for $|\mathbf{\hat{\Lambda}}|$ to
 indicate that the eigenvalues 
@@ -301,34 +260,45 @@ critical flow.
  
 ### Source terms
 
-The sources for the momentum equation are
-
-\begin{eqnarray}
-\int_{d\Omega} \mathbf{S}_{u_k} d\Omega &=& \int_{\Omega} \left( -gh\frac{\partial z}{\partial x_k} - C_D u \sqrt{u^2 + v^2} \right) d\Omega \nonumber \\
-&=& \int_{d\Omega}  -gh\frac{\partial z}{\partial x_k} d\Omega - \int_{\Omega} C_D u \sqrt{u^2 + v^2}  d\Omega 
-\end{eqnarray}
-
-where $x_k$ can be either of the spatial coordinates $x$, $y$.
-
-#### Bed slope elevation term
+The term for the vector-valued source for the water's momentum, which we
+designate as $\vec{S}_{\vec{p}}$ is computed from the following integral:
 
 \begin{equation}
-\int_{d\Omega}  -gh\frac{\partial z}{\partial x} d\Omega \approx -gh\overline{\frac{\partial z}{\partial x}} \Omega
+\int_{d\Omega} \mathbf{\vec{S}}_\vec{p} d\Omega = \int_{\Omega} \left( -gh\nabla z - C_D \vec{u} \sqrt{u^2 + v^2} \right) d\Omega
 \end{equation}
 
-For a triangular grid cell
+Here, $\nabla z = (\partial z/\partial x, \partial z/\partial y)$ is the
+two-dimensional gradient of the bed elevation function $z$ and $\vec{u} = (u, v)$
+is the flow velocity vector.
+
+The first of these terms, the _bed elevation slope_ term, represents the force
+of gravity on the water and can be approximated as
 
 \begin{equation}
-\overline{\frac{\partial z}{\partial x}}  = \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)}
+\int_{d\Omega_i} -gh\nabla z d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
 \end{equation}
 
-#### Roughness term
+where $V_i$ is the volume of cell $i$. For a triangular grid cell,
 
 \begin{eqnarray}
-\int_{\Omega} C_D u \sqrt{u^2 + v^2}  d\Omega  &\approx& C_D u \sqrt{u^2 + v^2} \Omega
+\overline{\frac{\partial z}{\partial x}} &=& \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)} \\
+\overline{\frac{\partial z}{\partial y}} &=& \frac{(x_2 - x_0)(z_1 - z_0) - (x_1 - x_0)(z_2 - z_0)}{(x_2 - y_0)(x_1 - x_0) - (x_1 - y_0)(y_2 - y_0)}.
 \end{eqnarray}
+
+The second term, the _roughness term_, is associated with bed friction:
+
+\begin{equation}
+\int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2} d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
+\end{equation}
 
 ## Temporal Discretization
+
+The above spatial discretization produces a "semi-discrete" system of equations
+that can be integrated using various methods for solving systems of ordinary
+differential equations. The following methods of integration are provided by
+PETSc and supported for RDycore:
+
+* [Forward Euler](https://petsc.org/release/manualpages/TS/TSEULER/)
 
 ## References
 
