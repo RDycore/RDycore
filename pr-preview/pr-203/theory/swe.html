@@ -997,15 +997,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finite-volume-formulation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Finite volume formulation
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#boundary-conditions" class="md-nav__link">
     <span class="md-ellipsis">
       Boundary conditions
@@ -1015,18 +1006,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#source-terms" class="md-nav__link">
+  <a href="#evaluating-normal-fluxes" class="md-nav__link">
     <span class="md-ellipsis">
-      Source terms
+      Evaluating normal fluxes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#evaluating-normal-fluxes" class="md-nav__link">
+  <a href="#source-terms" class="md-nav__link">
     <span class="md-ellipsis">
-      Evaluating normal fluxes
+      Source terms
     </span>
   </a>
   
@@ -1129,15 +1120,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finite-volume-formulation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Finite volume formulation
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#boundary-conditions" class="md-nav__link">
     <span class="md-ellipsis">
       Boundary conditions
@@ -1147,18 +1129,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#source-terms" class="md-nav__link">
+  <a href="#evaluating-normal-fluxes" class="md-nav__link">
     <span class="md-ellipsis">
-      Source terms
+      Evaluating normal fluxes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#evaluating-normal-fluxes" class="md-nav__link">
+  <a href="#source-terms" class="md-nav__link">
     <span class="md-ellipsis">
-      Evaluating normal fluxes
+      Source terms
     </span>
   </a>
   
@@ -1299,28 +1281,8 @@ pointing outward along the cell boundary <span class="arithmatex">\(\partial\Ome
 boundary of cell <span class="arithmatex">\(i\)</span>. One obtains this surface integral by integrating <span class="arithmatex">\((\ref{2})\)</span>
 over the domain <span class="arithmatex">\(\Omega\)</span> and applying the (two-dimensional) divergence theorem
 to the flux term.</p>
-<p>To compare these two integral forms, consider the line integral in <span class="arithmatex">\((\ref{3})\)</span>
-on a quadrilateral cell along a counterclockwise path connecting its vertices:</p>
-<div class="arithmatex">\[\begin{eqnarray}
-I_1 =  &amp;\oint_{\partial\Omega_i}&amp; \left( \mathbf{E}~dy - \mathbf{G}~dx \right) \\
-   = - &amp;\int_{x_1}^{x_2}&amp;\mathbf{G}|_{y_1}~dx ~~~~\mathrm{(bottom)} \\
-     + &amp;\int_{y_1}^{y_2}&amp;\mathbf{E}|_{x_2}~dy ~~~~\mathrm{(right)} \\
-     - &amp;\int_{x_2}^{x_1}&amp;\mathbf{G}|_{y_2}~dx ~~~~\mathrm{(top)} \\
-     + &amp;\int_{y_2}^{y_1}&amp;\mathbf{E}|_{x_1}~dy ~~~~\mathrm{(left)}
-\end{eqnarray}\]</div>
-<p>Compare this to the corresponding term in <span class="arithmatex">\((\ref{4})\)</span>, a surface integral in
-which the areas (lengths) of the faces (edges) are always positive:</p>
-<div class="arithmatex">\[\begin{eqnarray}
-I_2 = &amp;\iint_{\partial\Omega_i}&amp; \mathbf{\vec{F}} \cdot \vec{n}~dl_i \\
-     - &amp;\int_{x_1}^{x_2}&amp;\mathbf{F}_y|_{y_1}~dx ~~~~\mathrm{(bottom)} \\
-     + &amp;\int_{y_1}^{y_2}&amp;\mathbf{F}_x|_{x_2}~dy ~~~~\mathrm{(right)} \\
-     + &amp;\int_{x_1}^{x_2}&amp;\mathbf{F}_y|_{y_2}~dx ~~~~\mathrm{(top)} \\
-     - &amp;\int_{y_1}^{y_2}&amp;\mathbf{F}_x|_{x_1}~dy ~~~~\mathrm{(left)}
-\end{eqnarray}\]</div>
-<p>Evidently <span class="arithmatex">\(I_1 = I_2\)</span> if <span class="arithmatex">\(\mathbf{F}_x = \mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{F}_y = \mathbf{G}.\)</span></p>
 <p>In the rest of this section, we use the flux form <span class="arithmatex">\((\ref{4})\)</span> of the shallow
 water equations.</p>
-<h3 id="finite-volume-formulation">Finite volume formulation</h3>
 <p>We can obtain a finite volume method for these equations by defining
 <em>horizontally-averaged</em> quantities for flow depth and velocities:</p>
 <div class="arithmatex">\[\begin{eqnarray}
@@ -1331,7 +1293,7 @@ v_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} v d\Omega_i
 <p>where <span class="arithmatex">\(A_i = \int_{\Omega_i}d\Omega_i\)</span> is the area enclosed within cell <span class="arithmatex">\(i\)</span>. We
 also introduce the <em>horizontally-averaged solution vector</em></p>
 <div class="arithmatex">\[
-\mathbf{U}_i = (h_i, h_i u_i, h_i v_i)^T
+\mathbf{U}_i = [h_i, h_i u_i, h_i v_i]^T
 \]</div>
 <p>and the <em>horizontally-averaged source vector</em></p>
 <div class="arithmatex">\[
@@ -1352,12 +1314,8 @@ an adjoining cell <span class="arithmatex">\(j\)</span>:</p>
 <p>To incorporate boundary conditions, we partition the domain boundary <span class="arithmatex">\(\Gamma\)</span>
 into disjoint line segments, each of which represents a <em>boundary face</em>
 <span class="arithmatex">\(\Gamma_i\)</span>. Every cell <span class="arithmatex">\(j\)</span> that touches the boundary <span class="arithmatex">\(\Gamma\)</span> has at least one
-boundary face so that </p>
-<div class="arithmatex">\[
-\partial\Omega_j \bigcup \Gamma \neq \varnothing.
-\]</div>
-<p>Such a cell is a <em>boundary cell</em>. The boundary <span class="arithmatex">\(\Gamma\)</span> consists entirely of
-faces of boundary cells.</p>
+boundary face. Such a cell is a <em>boundary cell</em>. The boundary <span class="arithmatex">\(\Gamma\)</span> consists
+entirely of faces of boundary cells.</p>
 <p>In dealing with boundary conditions, we must distinguish between the faces a
 boundary cell <span class="arithmatex">\(i\)</span> <em>does</em> and <em>does not</em> share with the boundary <span class="arithmatex">\(\Gamma\)</span>:</p>
 <div class="arithmatex">\[
@@ -1370,29 +1328,6 @@ boundary cell <span class="arithmatex">\(i\)</span> <em>does</em> and <em>does n
 <span class="arithmatex">\(\mathbf{F}_{ij}^{\Gamma}\)</span> that appear in the first sum in <span class="arithmatex">\((\ref{7})\)</span>. These
 boundary fluxes have specific forms depending on their respective boundary
 conditions.</p>
-<h3 id="source-terms">Source terms</h3>
-<p>The term for the vector-valued source for the water's momentum, which we
-designate as <span class="arithmatex">\(\vec{S}_{\vec{p}}\)</span> is computed from the following integral:</p>
-<div class="arithmatex">\[\begin{equation}
-\int_{d\Omega} \mathbf{\vec{S}}_\vec{p} d\Omega = \int_{\Omega} \left( -gh\nabla z - C_D \vec{u} \sqrt{u^2 + v^2} \right) d\Omega
-\end{equation}\]</div>
-<p>Here, <span class="arithmatex">\(\nabla z = (\partial z/\partial x, \partial z/\partial y)\)</span> is the
-two-dimensional gradient of the bed elevation function <span class="arithmatex">\(z\)</span> and <span class="arithmatex">\(\vec{u} = (u, v)\)</span>
-is the flow velocity vector.</p>
-<p>The first of these terms, the <em>bed elevation slope</em> term, represents the force
-of gravity on the water and can be approximated as</p>
-<div class="arithmatex">\[\begin{equation}
-\int_{d\Omega_i} -gh\nabla z d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
-\end{equation}\]</div>
-<p>where <span class="arithmatex">\(V_i\)</span> is the volume of cell <span class="arithmatex">\(i\)</span>. For a triangular grid cell,</p>
-<div class="arithmatex">\[\begin{eqnarray}
-\overline{\frac{\partial z}{\partial x}} &amp;=&amp; \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)} \\
-\overline{\frac{\partial z}{\partial y}} &amp;=&amp; \frac{(x_2 - x_0)(z_1 - z_0) - (x_1 - x_0)(z_2 - z_0)}{(x_2 - y_0)(x_1 - x_0) - (x_1 - y_0)(y_2 - y_0)}.
-\end{eqnarray}\]</div>
-<p>The second term, the <em>roughness term</em>, is associated with bed friction:</p>
-<div class="arithmatex">\[\begin{equation}
-\int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2} d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
-\end{equation}\]</div>
 <h3 id="evaluating-normal-fluxes">Evaluating normal fluxes</h3>
 <p>We have reduced the spatial discretization of our finite volume method to the
 calculation of normal fluxes between neighboring cells and on boundary faces.
@@ -1423,29 +1358,30 @@ the normal flux by the expression</p>
   \mathbf{\Delta\hat{V}}
   =
   \begin{bmatrix}
-  \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
-  \hat{h}u_\parallel \\[.5em]
-  \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right)
+  \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right) \\[.5em]
+  \hat{h}u_\perp \\[.5em]
+  \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right)
   \end{bmatrix}
 \end{align}\]</div>
 <div class="arithmatex">\[\begin{align}
   |\mathbf{\hat{\Lambda}}|
   =
   \begin{bmatrix}
-  | \hat{u}_\perp - \hat{a} |^* &amp; 0 &amp; 0  \\[.5em]
-  0                                 &amp; |\hat{u}_\perp| &amp; 0 \\[.5em]  
-  0                                 &amp;                         &amp; | \hat{u}_\perp + \hat{a} |^* 
+  | \hat{u}_\parallel - \hat{a} |^* &amp; 0 &amp; 0  \\[.5em]
+  0                                 &amp; |\hat{u}_\parallel| &amp; 0 \\[.5em]  
+  0                                 &amp;                     &amp; | \hat{u}_\parallel + \hat{a} |^* 
   \end{bmatrix}
 \end{align}\]</div>
-<p>with</p>
+<p>where</p>
 <div class="arithmatex">\[\begin{eqnarray}
   \hat{h} &amp; = &amp; \sqrt{h_i h_j} \\
-  \hat{u} &amp; = &amp; \frac{ \sqrt{h_i} u_i + \sqrt{h_j} u_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
-  \hat{v} &amp; = &amp; \frac{ \sqrt{h_i} v_i + \sqrt{h_j} v_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
-  \hat{a} &amp; = &amp; \sqrt{\frac{g}{2} \left( h_i + h_j \right)}
+  \hat{u} &amp; = &amp; \frac{ \sqrt{h_i} \vec{u}_i + \sqrt{h_j} \vec{u}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{v} &amp; = &amp; \frac{ \sqrt{h_i} \vec{v}_i + \sqrt{h_j} \vec{v}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{a} &amp; = &amp; \sqrt{\frac{g}{2} \left( h_i + h_j \right)},
 \end{eqnarray}\]</div>
-<p>and <span class="arithmatex">\(\Delta f = f_j - f_i\)</span> is the change in the quantity <span class="arithmatex">\(f\)</span> moving from cell
-<span class="arithmatex">\(i\)</span> to <span class="arithmatex">\(j\)</span>.</p>
+<p><span class="arithmatex">\(\Delta f = f_j - f_i\)</span> is the change in the quantity <span class="arithmatex">\(f\)</span> moving from cell
+<span class="arithmatex">\(i\)</span> to <span class="arithmatex">\(j\)</span>, and <span class="arithmatex">\(w_\parallel = \vec{w}\cdot\vec{n}\)</span> and
+<span class="arithmatex">\(w_\perp = |\vec{w} - w_\parallel \vec{n}|\)</span> for any vector <span class="arithmatex">\(\vec{w}\)</span>.</p>
 <p>We have used asterisks in the expression for <span class="arithmatex">\(|\mathbf{\hat{\Lambda}}|\)</span> to
 indicate that the eigenvalues 
 <span class="arithmatex">\(\hat{\lambda}_1 = \hat{u}_\perp - \hat{a}\)</span> and
@@ -1456,6 +1392,29 @@ critical flow.</p>
   |\hat{\lambda}|_1 &amp;=&amp; \frac{\hat{\lambda}^2_1}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_1 &lt; \Delta \lambda/2$} \\
   |\hat{\lambda}|_3 &amp;=&amp; \frac{\hat{\lambda}^2_2}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_3 &lt; \Delta \lambda/2$}
 \end{eqnarray}\]</div>
+<h3 id="source-terms">Source terms</h3>
+<p>The term for the vector-valued source for the water's momentum, which we
+designate as <span class="arithmatex">\(\vec{S}_{\vec{p}}\)</span> is computed from the following integral:</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{d\Omega} \mathbf{\vec{S}}_\vec{p} d\Omega = \int_{\Omega} \left( -gh\nabla z - C_D \vec{u} \sqrt{u^2 + v^2} \right) d\Omega
+\end{equation}\]</div>
+<p>Here, <span class="arithmatex">\(\nabla z = (\partial z/\partial x, \partial z/\partial y)\)</span> is the
+two-dimensional gradient of the bed elevation function <span class="arithmatex">\(z\)</span> and <span class="arithmatex">\(\vec{u} = (u, v)\)</span>
+is the flow velocity vector.</p>
+<p>The first of these terms, the <em>bed elevation slope</em> term, represents the force
+of gravity on the water and can be approximated as</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{d\Omega_i} -gh\nabla z d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(V_i\)</span> is the volume of cell <span class="arithmatex">\(i\)</span>. For a triangular grid cell,</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\overline{\frac{\partial z}{\partial x}} &amp;=&amp; \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)} \\
+\overline{\frac{\partial z}{\partial y}} &amp;=&amp; \frac{(x_2 - x_0)(z_1 - z_0) - (x_1 - x_0)(z_2 - z_0)}{(x_2 - y_0)(x_1 - x_0) - (x_1 - y_0)(y_2 - y_0)}.
+\end{eqnarray}\]</div>
+<p>The second term, the <em>roughness term</em>, is associated with bed friction:</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2} d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
+\end{equation}\]</div>
 <h2 id="temporal-discretization">Temporal Discretization</h2>
 <p>The above spatial discretization produces a "semi-discrete" system of equations
 that can be integrated using various methods for solving systems of ordinary

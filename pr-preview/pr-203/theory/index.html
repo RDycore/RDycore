@@ -1137,7 +1137,7 @@ RDycore to model compound flooding.</p>
 <h3 id="two-types-of-vectors">Two types of vectors</h3>
 <p>We write <em>multi-component quantities</em> in <span class="arithmatex">\(\mathbf{bold}\)</span>, sometimes referring to
 them as vectors. For example, we refer this way to the <em>solution vector</em>
-<span class="arithmatex">\(\mathbf{U} = (h, hu, hv)^T\)</span>. These multi-component quantities are <em>vectors</em> in
+<span class="arithmatex">\(\mathbf{U} = [h, hu, hv]^T\)</span>. These multi-component quantities are <em>vectors</em> in
 the sense that they are used in matrix-vector expressions suitable for solving
 systems of equations. By convention, we write them as column vectors.</p>
 <p>By contrast, we write <em>spatial vectors</em> (those with <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> components
@@ -1173,11 +1173,11 @@ to describe the geometry in our model formulation. Specifically:</p>
 </ul>
 <p>Cells, faces, and vertices can be easily expressed in terms of these basic ideas:</p>
 <ul>
-<li>The intersection of two cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span> (written <span class="arithmatex">\(\Omega_i \bigcup \Omega_j\)</span>),
+<li>The intersection of two cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span> (written <span class="arithmatex">\(\Omega_i \bigcap \Omega_j\)</span>),
 is the face separating those two cells, consisting of all points contained in
 both cells.</li>
-<li>We sometimes refer to a face <span class="arithmatex">\(j \in \partial\Omega_i\)</span>, which reads "face <span class="arithmatex">\(j\)</span>,
-which belongs to the set of faces bounding cell <span class="arithmatex">\(i\)</span>."</li>
+<li>We sometimes refer to a face <span class="arithmatex">\(f \in \partial\Omega_i\)</span>, which reads "face <span class="arithmatex">\(f\)</span>,
+which belongs to the boundary of cell <span class="arithmatex">\(i\)</span>."</li>
 <li>The intersection of two adjacent faces in a cell is a vertex of that cell,
 consisting of the single point common to those faces.</li>
 </ul>
