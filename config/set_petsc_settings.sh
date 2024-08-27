@@ -60,11 +60,11 @@ if [ "$mach" = "pm-cpu" ]; then
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
 
     if [ "$config" -eq 1 ]; then
-        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
+        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 2 ]; then
-        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
+        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 3 ]; then
-        export PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
+        export PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-0d6defa7a01
     fi
 
 elif [ "$mach" = "pm-gpu" ]; then
@@ -73,11 +73,11 @@ elif [ "$mach" = "pm-gpu" ]; then
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
 
     if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
+      export PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-0d6defa7a01
     else
       echo "Unsupported --config $config "
       display_help 

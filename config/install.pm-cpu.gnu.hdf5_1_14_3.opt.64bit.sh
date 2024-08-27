@@ -35,5 +35,5 @@
 --download-libceed \
 --download-cgns-commit=HEAD \
 --with-debugging=0 \
-PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
+PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-0d6defa7a01
 

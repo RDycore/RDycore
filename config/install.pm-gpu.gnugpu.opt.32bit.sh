@@ -17,6 +17,7 @@
 --with-batch=0 \
 --download-kokkos \
 --download-kokkos-kernels \
+--download-kokkos-cmake-arguments=-DKokkos_ENABLE_IMPL_CUDA_MALLOC_ASYNC=OFF \
 --with-kokkos-kernels-tpl=0 \
 --with-make-np=8 \
 --with-64-bit-indices=0 \
@@ -27,6 +28,7 @@
 --with-cuda-arch=80 \
 --download-parmetis \
 --download-metis \
+--download-muparser \
 --download-zlib \
 --download-scalapack \
 --download-sowing \
@@ -35,5 +37,5 @@
 --download-libceed \
 --download-cgns-commit=HEAD \
 --with-debugging=0 \
-PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
+PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-0d6defa7a01
 
