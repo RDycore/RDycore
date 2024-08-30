@@ -1,30 +1,18 @@
-# Modules as of 16-Feb-2024
-module -q unload cray-hdf5-parallel
-module -q unload cray-netcdf-hdf5parallel
-module -q unload cray-parallel-netcdf
-module -q unload cray-netcdf
-module -q unload cray-hdf5
-module -q unload PrgEnv-gnu
-module -q unload PrgEnv-intel
-module -q unload PrgEnv-nvidia
-module -q unload PrgEnv-cray
-module -q unload PrgEnv-aocc
-module -q unload intel
-module -q unload intel-oneapi
-module -q unload nvidia
-module -q unload aocc
-module -q unload cudatoolkit
-module -q unload climate-utils
-module -q unload craype-accel-nvidia80
-module -q unload craype-accel-host
-module -q unload perftools-base
-module -q unload perftools
-module -q unload darshan
-
+module purge
+module load craype-x86-milan
+module load libfabric/1.15.2.0
+module load craype-network-ofi
+module load xpmem/2.6.2-2.5_2.38__gd067c3f.shasta
+module load cpe/23.12
+module load gpu/1.0
+module load conda/Miniconda3-py311_23.11.0-2
+module load evp-patch
+module load python/3.11
+module load cray-dsmml/0.2.2
+module load cray-libsci/23.02.1.1
 module load PrgEnv-gnu/8.3.3
 module load gcc/11.2.0
 module load cray-libsci/23.02.1.1
-
 module load craype-accel-host
 module load craype/2.7.20
 module load cray-mpich/8.1.25

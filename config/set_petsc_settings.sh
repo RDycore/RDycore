@@ -24,8 +24,8 @@ display_help() {
     echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.12.2.3"
     echo
     echo "For Frontier (--mach frontier): "
-    echo "  --config 1: With debugging, 64bit indices, and HDF5 1.14.3"
-    echo "  --config 2: Without debugging, 64bit indices, and HDF5 1.14.3"
+    echo "  --config 1: Without debugging, 64bit indices, and HDF5 1.14.3"
+    echo "  --config 2: With debugging, 64bit indices, and HDF5 1.14.3"
     echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.12.2.1"
     echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
     echo
@@ -60,11 +60,11 @@ if [ "$mach" = "pm-cpu" ]; then
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
 
     if [ "$config" -eq 1 ]; then
-        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
+        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 2 ]; then
-        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
+        export PETSC_ARCH=pm-cpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 3 ]; then
-        export PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
+        export PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-0d6defa7a01
     fi
 
 elif [ "$mach" = "pm-gpu" ]; then
@@ -73,11 +73,11 @@ elif [ "$mach" = "pm-gpu" ]; then
     export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_main/
 
     if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc2888174f5
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-0d6defa7a01
     elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
+      export PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-0d6defa7a01
     else
       echo "Unsupported --config $config "
       display_help 
@@ -89,11 +89,11 @@ elif [ "$mach" = "frontier"  ]; then
   export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc
 
   if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-fc288817
+      export PETSC_ARCH=frontier-gpu-opt-64bit-gcc-12-3-0-0d6defa7a01
   elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc288817
+      export PETSC_ARCH=frontier-gpu-debug-64bit-gcc-12-3-0-0d6defa7a01
   elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-11-2-0-fc288817
+      export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-12-3-0-0d6defa7a01
   fi
 
 #elif [ "$mach" = "aurora"  ]; then

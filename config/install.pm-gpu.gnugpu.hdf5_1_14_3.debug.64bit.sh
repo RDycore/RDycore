@@ -37,5 +37,5 @@
 --download-libceed \
 --download-cgns-commit=HEAD \
 --with-debugging=1 \
-PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-fc2888174f5
+PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-0d6defa7a01
 
