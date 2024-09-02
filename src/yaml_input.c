@@ -29,15 +29,8 @@
 
 // Below, you'll see a bunch of schemas describing YAML sections and subsections
 // with fields defined using macros like CYAML_FIELD_ENUM, CYAML_FIELD_INT,
-// CYAML_FIELD_INT, etc.
+// CYAML_FIELD_FLOAT, etc.
 //
-// To specify an optional field with a default value, you must use the CYAML_FIELD
-// macro, which looks a bit different. In particular:
-// * the macro is called with the desired TYPE (in caps) as its first argument
-// * the last argument to the macro should be {.missing = <default_value>}
-//
-// Take a look at the examples below to get a feel for this.
-
 // clang-format off
 
 // ---------------
@@ -59,15 +52,15 @@ static const cyaml_strval_t physics_flow_modes[] = {
 // mapping of physics.flow fields to members of RDyPhysicsFlow
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
-    CYAML_FIELD(FLOAT, "tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h, {.missing = 1e-7}),
+    CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
     CYAML_FIELD_END
 };
 
 // mapping of physics fields to members of RDyPhysicsSection
 static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
-    CYAML_FIELD(BOOL, "sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, {.missing = false}),
-    CYAML_FIELD(BOOL, "salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity, {.missing = false}),
+    CYAML_FIELD_BOOL("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment),
+    CYAML_FIELD_BOOL("salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity),
     CYAML_FIELD_END
 };
 
@@ -128,11 +121,11 @@ static const cyaml_strval_t time_units[] = {
 
 // mapping of time fields to members of RDyTimeSection
 static const cyaml_schema_field_t time_fields_schema[] = {
-    CYAML_FIELD(FLOAT, "final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time, {.missing = INVALID_REAL}),
+    CYAML_FIELD_FLOAT("final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time),
     CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
-    CYAML_FIELD(INT, "max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step, {.missing = INVALID_INT}),
-    CYAML_FIELD(FLOAT, "time_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, time_step, {.missing = INVALID_REAL}),
-    CYAML_FIELD(FLOAT, "coupling_interval", CYAML_FLAG_OPTIONAL, RDyTimeSection, coupling_interval, {.missing = INVALID_REAL}),
+    CYAML_FIELD_INT("max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step),
+    CYAML_FIELD_FLOAT("time_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, time_step),
+    CYAML_FIELD_FLOAT( "coupling_interval", CYAML_FLAG_OPTIONAL, RDyTimeSection, coupling_interval),
     CYAML_FIELD_END
 };
 
@@ -714,6 +707,23 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, const cyaml
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// sets missing parameters to their default values for the parameters
+#define SET_MISSING_PARAMETER(param, value) \
+  if (!param) param = value
+static PetscErrorCode SetMissingValues(RDyConfig *config) {
+  PetscFunctionBegin;
+
+  SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
+
+  SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
+  SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
+  SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
+  SET_MISSING_PARAMETER(config->time.coupling_interval, INVALID_REAL);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#undef SET_MISSING_PARAMETER
+
 // checks config for any invalid or omitted parameters
 static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool mms_mode) {
   PetscFunctionBegin;
@@ -1177,6 +1187,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   // parse the YAML config file into a new config struct and validate it
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &config_schema, &config));
+  PetscCall(SetMissingValues(config));
   PetscCall(ValidateConfig(rdy->comm, config, PETSC_FALSE));
   PetscCall(ParseMathExpressions(rdy->comm, config));
 
