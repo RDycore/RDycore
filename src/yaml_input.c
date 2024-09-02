@@ -1223,6 +1223,7 @@ PetscErrorCode ReadMMSConfigFile(RDy rdy) {
   // parse the YAML config file into a new config struct and validate it
   RDyConfig *config;
   PetscCall(ParseYaml(rdy->comm, config_str, &mms_config_schema, &config));
+  PetscCall(SetMissingValues(config));
   PetscCall(ValidateConfig(rdy->comm, config, PETSC_TRUE));
   PetscCall(ParseMathExpressions(rdy->comm, config));
 
