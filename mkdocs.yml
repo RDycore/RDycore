@@ -16,8 +16,7 @@ nav:
         - 'With average rainfall and ocean BC': 'user/example-cases/harvey-flooding/ocean-bc/index.md'
     - 'E3SM-RDycore Example Cases':
        - 'Overview': 'user/example-cases/e3sm-cases/index.md'
-       - 'Hurricane Havery': 'user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.md'
-
+       - 'Hurricane Harvey': 'user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.md'
   - 'Developer Guide':
     - 'Overview': 'developer/index.md'
     - 'Installation': 'common/installation.md'
@@ -26,6 +25,9 @@ nav:
     - 'Style Guide': 'developer/style.md'
     - 'Developer Tools': 'developer/tools.md'
     - 'SWE implementation using libCEED': 'developer/ceed.md'
+  - 'Theory Guide':
+    - 'Overview': 'theory/index.md'
+    - 'Shallow Water Equations': 'theory/swe.md'
 
 edit_uri: ""
 
