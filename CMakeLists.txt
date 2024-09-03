@@ -12,10 +12,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 # Use a specific version of clang-format.
 set(CLANG_FORMAT_VERSION 14)
 
+project(rdycore)
 enable_language(C)
 enable_language(Fortran)
-
-project(rdycore)
 
 # Make sure PETSc can be found with pkgconfig
 set(PETSC_DIR $ENV{PETSC_DIR})
