@@ -26,7 +26,7 @@ where
 * $r_i$ and $r_{ri}$ are the _flow-induced entrainment and re-entrainment rates_
 * $d_i$ is a _deposition rate_ for the size class, expressed as mass per unit area per unit time
 
-and $\nabla\cdot\vec{F} = (\partial F_x/\partial x, \partial F_y/\partial y)$ is
+and $\nabla\cdot\vec{F} = \partial F_x/\partial x + \partial F_y/\partial y$ is
 the 2D divergence of the spatial vector $\vec{F}$.
 
 The deposited layer mass $M_i$ for each size class accumulates according to an
@@ -195,7 +195,7 @@ water equations to read
 \end{eqnarray}
 
 where we have defined a _deposited mass vector_ $\mathbf{M}$ and a
-_net deposition vector_ $\mathbf{D}$:
+_net deposition vector_ $\mathbf{D}$ to accommodate $\eqref{2}$:
 
 \begin{align}
 \mathbf{M} =
