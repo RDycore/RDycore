@@ -12,8 +12,6 @@
         <link rel="prev" href="index.html">
       
       
-        <link rel="next" href="sediment.html">
-      
       
       <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.34">
@@ -1088,27 +1086,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="sediment.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Sediment Transport
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -1336,7 +1313,7 @@ vector called the <em>flux function</em> <span class="arithmatex">\(\mathbf{\vec
 \frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}(\mathbf{U})\tag{2}\label{2}
 \]</div>
 <p>where <span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})\)</span>.</p>
-<p>We have written <span class="arithmatex">\(\mathbf{\vec{F}}\)</span> and <span class="arithmatex">\(\mathbf{S}\)</span> in <span class="arithmatex">\((\eqref{2})\)</span> in a way that
+<p>We have written <span class="arithmatex">\(\mathbf{\vec{F}}\)</span> and <span class="arithmatex">\(\mathbf{S}\)</span> in <span class="arithmatex">\(\eqref{2}\)</span> in a way that
 emphasizes that these functions depend on the solution vector <span class="arithmatex">\(\mathbf{U}\)</span>.</p>
 <h2 id="spatial-discretization">Spatial Discretization</h2>
 <p>We can rewrite the shallow water equations in a form more convenient for
@@ -1346,7 +1323,7 @@ piecewise linear closed curve <span class="arithmatex">\(\Gamma = \partial\Omega
 cells, with <span class="arithmatex">\(\Omega_i\)</span> representing cell <span class="arithmatex">\(i\)</span>. The boundary of cell <span class="arithmatex">\(i\)</span>, written
 <span class="arithmatex">\(\partial\Omega_i\)</span>, is the set of faces separating it from its neighboring
 cells. Using this notation, we obtain a discrete set of equations for the
-solution in cell <span class="arithmatex">\(i\)</span> by integrating <span class="arithmatex">\((\eqref{swe})\)</span> over <span class="arithmatex">\(\Omega_i\)</span> and using
+solution in cell <span class="arithmatex">\(i\)</span> by integrating <span class="arithmatex">\(\eqref{1}\)</span> over <span class="arithmatex">\(\Omega_i\)</span> and using
 Green's theorem:</p>
 <div class="arithmatex">\[\begin{eqnarray}
 \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
@@ -1358,9 +1335,9 @@ Green's theorem:</p>
 \int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
 \end{eqnarray}\]</div>
 <p>This equation can be used to approximate discontinuous flows, because all
-quantities appear under integrals. By contrast, <span class="arithmatex">\((\eqref{1})\)</span> cannot be used
+quantities appear under integrals. By contrast, <span class="arithmatex">\(\eqref{1}\)</span> cannot be used
 where derivatives of <span class="arithmatex">\(\mathbf{U}\)</span> don't exist.</p>
-<p>We can interpret the line integral in (<span class="arithmatex">\(\eqref{3}\)</span>) in terms of the flux
+<p>We can interpret the line integral in <span class="arithmatex">\(\eqref{3}\)</span> in terms of the flux
 <span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y)\)</span> between a cell <span class="arithmatex">\(i\)</span> and its
 neighboring cells.</p>
 <div class="arithmatex">\[
@@ -1369,12 +1346,12 @@ neighboring cells.</p>
 \int_{\Omega_i} \mathbf{S} d\Omega_i \tag{4}\label{4}
 \]</div>
 <p>Here, we have defined a unit normal vector <span class="arithmatex">\(\vec{n} = (n_x, n_y)\)</span>
-pointing outward along the cell boundary <span class="arithmatex">\(\partial\Omega_i\)</span>. <span class="arithmatex">\((\eqref{4})\)</span> is a
+pointing outward along the cell boundary <span class="arithmatex">\(\partial\Omega_i\)</span>. <span class="arithmatex">\(\eqref{4}\)</span> is a
 "surface integral" with a differential arc length <span class="arithmatex">\(dl\)</span> integrated over the
-boundary of cell <span class="arithmatex">\(i\)</span>. One obtains this surface integral by integrating <span class="arithmatex">\((\eqref{2})\)</span>
+boundary of cell <span class="arithmatex">\(i\)</span>. One obtains this surface integral by integrating <span class="arithmatex">\(\eqref{2}\)</span>
 over the domain <span class="arithmatex">\(\Omega\)</span> and applying the (two-dimensional) divergence theorem
 to the flux term.</p>
-<p>In the rest of this section, we use the flux form <span class="arithmatex">\((\eqref{4})\)</span> of the shallow
+<p>In the rest of this section, we use the flux form <span class="arithmatex">\(\eqref{4}\)</span> of the shallow
 water equations.</p>
 <p>We can obtain a finite volume method for these equations by defining
 <em>horizontally-averaged</em> quantities for flow depth and velocities:</p>
@@ -1419,7 +1396,7 @@ boundary cell <span class="arithmatex">\(i\)</span> <em>does</em> and <em>does n
 \text{(boundary)}&amp; &amp;\text{(interior)} &amp;
 \end{eqnarray}\]</div>
 <p>To enforce boundary conditions, we must compute the effective boundary fluxes
-<span class="arithmatex">\(\mathbf{F}_{ij}^{\Gamma}\)</span> that appear in the first sum in <span class="arithmatex">\((\eqref{7})\)</span>. These
+<span class="arithmatex">\(\mathbf{F}_{ij}^{\Gamma}\)</span> that appear in the first sum in <span class="arithmatex">\(\eqref{7}\)</span>. These
 boundary fluxes have specific forms depending on their respective boundary
 conditions.</p>
 <h3 id="evaluating-normal-fluxes">Evaluating normal fluxes</h3>
