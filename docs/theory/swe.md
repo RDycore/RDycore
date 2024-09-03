@@ -309,10 +309,10 @@ function $R(x, y, t)$. We can approximate the integral of this term using the
 mean value theorem of calculus:
 
 \begin{equation}
-\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [R, 0, 0]^T~d\Omega \approx [R V_i, 0, 0]^T,
+\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [R, 0, 0]^T~d\Omega \approx [R A_i, 0, 0]^T,
 \end{equation}
 
-where $V_i$ is the volume of cell $i$.
+where $A_i$ is the area of cell $i$.
 
 #### Bed elevation slope term $\mathbf{S}_b$
 
@@ -320,7 +320,7 @@ This term represents the force of gravity on the water and can be
 approximated as
 
 \begin{equation}
-\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
+\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) A_i
 \end{equation}
 
 where $\nabla z = (\partial z/\partial x, \partial z/\partial y)$ is the two-dimensional
@@ -339,7 +339,7 @@ Like the runoff term, this term involves only quantities within a single cell
 and can be approximated by the mean value theorem:
 
 \begin{equation}
-\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} A_i
 \end{equation}
 
 where $\vec{u} = (u, v)$ is the flow velocity vector. The $x$ and $y$ spatial
