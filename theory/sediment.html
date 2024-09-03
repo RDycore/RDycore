@@ -9,10 +9,6 @@
       
       
       
-        <link rel="prev" href="organization.html">
-      
-      
-        <link rel="next" href="tools.html">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -20,7 +16,7 @@
     
     
       
-        <title>Style Guide - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Sediment Transport - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -72,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rdycore-c-style-guide" class="md-skip">
+        <a href="#sediment-transport" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +104,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Style Guide
+              Sediment Transport
             
           </span>
         </div>
@@ -681,8 +677,6 @@
       
   
   
-    
-  
   
   
     
@@ -694,11 +688,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -712,7 +706,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -726,7 +720,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../developer/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -768,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development.html" class="md-nav__link">
+      <a href="../developer/development.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -789,7 +783,7 @@
   
   
     <li class="md-nav__item">
-      <a href="organization.html" class="md-nav__link">
+      <a href="../developer/organization.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -807,30 +801,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Style Guide
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="style.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../developer/style.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -839,95 +813,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#style-conventions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Style Conventions
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Style Conventions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Functions
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#petsc-data-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      PETSc Data Types
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#header-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      Header files
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#naming" class="md-nav__link">
-    <span class="md-ellipsis">
-      Naming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#structs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Structs
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#style-enforcement-by-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      Style Enforcement by Tools
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -940,7 +825,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tools.html" class="md-nav__link">
+      <a href="../developer/tools.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -961,7 +846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="ceed.html" class="md-nav__link">
+      <a href="../developer/ceed.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1029,7 +914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../theory/index.html" class="md-nav__link">
+      <a href="index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1050,7 +935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../theory/swe.html" class="md-nav__link">
+      <a href="swe.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1098,55 +983,19 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#style-conventions" class="md-nav__link">
+  <a href="#2-d-h-r-equation" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Conventions
+      2-D H-R equation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Style Conventions">
+    <nav class="md-nav" aria-label="2-D H-R equation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
+  <a href="#telemacgaia-equations" class="md-nav__link">
     <span class="md-ellipsis">
-      Functions
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#petsc-data-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      PETSc Data Types
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#header-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      Header files
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#naming" class="md-nav__link">
-    <span class="md-ellipsis">
-      Naming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#structs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Structs
+      TELEMAC/GAIA equations
     </span>
   </a>
   
@@ -1158,9 +1007,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#style-enforcement-by-tools" class="md-nav__link">
+  <a href="#spatial-discretization" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Enforcement by Tools
+      Spatial discretization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-term" class="md-nav__link">
+    <span class="md-ellipsis">
+      Source term
     </span>
   </a>
   
@@ -1181,117 +1039,287 @@
                   
 
 
-<h1 id="rdycore-c-style-guide">RDycore (C) Style Guide</h1>
-<p>Here we provide a simple style guide for C code within the RDycore library. This
-style guide applies mainly to source code within the RDycore C library itself.
-The corresponding Fortran library is a thin hand-written wrapper around the C
-library that doesn't leave much room for "style," so there is no Fortran style
-guide.</p>
-<p>This style guide is very short compared to many others, since C is a very small
-language and most formatting conventions (whitespace, lengths of lines,
-placement of curly braces) are enforced via tools and not humans. Here, we focus
-mainly on those conventions that need the attention of RDycore team members and
-other contributors.</p>
-<h2 id="style-conventions">Style Conventions</h2>
-<p>RDycore's conventions are based on those in the
-<a href="https://petsc.org/release/developers/style/">PETSc Style and Usage Guide</a>,
-with the following deviations:</p>
-<ul>
-<li>we allow the use of variable-length arrays (VLAs)</li>
-<li>we use standard header guards instead of the nonstandard <code>#pragma once</code>
-  mechanism</li>
-<li>we prefer C++-style code comments (<code>//</code>) to C-style comments (<code>/* */</code>) even
-  for multi-line comments</li>
-<li>we use C conventions for logical expressions, e.g.<ul>
-<li><code>if (cond)</code> instead of <code>if (cond == PETSC_TRUE)</code></li>
-<li><code>if (!cond)</code> instead of <code>if (cond == PETSC_FALSE)</code></li>
-<li><code>if (foo)</code> instead of <code>if (foo != NULL)</code> for pointers</li>
-<li><code>if (!foo)</code> instead of <code>if (foo == NULL)</code> for pointers</li>
-</ul>
-</li>
-</ul>
-<p>These deviations reflect certain facts about RDycore relative to PETSc:</p>
-<ul>
-<li>RDycore targets fewer systems than PETSc</li>
-<li>RDycore is much small codebase with fewer contributors than PETSc</li>
-<li>RDycore does not support the use of C++</li>
-</ul>
-<p>We summarize the most important conventions below (in alphabetical order).</p>
-<h3 id="functions">Functions</h3>
-<p>Following the PETSc approach, all function bodies must be surrounded by
-the <code>PetscFunctionBegin</code> and <code>PetscFunctionReturn</code> macros. Try to write short
-functions, but avoid breaking up a function if doing so would introduce
-undue complexity, such as passing several variables around or introducing
-otherwise unnecessary abstractions.</p>
-<p>Accordingly, almost all functions in RDycore return a <code>PetscErrorCode</code>
-indicating success or failure, and all calls to these functions are enclosed
-within the <code>PetscCall</code> macro, e.g.</p>
-<div class="highlight"><pre><span></span><code>  PetscCall(RDyAdvance(rdy));
+<h1 id="sediment-transport">Sediment Transport</h1>
+<h2 id="2-d-h-r-equation">2-D H-R equation</h2>
+<p>The 2-D H-R equations are</p>
+<div class="arithmatex">\[\begin{equation}
+\label{eqn:hr2d}
+\frac{\partial hc_{i}}{\partial t}+\frac{\partial uhc_{i}}{\partial x} + \frac{\partial vhc_{i}}{\partial y} = e_{i} + e_{ri} + r_{i} + r_{ri} - d_{i},
+\end{equation}\]</div>
+<div class="arithmatex">\[\begin{equation}
+\frac{\partial M_{i}}{\partial t} = d_{i} - e_{ri} - r_{ri},
+\end{equation}\]</div>
+<div class="arithmatex">\[\begin{equation}
+(1-\beta)\rho_{s}\frac{\partial z_{b}}{\partial t} = \sum_{i=1}^{I}(d_{i}-e_{i}-e_{ri}-r_{i}-r_{ri}),
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(i = 1, 2, \dots I\)</span>, <span class="arithmatex">\(c_{i}\)</span> is the sediment concentration given as mass per unit volume <span class="arithmatex">\([M/L^{3}]\)</span>, 
+<span class="arithmatex">\(M_{i}\)</span> is the sediment mass of the deposited layer formulated as mass per unit area <span class="arithmatex">\([M/L^{2}]\)</span>, 
+<span class="arithmatex">\(I\)</span> is the number of sediment size classes, and <span class="arithmatex">\(e_{i}, e_{ri}, r_{i}, r_{ri}\)</span>, and <span class="arithmatex">\(d_{i}\)</span> are rainfall-driven
+detachment and redetachment rates, flow-induced entrainment and reentrainment rates, and the deposition rate 
+formulated as mass per unit area per unit time <span class="arithmatex">\([M/L^{2}/T]\)</span>. <span class="arithmatex">\(\beta\)</span> is the porosity of original soil and <span class="arithmatex">\(\rho_{s}\)</span>
+is the density of solids assumed to be uniform for all sediment classes.
+According to [Hairsine and Rose, 1992], the detachment and redetachment rates due to rainfall are calculated as 
+following:
+\begin{equation}
+e_{i} = F_{w}(1-H)p_{i}a_{0}P,
+\end{equation}
+\begin{equation}
+e_{ri} = F_{w}H\frac{M_{i}}{M_{t}}a_{d}P,
+\end{equation}
+where <span class="arithmatex">\(p_{i}\)</span> is the ratio of the amount of sediment of class <span class="arithmatex">\(i\)</span> to that of the original soil, <span class="arithmatex">\(a_{0}\)</span> and <span class="arithmatex">\(a_{d}\)</span> 
+represent detachability of uneroded and deposited soil as mass per unit volume <span class="arithmatex">\([M/L^{3}]\)</span>, P is rallfall intensity <span class="arithmatex">\([L/T]\)</span>,
+and <span class="arithmatex">\(M_{t} = \sum M_{i}\)</span> is the total sediment mass in the deposited layer in mass per unit area <span class="arithmatex">\([M/L^2]\)</span>/.
+<span class="arithmatex">\(F_{w}\)</span> is the shield factor, which can be formulated with the power law relation by Proffitt et al. [1991]:</p>
+<div class="arithmatex">\[\begin{equation}
+F_{w}=\begin{cases}
+       1             \quad &amp; h \le h_{0} \\
+       (h_{0}/h)^{b} \quad &amp; h &gt; h_{0}   \\
+       \end{cases}
+\end{equation}\]</div>
+<p>where a threshold of <span class="arithmatex">\(h_{0} = 0.33D_{R}\)</span> is used, and <span class="arithmatex">\(D_{R}\)</span> is the mean raindrop size. The exponent b varies depending on the 
+type of soil and can be obtained with a best fit using experimental data,  e.g., for clay, <span class="arithmatex">\(b=0.66\)</span>, and for loam, <span class="arithmatex">\(b=1.13\)</span>.
+<span class="arithmatex">\(H\)</span> is the proportion of shielding of the deposited layer:
+\begin{equation}
+H = min(M_{t}/(F_{w}<em>M_{t}^{</em>}),1)
+\end{equation}
+where <span class="arithmatex">\(M_{t}^{*}\)</span> is a calibrated parameter denoting the mass of deposited sediment needed to completely sheild and original soil, 
+given as mass per unit area <span class="arithmatex">\([M/L^{2}]\)</span>.
+The entrainment and reentrainment rates due to overland flow can be estimated by:
+\begin{equation}
+r_{i} = (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J}
+\end{equation}
+\begin{equation}
+r_{ri} = H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}}
+\end{equation}
+where <span class="arithmatex">\(\Omega\)</span> is the stream power in units of <span class="arithmatex">\([M/^{3}]\)</span>:
+\begin{equation}
+\Omega = \rho_{w}ghS_{f}\sqrt{u^2+v^2}
+\end{equation}
+\begin{equation}
+S_{f} = n^{2}(u^{2}+v^{2})h^{-4/3}
+\end{equation}
+and <span class="arithmatex">\(\Omega_{cr}\)</span> is the critical stream power, below which soil entrainment or reentrainment do not occur.
+<span class="arithmatex">\(F\)</span> is the effective fraction of excess stream power in entrainment or reentrainment to account for energy dissipation due to heat.
+<span class="arithmatex">\(J\)</span> is the specific energy of entrainment, for example, the energy required for soil to be entrained per unit mass of sediment <span class="arithmatex">\([ML^{2}/T^{2}/M]\)</span>.
+<span class="arithmatex">\(\rho_{w}\)</span> is the density of water.
+The deposition rate for a sediment class <span class="arithmatex">\(i\)</span> can be calculated as:
+\begin{equation}
+d_{i} = v_{i}c_{i}
+\end{equation}
+where <span class="arithmatex">\(v_{i}\)</span> represents the settling velocity of each sediment class <span class="arithmatex">\([L/T]\)</span>. Please note the assumptions behind this equation:</p>
+<div class="highlight"><pre><span></span><code>*   The suspended load in the water column is completely mixed in the vertical direction.
+*   Infiltration rate does not affect settling velocities.
 </code></pre></div>
-<p>Function inputs and outputs are passed as arguments to a function. Because C
-passes arguments by value and not by reference (like Fortan), output parameters
-are typically pointers.</p>
-<h3 id="petsc-data-types">PETSc Data Types</h3>
-<p>We use data types defined by PETSc, which are configured according to RDycore's
-build parameters:</p>
-<ul>
-<li><code>PetscInt</code> is a 32-bit or 64-bit integer, depending on whether your PETSc
-  installation is configured to use 32-bit or 64-bit indices. Use this for all
-  integers <strong>except</strong> those transmitted via MPI (see below).</li>
-<li><code>PetscMPIInt</code> is a 32-bit integer corresponding to the <code>MPI_INT</code> type, and
-  should be used for all integers in MPI messages, even in 64-bit builds.</li>
-<li><code>PetscReal</code> represents all real-valued quantities (usually double precision)</li>
-<li><code>PetscBool</code> is PETSc's boolean type, which assumes one of the values
-  <code>PETSC_TRUE</code> or <code>PETSC_FALSE</code>. It provides this type to provide compatibility
-  with older revisions of the C language that don't include the standard C
-  <code>bool</code> type.</li>
-</ul>
-<h3 id="header-files">Header files</h3>
-<p>RDycore has one public header file that defines the interface for its C library:
-<code>rdycore.h</code>. This file is generated by CMake, which injects configuration
-information into the template <code>include/rdycore.h.in</code>. All other headers are
-private and declare functions and types used internally within the RDycore
-library.</p>
-<p>Functions declared in <code>rdycore.h</code> are annotated with the <code>PETSC_EXTERN</code> macro,
-which gives them external linkage, making them available to call outside of
-RDycore. Functions in private headers are annotated instead with <code>PETSC_INTERN</code>,
-giving them internal linkage and making them invisible to code outside of
-RDycore.</p>
-<p>All header files are located within the <code>include</code> directory. Private headers
-live in the <code>private</code> subdirectory. Take a look at these header files to get a
-sense of their structure.</p>
-<h3 id="naming">Naming</h3>
-<ul>
-<li><strong>Variable names</strong>: all variables (including fields within structs and
-  function pointers) use <code>snake_case</code> (e.g. <code>water_height</code>, <code>num_cells</code>)</li>
-<li><strong>Function names</strong>: all functions using <code>PascalCase</code> (e.g. <code>RDySetup</code>,
-  <code>ApplyBoundaryCondition</code>)</li>
-</ul>
-<p>In all cases, avoid inscrutible names that use single letters or unconventional
-abbreviations unless their meaning is clear within the context in which they
-appear.</p>
-<h3 id="structs">Structs</h3>
-<p>RDycore is developed using a "structured programming" approach in which related
-data are grouped into <code>struct</code>s and passed to functions by value.</p>
-<h2 id="style-enforcement-by-tools">Style Enforcement by Tools</h2>
-<p>To check and enforce the style in the code within your Git workspace against
-the conventions we've adopted, you can use the following commands from your
-build directory:</p>
-<ul>
-<li><code>make format-c-check</code>: checks the source code in your workspace, reporting
-  success or failure depending on whether it conforms to our style conventions</li>
-<li><code>make format-c</code>: formats in place all relevant source code in your workspace,
-  enforcing our style conventions</li>
-</ul>
-<p>Sometimes an automated formatting tool disrupts the desired structure or layout
-of a particular section of code. In this case, you can exclude the section from
-auto-formatting by surrounding it with <code>// clang-format [on/off]</code> comments:</p>
-<div class="highlight"><pre><span></span><code>// clang-format on
-&lt;code section excluded from formatting&gt;
-// clang-format off
-</code></pre></div>
-<p>It's a good idea to run <code>make format-c</code> within a feature branch before creating
-a pull request. This ensures that the automated formatting check will pass.</p>
+<p>Coupling H-R equation with Shallow Water Equations lead to:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\label{eqn:cpeqns}
+\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial t} + \frac{\partial \mathbf{G}}{\partial t} &amp;=&amp; \mathbf{S}\\
+\frac{\partial \mathbf{M}}{\partial t} &amp;=&amp; \mathbf{D}
+\end{eqnarray}\]</div>
+<p>where <span class="arithmatex">\(\mathbf{U}\)</span> is the conservative variable vector, <span class="arithmatex">\(\mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{G}\)</span> are the flux vectors in x and y direction, respectively, 
+<span class="arithmatex">\(\mathbf{S}\)</span> is the source vector, <span class="arithmatex">\(\mathbf{M}\)</span> is a deposited mass vector, and <span class="arithmatex">\(\mathbf{D}\)</span> is the net deposition vector:</p>
+<div class="arithmatex">\[\begin{align}
+\mathbf{U} 
+=
+    \begin{bmatrix}
+    h      \\[.5em]
+    uh     \\[.5em]
+    vh     \\
+    c_{1}h \\
+    \vdots \\
+    c_{I}h
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{E} 
+=
+    \begin{bmatrix}
+    uh                           \\[.5em]
+    u^{2}h+\frac{1}{2}gh^{2}     \\[.5em]
+    uvh                          \\
+    c_{1}uh                      \\
+    \vdots                       \\
+    c_{I}uh
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{G} 
+=
+    \begin{bmatrix}
+    vh                           \\[.5em]
+    uvh                          \\[.5em]
+    v^{2}h+\frac{1}{2}gh^{2}     \\
+    c_{1}vh                      \\
+    \vdots                       \\
+    c_{I}vh
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{S} 
+=
+    \begin{bmatrix}
+    S_{r}                                                           \\[.5em]
+    -gh\frac{\partial z_{b}}{\partial x} - C_{D}u\sqrt{u^{2}+v^{2}} \\[.5em]
+    -gh\frac{\partial z_{b}}{\partial y} - C_{D}v\sqrt{u^{2}+v^{2}} \\
+    e_{1}+e_{r1}+r_{1}+r_{r1}-d_{1}                                 \\
+    \vdots                                                          \\
+    e_{I}+e_{rI}+r_{I}+r_{rI}-d_{I} 
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{M} 
+=
+    \begin{bmatrix}
+    M_{1}    \\[.5em]
+    \vdots   \\
+    M_{I} 
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{D} 
+    =
+    \begin{bmatrix}
+    d_{1}-e_{r1}-r_{r1} \\[.5em]
+    \vdots              \\
+    d_{I}-e_{rI}-r_{rI}  
+    \end{bmatrix}
+\end{align}\]</div>
+<h3 id="telemacgaia-equations">TELEMAC/GAIA equations</h3>
+<p>The sediment transport equations implemented in TELEMAC/GAIA are</p>
+<div class="arithmatex">\[\begin{equation}
+\label{eqn:sd2d}
+\frac{\partial hc_{i}}{\partial t}+\frac{\partial uhc_{i}}{\partial x} + \frac{\partial vhc_{i}}{\partial y} = E_{i} - D_{i},
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(u\)</span> and <span class="arithmatex">\(v\)</span> are water depth, velocities in horizontal and vertical directions, respectively, <span class="arithmatex">\(i = 1, 2, \dots I\)</span> is the sediment class, <span class="arithmatex">\(c_{i}\)</span> is the sediment concentration given as mass per unit volume <span class="arithmatex">\([M/L^{3}]\)</span>, 
+<span class="arithmatex">\(I\)</span> is the number of sediment size classes, and <span class="arithmatex">\(E_{i}\)</span> and <span class="arithmatex">\(D_{i}\)</span> are erosion and deposition rate formulated as mass per unit area per unit time <span class="arithmatex">\([M/L^{2}/T]\)</span>.</p>
+<p>According to GAIA, the erosion and deposition rates are calculated as:
+\begin{equation}
+E_i = M \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right),
+\end{equation}
+\begin{equation}
+D_i = w c_i \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right],
+\end{equation}</p>
+<p>where, for each sediment class <span class="arithmatex">\(i\)</span>, <span class="arithmatex">\(M\)</span> is the Krone-Partheniades erosion law constant [kg/m<span class="arithmatex">\(^{2}\)</span>], or the erodibility coefficient, <span class="arithmatex">\(w\)</span> is the settling velocity for sediment class <span class="arithmatex">\(i\)</span> (m/s), <span class="arithmatex">\(\tau_{ce}\)</span> is critical shear stress for erosion (N/m<span class="arithmatex">\(^2\)</span>), <span class="arithmatex">\(\tau_{cd}\)</span> is critical shear stress for deposition (N/m<span class="arithmatex">\(^2\)</span>), <span class="arithmatex">\(\tau_b = \rho C_D u\sqrt{u^2+v^2}\)</span> is the bottom shear stress. </p>
+<p>Coupling sediment transport equation with Shallow Water Equations lead to:</p>
+<div class="arithmatex">\[\begin{equation}
+\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial t} + \frac{\partial \mathbf{G}}{\partial t} = \mathbf{S},
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\mathbf{U}\)</span> is the conservative variable vector, <span class="arithmatex">\(\mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{G}\)</span> are the flux vectors in x and y direction. <span class="arithmatex">\(\mathbf{U}\)</span>, <span class="arithmatex">\(\mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{G}\)</span> are same as those in 2-D H-R equation. <span class="arithmatex">\(\mathbf{S}\)</span> is the source vector:</p>
+<div class="arithmatex">\[\begin{align}
+\mathbf{S} 
+=
+    \begin{bmatrix}
+    S_{r}                                                           \\[.5em]
+    -gh\frac{\partial z_{b}}{\partial x} - C_{D}u\sqrt{u^{2}+v^{2}} \\[.5em]
+    -gh\frac{\partial z_{b}}{\partial y} - C_{D}v\sqrt{u^{2}+v^{2}} \\
+    E_{1}-D_{1}                                 \\
+    \vdots                                                          \\
+    E_{I}-D_{I} 
+    \end{bmatrix}
+\end{align}\]</div>
+<h2 id="spatial-discretization">Spatial discretization</h2>
+<p>Integrating equation Eq (\ref{eqn:cpeqns}) over an arbitrary two-dimensional computational element <span class="arithmatex">\(A\)</span> with a boundary <span class="arithmatex">\(\Gamma\)</span>, then the 
+governing equations expressed in conservation form can be written as follows:</p>
+<div class="arithmatex">\[\begin{equation}
+\frac{\partial}{\partial t}\int_{A}\mathbf{U}dA + \oint_{\Gamma}\mathbf{F} \cdot \mathbf{n}d\Gamma = \iint_{A}\mathbf{S}dA,
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\mathbf{F}\)</span> is the flux vector, and <span class="arithmatex">\(\mathbf{n}\)</span> is the unit vector normal to boundary <span class="arithmatex">\(\partial \Gamma\)</span> and directed outward. The 
+integrand <span class="arithmatex">\(\mathbf{F} \cdot \mathbf{n} = F_{\perp}\)</span> is the numerical flux normal to each cell face and defined as:</p>
+<div class="arithmatex">\[\begin{align}
+\label{eqn:flux}
+\mathbf{F} \cdot \mathbf{n} 
+=
+    \begin{bmatrix}
+    hu_{\perp}                                                                      \\[.5em]
+    huu_{\perp} + \frac{1}{2}gh^{2}cos \theta + \frac{1}{24}g\Delta h^{2}cos \theta \\
+    hvu_{\perp} + \frac{1}{2}gh^{2}sin \theta + \frac{1}{24}g\Delta h^{2}sin \theta \\
+    hc_{1}u_{\perp}                                                                 \\
+    \vdots                                                                          \\
+    hc_{I}u_{\perp}                                                                 \\
+    \end{bmatrix}
+\end{align}\]</div>
+<p>where <span class="arithmatex">\(u_{\perp}\)</span> denotes the velocity normal to the cell interface and computed as <span class="arithmatex">\(u_{\perp}=ucos \theta + vsin \theta\)</span>, and <span class="arithmatex">\(\theta\)</span> is an 
+angle between the face normal vector and the x axis, <span class="arithmatex">\(\Delta h\)</span> is a variation of <span class="arithmatex">\(h\)</span> along the cell face. The last terms in the second and third
+rows of equation (\ref{eqn:flux}) are the hydrostatic thrust correction terms suggested by Bradford and Sanders [2002]. The are necessary to balance 
+the bed slope terms for the still water condition.</p>
+<p>Roe's approximate Riemann solver [Roe, 1981] is implemented to compute the fluxes at the cell interface:</p>
+<div class="arithmatex">\[\begin{equation}
+\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\perp,f} = 
+\frac{1}{2} \left(\mathbf{F}_{\perp,L} + \mathbf{F}_{\perp,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
+\end{equation}\]</div>
+<p>where the subscript <span class="arithmatex">\(f\)</span> denotes the interface between two adjacent cells, <span class="arithmatex">\(L\)</span> and <span class="arithmatex">\(R\)</span> denote left and right cell for the interface, and <span class="arithmatex">\(\Delta\)</span> 
+denotes the finite difference across the interface. The terms <span class="arithmatex">\(\mathbf{\hat{R}}\)</span> and <span class="arithmatex">\(\mathbf{\hat{\Lambda}}\)</span> are the right eigenvector and the 
+eigenvalue of the Jacobian of <span class="arithmatex">\(\mathbf{F}_{\perp}\)</span>, and <span class="arithmatex">\(\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U\)</span>, denotes the wave strength, where <span class="arithmatex">\(\hat{L}\)</span> 
+is the left eigenvector of the Jacobian of <span class="arithmatex">\(\mathbf{F}_{\perp}\)</span>:</p>
+<div class="arithmatex">\[\begin{align}
+\mathbf{\hat{R}}
+=
+    \begin{bmatrix}
+    1                         &amp; 0           &amp; 1                         &amp; 0      &amp; \ldots &amp; 0      \\
+    \hat{u}-\hat{a}cos \theta &amp; -sin \theta &amp; \hat{u}+\hat{a}cos \theta &amp; 0      &amp; \ldots &amp; 0      \\
+    \hat{v}-\hat{a}sin \theta &amp;  cos \theta &amp; \hat{v}+\hat{a}sin \theta &amp; 0      &amp; \ldots &amp; 0      \\
+    \hat{c_{1}}               &amp; 0           &amp; \hat{c_{1}}               &amp; 1      &amp; \ldots &amp; 0      \\
+    \vdots                    &amp; \vdots      &amp; \vdots                    &amp; \vdots &amp; \ddots &amp; \vdots \\ 
+    \hat{c_{I}}               &amp; 0           &amp; \hat{c_{I}}               &amp; 0      &amp; \ldots &amp; 1      \\
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{\hat{\Lambda}}
+=
+    \begin{bmatrix}
+    |\hat{u_{\perp}}-\hat{a}|^{*} &amp;                   &amp;                               &amp;                   &amp;        &amp;                   \\
+                                  &amp; |\hat{u_{\perp}}| &amp;                               &amp;                   &amp;        &amp;                   \\
+                                  &amp;                   &amp; |\hat{u_{\perp}}+\hat{a}|^{*} &amp;                   &amp;        &amp;                   \\
+                                  &amp;                   &amp;                               &amp; |\hat{u_{\perp}}| &amp;        &amp;                   \\
+                                  &amp;                   &amp;                               &amp;                   &amp; \ddots &amp;                   \\
+                                  &amp;                   &amp;                               &amp;                   &amp;        &amp; |\hat{u_{\perp}}| \\
+    \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U
+=
+    \begin{bmatrix}
+    \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
+    \hat{h}u_\parallel                                                          \\[.5em]
+    \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
+    (c_{1}h)_{R} - (c_{1}h)_{L} - \hat{c_{1}}(h_{R}-h_{L})                      \\[.5em]
+    \vdots                                                                      \\[.5em]
+    (c_{I}h)_{R} - (c_{I}h)_{L} - \hat{c_{I}}(h_{R}-h_{L})                      \\[.5em]
+    \end{bmatrix}
+\end{align}\]</div>
+<p>where <span class="arithmatex">\(a\)</span> denotes the celerity of a simple gravity wave, <span class="arithmatex">\(u_{\parallel}\)</span> denotes the vecloty components parallel to the cell interface and can be 
+computed as:</p>
+<div class="arithmatex">\[\begin{equation}
+u_{\parallel} = -usin \theta + vcos \theta
+\end{equation}\]</div>
+<p>The quantities with a hat denote the Roe averages, whch are calculated as the following:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\hat{h}     &amp;=&amp; \sqrt{h_{L}h_{R}}                                                     \\
+\hat{u}     &amp;=&amp; \frac{\sqrt{h_{L}}u_{L}+\sqrt{h_{R}}u_{R}}{\sqrt{h_{L}}+\sqrt{h_{R}}} \\
+\hat{v}     &amp;=&amp; \frac{\sqrt{h_{L}}v_{L}+\sqrt{h_{R}}v_{R}}{\sqrt{h_{L}}+\sqrt{h_{R}}} \\
+\hat{a}     &amp;=&amp; \sqrt{\frac{g}{2}(h_{L}+h_{R})}                                       \\
+\hat{c_{i}} &amp;=&amp; \frac{\sqrt{h_{L}}c_{i,L}+\sqrt{h_{R}}c_{i,R}}{\sqrt{h_{L}}+\sqrt{h_{R}}} 
+\end{eqnarray}\]</div>
+<p>The asterisks denote that the eigenvalues <span class="arithmatex">\(\hat{\lambda}_{1}=\hat{u}_{\perp}-\hat{a}\)</span> and <span class="arithmatex">\(\hat{\lambda}_{3}=\hat{u}_{\perp}+\hat{a}\)</span> are adjusted since Roe's 
+method does not provide correct flux for critical flow :</p>
+<div class="arithmatex">\[\begin{equation}
+|\hat{\lambda}_{1}|^{*} = \frac{\hat{\lambda}_{1}^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
+\quad if \quad -\Delta \lambda /2 &lt; \hat{\lambda}_{1} &lt; \Delta \lambda /2
+\end{equation}\]</div>
+<div class="arithmatex">\[\begin{equation}
+|\hat{\lambda}_{3}|^{*} = \frac{\hat{\lambda}_{3}^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
+\quad if \quad -\Delta \lambda /2 &lt; \hat{\lambda}_{3} &lt; \Delta \lambda /2
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\Delta \lambda = 4(\lambda_{R}-\lambda_{L})\)</span></p>
+<h2 id="source-term">Source term</h2>
+<p>Please refer to shallow_water_equation.md. The H-R sediment source is</p>
+<div class="arithmatex">\[\begin{equation}
+(e_{i}+e_{ri}+r_{i}+r_{ri}-d_{i})A
+\end{equation}\]</div>
+<p>The sediment source in GAIA is 
+\begin{equation}
+(E_{i}-D_{i})A
+\end{equation}</p>
 
 
 

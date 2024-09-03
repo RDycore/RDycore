@@ -9,10 +9,8 @@
       
       
       
-        <link rel="prev" href="organization.html">
+        <link rel="prev" href="index.html">
       
-      
-        <link rel="next" href="tools.html">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -20,7 +18,7 @@
     
     
       
-        <title>Style Guide - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Shallow Water Equations - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -72,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rdycore-c-style-guide" class="md-skip">
+        <a href="#shallow-water-equations" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +106,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Style Guide
+              Shallow Water Equations
             
           </span>
         </div>
@@ -681,8 +679,6 @@
       
   
   
-    
-  
   
   
     
@@ -694,11 +690,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -712,7 +708,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -726,7 +722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../developer/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -768,7 +764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development.html" class="md-nav__link">
+      <a href="../developer/development.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -789,11 +785,144 @@
   
   
     <li class="md-nav__item">
-      <a href="organization.html" class="md-nav__link">
+      <a href="../developer/organization.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
     Code Structure and Organization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/style.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Style Guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/tools.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer Tools
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/ceed.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    SWE implementation using libCEED
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Theory Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Theory Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
   </span>
   
 
@@ -823,18 +952,18 @@
           
   
   <span class="md-ellipsis">
-    Style Guide
+    Shallow Water Equations
   </span>
   
 
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="style.html" class="md-nav__link md-nav__link--active">
+      <a href="swe.html" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
-    Style Guide
+    Shallow Water Equations
   </span>
   
 
@@ -856,55 +985,65 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#style-conventions" class="md-nav__link">
+  <a href="#spatial-discretization" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Conventions
+      Spatial Discretization
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Style Conventions">
+    <nav class="md-nav" aria-label="Spatial Discretization">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
+  <a href="#boundary-conditions" class="md-nav__link">
     <span class="md-ellipsis">
-      Functions
+      Boundary conditions
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#petsc-data-types" class="md-nav__link">
+  <a href="#evaluating-normal-fluxes" class="md-nav__link">
     <span class="md-ellipsis">
-      PETSc Data Types
+      Evaluating normal fluxes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#header-files" class="md-nav__link">
+  <a href="#source-terms" class="md-nav__link">
     <span class="md-ellipsis">
-      Header files
+      Source terms
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Source terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#net-runoff-production-mathbfs_r" class="md-nav__link">
+    <span class="md-ellipsis">
+      Net runoff production \(\mathbf{S}_r\)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#naming" class="md-nav__link">
+  <a href="#bed-elevation-slope-term-mathbfs_b" class="md-nav__link">
     <span class="md-ellipsis">
-      Naming
+      Bed elevation slope term \(\mathbf{S}_b\)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#structs" class="md-nav__link">
+  <a href="#bed-friction-roughness-term-mathbfs_f" class="md-nav__link">
     <span class="md-ellipsis">
-      Structs
+      Bed friction roughness term \(\mathbf{S}_f\)
     </span>
   </a>
   
@@ -914,11 +1053,25 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#style-enforcement-by-tools" class="md-nav__link">
+  <a href="#temporal-discretization" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Enforcement by Tools
+      Temporal Discretization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
     </span>
   </a>
   
@@ -928,137 +1081,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="tools.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Developer Tools
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="ceed.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    SWE implementation using libCEED
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-      
-        
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
-            
-  
-  <span class="md-ellipsis">
-    Theory Guide
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            Theory Guide
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../theory/index.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Overview
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../theory/swe.html" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Shallow Water Equations
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1098,55 +1120,65 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#style-conventions" class="md-nav__link">
+  <a href="#spatial-discretization" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Conventions
+      Spatial Discretization
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Style Conventions">
+    <nav class="md-nav" aria-label="Spatial Discretization">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
+  <a href="#boundary-conditions" class="md-nav__link">
     <span class="md-ellipsis">
-      Functions
+      Boundary conditions
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#petsc-data-types" class="md-nav__link">
+  <a href="#evaluating-normal-fluxes" class="md-nav__link">
     <span class="md-ellipsis">
-      PETSc Data Types
+      Evaluating normal fluxes
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#header-files" class="md-nav__link">
+  <a href="#source-terms" class="md-nav__link">
     <span class="md-ellipsis">
-      Header files
+      Source terms
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Source terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#net-runoff-production-mathbfs_r" class="md-nav__link">
+    <span class="md-ellipsis">
+      Net runoff production \(\mathbf{S}_r\)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#naming" class="md-nav__link">
+  <a href="#bed-elevation-slope-term-mathbfs_b" class="md-nav__link">
     <span class="md-ellipsis">
-      Naming
+      Bed elevation slope term \(\mathbf{S}_b\)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#structs" class="md-nav__link">
+  <a href="#bed-friction-roughness-term-mathbfs_f" class="md-nav__link">
     <span class="md-ellipsis">
-      Structs
+      Bed friction roughness term \(\mathbf{S}_f\)
     </span>
   </a>
   
@@ -1156,11 +1188,25 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#style-enforcement-by-tools" class="md-nav__link">
+  <a href="#temporal-discretization" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Enforcement by Tools
+      Temporal Discretization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
     </span>
   </a>
   
@@ -1181,117 +1227,299 @@
                   
 
 
-<h1 id="rdycore-c-style-guide">RDycore (C) Style Guide</h1>
-<p>Here we provide a simple style guide for C code within the RDycore library. This
-style guide applies mainly to source code within the RDycore C library itself.
-The corresponding Fortran library is a thin hand-written wrapper around the C
-library that doesn't leave much room for "style," so there is no Fortran style
-guide.</p>
-<p>This style guide is very short compared to many others, since C is a very small
-language and most formatting conventions (whitespace, lengths of lines,
-placement of curly braces) are enforced via tools and not humans. Here, we focus
-mainly on those conventions that need the attention of RDycore team members and
-other contributors.</p>
-<h2 id="style-conventions">Style Conventions</h2>
-<p>RDycore's conventions are based on those in the
-<a href="https://petsc.org/release/developers/style/">PETSc Style and Usage Guide</a>,
-with the following deviations:</p>
+<h1 id="shallow-water-equations">Shallow Water Equations</h1>
+<p>The two-dimensional shallow water equations can be written in the conservative
+form</p>
+<div class="arithmatex">\[
+\frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f \tag{1}\label{1}
+\]</div>
+<p>Here,</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{U}
+  =
+  \begin{bmatrix}
+  h \\[.5em]
+  hu \\[.5em]
+  hv
+  \end{bmatrix},
+\end{align}\]</div>
+<p>is the <em>solution vector</em>, with components</p>
 <ul>
-<li>we allow the use of variable-length arrays (VLAs)</li>
-<li>we use standard header guards instead of the nonstandard <code>#pragma once</code>
-  mechanism</li>
-<li>we prefer C++-style code comments (<code>//</code>) to C-style comments (<code>/* */</code>) even
-  for multi-line comments</li>
-<li>we use C conventions for logical expressions, e.g.<ul>
-<li><code>if (cond)</code> instead of <code>if (cond == PETSC_TRUE)</code></li>
-<li><code>if (!cond)</code> instead of <code>if (cond == PETSC_FALSE)</code></li>
-<li><code>if (foo)</code> instead of <code>if (foo != NULL)</code> for pointers</li>
-<li><code>if (!foo)</code> instead of <code>if (foo == NULL)</code> for pointers</li>
+<li><span class="arithmatex">\(h\)</span>, the flow depth</li>
+<li><span class="arithmatex">\(u\)</span>, the vertically-averaged velocity in the <span class="arithmatex">\(x\)</span> direction</li>
+<li><span class="arithmatex">\(v\)</span>, the vertically-averaged velocity in the <span class="arithmatex">\(y\)</span> direction</li>
 </ul>
+<p>The terms <span class="arithmatex">\(\mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{G}\)</span> on the left hand side of <span class="arithmatex">\(\eqref{1}\)</span> are
+the <em>flux vectors</em> in the <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial dimensions:</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{E}
+  =
+  \begin{bmatrix}
+  hu \\[.5em]
+  hu^2 + \frac{1}{2}gh^2 \\[.5em]
+  huv
+  \end{bmatrix},
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{G}
+  =
+  \begin{bmatrix}
+  hv \\[.5em]
+  huv \\[.5em]
+  hv^2 + \frac{1}{2}gh^2
+  \end{bmatrix},
+\end{align}\]</div>
+<p>where <span class="arithmatex">\(g\)</span> is the acceleration due to gravity.</p>
+<p>The three source terms on the right hand side of <span class="arithmatex">\(\eqref{1}\)</span> represent
+contributions to <span class="arithmatex">\(\mathbf{U}\)</span> from</p>
+<ul>
+<li><span class="arithmatex">\(\mathbf{S}_r\)</span>, <em>net runoff (water) production</em></li>
+<li><span class="arithmatex">\(\mathbf{S}_b\)</span>, <em>bed elevation slope</em></li>
+<li><span class="arithmatex">\(\mathbf{S}_f\)</span>, <em>bed friction roughness</em>.</li>
+</ul>
+<p>These source terms are</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{S}_r
+  =
+  \begin{bmatrix}
+  Q \\[.5em]
+  0 \\[.5em]
+  0
+  \end{bmatrix},
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{S}_b
+  =
+  \begin{bmatrix}
+  0 \\[.5em]
+  -gh\frac{\partial z}{\partial x} \\[.5em]
+  -gh\frac{\partial z}{\partial y}
+  \end{bmatrix},
+\end{align}\]</div>
+<p>and</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{S}_f
+  =
+  \begin{bmatrix}
+  0 \\[.5em]
+  - C_D u \sqrt{u^2 + v^2} \\[.5em]
+  - C_D v \sqrt{u^2 + v^2}
+  \end{bmatrix}.
+\end{align}\]</div>
+<p>It is sometimes convenient to interpret the terms involving <span class="arithmatex">\(\mathbf{E}\)</span> and
+<span class="arithmatex">\(\mathbf{G}\)</span> as the (two-dimensional) divergence of a multi-component spatial
+vector called the <em>flux function</em> <span class="arithmatex">\(\mathbf{\vec{F}}\)</span>.</p>
+<div class="arithmatex">\[
+\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}(\mathbf{U})\tag{2}\label{2}
+\]</div>
+<p>where <span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})\)</span>.</p>
+<p>We have written <span class="arithmatex">\(\mathbf{\vec{F}}\)</span> and <span class="arithmatex">\(\mathbf{S}\)</span> in <span class="arithmatex">\(\eqref{2}\)</span> in a way that
+emphasizes that these functions depend on the solution vector <span class="arithmatex">\(\mathbf{U}\)</span>.</p>
+<h2 id="spatial-discretization">Spatial Discretization</h2>
+<p>We can rewrite the shallow water equations in a form more convenient for
+numerical treatment by defining a computational domain <span class="arithmatex">\(\Omega\)</span> bounded by a
+piecewise linear closed curve <span class="arithmatex">\(\Gamma = \partial\Omega\)</span>.</p>
+<p>We create a discrete representation by partitioning <span class="arithmatex">\(\Omega\)</span> into disjoint
+cells, with <span class="arithmatex">\(\Omega_i\)</span> representing cell <span class="arithmatex">\(i\)</span>. The boundary of cell <span class="arithmatex">\(i\)</span>, written
+<span class="arithmatex">\(\partial\Omega_i\)</span>, is the set of faces separating it from its neighboring
+cells. Using this notation, we obtain a discrete set of equations for the
+solution in cell <span class="arithmatex">\(i\)</span> by integrating <span class="arithmatex">\(\eqref{1}\)</span> over <span class="arithmatex">\(\Omega_i\)</span> and using
+Green's theorem:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\int_{\Omega_i} \left[ \frac{\partial\mathbf{E}}{\partial x} +
+\frac{\partial\mathbf{G}}{\partial y} \right] d\Omega_i &amp;=&amp;
+\int_{\Omega_i} \mathbf{S} d\Omega_i \nonumber\\
+\frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\oint_{\partial\Omega_i} \left( \mathbf{E}~dy - \mathbf{G}~dx \right) &amp;=&amp;
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
+\end{eqnarray}\]</div>
+<p>This equation can be used to approximate discontinuous flows, because all
+quantities appear under integrals. By contrast, <span class="arithmatex">\(\eqref{1}\)</span> cannot be used
+where derivatives of <span class="arithmatex">\(\mathbf{U}\)</span> don't exist.</p>
+<p>We can interpret the line integral in <span class="arithmatex">\(\eqref{3}\)</span> in terms of the flux
+<span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y)\)</span> between a cell <span class="arithmatex">\(i\)</span> and its
+neighboring cells.</p>
+<div class="arithmatex">\[
+ \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\oint_{\partial\Omega_i} \mathbf{\vec{F}} \cdot \vec{n}~dl =
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{4}\label{4}
+\]</div>
+<p>Here, we have defined a unit normal vector <span class="arithmatex">\(\vec{n} = (n_x, n_y)\)</span>
+pointing outward along the cell boundary <span class="arithmatex">\(\partial\Omega_i\)</span>. <span class="arithmatex">\(\eqref{4}\)</span> is a
+"surface integral" with a differential arc length <span class="arithmatex">\(dl\)</span> integrated over the
+boundary of cell <span class="arithmatex">\(i\)</span>. One obtains this surface integral by integrating <span class="arithmatex">\(\eqref{2}\)</span>
+over the domain <span class="arithmatex">\(\Omega\)</span> and applying the (two-dimensional) divergence theorem
+to the flux term.</p>
+<p>In the rest of this section, we use the flux form <span class="arithmatex">\(\eqref{4}\)</span> of the shallow
+water equations.</p>
+<p>We can obtain a finite volume method for these equations by defining
+<em>horizontally-averaged</em> quantities for flow depth and velocities:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+h_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} h d\Omega_i \\
+u_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} u d\Omega_i \\
+v_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} v d\Omega_i
+\end{eqnarray}\]</div>
+<p>where <span class="arithmatex">\(A_i = \int_{\Omega_i}d\Omega_i\)</span> is the area enclosed within cell <span class="arithmatex">\(i\)</span>. We
+also introduce the <em>horizontally-averaged solution vector</em></p>
+<div class="arithmatex">\[
+\mathbf{U}_i = [h_i, h_i u_i, h_i v_i]^T
+\]</div>
+<p>and the <em>horizontally-averaged source vector</em></p>
+<div class="arithmatex">\[
+\mathbf{S}_i = \frac{1}{A_i}\int_{\Omega_i} \left(\mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f\right) d\Omega_i.
+\]</div>
+<p>Finally, we define the <em>face-averaged normal flux vector</em> between cell <span class="arithmatex">\(i\)</span> and
+an adjoining cell <span class="arithmatex">\(j\)</span>:</p>
+<div class="arithmatex">\[
+\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\vec{n}~dl \tag{5}\label{5}
+\]</div>
+<p>where <span class="arithmatex">\(l_{ij}\)</span> is the length of the face connecting cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>.</p>
+<p>With these definitions, the shallow water equations in cell <span class="arithmatex">\(i\)</span> are</p>
+<div class="arithmatex">\[
+\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \tag{6}\label{6}
+\]</div>
+<p>where the index <span class="arithmatex">\(j\)</span> in each term of the sum refers to a neighboring cell of cell <span class="arithmatex">\(i\)</span>.</p>
+<h3 id="boundary-conditions">Boundary conditions</h3>
+<p>To incorporate boundary conditions, we partition the domain boundary <span class="arithmatex">\(\Gamma\)</span>
+into disjoint line segments, each of which represents a <em>boundary face</em>
+<span class="arithmatex">\(\Gamma_i\)</span>. Every cell <span class="arithmatex">\(j\)</span> that touches the boundary <span class="arithmatex">\(\Gamma\)</span> has at least one
+boundary face. Such a cell is a <em>boundary cell</em>. The boundary <span class="arithmatex">\(\Gamma\)</span> consists
+entirely of faces of boundary cells.</p>
+<p>In dealing with boundary conditions, we must distinguish between the faces a
+boundary cell <span class="arithmatex">\(i\)</span> <em>does</em> and <em>does not</em> share with the boundary <span class="arithmatex">\(\Gamma\)</span>:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\frac{\partial\mathbf{U}_i}{\partial t} +
+\sum_{j: \partial\Omega_j\subset\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} &amp;+&amp;
+\sum_{j: \partial\Omega_j\not\subset\Gamma}\mathbf{F}_{ij} l_{ij}
+&amp;= \mathbf{S}_i. \tag{7}\label{7} \\
+\text{(boundary)}&amp; &amp;\text{(interior)} &amp;
+\end{eqnarray}\]</div>
+<p>To enforce boundary conditions, we must compute the effective boundary fluxes
+<span class="arithmatex">\(\mathbf{F}_{ij}^{\Gamma}\)</span> that appear in the first sum in <span class="arithmatex">\(\eqref{7}\)</span>. These
+boundary fluxes have specific forms depending on their respective boundary
+conditions.</p>
+<h3 id="evaluating-normal-fluxes">Evaluating normal fluxes</h3>
+<p>We have reduced the spatial discretization of our finite volume method to the
+calculation of normal fluxes between neighboring cells and on boundary faces.
+The normal flux function is</p>
+<div class="arithmatex">\[\begin{equation}
+\mathbf{\vec{F}}\cdot\vec{n} = \mathbf{E} n_x + \mathbf{G} n_y.
+\end{equation}\]</div>
+<p>We can evaluate <span class="arithmatex">\(\mathbf{F}_{ij} \approx \mathbf{\vec{F}}\cdot\vec{n}\)</span>, the
+approximate normal flux at a face shared shared by <em>interior cells</em> <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>,
+by solving the relevant Riemann problem using Roe's method. If we designate
+<span class="arithmatex">\(\phi\)</span> as the angle between <span class="arithmatex">\(\vec{n}\)</span> and the <span class="arithmatex">\(x\)</span> axis and adopt <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>
+subscripts for quantities respectively in cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>, we can approximate
+the normal flux by the expression</p>
+<div class="arithmatex">\[\begin{equation}
+\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right).
+\end{equation}\]</div>
+<p>Above,</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{R}
+  =
+  \begin{bmatrix}
+  1 &amp; 0 &amp; 1  \\[.5em]
+  \hat{u} - \hat{a}\cos\phi &amp; -\sin\phi &amp; \hat{u} + \hat{a}\cos\phi  \\[.5em]
+  \hat{v} - \hat{a}\sin\phi &amp;  \cos\phi &amp; \hat{v} + \hat{a}\sin\phi
+  \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{\Delta\hat{V}}
+  =
+  \begin{bmatrix}
+  \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right) \\[.5em]
+  \hat{h}u_\perp \\[.5em]
+  \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right)
+  \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  |\mathbf{\hat{\Lambda}}|
+  =
+  \begin{bmatrix}
+  | \hat{u}_\parallel - \hat{a} |^* &amp; 0 &amp; 0  \\[.5em]
+  0                                 &amp; |\hat{u}_\parallel| &amp; 0 \\[.5em]  
+  0                                 &amp;                     &amp; | \hat{u}_\parallel + \hat{a} |^* 
+  \end{bmatrix}
+\end{align}\]</div>
+<p>where</p>
+<div class="arithmatex">\[\begin{eqnarray}
+  \hat{h} &amp; = &amp; \sqrt{h_i h_j} \\
+  \hat{u} &amp; = &amp; \frac{ \sqrt{h_i} \vec{u}_i + \sqrt{h_j} \vec{u}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{v} &amp; = &amp; \frac{ \sqrt{h_i} \vec{v}_i + \sqrt{h_j} \vec{v}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{a} &amp; = &amp; \sqrt{\frac{g}{2} \left( h_i + h_j \right)},
+\end{eqnarray}\]</div>
+<p><span class="arithmatex">\(\Delta f = f_j - f_i\)</span> is the change in the quantity <span class="arithmatex">\(f\)</span> moving from cell
+<span class="arithmatex">\(i\)</span> to <span class="arithmatex">\(j\)</span>, and <span class="arithmatex">\(w_\parallel = \vec{w}\cdot\vec{n}\)</span> and
+<span class="arithmatex">\(w_\perp = |\vec{w} - w_\parallel \vec{n}|\)</span> for any vector <span class="arithmatex">\(\vec{w}\)</span>.</p>
+<p>We have used asterisks in the expression for <span class="arithmatex">\(|\mathbf{\hat{\Lambda}}|\)</span> to
+indicate that the eigenvalues 
+<span class="arithmatex">\(\hat{\lambda}_1 = \hat{u}_\perp - \hat{a}\)</span> and
+<span class="arithmatex">\(\hat{\lambda}_3 = \hat{u}_\perp + \hat{a}\)</span> 
+must be adjusted, since Roe's method does not provide the correct flux for
+critical flow.</p>
+<div class="arithmatex">\[\begin{eqnarray}
+  |\hat{\lambda}|_1 &amp;=&amp; \frac{\hat{\lambda}^2_1}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_1 &lt; \Delta \lambda/2$} \\
+  |\hat{\lambda}|_3 &amp;=&amp; \frac{\hat{\lambda}^2_2}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_3 &lt; \Delta \lambda/2$}
+\end{eqnarray}\]</div>
+<h3 id="source-terms">Source terms</h3>
+<p>Recall that there are three source terms $\mathbf{S}_r, <span class="arithmatex">\(\mathbf{S}_b\)</span>, and
+<span class="arithmatex">\(\mathbf{S}_f\)</span>. In this section, we write the source terms for the momentum
+vector as <span class="arithmatex">\(\mathbf{S}_b = [0, \mathbf{\vec{S}}_b]^T\)</span> and <span class="arithmatex">\(\mathbf{S}_f = [0, \mathbf{\vec{S}}_f]^T\)</span>
+because their second and third components correspond to the spatial components
+of the momentum vector.</p>
+<h4 id="net-runoff-production-mathbfs_r">Net runoff production <span class="arithmatex">\(\mathbf{S}_r\)</span></h4>
+<p>This source term contributes only to height of the water, and is expressed as
+<span class="arithmatex">\(\mathbf{S}_r = [R, 0, 0]^T\)</span>, where <span class="arithmatex">\(R\)</span> is a constant, a spatially homogeneous
+time-dependent function <span class="arithmatex">\(R(t)\)</span>, or a spatially heterogeneous time-dependent
+function <span class="arithmatex">\(R(x, y, t)\)</span>. We can approximate the integral of this term using the
+mean value theorem of calculus:</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [R, 0, 0]^T~d\Omega \approx [R V_i, 0, 0]^T,
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(V_i\)</span> is the volume of cell <span class="arithmatex">\(i\)</span>.</p>
+<h4 id="bed-elevation-slope-term-mathbfs_b">Bed elevation slope term <span class="arithmatex">\(\mathbf{S}_b\)</span></h4>
+<p>This term represents the force of gravity on the water and can be
+approximated as</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\nabla z = (\partial z/\partial x, \partial z/\partial y)\)</span> is the two-dimensional
+gradient of the bed elevation function <span class="arithmatex">\(z\)</span>.</p>
+<p>For a triangular grid cell,</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\overline{\frac{\partial z}{\partial x}} &amp;=&amp; \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)} \\
+\overline{\frac{\partial z}{\partial y}} &amp;=&amp; \frac{(x_2 - x_0)(z_1 - z_0) - (x_1 - x_0)(z_2 - z_0)}{(x_2 - y_0)(x_1 - x_0) - (x_1 - y_0)(y_2 - y_0)}.
+\end{eqnarray}\]</div>
+<h4 id="bed-friction-roughness-term-mathbfs_f">Bed friction roughness term <span class="arithmatex">\(\mathbf{S}_f\)</span></h4>
+<p>Like the runoff term, this term involves only quantities within a single cell
+and can be approximated by the mean value theorem:</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\vec{u} = (u, v)\)</span> is the flow velocity vector. The <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial
+components contribute to the second and third vector components of the integral
+of <span class="arithmatex">\(\mathbf{S}_r\)</span>, respectively.</p>
+<h2 id="temporal-discretization">Temporal Discretization</h2>
+<p>The above spatial discretization produces a "semi-discrete" system of equations
+that can be integrated using various methods for solving systems of ordinary
+differential equations. The following methods of integration are provided by
+PETSc and supported for RDycore:</p>
+<ul>
+<li><a href="https://petsc.org/release/manualpages/TS/TSEULER/">Forward Euler</a></li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li>
+<p><a href="https://ascelibrary.org/doi/10.1061/%28ASCE%290733-9429%282002%29128%3A3%28289%29">Bradford, S. F., &amp; Sanders, B. F. (2002). Finite-volume model for shallow-water flooding of arbitrary topography. Journal of hydraulic engineering, 128(3), 289-298.</a></p>
+</li>
+<li>
+<p><a href="https://www.sciencedirect.com/science/article/pii/S0309170811002211?via%3Dihub">Kim, J., Warnock, A., Ivanov, V. Y., &amp; Katopodes, N. D. (2012).
+Coupled modeling of hydrologic and hydrodynamic processes including
+overland and channel flow. Advances in water resources, 37, 104-126.</a></p>
 </li>
 </ul>
-<p>These deviations reflect certain facts about RDycore relative to PETSc:</p>
-<ul>
-<li>RDycore targets fewer systems than PETSc</li>
-<li>RDycore is much small codebase with fewer contributors than PETSc</li>
-<li>RDycore does not support the use of C++</li>
-</ul>
-<p>We summarize the most important conventions below (in alphabetical order).</p>
-<h3 id="functions">Functions</h3>
-<p>Following the PETSc approach, all function bodies must be surrounded by
-the <code>PetscFunctionBegin</code> and <code>PetscFunctionReturn</code> macros. Try to write short
-functions, but avoid breaking up a function if doing so would introduce
-undue complexity, such as passing several variables around or introducing
-otherwise unnecessary abstractions.</p>
-<p>Accordingly, almost all functions in RDycore return a <code>PetscErrorCode</code>
-indicating success or failure, and all calls to these functions are enclosed
-within the <code>PetscCall</code> macro, e.g.</p>
-<div class="highlight"><pre><span></span><code>  PetscCall(RDyAdvance(rdy));
-</code></pre></div>
-<p>Function inputs and outputs are passed as arguments to a function. Because C
-passes arguments by value and not by reference (like Fortan), output parameters
-are typically pointers.</p>
-<h3 id="petsc-data-types">PETSc Data Types</h3>
-<p>We use data types defined by PETSc, which are configured according to RDycore's
-build parameters:</p>
-<ul>
-<li><code>PetscInt</code> is a 32-bit or 64-bit integer, depending on whether your PETSc
-  installation is configured to use 32-bit or 64-bit indices. Use this for all
-  integers <strong>except</strong> those transmitted via MPI (see below).</li>
-<li><code>PetscMPIInt</code> is a 32-bit integer corresponding to the <code>MPI_INT</code> type, and
-  should be used for all integers in MPI messages, even in 64-bit builds.</li>
-<li><code>PetscReal</code> represents all real-valued quantities (usually double precision)</li>
-<li><code>PetscBool</code> is PETSc's boolean type, which assumes one of the values
-  <code>PETSC_TRUE</code> or <code>PETSC_FALSE</code>. It provides this type to provide compatibility
-  with older revisions of the C language that don't include the standard C
-  <code>bool</code> type.</li>
-</ul>
-<h3 id="header-files">Header files</h3>
-<p>RDycore has one public header file that defines the interface for its C library:
-<code>rdycore.h</code>. This file is generated by CMake, which injects configuration
-information into the template <code>include/rdycore.h.in</code>. All other headers are
-private and declare functions and types used internally within the RDycore
-library.</p>
-<p>Functions declared in <code>rdycore.h</code> are annotated with the <code>PETSC_EXTERN</code> macro,
-which gives them external linkage, making them available to call outside of
-RDycore. Functions in private headers are annotated instead with <code>PETSC_INTERN</code>,
-giving them internal linkage and making them invisible to code outside of
-RDycore.</p>
-<p>All header files are located within the <code>include</code> directory. Private headers
-live in the <code>private</code> subdirectory. Take a look at these header files to get a
-sense of their structure.</p>
-<h3 id="naming">Naming</h3>
-<ul>
-<li><strong>Variable names</strong>: all variables (including fields within structs and
-  function pointers) use <code>snake_case</code> (e.g. <code>water_height</code>, <code>num_cells</code>)</li>
-<li><strong>Function names</strong>: all functions using <code>PascalCase</code> (e.g. <code>RDySetup</code>,
-  <code>ApplyBoundaryCondition</code>)</li>
-</ul>
-<p>In all cases, avoid inscrutible names that use single letters or unconventional
-abbreviations unless their meaning is clear within the context in which they
-appear.</p>
-<h3 id="structs">Structs</h3>
-<p>RDycore is developed using a "structured programming" approach in which related
-data are grouped into <code>struct</code>s and passed to functions by value.</p>
-<h2 id="style-enforcement-by-tools">Style Enforcement by Tools</h2>
-<p>To check and enforce the style in the code within your Git workspace against
-the conventions we've adopted, you can use the following commands from your
-build directory:</p>
-<ul>
-<li><code>make format-c-check</code>: checks the source code in your workspace, reporting
-  success or failure depending on whether it conforms to our style conventions</li>
-<li><code>make format-c</code>: formats in place all relevant source code in your workspace,
-  enforcing our style conventions</li>
-</ul>
-<p>Sometimes an automated formatting tool disrupts the desired structure or layout
-of a particular section of code. In this case, you can exclude the section from
-auto-formatting by surrounding it with <code>// clang-format [on/off]</code> comments:</p>
-<div class="highlight"><pre><span></span><code>// clang-format on
-&lt;code section excluded from formatting&gt;
-// clang-format off
-</code></pre></div>
-<p>It's a good idea to run <code>make format-c</code> within a feature branch before creating
-a pull request. This ensures that the automated formatting check will pass.</p>
 
 
 

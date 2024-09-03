@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="organization.html">
+        <link rel="prev" href="../developer/ceed.html">
       
       
-        <link rel="next" href="tools.html">
+        <link rel="next" href="swe.html">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Style Guide - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Overview - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
@@ -72,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rdycore-c-style-guide" class="md-skip">
+        <a href="#rdycore-theory-guide-overview" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Style Guide
+              Overview
             
           </span>
         </div>
@@ -681,8 +681,6 @@
       
   
   
-    
-  
   
   
     
@@ -694,11 +692,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -712,7 +710,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Developer Guide
@@ -726,7 +724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../developer/index.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -768,7 +766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development.html" class="md-nav__link">
+      <a href="../developer/development.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -789,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="organization.html" class="md-nav__link">
+      <a href="../developer/organization.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -807,30 +805,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Style Guide
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="style.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../developer/style.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -839,95 +817,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#style-conventions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Style Conventions
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Style Conventions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      Functions
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#petsc-data-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      PETSc Data Types
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#header-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      Header files
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#naming" class="md-nav__link">
-    <span class="md-ellipsis">
-      Naming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#structs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Structs
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#style-enforcement-by-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      Style Enforcement by Tools
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -940,7 +829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tools.html" class="md-nav__link">
+      <a href="../developer/tools.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -961,7 +850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="ceed.html" class="md-nav__link">
+      <a href="../developer/ceed.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -986,8 +875,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -997,11 +888,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -1015,7 +906,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             Theory Guide
@@ -1026,10 +917,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../theory/index.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="index.html" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -1038,6 +949,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#notation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-types-of-vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Two types of vectors
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#geometry" class="md-nav__link">
+    <span class="md-ellipsis">
+      Geometry
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1050,7 +1014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../theory/swe.html" class="md-nav__link">
+      <a href="swe.html" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1098,55 +1062,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#style-conventions" class="md-nav__link">
+  <a href="#notation" class="md-nav__link">
     <span class="md-ellipsis">
-      Style Conventions
+      Notation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Style Conventions">
+    <nav class="md-nav" aria-label="Notation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
+  <a href="#two-types-of-vectors" class="md-nav__link">
     <span class="md-ellipsis">
-      Functions
+      Two types of vectors
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#petsc-data-types" class="md-nav__link">
+  <a href="#geometry" class="md-nav__link">
     <span class="md-ellipsis">
-      PETSc Data Types
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#header-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      Header files
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#naming" class="md-nav__link">
-    <span class="md-ellipsis">
-      Naming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#structs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Structs
+      Geometry
     </span>
   </a>
   
@@ -1154,15 +1091,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#style-enforcement-by-tools" class="md-nav__link">
-    <span class="md-ellipsis">
-      Style Enforcement by Tools
-    </span>
-  </a>
   
 </li>
       
@@ -1181,117 +1109,61 @@
                   
 
 
-<h1 id="rdycore-c-style-guide">RDycore (C) Style Guide</h1>
-<p>Here we provide a simple style guide for C code within the RDycore library. This
-style guide applies mainly to source code within the RDycore C library itself.
-The corresponding Fortran library is a thin hand-written wrapper around the C
-library that doesn't leave much room for "style," so there is no Fortran style
-guide.</p>
-<p>This style guide is very short compared to many others, since C is a very small
-language and most formatting conventions (whitespace, lengths of lines,
-placement of curly braces) are enforced via tools and not humans. Here, we focus
-mainly on those conventions that need the attention of RDycore team members and
-other contributors.</p>
-<h2 id="style-conventions">Style Conventions</h2>
-<p>RDycore's conventions are based on those in the
-<a href="https://petsc.org/release/developers/style/">PETSc Style and Usage Guide</a>,
-with the following deviations:</p>
+<h1 id="rdycore-theory-guide-overview">RDycore Theory Guide - Overview</h1>
+<p>This guide describes the mathematical and numerical approximations used by
+RDycore to model compound flooding.</p>
+<h2 id="notation">Notation</h2>
+<h3 id="two-types-of-vectors">Two types of vectors</h3>
+<p>We write <em>multi-component quantities</em> in <span class="arithmatex">\(\mathbf{bold}\)</span>, sometimes referring to
+them as vectors. For example, we refer this way to the <em>solution vector</em>
+<span class="arithmatex">\(\mathbf{U} = [h, hu, hv]^T\)</span>. These multi-component quantities are <em>vectors</em> in
+the sense that they are used in matrix-vector expressions suitable for solving
+systems of equations. By convention, we write them as column vectors.</p>
+<p>By contrast, we write <em>spatial vectors</em> (those with <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> components
+aligned respectively with corresponding spatial axes) with arrows over their
+symbols, like the flow velocity <span class="arithmatex">\(\vec{u} = (u_x, u_y) = (u, v)\)</span>. These are the
+vectors familiar to physical scientists. We write these as row vectors.</p>
+<p>Sometimes a multi-component quantity itself can be considered a spatial vector,
+such as the <em>flux vector</em> <span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y),\)</span>
+where <span class="arithmatex">\(\mathbf{F}_x\)</span> and <span class="arithmatex">\(\mathbf{F}_y\)</span> are themselves multi-component
+quantities. We write these "multi-component vector quantities" in bold with
+arrows overhead.</p>
+<p>Distinguishing between these "types" of vectors allows us to make use of
+concepts from vector calculus such as <em>divergence</em> (<span class="arithmatex">\(\vec{\nabla}\cdot\mathbf{\vec{F}}\)</span>)
+and <em>projections</em> along vectors normal to surfaces (<span class="arithmatex">\(\mathbf{\vec{F}}\cdot\vec{n}\)</span>).
+This distinction is often not made in numerical analysis, which can confuse the
+reader who is trying to unpack a complicated expression.</p>
+<h3 id="geometry">Geometry</h3>
+<p>We use some elementary ideas from <a href="https://en.wikipedia.org/wiki/Set_theory">set theory</a>
+to describe the geometry in our model formulation. Specifically:</p>
 <ul>
-<li>we allow the use of variable-length arrays (VLAs)</li>
-<li>we use standard header guards instead of the nonstandard <code>#pragma once</code>
-  mechanism</li>
-<li>we prefer C++-style code comments (<code>//</code>) to C-style comments (<code>/* */</code>) even
-  for multi-line comments</li>
-<li>we use C conventions for logical expressions, e.g.<ul>
-<li><code>if (cond)</code> instead of <code>if (cond == PETSC_TRUE)</code></li>
-<li><code>if (!cond)</code> instead of <code>if (cond == PETSC_FALSE)</code></li>
-<li><code>if (foo)</code> instead of <code>if (foo != NULL)</code> for pointers</li>
-<li><code>if (!foo)</code> instead of <code>if (foo == NULL)</code> for pointers</li>
+<li>We deal exclusively with sets containing points in the plane. Any two sets
+<span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> are <em>equal</em> <span class="arithmatex">\((x = y)\)</span> if they contain exactly the same points.</li>
+<li><span class="arithmatex">\(\varnothing\)</span> is the <em>null set</em>, which contains no points.</li>
+<li>We represent the 2D <em>cells</em> used by RDycore as <a href="https://mathworld.wolfram.com/ClosedSet.html">closed sets</a> in the plane. We typically write the cell <span class="arithmatex">\(i\)</span> as <span class="arithmatex">\(\Omega_i\)</span>, the set of all points contained within that cell, <em>including those on its boundary</em>.</li>
+<li>The boundary of a 2D cell consists of the <em>faces</em> (alternatively <em>edges</em>) that bound the cell. We write the boundary of the cell <span class="arithmatex">\(\Omega_i\)</span> as <span class="arithmatex">\(\partial\Omega_i\)</span>, the set of all points in each (piecewise linear) face attached to the cell, <em>including its endpoints</em>.</li>
+<li>The vertices of a 2D cell are the isolated points shared by adjacent faces in that cell. A triangular cell has 3 vertices, while a quadrilateral cell has 4.</li>
+<li><span class="arithmatex">\(p \in x\)</span> indicates that the point <span class="arithmatex">\(p\)</span> belongs to the set <span class="arithmatex">\(x\)</span>.</li>
+<li><span class="arithmatex">\(x \subset y\)</span> indicates that the set <span class="arithmatex">\(x\)</span> is a <a href="https://en.wikipedia.org/wiki/Subset">subset</a> of the set <span class="arithmatex">\(y\)</span>. <span class="arithmatex">\(x \not\subset y\)</span> indicates that <span class="arithmatex">\(x\)</span> is <em>not</em> a subset of <span class="arithmatex">\(y\)</span>.</li>
+<li><span class="arithmatex">\(x \bigcup y\)</span> indicates the <a href="https://en.wikipedia.org/wiki/Union_(set_theory)">union</a> of two sets <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span>.</li>
+<li><span class="arithmatex">\(\bigcup_i x_i\)</span> indicates the <a href="https://en.wikipedia.org/wiki/Union_(set_theory)">union</a> of a number of indexed sets <span class="arithmatex">\(x_i\)</span>.</li>
+<li><span class="arithmatex">\(x \bigcap y\)</span> indicates the <a href="https://en.wikipedia.org/wiki/Intersection_(set_theory)">intersection</a> of two sets <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span>.</li>
+<li><span class="arithmatex">\(\bigcap_i x_i\)</span> indicates the <a href="https://en.wikipedia.org/wiki/Intersection_(set_theory)">intersection</a> of a number of indexed sets <span class="arithmatex">\(x_i\)</span>.</li>
 </ul>
-</li>
-</ul>
-<p>These deviations reflect certain facts about RDycore relative to PETSc:</p>
+<p>Cells, faces, and vertices can be easily expressed in terms of these basic ideas:</p>
 <ul>
-<li>RDycore targets fewer systems than PETSc</li>
-<li>RDycore is much small codebase with fewer contributors than PETSc</li>
-<li>RDycore does not support the use of C++</li>
+<li>The intersection of two cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span> (written <span class="arithmatex">\(\Omega_i \bigcap \Omega_j\)</span>),
+is the face separating those two cells, consisting of all points contained in
+both cells.</li>
+<li>We sometimes refer to a face <span class="arithmatex">\(f \in \partial\Omega_i\)</span>, which reads "face <span class="arithmatex">\(f\)</span>,
+which belongs to the boundary of cell <span class="arithmatex">\(i\)</span>."</li>
+<li>The intersection of two adjacent faces in a cell is a vertex of that cell,
+consisting of the single point common to those faces.</li>
 </ul>
-<p>We summarize the most important conventions below (in alphabetical order).</p>
-<h3 id="functions">Functions</h3>
-<p>Following the PETSc approach, all function bodies must be surrounded by
-the <code>PetscFunctionBegin</code> and <code>PetscFunctionReturn</code> macros. Try to write short
-functions, but avoid breaking up a function if doing so would introduce
-undue complexity, such as passing several variables around or introducing
-otherwise unnecessary abstractions.</p>
-<p>Accordingly, almost all functions in RDycore return a <code>PetscErrorCode</code>
-indicating success or failure, and all calls to these functions are enclosed
-within the <code>PetscCall</code> macro, e.g.</p>
-<div class="highlight"><pre><span></span><code>  PetscCall(RDyAdvance(rdy));
-</code></pre></div>
-<p>Function inputs and outputs are passed as arguments to a function. Because C
-passes arguments by value and not by reference (like Fortan), output parameters
-are typically pointers.</p>
-<h3 id="petsc-data-types">PETSc Data Types</h3>
-<p>We use data types defined by PETSc, which are configured according to RDycore's
-build parameters:</p>
-<ul>
-<li><code>PetscInt</code> is a 32-bit or 64-bit integer, depending on whether your PETSc
-  installation is configured to use 32-bit or 64-bit indices. Use this for all
-  integers <strong>except</strong> those transmitted via MPI (see below).</li>
-<li><code>PetscMPIInt</code> is a 32-bit integer corresponding to the <code>MPI_INT</code> type, and
-  should be used for all integers in MPI messages, even in 64-bit builds.</li>
-<li><code>PetscReal</code> represents all real-valued quantities (usually double precision)</li>
-<li><code>PetscBool</code> is PETSc's boolean type, which assumes one of the values
-  <code>PETSC_TRUE</code> or <code>PETSC_FALSE</code>. It provides this type to provide compatibility
-  with older revisions of the C language that don't include the standard C
-  <code>bool</code> type.</li>
-</ul>
-<h3 id="header-files">Header files</h3>
-<p>RDycore has one public header file that defines the interface for its C library:
-<code>rdycore.h</code>. This file is generated by CMake, which injects configuration
-information into the template <code>include/rdycore.h.in</code>. All other headers are
-private and declare functions and types used internally within the RDycore
-library.</p>
-<p>Functions declared in <code>rdycore.h</code> are annotated with the <code>PETSC_EXTERN</code> macro,
-which gives them external linkage, making them available to call outside of
-RDycore. Functions in private headers are annotated instead with <code>PETSC_INTERN</code>,
-giving them internal linkage and making them invisible to code outside of
-RDycore.</p>
-<p>All header files are located within the <code>include</code> directory. Private headers
-live in the <code>private</code> subdirectory. Take a look at these header files to get a
-sense of their structure.</p>
-<h3 id="naming">Naming</h3>
-<ul>
-<li><strong>Variable names</strong>: all variables (including fields within structs and
-  function pointers) use <code>snake_case</code> (e.g. <code>water_height</code>, <code>num_cells</code>)</li>
-<li><strong>Function names</strong>: all functions using <code>PascalCase</code> (e.g. <code>RDySetup</code>,
-  <code>ApplyBoundaryCondition</code>)</li>
-</ul>
-<p>In all cases, avoid inscrutible names that use single letters or unconventional
-abbreviations unless their meaning is clear within the context in which they
-appear.</p>
-<h3 id="structs">Structs</h3>
-<p>RDycore is developed using a "structured programming" approach in which related
-data are grouped into <code>struct</code>s and passed to functions by value.</p>
-<h2 id="style-enforcement-by-tools">Style Enforcement by Tools</h2>
-<p>To check and enforce the style in the code within your Git workspace against
-the conventions we've adopted, you can use the following commands from your
-build directory:</p>
-<ul>
-<li><code>make format-c-check</code>: checks the source code in your workspace, reporting
-  success or failure depending on whether it conforms to our style conventions</li>
-<li><code>make format-c</code>: formats in place all relevant source code in your workspace,
-  enforcing our style conventions</li>
-</ul>
-<p>Sometimes an automated formatting tool disrupts the desired structure or layout
-of a particular section of code. In this case, you can exclude the section from
-auto-formatting by surrounding it with <code>// clang-format [on/off]</code> comments:</p>
-<div class="highlight"><pre><span></span><code>// clang-format on
-&lt;code section excluded from formatting&gt;
-// clang-format off
-</code></pre></div>
-<p>It's a good idea to run <code>make format-c</code> within a feature branch before creating
-a pull request. This ensures that the automated formatting check will pass.</p>
+<p>The union of all cells <span class="arithmatex">\(\Omega_i\)</span> in a grid is the <em>computational domain</em> <span class="arithmatex">\(\Omega\)</span>
+over which the grid is defined. The boundary of this domain, which can be written
+<span class="arithmatex">\(\partial\Omega\)</span> but which we also sometimes write as <span class="arithmatex">\(\Gamma\)</span> for clarity,
+is the set of all faces attached to only one cell.</p>
 
 
 
