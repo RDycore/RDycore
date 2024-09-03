@@ -4,10 +4,10 @@ The two-dimensional shallow water equations can be written in the conservative
 form
 
 $$
-\frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}\label{1}
+\frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f \tag{1}\label{1}
 $$
 
-where
+Here,
 
 \begin{align}
   \mathbf{U}
@@ -18,6 +18,15 @@ where
   hv
   \end{bmatrix},
 \end{align}
+
+is the _solution vector_, with components
+
+* $h$, the flow depth
+* $u$, the vertically-averaged velocity in the $x$ direction
+* $v$, the vertically-averaged velocity in the $y$ direction
+
+The terms $\mathbf{E}$ and $\mathbf{G}$ on the left hand side of $\eqref{1}$ are
+the _flux vectors_ in the $x$ and $y$ spatial dimensions:
 
 \begin{align}
   \mathbf{E}
@@ -39,36 +48,60 @@ where
   \end{bmatrix},
 \end{align}
 
+where $g$ is the acceleration due to gravity.
+
+The three source terms on the right hand side of $\eqref{1}$ represent
+contributions to $\mathbf{U}$ from
+
+* $\mathbf{S}_r$, _net runoff (water) production_
+* $\mathbf{S}_b$, _bed elevation slope_
+* $\mathbf{S}_f$, _bed friction roughness_.
+
+These source terms are
+
 \begin{align}
-  \mathbf{S}
+  \mathbf{S}_r
   =
   \begin{bmatrix}
   Q \\[.5em]
-  -gh\frac{\partial z}{\partial x} - C_D u \sqrt{u^2 + v^2}\\[.5em]
-  -gh\frac{\partial z}{\partial y} - C_D v \sqrt{u^2 + v^2}
-  \end{bmatrix}.
+  0 \\[.5em]
+  0
+  \end{bmatrix},
 \end{align}
 
-In the above expressions,
+\begin{align}
+  \mathbf{S}_b
+  =
+  \begin{bmatrix}
+  0 \\[.5em]
+  -gh\frac{\partial z}{\partial x} \\[.5em]
+  -gh\frac{\partial z}{\partial y}
+  \end{bmatrix},
+\end{align}
 
-* $h$ is the flow depth
-* $u$ is the vertically-averaged velocity in the $x$ direction
-* $v$ is the vertically-averaged velocity in the $y$ direction
-* $z$ is the bed elevation (generally a function of $x$ and $y$)
-* $C_D = g n^2/h^\frac{1}{3}$ is the drag coefficient
-* $n$ is the Manning's coefficient
+and
+
+\begin{align}
+  \mathbf{S}_f
+  =
+  \begin{bmatrix}
+  0 \\[.5em]
+  - C_D u \sqrt{u^2 + v^2} \\[.5em]
+  - C_D v \sqrt{u^2 + v^2}
+  \end{bmatrix}.
+\end{align}
 
 It is sometimes convenient to interpret the terms involving $\mathbf{E}$ and
 $\mathbf{G}$ as the (two-dimensional) divergence of a multi-component spatial
 vector called the _flux function_ $\mathbf{\vec{F}}$.
 
 $$
-\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}(\mathbf{U})\label{2}
+\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}(\mathbf{U})\tag{2}\label{2}
 $$
 
 where $\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})$.
 
-We have written $\mathbf{\vec{F}}$ and $\mathbf{S}$ in $(\ref{2})$ in a way that
+We have written $\mathbf{\vec{F}}$ and $\mathbf{S}$ in $(\eqref{2})$ in a way that
 emphasizes that these functions depend on the solution vector $\mathbf{U}$.
 
 ## Spatial Discretization
@@ -81,7 +114,7 @@ We create a discrete representation by partitioning $\Omega$ into disjoint
 cells, with $\Omega_i$ representing cell $i$. The boundary of cell $i$, written
 $\partial\Omega_i$, is the set of faces separating it from its neighboring
 cells. Using this notation, we obtain a discrete set of equations for the
-solution in cell $i$ by integrating $(\ref{1})$ over $\Omega_i$ and using
+solution in cell $i$ by integrating $(\eqref{swe})$ over $\Omega_i$ and using
 Green's theorem:
 
 \begin{eqnarray}
@@ -91,31 +124,31 @@ Green's theorem:
 \int_{\Omega_i} \mathbf{S} d\Omega_i \nonumber\\
 \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
 \oint_{\partial\Omega_i} \left( \mathbf{E}~dy - \mathbf{G}~dx \right) &=&
-\int_{\Omega_i} \mathbf{S} d\Omega_i \label{3}
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
 \end{eqnarray}
 
 This equation can be used to approximate discontinuous flows, because all
-quantities appear under integrals. By contrast, $(\ref{1})$ cannot be used
+quantities appear under integrals. By contrast, $(\eqref{1})$ cannot be used
 where derivatives of $\mathbf{U}$ don't exist.
 
-We can interpret the line integral in ($\ref{3}$) in terms of the flux
+We can interpret the line integral in ($\eqref{3}$) in terms of the flux
 $\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y)$ between a cell $i$ and its
 neighboring cells.
 
 $$
  \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
 \oint_{\partial\Omega_i} \mathbf{\vec{F}} \cdot \vec{n}~dl =
-\int_{\Omega_i} \mathbf{S} d\Omega_i \label{4}
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{4}\label{4}
 $$
 
 Here, we have defined a unit normal vector $\vec{n} = (n_x, n_y)$
-pointing outward along the cell boundary $\partial\Omega_i$. $(\ref{4})$ is a
+pointing outward along the cell boundary $\partial\Omega_i$. $(\eqref{4})$ is a
 "surface integral" with a differential arc length $dl$ integrated over the
-boundary of cell $i$. One obtains this surface integral by integrating $(\ref{2})$
+boundary of cell $i$. One obtains this surface integral by integrating $(\eqref{2})$
 over the domain $\Omega$ and applying the (two-dimensional) divergence theorem
 to the flux term.
 
-In the rest of this section, we use the flux form $(\ref{4})$ of the shallow
+In the rest of this section, we use the flux form $(\eqref{4})$ of the shallow
 water equations.
 
 We can obtain a finite volume method for these equations by defining
@@ -137,14 +170,14 @@ $$
 and the _horizontally-averaged source vector_
 
 $$
-\mathbf{S}_i = \frac{1}{A_i}\int_{\Omega_i} \mathbf{S} d\Omega_i.
+\mathbf{S}_i = \frac{1}{A_i}\int_{\Omega_i} \left(\mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f\right) d\Omega_i.
 $$
 
 Finally, we define the _face-averaged normal flux vector_ between cell $i$ and
 an adjoining cell $j$:
 
 $$
-\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\vec{n}~dl \label{5}
+\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\vec{n}~dl \tag{5}\label{5}
 $$
 
 where $l_{ij}$ is the length of the face connecting cells $i$ and $j$.
@@ -152,7 +185,7 @@ where $l_{ij}$ is the length of the face connecting cells $i$ and $j$.
 With these definitions, the shallow water equations in cell $i$ are
 
 $$
-\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \label{6}
+\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \tag{6}\label{6}
 $$
 
 where the index $j$ in each term of the sum refers to a neighboring cell of cell $i$.
@@ -168,15 +201,16 @@ entirely of faces of boundary cells.
 In dealing with boundary conditions, we must distinguish between the faces a
 boundary cell $i$ _does_ and _does not_ share with the boundary $\Gamma$:
 
-$$
+\begin{eqnarray}
 \frac{\partial\mathbf{U}_i}{\partial t} +
-\sum_{j: \partial\Omega_j\subset\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} +
+\sum_{j: \partial\Omega_j\subset\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} &+&
 \sum_{j: \partial\Omega_j\not\subset\Gamma}\mathbf{F}_{ij} l_{ij}
-= \mathbf{S}_i. \label{7}
-$$
+&= \mathbf{S}_i. \tag{7}\label{7} \\
+\text{(boundary)}& &\text{(interior)} &
+\end{eqnarray}
 
 To enforce boundary conditions, we must compute the effective boundary fluxes
-$\mathbf{F}_{ij}^{\Gamma}$ that appear in the first sum in $(\ref{7})$. These
+$\mathbf{F}_{ij}^{\Gamma}$ that appear in the first sum in $(\eqref{7})$. These
 boundary fluxes have specific forms depending on their respective boundary
 conditions.
 
@@ -260,36 +294,57 @@ critical flow.
  
 ### Source terms
 
-The term for the vector-valued source for the water's momentum, which we
-designate as $\vec{S}_{\vec{p}}$ is computed from the following integral:
+Recall that there are three source terms $\mathbf{S}_r, $\mathbf{S}_b$, and
+$\mathbf{S}_f$. In this section, we write the source terms for the momentum
+vector as $\mathbf{S}_b = [0, \mathbf{\vec{S}}_b]^T$ and $\mathbf{S}_f = [0, \mathbf{\vec{S}}_f]^T$
+because their second and third components correspond to the spatial components
+of the momentum vector.
+
+#### Net runoff production $\mathbf{S}_r$
+
+This source term contributes only to height of the water, and is expressed as
+$\mathbf{S}_r = [R, 0, 0]^T$, where $R$ is a constant, a spatially homogeneous
+time-dependent function $R(t)$, or a spatially heterogeneous time-dependent
+function $R(x, y, t)$. We can approximate the integral of this term using the
+mean value theorem of calculus:
 
 \begin{equation}
-\int_{d\Omega} \mathbf{\vec{S}}_\vec{p} d\Omega = \int_{\Omega} \left( -gh\nabla z - C_D \vec{u} \sqrt{u^2 + v^2} \right) d\Omega
+\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [R, 0, 0]^T~d\Omega \approx [R V_i, 0, 0]^T,
 \end{equation}
 
-Here, $\nabla z = (\partial z/\partial x, \partial z/\partial y)$ is the
-two-dimensional gradient of the bed elevation function $z$ and $\vec{u} = (u, v)$
-is the flow velocity vector.
+where $V_i$ is the volume of cell $i$.
 
-The first of these terms, the _bed elevation slope_ term, represents the force
-of gravity on the water and can be approximated as
+#### Bed elevation slope term $\mathbf{S}_b$
+
+This term represents the force of gravity on the water and can be
+approximated as
 
 \begin{equation}
-\int_{d\Omega_i} -gh\nabla z d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
+\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
 \end{equation}
 
-where $V_i$ is the volume of cell $i$. For a triangular grid cell,
+where $\nabla z = (\partial z/\partial x, \partial z/\partial y)$ is the two-dimensional
+gradient of the bed elevation function $z$.
+
+For a triangular grid cell,
 
 \begin{eqnarray}
 \overline{\frac{\partial z}{\partial x}} &=& \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)} \\
 \overline{\frac{\partial z}{\partial y}} &=& \frac{(x_2 - x_0)(z_1 - z_0) - (x_1 - x_0)(z_2 - z_0)}{(x_2 - y_0)(x_1 - x_0) - (x_1 - y_0)(y_2 - y_0)}.
 \end{eqnarray}
 
-The second term, the _roughness term_, is associated with bed friction:
+#### Bed friction roughness term $\mathbf{S}_f$
+
+Like the runoff term, this term involves only quantities within a single cell
+and can be approximated by the mean value theorem:
 
 \begin{equation}
-\int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2} d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
 \end{equation}
+
+where $\vec{u} = (u, v)$ is the flow velocity vector. The $x$ and $y$ spatial
+components contribute to the second and third vector components of the integral
+of $\mathbf{S}_r$, respectively.
 
 ## Temporal Discretization
 
