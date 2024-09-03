@@ -101,7 +101,7 @@ $$
 
 where $\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})$.
 
-We have written $\mathbf{\vec{F}}$ and $\mathbf{S}$ in $(\eqref{2})$ in a way that
+We have written $\mathbf{\vec{F}}$ and $\mathbf{S}$ in $\eqref{2}$ in a way that
 emphasizes that these functions depend on the solution vector $\mathbf{U}$.
 
 ## Spatial Discretization
@@ -114,7 +114,7 @@ We create a discrete representation by partitioning $\Omega$ into disjoint
 cells, with $\Omega_i$ representing cell $i$. The boundary of cell $i$, written
 $\partial\Omega_i$, is the set of faces separating it from its neighboring
 cells. Using this notation, we obtain a discrete set of equations for the
-solution in cell $i$ by integrating $(\eqref{swe})$ over $\Omega_i$ and using
+solution in cell $i$ by integrating $\eqref{1}$ over $\Omega_i$ and using
 Green's theorem:
 
 \begin{eqnarray}
@@ -128,10 +128,10 @@ Green's theorem:
 \end{eqnarray}
 
 This equation can be used to approximate discontinuous flows, because all
-quantities appear under integrals. By contrast, $(\eqref{1})$ cannot be used
+quantities appear under integrals. By contrast, $\eqref{1}$ cannot be used
 where derivatives of $\mathbf{U}$ don't exist.
 
-We can interpret the line integral in ($\eqref{3}$) in terms of the flux
+We can interpret the line integral in $\eqref{3}$ in terms of the flux
 $\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y)$ between a cell $i$ and its
 neighboring cells.
 
@@ -142,13 +142,13 @@ $$
 $$
 
 Here, we have defined a unit normal vector $\vec{n} = (n_x, n_y)$
-pointing outward along the cell boundary $\partial\Omega_i$. $(\eqref{4})$ is a
+pointing outward along the cell boundary $\partial\Omega_i$. $\eqref{4}$ is a
 "surface integral" with a differential arc length $dl$ integrated over the
-boundary of cell $i$. One obtains this surface integral by integrating $(\eqref{2})$
+boundary of cell $i$. One obtains this surface integral by integrating $\eqref{2}$
 over the domain $\Omega$ and applying the (two-dimensional) divergence theorem
 to the flux term.
 
-In the rest of this section, we use the flux form $(\eqref{4})$ of the shallow
+In the rest of this section, we use the flux form $\eqref{4}$ of the shallow
 water equations.
 
 We can obtain a finite volume method for these equations by defining
@@ -210,7 +210,7 @@ boundary cell $i$ _does_ and _does not_ share with the boundary $\Gamma$:
 \end{eqnarray}
 
 To enforce boundary conditions, we must compute the effective boundary fluxes
-$\mathbf{F}_{ij}^{\Gamma}$ that appear in the first sum in $(\eqref{7})$. These
+$\mathbf{F}_{ij}^{\Gamma}$ that appear in the first sum in $\eqref{7}$. These
 boundary fluxes have specific forms depending on their respective boundary
 conditions.
 

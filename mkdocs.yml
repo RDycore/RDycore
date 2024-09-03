@@ -28,7 +28,6 @@ nav:
   - 'Theory Guide':
     - 'Overview': 'theory/index.md'
     - 'Shallow Water Equations': 'theory/swe.md'
-    - 'Sediment Transport': 'theory/sediment.md'
 
 edit_uri: ""
 
