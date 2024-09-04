@@ -232,10 +232,11 @@ subscripts for quantities respectively in cells $i$ and $j$, we can approximate
 the normal flux by the expression
 
 \begin{equation}
-\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right).
+\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right)
 \end{equation}
 
-Above,
+where $\Delta f$ is the variation of the quantity of $f$ along a face. In
+particular,
 
 \begin{align}
   \mathbf{R}

@@ -72,10 +72,10 @@ where
 * $M_t = \sum M_i$ is the total sediment mass in the deposited layer,
   expressed in mass per unit area
 * $F_w$ is a _shield factor_ that attenuates the detachment and re-detachment
-  rates under conditions where the water height is three times greater than the
+  rates under conditions where the water height is more than 3 times the
   diameter of a "typical" raindrop.
-* $H = min(M_t/(F_w M_t^*),1)$ is the proportion of shielding of the deposited
-  layer, given in mass per unit area; here, $M_t^* is calibrated to the mass of
+* $H = \min(M_t/(F_w M_t^*),1)$ is the proportion of shielding of the deposited
+  layer, given in mass per unit area; here, $M_t^*$ is calibrated to the mass of
   deposited sediment needed to completely shield the soil in its original state.
 
 The shield factor $F_w$ can be computed using a power law relation by [Proffitt et al. 1991]:
@@ -88,7 +88,8 @@ F_{w}=
 \end{cases} \tag{5}\label{5}
 \end{equation}
 
-where a threshold of $h_0 = 0.33D_R$ is used, and $D_R$ is the mean raindrop size.
+where $h_0$ is a threshold height (typically $0.33 D_R$, with $D_R$ the mean
+raindrop size).
 
 The exponent $b$ in $\eqref{5}$ varies depending on the type of soil, and can be
 obtained with a best fit using experimental data. For example, $b$ is 0.66 for
@@ -120,7 +121,7 @@ d_{i} = v_{i}c_{i} \tag{7}\label{7}
 \end{equation}
 
 where $v_{i}$ is the _settling velocity_ of each size class with concentration
-$c_i$. This model assumes that
+$c_i$, given as mass per unit volume. This model assumes that
 
 * the suspended load in the water column is completely mixed in the vertical direction
 * the infiltration rate does not affect size class settling velocities.
@@ -137,9 +138,9 @@ sediment size-class concentrations:
     h      \\[.5em]
     uh     \\[.5em]
     vh     \\
-    c_{1}h \\
+    c_1 h \\
     \vdots \\
-    c_{I}h
+    c_I h
   \end{bmatrix}.
 \end{align}
 
@@ -150,52 +151,45 @@ equations:
 \begin{align}
 \mathbf{E} =
   \begin{bmatrix}
-    uh                           \\[.5em]
-    u^{2}h+\frac{1}{2}gh^{2}     \\[.5em]
-    uvh                          \\
-    c_{1}uh                      \\
-    \vdots                       \\
-    c_{I}uh
+    u h                       \\[.5em]
+    u^2 h + \frac{1}{2} g h^2 \\[.5em]
+    u v h                     \\
+    c_1 u h                   \\
+    \vdots                    \\
+    c_I u h
   \end{bmatrix},
 \end{align}
 
 \begin{align}
 \mathbf{G} =
   \begin{bmatrix}
-    vh                           \\[.5em]
-    uvh                          \\[.5em]
-    v^{2}h+\frac{1}{2}gh^{2}     \\
-    c_{1}vh                      \\
-    \vdots                       \\
-    c_{I}vh
+    v h                       \\[.5em]
+    u v h                     \\[.5em]
+    v^2 h + \frac{1}{2} g h^2 \\
+    c_1 v h                   \\
+    \vdots                    \\
+    c_I v h
   \end{bmatrix}.
 \end{align}
 
-Finally, we augment the shallow water equation source vector $\mathbf{S}$ with
+We also augment the shallow water equation source vector $\mathbf{S}$ with
 the (re)attachment, (re)entrainment, and deposition terms:
 
 \begin{align}
 \mathbf{S} =
   \begin{bmatrix}
     R
-    -gh\frac{\partial z}{\partial x} - C_D u\sqrt{u^2 + v^2} \\[.5em]
-    -gh\frac{\partial z}{\partial y} - C_D v\sqrt{u^2 + v^2} \\
+    -g h\frac{\partial z}{\partial x} - C_D u\sqrt{u^2 + v^2} \\[.5em]
+    -g h\frac{\partial z}{\partial y} - C_D v\sqrt{u^2 + v^2} \\
     e_1 + e_{r1} + r_1 + r_{r1} - d_{1}                                 \\
     \vdots                                                          \\
     e_I + e_{rI} + r_I + r_{rI} - d_I 
   \end{bmatrix}.
 \end{align}
 
-with these augmentations, the H-R equations can be merged with the shallow
-water equations to read
 
-\begin{eqnarray}
-\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial t} + \frac{\partial \mathbf{G}}{\partial t} &=& \mathbf{S}\\
-\frac{\partial \mathbf{M}}{\partial t} &=& \mathbf{D} \tag{8}\label{8}
-\end{eqnarray}
-
-where we have defined a _deposited mass vector_ $\mathbf{M}$ and a
-_net deposition vector_ $\mathbf{D}$ to accommodate $\eqref{2}$:
+Finally, to represent the deposition of mass on the bed floor, we define a
+_deposited mass vector_ $\mathbf{M}$ and a _net deposition vector_ $\mathbf{D}$:
 
 \begin{align}
 \mathbf{M} =
@@ -215,153 +209,146 @@ _net deposition vector_ $\mathbf{D}$ to accommodate $\eqref{2}$:
   \end{bmatrix}.
 \end{align}
 
-### TELEMAC/GAIA equations
+With these augmented and additional quantities, we can merge the H-R equations
+with the shallow water equations:
 
-The sediment transport equations implemented in TELEMAC/GAIA are
+\begin{eqnarray}
+\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} &=& \mathbf{S}\\
+\frac{\partial \mathbf{M}}{\partial t} &=& \mathbf{D} \tag{8}\label{8}
+\end{eqnarray}
 
-\begin{equation}
-\label{eqn:sd2d}
-\frac{\partial hc_{i}}{\partial t}+\frac{\partial uhc_{i}}{\partial x} + \frac{\partial vhc_{i}}{\partial y} = E_{i} - D_{i},
-\end{equation}
+As in the case of the shallow water equations by themselves, we can form a
+multicomponent spatial flux vector $\mathbf{\vec{F}} = (\mathbf{E}, \mathbf{G})$
+to better accommodate our numerical treatment.
 
-where $h$, $u$ and $v$ are water depth, velocities in horizontal and vertical directions, respectively, $i = 1, 2, \dots I$ is the sediment class, $c_{i}$ is the sediment concentration given as mass per unit volume $[M/L^{3}]$, 
-$I$ is the number of sediment size classes, and $E_{i}$ and $D_{i}$ are erosion and deposition rate formulated as mass per unit area per unit time $[M/L^{2}/T]$.
+## TELEMAC/GAIA source terms
 
-According to GAIA, the erosion and deposition rates are calculated as:
-\begin{equation}
-E_i = M \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right),
-\end{equation}
-\begin{equation}
-D_i = w c_i \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right],
-\end{equation}
-
-where, for each sediment class $i$, $M$ is the Krone-Partheniades erosion law constant [kg/m$^{2}$], or the erodibility coefficient, $w$ is the settling velocity for sediment class $i$ (m/s), $\tau_{ce}$ is critical shear stress for erosion (N/m$^2$), $\tau_{cd}$ is critical shear stress for deposition (N/m$^2$), $\tau_b = \rho C_D u\sqrt{u^2+v^2}$ is the bottom shear stress. 
-
-Coupling sediment transport equation with Shallow Water Equations lead to:
+The TELEMAC/GAIA sediment transport model solves the coupled H-R/shallow water
+equations, but uses simplified source terms in the size-class specific transport
+equations:
 
 \begin{equation}
-\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial t} + \frac{\partial \mathbf{G}}{\partial t} = \mathbf{S},
+\frac{\partial (h c_i)}{\partial t} + \nabla\cdot\left(h c_i \vec{u}\right) = E_i - D_i \tag{9} \label{9}
 \end{equation}
 
-where $\mathbf{U}$ is the conservative variable vector, $\mathbf{E}$ and $\mathbf{G}$ are the flux vectors in x and y direction. $\mathbf{U}$, $\mathbf{E}$ and $\mathbf{G}$ are same as those in 2-D H-R equation. $\mathbf{S}$ is the source vector:
+with source terms $E_i$ and $D_i$ representing size-class-specific erosion and
+deposition rates, each expressed as mass per unit area per unit time.
 
+The GAIA model calculates these erosion and deposition rates from the following
+expressions for each size class $i$:
 
-\begin{align}
-\mathbf{S} 
-=
-    \begin{bmatrix}
-    S_{r}                                                           \\[.5em]
-    -gh\frac{\partial z_{b}}{\partial x} - C_{D}u\sqrt{u^{2}+v^{2}} \\[.5em]
-    -gh\frac{\partial z_{b}}{\partial y} - C_{D}v\sqrt{u^{2}+v^{2}} \\
-    E_{1}-D_{1}                                 \\
-    \vdots                                                          \\
-    E_{I}-D_{I} 
-    \end{bmatrix}
-\end{align}
+\begin{eqnarray}
+E_i &=& \mathcal{M} \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right) \\
+D_i &=& w_i c_i \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right] \tag{10} \label{10}
+\end{eqnarray}
 
+where
 
+* $\mathcal{M}$ is the Krone-Partheniades erosion law constant, sometimes called
+  the "erodibility coefficient"
+* $w_i$ is the settling velocity for sediment class $i$
+* $\tau_{ce}$ is the critical shear stress for erosion
+* $\tau_{cd}$ is the critical shear stress for deposition, and
+* $\tau_b = \rho_s C_D u \sqrt{u^2 + v^2}$ is the bed bottom shear stress.
 
 ## Spatial discretization
 
-Integrating equation Eq (\ref{eqn:cpeqns}) over an arbitrary two-dimensional computational element $A$ with a boundary $\Gamma$, then the 
-governing equations expressed in conservation form can be written as follows:
+The spatial discretization for the coupled H-R/shallow water equations is very
+similar to the treatment described for [the shallow water equations](swe.md),
+but uses the augmented solution vector $\mathbf{U}$, flux $\mathbf{\vec{F}}$,
+and source term $\mathbf{S}$, which have analogous eigenvectors that can be
+used to solve the Riemann problem with the Roe method.
 
-\begin{equation}
-\frac{\partial}{\partial t}\int_{A}\mathbf{U}dA + \oint_{\Gamma}\mathbf{F} \cdot \mathbf{n}d\Gamma = \iint_{A}\mathbf{S}dA,
-\end{equation}
-
-where $\mathbf{F}$ is the flux vector, and $\mathbf{n}$ is the unit vector normal to boundary $\partial \Gamma$ and directed outward. The 
-integrand $\mathbf{F} \cdot \mathbf{n} = F_{\perp}$ is the numerical flux normal to each cell face and defined as:
+Defining quantities normal to the face separating two cells (or on the boundary)
+with a $\parallel$ subscript and the angle $\phi$ separating the face normal
+from the $x$ axis, the normal flux is
 
 \begin{align}
-\label{eqn:flux}
-\mathbf{F} \cdot \mathbf{n} 
-=
-    \begin{bmatrix}
-    hu_{\perp}                                                                      \\[.5em]
-    huu_{\perp} + \frac{1}{2}gh^{2}cos \theta + \frac{1}{24}g\Delta h^{2}cos \theta \\
-    hvu_{\perp} + \frac{1}{2}gh^{2}sin \theta + \frac{1}{24}g\Delta h^{2}sin \theta \\
-    hc_{1}u_{\perp}                                                                 \\
+\mathbf{\vec{F}} \cdot \vec{n} =
+  \begin{bmatrix}
+    hu_{\parallel}                                                                  \\[.5em]
+    huu_{\parallel} + \frac{1}{2}gh^{2}cos \phi + \frac{1}{24}g\Delta h^{2}cos \phi \\
+    hvu_{\parallel} + \frac{1}{2}gh^{2}sin \phi + \frac{1}{24}g\Delta h^{2}sin \phi \\
+    hc_{1}u_{\parallel}                                                             \\
     \vdots                                                                          \\
-    hc_{I}u_{\perp}                                                                 \\
-    \end{bmatrix}
+    hc_{I}u_{\parallel}                                                             \\
+  \end{bmatrix}\tag{11}\label{11}.
 \end{align}
 
-where $u_{\perp}$ denotes the velocity normal to the cell interface and computed as $u_{\perp}=ucos \theta + vsin \theta$, and $\theta$ is an 
-angle between the face normal vector and the x axis, $\Delta h$ is a variation of $h$ along the cell face. The last terms in the second and third
-rows of equation (\ref{eqn:flux}) are the hydrostatic thrust correction terms suggested by Bradford and Sanders [2002]. The are necessary to balance 
-the bed slope terms for the still water condition.
+The last terms in the second and third rows of $\eqref{11}$ are _hydrostatic
+thrust correction_ terms suggested by Bradford and Sanders [2002]. These terms
+balance the bed slope terms for the still water condition.
 
-Roe's approximate Riemann solver [Roe, 1981] is implemented to compute the fluxes at the cell interface:
+The fluxes at the interface between cells can be approximated with Roe's method:
 
 \begin{equation}
-\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\perp,f} = 
-\frac{1}{2} \left(\mathbf{F}_{\perp,L} + \mathbf{F}_{\perp,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
+\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} = 
+\frac{1}{2} \left(\mathbf{F}_{\parallel,L} + \mathbf{F}_{\parallel,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
 \end{equation}
 
-where the subscript $f$ denotes the interface between two adjacent cells, $L$ and $R$ denote left and right cell for the interface, and $\Delta$ 
-denotes the finite difference across the interface. The terms $\mathbf{\hat{R}}$ and $\mathbf{\hat{\Lambda}}$ are the right eigenvector and the 
-eigenvalue of the Jacobian of $\mathbf{F}_{\perp}$, and $\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U$, denotes the wave strength, where $\hat{L}$ 
-is the left eigenvector of the Jacobian of $\mathbf{F}_{\perp}$:
+where the subscript $f$ annotates the interface between two adjacent cells,
+$L$ and $R$ indicate the "left" and "right" states for the interface, and
+$\Delta$ denotes the difference in quantities across the interface. The terms
+$\mathbf{\hat{R}}$ and $\mathbf{\hat{\Lambda}}$ are the right eigenvector and the 
+eigenvalue of the Jacobian of $\mathbf{F}_{\parallel}$, and
+$\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U$ denotes the wave strength,
+with $\hat{L}$ the left eigenvector of the Jacobian of $\mathbf{F}_{\parallel}$.
 
 \begin{align}
-\mathbf{\hat{R}}
-=
-    \begin{bmatrix}
+\mathbf{\hat{R}} =
+  \begin{bmatrix}
     1                         & 0           & 1                         & 0      & \ldots & 0      \\
     \hat{u}-\hat{a}cos \theta & -sin \theta & \hat{u}+\hat{a}cos \theta & 0      & \ldots & 0      \\
     \hat{v}-\hat{a}sin \theta &  cos \theta & \hat{v}+\hat{a}sin \theta & 0      & \ldots & 0      \\
     \hat{c_{1}}               & 0           & \hat{c_{1}}               & 1      & \ldots & 0      \\
     \vdots                    & \vdots      & \vdots                    & \vdots & \ddots & \vdots \\ 
     \hat{c_{I}}               & 0           & \hat{c_{I}}               & 0      & \ldots & 1      \\
-    \end{bmatrix}
+  \end{bmatrix}
 \end{align}
 
 \begin{align}
-\mathbf{\hat{\Lambda}}
-=
-    \begin{bmatrix}
-    |\hat{u_{\perp}}-\hat{a}|^{*} &                   &                               &                   &        &                   \\
-                                  & |\hat{u_{\perp}}| &                               &                   &        &                   \\
-                                  &                   & |\hat{u_{\perp}}+\hat{a}|^{*} &                   &        &                   \\
-                                  &                   &                               & |\hat{u_{\perp}}| &        &                   \\
+\mathbf{\hat{\Lambda}} =
+  \begin{bmatrix}
+    |\hat{u_{\parallel}}-\hat{a}|^{*} &                   &                               &                   &        &                   \\
+                                  & |\hat{u_{\parallel}}| &                               &                   &        &                   \\
+                                  &                   & |\hat{u_{\parallel}}+\hat{a}|^{*} &                   &        &                   \\
+                                  &                   &                               & |\hat{u_{\parallel}}| &        &                   \\
                                   &                   &                               &                   & \ddots &                   \\
-                                  &                   &                               &                   &        & |\hat{u_{\perp}}| \\
-    \end{bmatrix}
+                                  &                   &                               &                   &        & |\hat{u_{\parallel}}| \\
+  \end{bmatrix}
 \end{align}
 
 \begin{align}
-\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U
-=
-    \begin{bmatrix}
+\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U =
+  \begin{bmatrix}
     \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
-    \hat{h}u_\parallel                                                          \\[.5em]
+    \hat{h}u_\perp                                                          \\[.5em]
     \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
     (c_{1}h)_{R} - (c_{1}h)_{L} - \hat{c_{1}}(h_{R}-h_{L})                      \\[.5em]
     \vdots                                                                      \\[.5em]
     (c_{I}h)_{R} - (c_{I}h)_{L} - \hat{c_{I}}(h_{R}-h_{L})                      \\[.5em]
-    \end{bmatrix}
+  \end{bmatrix}
 \end{align}
 
-where $a$ denotes the celerity of a simple gravity wave, $u_{\parallel}$ denotes the vecloty components parallel to the cell interface and can be 
-computed as:
+Above,
 
-\begin{equation}
-u_{\parallel} = -usin \theta + vcos \theta
-\end{equation}
+* $a$ is the _celerity_ of a simple gravity wave, and
+* $u_{\perp} = -u \sin \phi + v \cos \phi$ is the velocity perpendicular to
+  the interface normal.
 
-The quantities with a hat denote the Roe averages, whch are calculated as the following:
+The quantities with a hat are Roe averages, which are calculated thus:
 
 \begin{eqnarray}
-\hat{h}     &=& \sqrt{h_{L}h_{R}}                                                     \\
-\hat{u}     &=& \frac{\sqrt{h_{L}}u_{L}+\sqrt{h_{R}}u_{R}}{\sqrt{h_{L}}+\sqrt{h_{R}}} \\
-\hat{v}     &=& \frac{\sqrt{h_{L}}v_{L}+\sqrt{h_{R}}v_{R}}{\sqrt{h_{L}}+\sqrt{h_{R}}} \\
-\hat{a}     &=& \sqrt{\frac{g}{2}(h_{L}+h_{R})}                                       \\
-\hat{c_{i}} &=& \frac{\sqrt{h_{L}}c_{i,L}+\sqrt{h_{R}}c_{i,R}}{\sqrt{h_{L}}+\sqrt{h_{R}}} 
+\hat{h}   &=& \sqrt{h_L h_R}                                              \\
+\hat{u}   &=& \frac{\sqrt{h_L}u_L + \sqrt{h_R}u_R}{\sqrt{h_L}+\sqrt{h_R}} \\
+\hat{v}   &=& \frac{\sqrt{h_L}v_L + \sqrt{h_R}v_R}{\sqrt{h_L}+\sqrt{h_R}} \\
+\hat{a}   &=& \sqrt{\frac{g}{2}(h_L + h_R)}                               \\
+\hat{c_i} &=& \frac{\sqrt{h_L}c_{i,L}+\sqrt{h_R} c_{i,R}}{\sqrt{h_L}+\sqrt{h_R}} 
 \end{eqnarray}
 
-The asterisks denote that the eigenvalues $\hat{\lambda}_{1}=\hat{u}_{\perp}-\hat{a}$ and $\hat{\lambda}_{3}=\hat{u}_{\perp}+\hat{a}$ are adjusted since Roe's 
-method does not provide correct flux for critical flow :
+The asterisks indicate that the eigenvalues $\hat{\lambda}_{1}=\hat{u}_{\parallel}-\hat{a}$
+and $\hat{\lambda}_{3}=\hat{u}_{\parallel}+\hat{a}$ are adjusted because Roe's 
+method does not provide correct fluxes for critical flow:
 
 \begin{equation}
 |\hat{\lambda}_{1}|^{*} = \frac{\hat{\lambda}_{1}^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
@@ -373,20 +360,7 @@ method does not provide correct flux for critical flow :
 \quad if \quad -\Delta \lambda /2 < \hat{\lambda}_{3} < \Delta \lambda /2
 \end{equation}
 
-where $\Delta \lambda = 4(\lambda_{R}-\lambda_{L})$
-
-## Source term
-
-Please refer to shallow_water_equation.md. The H-R sediment source is
-
-\begin{equation}
-(e_{i}+e_{ri}+r_{i}+r_{ri}-d_{i})A
-\end{equation}
-
-The sediment source in GAIA is 
-\begin{equation}
-(E_{i}-D_{i})A
-\end{equation}
+with $\Delta \lambda = 4(\lambda_{R}-\lambda_{L})$.
 
 ## References
 
