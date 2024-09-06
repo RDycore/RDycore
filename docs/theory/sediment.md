@@ -7,41 +7,41 @@ particle size distribution.
 ## 2-D Hairsine-Rose (H-R) Equations
 
 The H-R equations use a particle size distribution consisting of a set of
-$I$ discrete particle/sediment size classes $i = 1, 2, ..., I$. Each size class
-is represented by a sediment concentration $c_i$ and the mass $M_i$ of the layer
-deposited by size class $i$ on the bed floor.
+$P$ discrete particle/sediment size classes $p = 1, 2, ..., P$. Each size class
+is represented by a sediment concentration $c_p$ and the mass $M_p$ of the layer
+deposited by size class $p$ on the bed floor.
 
-Each sediment concentration $c_i$ evolves in time according to its own transport
+Each sediment concentration $c_p$ evolves in time according to its own transport
 equation
 
 \begin{equation}
-\frac{\partial (hc)_{i}}{\partial t} + \nabla\cdot(h c_i \vec{u}) = e_i + e_{ri} + r_i + r_{ri} - d_i \tag{1}\label{1}
+\frac{\partial (hc)_{i}}{\partial t} + \nabla\cdot(h c_p \vec{u}) = e_p + e_{rp} + r_p + r_{rp} - d_p \tag{1}\label{1}
 \end{equation}
 
 where
 
 * $h$ is the water height, as in the [shallow water equations](swe.md)
 * $\vec{u} = (u, v)$ is the water flow velocity, along with which sediments are carried
-* $e_i$ and $e_{ri}$ are the _rainfall-driven detachment_ and _re-detachment rates_
-* $r_i$ and $r_{ri}$ are the _flow-induced entrainment and re-entrainment rates_
-* $d_i$ is a _deposition rate_ for the size class, expressed as mass per unit area per unit time
+* $e_p$ and $e_{rp}$ are the _rainfall-driven detachment_ and _re-detachment rates_
+* $r_p$ and $r_{rp}$ are the _flow-induced entrainment and re-entrainment rates_
+* $d_p$ is a _deposition rate_, expressed as mass per unit area per unit time
 
 and $\nabla\cdot\vec{F} = \partial F_x/\partial x + \partial F_y/\partial y$ is
 the 2D divergence of the spatial vector $\vec{F}$.
 
-The deposited layer mass $M_i$ for each size class accumulates according to an
+The deposited layer mass $M_p$ for each size class accumulates according to an
 ordinary differential equation involving its deposition, re-detachment, and
 re-entrainment rates:
 
 \begin{equation}
-\frac{\partial M_i}{\partial t} = d_i - e_{ri} - r_{ri}\tag{2}\label{2}
+\frac{\partial M_p}{\partial t} = d_p - e_{rp} - r_{rp}\tag{2}\label{2}
 \end{equation}
 
 All size classes deposit their layers to the bed floor, changing the bed
 elevation according to the ordinary differential equation
 
 \begin{equation}
-(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{i=1}^{I}(d_i - e_i - e_{ri} - r_{i} - r_{ri})\tag{3}\label{3}
+(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{i=1}^{I}(d_p - e_p - e_{rp} - r_p - r_{rp})\tag{3}\label{3}
 \end{equation}
 
 where 
@@ -57,19 +57,19 @@ the H-R equations above.
 #### Rainfall-driven detachment and re-detachment rates
 
 \begin{eqnarray}
-e_i &=& F_w (1 - H) p_i a_0 P \\
-e_{ri} &=& F_w H \frac{M_i}{M_t} a_d P \tag{4}\label{4}
+e_p &=& F_w (1 - H) f_p a_0 R \\
+e_{rp} &=& F_w H \frac{M_p}{M_t} a_d R \tag{4}\label{4}
 \end{eqnarray}
 
 where
 
-* $p_i$ is the time-dependent ratio of the proportion of sediment in size class $i$
-  to its proportion in the soil's original state (i.e. $p_i(0) = 1)
+* $f_p$ is the time-dependent ratio of the fraction of sediment in size class $p$
+  to its proportion in the soil's original state (i.e. $f_p(0) = 1$)
 * $a_0$ and $a_d$ are the detachability of uneroded and deposited soil, expressed
   in mass per unit volume
-* P is the intensity of rainfall intensity expressed as the change in water height
+* R is the intensity of rainfall, expressed as the change in water height
   per unit time
-* $M_t = \sum M_i$ is the total sediment mass in the deposited layer,
+* $M_t = \sum M_p$ is the total sediment mass in the deposited layer,
   expressed in mass per unit area
 * $F_w$ is a _shield factor_ that attenuates the detachment and re-detachment
   rates under conditions where the water height is more than 3 times the
@@ -98,8 +98,8 @@ clay and 1.13 for loam.
 #### Overland flow-driven entrainment and re-entrainment rates
 
 \begin{eqnarray}
-r_i &=& (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J} \\
-r_{ri} &=& H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
+r_p &=& (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J} \\
+r_{rp} &=& H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
 \end{eqnarray}
 
 where
@@ -117,11 +117,11 @@ where
 #### Size class deposition rate
 
 \begin{equation}
-d_{i} = v_{i}c_{i} \tag{7}\label{7}
+d_p = v_p c_{i} \tag{7}\label{7}
 \end{equation}
 
-where $v_{i}$ is the _settling velocity_ of each size class with concentration
-$c_i$, given as mass per unit volume. This model assumes that
+where $v_p$ is the _settling velocity_ of each size class with concentration
+$c_p$, given as mass per unit volume. This model assumes that
 
 * the suspended load in the water column is completely mixed in the vertical direction
 * the infiltration rate does not affect size class settling velocities.
@@ -178,7 +178,7 @@ the (re)attachment, (re)entrainment, and deposition terms:
 \begin{align}
 \mathbf{S} =
   \begin{bmatrix}
-    R
+    Q
     -g h\frac{\partial z}{\partial x} - C_D u\sqrt{u^2 + v^2} \\[.5em]
     -g h\frac{\partial z}{\partial y} - C_D v\sqrt{u^2 + v^2} \\
     e_1 + e_{r1} + r_1 + r_{r1} - d_{1}                                 \\
@@ -228,25 +228,25 @@ equations, but uses simplified source terms in the size-class specific transport
 equations:
 
 \begin{equation}
-\frac{\partial (h c_i)}{\partial t} + \nabla\cdot\left(h c_i \vec{u}\right) = E_i - D_i \tag{9} \label{9}
+\frac{\partial (h c_p)}{\partial t} + \nabla\cdot\left(h c_p \vec{u}\right) = E_p - D_p \tag{9} \label{9}
 \end{equation}
 
-with source terms $E_i$ and $D_i$ representing size-class-specific erosion and
+with source terms $E_p$ and $D_p$ representing size-class-specific erosion and
 deposition rates, each expressed as mass per unit area per unit time.
 
 The GAIA model calculates these erosion and deposition rates from the following
-expressions for each size class $i$:
+expressions for each size class $p$:
 
 \begin{eqnarray}
-E_i &=& \mathcal{M} \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right) \\
-D_i &=& w_i c_i \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right] \tag{10} \label{10}
+E_p &=& \mathcal{M} \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right) \\
+D_p &=& w_p c_p \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right] \tag{10} \label{10}
 \end{eqnarray}
 
 where
 
 * $\mathcal{M}$ is the Krone-Partheniades erosion law constant, sometimes called
   the "erodibility coefficient"
-* $w_i$ is the settling velocity for sediment class $i$
+* $w_p$ is the settling velocity for sediment class $p$
 * $\tau_{ce}$ is the critical shear stress for erosion
 * $\tau_{cd}$ is the critical shear stress for deposition, and
 * $\tau_b = \rho_s C_D u \sqrt{u^2 + v^2}$ is the bed bottom shear stress.
