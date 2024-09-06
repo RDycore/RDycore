@@ -304,13 +304,18 @@ of the momentum vector.
 #### Net runoff production $\mathbf{S}_r$
 
 This source term contributes only to height of the water, and is expressed as
-$\mathbf{S}_r = [Q, 0, 0]^T$, where $Q$ is a constant, a spatially homogeneous
-time-dependent function $R(t)$, or a spatially heterogeneous time-dependent
-function $R(x, y, t)$ with units of water height per unit time. We can
-approximate the integral of this term using the mean value theorem of calculus:
+$\mathbf{S}_r = [Q_r, 0, 0]^T$, where $Q_r$, _the net runoff production_,
+with units of water height per unit time, is
+
+* a constant
+* a spatially homogeneous time-dependent function $Q_r(t)$, or
+* a spatially heterogeneous time-dependent function $Q_r(x, y, t)$.
+
+In any case, we can approximate the integral of this term using the mean value
+theorem of calculus:
 
 \begin{equation}
-\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [Q, 0, 0]^T~d\Omega \approx [Q A_i, 0, 0]^T,
+\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [Q_r, 0, 0]^T~d\Omega \approx [Q_r A_i, 0, 0]^T,
 \end{equation}
 
 where $A_i$ is the area of cell $i$.
