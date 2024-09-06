@@ -1254,34 +1254,34 @@ Hairsine and Rose that accounts for size-selective sediment transport using a
 particle size distribution.</p>
 <h2 id="2-d-hairsine-rose-h-r-equations">2-D Hairsine-Rose (H-R) Equations</h2>
 <p>The H-R equations use a particle size distribution consisting of a set of
-<span class="arithmatex">\(I\)</span> discrete particle/sediment size classes <span class="arithmatex">\(i = 1, 2, ..., I\)</span>. Each size class
-is represented by a sediment concentration <span class="arithmatex">\(c_i\)</span> and the mass <span class="arithmatex">\(M_i\)</span> of the layer
-deposited by size class <span class="arithmatex">\(i\)</span> on the bed floor.</p>
-<p>Each sediment concentration <span class="arithmatex">\(c_i\)</span> evolves in time according to its own transport
+<span class="arithmatex">\(P\)</span> discrete particle/sediment size classes <span class="arithmatex">\(p = 1, 2, ..., P\)</span>. Each size class
+is represented by a sediment concentration <span class="arithmatex">\(c_p\)</span> and the mass <span class="arithmatex">\(M_p\)</span> of the layer
+deposited by size class <span class="arithmatex">\(p\)</span> on the bed floor.</p>
+<p>Each sediment concentration <span class="arithmatex">\(c_p\)</span> evolves in time according to its own transport
 equation</p>
 <div class="arithmatex">\[\begin{equation}
-\frac{\partial (hc)_{i}}{\partial t} + \nabla\cdot(h c_i \vec{u}) = e_i + e_{ri} + r_i + r_{ri} - d_i \tag{1}\label{1}
+\frac{\partial (hc)_{i}}{\partial t} + \nabla\cdot(h c_p \vec{u}) = e_p + e_{rp} + r_p + r_{rp} - d_p \tag{1}\label{1}
 \end{equation}\]</div>
 <p>where</p>
 <ul>
 <li><span class="arithmatex">\(h\)</span> is the water height, as in the <a href="swe.html">shallow water equations</a></li>
 <li><span class="arithmatex">\(\vec{u} = (u, v)\)</span> is the water flow velocity, along with which sediments are carried</li>
-<li><span class="arithmatex">\(e_i\)</span> and <span class="arithmatex">\(e_{ri}\)</span> are the <em>rainfall-driven detachment</em> and <em>re-detachment rates</em></li>
-<li><span class="arithmatex">\(r_i\)</span> and <span class="arithmatex">\(r_{ri}\)</span> are the <em>flow-induced entrainment and re-entrainment rates</em></li>
-<li><span class="arithmatex">\(d_i\)</span> is a <em>deposition rate</em> for the size class, expressed as mass per unit area per unit time</li>
+<li><span class="arithmatex">\(e_p\)</span> and <span class="arithmatex">\(e_{rp}\)</span> are the <em>rainfall-driven detachment</em> and <em>re-detachment rates</em></li>
+<li><span class="arithmatex">\(r_p\)</span> and <span class="arithmatex">\(r_{rp}\)</span> are the <em>flow-induced entrainment and re-entrainment rates</em></li>
+<li><span class="arithmatex">\(d_p\)</span> is a <em>deposition rate</em>, expressed as mass per unit area per unit time</li>
 </ul>
 <p>and <span class="arithmatex">\(\nabla\cdot\vec{F} = \partial F_x/\partial x + \partial F_y/\partial y\)</span> is
 the 2D divergence of the spatial vector <span class="arithmatex">\(\vec{F}\)</span>.</p>
-<p>The deposited layer mass <span class="arithmatex">\(M_i\)</span> for each size class accumulates according to an
+<p>The deposited layer mass <span class="arithmatex">\(M_p\)</span> for each size class accumulates according to an
 ordinary differential equation involving its deposition, re-detachment, and
 re-entrainment rates:</p>
 <div class="arithmatex">\[\begin{equation}
-\frac{\partial M_i}{\partial t} = d_i - e_{ri} - r_{ri}\tag{2}\label{2}
+\frac{\partial M_p}{\partial t} = d_p - e_{rp} - r_{rp}\tag{2}\label{2}
 \end{equation}\]</div>
 <p>All size classes deposit their layers to the bed floor, changing the bed
 elevation according to the ordinary differential equation</p>
 <div class="arithmatex">\[\begin{equation}
-(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{i=1}^{I}(d_i - e_i - e_{ri} - r_{i} - r_{ri})\tag{3}\label{3}
+(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{i=1}^{I}(d_p - e_p - e_{rp} - r_p - r_{rp})\tag{3}\label{3}
 \end{equation}\]</div>
 <p>where </p>
 <ul>
@@ -1293,18 +1293,18 @@ elevation according to the ordinary differential equation</p>
 the H-R equations above.</p>
 <h4 id="rainfall-driven-detachment-and-re-detachment-rates">Rainfall-driven detachment and re-detachment rates</h4>
 <div class="arithmatex">\[\begin{eqnarray}
-e_i &amp;=&amp; F_w (1 - H) p_i a_0 P \\
-e_{ri} &amp;=&amp; F_w H \frac{M_i}{M_t} a_d P \tag{4}\label{4}
+e_p &amp;=&amp; F_w (1 - H) f_p a_0 R \\
+e_{rp} &amp;=&amp; F_w H \frac{M_p}{M_t} a_d R \tag{4}\label{4}
 \end{eqnarray}\]</div>
 <p>where</p>
 <ul>
-<li><span class="arithmatex">\(p_i\)</span> is the time-dependent ratio of the proportion of sediment in size class <span class="arithmatex">\(i\)</span>
-  to its proportion in the soil's original state (i.e. $p_i(0) = 1)</li>
+<li><span class="arithmatex">\(f_p\)</span> is the time-dependent ratio of the fraction of sediment in size class <span class="arithmatex">\(p\)</span>
+  to its proportion in the soil's original state (i.e. <span class="arithmatex">\(f_p(0) = 1\)</span>)</li>
 <li><span class="arithmatex">\(a_0\)</span> and <span class="arithmatex">\(a_d\)</span> are the detachability of uneroded and deposited soil, expressed
   in mass per unit volume</li>
-<li>P is the intensity of rainfall intensity expressed as the change in water height
+<li>R is the intensity of rainfall, expressed as the change in water height
   per unit time</li>
-<li><span class="arithmatex">\(M_t = \sum M_i\)</span> is the total sediment mass in the deposited layer,
+<li><span class="arithmatex">\(M_t = \sum M_p\)</span> is the total sediment mass in the deposited layer,
   expressed in mass per unit area</li>
 <li><span class="arithmatex">\(F_w\)</span> is a <em>shield factor</em> that attenuates the detachment and re-detachment
   rates under conditions where the water height is more than 3 times the
@@ -1328,8 +1328,8 @@ obtained with a best fit using experimental data. For example, <span class="arit
 clay and 1.13 for loam.</p>
 <h4 id="overland-flow-driven-entrainment-and-re-entrainment-rates">Overland flow-driven entrainment and re-entrainment rates</h4>
 <div class="arithmatex">\[\begin{eqnarray}
-r_i &amp;=&amp; (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J} \\
-r_{ri} &amp;=&amp; H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
+r_p &amp;=&amp; (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J} \\
+r_{rp} &amp;=&amp; H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
 \end{eqnarray}\]</div>
 <p>where</p>
 <ul>
@@ -1345,10 +1345,10 @@ r_{ri} &amp;=&amp; H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-
 </ul>
 <h4 id="size-class-deposition-rate">Size class deposition rate</h4>
 <div class="arithmatex">\[\begin{equation}
-d_{i} = v_{i}c_{i} \tag{7}\label{7}
+d_p = v_p c_{i} \tag{7}\label{7}
 \end{equation}\]</div>
-<p>where <span class="arithmatex">\(v_{i}\)</span> is the <em>settling velocity</em> of each size class with concentration
-<span class="arithmatex">\(c_i\)</span>, given as mass per unit volume. This model assumes that</p>
+<p>where <span class="arithmatex">\(v_p\)</span> is the <em>settling velocity</em> of each size class with concentration
+<span class="arithmatex">\(c_p\)</span>, given as mass per unit volume. This model assumes that</p>
 <ul>
 <li>the suspended load in the water column is completely mixed in the vertical direction</li>
 <li>the infiltration rate does not affect size class settling velocities.</li>
@@ -1398,7 +1398,7 @@ the (re)attachment, (re)entrainment, and deposition terms:</p>
 <div class="arithmatex">\[\begin{align}
 \mathbf{S} =
   \begin{bmatrix}
-    R
+    Q
     -g h\frac{\partial z}{\partial x} - C_D u\sqrt{u^2 + v^2} \\[.5em]
     -g h\frac{\partial z}{\partial y} - C_D v\sqrt{u^2 + v^2} \\
     e_1 + e_{r1} + r_1 + r_{r1} - d_{1}                                 \\
@@ -1438,21 +1438,21 @@ to better accommodate our numerical treatment.</p>
 equations, but uses simplified source terms in the size-class specific transport
 equations:</p>
 <div class="arithmatex">\[\begin{equation}
-\frac{\partial (h c_i)}{\partial t} + \nabla\cdot\left(h c_i \vec{u}\right) = E_i - D_i \tag{9} \label{9}
+\frac{\partial (h c_p)}{\partial t} + \nabla\cdot\left(h c_p \vec{u}\right) = E_p - D_p \tag{9} \label{9}
 \end{equation}\]</div>
-<p>with source terms <span class="arithmatex">\(E_i\)</span> and <span class="arithmatex">\(D_i\)</span> representing size-class-specific erosion and
+<p>with source terms <span class="arithmatex">\(E_p\)</span> and <span class="arithmatex">\(D_p\)</span> representing size-class-specific erosion and
 deposition rates, each expressed as mass per unit area per unit time.</p>
 <p>The GAIA model calculates these erosion and deposition rates from the following
-expressions for each size class <span class="arithmatex">\(i\)</span>:</p>
+expressions for each size class <span class="arithmatex">\(p\)</span>:</p>
 <div class="arithmatex">\[\begin{eqnarray}
-E_i &amp;=&amp; \mathcal{M} \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right) \\
-D_i &amp;=&amp; w_i c_i \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right] \tag{10} \label{10}
+E_p &amp;=&amp; \mathcal{M} \left( \frac{\tau_b - \tau_{ce}}{\tau_{ce}} \right) \\
+D_p &amp;=&amp; w_p c_p \left[ 1 - \left( \frac{\tau_b}{\tau_{cd}} \right) \right] \tag{10} \label{10}
 \end{eqnarray}\]</div>
 <p>where</p>
 <ul>
 <li><span class="arithmatex">\(\mathcal{M}\)</span> is the Krone-Partheniades erosion law constant, sometimes called
   the "erodibility coefficient"</li>
-<li><span class="arithmatex">\(w_i\)</span> is the settling velocity for sediment class <span class="arithmatex">\(i\)</span></li>
+<li><span class="arithmatex">\(w_p\)</span> is the settling velocity for sediment class <span class="arithmatex">\(p\)</span></li>
 <li><span class="arithmatex">\(\tau_{ce}\)</span> is the critical shear stress for erosion</li>
 <li><span class="arithmatex">\(\tau_{cd}\)</span> is the critical shear stress for deposition, and</li>
 <li><span class="arithmatex">\(\tau_b = \rho_s C_D u \sqrt{u^2 + v^2}\)</span> is the bed bottom shear stress.</li>
