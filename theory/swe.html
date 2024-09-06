@@ -12,6 +12,8 @@
         <link rel="prev" href="index.html">
       
       
+        <link rel="next" href="sediment.html">
+      
       
       <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.34">
@@ -1086,6 +1088,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sediment.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sediment Transport
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1413,9 +1436,10 @@ by solving the relevant Riemann problem using Roe's method. If we designate
 subscripts for quantities respectively in cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>, we can approximate
 the normal flux by the expression</p>
 <div class="arithmatex">\[\begin{equation}
-\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right).
+\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right)
 \end{equation}\]</div>
-<p>Above,</p>
+<p>where <span class="arithmatex">\(\Delta f\)</span> is the variation of the quantity of <span class="arithmatex">\(f\)</span> along a face. In
+particular,</p>
 <div class="arithmatex">\[\begin{align}
   \mathbf{R}
   =
@@ -1471,19 +1495,24 @@ because their second and third components correspond to the spatial components
 of the momentum vector.</p>
 <h4 id="net-runoff-production-mathbfs_r">Net runoff production <span class="arithmatex">\(\mathbf{S}_r\)</span></h4>
 <p>This source term contributes only to height of the water, and is expressed as
-<span class="arithmatex">\(\mathbf{S}_r = [R, 0, 0]^T\)</span>, where <span class="arithmatex">\(R\)</span> is a constant, a spatially homogeneous
-time-dependent function <span class="arithmatex">\(R(t)\)</span>, or a spatially heterogeneous time-dependent
-function <span class="arithmatex">\(R(x, y, t)\)</span>. We can approximate the integral of this term using the
-mean value theorem of calculus:</p>
+<span class="arithmatex">\(\mathbf{S}_r = [Q_r, 0, 0]^T\)</span>, where <span class="arithmatex">\(Q_r\)</span>, <em>the net runoff production</em>,
+with units of water height per unit time, is</p>
+<ul>
+<li>a constant</li>
+<li>a spatially homogeneous time-dependent function <span class="arithmatex">\(Q_r(t)\)</span>, or</li>
+<li>a spatially heterogeneous time-dependent function <span class="arithmatex">\(Q_r(x, y, t)\)</span>.</li>
+</ul>
+<p>In any case, we can approximate the integral of this term using the mean value
+theorem of calculus:</p>
 <div class="arithmatex">\[\begin{equation}
-\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [R, 0, 0]^T~d\Omega \approx [R V_i, 0, 0]^T,
+\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [Q_r, 0, 0]^T~d\Omega \approx [Q_r A_i, 0, 0]^T,
 \end{equation}\]</div>
-<p>where <span class="arithmatex">\(V_i\)</span> is the volume of cell <span class="arithmatex">\(i\)</span>.</p>
+<p>where <span class="arithmatex">\(A_i\)</span> is the area of cell <span class="arithmatex">\(i\)</span>.</p>
 <h4 id="bed-elevation-slope-term-mathbfs_b">Bed elevation slope term <span class="arithmatex">\(\mathbf{S}_b\)</span></h4>
 <p>This term represents the force of gravity on the water and can be
 approximated as</p>
 <div class="arithmatex">\[\begin{equation}
-\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) V_i
+\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) A_i
 \end{equation}\]</div>
 <p>where <span class="arithmatex">\(\nabla z = (\partial z/\partial x, \partial z/\partial y)\)</span> is the two-dimensional
 gradient of the bed elevation function <span class="arithmatex">\(z\)</span>.</p>
@@ -1496,7 +1525,7 @@ gradient of the bed elevation function <span class="arithmatex">\(z\)</span>.</p
 <p>Like the runoff term, this term involves only quantities within a single cell
 and can be approximated by the mean value theorem:</p>
 <div class="arithmatex">\[\begin{equation}
-\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} V_i
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} A_i
 \end{equation}\]</div>
 <p>where <span class="arithmatex">\(\vec{u} = (u, v)\)</span> is the flow velocity vector. The <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial
 components contribute to the second and third vector components of the integral
