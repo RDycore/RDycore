@@ -18,15 +18,6 @@ typedef struct {
   RiemannDataSWE  data_cells;
 } PetscRiemannDataSWE;
 
-// Diagnostic structure that captures information about the conditions under
-// which the maximum courant number is encountered. If you change this struct,
-// update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
-typedef struct {
-  PetscReal max_courant_num;  // maximum courant number
-  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
-  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
-} CourantNumberDiagnostics;
-
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);

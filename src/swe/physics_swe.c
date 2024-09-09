@@ -327,13 +327,10 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
   PetscCall(DMGlobalToLocalBegin(dm, X, INSERT_VALUES, rdy->X_local));
   PetscCall(DMGlobalToLocalEnd(dm, X, INSERT_VALUES, rdy->X_local));
 
-  // compute the right hand side
-  CourantNumberDiagnostics courant_num_diags = {
-      .max_courant_num = 0.0,
-      .global_edge_id  = -1,
-      .global_cell_id  = -1,
-  };
+  // get courant number diagnostics
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
 
+  // compute the right hand side
   if (rdy->ceed_resource[0]) {
     PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->X_local, F));
     if (0) {
@@ -350,8 +347,8 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     }
   } else {
     PetscCall(ComputeSWEDiagnosticVariables(rdy));
-    PetscCall(SWERHSFunctionForInternalEdges(rdy, F, &courant_num_diags));
-    PetscCall(SWERHSFunctionForBoundaryEdges(rdy, F, &courant_num_diags));
+    PetscCall(SWERHSFunctionForInternalEdges(rdy, F, courant_num_diags));
+    PetscCall(SWERHSFunctionForBoundaryEdges(rdy, F, courant_num_diags));
     PetscCall(AddSWESourceTerm(rdy, F));
     if (0) {
       PetscInt nstep;
@@ -369,14 +366,14 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   // write out debugging info for maximum courant number
   if (rdy->config.logging.level >= LOG_DEBUG) {
-    MPI_Allreduce(MPI_IN_PLACE, &courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
+    MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal time;
     PetscInt  stepnum;
     PetscCall(TSGetTime(ts, &time));
     PetscCall(TSGetStepNumber(ts, &stepnum));
     RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT " is %f",
-                stepnum, time, courant_num_diags.max_courant_num, courant_num_diags.global_edge_id, courant_num_diags.global_cell_id,
-                courant_num_diags.max_courant_num);
+                stepnum, time, courant_num_diags->max_courant_num, courant_num_diags->global_edge_id, courant_num_diags->global_cell_id,
+                courant_num_diags->max_courant_num);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

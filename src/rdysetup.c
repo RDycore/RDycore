@@ -963,6 +963,12 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
 
+  RDyLogDebug(rdy, "Initializing courant number diagnostics...");
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  courant_num_diags->max_courant_num = 0.0;
+  courant_num_diags->global_edge_id = -1;
+  courant_num_diags->global_cell_id = -1;
+
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data
   if (rdy->config.restart.file[0]) {
