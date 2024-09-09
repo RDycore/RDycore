@@ -329,6 +329,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   // get courant number diagnostics
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  courant_num_diags->max_courant_num = 0.0;
 
   // compute the right hand side
   if (rdy->ceed_resource[0]) {
@@ -364,9 +365,13 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     }
   }
 
+  // find maximum courant number
+  if (rdy->config.logging.level >= LOG_DEBUG || rdy->config.time.adaptivity.enable) {
+    MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
+  }
+
   // write out debugging info for maximum courant number
   if (rdy->config.logging.level >= LOG_DEBUG) {
-    MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
     PetscReal time;
     PetscInt  stepnum;
     PetscCall(TSGetTime(ts, &time));
