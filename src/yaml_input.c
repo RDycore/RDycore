@@ -119,6 +119,19 @@ static const cyaml_strval_t time_units[] = {
     {"years",   RDY_TIME_YEARS  },
 };
 
+static const cyaml_strval_t enable_units[] = {
+    {"true", PETSC_TRUE},
+    {"false", PETSC_FALSE},
+};
+
+static const cyaml_schema_field_t adaptivity_fields_schema[] = {
+    CYAML_FIELD_ENUM("enable", CYAML_FLAG_DEFAULT, RDyTimeAdaptivitySection, enable, enable_units, CYAML_ARRAY_LEN(enable_units)),
+    CYAML_FIELD_FLOAT("max_courant_number", CYAML_FLAG_OPTIONAL, RDyTimeAdaptivitySection, max_courant_number),
+    CYAML_FIELD_FLOAT("max_increase_factor", CYAML_FLAG_OPTIONAL, RDyTimeAdaptivitySection, max_increase_factor),
+    CYAML_FIELD_END
+};
+
+
 // mapping of time fields to members of RDyTimeSection
 static const cyaml_schema_field_t time_fields_schema[] = {
     CYAML_FIELD_FLOAT("final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time),
@@ -126,6 +139,7 @@ static const cyaml_schema_field_t time_fields_schema[] = {
     CYAML_FIELD_INT("max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step),
     CYAML_FIELD_FLOAT("time_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, time_step),
     CYAML_FIELD_FLOAT( "coupling_interval", CYAML_FLAG_OPTIONAL, RDyTimeSection, coupling_interval),
+    CYAML_FIELD_MAPPING("adaptivity", CYAML_FLAG_OPTIONAL, RDyTimeSection, adaptivity, adaptivity_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -780,6 +794,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     PetscCheck(config->time.coupling_interval > 0.0, comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
     PetscCheck(config->time.coupling_interval <= config->time.final_time, comm, PETSC_ERR_USER,
                "time.coupling_interval must not exceed time.final_time");
+  }
+
+  if (config->time.adaptivity.enable) {
+    PetscCheck(config->time.adaptivity.max_courant_number > 0.0, comm, PETSC_ERR_USER, "time.adaptivity.max_courant_number must be greater than 0.0");
+    PetscCheck(config->time.adaptivity.max_courant_number < 1.0, comm, PETSC_ERR_USER, "time.adaptivity.max_courant_number must be less than 1.0");
+    PetscCheck(config->time.adaptivity.max_increase_factor > 1.0, comm, PETSC_ERR_USER, "time.adaptivity.max_increase_factor must be greater than 1.0");
   }
 
   // we need initial conditions and material properties specified for each
