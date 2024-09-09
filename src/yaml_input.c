@@ -799,7 +799,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if (config->time.adaptivity.enable) {
     PetscCheck(config->time.adaptivity.max_courant_number > 0.0, comm, PETSC_ERR_USER, "time.adaptivity.max_courant_number must be greater than 0.0");
     PetscCheck(config->time.adaptivity.max_courant_number < 1.0, comm, PETSC_ERR_USER, "time.adaptivity.max_courant_number must be less than 1.0");
-    PetscCheck(config->time.adaptivity.max_increase_factor > 1.0, comm, PETSC_ERR_USER, "time.adaptivity.max_increase_factor must be greater than 1.0");
+    PetscCheck(config->time.adaptivity.max_increase_factor > 1.0, comm, PETSC_ERR_USER,
+               "time.adaptivity.max_increase_factor must be greater than 1.0");
   }
 
   // we need initial conditions and material properties specified for each

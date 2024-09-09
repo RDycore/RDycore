@@ -64,9 +64,9 @@ static PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
   PetscInt n_field                             = 1;
   PetscInt n_field_comps[1]                    = {3};
   char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
-          "Height",
-          "MomentumX",
-          "MomentumY",
+      "Height",
+      "MomentumX",
+      "MomentumY",
   };
 
   PetscFunctionBeginUser;

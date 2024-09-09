@@ -97,20 +97,20 @@ typedef struct {
 // time section
 // ------------
 
-typedef struct{
-  PetscBool enable;              // true = use timestep adaptivity
-  PetscReal max_courant_number;  // max courant number to target for adaptivity
-  PetscReal max_increase_factor; // max allowable increase in timestep
+typedef struct {
+  PetscBool enable;               // true = use timestep adaptivity
+  PetscReal max_courant_number;   // max courant number to target for adaptivity
+  PetscReal max_increase_factor;  // max allowable increase in timestep
 } RDyTimeAdaptivitySection;
 
 // all time parameters
 typedef struct {
-  PetscReal   final_time;              // final simulation time [unit]
-  RDyTimeUnit unit;                    // unit in which time is expressed
-  PetscInt    max_step;                // maximum number of simulation time steps
-  PetscReal   time_step;               // minimum internal time step [unit]
-  PetscReal   coupling_interval;       // time interval spanned by RDyAdvance [unit]
-  RDyTimeAdaptivitySection adaptivity; // timestep adaptivity for explicity time integration
+  PetscReal                final_time;         // final simulation time [unit]
+  RDyTimeUnit              unit;               // unit in which time is expressed
+  PetscInt                 max_step;           // maximum number of simulation time steps
+  PetscReal                time_step;          // minimum internal time step [unit]
+  PetscReal                coupling_interval;  // time interval spanned by RDyAdvance [unit]
+  RDyTimeAdaptivitySection adaptivity;         // timestep adaptivity for explicity time integration
 } RDyTimeSection;
 
 // ---------------
