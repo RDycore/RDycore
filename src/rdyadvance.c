@@ -269,9 +269,11 @@ PetscErrorCode RDyAdvance(RDy rdy) {
         if (dt > interval) dt = interval;
 
         if (rdy->config.logging.level >= LOG_DEBUG) {
-          RDyLogDebug(rdy, "Increasing dt from %f to %f", rdy->dt, dt);
+          const char *units  = TimeUnitAsString(rdy->config.time.unit);
+          PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
+          PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
+          RDyLogDebug(rdy, "Increasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
         }
-        printf("Increasing dt from %f to %f", rdy->dt, dt);
 
         // update the timestep
         rdy->dt = dt;
@@ -284,9 +286,11 @@ PetscErrorCode RDyAdvance(RDy rdy) {
         dt *= factor;
 
         if (rdy->config.logging.level >= LOG_DEBUG) {
-          RDyLogDebug(rdy, "Decreasing dt from %f to %f", rdy->dt, dt);
+          const char *units  = TimeUnitAsString(rdy->config.time.unit);
+          PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
+          PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
+          RDyLogDebug(rdy, "Decreasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
         }
-        printf("Decreasing dt from %f to %f", rdy->dt, dt);
 
         // update the timestep
         rdy->dt = dt;
