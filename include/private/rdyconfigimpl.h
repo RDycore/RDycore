@@ -101,6 +101,7 @@ typedef struct {
   PetscBool enable;                 // true = use timestep adaptivity
   PetscReal target_courant_number;  // target courant number
   PetscReal max_increase_factor;    // max allowable increase in timestep
+  PetscReal initial_time_step;      // initial timestep for adaptivity
 } RDyTimeAdaptivitySection;
 
 // all time parameters

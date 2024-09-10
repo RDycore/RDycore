@@ -126,8 +126,9 @@ static const cyaml_strval_t enable_units[] = {
 
 static const cyaml_schema_field_t adaptivity_fields_schema[] = {
     CYAML_FIELD_ENUM("enable", CYAML_FLAG_DEFAULT, RDyTimeAdaptivitySection, enable, enable_units, CYAML_ARRAY_LEN(enable_units)),
-    CYAML_FIELD_FLOAT("target_courant_number", CYAML_FLAG_OPTIONAL, RDyTimeAdaptivitySection, target_courant_number),
-    CYAML_FIELD_FLOAT("max_increase_factor", CYAML_FLAG_OPTIONAL, RDyTimeAdaptivitySection, max_increase_factor),
+    CYAML_FIELD_FLOAT("target_courant_number", CYAML_FLAG_DEFAULT, RDyTimeAdaptivitySection, target_courant_number),
+    CYAML_FIELD_FLOAT("max_increase_factor", CYAML_FLAG_DEFAULT, RDyTimeAdaptivitySection, max_increase_factor),
+    CYAML_FIELD_FLOAT("initial_time_step", CYAML_FLAG_DEFAULT, RDyTimeAdaptivitySection, initial_time_step),
     CYAML_FIELD_END
 };
 
@@ -776,6 +777,14 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
                "time.adaptivity.target_courant_number must be less than 1.0");
     PetscCheck(config->time.adaptivity.max_increase_factor > 1.0, comm, PETSC_ERR_USER,
                "time.adaptivity.max_increase_factor must be greater than 1.0");
+    PetscCheck(config->time.adaptivity.initial_time_step > 0.0, comm, PETSC_ERR_USER, "time.adaptivity.initial_time_step must be greater than 0.0");
+
+    // ensure that max_step and time_step is not specified
+    PetscCheck(config->time.max_step == INVALID_INT, comm, PETSC_ERR_USER, "max_step cannot be specified with time adaptivity enabled");
+    PetscCheck(config->time.time_step == INVALID_REAL, comm, PETSC_ERR_USER, "time_step cannot be specified with time adaptivity enabled");
+
+    // set time step
+    config->time.time_step = config->time.adaptivity.initial_time_step;
   }
 
   // check time settings
