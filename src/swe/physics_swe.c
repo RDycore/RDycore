@@ -108,7 +108,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
 
-  //PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
+  // PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
   PetscCall(TSSetTime(rdy->ts, 0.0));
@@ -304,6 +304,94 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Loops over all internal edges and finds the maximum courant number
+/// @param [in] rdy An RDy object
+/// @param *max_courant_number Maximum value of courant number
+/// @return 0 on sucess, or a non-zero error code on failure
+static PetscErrorCode RDyCeedFindMaxCourantNumberInternalEdges(RDy rdy, PetscReal *max_courant_number) {
+  PetscFunctionBegin;
+
+  // get the relevant interior sub-operator
+  CeedOperator *sub_ops;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_edges, &sub_ops));
+  CeedOperator interior_flux_op = sub_ops[0];
+
+  // fetch the field
+  CeedOperatorField courant_num;
+  PetscCallCEED(CeedOperatorGetFieldByName(interior_flux_op, "courant_number", &courant_num));
+
+  CeedVector courant_num_vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+
+  int num_comp = 2;  // values left and right of an edge
+  CeedScalar(*courant_num_data)[num_comp];
+  PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscInt iedge_owned = 0;
+  for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
+    if (edges->is_owned[ii]) {
+      CeedScalar local_max = fmax(courant_num_data[iedge_owned][0], courant_num_data[iedge_owned][1]);
+      *max_courant_number  = fmax(*max_courant_number, local_max);
+      iedge_owned++;
+    }
+  }
+  PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Loops over all boundary conditions and finds the maximum courant number
+/// @param [in] rdy An RDy object
+/// @param *max_courant_number Maximum value of courant number
+/// @return 0 on sucess, or a non-zero error code on failure
+static PetscErrorCode RDyCeedFindMaxCourantNumberBoundaryEdges(RDy rdy, PetscReal *max_courant_number) {
+  PetscFunctionBegin;
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    RDyBoundary boundary = rdy->boundaries[b];
+
+    // get the relevant boundary sub-operator
+    CeedOperator *sub_ops;
+    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_edges, &sub_ops));
+    CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
+
+    // fetch the field
+    CeedOperatorField courant_num;
+    PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "courant_number", &courant_num));
+
+    // get access to the data
+    CeedVector courant_num_vec;
+    PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+    int num_comp = 1;
+    CeedScalar(*courant_num_data)[num_comp];
+    PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+
+    // find the maximum value
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      *max_courant_number = fmax(*max_courant_number, courant_num_data[e][0]);
+    }
+
+    // restores the pointer
+    PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyCeedFindMaxCourantNumber(RDy rdy, PetscReal *max_courant_number) {
+  PetscFunctionBegin;
+
+  PetscCall(RDyCeedFindMaxCourantNumberInternalEdges(rdy, max_courant_number));
+  PetscCall(RDyCeedFindMaxCourantNumberBoundaryEdges(rdy, max_courant_number));
+
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, max_courant_number, 1, MPI_DOUBLE, MPI_MAX, rdy->comm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This is the right-hand-side function used by our timestepping solver for
 // the shallow water equations.
 // Parameters:
@@ -329,7 +417,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   // get courant number diagnostics
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  courant_num_diags->max_courant_num = 0.0;
+  courant_num_diags->max_courant_num          = 0.0;
 
   // compute the right hand side
   if (rdy->ceed_resource[0]) {
@@ -367,19 +455,35 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   // find maximum courant number
   if (rdy->config.logging.level >= LOG_DEBUG || rdy->config.time.adaptivity.enable) {
-    MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
+    if (rdy->ceed_resource[0]) {
+      PetscCall(RDyCeedFindMaxCourantNumber(rdy, &courant_num_diags->max_courant_num));
+    } else {
+      MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
+    }
   }
 
   // write out debugging info for maximum courant number
   if (rdy->config.logging.level >= LOG_DEBUG) {
-    PetscReal time;
-    PetscInt  stepnum;
-    PetscCall(TSGetTime(ts, &time));
-    PetscCall(TSGetStepNumber(ts, &stepnum));
-    const char *units = TimeUnitAsString(rdy->config.time.unit);
-    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT " is %f",
-                stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units, courant_num_diags->max_courant_num, courant_num_diags->global_edge_id, courant_num_diags->global_cell_id,
-                courant_num_diags->max_courant_num);
+    if (rdy->ceed_resource[0]) {
+      PetscReal time;
+      PetscInt  stepnum;
+      PetscCall(TSGetTime(ts, &time));
+      PetscCall(TSGetStepNumber(ts, &stepnum));
+      const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+      RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit),
+                  units, courant_num_diags->max_courant_num);
+
+    } else {
+      PetscReal time;
+      PetscInt  stepnum;
+      PetscCall(TSGetTime(ts, &time));
+      PetscCall(TSGetStepNumber(ts, &stepnum));
+      const char *units = TimeUnitAsString(rdy->config.time.unit);
+      RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT,
+                  stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units, courant_num_diags->max_courant_num,
+                  courant_num_diags->global_edge_id, courant_num_diags->global_cell_id);
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
