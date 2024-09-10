@@ -258,9 +258,9 @@ PetscErrorCode RDyAdvance(RDy rdy) {
       // get current timestep
       PetscReal dt = rdy->dt;
 
-      if (cnum_diags->max_courant_num < time_adap->max_courant_number) {
+      if (cnum_diags->max_courant_num < time_adap->target_courant_number) {
         // timestep can be increased, so find the factor by which timestep can be increased
-        PetscReal factor = PetscMin(time_adap->max_courant_number / cnum_diags->max_courant_num, time_adap->max_increase_factor);
+        PetscReal factor = PetscMin(time_adap->target_courant_number / cnum_diags->max_courant_num, time_adap->max_increase_factor);
 
         // increase the timestep
         dt *= factor;
@@ -278,7 +278,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
       } else {
         // decrease the timestep
-        PetscReal factor = time_adap->max_courant_number / cnum_diags->max_courant_num;
+        PetscReal factor = time_adap->target_courant_number / cnum_diags->max_courant_num;
 
         // decrease the timestep
         dt *= factor;
