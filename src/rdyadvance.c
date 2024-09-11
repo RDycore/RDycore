@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -244,14 +245,61 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
   PetscReal interval           = ConvertTimeToSeconds(rdy->config.time.coupling_interval, rdy->config.time.unit);
   PetscReal next_coupling_time = time + interval;
+
+  RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
+               ConvertTimeFromSeconds(next_coupling_time, rdy->config.time.unit));
+
+  // if adaptive time is enabled, try to increase the dt
+  RDyTimeAdaptiveSection *time_adap = &rdy->config.time.adaptive;
+  if (time_adap->enable) {
+    CourantNumberDiagnostics *cnum_diags = &rdy->courant_num_diags;
+
+    // if previous courant number is valid
+    if (cnum_diags->is_set) {
+      // get current timestep
+      PetscReal dt = rdy->dt;
+
+      PetscReal factor = 0.0;
+      if (cnum_diags->max_courant_num < time_adap->target_courant_number) {
+        // timestep can be increased, so find the factor by which timestep can be increased
+        factor = PetscMin(time_adap->target_courant_number / cnum_diags->max_courant_num, time_adap->max_increase_factor);
+
+        // increase the timestep
+        dt *= factor;
+
+        // ensure the increase in timestep is less than the coupling timestep
+        if (dt > interval) dt = interval;
+
+      } else {
+        // decrease the timestep
+        factor = time_adap->target_courant_number / cnum_diags->max_courant_num;
+
+        // decrease the timestep
+        dt *= factor;
+      }
+
+      // if needed, log the Courant number
+      if (rdy->config.logging.level >= LOG_DEBUG) {
+        const char *units  = TimeUnitAsString(rdy->config.time.unit);
+        PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
+        PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
+        RDyLogDebug(rdy, "Increasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
+      }
+
+      // update the timestep
+      rdy->dt = dt;
+    }
+  }
+
   PetscCall(TSSetMaxTime(rdy->ts, next_coupling_time));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
 
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  courant_num_diags->is_set                   = PETSC_FALSE;
+
   // advance the solution to the specified time (handling preloading if requested)
-  RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
-               ConvertTimeFromSeconds(next_coupling_time, rdy->config.time.unit));
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
   if (PetscPreLoadingOn) {
     PetscCall(CalibrateSolverTimers(rdy));
@@ -261,6 +309,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
   PetscPreLoadEnd();
+
+  if (time_adap->enable & !courant_num_diags->is_set) {
+    PetscCall(SWEFindMaxCourantNumber(rdy));
+  }
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
@@ -284,7 +336,7 @@ PetscBool RDyFinished(RDy rdy) {
   PetscReal time_in_unit = ConvertTimeFromSeconds(time, rdy->config.time.unit);
   PetscInt  step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
-  if ((time_in_unit >= rdy->config.time.final_time) || (step >= rdy->config.time.max_step)) {
+  if ((time_in_unit >= rdy->config.time.final_time)) {
     finished = PETSC_TRUE;
   }
   PetscFunctionReturn(finished);

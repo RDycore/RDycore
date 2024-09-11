@@ -90,6 +90,21 @@ foreach(np 1 2) # test on 1, 2 processes
   endforeach()
 endforeach()
 
+# ex2b with ICs specified by a file and adaptive time step
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_ic_file_with_adapt.yaml
+     ${MESH_DIR}/DamBreak_grid5x10.exo
+     ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
+     ${MATERIALS_DIR}/manning_grid5x10.${PETSC_ID_TYPE}.bin
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2) # test on 1, 2 processes
+  foreach(config basic ceed preload)
+    foreach(lang c f90)
+      add_test(swe_roe_ex2b_ic_file_with_adapt_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_ic_file_with_adapt.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
 # ex2b ensemble test -- (file copy only for now)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b-ensemble.yaml
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

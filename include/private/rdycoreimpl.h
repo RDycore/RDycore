@@ -8,6 +8,16 @@
 #include <private/rdymeshimpl.h>
 #include <rdycore.h>
 
+// Diagnostic structure that captures information about the conditions under
+// which the maximum courant number is encountered. If you change this struct,
+// update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
+typedef struct {
+  PetscReal max_courant_num;  // maximum courant number
+  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
+  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
+  PetscBool is_set;           // true if max_courant_num is set, otherwise false
+} CourantNumberDiagnostics;
+
 // This type defines a material with specific properties.
 // (undefined properties are set to INVALID_INT/INVALID_REAL)
 typedef struct {
@@ -172,6 +182,8 @@ struct _p_RDy {
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
+
+  CourantNumberDiagnostics courant_num_diags;
 
   //-------------------
   // Simulatіon output

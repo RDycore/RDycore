@@ -119,6 +119,20 @@ static const cyaml_strval_t time_units[] = {
     {"years",   RDY_TIME_YEARS  },
 };
 
+static const cyaml_strval_t enable_units[] = {
+    {"true", PETSC_TRUE},
+    {"false", PETSC_FALSE},
+};
+
+static const cyaml_schema_field_t adaptive_fields_schema[] = {
+    CYAML_FIELD_ENUM("enable", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, enable, enable_units, CYAML_ARRAY_LEN(enable_units)),
+    CYAML_FIELD_FLOAT("target_courant_number", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, target_courant_number),
+    CYAML_FIELD_FLOAT("max_increase_factor", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, max_increase_factor),
+    CYAML_FIELD_FLOAT("initial_time_step", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, initial_time_step),
+    CYAML_FIELD_END
+};
+
+
 // mapping of time fields to members of RDyTimeSection
 static const cyaml_schema_field_t time_fields_schema[] = {
     CYAML_FIELD_FLOAT("final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time),
@@ -126,6 +140,7 @@ static const cyaml_schema_field_t time_fields_schema[] = {
     CYAML_FIELD_INT("max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step),
     CYAML_FIELD_FLOAT("time_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, time_step),
     CYAML_FIELD_FLOAT( "coupling_interval", CYAML_FLAG_OPTIONAL, RDyTimeSection, coupling_interval),
+    CYAML_FIELD_MAPPING("adaptive", CYAML_FLAG_OPTIONAL, RDyTimeSection, adaptive, adaptive_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -753,6 +768,22 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
 
   PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");
+
+  // check adaptive time step setting
+  if (config->time.adaptive.enable) {
+    PetscCheck(config->time.adaptive.target_courant_number > 0.0, comm, PETSC_ERR_USER,
+               "time.adaptive.target_courant_number must be greater than 0.0");
+    PetscCheck(config->time.adaptive.target_courant_number < 1.0, comm, PETSC_ERR_USER, "time.adaptive.target_courant_number must be less than 1.0");
+    PetscCheck(config->time.adaptive.max_increase_factor > 1.0, comm, PETSC_ERR_USER, "time.adaptive.max_increase_factor must be greater than 1.0");
+    PetscCheck(config->time.adaptive.initial_time_step > 0.0, comm, PETSC_ERR_USER, "time.adaptive.initial_time_step must be greater than 0.0");
+
+    // ensure that max_step and time_step is not specified
+    PetscCheck(config->time.max_step == INVALID_INT, comm, PETSC_ERR_USER, "max_step cannot be specified with adaptive time step enabled");
+    PetscCheck(config->time.time_step == INVALID_REAL, comm, PETSC_ERR_USER, "time_step cannot be specified with adaptive time step enabled");
+
+    // set time step
+    config->time.time_step = config->time.adaptive.initial_time_step;
+  }
 
   // check time settings
   // 'final_time', 'max_step', 'time_step': exactly two of these three can be specified in the .yaml file.
