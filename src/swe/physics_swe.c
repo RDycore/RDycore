@@ -307,16 +307,18 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Loops over all internal edges and finds the maximum courant number
-/// @param [in] rdy An RDy object
-/// @param *max_courant_number Maximum value of courant number
+/// @brief Loops over all internal edges and finds the local maximum courant number.
+///        If needed, the data is moved from device to host.
+/// @param [in] op_edges A CeedOperator object for edges
+/// @param [in] mesh A pointer to a RDyMesh object
+/// @param [in] *max_courant_number Local maximum value of courant number
 /// @return 0 on sucess, or a non-zero error code on failure
-static PetscErrorCode RDyCeedFindMaxCourantNumberInternalEdges(RDy rdy, PetscReal *max_courant_number) {
+static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edges, RDyMesh *mesh, PetscReal *max_courant_number) {
   PetscFunctionBegin;
 
   // get the relevant interior sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_edges, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
   CeedOperator interior_flux_op = sub_ops[0];
 
   // fetch the field
@@ -330,7 +332,7 @@ static PetscErrorCode RDyCeedFindMaxCourantNumberInternalEdges(RDy rdy, PetscRea
   CeedScalar(*courant_num_data)[num_comp];
   PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
 
-  RDyMesh  *mesh  = &rdy->mesh;
+  // RDyMesh  *mesh  = &rdy->mesh;
   RDyEdges *edges = &mesh->edges;
 
   PetscInt iedge_owned = 0;
@@ -346,19 +348,24 @@ static PetscErrorCode RDyCeedFindMaxCourantNumberInternalEdges(RDy rdy, PetscRea
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Loops over all boundary conditions and finds the maximum courant number
-/// @param [in] rdy An RDy object
-/// @param *max_courant_number Maximum value of courant number
+/// @brief Loops over all boundary conditions and finds the local maximum Courant number.
+///        If needed, the data is moved from device to host.
+/// @param [in] op_edges A CeedOperator object for edges
+/// @param [in] num_boundaries Total number of boundaries
+/// @param [in] boundaries A RDyBoundary object
+/// @param [in] *max_courant_number Local maximum value of courant number
 /// @return 0 on sucess, or a non-zero error code on failure
-static PetscErrorCode RDyCeedFindMaxCourantNumberBoundaryEdges(RDy rdy, PetscReal *max_courant_number) {
+static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edges, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries],
+                                                            PetscReal *max_courant_number) {
   PetscFunctionBegin;
 
-  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    RDyBoundary boundary = rdy->boundaries[b];
+  // loop over all boundaries
+  for (PetscInt b = 0; b < num_boundaries; ++b) {
+    RDyBoundary boundary = boundaries[b];
 
     // get the relevant boundary sub-operator
     CeedOperator *sub_ops;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed_rhs.op_edges, &sub_ops));
+    PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
     CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
 
     // fetch the field
@@ -384,24 +391,36 @@ static PetscErrorCode RDyCeedFindMaxCourantNumberBoundaryEdges(RDy rdy, PetscRea
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyCeedFindMaxCourantNumber(RDy rdy, PetscReal *max_courant_number) {
+/// @brief Finds the global maximum Courant number across all internal and boundary edges.
+/// @param [in] op_edges A CeedOperator object for edges
+/// @param [in] num_boundaries Total number of boundaries
+/// @param [in] boundaries A RDyBoundary object
+/// @param [in] comm A MPI_Comm object
+/// @param [out] *max_courant_number Global maximum value of courant number
+/// @return 0 on sucess, or a non-zero error code on failure
+static PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary boundaries[num_boundaries],
+                                               MPI_Comm comm, PetscReal *max_courant_number) {
   PetscFunctionBegin;
 
-  PetscCall(RDyCeedFindMaxCourantNumberInternalEdges(rdy, max_courant_number));
-  PetscCall(RDyCeedFindMaxCourantNumberBoundaryEdges(rdy, max_courant_number));
+  PetscCall(CeedFindMaxCourantNumberInternalEdges(op_edges, mesh, max_courant_number));
+  PetscCall(CeedFindMaxCourantNumberBoundaryEdges(op_edges, num_boundaries, boundaries, max_courant_number));
 
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, max_courant_number, 1, MPI_DOUBLE, MPI_MAX, rdy->comm));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, max_courant_number, 1, MPI_DOUBLE, MPI_MAX, comm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Finds the maximum Courant number for the libCEED and the PETSc version of SWE implementation
+/// @param [inout] rdy An RDy object
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
   PetscFunctionBegin;
 
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
 
   if (rdy->ceed_resource[0]) {
-    PetscCall(RDyCeedFindMaxCourantNumber(rdy, &courant_num_diags->max_courant_num));
+    PetscCall(CeedFindMaxCourantNumber(rdy->ceed_rhs.op_edges, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->comm,
+                                       &courant_num_diags->max_courant_num));
     courant_num_diags->is_set = PETSC_TRUE;
   } else {
     MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
