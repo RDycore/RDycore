@@ -59,7 +59,7 @@ static PetscErrorCode InitMPITypesAndOps(void) {
         offsetof(CourantNumberDiagnostics, global_cell_id),
         offsetof(CourantNumberDiagnostics, is_set),
     };
-    MPI_Datatype block_types[4] = {MPI_DOUBLE, MPI_INT, MPI_INT, MPIU_BOOL};
+    MPI_Datatype block_types[4] = {MPIU_REAL, MPI_INT, MPI_INT, MPIU_BOOL};
     MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
     MPI_Type_commit(&courant_num_diags_type);
 
