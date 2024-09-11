@@ -640,14 +640,14 @@ Exactly two of `final_time`, `max_step`, and `time_step` must be specified.
 The missing parameter is then computed from those parameters given.
 
 Additionally, RDycore can increase or decrease time step to meet a target Courant
-number via `adaptivity` sub-block within the `time` block as shown below.
+number via `adaptive` sub-block within the `time` block as shown below.
 
 ```yaml
 time:
   final_time        : 0.005
   coupling_interval : 0.001
   unit              : hours
-  adaptivity:
+  adaptive:
     enable                 : true     # false or true. The values below are only used if is enable=true
     target_courant_number  : 0.6      # a target courant number
     max_increase_factor    : 2        # At max, the dt can be doubled to meet the target Courant number
@@ -657,7 +657,7 @@ time:
 The time step is increased/decreased used by `TS` at the coupling internal. The global
 Courant number during the last step of a `TSSolve` is used to either increase or
 decrease the time step for the next `TSSolve` to match the target Courant number
-(`target_cournant_number`). When time step adaptivity is enabled (via `enable: true`),
+(`target_cournant_number`). When time step adaptive is enabled (via `enable: true`),
 the `max_step` and `time_step` entried within the `time` block cannot be specified.
-Instead, one need to specify an initial time step (`initial_time_step`) in the `adaptivity`
+Instead, one need to specify an initial time step (`initial_time_step`) in the `adaptive`
 sub-block.

@@ -249,8 +249,8 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   RDyLogDetail(rdy, "Advancing from t = %g to %g...", ConvertTimeFromSeconds(time, rdy->config.time.unit),
                ConvertTimeFromSeconds(next_coupling_time, rdy->config.time.unit));
 
-  // if time adaptivity is enabled, try to increase the dt
-  RDyTimeAdaptivitySection *time_adap = &rdy->config.time.adaptivity;
+  // if adaptive time is enabled, try to increase the dt
+  RDyTimeAdaptiveSection *time_adap = &rdy->config.time.adaptive;
   if (time_adap->enable) {
     CourantNumberDiagnostics *cnum_diags = &rdy->courant_num_diags;
 
