@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -254,7 +255,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     CourantNumberDiagnostics *cnum_diags = &rdy->courant_num_diags;
 
     // if previous courant number is valid
-    if (cnum_diags->max_courant_num > 0.0) {
+    if (cnum_diags->is_set) {
       // get current timestep
       PetscReal dt = rdy->dt;
 
@@ -303,6 +304,9 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->X));
 
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  courant_num_diags->is_set                   = PETSC_FALSE;
+
   // advance the solution to the specified time (handling preloading if requested)
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
   if (PetscPreLoadingOn) {
@@ -313,6 +317,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(TSSolve(rdy->ts, rdy->X));
   }
   PetscPreLoadEnd();
+
+  if (time_adap->enable & !courant_num_diags->is_set) {
+    PetscCall(SWEFindMaxCourantNumber(rdy));
+  }
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));

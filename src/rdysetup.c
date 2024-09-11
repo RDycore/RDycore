@@ -968,6 +968,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   courant_num_diags->max_courant_num          = 0.0;
   courant_num_diags->global_edge_id           = -1;
   courant_num_diags->global_cell_id           = -1;
+  courant_num_diags->is_set                   = PETSC_FALSE;
 
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data

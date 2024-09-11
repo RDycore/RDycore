@@ -51,14 +51,15 @@ static PetscErrorCode InitMPITypesAndOps(void) {
 
   if (!initialized) {
     // create an MPI data type for the CourantNumberDiagnostics struct
-    const int      num_blocks             = 3;
-    const int      block_lengths[3]       = {1, 1, 1};
-    const MPI_Aint block_displacements[3] = {
+    const int      num_blocks             = 4;
+    const int      block_lengths[4]       = {1, 1, 1, 1};
+    const MPI_Aint block_displacements[4] = {
         offsetof(CourantNumberDiagnostics, max_courant_num),
         offsetof(CourantNumberDiagnostics, global_edge_id),
         offsetof(CourantNumberDiagnostics, global_cell_id),
+        offsetof(CourantNumberDiagnostics, is_set),
     };
-    MPI_Datatype block_types[3] = {MPI_DOUBLE, MPI_INT, MPI_INT};
+    MPI_Datatype block_types[4] = {MPI_DOUBLE, MPI_INT, MPI_INT, MPI_C_BOOL};
     MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
     MPI_Type_commit(&courant_num_diags_type);
 
@@ -394,6 +395,21 @@ static PetscErrorCode RDyCeedFindMaxCourantNumber(RDy rdy, PetscReal *max_couran
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
+  PetscFunctionBegin;
+
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+
+  if (rdy->ceed_resource[0]) {
+    PetscCall(RDyCeedFindMaxCourantNumber(rdy, &courant_num_diags->max_courant_num));
+    courant_num_diags->is_set = PETSC_TRUE;
+  } else {
+    MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
+    courant_num_diags->is_set = PETSC_TRUE;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This is the right-hand-side function used by our timestepping solver for
 // the shallow water equations.
 // Parameters:
@@ -455,37 +471,18 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     }
   }
 
-  // find maximum courant number
-  if (rdy->config.logging.level >= LOG_DEBUG || rdy->config.time.adaptivity.enable) {
-    if (rdy->ceed_resource[0]) {
-      PetscCall(RDyCeedFindMaxCourantNumber(rdy, &courant_num_diags->max_courant_num));
-    } else {
-      MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
-    }
-  }
-
-  // write out debugging info for maximum courant number
+  // find the maximum courant number and write out the debugging info
   if (rdy->config.logging.level >= LOG_DEBUG) {
-    if (rdy->ceed_resource[0]) {
-      PetscReal time;
-      PetscInt  stepnum;
-      PetscCall(TSGetTime(ts, &time));
-      PetscCall(TSGetStepNumber(ts, &stepnum));
-      const char *units = TimeUnitAsString(rdy->config.time.unit);
+    PetscCall(SWEFindMaxCourantNumber(rdy));
 
-      RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit),
-                  units, courant_num_diags->max_courant_num);
+    PetscReal time;
+    PetscInt  stepnum;
+    PetscCall(TSGetTime(ts, &time));
+    PetscCall(TSGetStepNumber(ts, &stepnum));
+    const char *units = TimeUnitAsString(rdy->config.time.unit);
 
-    } else {
-      PetscReal time;
-      PetscInt  stepnum;
-      PetscCall(TSGetTime(ts, &time));
-      PetscCall(TSGetStepNumber(ts, &stepnum));
-      const char *units = TimeUnitAsString(rdy->config.time.unit);
-      RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g encountered at edge %" PetscInt_FMT " of cell %" PetscInt_FMT,
-                  stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units, courant_num_diags->max_courant_num,
-                  courant_num_diags->global_edge_id, courant_num_diags->global_cell_id);
-    }
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
+                courant_num_diags->max_courant_num);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
