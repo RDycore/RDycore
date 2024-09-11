@@ -773,10 +773,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if (config->time.adaptive.enable) {
     PetscCheck(config->time.adaptive.target_courant_number > 0.0, comm, PETSC_ERR_USER,
                "time.adaptive.target_courant_number must be greater than 0.0");
-    PetscCheck(config->time.adaptive.target_courant_number < 1.0, comm, PETSC_ERR_USER,
-               "time.adaptive.target_courant_number must be less than 1.0");
-    PetscCheck(config->time.adaptive.max_increase_factor > 1.0, comm, PETSC_ERR_USER,
-               "time.adaptive.max_increase_factor must be greater than 1.0");
+    PetscCheck(config->time.adaptive.target_courant_number < 1.0, comm, PETSC_ERR_USER, "time.adaptive.target_courant_number must be less than 1.0");
+    PetscCheck(config->time.adaptive.max_increase_factor > 1.0, comm, PETSC_ERR_USER, "time.adaptive.max_increase_factor must be greater than 1.0");
     PetscCheck(config->time.adaptive.initial_time_step > 0.0, comm, PETSC_ERR_USER, "time.adaptive.initial_time_step must be greater than 0.0");
 
     // ensure that max_step and time_step is not specified

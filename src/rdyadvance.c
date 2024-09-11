@@ -288,7 +288,6 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
       // update the timestep
       rdy->dt = dt;
-
     }
   }
 
