@@ -1306,40 +1306,46 @@ The pointer to the user-defined function is specified at the time of creation.</
 </thead>
 <tbody>
 <tr>
-<td>geom</td>
-<td>4</td>
+<td><code>geom</code></td>
+<td><code>4</code></td>
 <td>In</td>
 <td>Geometric attrbutes [sn, cn, L_edge/Area_left, L_edge/right]</td>
 </tr>
 <tr>
-<td>q_left</td>
-<td>3</td>
+<td><code>q_left</code></td>
+<td><code>3</code></td>
 <td>In</td>
 <td>State left of the edge [h_left, hu_left, hv_left]</td>
 </tr>
 <tr>
-<td>q_right</td>
-<td>3</td>
+<td><code>q_right</code></td>
+<td><code>3</code></td>
 <td>In</td>
 <td>State right of the edge [h_right, hu_right, hv_right]</td>
 </tr>
 <tr>
-<td>cell_left</td>
-<td>3</td>
+<td><code>cell_left</code></td>
+<td><code>3</code></td>
 <td>Out</td>
 <td>Flux contribution to the left cell [f_h f_hu f_hv] * L_edge/Area_left</td>
 </tr>
 <tr>
-<td>cell_right</td>
-<td>3</td>
+<td><code>cell_right</code></td>
+<td><code>3</code></td>
 <td>Out</td>
 <td>Flux contribution to the right cell [f_h f_hu f_hv] * L_edge/Area_right</td>
 </tr>
 <tr>
-<td>flux</td>
-<td>3</td>
+<td><code>flux</code></td>
+<td><code>3</code></td>
 <td>Out</td>
 <td>Flux through the edge [f_h f_hu f_hv]</td>
+</tr>
+<tr>
+<td><code>courant_number</code></td>
+<td><code>2</code></td>
+<td>Out</td>
+<td>Courant number for the left and right cell</td>
 </tr>
 </tbody>
 </table>
@@ -1401,6 +1407,13 @@ for an input/output field. The <code>CeedElemRestriction</code> for the fields a
 <td><code>CeedElemRestrictionCreateStrided</code></td>
 <td>offset = [ 0,  3,  6,  9, 12, 15, 18]</td>
 </tr>
+<tr>
+<td><code>restrict_cnum</code></td>
+<td><code>nOwnedInEdges</code></td>
+<td><code>2 * nOwnedInEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>offset = [ 0,  2,  4,  6,  8, 10, 12]</td>
+</tr>
 </tbody>
 </table>
 <p>where <code>nOwnedInEdges</code> is the number of owned internal edges and <code>nCells</code> is the total number of cells ( = owned + ghost).</p>
@@ -1453,6 +1466,12 @@ The multiple fields are added via <a href="https://libceed.org/en/latest/api/Cee
 <td><code>restrict_flux</code></td>
 <td><code>flux</code></td>
 <td><code>flux</code> is initalized to <code>0.0</code></td>
+</tr>
+<tr>
+<td><code>courant_number</code></td>
+<td><code>restrict_cnum</code></td>
+<td><code>cnum</code></td>
+<td><code>cnum</code> is initalized to <code>0.0</code></td>
 </tr>
 </tbody>
 </table>
@@ -1562,6 +1581,12 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 <td>Out</td>
 <td>Flux through the edge [f_h f_hu f_hv]</td>
 </tr>
+<tr>
+<td><code>courant_number</code></td>
+<td><code>1</code></td>
+<td>Out</td>
+<td>Courant number for the left cell</td>
+</tr>
 </tbody>
 </table>
 <p>The <code>CeedElemRestriction</code> for the boundary fields are listed below.</p>
@@ -1611,6 +1636,13 @@ Based on the mesh shown above, the boundary edges are listed in the table below.
 <td><code>CeedElemRestrictionCreateStrided</code></td>
 <td>[ 0,  3,  6,  9, 12, 15, 18]</td>
 </tr>
+<tr>
+<td><code>restrict_cnum</code></td>
+<td><code>nOwnedBndEdges</code></td>
+<td><code>1 * nOwnedBndEdges</code></td>
+<td><code>CeedElemRestrictionCreateStrided</code></td>
+<td>[ 0,  1,  2,  3,  4,  5,  6]</td>
+</tr>
 </tbody>
 </table>
 <p>where <code>nOwnedBndEdges</code> is the number of owned boundary edges and <code>nCells</code> is the total number of cells ( = owned + ghost).
@@ -1654,6 +1686,12 @@ The fields, <code>CeedElemRestriction</code>, and <code>CeedVector</code> that a
 <td><code>restrict_flux</code></td>
 <td><code>flux</code></td>
 <td><code>flux</code> is initalized to <code>0.0</code></td>
+</tr>
+<tr>
+<td><code>courant_number</code></td>
+<td><code>restrict_cnum</code></td>
+<td><code>cnum</code></td>
+<td><code>cnum</code> is initalized to <code>0.0</code></td>
 </tr>
 </tbody>
 </table>
