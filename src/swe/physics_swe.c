@@ -59,7 +59,7 @@ static PetscErrorCode InitMPITypesAndOps(void) {
         offsetof(CourantNumberDiagnostics, global_cell_id),
         offsetof(CourantNumberDiagnostics, is_set),
     };
-    MPI_Datatype block_types[4] = {MPI_DOUBLE, MPI_INT, MPI_INT, MPI_C_BOOL};
+    MPI_Datatype block_types[4] = {MPI_DOUBLE, MPI_INT, MPI_INT, MPIU_BOOL};
     MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
     MPI_Type_commit(&courant_num_diags_type);
 
@@ -490,7 +490,8 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
     }
   }
 
-  // find the maximum courant number and write out the debugging info
+  // if debug-level logging is enabled, find the latest global maximum Courant number
+  // and log it.
   if (rdy->config.logging.level >= LOG_DEBUG) {
     PetscCall(SWEFindMaxCourantNumber(rdy));
 

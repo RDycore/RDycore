@@ -259,9 +259,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
       // get current timestep
       PetscReal dt = rdy->dt;
 
+      PetscReal factor = 0.0;
       if (cnum_diags->max_courant_num < time_adap->target_courant_number) {
         // timestep can be increased, so find the factor by which timestep can be increased
-        PetscReal factor = PetscMin(time_adap->target_courant_number / cnum_diags->max_courant_num, time_adap->max_increase_factor);
+        factor = PetscMin(time_adap->target_courant_number / cnum_diags->max_courant_num, time_adap->max_increase_factor);
 
         // increase the timestep
         dt *= factor;
@@ -269,33 +270,25 @@ PetscErrorCode RDyAdvance(RDy rdy) {
         // ensure the increase in timestep is less than the coupling timestep
         if (dt > interval) dt = interval;
 
-        if (rdy->config.logging.level >= LOG_DEBUG) {
-          const char *units  = TimeUnitAsString(rdy->config.time.unit);
-          PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
-          PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
-          RDyLogDebug(rdy, "Increasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
-        }
-
-        // update the timestep
-        rdy->dt = dt;
-
       } else {
         // decrease the timestep
-        PetscReal factor = time_adap->target_courant_number / cnum_diags->max_courant_num;
+        factor = time_adap->target_courant_number / cnum_diags->max_courant_num;
 
         // decrease the timestep
         dt *= factor;
-
-        if (rdy->config.logging.level >= LOG_DEBUG) {
-          const char *units  = TimeUnitAsString(rdy->config.time.unit);
-          PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
-          PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
-          RDyLogDebug(rdy, "Decreasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
-        }
-
-        // update the timestep
-        rdy->dt = dt;
       }
+
+      // if needed, log the Courant number
+      if (rdy->config.logging.level >= LOG_DEBUG) {
+        const char *units  = TimeUnitAsString(rdy->config.time.unit);
+        PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
+        PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
+        RDyLogDebug(rdy, "Increasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
+      }
+
+      // update the timestep
+      rdy->dt = dt;
+
     }
   }
 
@@ -344,7 +337,7 @@ PetscBool RDyFinished(RDy rdy) {
   PetscReal time_in_unit = ConvertTimeFromSeconds(time, rdy->config.time.unit);
   PetscInt  step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
-  if ((time_in_unit >= rdy->config.time.final_time)) {  // || (step >= rdy->config.time.max_step)) {
+  if ((time_in_unit >= rdy->config.time.final_time)) {
     finished = PETSC_TRUE;
   }
   PetscFunctionReturn(finished);

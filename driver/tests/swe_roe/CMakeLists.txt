@@ -90,7 +90,7 @@ foreach(np 1 2) # test on 1, 2 processes
   endforeach()
 endforeach()
 
-# ex2b with ICs specified by a file
+# ex2b with ICs specified by a file and adaptive time step
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_ic_file_with_adapt.yaml
      ${MESH_DIR}/DamBreak_grid5x10.exo
