@@ -38,32 +38,27 @@ add_dependencies(yaml yaml_proj)
 #---------------------------------------------------------------------
 # Build libcyaml, a schema-based YAML parser built on top of libyaml.
 #---------------------------------------------------------------------
-set(LIBCYAML_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libcyaml)
-set(LIBCYAML_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/libcyaml)
-set(LIBCYAML_LIB_NAME libcyaml${CMAKE_STATIC_LIBRARY_SUFFIX})
-set(LIBCYAML_YAML_CFLAGS "-I${CMAKE_BINARY_DIR}/include")
-set(LIBCYAML_YAML_LDFLAGS "-L${CMAKE_BINARY_DIR}/lib -lyaml")
-string(TOLOWER ${CMAKE_BUILD_TYPE} LIBCYAML_VARIANT)
-ExternalProject_Add(cyaml_proj
-  PREFIX ${LIBCYAML_SOURCE_DIR}
-  SOURCE_DIR ${LIBCYAML_SOURCE_DIR}
-  BINARY_DIR ${LIBCYAML_BINARY_DIR}
-  INSTALL_DIR ${CMAKE_BINARY_DIR}
-  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBCYAML_SOURCE_DIR} ${LIBCYAML_BINARY_DIR}
-  BUILD_COMMAND env PREFIX=${CMAKE_BINARY_DIR} CFLAGS=${LIBCYAML_YAML_CFLAGS} LDFLAGS=${LIBCYAML_YAML_LDFLAGS} make build/${LIBCYAML_VARIANT}/${LIBCYAML_LIB_NAME} VARIANT=${LIBCYAML_VARIANT}
-  INSTALL_COMMAND env PREFIX=${CMAKE_BINARY_DIR} make install-static VARIANT=${LIBCYAML_VARIANT}
-  DEPENDS yaml
-  #LOG_CONFIGURE TRUE <-- uncommenting this causes CMake 3.30 to skip building this target (!??!?!)
-  LOG_BUILD TRUE
-  LOG_INSTALL TRUE
-  LOG_OUTPUT_ON_FAILURE TRUE
-  BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME}
+# I could not get libcyaml to build using ExternalProject_Add, so we're just
+# building it as a proper target here. -JNJ 2024/09/12
+add_library(cyaml STATIC
+  libcyaml/src/mem.c
+  libcyaml/src/free.c
+  libcyaml/src/load.c
+  libcyaml/src/save.c
+  libcyaml/src/util.c
+  libcyaml/src/utf8.c
 )
-add_library(cyaml STATIC IMPORTED GLOBAL)
-set_target_properties(cyaml PROPERTIES
-  IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/${LIBCYAML_LIB_NAME}
+target_include_directories(cyaml PUBLIC
+  ${CMAKE_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/libcyaml/include
 )
-add_dependencies(cyaml cyaml_proj)
+target_compile_definitions(cyaml PUBLIC
+  VERSION_MAJOR=1
+  VERSION_MINOR=4
+  VERSION_PATCH=2
+  VERSION_DEVEL=0
+)
+add_dependencies(cyaml yaml)
 
 if (ENABLE_TESTS)
   #----------------------------------------
