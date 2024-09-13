@@ -10,7 +10,7 @@ static const PetscReal GRAVITY = 9.806;
 
 /// For computing fluxes, allocates structs to hold values left and right
 /// of internal and boundary edges. This must be called before CreatePetscSWESource.
-PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_internal_edges, PetscInt num_boundaries,
+PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt ncomp, PetscInt num_internal_edges, PetscInt num_boundaries,
                                   RDyBoundary boundaries[num_boundaries], void **petsc_rhs) {
   PetscFunctionBegin;
 
@@ -19,7 +19,7 @@ PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num
   PetscCall(RiemannDataSWECreate(num_internal_edges, &datar));
 
   RiemannEdgeDataSWE data_edge_internal;
-  PetscCall(RiemannEdgeDataSWECreate(num_internal_edges, &data_edge_internal));
+  PetscCall(RiemannEdgeDataSWECreate(num_internal_edges, ncomp, &data_edge_internal));
   for (PetscInt ii = 0; ii < num_internal_edges; ii++) {
     PetscInt iedge = edges->internal_edge_ids[ii];
     PetscInt r     = edges->cell_ids[2 * iedge + 1];
@@ -40,7 +40,7 @@ PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num
     PetscInt num_edges = boundaries[b].num_edges;
     PetscCall(RiemannDataSWECreate(num_edges, &datal_bnd[b]));
     PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
-    PetscCall(RiemannEdgeDataSWECreate(num_edges, &data_edge_bnd[b]));
+    PetscCall(RiemannEdgeDataSWECreate(num_edges, ncomp, &data_edge_bnd[b]));
 
     for (PetscInt e = 0; e < num_edges; e++) {
       PetscInt iedge = boundaries[b].edge_ids[e];
