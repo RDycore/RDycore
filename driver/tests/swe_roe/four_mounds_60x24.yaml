@@ -49,6 +49,6 @@ flow_conditions:
 
 output:
   format: xdmf
-  interval: 10
+  step_interval: 10
 
 

@@ -159,10 +159,10 @@ typedef struct {
 
 // all output parameters
 typedef struct {
-  RDyOutputFormat format;       // file format
-  PetscInt        interval;     // output interval [steps between outputs]
-  PetscInt        batch_size;   // number of timesteps per output file (if available)
-  RDyTimeSeries   time_series;  // time series appended to text (.dat) files
+  RDyOutputFormat format;         // file format
+  PetscInt        step_interval;  // output interval [steps between outputs]
+  PetscInt        batch_size;     // number of timesteps per output file (if available)
+  RDyTimeSeries   time_series;    // time series appended to text (.dat) files
 } RDyOutputSection;
 
 // ------------

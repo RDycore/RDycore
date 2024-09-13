@@ -401,7 +401,7 @@ RDycore. The parameters that define these discretizations are
 ```yaml
 output:
   format: xdmf
-  interval: 100
+  step_interval: 100
   batch_size: 1
   time_series:
     boundary_fluxes: 10
@@ -415,7 +415,7 @@ time series data (and excluding checkpoint data). Relevant parameters are
     * `binary`: output is written using PETSc's binary data format
     * `xdmf`: output is written to the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
     * `cgns`: output is written to the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
-* `interval`: the number of time steps between output dumps. Default value: 0 (no output)
+* `step_interval`: the number of time steps between output dumps. Default value: 0 (no output)
 * `batch_size`: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1
