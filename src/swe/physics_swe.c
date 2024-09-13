@@ -150,7 +150,8 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     // allocate storage for our PETSc implementation of the  flux and
     // source terms
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
-    PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
+    PetscCall(
+        CreatePetscSWEFlux(&rdy->mesh.cells, &rdy->mesh.edges, rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
   }
 
@@ -530,6 +531,30 @@ PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
   PetscCall(PetscFree(data.hv));
   PetscCall(PetscFree(data.u));
   PetscCall(PetscFree(data.v));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RiemannEdgeDataSWECreate(PetscInt N, RiemannEdgeDataSWE *data) {
+  PetscFunctionBegin;
+
+  data->N = N;
+  PetscCall(PetscCalloc1(data->N, &data->cn));
+  PetscCall(PetscCalloc1(data->N, &data->sn));
+  PetscCall(PetscCalloc1(data->N * 3, &data->flux));
+  PetscCall(PetscCalloc1(data->N, &data->amax));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RiemannEdgeDataSWEDestroy(RiemannEdgeDataSWE data) {
+  PetscFunctionBegin;
+
+  data.N = 0;
+  PetscCall(PetscFree(data.cn));
+  PetscCall(PetscFree(data.sn));
+  PetscCall(PetscFree(data.flux));
+  PetscCall(PetscFree(data.amax));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -11,11 +11,20 @@ typedef struct {
   PetscReal *u, *v;        // diagnostic variables
 } RiemannDataSWE;
 
+typedef struct {
+  PetscInt   N;        // number of data values
+  PetscReal *cn, *sn;  // cosine and sine value of a edge
+  PetscReal *flux;     // flux through the edge
+  PetscReal *amax;     // courant number
+} RiemannEdgeDataSWE;
+
 // PETSc (non-CEED) Riemann solver data for SWE
 typedef struct {
-  RiemannDataSWE  datal_internal_edges, datar_internal_edges;
-  RiemannDataSWE *datal_bnd_edges, *datar_bnd_edges;
-  RiemannDataSWE  data_cells;
+  RiemannDataSWE      datal_internal_edges, datar_internal_edges;
+  RiemannEdgeDataSWE  data_internal_edges;
+  RiemannDataSWE     *datal_bnd_edges, *datar_bnd_edges;
+  RiemannEdgeDataSWE *data_bnd_edges;
+  RiemannDataSWE      data_cells;
 } PetscRiemannDataSWE;
 
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary[n], RDyCondition[n], PetscReal, CeedOperator *);
@@ -35,8 +44,10 @@ PETSC_INTERN PetscErrorCode SWESourceOperatorSetManningsN(CeedOperator, PetscRea
 
 PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);
+PETSC_INTERN PetscErrorCode RiemannEdgeDataSWECreate(PetscInt, RiemannEdgeDataSWE *);
+PETSC_INTERN PetscErrorCode RiemannEdgeDataSWEDestroy(RiemannEdgeDataSWE);
 
-PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(PetscInt num_internal_edges, PetscInt n, RDyBoundary[n], void **);
+PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_internal_edges, PetscInt n, RDyBoundary[n], void **);
 PETSC_INTERN PetscErrorCode CreatePetscSWESource(RDyMesh *, void *);
 PETSC_INTERN PetscErrorCode InitPetscSWEBoundaryFlux(void *, RDyCells *, RDyEdges *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal);
 PETSC_INTERN PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *, PetscInt, RiemannDataSWE *);
