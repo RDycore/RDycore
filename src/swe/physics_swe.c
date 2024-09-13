@@ -144,6 +144,23 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.s_ceed));
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.u_ceed));
 
+    // allocate data structure for saving the accumlated flux through boundaries
+    PetscInt            num_boundaries = rdy->num_boundaries;
+    RiemannEdgeDataSWE *data_edge_bnd;
+    PetscCall(PetscCalloc1(num_boundaries, &data_edge_bnd));
+
+    // loop over each boundary
+    for (PetscInt b = 0; b < num_boundaries; b++) {
+      PetscInt num_edges = rdy->boundaries[b].num_edges;
+      PetscCall(RiemannEdgeDataSWECreate(num_edges, num_comp, &data_edge_bnd[b]));
+    }
+
+    // set the pointers
+    PetscRiemannDataSWE *data_swe;
+    PetscCall(PetscCalloc1(1, &data_swe));
+    data_swe->data_bnd_edges = data_edge_bnd;
+    rdy->petsc_rhs           = data_swe;
+
     // reset the time step size
     rdy->ceed_rhs.dt = 0.0;
   } else {
