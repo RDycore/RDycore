@@ -118,7 +118,7 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
 
 // Accumulates boundary fluxes on the given boundary from the given array of
 // fluxes on boundary edges.
-PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal fluxes[size * ndof]) {
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *fluxes) {
   PetscFunctionBegin;
   RDyTimeSeriesData *time_series = &rdy->time_series;
   if (time_series->boundary_fluxes.fluxes) {
