@@ -86,6 +86,28 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode DestroyPetscSWEFlux(void *petsc_rhs, PetscBool ceed_enabled, PetscInt num_boundaries) {
+  PetscFunctionBeginUser;
+
+  PetscRiemannDataSWE *data_swe = petsc_rhs;
+
+  if (!ceed_enabled) {
+    PetscCall(RiemannDataSWEDestroy(data_swe->datal_internal_edges));
+    PetscCall(RiemannDataSWEDestroy(data_swe->datar_internal_edges));
+    PetscCall(RiemannEdgeDataSWEDestroy(data_swe->data_internal_edges));
+  }
+
+  for (PetscInt b = 0; b < num_boundaries; b++) {
+    if (!ceed_enabled) {
+      PetscCall(RiemannDataSWEDestroy(data_swe->datal_bnd_edges[b]));
+      PetscCall(RiemannDataSWEDestroy(data_swe->datar_bnd_edges[b]));
+    }
+    PetscCall(RiemannEdgeDataSWEDestroy(data_swe->data_bnd_edges[b]));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // computes velocities in x and y-dir based on momentum in x and y-dir
 // N - Size of the array
 // tiny_h - Threshold value for height

@@ -1,5 +1,6 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
@@ -121,7 +122,11 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
 
   // destroy FV mesh
-  if ((*rdy)->mesh.num_cells) RDyMeshDestroy((*rdy)->mesh);
+  if ((*rdy)->mesh.num_cells) {
+    PetscBool ceed_enabled = ((*rdy)->ceed_resource[0]);
+    PetscCall(DestroyPetscSWEFlux((*rdy)->petsc_rhs, ceed_enabled, (*rdy)->num_boundaries));
+    RDyMeshDestroy((*rdy)->mesh);
+  }
 
   // destroy conditions
   if ((*rdy)->initial_conditions) PetscFree((*rdy)->initial_conditions);

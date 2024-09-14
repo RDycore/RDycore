@@ -49,6 +49,7 @@ PETSC_INTERN PetscErrorCode RiemannEdgeDataSWEDestroy(RiemannEdgeDataSWE);
 
 PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_comp, PetscInt num_internal_edges, PetscInt n,
                                                RDyBoundary[n], void **);
+PETSC_INTERN PetscErrorCode DestroyPetscSWEFlux(void *, PetscBool, PetscInt);
 PETSC_INTERN PetscErrorCode CreatePetscSWESource(RDyMesh *, void *);
 PETSC_INTERN PetscErrorCode InitPetscSWEBoundaryFlux(void *, RDyCells *, RDyEdges *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal);
 PETSC_INTERN PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *, PetscInt, RiemannDataSWE *);
