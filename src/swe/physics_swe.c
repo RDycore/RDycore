@@ -144,22 +144,9 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.s_ceed));
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.u_ceed));
 
-    // allocate data structure for saving the accumlated flux through boundaries
-    PetscInt            num_boundaries = rdy->num_boundaries;
-    RiemannEdgeDataSWE *data_edge_bnd;
-    PetscCall(PetscCalloc1(num_boundaries, &data_edge_bnd));
-
-    // loop over each boundary
-    for (PetscInt b = 0; b < num_boundaries; b++) {
-      PetscInt num_edges = rdy->boundaries[b].num_edges;
-      PetscCall(RiemannEdgeDataSWECreate(num_edges, num_comp, &data_edge_bnd[b]));
-    }
-
-    // set the pointers
-    PetscRiemannDataSWE *data_swe;
-    PetscCall(PetscCalloc1(1, &data_swe));
-    data_swe->data_bnd_edges = data_edge_bnd;
-    rdy->petsc_rhs           = data_swe;
+    PetscBool ceed_enabled = PETSC_TRUE;
+    PetscCall(CreatePetscSWEFlux(&rdy->mesh.cells, &rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries,
+                                 ceed_enabled, &rdy->petsc_rhs));
 
     // reset the time step size
     rdy->ceed_rhs.dt = 0.0;
@@ -167,9 +154,10 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     // allocate storage for our PETSc implementation of the  flux and
     // source terms
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
-    int num_comp = 3;
+    int       num_comp     = 3;
+    PetscBool ceed_enabled = PETSC_FALSE;
     PetscCall(CreatePetscSWEFlux(&rdy->mesh.cells, &rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries,
-                                 &rdy->petsc_rhs));
+                                 ceed_enabled, &rdy->petsc_rhs));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
   }
 
