@@ -9,47 +9,68 @@
 static const PetscReal GRAVITY = 9.806;
 
 /// For computing fluxes, allocates structs to hold values left and right
-/// of internal and boundary edges. This must be called before CreatePetscSWESource.
-PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt ncomp, PetscInt num_internal_edges, PetscInt num_boundaries,
-                                  RDyBoundary boundaries[num_boundaries], PetscBool ceed_enabled, void **petsc_rhs) {
+/// of internal edges. This must be called before CreatePetscSWESource.
+PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncomp, PetscInt num_internal_edges, void **petsc_rhs) {
   PetscFunctionBegin;
 
   RiemannDataSWE datal, datar;
-  if (!ceed_enabled) {
-    PetscCall(RiemannDataSWECreate(num_internal_edges, &datal));
-    PetscCall(RiemannDataSWECreate(num_internal_edges, &datar));
-  }
+  PetscCall(RiemannDataSWECreate(num_internal_edges, &datal));
+  PetscCall(RiemannDataSWECreate(num_internal_edges, &datar));
 
   RiemannEdgeDataSWE data_edge_internal;
-  if (!ceed_enabled) {
-    PetscCall(RiemannEdgeDataSWECreate(num_internal_edges, ncomp, &data_edge_internal));
-    for (PetscInt ii = 0; ii < num_internal_edges; ii++) {
-      PetscInt iedge = edges->internal_edge_ids[ii];
-      PetscInt r     = edges->cell_ids[2 * iedge + 1];
+  PetscCall(RiemannEdgeDataSWECreate(num_internal_edges, ncomp, &data_edge_internal));
+  for (PetscInt ii = 0; ii < num_internal_edges; ii++) {
+    PetscInt iedge = edges->internal_edge_ids[ii];
+    PetscInt r     = edges->cell_ids[2 * iedge + 1];
 
-      if (r != -1) {
-        data_edge_internal.cn[ii] = edges->cn[iedge];
-        data_edge_internal.sn[ii] = edges->sn[iedge];
-      }
+    if (r != -1) {
+      data_edge_internal.cn[ii] = edges->cn[iedge];
+      data_edge_internal.sn[ii] = edges->sn[iedge];
     }
   }
 
+  PetscRiemannDataSWE *data_swe;
+  PetscCall(PetscCalloc1(1, &data_swe));
+
+  // set pointers for internal edges
+  data_swe->datal_internal_edges = datal;
+  data_swe->datar_internal_edges = datar;
+  data_swe->data_internal_edges  = data_edge_internal;
+
+  // set the pointer
+  *petsc_rhs = data_swe;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// For computing fluxes, allocates structs to hold values left and right
+/// of boundary edges. This must be called after CreatePetscSWEFluxForInternalEdges.
+PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt ncomp, PetscInt nbnd, RDyBoundary boundaries[nbnd],
+                                                  PetscBool ceed_enabled, void **petsc_rhs) {
+  PetscFunctionBegin;
+
+  // create an array of data structures to hold values for cells left/right of an edge
   RiemannDataSWE *datal_bnd, *datar_bnd;
   if (!ceed_enabled) {
-    PetscCall(PetscCalloc1(num_boundaries, &datal_bnd));
-    PetscCall(PetscCalloc1(num_boundaries, &datar_bnd));
+    PetscCall(PetscCalloc1(nbnd, &datal_bnd));
+    PetscCall(PetscCalloc1(nbnd, &datar_bnd));
   }
 
+  // create an array of data structures to hold values for boundary edges
   RiemannEdgeDataSWE *data_edge_bnd;
-  PetscCall(PetscCalloc1(num_boundaries, &data_edge_bnd));
+  PetscCall(PetscCalloc1(nbnd, &data_edge_bnd));
 
-  for (PetscInt b = 0; b < num_boundaries; b++) {
+  // loop over all boundaries
+  for (PetscInt b = 0; b < nbnd; b++) {
     PetscInt num_edges = boundaries[b].num_edges;
+
+    // for the b-th boundary, create the data struture to hold values for cells left/right of boundary edges
     if (!ceed_enabled) {
       PetscCall(RiemannDataSWECreate(num_edges, &datal_bnd[b]));
       PetscCall(RiemannDataSWECreate(num_edges, &datar_bnd[b]));
     }
 
+    // for the b-th boundary, create the data struture to hold values for boundary edges
     PetscCall(RiemannEdgeDataSWECreate(num_edges, ncomp, &data_edge_bnd[b]));
 
     if (!ceed_enabled) {
@@ -63,22 +84,26 @@ PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt nco
   }
 
   PetscRiemannDataSWE *data_swe;
-  PetscCall(PetscCalloc1(1, &data_swe));
 
   if (!ceed_enabled) {
-    // set pointers for internal edges
-    data_swe->datal_internal_edges = datal;
-    data_swe->datar_internal_edges = datar;
-    data_swe->data_internal_edges  = data_edge_internal;
+    // for the PETSc version, the data structure for internal edges has been already created.
+    // so, use the existing pointer.
+    data_swe = *petsc_rhs;
+  } else {
+    // for the CEED version, the data structures for internal edges are not created. so,
+    // allocate memory for the pointer.
+    PetscCall(PetscCalloc1(1, &data_swe));
+  }
 
+  if (!ceed_enabled) {
     // set pointers for boundary edges
     data_swe->datal_bnd_edges = datal_bnd;
     data_swe->datar_bnd_edges = datar_bnd;
   }
   data_swe->data_bnd_edges = data_edge_bnd;
 
-  // set the pointer
-  *petsc_rhs = data_swe;
+  // set the pointer for the CEED version
+  if (ceed_enabled) *petsc_rhs = data_swe;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

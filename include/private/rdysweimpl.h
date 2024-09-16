@@ -13,7 +13,7 @@ typedef struct {
 
 typedef struct {
   PetscInt   N;        // number of data values
-  PetscReal *cn, *sn;  // cosine and sine value of a edge
+  PetscReal *cn, *sn;  // cosine and sine of the angle between the edge and y-axis
   PetscReal *flux;     // flux through the edge
   PetscReal *amax;     // courant number
 } RiemannEdgeDataSWE;
@@ -47,8 +47,8 @@ PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);
 PETSC_INTERN PetscErrorCode RiemannEdgeDataSWECreate(PetscInt, PetscInt, RiemannEdgeDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannEdgeDataSWEDestroy(RiemannEdgeDataSWE);
 
-PETSC_INTERN PetscErrorCode CreatePetscSWEFlux(RDyCells *cells, RDyEdges *edges, PetscInt num_comp, PetscInt num_internal_edges, PetscInt n,
-                                               RDyBoundary[n], PetscBool, void **);
+PETSC_INTERN PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt num_comp, PetscInt num_internal_edges, void **);
+PETSC_INTERN PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt num_comp, PetscInt n, RDyBoundary[n], PetscBool, void **);
 PETSC_INTERN PetscErrorCode DestroyPetscSWEFlux(void *, PetscBool, PetscInt);
 PETSC_INTERN PetscErrorCode CreatePetscSWESource(RDyMesh *, void *);
 PETSC_INTERN PetscErrorCode InitPetscSWEBoundaryFlux(void *, RDyCells *, RDyEdges *, PetscInt n, RDyBoundary[n], RDyCondition[n], PetscReal);
