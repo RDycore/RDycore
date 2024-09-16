@@ -1810,7 +1810,7 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
 </ul>
 </li>
 <li><code>step_interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
-<li><code>time_interval</code>: the temporal frequency between output dumps.Default value: 0 (no output)</li>
+<li><code>time_interval</code>: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)</li>
 <li><code>time_unit</code>: units of temporal frequency output.</li>
 <li><code>batch_size</code>: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
