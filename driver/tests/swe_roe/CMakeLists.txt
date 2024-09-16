@@ -90,21 +90,6 @@ foreach(np 1 2) # test on 1, 2 processes
   endforeach()
 endforeach()
 
-# ex2b with ICs specified by a file and adaptive time step
-file(COPY
-     ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_ic_file_with_adapt.yaml
-     ${MESH_DIR}/DamBreak_grid5x10.exo
-     ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
-     ${MATERIALS_DIR}/manning_grid5x10.${PETSC_ID_TYPE}.bin
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2) # test on 1, 2 processes
-  foreach(config basic ceed preload)
-    foreach(lang c f90)
-      add_test(swe_roe_ex2b_ic_file_with_adapt_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_ic_file_with_adapt.yaml ${${config}_args})
-    endforeach()
-  endforeach()
-endforeach()
-
 # ex2b ensemble test -- (file copy only for now)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b-ensemble.yaml
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -135,6 +120,20 @@ file (COPY
 foreach(np 1 2)
   foreach(config basic)
     add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -homogeneous_rain Houston1km.rain.${PETSC_ID_TYPE}.bin -bc Houston1km.bc.${PETSC_ID_TYPE}.bin -interpolate_bc ${${config}_args})
+  endforeach()
+endforeach()
+
+# houston-harvey test with spatially homogenous rainfall
+file (COPY
+      ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.adaptive_timestep.yaml
+      ${MESH_DIR}/Houston1km_with_z.exo
+      ${CONDITION_DIR}/Houston1km.ic.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/Houston1km.bc.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/Houston1km.rain.${PETSC_ID_TYPE}.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config basic)
+    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain Houston1km.rain.${PETSC_ID_TYPE}.bin -bc Houston1km.bc.${PETSC_ID_TYPE}.bin -interpolate_bc ${${config}_args})
   endforeach()
 endforeach()
 
