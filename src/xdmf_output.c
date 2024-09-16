@@ -204,10 +204,11 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
 
     // check if it is time to output based on temporal interval
     if (output->time_interval > 0) {
-      PetscReal dt_interval_sec = ConvertTimeToSeconds(output->time_interval, output->time_unit);
-      PetscReal tmp             = fmod(time, dt_interval_sec);
-      PetscReal diff            = (tmp - dt_interval_sec);
-      write_output              = (PetscAbsReal(tmp) < 10.0 * DBL_EPSILON || PetscAbsReal(diff) < 10.0 * DBL_EPSILON);
+      PetscReal dt   = output->time_interval;
+      PetscReal t    = ConvertTimeFromSeconds(time, rdy->config.time.unit);
+      PetscReal tmp  = fmod(t, dt);
+      PetscReal diff = (tmp - dt);
+      write_output   = (PetscAbsReal(tmp) < 10.0 * DBL_EPSILON || PetscAbsReal(diff) < 10.0 * DBL_EPSILON);
     }
 
     // check if it is time to output based on step interval
