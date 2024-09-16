@@ -208,7 +208,6 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
       PetscReal tmp             = fmod(time, dt_interval_sec);
       PetscReal diff            = (tmp - dt_interval_sec);
       write_output              = (PetscAbsReal(tmp) < 10.0 * DBL_EPSILON || PetscAbsReal(diff) < 10.0 * DBL_EPSILON);
-      if (write_output) output->prev_output_time = time;
     }
 
     // check if it is time to output based on step interval
@@ -218,6 +217,9 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
 
     // write output
     if (write_output) {
+      // save the time output was written
+      output->prev_output_time = time;
+
       PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
       if (output->format == OUTPUT_XDMF) {
         PetscCall(WriteXDMFHDF5Data(rdy, step, t));
