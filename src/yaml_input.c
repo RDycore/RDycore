@@ -898,15 +898,14 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     }
 
     if (config->output.time_interval) {
-      printf("config->time.coupling_interval = %f; coupling_interval_was_specified = %d\n", config->time.coupling_interval,
-             coupling_interval_was_specified);
-      PetscCheck(coupling_interval_was_specified, comm, PETSC_ERR_USER,
-                 "When output is requested via time_interval, time.coupling_interval must be specified");
+      if (!coupling_interval_was_specified) config->time.coupling_interval = config->output.time_interval * 1.0;
       PetscReal t1 = config->time.coupling_interval;
       PetscReal t2 = config->output.time_interval;
       PetscCheck(t2 >= t1, comm, PETSC_ERR_USER, "output.time_interval needs be larger than or equal to time.coupling_interval");
       PetscCheck(PetscEqualReal(floor(t2 / t1) * t1 - t2, 0.0), comm, PETSC_ERR_USER,
                  "output.time_interval should be a multiple of time.coupling_interval");
+      PetscCheck((config->output.time_unit != RDY_TIME_UNSET), comm, PETSC_ERR_USER,
+                 "When output is requested via time_interval, time_unit must also be specified");
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
