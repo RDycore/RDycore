@@ -153,8 +153,16 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
   PetscFunctionBegin;
 
   PetscViewerFormat format = PETSC_VIEWER_DEFAULT;
-  if (rdy->config.output.step_interval) {
-    RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " timestep(s)", rdy->config.output.step_interval);
+  if (rdy->config.output.enable) {
+    if (rdy->config.output.step_interval) {
+      RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " timestep(s)", rdy->config.output.step_interval);
+    }
+
+    if (rdy->config.output.time_interval) {
+      const char *units = TimeUnitAsString(rdy->config.output.time_unit);
+      RDyLogDebug(rdy, "Writing output every %f %s", rdy->config.output.time_interval, units);
+    }
+
     switch (rdy->config.output.format) {
       case OUTPUT_NONE:
         // nothing to do here

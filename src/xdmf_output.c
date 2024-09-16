@@ -196,12 +196,33 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 
 PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
-  RDy rdy = ctx;
-  if (step % rdy->config.output.step_interval == 0) {
-    PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
-    if (rdy->config.output.format == OUTPUT_XDMF) {
-      PetscCall(WriteXDMFHDF5Data(rdy, step, t));
-      PetscCall(WriteXDMFXMFData(rdy, step, t));
+  RDy               rdy    = ctx;
+  RDyOutputSection *output = &rdy->config.output;
+
+  if (output->enable && (time != output->prev_output_time)) {
+    PetscBool write_output = PETSC_FALSE;
+
+    // check if it is time to output based on temporal interval
+    if (output->time_interval > 0) {
+      PetscReal dt_interval_sec = ConvertTimeToSeconds(output->time_interval, output->time_unit);
+      PetscReal tmp             = fmod(time, dt_interval_sec);
+      PetscReal diff            = (tmp - dt_interval_sec);
+      write_output              = (PetscAbsReal(tmp) < 10.0 * DBL_EPSILON || PetscAbsReal(diff) < 10.0 * DBL_EPSILON);
+      if (write_output) output->prev_output_time = time;
+    }
+
+    // check if it is time to output based on step interval
+    if (output->step_interval > 0 && !write_output) {
+      if (step % output->step_interval == 0) write_output = PETSC_TRUE;
+    }
+
+    // write output
+    if (write_output) {
+      PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
+      if (output->format == OUTPUT_XDMF) {
+        PetscCall(WriteXDMFHDF5Data(rdy, step, t));
+        PetscCall(WriteXDMFXMFData(rdy, step, t));
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);

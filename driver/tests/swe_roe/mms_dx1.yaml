@@ -74,7 +74,7 @@ time:
 
 output:
   format: xdmf
-  interval: 500
+  step_interval: 500
 
 grid:
   file: mms_triangles_dx1.exo # z coordinates overwritten by z(x, y) above

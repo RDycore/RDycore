@@ -229,6 +229,8 @@ static const cyaml_schema_field_t output_time_series_fields_schema[] = {
 static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_INT("step_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, step_interval),
+    CYAML_FIELD_FLOAT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
+    CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
     CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
@@ -873,12 +875,24 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
 
   // validate output options
-  PetscCheck((config->output.format == OUTPUT_NONE) || (config->output.step_interval > 0), comm, PETSC_ERR_USER,
-             "Output interval must be specified as a positive number of steps.");
-  PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
-             "Binary output does not support output batching");
-  if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
-    config->output.batch_size = 1;
+  if (config->output.format != OUTPUT_NONE || config->output.step_interval > 0 || config->output.time_interval > 0.0) {
+    config->output.enable           = PETSC_TRUE;
+    config->output.prev_output_time = -1.0;
+  } else {
+    config->output.enable = PETSC_FALSE;
+  }
+
+  if (config->output.enable) {
+    PetscCheck((config->output.format != OUTPUT_NONE), comm, PETSC_ERR_USER, "Output requested, but the format is not specified.");
+    PetscCheck(!(config->output.step_interval == 0 && config->output.time_interval == 0.0), comm, PETSC_ERR_USER,
+               "Output requested, but neither step_interval nor time_interval specified.");
+    PetscCheck((config->output.step_interval >= 0), comm, PETSC_ERR_USER, "Output step interval must be specified as a positive number of steps.");
+    PetscCheck((config->output.time_interval >= 0.0), comm, PETSC_ERR_USER, "Output time interval must be specified as a positive number of steps.");
+    PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
+               "Binary output does not support output batching");
+    if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
+      config->output.batch_size = 1;
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
