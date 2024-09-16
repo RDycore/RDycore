@@ -162,7 +162,7 @@ typedef struct {
   PetscBool       enable;            // true if output is requested
   RDyOutputFormat format;            // file format
   PetscInt        step_interval;     // output interval [steps between outputs]
-  PetscReal       time_interval;     // temporal interval at which output is written
+  PetscInt        time_interval;     // temporal interval at which output is written
   RDyTimeUnit     time_unit;         // unit of time for temporal interval
   PetscInt        batch_size;        // number of timesteps per output file (if available)
   RDyTimeSeries   time_series;       // time series appended to text (.dat) files

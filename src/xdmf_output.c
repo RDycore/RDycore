@@ -204,8 +204,8 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
 
     // check if it is time to output based on temporal interval
     if (output->time_interval > 0) {
-      PetscReal dt   = output->time_interval;
-      PetscReal t    = ConvertTimeFromSeconds(time, rdy->config.time.unit);
+      PetscReal dt   = ConvertTimeToSeconds(output->time_interval * 1.0, output->time_unit);
+      PetscReal t    = time;
       PetscReal tmp  = fmod(t, dt);
       PetscReal diff = (tmp - dt);
       write_output   = (PetscAbsReal(tmp) < 10.0 * DBL_EPSILON || PetscAbsReal(diff) < 10.0 * DBL_EPSILON);

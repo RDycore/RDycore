@@ -160,7 +160,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
 
     if (rdy->config.output.time_interval) {
       const char *units = TimeUnitAsString(rdy->config.output.time_unit);
-      RDyLogDebug(rdy, "Writing output every %f %s", rdy->config.output.time_interval, units);
+      RDyLogDebug(rdy, "Writing output every %d %s", rdy->config.output.time_interval, units);
     }
 
     switch (rdy->config.output.format) {
