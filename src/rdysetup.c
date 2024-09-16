@@ -269,7 +269,8 @@ PetscErrorCode InitBoundaries(RDy rdy) {
     RDyEdges *edges = &mesh->edges;
     RDyCells *cells = &mesh->cells;
 
-    PetscInt invalid_idx[mesh->num_edges];
+    PetscInt *invalid_idx;
+    PetscCall(PetscCalloc1(mesh->num_edges, &invalid_idx));
 
     for (PetscInt iedge = 0; iedge < mesh->num_edges; iedge++) {
       PetscInt  cell_id_1  = edges->cell_ids[2 * iedge];  // this cell id will always be > -1
@@ -297,6 +298,8 @@ PetscErrorCode InitBoundaries(RDy rdy) {
       ISDestroy(&unassigned_edges_is);
       unassigned_edges_is = new_unassigned_edges_is;
     }
+
+    PetscCall(PetscFree(invalid_idx));
   }
   PetscInt unassigned_edge_boundary_id = 0;  // boundary ID for unassigned edges
 
@@ -321,7 +324,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
     // before we proceed, check that all boundaries in our configuration
     // exist in the grid file
     if (rdy->config.num_boundaries > 0) {
-      PetscMPIInt boundary_in_file[rdy->config.num_boundaries];
+      PetscMPIInt boundary_in_file[MAX_NUM_BOUNDARIES];
       memset(boundary_in_file, 0, sizeof(PetscMPIInt) * rdy->config.num_boundaries);
       for (PetscInt bc = 0; bc < rdy->config.num_boundaries; ++bc) {
         for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
@@ -369,7 +372,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   } else {
     // no Face Tags label, but we might still need the Allreduce
     if (rdy->config.num_boundaries > 0) {
-      PetscMPIInt boundary_in_file[rdy->config.num_boundaries];
+      PetscMPIInt boundary_in_file[MAX_NUM_BOUNDARIES];
       memset(boundary_in_file, 0, sizeof(PetscMPIInt) * rdy->config.num_boundaries);
       MPI_Allreduce(boundary_in_file, boundary_in_file, rdy->config.num_boundaries, MPI_INT, MPI_SUM, rdy->comm);
       for (PetscInt b = 0; b < rdy->config.num_boundaries; ++b) {
@@ -817,7 +820,8 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
     RDyCondition      boundary_cond = rdy->boundary_conditions[b];
     RDyFlowCondition *flow_bc       = boundary_cond.flow;
 
-    PetscReal boundary_values[3 * boundary.num_edges];
+    PetscReal *boundary_values;
+    PetscCall(PetscCalloc1(3 * boundary.num_edges, &boundary_values));
     switch (boundary_cond.flow->type) {
       case CONDITION_DIRICHLET:
 
@@ -837,6 +841,7 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
                    boundary.id);
     }
+    PetscCall(PetscFree(boundary_values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -871,14 +876,18 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
       gethostname(hostname, 64);
       PetscFPrintf(rdy->comm, stderr, "Pausing... press Enter to resume.\n");
       if (rdy->nproc > 1) {
-        pid_t pids[rdy->nproc];
-        char  hostnames[rdy->nproc * 65];
+        pid_t *pids;
+        char *hostnames;
+        PetscCall(PetscCalloc1(rdy->nproc, &pids));
+        PetscCall(PetscCalloc1(rdy->nproc * (MAX_NAME_LEN+1), &hostnames));
         MPI_Gather(&pid, 1, MPI_INT, pids, 1, MPI_INT, 0, rdy->comm);
-        MPI_Gather(hostname, 65, MPI_CHAR, hostnames, 65, MPI_CHAR, 0, rdy->comm);
+        MPI_Gather(hostname, MAX_NAME_LEN+1, MPI_CHAR, hostnames, MAX_NAME_LEN+1, MPI_CHAR, 0, rdy->comm);
         PetscFPrintf(rdy->comm, stderr, "  PIDs (host):\n");
         for (PetscMPIInt p = 0; p < rdy->nproc; ++p) {
-          PetscFPrintf(rdy->comm, stderr, "    rank %d (%s): %d:\n", p, &hostnames[p * 65], pids[p]);
+          PetscFPrintf(rdy->comm, stderr, "    rank %d (%s): %d:\n", p, &hostnames[p * (MAX_NAME_LEN+1)], pids[p]);
         }
+        PetscCall(PetscFree(pids));
+        PetscCall(PetscFree(hostnames));
 
         // wait for input on rank 0
         if (rdy->rank == 0) {

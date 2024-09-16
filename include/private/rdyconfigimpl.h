@@ -31,9 +31,6 @@
 // simulation
 #define MAX_NUM_CONDITIONS 32
 
-// the maximum length of a string referring to a name in the config file
-#define MAX_NAME_LEN 128
-
 // The data structures below are intermediate representations of the sections
 // in the YAML configuration file. We parse this file with a YAML parser that
 // populates these data structures using a YAML schema. The parser is implemented
