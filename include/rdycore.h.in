@@ -60,7 +60,7 @@ PETSC_EXTERN PetscBool      RDyFinished(RDy);
 PETSC_EXTERN PetscBool      RDyRestarted(RDy);
 
 // time units
-typedef enum { RDY_TIME_SECONDS = 0, RDY_TIME_MINUTES, RDY_TIME_HOURS, RDY_TIME_DAYS, RDY_TIME_MONTHS, RDY_TIME_YEARS } RDyTimeUnit;
+typedef enum { RDY_TIME_UNSET = 0, RDY_TIME_SECONDS, RDY_TIME_MINUTES, RDY_TIME_HOURS, RDY_TIME_DAYS, RDY_TIME_MONTHS, RDY_TIME_YEARS } RDyTimeUnit;
 
 PETSC_EXTERN PetscErrorCode RDyGetTimeUnit(RDy, RDyTimeUnit*);
 PETSC_EXTERN PetscErrorCode RDyGetTime(RDy, RDyTimeUnit, PetscReal*);
