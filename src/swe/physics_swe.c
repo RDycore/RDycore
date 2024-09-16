@@ -144,13 +144,19 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.s_ceed));
     PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.u_ceed));
 
+    PetscBool ceed_enabled = PETSC_TRUE;
+    PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc_rhs));
+
     // reset the time step size
     rdy->ceed_rhs.dt = 0.0;
   } else {
     // allocate storage for our PETSc implementation of the  flux and
     // source terms
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
-    PetscCall(CreatePetscSWEFlux(rdy->mesh.num_internal_edges, rdy->num_boundaries, rdy->boundaries, &rdy->petsc_rhs));
+    int       num_comp     = 3;
+    PetscBool ceed_enabled = PETSC_FALSE;
+    PetscCall(CreatePetscSWEFluxForInternalEdges(&rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, &rdy->petsc_rhs));
+    PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc_rhs));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
   }
 
@@ -530,6 +536,30 @@ PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE data) {
   PetscCall(PetscFree(data.hv));
   PetscCall(PetscFree(data.u));
   PetscCall(PetscFree(data.v));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RiemannEdgeDataSWECreate(PetscInt N, PetscInt ncomp, RiemannEdgeDataSWE *data) {
+  PetscFunctionBegin;
+
+  data->N = N;
+  PetscCall(PetscCalloc1(data->N, &data->cn));
+  PetscCall(PetscCalloc1(data->N, &data->sn));
+  PetscCall(PetscCalloc1(data->N * ncomp, &data->flux));
+  PetscCall(PetscCalloc1(data->N, &data->amax));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RiemannEdgeDataSWEDestroy(RiemannEdgeDataSWE data) {
+  PetscFunctionBegin;
+
+  data.N = 0;
+  PetscCall(PetscFree(data.cn));
+  PetscCall(PetscFree(data.sn));
+  PetscCall(PetscFree(data.flux));
+  PetscCall(PetscFree(data.amax));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

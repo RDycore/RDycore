@@ -118,7 +118,7 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
 
 // Accumulates boundary fluxes on the given boundary from the given array of
 // fluxes on boundary edges.
-PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal fluxes[size][ndof]) {
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *fluxes) {
   PetscFunctionBegin;
   RDyTimeSeriesData *time_series = &rdy->time_series;
   if (time_series->boundary_fluxes.fluxes) {
@@ -131,9 +131,9 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt 
         PetscInt  cell_id  = rdy->mesh.edges.cell_ids[2 * edge_id];
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_local[cell_id]) {
-          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * fluxes[e][0];
-          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * fluxes[e][1];
-          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * fluxes[e][2];
+          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * fluxes[e * ndof + 0];
+          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * fluxes[e * ndof + 1];
+          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * fluxes[e * ndof + 2];
           ++n;
         }
       }
@@ -235,6 +235,8 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
 static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
+  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary boundary = rdy->boundaries[b];
 
@@ -250,8 +252,17 @@ static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
     PetscCallCEED(CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data));
 
     // hand over the boundary fluxes and zero the flux vector
-    PetscInt size = boundary.num_edges;
-    PetscCall(AccumulateBoundaryFluxes(rdy, boundary, size, num_comp, bflux_data));
+    PetscInt            size         = boundary.num_edges;
+    RiemannEdgeDataSWE *data_edge    = &data_swe->data_bnd_edges[b];
+    PetscReal          *flux_vec_bnd = data_edge->flux;
+
+    for (PetscInt e = 0; e < size; e++) {
+      for (PetscInt icomp = 0; icomp < num_comp; icomp++) {
+        flux_vec_bnd[e * num_comp + icomp] = bflux_data[e][icomp];
+      }
+    }
+
+    PetscCall(AccumulateBoundaryFluxes(rdy, boundary, size, num_comp, flux_vec_bnd));
     PetscCallCEED(CeedVectorRestoreArray(bflux_vec, (CeedScalar **)&bflux_data));
     PetscCallCEED(CeedVectorSetValue(bflux_vec, 0.0));  // reset flux accumulation
   }

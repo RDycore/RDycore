@@ -234,7 +234,7 @@ PETSC_INTERN PetscErrorCode ReadCheckpointFile(RDy, const char *);
 
 // time series
 PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);
-PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal[size][ndof]);
+PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *);
 PETSC_INTERN PetscErrorCode WriteTimeSeries(TS, PetscInt, PetscReal, Vec, void *);
 PETSC_INTERN PetscErrorCode DestroyTimeSeries(RDy);
 
