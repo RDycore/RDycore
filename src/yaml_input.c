@@ -810,7 +810,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   PetscBool coupling_interval_was_specified;
   if (config->time.coupling_interval == INVALID_REAL) {
     coupling_interval_was_specified = PETSC_FALSE;
-    config->time.coupling_interval = config->time.final_time;
+    config->time.coupling_interval  = config->time.final_time;
   } else {
     coupling_interval_was_specified = PETSC_TRUE;
     PetscCheck(config->time.coupling_interval > 0.0, comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
@@ -898,12 +898,15 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     }
 
     if (config->output.time_interval) {
-      printf("config->time.coupling_interval = %f; coupling_interval_was_specified = %d\n",config->time.coupling_interval,coupling_interval_was_specified);
-      PetscCheck(coupling_interval_was_specified, comm, PETSC_ERR_USER, "When output is requested via time_interval, time.coupling_interval must be specified");
+      printf("config->time.coupling_interval = %f; coupling_interval_was_specified = %d\n", config->time.coupling_interval,
+             coupling_interval_was_specified);
+      PetscCheck(coupling_interval_was_specified, comm, PETSC_ERR_USER,
+                 "When output is requested via time_interval, time.coupling_interval must be specified");
       PetscReal t1 = config->time.coupling_interval;
       PetscReal t2 = config->output.time_interval;
       PetscCheck(t2 >= t1, comm, PETSC_ERR_USER, "output.time_interval needs be larger than or equal to time.coupling_interval");
-      PetscCheck(PetscEqualReal(floor(t2/t1)*t1 - t2, 0.0), comm, PETSC_ERR_USER, "output.time_interval should be a multiple of time.coupling_interval");
+      PetscCheck(PetscEqualReal(floor(t2 / t1) * t1 - t2, 0.0), comm, PETSC_ERR_USER,
+                 "output.time_interval should be a multiple of time.coupling_interval");
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
