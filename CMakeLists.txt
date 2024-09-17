@@ -72,9 +72,12 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fmax-errors=10")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format-truncation")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
 elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
 
   # emit compile_commands.json for use with clangd
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

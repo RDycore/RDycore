@@ -915,7 +915,7 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecDuplicate(xcoord_nat, &ycoord_nat));
   PetscCall(VecDuplicate(xcoord_nat, &zcoord_nat));
 
-  PetscInt  num_vertices = mesh->num_vertices;
+  PetscInt   num_vertices = mesh->num_vertices;
   PetscInt  *indices;
   PetscReal *x, *y, *z;
 
@@ -1007,12 +1007,12 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   // create a local DM
-  DM       local_dm;
-  PetscInt max_num_vertices       = 4;
-  SectionFieldSpec aux_spec = {
-    .num_fields = 1,
-    .num_field_dof = {max_num_vertices},
-    .field_names = {"Cell Connections"},
+  DM               local_dm;
+  PetscInt         max_num_vertices = 4;
+  SectionFieldSpec aux_spec         = {
+              .num_fields    = 1,
+              .num_field_dof = {max_num_vertices},
+              .field_names   = {"Cell Connections"},
   };
   PetscCall(CloneAndCreateCellCenteredDM(dm, aux_spec, &local_dm));
 
@@ -1125,11 +1125,11 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   // create a local DM
-  DM       local_dm;
+  DM               local_dm;
   SectionFieldSpec local_spec = {
-    .num_fields = 1,
-    .num_field_dof = {1},
-    .field_names = {"Cell Coordinates"},
+      .num_fields    = 1,
+      .num_field_dof = {1},
+      .field_names   = {"Cell Coordinates"},
   };
 
   PetscCall(CloneAndCreateCellCenteredDM(dm, local_spec, &local_dm));

@@ -877,14 +877,14 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
       PetscFPrintf(rdy->comm, stderr, "Pausing... press Enter to resume.\n");
       if (rdy->nproc > 1) {
         pid_t *pids;
-        char *hostnames;
+        char  *hostnames;
         PetscCall(PetscCalloc1(rdy->nproc, &pids));
-        PetscCall(PetscCalloc1(rdy->nproc * (MAX_NAME_LEN+1), &hostnames));
+        PetscCall(PetscCalloc1(rdy->nproc * (MAX_NAME_LEN + 1), &hostnames));
         MPI_Gather(&pid, 1, MPI_INT, pids, 1, MPI_INT, 0, rdy->comm);
-        MPI_Gather(hostname, MAX_NAME_LEN+1, MPI_CHAR, hostnames, MAX_NAME_LEN+1, MPI_CHAR, 0, rdy->comm);
+        MPI_Gather(hostname, MAX_NAME_LEN + 1, MPI_CHAR, hostnames, MAX_NAME_LEN + 1, MPI_CHAR, 0, rdy->comm);
         PetscFPrintf(rdy->comm, stderr, "  PIDs (host):\n");
         for (PetscMPIInt p = 0; p < rdy->nproc; ++p) {
-          PetscFPrintf(rdy->comm, stderr, "    rank %d (%s): %d:\n", p, &hostnames[p * (MAX_NAME_LEN+1)], pids[p]);
+          PetscFPrintf(rdy->comm, stderr, "    rank %d (%s): %d:\n", p, &hostnames[p * (MAX_NAME_LEN + 1)], pids[p]);
         }
         PetscCall(PetscFree(pids));
         PetscCall(PetscFree(hostnames));

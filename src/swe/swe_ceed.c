@@ -3,6 +3,10 @@
 
 #include "swe_ceed_impl.h"
 
+// this value stores the maximum number of components needed (between solution
+// vector components, source vector components, geometric components, etc)
+#define MAX_NUM_COMPONENTS 4
+
 // frees a data context allocated using PETSc, returning a libCEED error code
 static int FreeContextPetsc(void *data) {
   if (PetscFree(data)) return CeedError(NULL, CEED_ERROR_ACCESS, "PetscFree failed");
@@ -309,8 +313,8 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
 // @param [in]  boundary_conditions An array of metadata defining boundary conditions the operator will enforce
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary boundaries[num_boundaries],
-                                     RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, CeedOperator *flux_op) {
+PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions,
+                                     PetscReal tiny_h, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   // create a composite operator consisting of interior and boundary flux
@@ -378,7 +382,7 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
 }
 
 PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary, PetscInt size,
-                                                         PetscReal boundary_values[size]) {
+                                                         PetscReal *boundary_values) {
   PetscFunctionBeginUser;
 
   // fetch the array storing the boundary values
@@ -387,7 +391,7 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
   CeedVector dirichlet_vector;
   PetscCallCEED(CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector));
   CeedInt num_comp = 3;
-  CeedScalar(*dirichlet_ceed)[num_comp];
+  CeedScalar(*dirichlet_ceed)[MAX_NUM_COMPONENTS];
   PetscCallCEED(CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed));
 
   // set the boundary values
@@ -411,7 +415,7 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 // @param [in]  materials_by_cell An array of RDyMaterials defining cellwise material properties
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial materials_by_cell[num_cells], PetscReal tiny_h,
+PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial *materials_by_cell, PetscReal tiny_h,
                                        CeedOperator *source_op) {
   PetscFunctionBeginUser;
 
@@ -444,8 +448,8 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     CeedVector          riemannf;
     {  // Create element restrictions for state
       CeedInt *offset_c, *offset_q;
-      CeedScalar(*g)[num_comp_geom];
-      CeedScalar(*n)[num_comp_mannings_n];
+      CeedScalar(*g)[MAX_NUM_COMPONENTS];
+      CeedScalar(*n)[MAX_NUM_COMPONENTS];
       CeedInt num_owned_cells = mesh->num_owned_cells;
       CeedInt num_cells       = mesh->num_cells;
 
@@ -587,7 +591,7 @@ static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_
   CeedInt num_comp;
   PetscCallCEED(CeedElemRestrictionGetNumComponents(restrict_swe, &num_comp));
 
-  CeedScalar(*data_ceed)[num_comp];
+  CeedScalar(*data_ceed)[MAX_NUM_COMPONENTS];
   PetscCallCEED(CeedVectorGetArray(swe_vec, CEED_MEM_HOST, (CeedScalar **)&data_ceed));
 
   CeedSize len;

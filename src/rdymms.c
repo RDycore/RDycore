@@ -217,7 +217,7 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
     PetscCall(PetscCalloc(region.num_cells, &cell_x));
     PetscCall(PetscCalloc(region.num_cells, &cell_y));
 
-    PetscInt  N = 0;  // number of bulk evaluations
+    PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_cells; ++c) {
       PetscInt cell_id = region.cell_ids[c];
       if (3 * cell_id < n_local) {
@@ -396,7 +396,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     // fetch x, y for each edge (and set t = time)
     RDyBoundary boundary  = rdy->boundaries[b];
     PetscInt    num_edges = boundary.num_edges;
-    PetscReal   *x, *y;
+    PetscReal  *x, *y;
     PetscCall(PetscCalloc1(num_edges, &x));
     PetscCall(PetscCalloc1(num_edges, &y));
     for (PetscInt e = 0; e < num_edges; ++e) {
@@ -455,7 +455,7 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
     PetscCall(PetscCalloc1(region.num_cells, &cell_x));
     PetscCall(PetscCalloc1(region.num_cells, &cell_y));
 
-    PetscInt  N = 0;  // number of bulk evaluations
+    PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_cells; ++c) {
       PetscInt cell_id = region.cell_ids[c];
       if (3 * cell_id < n_local) {
@@ -539,8 +539,8 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, const char **comp_names, PetscReal *L1_norms,
-                                      PetscReal *L2_norms, PetscReal *Linf_norms) {
+static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, const char **comp_names, PetscReal *L1_norms, PetscReal *L2_norms,
+                                      PetscReal *Linf_norms) {
   PetscFunctionBegin;
   PetscPrintf(comm, "  Error norms at t = %g:\n", time);
   for (PetscInt c = 0; c < num_comps; ++c) {
@@ -567,15 +567,14 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
   int base_refinement = rdy->config.mms.swe.convergence.base_refinement;
 
 #define MAX_NUM_REFINEMENTS 8
-  PetscCheck(num_refinements <= MAX_NUM_REFINEMENTS, rdy->comm, PETSC_ERR_USER,
-      "Number of refinements (%d) exceeds maximum (%d)", num_refinements, MAX_NUM_REFINEMENTS);
+  PetscCheck(num_refinements <= MAX_NUM_REFINEMENTS, rdy->comm, PETSC_ERR_USER, "Number of refinements (%d) exceeds maximum (%d)", num_refinements,
+             MAX_NUM_REFINEMENTS);
 
   // error norm storage
-#define MAX_NUM_COMPONENTS 3 // FIXME: SWE only
-  int num_comps = MAX_NUM_COMPONENTS;
-  PetscReal L1_norms[MAX_NUM_REFINEMENTS+1][MAX_NUM_COMPONENTS],
-            L2_norms[MAX_NUM_REFINEMENTS+1][MAX_NUM_COMPONENTS],
-            Linf_norms[MAX_NUM_REFINEMENTS+1][MAX_NUM_COMPONENTS];
+#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only
+  int       num_comps = MAX_NUM_COMPONENTS;
+  PetscReal L1_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS],
+      Linf_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS];
   const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
 
   // create refined RDy objects and set them up (dumb, but easy)
@@ -651,9 +650,9 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
-#define MAX_NUM_COMPONENTS 3 // FIXME: SWE only!
-  PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS],
-            L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
+#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only!
+  PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS], L1_norms[MAX_NUM_COMPONENTS],
+      L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
   const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
     // run a convergence study

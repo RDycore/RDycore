@@ -224,9 +224,9 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
 
   // create an auxiliary section with a diagnostic parameter.
   SectionFieldSpec cc_spec = {
-    .num_fields = 1,
-    .num_field_dof = {1},
-    .field_names = {"Parameter"},
+      .num_fields    = 1,
+      .num_field_dof = {1},
+      .field_names   = {"Parameter"},
   };
   PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, cc_spec, &rdy->aux_dm));
 
