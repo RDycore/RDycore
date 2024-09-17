@@ -228,7 +228,9 @@ static const cyaml_schema_field_t output_time_series_fields_schema[] = {
 // mapping of output fields to members of RDyOutputSection
 static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
-    CYAML_FIELD_INT("interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, interval),
+    CYAML_FIELD_INT("step_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, step_interval),
+    CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
+    CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
     CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
@@ -805,9 +807,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // by default, the coupling interval is set to the final time (but in any case,
   // it shouldn't be greater!)
+  PetscBool coupling_interval_was_specified;
   if (config->time.coupling_interval == INVALID_REAL) {
-    config->time.coupling_interval = config->time.final_time;
+    coupling_interval_was_specified = PETSC_FALSE;
+    config->time.coupling_interval  = config->time.final_time;
   } else {
+    coupling_interval_was_specified = PETSC_TRUE;
     PetscCheck(config->time.coupling_interval > 0.0, comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
     PetscCheck(config->time.coupling_interval <= config->time.final_time, comm, PETSC_ERR_USER,
                "time.coupling_interval must not exceed time.final_time");
@@ -873,12 +878,35 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
 
   // validate output options
-  PetscCheck((config->output.format == OUTPUT_NONE) || (config->output.interval > 0), comm, PETSC_ERR_USER,
-             "Output interval must be specified as a positive number of steps.");
-  PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
-             "Binary output does not support output batching");
-  if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
-    config->output.batch_size = 1;
+  if (config->output.format != OUTPUT_NONE || config->output.step_interval > 0 || config->output.time_interval > 0) {
+    config->output.enable           = PETSC_TRUE;
+    config->output.prev_output_time = -1.0;
+  } else {
+    config->output.enable = PETSC_FALSE;
+  }
+
+  if (config->output.enable) {
+    PetscCheck((config->output.format != OUTPUT_NONE), comm, PETSC_ERR_USER, "Output requested, but the format is not specified.");
+    PetscCheck(!(config->output.step_interval == 0 && config->output.time_interval == 0), comm, PETSC_ERR_USER,
+               "Output requested, but neither step_interval nor time_interval specified.");
+    PetscCheck((config->output.step_interval >= 0), comm, PETSC_ERR_USER, "Output step interval must be specified as a positive number of steps.");
+    PetscCheck((config->output.time_interval >= 0), comm, PETSC_ERR_USER, "Output time interval must be specified as a positive number of steps.");
+    PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
+               "Binary output does not support output batching");
+    if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
+      config->output.batch_size = 1;
+    }
+
+    if (config->output.time_interval) {
+      if (!coupling_interval_was_specified) config->time.coupling_interval = config->output.time_interval * 1.0;
+      PetscCheck((config->output.time_unit != RDY_TIME_UNSET), comm, PETSC_ERR_USER,
+                 "When output is requested via time_interval, time_unit must also be specified");
+      PetscReal t1 = ConvertTimeToSeconds(config->time.coupling_interval, config->time.unit);
+      PetscReal t2 = ConvertTimeToSeconds(config->output.time_interval, config->output.time_unit);
+      PetscCheck(t2 >= t1, comm, PETSC_ERR_USER, "output.time_interval needs be larger than or equal to time.coupling_interval");
+      PetscCheck(PetscEqualReal(floor(t2 / t1) * t1 - t2, 0.0), comm, PETSC_ERR_USER,
+                 "output.time_interval should be a multiple of time.coupling_interval");
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1014,10 +1042,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   //--------
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.step_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.step_interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
@@ -1063,10 +1091,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   }
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.step_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.step_interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }

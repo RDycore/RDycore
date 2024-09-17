@@ -18,7 +18,7 @@ time:
 
 output:
   format: xdmf
-  interval: 14400             # 1-hr (=14400 * 0.25 sec = 3600 sec) 
+  step_interval: 14400             # 1-hr (=14400 * 0.25 sec = 3600 sec) 
   batch_size: 24              # 24 time slices put in a single .h5
   time_series:
     boundary_fluxes: 14400    # 1-hr (=14400 * 0.25 sec = 3600 sec)

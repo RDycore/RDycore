@@ -100,10 +100,10 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
         snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%" PetscInt_FMT ".%s", output_dir, prefix, step, suffix);
       } else {
         // output data is grouped into batches of a fixed number of time steps
-        PetscInt batch_size = rdy->config.output.batch_size;
-        PetscInt interval   = rdy->config.output.interval;
-        PetscInt batch      = step / interval / batch_size;
-        PetscInt max_batch  = rdy->config.time.max_step / interval / batch_size;
+        PetscInt batch_size    = rdy->config.output.batch_size;
+        PetscInt step_interval = rdy->config.output.step_interval;
+        PetscInt batch         = step / step_interval / batch_size;
+        PetscInt max_batch     = rdy->config.time.max_step / step_interval / batch_size;
         if (max_batch < 1) max_batch = 1;
         PetscCall(GenerateIndexedFilename(output_dir, prefix, batch, max_batch, suffix, filename));
       }
@@ -136,7 +136,7 @@ static PetscErrorCode DestroyOutputViewer(RDy rdy) {
 PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
-  if (step % rdy->config.output.interval == 0) {
+  if (step % rdy->config.output.step_interval == 0) {
     static const char *formats[3] = {"binary", "XDMF", "CGNS"};
     const char        *format     = formats[rdy->config.output.format];
     const char        *units      = TimeUnitAsString(rdy->config.time.unit);
@@ -153,8 +153,16 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
   PetscFunctionBegin;
 
   PetscViewerFormat format = PETSC_VIEWER_DEFAULT;
-  if (rdy->config.output.interval) {
-    RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " timestep(s)", rdy->config.output.interval);
+  if (rdy->config.output.enable) {
+    if (rdy->config.output.step_interval) {
+      RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " timestep(s)", rdy->config.output.step_interval);
+    }
+
+    if (rdy->config.output.time_interval) {
+      const char *units = TimeUnitAsString(rdy->config.output.time_unit);
+      RDyLogDebug(rdy, "Writing output every %d %s", rdy->config.output.time_interval, units);
+    }
+
     switch (rdy->config.output.format) {
       case OUTPUT_NONE:
         // nothing to do here

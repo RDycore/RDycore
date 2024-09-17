@@ -19,7 +19,7 @@ time:
 
 output:
   format: xdmf
-  interval: 100
+  step_interval: 100
   batch_size: 20
   time_series:
     boundary_fluxes: 10

@@ -8,24 +8,31 @@ numerics:
   riemann: roe
 
 logging:
-  level: detail
+  level: debug
 
 time:
-  final_time       : 7200.0   # 2-hr
-  coupling_interval: 3600.0   # 1-hr
-  time_step        : 0.25
+  final_time       : 4200.0
+  coupling_interval: 60.0
   unit             : seconds
+  adaptive:
+    enable                 : true # false or true. The values below are only used if is enable=true
+    target_courant_number  : 0.8  # CFL
+    max_increase_factor    : 2    # At max, the dt can be doubled while still allowing CFL be less than 0.8
+    initial_time_step      : 30   # initial timestep
 
 output:
   format: xdmf
-  step_interval: 14400        # 1-hr (=14400 * 0.25 sec = 3600 sec)
-  batch_size: 24              # 24 time slices put in a single .h5
+  step_interval: 10000
+  time_interval: 600
+  time_unit: seconds
+  batch_size: 20
   time_series:
-    boundary_fluxes: 14400    # 1-hr (=14400 * 0.25 sec = 3600 sec)
+    boundary_fluxes: 1
 
 grid:
-  file: Turning_30m_with_z.updated.with_sidesets.exo
+  file: Houston1km_with_z.exo
 
+# one region represents the whole domain
 regions:
   - name: domain
     grid_region_id: 1
@@ -45,22 +52,21 @@ initial_conditions:
     flow: domain_flow_ic
 
 boundaries:
-  - name: outlet
+  - name: bottom_wall
     grid_boundary_id: 1
 
 boundary_conditions:
-  - boundaries: [outlet]
+  - boundaries: [bottom_wall]
     flow: outflow_bc
 
 flow_conditions:
   - name: domain_flow_ic
     type: dirichlet
+    file: Houston1km.ic.${PETSC_ID_TYPE}.bin
     format: binary
-    file: solution_219.int64.dat
   - name: outflow_bc
     type: dirichlet
     height: 0
     x_momentum: 0
     y_momentum: 0
-
 

@@ -28,7 +28,7 @@ const char *TimeUnitAsString(RDyTimeUnit time_unit) {
       "yr",   // years
   };
   PetscFunctionBegin;
-  PetscFunctionReturn(time_unit_strings[time_unit]);
+  PetscFunctionReturn(time_unit_strings[time_unit - 1]);
 }
 
 /// Converts the given time (expressed in the given units) to seconds.

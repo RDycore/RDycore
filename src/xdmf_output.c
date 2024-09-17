@@ -18,7 +18,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
 
   // write the grid if we're the first step in a batch.
-  PetscInt dataset = step / rdy->config.output.interval;
+  PetscInt dataset = step / rdy->config.output.step_interval;
   if (dataset % rdy->config.output.batch_size == 0) {
     PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
     PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
@@ -196,12 +196,36 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
 
 PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
-  RDy rdy = ctx;
-  if (step % rdy->config.output.interval == 0) {
-    PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
-    if (rdy->config.output.format == OUTPUT_XDMF) {
-      PetscCall(WriteXDMFHDF5Data(rdy, step, t));
-      PetscCall(WriteXDMFXMFData(rdy, step, t));
+  RDy               rdy    = ctx;
+  RDyOutputSection *output = &rdy->config.output;
+
+  if (output->enable && (time != output->prev_output_time)) {
+    PetscBool write_output = PETSC_FALSE;
+
+    // check if it is time to output based on temporal interval
+    if (output->time_interval > 0) {
+      PetscReal dt   = ConvertTimeToSeconds(output->time_interval * 1.0, output->time_unit);
+      PetscReal t    = time;
+      PetscReal tmp  = fmod(t, dt);
+      PetscReal diff = (tmp - dt);
+      write_output   = (PetscAbsReal(tmp) < 10.0 * DBL_EPSILON || PetscAbsReal(diff) < 10.0 * DBL_EPSILON);
+    }
+
+    // check if it is time to output based on step interval
+    if (output->step_interval > 0 && !write_output) {
+      if (step % output->step_interval == 0) write_output = PETSC_TRUE;
+    }
+
+    // write output
+    if (write_output) {
+      // save the time output was written
+      output->prev_output_time = time;
+
+      PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
+      if (output->format == OUTPUT_XDMF) {
+        PetscCall(WriteXDMFHDF5Data(rdy, step, t));
+        PetscCall(WriteXDMFXMFData(rdy, step, t));
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
