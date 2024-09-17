@@ -3,9 +3,13 @@
 
 #include "swe_ceed_impl.h"
 
-// this value stores the maximum number of components needed (between solution
-// vector components, source vector components, geometric components, etc)
-#define MAX_NUM_COMPONENTS 4 // determined by num_comp_geom in CreateInteriorFluxOperator
+// CEED uses C99 VLA features for shaping multidimensional
+// arrays, which don't have the same drawbacks as VLA allocations.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla"
 
 // frees a data context allocated using PETSc, returning a libCEED error code
 static int FreeContextPetsc(void *data) {
@@ -391,7 +395,7 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
   CeedVector dirichlet_vector;
   PetscCallCEED(CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector));
   CeedInt num_comp = 3;
-  CeedScalar(*dirichlet_ceed)[MAX_NUM_COMPONENTS];
+  CeedScalar(*dirichlet_ceed)[num_comp];
   PetscCallCEED(CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed));
 
   // set the boundary values
@@ -448,8 +452,8 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     CeedVector          riemannf;
     {  // Create element restrictions for state
       CeedInt *offset_c, *offset_q;
-      CeedScalar(*g)[MAX_NUM_COMPONENTS];
-      CeedScalar(*n)[MAX_NUM_COMPONENTS];
+      CeedScalar(*g)[num_comp_geom];
+      CeedScalar(*n)[num_comp_mannings_n];
       CeedInt num_owned_cells = mesh->num_owned_cells;
       CeedInt num_cells       = mesh->num_cells;
 
@@ -591,7 +595,7 @@ static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_
   CeedInt num_comp;
   PetscCallCEED(CeedElemRestrictionGetNumComponents(restrict_swe, &num_comp));
 
-  CeedScalar(*data_ceed)[MAX_NUM_COMPONENTS];
+  CeedScalar(*data_ceed)[num_comp];
   PetscCallCEED(CeedVectorGetArray(swe_vec, CEED_MEM_HOST, (CeedScalar **)&data_ceed));
 
   CeedSize len;
@@ -649,3 +653,6 @@ PetscErrorCode SWESourceOperatorSetManningsN(CeedOperator source_op, PetscReal *
   PetscCall(SetOperatorFieldComponent(source_op, sub_op_idx, "mannings_n", icomp, n_values));
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
+
+#pragma GCC diagnostic   pop
+#pragma clang diagnostic pop
