@@ -5,7 +5,7 @@
 
 // this value stores the maximum number of components needed (between solution
 // vector components, source vector components, geometric components, etc)
-#define MAX_NUM_COMPONENTS 4
+#define MAX_NUM_COMPONENTS 4 // determined by num_comp_geom in CreateInteriorFluxOperator
 
 // frees a data context allocated using PETSc, returning a libCEED error code
 static int FreeContextPetsc(void *data) {

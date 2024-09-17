@@ -43,6 +43,7 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spe
   PetscCall(PetscSectionSetUp(cc_section));
   PetscCall(DMSetLocalSection(*cc_dm, cc_section));
   PetscCall(PetscSectionViewFromOptions(cc_section, NULL, "-aux_layout_view"));
+  PetscCall(PetscSectionDestroy(&cc_section));
 
   PetscInt refine_level;
   DMGetRefineLevel(dm, &refine_level);
@@ -56,7 +57,6 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spe
     PetscCall(PetscSFDestroy(&sf_natural));
   }
 
-  PetscCall(PetscSectionDestroy(&cc_section));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

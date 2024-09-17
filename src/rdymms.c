@@ -214,8 +214,8 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
     // Create vectorized (x, y, t) triples for bulk expression evaluation
     PetscReal *cell_x, *cell_y;
-    PetscCall(PetscCalloc(region.num_cells, &cell_x));
-    PetscCall(PetscCalloc(region.num_cells, &cell_y));
+    PetscCall(PetscCalloc1(region.num_cells, &cell_x));
+    PetscCall(PetscCalloc1(region.num_cells, &cell_y));
 
     PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_cells; ++c) {
@@ -232,9 +232,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
       // evaluate the manufactured ѕolutions at all (x, y, t)
       PetscReal *h, *u, *v;
-      PetscCall(PetscCalloc(region.num_cells, &h));
-      PetscCall(PetscCalloc(region.num_cells, &u));
-      PetscCall(PetscCalloc(region.num_cells, &v));
+      PetscCall(PetscCalloc1(region.num_cells, &h));
+      PetscCall(PetscCalloc1(region.num_cells, &u));
+      PetscCall(PetscCalloc1(region.num_cells, &v));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
@@ -273,8 +273,8 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
   PetscInt N;
   PetscCall(RDyGetNumLocalCells(rdy, &N));
   PetscReal *cell_x, *cell_y;
-  PetscCall(PetscCalloc(N, &cell_x));
-  PetscCall(PetscCalloc(N, &cell_y));
+  PetscCall(PetscCalloc1(N, &cell_x));
+  PetscCall(PetscCalloc1(N, &cell_y));
 
   PetscInt l = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {

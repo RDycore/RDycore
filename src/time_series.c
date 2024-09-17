@@ -9,7 +9,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
   PetscInt  num_md          = 3;
   PetscInt  num_local_edges = rdy->time_series.boundary_fluxes.num_local_edges[rdy->rank];
   PetscInt *local_flux_md;
-  PetscCall(PetscCalloc(num_md * num_local_edges + 1, &local_flux_md));
+  PetscCall(PetscCalloc1(num_md * num_local_edges + 1, &local_flux_md));
 
   // gather local metadata
   PetscInt n = 0;
@@ -238,6 +238,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     // send the root proc the local flux data
     MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm);
   }
+  PetscCall(PetscFree(local_flux_data));
 
   // zero the boundary fluxes so they can begin reaccumulating
   // NOTE that there are 3 fluxes (and not 5)

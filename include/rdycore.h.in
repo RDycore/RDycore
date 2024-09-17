@@ -21,7 +21,7 @@
 // with 64-bit indices
 #define PETSC_ID_TYPE "@PETSC_ID_TYPE@"
 
-// maximum length of names of fields stored in DM sections
+// maximum length of names (config parameters, fields in DM sections, etc)
 #define MAX_NAME_LEN @MAX_NAME_LEN@
 
 //-------------------
