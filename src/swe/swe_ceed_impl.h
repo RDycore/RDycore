@@ -101,6 +101,14 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
   *amax = chat + fabs(uperp);
 }
 
+// The following Q functions use C99 VLA features for shaping multidimensional
+// arrays, which don't have the same drawbacks as VLA allocations.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla"
+
 CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -274,5 +282,8 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   }
   return 0;
 }
+
+#pragma GCC diagnostic   pop
+#pragma clang diagnostic pop
 
 #endif

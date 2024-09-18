@@ -109,7 +109,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   PetscInt num_owned_cells = 0;
   for (PetscInt c = c_start; c < c_end; c++) {
     PetscInt  icell = c - c_start;
-    PetscReal centroid[dim], normal[dim];
+    PetscReal centroid[3], normal[3];
     DMPlexComputeCellGeometryFVM(dm, c, &cells->areas[icell], &centroid[0], &normal[0]);
 
     for (PetscInt idim = 0; idim < dim; idim++) {
@@ -459,7 +459,7 @@ static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
 
   for (PetscInt e = e_start; e < e_end; e++) {
     PetscInt  iedge = e - e_start;
-    PetscReal centroid[dim], normal[dim];
+    PetscReal centroid[3], normal[3];
     DMPlexComputeCellGeometryFVM(dm, e, &edges->lengths[iedge], &centroid[0], &normal[0]);
 
     for (PetscInt idim = 0; idim < dim; idim++) {
@@ -915,9 +915,14 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecDuplicate(xcoord_nat, &ycoord_nat));
   PetscCall(VecDuplicate(xcoord_nat, &zcoord_nat));
 
-  PetscInt  num_vertices = mesh->num_vertices;
-  PetscInt  indices[num_vertices];
-  PetscReal x[num_vertices], y[num_vertices], z[num_vertices];
+  PetscInt   num_vertices = mesh->num_vertices;
+  PetscInt  *indices;
+  PetscReal *x, *y, *z;
+
+  PetscCall(PetscCalloc1(num_vertices, &indices));
+  PetscCall(PetscCalloc1(num_vertices, &x));
+  PetscCall(PetscCalloc1(num_vertices, &y));
+  PetscCall(PetscCalloc1(num_vertices, &z));
 
   RDyVertices *vertices = &mesh->vertices;
   for (PetscInt v = 0; v < num_vertices; v++) {
@@ -935,6 +940,11 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscCall(VecSetValues(xcoord_nat, num_vertices, indices, x, INSERT_VALUES));
   PetscCall(VecSetValues(ycoord_nat, num_vertices, indices, y, INSERT_VALUES));
   PetscCall(VecSetValues(zcoord_nat, num_vertices, indices, z, INSERT_VALUES));
+
+  PetscCall(PetscFree(indices));
+  PetscCall(PetscFree(x));
+  PetscCall(PetscFree(y));
+  PetscCall(PetscFree(z));
 
   PetscCall(VecAssemblyBegin(xcoord_nat));
   PetscCall(VecAssemblyEnd(xcoord_nat));
@@ -997,13 +1007,14 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   // create a local DM
-  DM       local_dm;
-  PetscInt max_num_vertices       = 4;
-  PetscInt n_aux_field            = 1;
-  PetscInt n_aux_field_dof[1]     = {max_num_vertices};
-  char     aux_field_names[1][20] = {"Cell Connections"};
-
-  PetscCall(CloneAndCreateCellCenteredDM(dm, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+  DM               local_dm;
+  PetscInt         max_num_vertices = 4;
+  SectionFieldSpec aux_spec         = {
+              .num_fields    = 1,
+              .num_field_dof = {max_num_vertices},
+              .field_names   = {"Cell Connections"},
+  };
+  PetscCall(CloneAndCreateCellCenteredDM(dm, aux_spec, &local_dm));
 
   Vec          global_vec, natural_vec;
   PetscScalar *vec_ptr;
@@ -1114,12 +1125,14 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   // create a local DM
-  DM       local_dm;
-  PetscInt n_aux_field            = 1;
-  PetscInt n_aux_field_dof[1]     = {1};
-  char     aux_field_names[1][20] = {"Cell Coordinates"};
+  DM               local_dm;
+  SectionFieldSpec local_spec = {
+      .num_fields    = 1,
+      .num_field_dof = {1},
+      .field_names   = {"Cell Coordinates"},
+  };
 
-  PetscCall(CloneAndCreateCellCenteredDM(dm, n_aux_field, n_aux_field_dof, 20, &aux_field_names[0], &local_dm));
+  PetscCall(CloneAndCreateCellCenteredDM(dm, local_spec, &local_dm));
 
   Vec global_vec, natural_vec;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));

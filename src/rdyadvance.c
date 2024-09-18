@@ -84,8 +84,7 @@ PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix
 PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
   PetscFunctionBegin;
 
-  size_t config_len = strlen(rdy->config_file);
-  char   prefix[config_len + 1];
+  char prefix[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
 
   // encode specific information into the filename based on its format
@@ -160,7 +159,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
 
     if (rdy->config.output.time_interval) {
       const char *units = TimeUnitAsString(rdy->config.output.time_unit);
-      RDyLogDebug(rdy, "Writing output every %d %s", rdy->config.output.time_interval, units);
+      RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " %s", rdy->config.output.time_interval, units);
     }
 
     switch (rdy->config.output.format) {

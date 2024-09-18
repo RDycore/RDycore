@@ -47,7 +47,7 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
   mupDefineBulkVar(func, "y", y)
 
 // evaluates the given expression at all given x, y, placing the results into values
-static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal x[n], PetscReal y[n], PetscReal values[n]) {
+static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal *x, PetscReal *y, PetscReal *values) {
   PetscFunctionBegin;
 
   SET_SPATIAL_VARIABLES(expr);
@@ -61,13 +61,15 @@ static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal 
   mupDefineBulkVar(func, "t", t)
 
 // evaluates the given expression at all given x, y, t, placing the results into values
-static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal x[n], PetscReal y[n], PetscReal time, PetscReal values[n]) {
+static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal *x, PetscReal *y, PetscReal time, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscReal t[n];
+  PetscReal *t;
+  PetscCalloc1(n, &t);
   for (PetscInt i = 0; i < n; ++i) t[i] = time;
   SET_SPATIOTEMPORAL_VARIABLES(expr);
   mupEvalBulk(expr, values, n);
+  PetscCall(PetscFree(t));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -211,8 +213,11 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
     RDyRegion region = rdy->regions[r];
 
     // Create vectorized (x, y, t) triples for bulk expression evaluation
-    PetscReal cell_x[region.num_cells], cell_y[region.num_cells];
-    PetscInt  N = 0;  // number of bulk evaluations
+    PetscReal *cell_x, *cell_y;
+    PetscCall(PetscCalloc1(region.num_cells, &cell_x));
+    PetscCall(PetscCalloc1(region.num_cells, &cell_y));
+
+    PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_cells; ++c) {
       PetscInt cell_id = region.cell_ids[c];
       if (3 * cell_id < n_local) {
@@ -226,7 +231,10 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "SWE solution vector has %" PetscInt_FMT " DOF (should have 3)", ndof);
 
       // evaluate the manufactured ѕolutions at all (x, y, t)
-      PetscReal h[N], u[N], v[N];
+      PetscReal *h, *u, *v;
+      PetscCall(PetscCalloc1(region.num_cells, &h));
+      PetscCall(PetscCalloc1(region.num_cells, &u));
+      PetscCall(PetscCalloc1(region.num_cells, &v));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
@@ -243,7 +251,12 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
           ++l;
         }
       }
+      PetscCall(PetscFree(h));
+      PetscCall(PetscFree(u));
+      PetscCall(PetscFree(v));
     }
+    PetscCall(PetscFree(cell_x));
+    PetscCall(PetscFree(cell_y));
   }
 
   PetscCall(VecRestoreArray(solution, &x_ptr));
@@ -259,7 +272,9 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
   PetscInt N;
   PetscCall(RDyGetNumLocalCells(rdy, &N));
-  PetscReal cell_x[N], cell_y[N];
+  PetscReal *cell_x, *cell_y;
+  PetscCall(PetscCalloc1(N, &cell_x));
+  PetscCall(PetscCalloc1(N, &cell_y));
 
   PetscInt l = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
@@ -272,34 +287,53 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
   if (rdy->config.physics.flow.mode == FLOW_SWE) {
     // evaluate the manufactured ѕolutions at all (x, y, t)
-    PetscReal h[N], u[N], v[N];
+
+    PetscReal *h, *u, *v;
+    PetscCall(PetscCalloc1(N, &h));
+    PetscCall(PetscCalloc1(N, &u));
+    PetscCall(PetscCalloc1(N, &v));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
 
-    PetscReal dhdx[N], dhdy[N], dhdt[N];
+    PetscReal *dhdx, *dhdy, *dhdt;
+    PetscCall(PetscCalloc1(N, &dhdx));
+    PetscCall(PetscCalloc1(N, &dhdy));
+    PetscCall(PetscCalloc1(N, &dhdt));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdx, N, cell_x, cell_y, time, dhdx));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdy, N, cell_x, cell_y, time, dhdy));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdt, N, cell_x, cell_y, time, dhdt));
 
-    PetscReal dudx[N], dudy[N], dudt[N];
+    PetscReal *dudx, *dudy, *dudt;
+    PetscCall(PetscCalloc1(N, &dudx));
+    PetscCall(PetscCalloc1(N, &dudy));
+    PetscCall(PetscCalloc1(N, &dudt));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudx, N, cell_x, cell_y, time, dudx));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudy, N, cell_x, cell_y, time, dudy));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudt, N, cell_x, cell_y, time, dudt));
 
-    PetscReal dvdx[N], dvdy[N], dvdt[N];
+    PetscReal *dvdx, *dvdy, *dvdt;
+    PetscCall(PetscCalloc1(N, &dvdx));
+    PetscCall(PetscCalloc1(N, &dvdy));
+    PetscCall(PetscCalloc1(N, &dvdt));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdx, N, cell_x, cell_y, time, dvdx));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdy, N, cell_x, cell_y, time, dvdy));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdt, N, cell_x, cell_y, time, dvdt));
 
-    PetscReal n[N];
+    PetscReal *n;
+    PetscCall(PetscCalloc1(N, &n));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, time, n));
 
-    PetscReal dzdx[N], dzdy[N];
+    PetscReal *dzdx, *dzdy;
+    PetscCall(PetscCalloc1(N, &dzdx));
+    PetscCall(PetscCalloc1(N, &dzdy));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdx, N, cell_x, cell_y, time, dzdx));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dzdy, N, cell_x, cell_y, time, dzdy));
 
-    PetscReal h_source[N], hu_source[N], hv_source[N];
+    PetscReal *h_source, *hu_source, *hv_source;
+    PetscCall(PetscCalloc1(N, &h_source));
+    PetscCall(PetscCalloc1(N, &hu_source));
+    PetscCall(PetscCalloc1(N, &hv_source));
 
     l = 0;
     for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
@@ -326,7 +360,28 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
     PetscCall(RDySetWaterSourceForLocalCells(rdy, N, h_source));
     PetscCall(RDySetXMomentumSourceForLocalCells(rdy, N, hu_source));
     PetscCall(RDySetYMomentumSourceForLocalCells(rdy, N, hv_source));
+
+    PetscCall(PetscFree(h));
+    PetscCall(PetscFree(u));
+    PetscCall(PetscFree(v));
+    PetscCall(PetscFree(dhdx));
+    PetscCall(PetscFree(dhdy));
+    PetscCall(PetscFree(dhdt));
+    PetscCall(PetscFree(dudx));
+    PetscCall(PetscFree(dudy));
+    PetscCall(PetscFree(dudt));
+    PetscCall(PetscFree(dvdx));
+    PetscCall(PetscFree(dvdy));
+    PetscCall(PetscFree(dvdt));
+    PetscCall(PetscFree(n));
+    PetscCall(PetscFree(dzdx));
+    PetscCall(PetscFree(dzdy));
+    PetscCall(PetscFree(h_source));
+    PetscCall(PetscFree(hu_source));
+    PetscCall(PetscFree(hv_source));
   }
+  PetscCall(PetscFree(cell_x));
+  PetscCall(PetscFree(cell_y));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -341,7 +396,9 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     // fetch x, y for each edge (and set t = time)
     RDyBoundary boundary  = rdy->boundaries[b];
     PetscInt    num_edges = boundary.num_edges;
-    PetscReal   x[num_edges], y[num_edges];
+    PetscReal  *x, *y;
+    PetscCall(PetscCalloc1(num_edges, &x));
+    PetscCall(PetscCalloc1(num_edges, &y));
     for (PetscInt e = 0; e < num_edges; ++e) {
       PetscInt edge_id       = boundary.edge_ids[e];
       RDyPoint edge_centroid = rdy->mesh.edges.centroids[edge_id];
@@ -351,20 +408,31 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
 
     // compute h, hu, hv on each edge (SWE-specific)
     RDyFlowCondition *flow_bc = rdy->boundary_conditions[b].flow;
-    PetscReal         h[num_edges], u[num_edges], v[num_edges];
+    PetscReal        *h, *u, *v;
+    PetscCall(PetscCalloc1(num_edges, &h));
+    PetscCall(PetscCalloc1(num_edges, &u));
+    PetscCall(PetscCalloc1(num_edges, &v));
     PetscCall(EvaluateTemporalSolution(flow_bc->height, num_edges, x, y, time, h));
     PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, time, u));
     PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, time, v));
 
     // set the boundary values (SWE-specific)
     // NOTE: ndof == 3 for SWE
-    PetscReal boundary_values[3 * num_edges];
+    PetscReal *boundary_values;
+    PetscCall(PetscCalloc1(3 * num_edges, &boundary_values));
     for (PetscInt e = 0; e < num_edges; ++e) {
       boundary_values[3 * e]     = h[e];
       boundary_values[3 * e + 1] = h[e] * u[e];
       boundary_values[3 * e + 2] = h[e] * v[e];
     }
     PetscCall(RDySetDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+
+    PetscCall(PetscFree(x));
+    PetscCall(PetscFree(y));
+    PetscCall(PetscFree(h));
+    PetscCall(PetscFree(u));
+    PetscCall(PetscFree(v));
+    PetscCall(PetscFree(boundary_values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -383,8 +451,11 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
     RDyRegion region = rdy->regions[r];
 
     // create vectorized (x, y) pairs for bulk expression evaluation
-    PetscReal cell_x[region.num_cells], cell_y[region.num_cells];
-    PetscInt  N = 0;  // number of bulk evaluations
+    PetscReal *cell_x, *cell_y;
+    PetscCall(PetscCalloc1(region.num_cells, &cell_x));
+    PetscCall(PetscCalloc1(region.num_cells, &cell_y));
+
+    PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_cells; ++c) {
       PetscInt cell_id = region.cell_ids[c];
       if (3 * cell_id < n_local) {
@@ -396,10 +467,14 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
     // evaluate and set material properties
     if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      PetscReal manning[N];
+      PetscReal *manning;
+      PetscCall(PetscCalloc1(N, &manning));
       PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, manning));
       PetscCall(RDySetManningsNForLocalCells(rdy, N, manning));
+      PetscCall(PetscFree(manning));
     }
+    PetscCall(PetscFree(cell_x));
+    PetscCall(PetscFree(cell_y));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -464,8 +539,8 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, const char *comp_names[num_comps], PetscReal L1_norms[num_comps],
-                                      PetscReal L2_norms[num_comps], PetscReal Linf_norms[num_comps]) {
+static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, const char **comp_names, PetscReal *L1_norms, PetscReal *L2_norms,
+                                      PetscReal *Linf_norms) {
   PetscFunctionBegin;
   PetscPrintf(comm, "  Error norms at t = %g:\n", time);
   for (PetscInt c = 0; c < num_comps; ++c) {
@@ -491,12 +566,19 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
   int num_refinements = rdy->config.mms.swe.convergence.num_refinements;
   int base_refinement = rdy->config.mms.swe.convergence.base_refinement;
 
+#define MAX_NUM_REFINEMENTS 8
+  PetscCheck(num_refinements <= MAX_NUM_REFINEMENTS, rdy->comm, PETSC_ERR_USER, "Number of refinements (%d) exceeds maximum (%d)", num_refinements,
+             MAX_NUM_REFINEMENTS);
+
   // error norm storage
-  PetscInt  num_comps = 3;  // SWE only!
-  PetscReal L1_norms[num_refinements + 1][num_comps], L2_norms[num_refinements + 1][num_comps], Linf_norms[num_refinements + 1][num_comps];
+#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only
+  int       num_comps = MAX_NUM_COMPONENTS;
+  PetscReal L1_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS],
+      Linf_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS];
+  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
 
   // create refined RDy objects and set them up (dumb, but easy)
-  RDy rdys[num_refinements + 1];
+  RDy rdys[MAX_NUM_REFINEMENTS + 1];
   rdys[0] = rdy;
   for (PetscInt r = 1; r <= num_refinements; ++r) {
     PetscCall(RDyCreate(rdy->comm, rdy->config_file, &rdys[r]));
@@ -520,19 +602,18 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 
     // compute error norms for this refinement level
     PetscCall(RDyMMSComputeErrorNorms(rdys[r], final_time, L1_norms[r], L2_norms[r], Linf_norms[r], NULL, NULL));
-    const char *comp_names[3] = {" h", "hu", "hv"};
-    PrintErrorNorms(rdys[r]->comm, final_time, 3, comp_names, L1_norms[r], L2_norms[r], Linf_norms[r]);
+    PrintErrorNorms(rdys[r]->comm, final_time, num_comps, comp_names, L1_norms[r], L2_norms[r], Linf_norms[r]);
   }
 
   // calculate the spatial discretization parameter N, where h^{-dim} = N.
-  PetscReal x[num_refinements + 1];
+  PetscReal x[MAX_NUM_REFINEMENTS + 1];
   for (PetscInt r = 0; r <= num_refinements; ++r) {
     PetscInt N = rdys[r]->mesh.num_cells_global;
     x[r]       = PetscLog10Real(N);
   }
 
   // fit convergence rates
-  PetscReal y1[num_refinements + 1], y2[num_refinements + 1], yinf[num_refinements + 1];
+  PetscReal y1[MAX_NUM_REFINEMENTS + 1], y2[MAX_NUM_REFINEMENTS + 1], yinf[MAX_NUM_REFINEMENTS + 1];
   for (PetscInt c = 0; c < num_comps; ++c) {
     for (PetscInt r = 0; r <= num_refinements; ++r) {
       y1[r]   = PetscLog10Real(L1_norms[r][c]);
@@ -554,6 +635,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
   for (PetscInt r = 1; r <= num_refinements; ++r) {
     PetscCall(RDyDestroy(&rdys[r]));
   }
+#undef MAX_NUM_COMPONENTS
 
   // PetscCall(PetscConvEstDestroy(&convEst));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -568,16 +650,16 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
-  // FIXME: SWE only at the moment
+#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only!
+  PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS], L1_norms[MAX_NUM_COMPONENTS],
+      L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
+  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
     // run a convergence study
-    PetscInt  num_comps = 3;
-    PetscReal L1_conv_rates[num_comps], L2_conv_rates[num_comps], Linf_conv_rates[num_comps];
     PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
-    const char *comp_names[3] = {" h", "hu", "hv"};
     PetscPrintf(rdy->comm, "Convergence rates:\n");
-    for (PetscInt idof = 0; idof < 3; idof++) {
+    for (PetscInt idof = 0; idof < MAX_NUM_COMPONENTS; idof++) {
       PetscPrintf(rdy->comm, "  %s: L1 = %g, L2 = %g, Linf = %g\n", comp_names[idof], L1_conv_rates[idof], L2_conv_rates[idof],
                   Linf_conv_rates[idof]);
     }
@@ -604,16 +686,16 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
     PetscReal cur_time;
     PetscCall(RDyGetTime(rdy, time_unit, &cur_time));
-    PetscReal L1_norms[3], L2_norms[3], Linf_norms[3], global_area;
+    PetscReal global_area;
     PetscInt  num_global_cells;
     PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
 
-    const char *comp_names[3] = {" h", "hu", "hv"};
-    PrintErrorNorms(rdy->comm, cur_time, 3, comp_names, L1_norms, L2_norms, Linf_norms);
+    PrintErrorNorms(rdy->comm, cur_time, MAX_NUM_COMPONENTS, comp_names, L1_norms, L2_norms, Linf_norms);
 
     PetscPrintf(rdy->comm, "  Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
     PetscPrintf(rdy->comm, "  Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
   }
+#undef MAX_NUM_COMPONENTS
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -6,6 +6,8 @@ option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
 
+set(MAX_NAME_LEN 128 CACHE STRING "Maximum allowable length of field/variable names")
+
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -70,8 +72,12 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fmax-errors=10")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-value")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format-truncation")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
 elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
 
   # emit compile_commands.json for use with clangd
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

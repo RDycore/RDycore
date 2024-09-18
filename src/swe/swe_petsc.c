@@ -45,8 +45,8 @@ PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncom
 
 /// For computing fluxes, allocates structs to hold values left and right
 /// of boundary edges. This must be called after CreatePetscSWEFluxForInternalEdges.
-PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt ncomp, PetscInt nbnd, RDyBoundary boundaries[nbnd],
-                                                  PetscBool ceed_enabled, void **petsc_rhs) {
+PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt ncomp, PetscInt nbnd, RDyBoundary *boundaries, PetscBool ceed_enabled,
+                                                  void **petsc_rhs) {
   PetscFunctionBegin;
 
   // create an array of data structures to hold values for cells left/right of an edge
@@ -175,13 +175,13 @@ static PetscErrorCode GetVelocityFromMomentum(PetscReal tiny_h, RiemannDataSWE *
 /// @param [in] N Size of the array
 /// @param [in] *datal A RiemannDataSWE for values left of the edges
 /// @param [in] *datar A RiemannDataSWE for values right of the edges
-/// @param [in] sn Sine of the angle between edge and y-axis
-/// @param [in] cn Cosine of the angle between edge and y-axis
-/// @param [out] fij Flux through the edges
-/// @param [out] amax Maximum courant number
+/// @param [in] sn array containing sines of the angles between edges and y-axis (length N)
+/// @param [in] cn array containing cosines of the angles between edges and y-axis (length N)
+/// @param [out] fij array containing fluxes through edges (length 3*N)
+/// @param [out] amax array storing maximum courant number on edges (length N)
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeRoeFlux(PetscInt N, RiemannDataSWE *datal, RiemannDataSWE *datar, const PetscReal sn[N], const PetscReal cn[N],
-                                     PetscReal fij[N * 3], PetscReal amax[N]) {
+static PetscErrorCode ComputeRoeFlux(PetscInt N, RiemannDataSWE *datal, RiemannDataSWE *datar, const PetscReal *sn, const PetscReal *cn,
+                                     PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
   PetscReal *hl = datal->h;
@@ -415,8 +415,10 @@ static PetscErrorCode PerformPrecomputationForBC(RDy rdy, RDyBoundary boundary, 
 // After the right values (hr/ur/vr) have been computed based on the different type of BCs,
 // compute the fluxes and add contribution in the F vector.
 static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h, CourantNumberDiagnostics *courant_num_diags, PetscInt N,
-                                RiemannDataSWE *datal, RiemannDataSWE *datar, const PetscReal sn[N], const PetscReal cn[N],
-                                PetscReal flux_vec_bnd[N * 3], PetscReal amax_vec_bnd[N], PetscReal *F) {
+                                RiemannDataSWE *datal, RiemannDataSWE *datar, const PetscReal *sn, const PetscReal *cn,  // arrays of length N
+                                PetscReal *flux_vec_bnd,                                                                 // array of length 3*N
+                                PetscReal *amax_vec_bnd,                                                                 // array of length N
+                                PetscReal *F) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &rdy->mesh.cells;

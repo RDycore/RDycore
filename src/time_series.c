@@ -5,11 +5,13 @@
 static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscInt num_md = 3;
+  // allocate storage for local metadata
+  PetscInt  num_md          = 3;
+  PetscInt  num_local_edges = rdy->time_series.boundary_fluxes.num_local_edges[rdy->rank];
+  PetscInt *local_flux_md;
+  PetscCall(PetscCalloc1(num_md * num_local_edges + 1, &local_flux_md));
 
   // gather local metadata
-  PetscInt num_local_edges = rdy->time_series.boundary_fluxes.num_local_edges[rdy->rank];
-  PetscInt local_flux_md[num_md * num_local_edges + 1];
   PetscInt n = 0;
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyCondition bc = rdy->boundary_conditions[b];
@@ -30,12 +32,13 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 
   // gather it on the root process (rank 0)
   if (rdy->rank == 0) {
-    PetscMPIInt *global_flux_md;
+    PetscMPIInt *global_flux_md, *n_recv_counts, *n_recv_displs;
     PetscInt     num_global_edges = rdy->time_series.boundary_fluxes.num_global_edges;
     PetscCall(PetscCalloc1(num_md * num_global_edges, &global_flux_md));
+    PetscCall(PetscCalloc1(rdy->nproc, &n_recv_counts));
+    PetscCall(PetscCalloc1(rdy->nproc + 1, &n_recv_displs));
 
     // local -> global flux metadata
-    PetscMPIInt n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
     n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
       n_recv_counts[p]     = num_md * rdy->time_series.boundary_fluxes.num_local_edges[p];
@@ -46,11 +49,15 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
     for (PetscInt i = 0; i < num_md * num_global_edges; ++i) {
       rdy->time_series.boundary_fluxes.global_flux_md[i] = (PetscInt)global_flux_md[i];
     }
-    PetscFree(global_flux_md);
+    PetscCall(PetscFree(global_flux_md));
+    PetscCall(PetscFree(n_recv_counts));
+    PetscCall(PetscFree(n_recv_displs));
   } else {
     // send the root proc the local flux metadata
     MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm);
   }
+
+  PetscCall(PetscFree(local_flux_md));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -85,12 +92,14 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   }
 
   // gather per-process numbers of local boundary edges
-  PetscMPIInt num_local_edges[rdy->nproc];
+  PetscMPIInt *num_local_edges;
+  PetscCall(PetscCalloc1(rdy->nproc, &num_local_edges));
   MPI_Allgather(&num_boundary_edges, 1, MPI_INT, num_local_edges, 1, MPI_INT, rdy->comm);
   PetscCall(PetscCalloc1(rdy->nproc, &rdy->time_series.boundary_fluxes.num_local_edges));
   for (PetscInt p = 0; p < rdy->nproc; ++p) {
     rdy->time_series.boundary_fluxes.num_local_edges[p] = (PetscInt)num_local_edges[p];
   }
+  PetscCall(PetscFree(num_local_edges));
 
   // determine the global number of boundary edges
   MPI_Allreduce(&num_boundary_edges, &rdy->time_series.boundary_fluxes.num_global_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
@@ -151,8 +160,9 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   // flux data itself (mass, x-momentum, y-momentum, edge x normal, edge y normal)
   // (add a padding byte to the end to prevent a 0-length VLA in case we don't
   // have any local boundary edges)
-  PetscInt  num_data = 5;
-  PetscReal local_flux_data[num_data * num_local_edges + 1];
+  PetscInt   num_data = 5;
+  PetscReal *local_flux_data;
+  PetscCall(PetscCalloc1(num_data * num_local_edges + 1, &local_flux_data));
 
   // gather local data
   PetscInt n = 0;
@@ -179,16 +189,22 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   // gather local data into global arrays on the root process and
   // write them out
   if (rdy->rank == 0) {
-    int         num_md         = 3;
-    PetscInt   *global_flux_md = rdy->time_series.boundary_fluxes.global_flux_md;
-    PetscMPIInt n_recv_counts[rdy->nproc], n_recv_displs[rdy->nproc + 1];
+    int          num_md         = 3;
+    PetscInt    *global_flux_md = rdy->time_series.boundary_fluxes.global_flux_md;
+    PetscMPIInt *n_recv_counts, *n_recv_displs;
+    PetscCall(PetscCalloc1(rdy->nproc, &n_recv_counts));
+    PetscCall(PetscCalloc1(rdy->nproc + 1, &n_recv_displs));
+
     n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
       n_recv_counts[p]     = num_data * rdy->time_series.boundary_fluxes.num_local_edges[p];
       n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
-    PetscReal global_flux_data[num_data * num_global_edges];
+    PetscReal *global_flux_data;
+    PetscCall(PetscCalloc1(num_data * num_global_edges, &global_flux_data));
     MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0, rdy->comm);
+    PetscCall(PetscFree(n_recv_counts));
+    PetscCall(PetscFree(n_recv_displs));
 
     // append the data to the boundary fluxes file (or, if this is our first
     // step, overwrite the existing file)
@@ -216,11 +232,13 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
       PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%" PetscInt_FMT "\t%" PetscInt_FMT "\t%" PetscInt_FMT "\t%e\t%e\t%e\t%e\t%e\n", time, global_edge_id,
                              boundary_id, bc_type, water_mass, x_momentum, y_momentum, x_normal, y_normal));
     }
+    PetscCall(PetscFree(global_flux_data));
     PetscCall(PetscFClose(rdy->comm, fp));
   } else {
     // send the root proc the local flux data
     MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm);
   }
+  PetscCall(PetscFree(local_flux_data));
 
   // zero the boundary fluxes so they can begin reaccumulating
   // NOTE that there are 3 fluxes (and not 5)
@@ -248,7 +266,7 @@ static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
     CeedVector bflux_vec;
     PetscCallCEED(CeedOperatorFieldGetVector(bflux, &bflux_vec));
     int num_comp = 3;  // SWE
-    CeedScalar(*bflux_data)[num_comp];
+    CeedScalar(*bflux_data)[3];
     PetscCallCEED(CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data));
 
     // hand over the boundary fluxes and zero the flux vector

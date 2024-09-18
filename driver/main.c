@@ -148,7 +148,7 @@ static PetscErrorCode CloseHomogeneousRainData(HomogeneousRainData *homogeneous_
 }
 
 // set a constant rainfall for all grid cells
-PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
   for (PetscInt icell = 0; icell < ncells; icell++) {
     rain[icell] = rain_rate;
@@ -299,7 +299,7 @@ static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRa
 }
 
 // set spatially heterogeneous rainfall rate
-PetscErrorCode SetHeterogeneousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetHeterogeneousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
   // Is it time to open a new file?
@@ -319,7 +319,7 @@ PetscErrorCode SetHeterogeneousRainfall(HeterogeneousRainData *hetero_rain, Pets
 }
 
 // set spatially homogeneous rainfall rate for all grid cells
-PetscErrorCode SetHomogeneousRainfall(HomogeneousRainData *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal rain[ncells]) {
+PetscErrorCode SetHomogeneousRainfall(HomogeneousRainData *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
   PetscReal    cur_rain;
@@ -362,12 +362,14 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   PetscBool sp_hetero_dir_flag;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset->heterogeneous.dir, sizeof(rain_dataset->heterogeneous.dir),
                                   &sp_hetero_dir_flag));
-  PetscInt nvalues = 5;
-  PetscInt date[nvalues];
-  PetscInt ndate = nvalues;
+
+#define NUM_HETEROGENEOUS_RAIN_DATE_VALUES 5  // number of parameters expected for heterogeneous rain date
+  PetscInt date[NUM_HETEROGENEOUS_RAIN_DATE_VALUES];
+  PetscInt ndate = NUM_HETEROGENEOUS_RAIN_DATE_VALUES;
   PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-heterogeneous_rain_start_date", date, &ndate, &flag));
   if (flag) {
-    PetscCheck(ndate == nvalues, PETSC_COMM_WORLD, PETSC_ERR_USER, "Expect 5 values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM");
+    PetscCheck(ndate == NUM_HETEROGENEOUS_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "Expect %d values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM", NUM_HETEROGENEOUS_RAIN_DATE_VALUES);
     PetscCheck(rain_dataset->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
                "Can only specify homogeneous or heterogeneous rainfall datasets.");
     PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
@@ -395,6 +397,7 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
 
     rain_dataset->heterogeneous.ndata = 0;
   }
+#undef NUM_HETEROGENEOUS_RAIN_DATE_VALUES
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

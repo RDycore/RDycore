@@ -3,6 +3,14 @@
 
 #include "swe_ceed_impl.h"
 
+// CEED uses C99 VLA features for shaping multidimensional
+// arrays, which don't have the same drawbacks as VLA allocations.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wvla"
+
 // frees a data context allocated using PETSc, returning a libCEED error code
 static int FreeContextPetsc(void *data) {
   if (PetscFree(data)) return CeedError(NULL, CEED_ERROR_ACCESS, "PetscFree failed");
@@ -309,8 +317,8 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
 // @param [in]  boundary_conditions An array of metadata defining boundary conditions the operator will enforce
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary boundaries[num_boundaries],
-                                     RDyCondition boundary_conditions[num_boundaries], PetscReal tiny_h, CeedOperator *flux_op) {
+PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions,
+                                     PetscReal tiny_h, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   // create a composite operator consisting of interior and boundary flux
@@ -378,7 +386,7 @@ PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, R
 }
 
 PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary, PetscInt size,
-                                                         PetscReal boundary_values[size]) {
+                                                         PetscReal *boundary_values) {
   PetscFunctionBeginUser;
 
   // fetch the array storing the boundary values
@@ -411,7 +419,7 @@ PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, R
 // @param [in]  materials_by_cell An array of RDyMaterials defining cellwise material properties
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial materials_by_cell[num_cells], PetscReal tiny_h,
+PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial *materials_by_cell, PetscReal tiny_h,
                                        CeedOperator *source_op) {
   PetscFunctionBeginUser;
 
@@ -645,3 +653,6 @@ PetscErrorCode SWESourceOperatorSetManningsN(CeedOperator source_op, PetscReal *
   PetscCall(SetOperatorFieldComponent(source_op, sub_op_idx, "mannings_n", icomp, n_values));
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
+
+#pragma GCC diagnostic   pop
+#pragma clang diagnostic pop
