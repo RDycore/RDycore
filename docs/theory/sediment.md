@@ -15,7 +15,7 @@ Each sediment concentration $c_p$ evolves in time according to its own transport
 equation
 
 \begin{equation}
-\frac{\partial (hc)_{i}}{\partial t} + \nabla\cdot(h c_p \vec{u}) = e_p + e_{rp} + r_p + r_{rp} - d_p \tag{1}\label{1}
+\frac{\partial (hc)_p}{\partial t} + \nabla\cdot(h c_p \vec{u}) = e_p + e_{rp} + r_p + r_{rp} - d_p \tag{1}\label{1}
 \end{equation}
 
 where
@@ -41,7 +41,7 @@ All size classes deposit their layers to the bed floor, changing the bed
 elevation according to the ordinary differential equation
 
 \begin{equation}
-(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{i=1}^{I}(d_p - e_p - e_{rp} - r_p - r_{rp})\tag{3}\label{3}
+(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{p=1}^{P}(d_p - e_p - e_{rp} - r_p - r_{rp})\tag{3}\label{3}
 \end{equation}
 
 where 
@@ -98,8 +98,8 @@ clay and 1.13 for loam.
 #### Overland flow-driven entrainment and re-entrainment rates
 
 \begin{eqnarray}
-r_p &=& (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J} \\
-r_{rp} &=& H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
+r_p &=& (1-H)f_p}\frac{F(\Omega-\Omega_{cr})}{J} \\
+r_{rp} &=& H\frac{M_p}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
 \end{eqnarray}
 
 where
@@ -117,7 +117,7 @@ where
 #### Size class deposition rate
 
 \begin{equation}
-d_p = v_p c_{i} \tag{7}\label{7}
+d_p = v_p c_p \tag{7}\label{7}
 \end{equation}
 
 where $v_p$ is the _settling velocity_ of each size class with concentration
@@ -140,7 +140,7 @@ sediment size-class concentrations:
     vh     \\
     c_1 h \\
     \vdots \\
-    c_I h
+    c_P h
   \end{bmatrix}.
 \end{align}
 
@@ -156,7 +156,7 @@ equations:
     u v h                     \\
     c_1 u h                   \\
     \vdots                    \\
-    c_I u h
+    c_P u h
   \end{bmatrix},
 \end{align}
 
@@ -168,12 +168,12 @@ equations:
     v^2 h + \frac{1}{2} g h^2 \\
     c_1 v h                   \\
     \vdots                    \\
-    c_I v h
+    c_P v h
   \end{bmatrix}.
 \end{align}
 
-We also augment the shallow water equation source vector $\mathbf{S}$ with
-the (re)attachment, (re)entrainment, and deposition terms:
+Additionally, we augment the shallow water equation source vector $\mathbf{S}$
+with the (re)attachment, (re)entrainment, and deposition terms:
 
 \begin{align}
 \mathbf{S} =
@@ -181,9 +181,9 @@ the (re)attachment, (re)entrainment, and deposition terms:
     Q
     -g h\frac{\partial z}{\partial x} - C_D u\sqrt{u^2 + v^2} \\[.5em]
     -g h\frac{\partial z}{\partial y} - C_D v\sqrt{u^2 + v^2} \\
-    e_1 + e_{r1} + r_1 + r_{r1} - d_{1}                                 \\
+    e_1 + e_{r1} + r_1 + r_{r1} - d_1                                 \\
     \vdots                                                          \\
-    e_I + e_{rI} + r_I + r_{rI} - d_I 
+    e_P + e_{rP} + r_P + r_{rP} - d_P
   \end{bmatrix}.
 \end{align}
 
@@ -194,18 +194,18 @@ _deposited mass vector_ $\mathbf{M}$ and a _net deposition vector_ $\mathbf{D}$:
 \begin{align}
 \mathbf{M} =
   \begin{bmatrix}
-    M_{1}    \\[.5em]
+    M_1    \\[.5em]
     \vdots   \\
-    M_{I} 
+    M_P
   \end{bmatrix},
 \end{align}
 
 \begin{align}
 \mathbf{D} =
   \begin{bmatrix}
-    d_{1}-e_{r1}-r_{r1} \\[.5em]
+    d_1-e_{r1}-r_{r1} \\[.5em]
     \vdots              \\
-    d_{I}-e_{rI}-r_{rI}  
+    d_P-e_{rI}-r_{rP}
   \end{bmatrix}.
 \end{align}
 
@@ -269,9 +269,9 @@ from the $x$ axis, the normal flux is
     hu_{\parallel}                                                                  \\[.5em]
     huu_{\parallel} + \frac{1}{2}gh^{2}cos \phi + \frac{1}{24}g\Delta h^{2}cos \phi \\
     hvu_{\parallel} + \frac{1}{2}gh^{2}sin \phi + \frac{1}{24}g\Delta h^{2}sin \phi \\
-    hc_{1}u_{\parallel}                                                             \\
+    hc_1 u_{\parallel}                                                             \\
     \vdots                                                                          \\
-    hc_{I}u_{\parallel}                                                             \\
+    hc_P u_{\parallel}                                                             \\
   \end{bmatrix}\tag{11}\label{11}.
 \end{align}
 
@@ -282,14 +282,14 @@ balance the bed slope terms for the still water condition.
 The fluxes at the interface between cells can be approximated with Roe's method:
 
 \begin{equation}
-\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} = 
+\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} =
 \frac{1}{2} \left(\mathbf{F}_{\parallel,L} + \mathbf{F}_{\parallel,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
 \end{equation}
 
 where the subscript $f$ annotates the interface between two adjacent cells,
 $L$ and $R$ indicate the "left" and "right" states for the interface, and
 $\Delta$ denotes the difference in quantities across the interface. The terms
-$\mathbf{\hat{R}}$ and $\mathbf{\hat{\Lambda}}$ are the right eigenvector and the 
+$\mathbf{\hat{R}}$ and $\mathbf{\hat{\Lambda}}$ are the right eigenvector and the
 eigenvalue of the Jacobian of $\mathbf{F}_{\parallel}$, and
 $\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U$ denotes the wave strength,
 with $\hat{L}$ the left eigenvector of the Jacobian of $\mathbf{F}_{\parallel}$.
@@ -300,9 +300,9 @@ with $\hat{L}$ the left eigenvector of the Jacobian of $\mathbf{F}_{\parallel}$.
     1                         & 0           & 1                         & 0      & \ldots & 0      \\
     \hat{u}-\hat{a}cos \theta & -sin \theta & \hat{u}+\hat{a}cos \theta & 0      & \ldots & 0      \\
     \hat{v}-\hat{a}sin \theta &  cos \theta & \hat{v}+\hat{a}sin \theta & 0      & \ldots & 0      \\
-    \hat{c_{1}}               & 0           & \hat{c_{1}}               & 1      & \ldots & 0      \\
+    \hat{c_1}               & 0           & \hat{c_1}               & 1      & \ldots & 0      \\
     \vdots                    & \vdots      & \vdots                    & \vdots & \ddots & \vdots \\ 
-    \hat{c_{I}}               & 0           & \hat{c_{I}}               & 0      & \ldots & 1      \\
+    \hat{c_P}               & 0           & \hat{c_P}               & 0      & \ldots & 1      \\
   \end{bmatrix}
 \end{align}
 
@@ -324,9 +324,9 @@ with $\hat{L}$ the left eigenvector of the Jacobian of $\mathbf{F}_{\parallel}$.
     \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
     \hat{h}u_\perp                                                          \\[.5em]
     \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
-    (c_{1}h)_{R} - (c_{1}h)_{L} - \hat{c_{1}}(h_{R}-h_{L})                      \\[.5em]
+    (c_1 h)_{R} - (c_1 h)_{L} - \hat{c_1}(h_{R}-h_{L})                      \\[.5em]
     \vdots                                                                      \\[.5em]
-    (c_{I}h)_{R} - (c_{I}h)_{L} - \hat{c_{I}}(h_{R}-h_{L})                      \\[.5em]
+    (c_P h)_{R} - (c_P h)_{L} - \hat{c_P}(h_{R}-h_{L})                      \\[.5em]
   \end{bmatrix}
 \end{align}
 
@@ -343,16 +343,16 @@ The quantities with a hat are Roe averages, which are calculated thus:
 \hat{u}   &=& \frac{\sqrt{h_L}u_L + \sqrt{h_R}u_R}{\sqrt{h_L}+\sqrt{h_R}} \\
 \hat{v}   &=& \frac{\sqrt{h_L}v_L + \sqrt{h_R}v_R}{\sqrt{h_L}+\sqrt{h_R}} \\
 \hat{a}   &=& \sqrt{\frac{g}{2}(h_L + h_R)}                               \\
-\hat{c_i} &=& \frac{\sqrt{h_L}c_{i,L}+\sqrt{h_R} c_{i,R}}{\sqrt{h_L}+\sqrt{h_R}} 
+\hat{c_i} &=& \frac{\sqrt{h_L}c_{i,L}+\sqrt{h_R} c_{i,R}}{\sqrt{h_L}+\sqrt{h_R}}
 \end{eqnarray}
 
-The asterisks indicate that the eigenvalues $\hat{\lambda}_{1}=\hat{u}_{\parallel}-\hat{a}$
-and $\hat{\lambda}_{3}=\hat{u}_{\parallel}+\hat{a}$ are adjusted because Roe's 
+The asterisks indicate that the eigenvalues $\hat{\lambda}_1=\hat{u}_{\parallel}-\hat{a}$
+and $\hat{\lambda}_{3}=\hat{u}_{\parallel}+\hat{a}$ are adjusted because Roe's
 method does not provide correct fluxes for critical flow:
 
 \begin{equation}
-|\hat{\lambda}_{1}|^{*} = \frac{\hat{\lambda}_{1}^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
-\quad if \quad -\Delta \lambda /2 < \hat{\lambda}_{1} < \Delta \lambda /2
+|\hat{\lambda}_1|^{*} = \frac{\hat{\lambda}_1^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
+\quad if \quad -\Delta \lambda /2 < \hat{\lambda}_1 < \Delta \lambda /2
 \end{equation}
 
 \begin{equation}
