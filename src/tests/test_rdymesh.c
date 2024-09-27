@@ -19,7 +19,10 @@ static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   PetscInt  faces[] = {Nx, Ny};
   PetscReal lower[] = {x1, y1};
   PetscReal upper[] = {x2, y2};
-  PetscCall(DMPlexCreateBoxMesh(comm, dim, PETSC_FALSE, faces, lower, upper, NULL, PETSC_TRUE, dm));
+  PetscBool interpolate        = PETSC_TRUE;
+  PetscInt  localizationHeight = 0;
+  PetscBool sparseLocalize     = PETSC_FALSE;
+  PetscCall(DMPlexCreateBoxMesh(comm, dim, PETSC_FALSE, faces, lower, upper, NULL, interpolate, localizationHeight, sparseLocalize, dm));
   PetscCall(DMPlexDistributeSetDefault(*dm, PETSC_FALSE));
 
   // Determine the number of cells, edges, and vertices of the mesh
