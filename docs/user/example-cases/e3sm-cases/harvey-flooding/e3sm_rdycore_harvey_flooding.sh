@@ -140,8 +140,6 @@ rdycore_dir=$e3sm_dir/externals/rdycore/
 cd $rdycore_dir
 
 source config/set_petsc_settings.sh --mach $mach --config 3
-export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_veccopy_fix
-export PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-veccopy_fix
 
 
 if [ ! -d "$rdycore_dir/build-$PETSC_ARCH" ]
