@@ -1,4 +1,4 @@
-# Hurricane Harvey Flooding Simulation using Spatially-Homogenous Rainfall and Time-varying Ocean BC dataset
+# Hurricane Harvey Flooding Simulation using Spatially-homogeneous Rainfall and Time-varying Ocean BC dataset
 
 Both datasets, the spatially-homogeneous rainfall (`share/conditions/Houston1km.rain.<int32|int64>.bin`) and
 time-varying ocean boundary condition (`share/conditions/Houston1km.bc.<int32|int64>.bin`) are PETSc `Vec`
@@ -19,7 +19,7 @@ The rainfall and boundary condition dataset can be specified to the RDycore driv
 the following command line options:
 
 1. `-rain <binary-rainfall-dataset>`
-2. `-bc <binary-bc-dataset>` and
+2. `-homogeneous_bc_file <binary-bc-dataset>` and
 
 ## Script
 

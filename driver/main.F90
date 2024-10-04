@@ -120,13 +120,13 @@ program rdycore_f90
     if (trim(config_file) /= trim('-help')) then
 
       PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-rain', rainfile, rain_specified, ierr))
-      PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-bc', bcfile, bc_specified, ierr))
+      PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-homogeneous_bc_file', bcfile, bc_specified, ierr))
 
       ! Flags to temporally interpolate rain and bc forcing
       interpolate_rain = PETSC_FALSE
       interpolate_bc   = PETSC_FALSE
-      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-interpolate_rain', interpolate_rain, flg, ierr))
-      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-interpolate_bc', interpolate_bc, flg, ierr))
+      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-temporally_interpolate_rain', interpolate_rain, flg, ierr))
+      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-temporally_interpolate_bc', interpolate_bc, flg, ierr))
 
       if (rain_specified) then
         call opendata(rainfile, rain_vec, nrain)
@@ -169,7 +169,7 @@ program rdycore_f90
 
         if (bcond_type == CONDITION_DIRICHLET) then
           if (bc_specified .and. dirc_bc_idx > 0) then
-            SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "When BC file specified via -bc argument, only one CONDITION_DIRICHLET can be present in the yaml")
+            SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml")
           endif
           dirc_bc_idx = ibcond
           num_edges_dirc_bc = num_edges

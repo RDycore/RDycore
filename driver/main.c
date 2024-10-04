@@ -353,11 +353,11 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, NULL));
 
   PetscCall(
-      PetscOptionsGetString(NULL, NULL, "-homogeneous_rain", rain_dataset->homogeneous.filename, sizeof(rain_dataset->homogeneous.filename), &flag));
+      PetscOptionsGetString(NULL, NULL, "-homogeneous_rain_file", rain_dataset->homogeneous.filename, sizeof(rain_dataset->homogeneous.filename), &flag));
   if (flag) {
     rain_dataset->type = HOMOGENEOUS;
   }
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
 
   PetscBool sp_hetero_dir_flag;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset->heterogeneous.dir, sizeof(rain_dataset->heterogeneous.dir),
@@ -429,8 +429,8 @@ int main(int argc, char *argv[]) {
     PetscBool interpolate_bc = PETSC_FALSE;
 
     PetscCall(ParseRainfallDataOptions(&rain_dataset));
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-bc", bcfile, sizeof(bcfile), &bc_specified));
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-interpolate_bc", &interpolate_bc, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bcfile, sizeof(bcfile), &bc_specified));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_bc", &interpolate_bc, NULL));
 
     Vec          bc_vec = NULL;
     PetscScalar *bc_ptr = NULL;
@@ -474,7 +474,7 @@ int main(int argc, char *argv[]) {
       if (bc_type == CONDITION_DIRICHLET) {
         if (bc_specified) {
           PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                     "When BC file specified via -bc argument, only one CONDITION_DIRICHLET can be present in the yaml");
+                     "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
         }
         dirc_bc_idx       = ibc;
         num_edges_dirc_bc = num_edges;
@@ -485,7 +485,7 @@ int main(int argc, char *argv[]) {
       PetscMPIInt global_dirc_bc_idx = -1;
       MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
       PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
-                 "The BC file specified via -bc argument, but no CONDITION_DIRICHLET found in the yaml");
+                 "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
     }
     PetscReal *bc_values;
     PetscCalloc1(num_edges_dirc_bc * 3, &bc_values);
