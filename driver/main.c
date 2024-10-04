@@ -11,11 +11,11 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
-typedef enum { CONSTANT = 0, HOMOGENEOUS, HETEROGENEOUS } RainType;
+typedef enum { CONSTANT = 0, HOMOGENEOUS, HETEROGENEOUS } DatasetType;
 
 typedef struct {
   PetscReal rate;
-} ConstantRainData;
+} ConstantDataset;
 
 typedef struct {
   char         filename[PETSC_MAX_PATH_LEN];
@@ -24,7 +24,7 @@ typedef struct {
   PetscScalar *data_ptr;
   PetscBool    temporally_interpolate;
   PetscInt     cur_idx, prev_idx;
-} HomogeneousRainData;
+} HomogeneousDataset;
 
 typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
@@ -55,13 +55,13 @@ typedef struct {
   PetscReal *mesh_xc, *mesh_yc;
   PetscInt   mesh_ncells_local;
 
-} HeterogeneousRainData;
+} RasterDataset;
 
 typedef struct {
-  RainType              type;
-  ConstantRainData      constant;
-  HomogeneousRainData   homogeneous;
-  HeterogeneousRainData heterogeneous;
+  DatasetType        type;
+  ConstantDataset    constant;
+  HomogeneousDataset homogeneous;
+  RasterDataset      heterogeneous;
 } Rain;
 
 // open a Vec that contains data in the following format:
@@ -125,24 +125,24 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
 }
 
 // loads the binary data in a Vec
-static PetscErrorCode OpenHomogeneousRainData(HomogeneousRainData *homogeneous_rain) {
+static PetscErrorCode OpenHomogeneousDataset(HomogeneousDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(OpenData(homogeneous_rain->filename, &homogeneous_rain->data_vec, &homogeneous_rain->ndata));
-  PetscCall(VecGetArray(homogeneous_rain->data_vec, &homogeneous_rain->data_ptr));
-  homogeneous_rain->cur_idx                = -1;
-  homogeneous_rain->prev_idx               = -1;
-  homogeneous_rain->temporally_interpolate = PETSC_FALSE;
+  PetscCall(OpenData(data->filename, &data->data_vec, &data->ndata));
+  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+  data->cur_idx                = -1;
+  data->prev_idx               = -1;
+  data->temporally_interpolate = PETSC_FALSE;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // close and destroys the Vec
-static PetscErrorCode CloseHomogeneousRainData(HomogeneousRainData *homogeneous_rain) {
+static PetscErrorCode CloseHomogeneousDataset(HomogeneousDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(homogeneous_rain->data_vec, &homogeneous_rain->data_ptr));
-  PetscCall(VecDestroy(&homogeneous_rain->data_vec));
+  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
+  PetscCall(VecDestroy(&data->data_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -158,13 +158,13 @@ PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscRe
 }
 
 // compute the file name of the rainfall given the current data
-static PetscErrorCode DetermineHeterogeneousRainfallDataFilename(HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode DetermineRasterDatasetFilename(RasterDataset *hetero_data) {
   PetscFunctionBegin;
 
-  struct tm *current_date = &hetero_rain->current_date;
+  struct tm *current_date = &hetero_data->current_date;
 
   mktime(current_date);
-  snprintf(hetero_rain->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_rain->dir, current_date->tm_year + 1900,
+  snprintf(hetero_data->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_data->dir, current_date->tm_year + 1900,
            current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -177,121 +177,121 @@ static PetscErrorCode DetermineHeterogeneousRainfallDataFilename(HeterogeneousRa
 // - ylc      : y coordinate of the lower left corner [m]
 // - cellsize : size of grid cells in the rainfall dataset [m]
 // - data     : rainfall rate for ncols * nrows cells [mm/hr]
-static PetscErrorCode OpenHeterogeneousRainData(HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(DetermineHeterogeneousRainfallDataFilename(hetero_rain));
-  PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", hetero_rain->file);
+  PetscCall(DetermineRasterDatasetFilename(data));
+  PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", data->file);
 
-  hetero_rain->dtime_in_hour = 1.0;  // assume an hourly dataset
-  hetero_rain->ndata_file    = 1;
+  data->dtime_in_hour = 1.0;  // assume an hourly dataset
+  data->ndata_file    = 1;
 
-  PetscCall(OpenData(hetero_rain->file, &hetero_rain->data_vec, &hetero_rain->ndata));
-  PetscCall(VecGetArray(hetero_rain->data_vec, &hetero_rain->data_ptr));
+  PetscCall(OpenData(data->file, &data->data_vec, &data->ndata));
+  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
-  hetero_rain->header_offset = 5;
+  data->header_offset = 5;
 
-  hetero_rain->ncols    = (PetscInt)hetero_rain->data_ptr[0];
-  hetero_rain->nrows    = (PetscInt)hetero_rain->data_ptr[1];
-  hetero_rain->xlc      = hetero_rain->data_ptr[2];
-  hetero_rain->ylc      = hetero_rain->data_ptr[3];
-  hetero_rain->cellsize = hetero_rain->data_ptr[4];
+  data->ncols    = (PetscInt)data->data_ptr[0];
+  data->nrows    = (PetscInt)data->data_ptr[1];
+  data->xlc      = data->data_ptr[2];
+  data->ylc      = data->data_ptr[3];
+  data->cellsize = data->data_ptr[4];
 
   if (0) {
-    printf("ncols = %" PetscInt_FMT "\n", hetero_rain->ncols);
-    printf("nrows = %" PetscInt_FMT "\n", hetero_rain->nrows);
-    printf("xlc   = %f\n", hetero_rain->xlc);
-    printf("ylc   = %f\n", hetero_rain->ylc);
-    printf("size  = %f\n", hetero_rain->cellsize);
+    printf("ncols = %" PetscInt_FMT "\n", data->ncols);
+    printf("nrows = %" PetscInt_FMT "\n", data->nrows);
+    printf("xlc   = %f\n", data->xlc);
+    printf("ylc   = %f\n", data->ylc);
+    printf("size  = %f\n", data->cellsize);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // close the currently open rain dataset and open a new dataset file
-static PetscErrorCode OpenANewHeterogeneousRainfallData(HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
 
   // close the existing file
-  PetscCall(VecRestoreArray(hetero_rain->data_vec, &hetero_rain->data_ptr));
-  PetscCall(VecDestroy(&hetero_rain->data_vec));
+  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
+  PetscCall(VecDestroy(&data->data_vec));
 
   // increase the date
-  struct tm *current_date = &hetero_rain->current_date;
+  struct tm *current_date = &data->current_date;
   current_date->tm_hour++;
   mktime(current_date);
 
   // determine the new file
-  PetscCall(DetermineHeterogeneousRainfallDataFilename(hetero_rain));
-  PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", hetero_rain->file);
+  PetscCall(DetermineRasterDatasetFilename(data));
+  PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", data->file);
 
   PetscInt ndata;
-  PetscCall(OpenData(hetero_rain->file, &hetero_rain->data_vec, &ndata));
-  PetscCall(VecGetArray(hetero_rain->data_vec, &hetero_rain->data_ptr));
+  PetscCall(OpenData(data->file, &data->data_vec, &ndata));
+  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
   // check to ensure the size and header information of the new rainfall data is the same as the older one
-  PetscCheck(ndata == hetero_rain->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER, "The ndata of previous and new rainfal do not match");
-  PetscCheck(hetero_rain->ncols == (PetscInt)hetero_rain->data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER,
+  PetscCheck(ndata == data->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER, "The ndata of previous and new rainfal do not match");
+  PetscCheck(data->ncols == (PetscInt)data->data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The number of columns in the previous and new rainfal do not match");
-  PetscCheck(hetero_rain->nrows == (PetscInt)hetero_rain->data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER,
+  PetscCheck(data->nrows == (PetscInt)data->data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The number of rows in the previous and new rainfal do not match");
-  PetscCheck(hetero_rain->xlc == hetero_rain->data_ptr[2], PETSC_COMM_WORLD, PETSC_ERR_USER, "The xc of the previous and new rainfal do not match");
-  PetscCheck(hetero_rain->ylc == hetero_rain->data_ptr[3], PETSC_COMM_WORLD, PETSC_ERR_USER, "The yc of the previous and new rainfal do not match");
-  PetscCheck(hetero_rain->cellsize == hetero_rain->data_ptr[4], PETSC_COMM_WORLD, PETSC_ERR_USER,
+  PetscCheck(data->xlc == data->data_ptr[2], PETSC_COMM_WORLD, PETSC_ERR_USER, "The xc of the previous and new rainfal do not match");
+  PetscCheck(data->ylc == data->data_ptr[3], PETSC_COMM_WORLD, PETSC_ERR_USER, "The yc of the previous and new rainfal do not match");
+  PetscCheck(data->cellsize == data->data_ptr[4], PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The cellsize of the previous and new rainfal do not match");
 
-  hetero_rain->ndata_file++;
+  data->ndata_file++;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // for each local RDycore grid cell, find the nearest neighbor cell in the rainfall dataset
-static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRainData *hetero_rain) {
+static PetscErrorCode SetupRasterDatasetMapping(RDy rdy, RasterDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(RDyGetNumLocalCells(rdy, &hetero_rain->mesh_ncells_local));
-  PetscCalloc1(hetero_rain->mesh_ncells_local, &hetero_rain->mesh_xc);
-  PetscCalloc1(hetero_rain->mesh_ncells_local, &hetero_rain->mesh_yc);
-  PetscCalloc1(hetero_rain->mesh_ncells_local, &hetero_rain->data2mesh_idx);
+  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_ncells_local));
+  PetscCalloc1(data->mesh_ncells_local, &data->mesh_xc);
+  PetscCalloc1(data->mesh_ncells_local, &data->mesh_yc);
+  PetscCalloc1(data->mesh_ncells_local, &data->data2mesh_idx);
 
-  PetscCalloc1(hetero_rain->ncols * hetero_rain->nrows, &hetero_rain->data_xc);
-  PetscCalloc1(hetero_rain->ncols * hetero_rain->nrows, &hetero_rain->data_yc);
+  PetscCalloc1(data->ncols * data->nrows, &data->data_xc);
+  PetscCalloc1(data->ncols * data->nrows, &data->data_yc);
 
   PetscInt idx = 0;
-  for (PetscInt irow = 0; irow < hetero_rain->nrows; irow++) {
-    for (PetscInt icol = 0; icol < hetero_rain->ncols; icol++) {
-      hetero_rain->data_xc[idx] = hetero_rain->xlc + icol * hetero_rain->cellsize + hetero_rain->cellsize / 2.0;
-      hetero_rain->data_yc[idx] = hetero_rain->ylc + (hetero_rain->nrows - 1 - irow) * hetero_rain->cellsize + hetero_rain->cellsize / 2.0;
+  for (PetscInt irow = 0; irow < data->nrows; irow++) {
+    for (PetscInt icol = 0; icol < data->ncols; icol++) {
+      data->data_xc[idx] = data->xlc + icol * data->cellsize + data->cellsize / 2.0;
+      data->data_yc[idx] = data->ylc + (data->nrows - 1 - irow) * data->cellsize + data->cellsize / 2.0;
       idx++;
     }
   }
 
-  PetscCall(RDyGetLocalCellXCentroids(rdy, hetero_rain->mesh_ncells_local, hetero_rain->mesh_xc));
-  PetscCall(RDyGetLocalCellYCentroids(rdy, hetero_rain->mesh_ncells_local, hetero_rain->mesh_yc));
+  PetscCall(RDyGetLocalCellXCentroids(rdy, data->mesh_ncells_local, data->mesh_xc));
+  PetscCall(RDyGetLocalCellYCentroids(rdy, data->mesh_ncells_local, data->mesh_yc));
 
-  for (PetscInt icell = 0; icell < hetero_rain->mesh_ncells_local; icell++) {
-    PetscReal min_dist = (PetscMax(hetero_rain->ncols, hetero_rain->nrows) + 1) * hetero_rain->cellsize;
-    PetscReal xc       = hetero_rain->mesh_xc[icell];
-    PetscReal yc       = hetero_rain->mesh_yc[icell];
+  for (PetscInt icell = 0; icell < data->mesh_ncells_local; icell++) {
+    PetscReal min_dist = (PetscMax(data->ncols, data->nrows) + 1) * data->cellsize;
+    PetscReal xc       = data->mesh_xc[icell];
+    PetscReal yc       = data->mesh_yc[icell];
 
     PetscInt idx = 0;
-    for (PetscInt irow = 0; irow < hetero_rain->nrows; irow++) {
-      for (PetscInt icol = 0; icol < hetero_rain->ncols; icol++) {
-        PetscReal dx = xc - hetero_rain->data_xc[idx];
-        PetscReal dy = yc - hetero_rain->data_yc[idx];
+    for (PetscInt irow = 0; irow < data->nrows; irow++) {
+      for (PetscInt icol = 0; icol < data->ncols; icol++) {
+        PetscReal dx = xc - data->data_xc[idx];
+        PetscReal dy = yc - data->data_yc[idx];
 
         PetscReal dist = PetscPowReal(dx * dx + dy * dy, 0.5);
         if (dist < min_dist) {
           min_dist                          = dist;
-          hetero_rain->data2mesh_idx[icell] = idx;
+          data->data2mesh_idx[icell] = idx;
         }
         idx++;
       }
     }
 
     if (0) {
-      PetscInt idx = hetero_rain->data2mesh_idx[icell];
-      printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, hetero_rain->data_xc[idx], hetero_rain->data_yc[idx]);
+      PetscInt idx = data->data2mesh_idx[icell];
+      printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, data->data_xc[idx], data->data_yc[idx]);
     }
   }
 
@@ -299,27 +299,27 @@ static PetscErrorCode SetupHeterogeneousRainDataMapping(RDy rdy, HeterogeneousRa
 }
 
 // set spatially heterogeneous rainfall rate
-PetscErrorCode SetHeterogeneousRainfall(HeterogeneousRainData *hetero_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
+PetscErrorCode SetRasterDataset(RasterDataset *data, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
   // Is it time to open a new file?
-  if (cur_time / 3600.0 >= (hetero_rain->ndata_file) * hetero_rain->dtime_in_hour) {
-    OpenANewHeterogeneousRainfallData(hetero_rain);
+  if (cur_time / 3600.0 >= (data->ndata_file) * data->dtime_in_hour) {
+    OpenANewRasterDataset(data);
   }
 
-  PetscInt  offset                = hetero_rain->header_offset;
+  PetscInt  offset                = data->header_offset;
   PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
   for (PetscInt icell = 0; icell < ncells; icell++) {
-    PetscInt idx = hetero_rain->data2mesh_idx[icell];
-    rain[icell]  = hetero_rain->data_ptr[idx + offset] * mm_per_hr_2_m_per_sec;
+    PetscInt idx = data->data2mesh_idx[icell];
+    rain[icell]  = data->data_ptr[idx + offset] * mm_per_hr_2_m_per_sec;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // set spatially homogeneous rainfall rate for all grid cells
-PetscErrorCode SetHomogeneousRainfall(HomogeneousRainData *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
+PetscErrorCode SetHomogeneousRainfall(HomogeneousDataset *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
   PetscReal    cur_rain;
@@ -447,11 +447,11 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case HOMOGENEOUS:
-        PetscCall(OpenHomogeneousRainData(&rain_dataset.homogeneous));
+        PetscCall(OpenHomogeneousDataset(&rain_dataset.homogeneous));
         break;
       case HETEROGENEOUS:
-        PetscCall(OpenHeterogeneousRainData(&rain_dataset.heterogeneous));
-        PetscCall(SetupHeterogeneousRainDataMapping(rdy, &rain_dataset.heterogeneous));
+        PetscCall(OpenRasterDataset(&rain_dataset.heterogeneous));
+        PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset.heterogeneous));
         break;
     }
 
@@ -515,7 +515,7 @@ int main(int argc, char *argv[]) {
           PetscCall(SetHomogeneousRainfall(&rain_dataset.homogeneous, time, n, rain));
           break;
         case HETEROGENEOUS:
-          PetscCall(SetHeterogeneousRainfall(&rain_dataset.heterogeneous, time, n, rain));
+          PetscCall(SetRasterDataset(&rain_dataset.heterogeneous, time, n, rain));
           break;
       }
 
@@ -567,7 +567,7 @@ int main(int argc, char *argv[]) {
       case CONSTANT:
         break;
       case HOMOGENEOUS:
-        PetscCall(CloseHomogeneousRainData(&rain_dataset.homogeneous));
+        PetscCall(CloseHomogeneousDataset(&rain_dataset.homogeneous));
         break;
       case HETEROGENEOUS:
         break;
