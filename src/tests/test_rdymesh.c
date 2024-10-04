@@ -16,9 +16,9 @@ static PetscErrorCode Create2DUnitBoxDM(PetscInt Nx, PetscInt Ny, DM *dm) {
   PetscInt  dim  = 2;
   PetscReal x1 = 0.0, x2 = 1.0;
   PetscReal y1 = 0.0, y2 = 1.0;
-  PetscInt  faces[] = {Nx, Ny};
-  PetscReal lower[] = {x1, y1};
-  PetscReal upper[] = {x2, y2};
+  PetscInt  faces[]            = {Nx, Ny};
+  PetscReal lower[]            = {x1, y1};
+  PetscReal upper[]            = {x2, y2};
   PetscBool interpolate        = PETSC_TRUE;
   PetscInt  localizationHeight = 0;
   PetscBool sparseLocalize     = PETSC_FALSE;
