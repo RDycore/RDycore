@@ -8,7 +8,7 @@ The E3SM-RDycore model has been tested on Perlmutter and Frontier for the RDycor
 ```bash
 git clone git@github.com:rdycore/e3sm
 cd e3sm
-git checkout rdycore/mosart-rdycore/8b4c2d5df3-2024-04-05
+git checkout rdycore/mosart-rdycore/d4ca7d0606-2024-10-02
 git submodule update --init
 cd externals/rdycore
 git submodule update --init
