@@ -11,7 +11,7 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
-typedef enum { CONSTANT = 0, HOMOGENEOUS, HETEROGENEOUS } DatasetType;
+typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, HETEROGENEOUS } DatasetType;
 
 typedef struct {
   PetscReal rate;
@@ -63,6 +63,11 @@ typedef struct {
   HomogeneousDataset homogeneous;
   RasterDataset      heterogeneous;
 } Rain;
+
+typedef struct {
+  DatasetType        type;
+  HomogeneousDataset homogeneous;
+} BoundaryCondition;
 
 // open a Vec that contains data in the following format:
 //
@@ -132,7 +137,7 @@ static PetscErrorCode OpenHomogeneousDataset(HomogeneousDataset *data) {
   PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
   data->cur_idx                = -1;
   data->prev_idx               = -1;
-  data->temporally_interpolate = PETSC_FALSE;
+  //data->temporally_interpolate = PETSC_FALSE;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -340,6 +345,30 @@ PetscErrorCode SetHomogeneousRainfall(HomogeneousDataset *homogeneous_rain, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode SetHomogeneousBoundary(HomogeneousDataset *bc_data, PetscReal cur_time, PetscInt num_values, PetscReal *bc_values) {
+  PetscFunctionBegin;
+
+  PetscReal    cur_bc;
+  PetscScalar *bc_ptr                 = bc_data->data_ptr;
+  PetscInt     ndata                  = bc_data->ndata;
+  PetscBool    temporally_interpolate = bc_data->temporally_interpolate;
+  PetscInt    *cur_bc_idx             = &bc_data->cur_idx;
+  PetscInt    *prev_bc_idx            = &bc_data->prev_idx;
+
+  PetscCall(GetCurrentData(bc_ptr, ndata, cur_time, temporally_interpolate, cur_bc_idx, &cur_bc));
+
+  if (temporally_interpolate || *cur_bc_idx != *prev_bc_idx) {  // is it time to update the source term?
+    *prev_bc_idx = *cur_bc_idx;
+    for (PetscInt ii = 0; ii < num_values; ii++) {
+      bc_values[ii * 3]     = cur_bc;
+      bc_values[ii * 3 + 1] = 0.0;
+      bc_values[ii * 3 + 2] = 0.0;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // save information about rainfall dataset from command line options
 PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   PetscFunctionBegin;
@@ -347,16 +376,17 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   PetscBool flag;
 
   // set default rainfall
-  rain_dataset->type          = CONSTANT;
-  rain_dataset->constant.rate = 0.0;
+  rain_dataset->type                               = UNSET;
+  rain_dataset->constant.rate                      = 0.0;
+  rain_dataset->homogeneous.temporally_interpolate = PETSC_FALSE;
 
-  PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, NULL));
+  PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, &flag));
+  if (flag) rain_dataset->type = CONSTANT;
 
   PetscCall(
       PetscOptionsGetString(NULL, NULL, "-homogeneous_rain_file", rain_dataset->homogeneous.filename, sizeof(rain_dataset->homogeneous.filename), &flag));
-  if (flag) {
-    rain_dataset->type = HOMOGENEOUS;
-  }
+  if (flag) rain_dataset->type = HOMOGENEOUS;
+
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
 
   PetscBool sp_hetero_dir_flag;
@@ -399,6 +429,25 @@ PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
   }
 #undef NUM_HETEROGENEOUS_RAIN_DATE_VALUES
 
+  printf("ParaseRainDataOptions: rain_dataset->type = %d; rain_dataset->homogeneous.temporally_interpolate = %d\n",rain_dataset->type,rain_dataset->homogeneous.temporally_interpolate);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode ParaseBoundaryDataOptions(BoundaryCondition *bc) {
+  PetscFunctionBegin;
+
+  PetscBool flag;
+
+  bc->type                               = UNSET;
+  bc->homogeneous.temporally_interpolate = PETSC_FALSE;
+
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bc->homogeneous.filename, sizeof(bc->homogeneous.filename), &flag));
+  if (flag) bc->type = HOMOGENEOUS;
+
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_bc", &bc->homogeneous.temporally_interpolate, NULL));
+  printf("ParaseBoundaryDataOptions: bc->type = %d; bc->homogeneous.temporally_interpolate = %d\n",bc->type,bc->homogeneous.temporally_interpolate);
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -424,26 +473,17 @@ int main(int argc, char *argv[]) {
     // be that RDySetup is setting a default DM for all VecLoads.
     PetscBool bc_specified;
 
-    Rain      rain_dataset;
-    char      bcfile[PETSC_MAX_PATH_LEN];
-    PetscBool interpolate_bc = PETSC_FALSE;
+    Rain              rain_dataset;
+    BoundaryCondition bc_dataset;
 
     PetscCall(ParseRainfallDataOptions(&rain_dataset));
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bcfile, sizeof(bcfile), &bc_specified));
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_bc", &interpolate_bc, NULL));
-
-    Vec          bc_vec = NULL;
-    PetscScalar *bc_ptr = NULL;
-    PetscInt     nbc;
-
-    if (bc_specified) {
-      PetscCall(OpenData(bcfile, &bc_vec, &nbc));
-      PetscCall(VecGetArray(bc_vec, &bc_ptr));
-    }
+    PetscCall(ParaseBoundaryDataOptions(&bc_dataset));
 
     PetscCall(RDySetup(rdy));
 
     switch (rain_dataset.type) {
+      case UNSET:
+        break;
       case CONSTANT:
         break;
       case HOMOGENEOUS:
@@ -452,6 +492,22 @@ int main(int argc, char *argv[]) {
       case HETEROGENEOUS:
         PetscCall(OpenRasterDataset(&rain_dataset.heterogeneous));
         PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset.heterogeneous));
+        break;
+    }
+
+    switch (bc_dataset.type) {
+      case UNSET:
+        bc_specified = PETSC_FALSE;
+        break;
+      case CONSTANT:
+        bc_specified = PETSC_TRUE;
+        break;
+      case HOMOGENEOUS:
+        bc_specified = PETSC_TRUE;
+        PetscCall(OpenHomogeneousDataset(&bc_dataset.homogeneous));
+        break;
+      case HETEROGENEOUS:
+        bc_specified = PETSC_TRUE;
         break;
     }
 
@@ -500,14 +556,14 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-coupling_interval", &coupling_interval, NULL));
     PetscCall(RDySetCouplingInterval(rdy, time_unit, coupling_interval));
 
-    PetscInt cur_bc_idx = -1, prev_bc_idx = -1;
-
     while (!RDyFinished(rdy)) {  // returns true based on stopping criteria
 
       PetscReal time, time_step;
       PetscCall(RDyGetTime(rdy, time_unit, &time));
 
       switch (rain_dataset.type) {
+        case UNSET:
+          break;
         case CONSTANT:
           PetscCall(SetConstantRainfall(rain_dataset.constant.rate, n, rain));
           break;
@@ -521,18 +577,19 @@ int main(int argc, char *argv[]) {
 
       PetscCall(RDySetWaterSourceForLocalCells(rdy, n, rain));
 
-      if (bc_specified && num_edges_dirc_bc > 0) {
-        PetscReal cur_bc;
-        PetscCall(GetCurrentData(bc_ptr, nbc, time, interpolate_bc, &cur_bc_idx, &cur_bc));
-        if (interpolate_bc || cur_bc_idx != prev_bc_idx) {  // is it time to update the bc?
-          prev_bc_idx = cur_bc_idx;
-          for (PetscInt iedge = 0; iedge < num_edges_dirc_bc; iedge++) {
-            bc_values[iedge * 3]     = cur_bc;
-            bc_values[iedge * 3 + 1] = 0.0;
-            bc_values[iedge * 3 + 2] = 0.0;
-          }
-          PetscCall(RDySetDirichletBoundaryValues(rdy, dirc_bc_idx, num_edges_dirc_bc, 3, bc_values));
+      if (num_edges_dirc_bc > 0) {
+        switch (bc_dataset.type) {
+          case UNSET:
+            break;
+          case CONSTANT:
+            break;
+          case HOMOGENEOUS:
+            PetscCall(SetHomogeneousBoundary(&bc_dataset.homogeneous, time, num_edges_dirc_bc, bc_values));
+            break;
+          case HETEROGENEOUS:
+            break;
         }
+        PetscCall(RDySetDirichletBoundaryValues(rdy, dirc_bc_idx, num_edges_dirc_bc, 3, bc_values));
       }
 
       // advance the solution by the coupling interval specified in the config file
@@ -564,6 +621,8 @@ int main(int argc, char *argv[]) {
 
     // clean up
     switch (rain_dataset.type) {
+      case UNSET:
+        break;
       case CONSTANT:
         break;
       case HOMOGENEOUS:
@@ -573,9 +632,17 @@ int main(int argc, char *argv[]) {
         break;
     }
 
-    if (bc_specified) {
-      PetscCall(VecRestoreArray(bc_vec, &bc_ptr));
-      PetscCall(VecDestroy(&bc_vec));
+    // clean up
+    switch (bc_dataset.type) {
+      case UNSET:
+        break;
+      case CONSTANT:
+        break;
+      case HOMOGENEOUS:
+        PetscCall(CloseHomogeneousDataset(&bc_dataset.homogeneous));
+        break;
+      case HETEROGENEOUS:
+        break;
     }
 
     PetscFree(h);
