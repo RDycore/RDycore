@@ -832,14 +832,14 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     // validate our materials and their properties
     PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
-#define VALIDATE_MATERIAL_PROPERTY(materials, imat, property)                                                                   \
-  PetscCheck(materials[imat].properties.property.expression || materials[imat].properties.property.file, comm, PETSC_ERR_USER,  \
-             "Material %" PetscInt_FMT " has no associated value or file", imat);                                               \
-  PetscCheck(materials[imat].properties.property.expression != !materials[imat].properties.property.file, comm, PETSC_ERR_USER, \
-             "Material %" PetscInt_FMT " has both a value and a file -- only one may be specified", imat);                      \
-  if (materials[imat].properties.property.file) {                                                                               \
-    PetscCheck(materials[imat].properties.property.format != PETSC_VIEWER_NOFORMAT, comm, PETSC_ERR_USER,                       \
-               "Material %" PetscInt_FMT " file has no specified format", imat);                                                \
+#define VALIDATE_MATERIAL_PROPERTY(materials, imat, property)                                                                          \
+  PetscCheck(materials[imat].properties.property.expression[0] || materials[imat].properties.property.file[0], comm, PETSC_ERR_USER,   \
+             "Material %" PetscInt_FMT " has no associated value or file", imat);                                                      \
+  PetscCheck(!materials[imat].properties.property.expression[0] != !materials[imat].properties.property.file[0], comm, PETSC_ERR_USER, \
+             "Material %" PetscInt_FMT " has both a value and a file -- only one may be specified", imat);                             \
+  if (materials[imat].properties.property.file[0]) {                                                                                   \
+    PetscCheck(materials[imat].properties.property.format != PETSC_VIEWER_NOFORMAT, comm, PETSC_ERR_USER,                              \
+               "Material %" PetscInt_FMT " file has no specified format", imat);                                                       \
   }
     for (PetscInt imat = 0; imat < config->num_materials; ++imat) {
       VALIDATE_MATERIAL_PROPERTY(config->materials, imat, manning);
@@ -1003,8 +1003,10 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
   // material properties
   for (PetscInt m = 0; m < config->num_materials; ++m) {
     RDyMaterialPropertiesSpec *properties = &config->materials[m].properties;
-    properties->manning.value             = mupCreate(muBASETYPE_FLOAT);
-    mupSetExpr(properties->manning.value, properties->manning.expression);
+    if (properties->manning.expression[0]) {
+      properties->manning.value = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(properties->manning.value, properties->manning.expression);
+    }
   }
 
   // flow conditions
@@ -1261,7 +1263,6 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscCall(ParseYaml(rdy->comm, config_str, &config_schema, &config));
   PetscCall(SetMissingValues(config));
   PetscCall(ValidateConfig(rdy->comm, config, PETSC_FALSE));
-  PetscCall(ParseMathExpressions(rdy->comm, config));
 
   // copy the config into place and dispose of the original
   rdy->config = *config;
@@ -1274,6 +1275,9 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   } else {
     rdy->ensemble_member_index = -1;  // not a member of an ensemble
   }
+
+  // parse math expressions as needed
+  PetscCall(ParseMathExpressions(rdy->comm, &rdy->config));
 
   // set any additional options needed in PETSc's options database
   PetscCall(SetAdditionalOptions(rdy));
