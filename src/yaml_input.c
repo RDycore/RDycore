@@ -830,8 +830,21 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
                "Only %" PetscInt_FMT " material <-> region assignments were found in surface_composition (%" PetscInt_FMT " needed)",
                config->num_material_assignments, config->num_regions);
 
-    // validate our materials
+    // validate our materials and their properties
     PetscCheck(config->num_materials > 0, comm, PETSC_ERR_USER, "No materials specified!");
+#define VALIDATE_MATERIAL_PROPERTY(materials, imat, property)                                                                   \
+  PetscCheck(materials[imat].properties.property.expression || materials[imat].properties.property.file, comm, PETSC_ERR_USER,  \
+             "Material %" PetscInt_FMT " has no associated value or file", imat);                                               \
+  PetscCheck(materials[imat].properties.property.expression != !materials[imat].properties.property.file, comm, PETSC_ERR_USER, \
+             "Material %" PetscInt_FMT " has both a value and a file -- only one may be specified", imat);                      \
+  if (materials[imat].properties.property.file) {                                                                               \
+    PetscCheck(materials[imat].properties.property.format != PETSC_VIEWER_NOFORMAT, comm, PETSC_ERR_USER,                       \
+               "Material %" PetscInt_FMT " file has no specified format", imat);                                                \
+  }
+    for (PetscInt imat = 0; imat < config->num_materials; ++imat) {
+      VALIDATE_MATERIAL_PROPERTY(config->materials, imat, manning);
+    }
+#undef VALIDATE_MATERIAL_PROPERTY
   } else {  // mms mode
     // check that we have expressions for our manufactured solutions
     if (config->physics.flow.mode == FLOW_SWE) {
