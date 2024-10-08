@@ -90,9 +90,14 @@ foreach(np 1 2) # test on 1, 2 processes
   endforeach()
 endforeach()
 
-# ex2b ensemble test -- (file copy only for now)
+# ex2b ensemble test
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b-ensemble.yaml
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(lang c f90)
+  foreach(config basic ceed preload)
+    add_test(swe_ensemble_${lang}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n 2 ${rdycore_${lang}_driver} ex2b-ensemble.yaml ${${config}_args})
+  endforeach()
+endforeach()
 
 # four_mounds_60x24
 file (COPY

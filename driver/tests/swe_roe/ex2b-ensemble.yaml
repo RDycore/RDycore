@@ -1,7 +1,7 @@
 # This test input corresponds to toy-problems/swe_roe/ex2b.c.
 
 ensemble:
-  size: 5
+  size: 2
   members:
   - materials:
     - name: smooth
@@ -12,22 +12,7 @@ ensemble:
     - name: smooth
       properties:
         manning:
-          value: 0.020
-  - materials:
-    - name: smooth
-      properties:
-        manning:
-          value: 0.025
-  - materials:
-    - name: smooth
-      properties:
-        manning:
           value: 0.030
-  - materials:
-    - name: smooth
-      properties:
-        manning:
-          value: 0.035
 
 physics:
   flow:
