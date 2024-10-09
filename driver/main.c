@@ -62,11 +62,17 @@ typedef struct {
   ConstantDataset    constant;
   HomogeneousDataset homogeneous;
   RasterDataset      heterogeneous;
-} Rain;
+
+  PetscInt ndata;
+  PetscReal *data_for_rdycore;
+} SourceSink;
 
 typedef struct {
   DatasetType        type;
   HomogeneousDataset homogeneous;
+
+  PetscInt ndata;
+  PetscReal *data_for_rdycore;
 } BoundaryCondition;
 
 // open a Vec that contains data in the following format:
@@ -370,7 +376,7 @@ PetscErrorCode SetHomogeneousBoundary(HomogeneousDataset *bc_data, PetscReal cur
 }
 
 // save information about rainfall dataset from command line options
-PetscErrorCode ParseRainfallDataOptions(Rain *rain_dataset) {
+PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
   PetscBool flag;
@@ -473,7 +479,7 @@ int main(int argc, char *argv[]) {
     // be that RDySetup is setting a default DM for all VecLoads.
     PetscBool bc_specified;
 
-    Rain              rain_dataset;
+    SourceSink        rain_dataset;
     BoundaryCondition bc_dataset;
 
     PetscCall(ParseRainfallDataOptions(&rain_dataset));
@@ -481,15 +487,24 @@ int main(int argc, char *argv[]) {
 
     PetscCall(RDySetup(rdy));
 
+    PetscInt n;
+    PetscCall(RDyGetNumLocalCells(rdy, &n));
+
     switch (rain_dataset.type) {
       case UNSET:
         break;
       case CONSTANT:
+        rain_dataset.ndata = n;
+        PetscCalloc1(n, &rain_dataset.data_for_rdycore);
         break;
       case HOMOGENEOUS:
+        rain_dataset.ndata = n;
+        PetscCalloc1(n, &rain_dataset.data_for_rdycore);
         PetscCall(OpenHomogeneousDataset(&rain_dataset.homogeneous));
         break;
       case HETEROGENEOUS:
+        rain_dataset.ndata = n;
+        PetscCalloc1(n, &rain_dataset.data_for_rdycore);
         PetscCall(OpenRasterDataset(&rain_dataset.heterogeneous));
         PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset.heterogeneous));
         break;
@@ -512,13 +527,10 @@ int main(int argc, char *argv[]) {
     }
 
     // allocate arrays for inspecting simulation data
-    PetscInt n;
-    PetscCall(RDyGetNumLocalCells(rdy, &n));
-    PetscReal *h, *hu, *hv, *rain;
+    PetscReal *h, *hu, *hv;
     PetscCalloc1(n, &h);
     PetscCalloc1(n, &hu);
     PetscCalloc1(n, &hv);
-    PetscCalloc1(n, &rain);
 
     // get information about boundary conditions
     PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
@@ -543,8 +555,9 @@ int main(int argc, char *argv[]) {
       PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
                  "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
     }
-    PetscReal *bc_values;
-    PetscCalloc1(num_edges_dirc_bc * 3, &bc_values);
+
+    bc_dataset.ndata = num_edges_dirc_bc * 3;
+    PetscCalloc1(bc_dataset.ndata, &bc_dataset.data_for_rdycore);
 
     // run the simulation to completion using the time parameters in the
     // config file
@@ -565,17 +578,18 @@ int main(int argc, char *argv[]) {
         case UNSET:
           break;
         case CONSTANT:
-          PetscCall(SetConstantRainfall(rain_dataset.constant.rate, n, rain));
+          PetscCall(SetConstantRainfall(rain_dataset.constant.rate, rain_dataset.ndata, rain_dataset.data_for_rdycore));
+          PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset.ndata, rain_dataset.data_for_rdycore));
           break;
         case HOMOGENEOUS:
-          PetscCall(SetHomogeneousRainfall(&rain_dataset.homogeneous, time, n, rain));
+          PetscCall(SetHomogeneousRainfall(&rain_dataset.homogeneous, time, rain_dataset.ndata, rain_dataset.data_for_rdycore));
+          PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset.ndata, rain_dataset.data_for_rdycore));
           break;
         case HETEROGENEOUS:
-          PetscCall(SetRasterDataset(&rain_dataset.heterogeneous, time, n, rain));
+          PetscCall(SetRasterDataset(&rain_dataset.heterogeneous, time, rain_dataset.ndata, rain_dataset.data_for_rdycore));
+          PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset.ndata, rain_dataset.data_for_rdycore));
           break;
       }
-
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, n, rain));
 
       if (num_edges_dirc_bc > 0) {
         switch (bc_dataset.type) {
@@ -584,12 +598,12 @@ int main(int argc, char *argv[]) {
           case CONSTANT:
             break;
           case HOMOGENEOUS:
-            PetscCall(SetHomogeneousBoundary(&bc_dataset.homogeneous, time, num_edges_dirc_bc, bc_values));
+            PetscCall(SetHomogeneousBoundary(&bc_dataset.homogeneous, time, num_edges_dirc_bc, bc_dataset.data_for_rdycore));
+            PetscCall(RDySetDirichletBoundaryValues(rdy, dirc_bc_idx, num_edges_dirc_bc, 3, bc_dataset.data_for_rdycore));
             break;
           case HETEROGENEOUS:
             break;
         }
-        PetscCall(RDySetDirichletBoundaryValues(rdy, dirc_bc_idx, num_edges_dirc_bc, 3, bc_values));
       }
 
       // advance the solution by the coupling interval specified in the config file
@@ -648,8 +662,6 @@ int main(int argc, char *argv[]) {
     PetscFree(h);
     PetscFree(hu);
     PetscFree(hv);
-    PetscFree(rain);
-    PetscFree(bc_values);
     PetscCall(RDyDestroy(&rdy));
   }
 
