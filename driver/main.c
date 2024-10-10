@@ -32,8 +32,6 @@ typedef struct {
 
   struct tm start_date, current_date;  // start and current date for rainfall dataset
 
-  PetscInt dataset_id_opened;
-
   // binary data
   Vec          data_vec;
   PetscScalar *data_ptr;
@@ -58,6 +56,30 @@ typedef struct {
 } RasterDataset;
 
 typedef struct {
+  char dir[PETSC_MAX_PATH_LEN];
+  char file[PETSC_MAX_PATH_LEN];
+  char mesh_file[PETSC_MAX_PATH_LEN];
+
+  PetscReal dtime_in_hour;
+  PetscInt  ndata_file;
+
+  struct tm start_date, current_date;  // start and current date for rainfall dataset
+
+  // binary data
+  Vec          data_vec;
+  PetscScalar *data_ptr;
+
+  PetscInt ndata;
+  PetscInt stride;
+
+  PetscInt  *data2mesh_idx;
+  PetscReal *data_xc, *data_yc;
+  PetscReal *mesh_bc_xc, *mesh_bc_yc;
+  PetscInt   mesh_bc_ncells;
+
+} UnstructuredDataset;
+
+typedef struct {
   DatasetType        type;
   ConstantDataset    constant;
   HomogeneousDataset homogeneous;
@@ -68,8 +90,9 @@ typedef struct {
 } SourceSink;
 
 typedef struct {
-  DatasetType        type;
-  HomogeneousDataset homogeneous;
+  DatasetType         type;
+  HomogeneousDataset  homogeneous;
+  UnstructuredDataset unstructured;
 
   PetscInt ndata;
   PetscInt dirichlet_bc_idx;
@@ -170,13 +193,11 @@ PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscRe
 }
 
 // compute the file name of the rainfall given the current data
-static PetscErrorCode DetermineRasterDatasetFilename(RasterDataset *hetero_data) {
+static PetscErrorCode DetermineDatasetFilename(struct tm *current_date, char *dir, char *file) {
   PetscFunctionBegin;
 
-  struct tm *current_date = &hetero_data->current_date;
-
   mktime(current_date);
-  snprintf(hetero_data->file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", hetero_data->dir, current_date->tm_year + 1900,
+  snprintf(file, PETSC_MAX_PATH_LEN - 1, "%s/%4d-%02d-%02d:%02d-%02d.%s.bin", dir, current_date->tm_year + 1900,
            current_date->tm_mon + 1, current_date->tm_mday, current_date->tm_hour, current_date->tm_min, PETSC_ID_TYPE);
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -192,7 +213,7 @@ static PetscErrorCode DetermineRasterDatasetFilename(RasterDataset *hetero_data)
 static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(DetermineRasterDatasetFilename(data));
+  PetscCall(DetermineDatasetFilename(&data->current_date, data->dir, data->file));
   PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", data->file);
 
   data->dtime_in_hour = 1.0;  // assume an hourly dataset
@@ -220,6 +241,153 @@ static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
+  PetscFunctionBegin;
+
+  PetscCall(DetermineDatasetFilename(&data->current_date, data->dir, data->file));
+
+  data->dtime_in_hour = 1.0;  // assume an hourly dataset
+  data->ndata_file    = 1;
+
+  PetscViewer viewer;
+  PetscCall(VecCreate(PETSC_COMM_SELF, &data->data_vec));
+  PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, data->file, FILE_MODE_READ, &viewer));
+  PetscCall(VecLoad(data->data_vec, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscInt size;
+  PetscCall(VecGetSize(data->data_vec, &size));
+  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+
+  data->ndata  = data->data_ptr[0];
+  data->stride = data->data_ptr[1];
+
+  PetscCheck((size - 2)/data->stride == data->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER, "The length (=%d) of loaded Vec does is not consistent with first (N = %d) and second (stride = %d) in the Vec", size, data->ndata, data->stride);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode SetupUnstructuredDatasetMapping(RDy rdy, PetscInt bc_idx, UnstructuredDataset *data) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  Vec         vec;
+  PetscScalar *vec_ptr;
+
+  PetscCall(VecCreate(PETSC_COMM_SELF, &vec));
+  PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, data->mesh_file, FILE_MODE_READ, &viewer));
+  PetscCall(VecLoad(vec, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscCall(VecGetArray(vec, &vec_ptr));
+
+  data->ndata = vec_ptr[0];
+  PetscCalloc1(data->ndata, &data->data_xc);
+  PetscCalloc1(data->ndata, &data->data_yc);
+
+  PetscInt stride = vec_ptr[1];
+  PetscCheck(stride == 2, PETSC_COMM_WORLD, PETSC_ERR_USER, "Stride (= %d) of unstructured dataset is unexpected.", (PetscInt) vec_ptr[1]);
+
+  PetscInt offset = 2;
+  for (PetscInt i = 0; i < data->ndata; i++) {
+    data->data_xc[i] = vec_ptr[i * stride + offset];
+    data->data_yc[i] = vec_ptr[i * stride + 1 + offset];
+  }
+
+  PetscCall(VecRestoreArray(vec, &vec_ptr));
+  PetscCall(VecDestroy(&vec));
+
+  PetscCalloc1(data->mesh_bc_ncells, &data->data2mesh_idx);
+  PetscCalloc1(data->mesh_bc_ncells, &data->mesh_bc_xc);
+  PetscCalloc1(data->mesh_bc_ncells, &data->mesh_bc_yc);
+
+  PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_idx, data->mesh_bc_ncells, data->mesh_bc_xc));
+  PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_idx, data->mesh_bc_ncells, data->mesh_bc_yc));
+
+  // for each boundary edge, find nearest dataset cell
+  for (PetscInt icell = 0; icell < data->mesh_bc_ncells; icell++) {
+    PetscReal xc = data->mesh_bc_xc[icell];
+    PetscReal yc = data->mesh_bc_yc[icell];
+
+    PetscReal min_dist;
+    for (PetscInt kk = 0; kk < data->ndata; kk++) {
+      PetscReal dx   = xc - data->data_xc[kk];
+      PetscReal dy   = yc - data->data_yc[kk];
+      PetscReal dist = PetscPowReal(dx * dx + dy * dy, 0.5);
+
+      if (kk == 0) {
+        min_dist                   = dist;
+        data->data2mesh_idx[icell] = kk;
+      } else {
+        if (dist < min_dist) {
+          min_dist                   = dist;
+          data->data2mesh_idx[icell] = kk;
+        }
+      }
+    }
+
+    if (1) {
+      PetscInt idx = data->data2mesh_idx[icell];
+      printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, data->data_xc[idx], data->data_yc[idx]);
+    }
+  }
+  printf("\n");
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode OpenANewUnstructuredDataset(UnstructuredDataset *data) {
+  PetscFunctionBegin;
+
+  // close the existing file
+  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
+  PetscCall(VecDestroy(&data->data_vec));
+
+  // increase the date
+  struct tm *current_date = &data->current_date;
+  current_date->tm_hour++;
+  mktime(current_date);
+
+  // determine the new file
+  PetscCall(DetermineDatasetFilename(&data->current_date, data->dir, data->file));
+  PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", data->file);
+
+  PetscViewer viewer;
+  PetscCall(VecCreate(PETSC_COMM_SELF, &data->data_vec));
+  PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, data->file, FILE_MODE_READ, &viewer));
+  PetscCall(VecLoad(data->data_vec, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+
+  data->ndata_file++;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// set spatially raster rainfall rate
+PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_time, PetscReal *data_values) {
+  PetscFunctionBegin;
+
+  // Is it time to open a new file?
+  if (cur_time / 3600.0 >= (data->ndata_file) * data->dtime_in_hour) {
+    OpenANewUnstructuredDataset(data);
+  }
+
+  PetscInt offset = 2;
+  PetscInt stride = data->stride;
+
+  for (PetscInt icell = 0; icell < data->mesh_bc_ncells; icell++) {
+    PetscInt idx = data->data2mesh_idx[icell] * stride;
+
+    for (PetscInt ii = 0; ii < stride; ii++) {
+      data_values[icell * stride]  = data->data_ptr[idx + ii + offset];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // close the currently open rain dataset and open a new dataset file
 static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
@@ -234,7 +402,7 @@ static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
   mktime(current_date);
 
   // determine the new file
-  PetscCall(DetermineRasterDatasetFilename(data));
+  PetscCall(DetermineDatasetFilename(&data->current_date, data->dir, data->file));
   PetscPrintf(PETSC_COMM_WORLD, "Opening %s \n", data->file);
 
   PetscInt ndata;
@@ -436,12 +604,10 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   }
 #undef NUM_RASTER_RAIN_DATE_VALUES
 
-  printf("ParaseRainDataOptions: rain_dataset->type = %d; rain_dataset->homogeneous.temporally_interpolate = %d\n",rain_dataset->type,rain_dataset->homogeneous.temporally_interpolate);
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode ParaseBoundaryDataOptions(BoundaryCondition *bc) {
+PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscFunctionBegin;
 
   PetscBool flag;
@@ -450,12 +616,57 @@ PetscErrorCode ParaseBoundaryDataOptions(BoundaryCondition *bc) {
   bc->ndata                              = 0;
   bc->dirichlet_bc_idx                   = -1;
   bc->homogeneous.temporally_interpolate = PETSC_FALSE;
+  bc->unstructured.ndata                 = 0;
+  bc->unstructured.stride                = 0;
+  bc->unstructured.mesh_bc_ncells        = 0;
 
   PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bc->homogeneous.filename, sizeof(bc->homogeneous.filename), &flag));
   if (flag) bc->type = HOMOGENEOUS;
 
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_bc", &bc->homogeneous.temporally_interpolate, NULL));
-  printf("ParaseBoundaryDataOptions: bc->type = %d; bc->homogeneous.temporally_interpolate = %d\n",bc->type,bc->homogeneous.temporally_interpolate);
+
+  PetscBool unstructured_bc_dir_flag;
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_dir", bc->unstructured.dir, sizeof(bc->unstructured.dir),
+                                  &unstructured_bc_dir_flag));
+
+#define NUM_UNSTRUCTURED_BC_DATE_VALUES 5  // number of parameters expected for raster rain date
+  PetscInt date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
+  PetscInt ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-unstructured_bc_start_date", date, &ndate, &flag));
+  if (flag) {
+    PetscCheck(ndate == NUM_UNSTRUCTURED_BC_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "Expect %d values when using -unstructured_bc_start_date YY,MO,DD,HH,MM", NUM_UNSTRUCTURED_BC_DATE_VALUES);
+    PetscCheck(bc->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "Can only specify homogeneous or unstructured BC datasets.");
+    PetscCheck(unstructured_bc_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "Need to specify path to unstructured BC data via -unstructured_bc_dir <dir>");
+
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_mesh_file", bc->unstructured.mesh_file, sizeof(bc->unstructured.mesh_file),
+                                    &flag));
+    PetscCheck(flag, PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify the mesh file -unstructured_bc_mesh_file <file>");
+
+    bc->type = UNSTRUCTRED;
+
+    bc->unstructured.start_date = (struct tm){
+        .tm_year  = date[0] - 1900,
+        .tm_mon   = date[1] - 1,
+        .tm_mday  = date[2],
+        .tm_hour  = date[3],
+        .tm_min   = date[4],
+        .tm_isdst = -1,
+    };
+
+    bc->unstructured.current_date = (struct tm){
+        .tm_year  = date[0] - 1900,
+        .tm_mon   = date[1] - 1,
+        .tm_mday  = date[2],
+        .tm_hour  = date[3],
+        .tm_min   = date[4],
+        .tm_isdst = -1,
+    };
+  }
+
+#undef NUM_UNSTRUCTURED_BC_DATE_VALUES
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -538,7 +749,7 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
 
   MPI_Comm comm = PETSC_COMM_WORLD;
 
-  PetscCall(ParaseBoundaryDataOptions(bc_dataset));
+  PetscCall(ParseBoundaryDataOptions(bc_dataset));
   switch (bc_dataset->type) {
     case UNSET:
       break;
@@ -550,6 +761,7 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
     case RASTER:
       break;
     case UNSTRUCTRED:
+      PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
       break;
   }
 
@@ -576,6 +788,11 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
     bc_dataset->ndata            = num_edges_dirc_bc * 3;
     bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
     PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
+
+    if ((bc_dataset->type == UNSTRUCTRED) & (num_edges_dirc_bc > 0)) {
+      bc_dataset->unstructured.mesh_bc_ncells = num_edges_dirc_bc;
+      PetscCall(SetupUnstructuredDatasetMapping(rdy, bc_dataset->dirichlet_bc_idx, &bc_dataset->unstructured));
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -597,6 +814,8 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
       case RASTER:
         break;
       case UNSTRUCTRED:
+        PetscCall(SetUnstructuredDataset(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
+        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata/3, 3, bc_dataset->data_for_rdycore));
         break;
     }
   }
