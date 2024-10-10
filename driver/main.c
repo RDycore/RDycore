@@ -72,6 +72,7 @@ typedef struct {
   HomogeneousDataset homogeneous;
 
   PetscInt ndata;
+  PetscInt dirichlet_bc_idx;
   PetscReal *data_for_rdycore;
 } BoundaryCondition;
 
@@ -446,6 +447,8 @@ PetscErrorCode ParaseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscBool flag;
 
   bc->type                               = UNSET;
+  bc->ndata                              = 0;
+  bc->dirichlet_bc_idx                   = -1;
   bc->homogeneous.temporally_interpolate = PETSC_FALSE;
 
   PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bc->homogeneous.filename, sizeof(bc->homogeneous.filename), &flag));
@@ -524,9 +527,10 @@ PetscErrorCode CloseRainfallDataset(SourceSink *rain_dataset) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode SetupBoundaryCondition(PetscInt n, BoundaryCondition *bc_dataset) {
-
+PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
+
+  MPI_Comm comm = PETSC_COMM_WORLD;
 
   PetscCall(ParaseBoundaryDataOptions(bc_dataset));
   switch (bc_dataset->type) {
@@ -541,24 +545,52 @@ PetscErrorCode SetupBoundaryCondition(PetscInt n, BoundaryCondition *bc_dataset)
       break;
   }
 
+  if (bc_dataset->type != UNSET) {
+    PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
+    PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+    for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
+      PetscInt num_edges, bc_type;
+      PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
+      PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
+      if (bc_type == CONDITION_DIRICHLET) {
+        PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
+                    "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
+        dirc_bc_idx       = ibc;
+        num_edges_dirc_bc = num_edges;
+      }
+    }
+
+    PetscMPIInt global_dirc_bc_idx = -1;
+    MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+    PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
+                "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
+
+    bc_dataset->ndata            = num_edges_dirc_bc * 3;
+    bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
+    PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, PetscInt dirc_bc_idx, BoundaryCondition *bc_dataset) {
-
+PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
-  switch (bc_dataset->type) {
-    case UNSET:
-      break;
-    case CONSTANT:
-      break;
-    case HOMOGENEOUS:
-      PetscCall(SetHomogeneousBoundary(&bc_dataset->homogeneous, time, bc_dataset->ndata/3, bc_dataset->data_for_rdycore));
-      PetscCall(RDySetDirichletBoundaryValues(rdy, dirc_bc_idx, bc_dataset->ndata/3, 3, bc_dataset->data_for_rdycore));
-      break;
-    case HETEROGENEOUS:
-      break;
+
+  if (bc_dataset->ndata) {
+    switch (bc_dataset->type) {
+      case UNSET:
+        break;
+      case CONSTANT:
+        break;
+      case HOMOGENEOUS:
+        PetscCall(SetHomogeneousBoundary(&bc_dataset->homogeneous, time, bc_dataset->ndata/3, bc_dataset->data_for_rdycore));
+        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata/3, 3, bc_dataset->data_for_rdycore));
+        break;
+      case HETEROGENEOUS:
+        break;
+    }
   }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -610,40 +642,13 @@ int main(int argc, char *argv[]) {
     PetscCall(RDyGetNumLocalCells(rdy, &n));
 
     PetscCall(SetupRainfallDataset(rdy, n, &rain_dataset)); 
-    PetscCall(SetupBoundaryCondition(n, &bc_dataset));
+    PetscCall(SetupBoundaryCondition(rdy, &bc_dataset));
 
     // allocate arrays for inspecting simulation data
     PetscReal *h, *hu, *hv;
     PetscCalloc1(n, &h);
     PetscCalloc1(n, &hu);
     PetscCalloc1(n, &hv);
-
-    // get information about boundary conditions
-    PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
-    PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
-    for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
-      PetscInt num_edges, bc_type;
-      PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
-      PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
-      if (bc_type == CONDITION_DIRICHLET) {
-        if (!bc_dataset.type) {
-          PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                     "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
-        }
-        dirc_bc_idx       = ibc;
-        num_edges_dirc_bc = num_edges;
-      }
-    }
-
-    if (!bc_dataset.type) {
-      PetscMPIInt global_dirc_bc_idx = -1;
-      MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
-      PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
-                 "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
-    }
-
-    bc_dataset.ndata = num_edges_dirc_bc * 3;
-    PetscCalloc1(bc_dataset.ndata, &bc_dataset.data_for_rdycore);
 
     // run the simulation to completion using the time parameters in the
     // config file
@@ -661,7 +666,7 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetTime(rdy, time_unit, &time));
 
       PetscCall(ApplyRainfallDataset(rdy, time, &rain_dataset));
-      if (num_edges_dirc_bc > 0) PetscCall(ApplyBoundaryCondition(rdy, time, dirc_bc_idx, &bc_dataset));
+      PetscCall(ApplyBoundaryCondition(rdy, time, &bc_dataset));
 
       // advance the solution by the coupling interval specified in the config file
       PetscCall(RDyAdvance(rdy));
