@@ -481,7 +481,6 @@ PetscErrorCode InitBoundaries(RDy rdy) {
               materials_by_cell[cell].property = x_ptr[c];                                             \
             }                                                                                          \
             PetscCall(VecRestoreArray(mat_prop_vec, &x_ptr));                                          \
-            PetscCall(VecDestroy(&mat_prop_vec));                                                      \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
