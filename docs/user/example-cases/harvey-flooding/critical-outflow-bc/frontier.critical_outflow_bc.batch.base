@@ -41,7 +41,7 @@ if [ $is_cpu_run -eq 1 ]; then
   mkdir ${DEST_DIR}
 
   LOG_FILE=${MACH}.cpu.N_${N}.${PETSC_ARCH}.ceed_cpu.${SLURM_JOB_ID}.log
-  srun -N${N} -n${n} -c1 ${RDYCORE_EXE} ${YAML_FILE} -heterogeneous_rain_start_date 2017,8,26,0,0 -heterogeneous_rain_dir $RAIN_DIR -ceed /cpu/self -ts_monitor -log_view -options_left 2>&1 | tee ${LOG_FILE}
+  srun -N${N} -n${n} -c1 ${RDYCORE_EXE} ${YAML_FILE} -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir $RAIN_DIR -ceed /cpu/self -ts_monitor -log_view -options_left 2>&1 | tee ${LOG_FILE}
 
 elif [ $is_gpu_run -eq 1 ]; then
 
@@ -55,7 +55,7 @@ elif [ $is_gpu_run -eq 1 ]; then
   export PE_MPICH_GTL_LIBS_amd_gfx90a="-lmpi_gtl_hsa"
 
   LOG_FILE=${MACH}.gpu.n_${N}.${PETSC_ARCH}.ceed_gpu.${SLURM_JOB_ID}.log
-  srun -N${N} -n${n} -c1 ${RDYCORE_EXE} ${YAML_FILE} -heterogeneous_rain_start_date 2017,8,26,0,0 -heterogeneous_rain_dir $RAIN_DIR -ceed /gpu/hip -dm_vec_type hip -ts_monitor -log_view_gpu_time -log_view -use_gpu_aware_mpi $GPU_AWARE_MPI -options_left 2>&1 | tee ${LOG_FILE}
+  srun -N${N} -n${n} -c1 ${RDYCORE_EXE} ${YAML_FILE} -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir $RAIN_DIR -ceed /gpu/hip -dm_vec_type hip -ts_monitor -log_view_gpu_time -log_view -use_gpu_aware_mpi $GPU_AWARE_MPI -options_left 2>&1 | tee ${LOG_FILE}
 fi
 
 # Move any reports to the slurm job dir

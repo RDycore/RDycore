@@ -43,7 +43,7 @@ if [ $is_cpu_run -eq 1 ]; then
   mkdir ${DEST_DIR}
 
   LOG_FILE=${MACH}.${PETSC_ARCH}.ceed_cpu.N_${N}.${SLURM_JOB_ID}.log
-  srun -N $N -n $n -c 2 ${RDYCORE_EXE} ${YAML_FILE} -heterogeneous_rain_start_date 2017,8,26,0,0 -heterogeneous_rain_dir $RAIN_DIR -ceed /cpu/self -ts_monitor -log_view 2>&1 | tee ${LOG_FILE}
+  srun -N $N -n $n -c 2 ${RDYCORE_EXE} ${YAML_FILE} -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir $RAIN_DIR -ceed /cpu/self -ts_monitor -log_view 2>&1 | tee ${LOG_FILE}
 
 elif [ $is_gpu_run -eq 1 ]; then
 
@@ -55,7 +55,7 @@ elif [ $is_gpu_run -eq 1 ]; then
   export GPU_AWARE_MPI=1
   G=$n
   LOG_FILE=${MACH}.${PETSC_ARCH}.ceed_gpu.N_${N}.${SLURM_JOB_ID}.log
-  srun -G${G} -N $N -n $n -c 32 ${RDYCORE_EXE} ${YAML_FILE} -heterogeneous_rain_start_date 2017,8,26,0,0 -heterogeneous_rain_dir $RAIN_DIR -ceed /gpu/cuda -dm_vec_type cuda -ts_monitor -log_view -log_view_gpu_time -use_gpu_aware_mpi 1 2>&1 | tee ${LOG_FILE}
+  srun -G${G} -N $N -n $n -c 32 ${RDYCORE_EXE} ${YAML_FILE} -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir $RAIN_DIR -ceed /gpu/cuda -dm_vec_type cuda -ts_monitor -log_view -log_view_gpu_time -use_gpu_aware_mpi 1 2>&1 | tee ${LOG_FILE}
 
 fi 
 

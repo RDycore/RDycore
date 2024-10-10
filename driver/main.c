@@ -11,7 +11,7 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
-typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, HETEROGENEOUS } DatasetType;
+typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, RASTER, UNSTRUCTRED } DatasetType;
 
 typedef struct {
   PetscReal rate;
@@ -61,7 +61,7 @@ typedef struct {
   DatasetType        type;
   ConstantDataset    constant;
   HomogeneousDataset homogeneous;
-  RasterDataset      heterogeneous;
+  RasterDataset      raster;
 
   PetscInt ndata;
   PetscReal *data_for_rdycore;
@@ -310,7 +310,7 @@ static PetscErrorCode SetupRasterDatasetMapping(RDy rdy, RasterDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// set spatially heterogeneous rainfall rate
+// set spatially raster rainfall rate
 PetscErrorCode SetRasterDataset(RasterDataset *data, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
@@ -397,24 +397,24 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
 
   PetscBool sp_hetero_dir_flag;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-heterogeneous_rain_dir", rain_dataset->heterogeneous.dir, sizeof(rain_dataset->heterogeneous.dir),
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir),
                                   &sp_hetero_dir_flag));
 
-#define NUM_HETEROGENEOUS_RAIN_DATE_VALUES 5  // number of parameters expected for heterogeneous rain date
-  PetscInt date[NUM_HETEROGENEOUS_RAIN_DATE_VALUES];
-  PetscInt ndate = NUM_HETEROGENEOUS_RAIN_DATE_VALUES;
-  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-heterogeneous_rain_start_date", date, &ndate, &flag));
+#define NUM_RASTER_RAIN_DATE_VALUES 5  // number of parameters expected for raster rain date
+  PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
+  PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-raster_rain_start_date", date, &ndate, &flag));
   if (flag) {
-    PetscCheck(ndate == NUM_HETEROGENEOUS_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
-               "Expect %d values when using -heterogeneous_rain_start_date YY,MO,DD,HH,MM", NUM_HETEROGENEOUS_RAIN_DATE_VALUES);
+    PetscCheck(ndate == NUM_RASTER_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "Expect %d values when using -raster_rain_start_date YY,MO,DD,HH,MM", NUM_RASTER_RAIN_DATE_VALUES);
     PetscCheck(rain_dataset->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER,
-               "Can only specify homogeneous or heterogeneous rainfall datasets.");
+               "Can only specify homogeneous or raster rainfall datasets.");
     PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
-               "Need to specify path to spatially heterogeneous rainfall via -heterogeneous_rain_dir <dir>");
+               "Need to specify path to spatially raster rainfall via -raster_rain_dir <dir>");
 
-    rain_dataset->type = HETEROGENEOUS;
+    rain_dataset->type = RASTER;
 
-    rain_dataset->heterogeneous.start_date = (struct tm){
+    rain_dataset->raster.start_date = (struct tm){
         .tm_year  = date[0] - 1900,
         .tm_mon   = date[1] - 1,
         .tm_mday  = date[2],
@@ -423,7 +423,7 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
         .tm_isdst = -1,
     };
 
-    rain_dataset->heterogeneous.current_date = (struct tm){
+    rain_dataset->raster.current_date = (struct tm){
         .tm_year  = date[0] - 1900,
         .tm_mon   = date[1] - 1,
         .tm_mday  = date[2],
@@ -432,9 +432,9 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
         .tm_isdst = -1,
     };
 
-    rain_dataset->heterogeneous.ndata = 0;
+    rain_dataset->raster.ndata = 0;
   }
-#undef NUM_HETEROGENEOUS_RAIN_DATE_VALUES
+#undef NUM_RASTER_RAIN_DATE_VALUES
 
   printf("ParaseRainDataOptions: rain_dataset->type = %d; rain_dataset->homogeneous.temporally_interpolate = %d\n",rain_dataset->type,rain_dataset->homogeneous.temporally_interpolate);
 
@@ -476,11 +476,13 @@ PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datase
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenHomogeneousDataset(&rain_dataset->homogeneous));
       break;
-    case HETEROGENEOUS:
+    case RASTER:
       rain_dataset->ndata = n;
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
-      PetscCall(OpenRasterDataset(&rain_dataset->heterogeneous));
-      PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset->heterogeneous));
+      PetscCall(OpenRasterDataset(&rain_dataset->raster));
+      PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset->raster));
+      break;
+    case UNSTRUCTRED:
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -500,9 +502,11 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       PetscCall(SetHomogeneousRainfall(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
-    case HETEROGENEOUS:
-      PetscCall(SetRasterDataset(&rain_dataset->heterogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+    case RASTER:
+      PetscCall(SetRasterDataset(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      break;
+    case UNSTRUCTRED:
       break;
   }
 
@@ -520,7 +524,9 @@ PetscErrorCode CloseRainfallDataset(SourceSink *rain_dataset) {
     case HOMOGENEOUS:
       PetscCall(CloseHomogeneousDataset(&rain_dataset->homogeneous));
       break;
-    case HETEROGENEOUS:
+    case RASTER:
+      break;
+    case UNSTRUCTRED:
       break;
   }
 
@@ -541,7 +547,9 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
     case HOMOGENEOUS:
       PetscCall(OpenHomogeneousDataset(&bc_dataset->homogeneous));
       break;
-    case HETEROGENEOUS:
+    case RASTER:
+      break;
+    case UNSTRUCTRED:
       break;
   }
 
@@ -586,7 +594,9 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
         PetscCall(SetHomogeneousBoundary(&bc_dataset->homogeneous, time, bc_dataset->ndata/3, bc_dataset->data_for_rdycore));
         PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata/3, 3, bc_dataset->data_for_rdycore));
         break;
-      case HETEROGENEOUS:
+      case RASTER:
+        break;
+      case UNSTRUCTRED:
         break;
     }
   }
@@ -605,7 +615,9 @@ PetscErrorCode CloseBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
       case HOMOGENEOUS:
         PetscCall(CloseHomogeneousDataset(&bc_dataset->homogeneous));
         break;
-      case HETEROGENEOUS:
+      case RASTER:
+        break;
+      case UNSTRUCTRED:
         break;
     }
   PetscFunctionReturn(PETSC_SUCCESS);
