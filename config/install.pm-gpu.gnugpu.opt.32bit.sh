@@ -37,5 +37,5 @@
 --download-libceed \
 --download-cgns-commit=HEAD \
 --with-debugging=0 \
-PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-0d6defa7a01
+PETSC_ARCH=pm-gpu-opt-32bit-gcc-11-2-0-v3.22.0
 

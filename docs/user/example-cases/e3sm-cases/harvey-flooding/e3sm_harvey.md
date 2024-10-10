@@ -8,7 +8,7 @@ The E3SM-RDycore model has been tested on Perlmutter and Frontier for the RDycor
 ```bash
 git clone git@github.com:rdycore/e3sm
 cd e3sm
-git checkout rdycore/mosart-rdycore/8b4c2d5df3-2024-04-05
+git checkout rdycore/mosart-rdycore/d4ca7d0606-2024-10-02
 git submodule update --init
 cd externals/rdycore
 git submodule update --init
@@ -33,7 +33,7 @@ git submodule update --init
 The steps a-e have been automated via the shell script via [`e3sm_rdycore_harvey_flooding.sh`](e3sm_rdycore_harvey_flooding.sh).
 
 ```bash
-cd <e3sm-rdycore/externals/docs/user/example-cases/e3sm-cases/harvey-flooding>
+cd <e3sm-rdycore/externals/rdycore/docs/user/example-cases/e3sm-cases/harvey-flooding>
 
 ./e3sm_rdycore_harvey_flooding.sh -h
 Usage: ./e3sm_rdycore_harvey_flooding.sh
