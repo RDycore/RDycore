@@ -141,6 +141,7 @@ cd $rdycore_dir
 
 source config/set_petsc_settings.sh --mach $mach --config 3
 
+
 if [ ! -d "$rdycore_dir/build-$PETSC_ARCH" ]
 then
   echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"

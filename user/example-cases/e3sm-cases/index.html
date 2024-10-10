@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.35">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.40">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.35f28582.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
@@ -1029,24 +1029,21 @@
 
 
 <h1 id="e3sm-rdycore">E3SM-RDycore</h1>
-<p>The coupled E3SM-RDycore is developed within a fork of the E3SM repository under the RDycore's Github account at <a href="https://github.com/rdycore/e3sm">https://github.com/rdycore/e3sm</a>. The coupled model is developed in a branch within the forked repository and the current branch is named <code>rdycore/mosart-rdycore/8b4c2d5df3-2024-04-05</code>. The <code>8b4c2d5df3</code> corresponds to the Git hash of the commit on the E3SM master branch from which the current E3SM-RDycore development branch started and <code>2024-04-05</code> corresponds to the date of that starting commit.</p>
+<p>The coupled E3SM-RDycore is developed within a fork of the E3SM repository under the RDycore's Github account at <a href="https://github.com/rdycore/e3sm">https://github.com/rdycore/e3sm</a>. 
+The coupled model is developed in a branch within the forked repository and the current branch is named <code>rdycore/mosart-rdycore/d4ca7d0606-2024-10-02</code>. 
+The <code>d4ca7d0606</code> corresponds to the Git hash of the commit on the E3SM master branch from which the current E3SM-RDycore development branch started and <code>2024-10-02</code> corresponds to the date of that starting commit.</p>
 <div class="highlight"><pre><span></span><code># From E3SM repo
-&gt;git show 8b4c2d5df3
-commit 8b4c2d5df3f0a53a2ea49bc0c63c2c7f07bcadd4
-Merge: 3b09ee8c5c 686b5c1689
-Author: James Foucar &lt;jgfouca@sandia.gov&gt;
-Date:   Fri Apr 5 09:05:36 2024 -0600
+&gt;git show d4ca7d0606
+commit d4ca7d0606930f53f30eb7ff7dbb92ec83b83b84 (tag: v3.0.1, e3sm/next, e3sm/master, e3sm/HEAD, master)
+Merge: f1e03b784b 55f473dcde
+Author: Robert Jacob &lt;jacob@anl.gov&gt;
+Date:   Wed Oct 2 16:21:12 2024 -0500
 
- Merge branch &#39;jgfouca/rm_gnu9&#39; into master (PR #6328)
+    Merge branch &#39;rljacob/doc/updateforv301&#39; (PR #6658)
 
- Remove gnu9 1-off
+    Update README, CITATION.cff and LICENSE for v3.0.1
 
- This was a 1-off for mappy that needed two gnu toolchains. Now that we
- have 11.2, we don&#39;t need this.
-
- [BFB]
-
-(END)
+    [BFB]
 </code></pre></div>
 <p>The E3SM-RDycore development branch is occasionally rebased on E3SM's master. After a rebase, the E3SM-RDycore development branch is named such that the new name correctly represents the starting commit hash and the commit date. The RDycore has been added in E3SM as a submodule at
 <code>externals/rdycore</code>. In the current model coupling, RDycore is part of the MOSART as shown below.</p>
@@ -1108,7 +1105,7 @@ Date:   Fri Apr 5 09:05:36 2024 -0600
     <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.56dfad97.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
       
         <script src="../../../javascript/mathjax.js"></script>
       
