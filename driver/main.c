@@ -36,7 +36,6 @@ typedef struct {
   Vec          data_vec;
   PetscScalar *data_ptr;
 
-  PetscInt ndata;
   PetscInt header_offset;
 
   // temporal duration of the rainfall dataset
@@ -101,9 +100,18 @@ typedef struct {
 
 // open a Vec that contains data in the following format:
 //
-// time_1 value_1
-// time_2 value_2
-// time_3 value_3
+
+/// @brief Loads a PETSc Vec in binary format that contains the data in the
+///        following format:
+///
+/// time_1 value_1
+/// time_2 value_2
+/// time_3 value_3
+///
+/// @param *filename [in]  Name of the PETSc Vec file
+/// @param data_vec  [out] Poitner to PETSc Vec in which the file is loaded
+/// @param ndata     [out] Number of temporal data values (= 3 in the above example)
+/// @return PETSC_SUCESS on success
 static PetscErrorCode OpenData(char *filename, Vec *data_vec, PetscInt *ndata) {
   PetscFunctionBegin;
 
@@ -120,8 +128,15 @@ static PetscErrorCode OpenData(char *filename, Vec *data_vec, PetscInt *ndata) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// For a given cur_time,
-//   cur_data = value_1 if cur_time >= time_1 and cur_time < time_2
+/// @brief Given the current time, finds the rainfall rate.
+/// @param data_ptr               [in]  A pointer obtained from VecGetArray for the Vec that
+///                                     has the spatially-homogenous, temporally variable rainfall dataset
+/// @param ndata                  [in]  Number of temporal values in the rainfall dataset
+/// @param cur_time               [in]  Current time
+/// @param temporally_interpolate [in]  if TRUE, temporally average rainfall values between two data values
+/// @param cur_data_idx           [out] Temporal index of the data selected
+/// @param cur_data               [out] Rainfall value
+/// @return PETSC_SUCESS on success
 PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal cur_time, PetscBool temporally_interpolate, PetscInt *cur_data_idx,
                               PetscReal *cur_data) {
   PetscFunctionBegin;
@@ -159,20 +174,27 @@ PetscErrorCode GetCurrentData(PetscScalar *data_ptr, PetscInt ndata, PetscReal c
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// loads the binary data in a Vec
+/// @brief Loads up a spatially homogeneous, temporally varying dataset, which is
+///        a PETSc Vec in binary format.
+/// @param *data [inout] Pointer to a HomogeneousDataset struct
+/// @return PETSC_SUCESS on success
 static PetscErrorCode OpenHomogeneousDataset(HomogeneousDataset *data) {
   PetscFunctionBegin;
 
   PetscCall(OpenData(data->filename, &data->data_vec, &data->ndata));
+
   PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+
+  // set initial settings
   data->cur_idx  = -1;
   data->prev_idx = -1;
-  // data->temporally_interpolate = PETSC_FALSE;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// close and destroys the Vec
+/// @brief Destroys the open PETSc Vec corresponding to a spatially homogeneous, temporally varying dataset
+/// @param *data [inout] Pointer to the HomogeneousDataset
+/// @return PETSC_SUCESS on success
 static PetscErrorCode CloseHomogeneousDataset(HomogeneousDataset *data) {
   PetscFunctionBegin;
 
@@ -182,7 +204,11 @@ static PetscErrorCode CloseHomogeneousDataset(HomogeneousDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// set a constant rainfall for all grid cells
+/// @brief Sets a constant rainfall value for all grid cells
+/// @param rain_rate [in]  Constant rainfall rate
+/// @param ncells    [in]  Number of local cells
+/// @param *rain     [out] Rainfall rate for local cells
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
   for (PetscInt icell = 0; icell < ncells; icell++) {
@@ -192,7 +218,11 @@ PetscErrorCode SetConstantRainfall(PetscReal rain_rate, PetscInt ncells, PetscRe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// compute the file name of the rainfall given the current data
+/// @brief Given the current data, determins the file name
+/// @param current_date [in]  A tm struct for current time
+/// @param dir          [in]  Path to the directory containing the file
+/// @param *file        [out] Filename (including the path to file)
+/// @return PETSC_SUCESS on success
 static PetscErrorCode DetermineDatasetFilename(struct tm *current_date, char *dir, char *file) {
   PetscFunctionBegin;
 
@@ -203,13 +233,17 @@ static PetscErrorCode DetermineDatasetFilename(struct tm *current_date, char *di
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// open the binary rainfall file that has following information:
-// - ncols    : number of columns in the rainfall dataset
-// - nrows    : number of rowns in the rainfall dataset
-// - xlc      : x coordinate of the lower left corner [m]
-// - ylc      : y coordinate of the lower left corner [m]
-// - cellsize : size of grid cells in the rainfall dataset [m]
-// - data     : rainfall rate for ncols * nrows cells [mm/hr]
+/// @brief Opens a raster dataset that is a PETSc Vec in a binary format that contains the following
+///        information:
+///        - ncols    : number of columns in the rainfall dataset
+///        - nrows    : number of rowns in the rainfall dataset
+///        - xlc      : x coordinate of the lower left corner [m]
+///        - ylc      : y coordinate of the lower left corner [m]
+///        - cellsize : size of grid cells in the rainfall dataset [m]
+///        - data     : data values for ncols * nrows cells
+///
+/// @param *data [inout] Pointer to a RasterDataset struct
+/// @return PETSC_SUCESS on success
 static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
 
@@ -219,7 +253,8 @@ static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   data->dtime_in_hour = 1.0;  // assume an hourly dataset
   data->ndata_file    = 1;
 
-  PetscCall(OpenData(data->file, &data->data_vec, &data->ndata));
+  PetscInt tmp;
+  PetscCall(OpenData(data->file, &data->data_vec, &tmp));
   PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
   data->header_offset = 5;
@@ -241,6 +276,19 @@ static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Opens an unstructured dataset that is a PETSc Vec in binary format that contains the following
+///        information:
+///
+///        n                                      : Number of unstructured grid points
+///        s                                      : Stride of the data
+///        val_0_0, val_0_1, ... val_0_s-1        : s values for grid point with index = 0
+///        val_1_0, val_1_1, ... val_1_s-1        : s values for grid point with index = 0
+///        ...
+///        ...
+///        val_n-1_0, val_n-1_1, ... val_n-1_s-1  : s values for grid point with index = n-1
+///
+/// @param *data [inout] A UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
 static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
@@ -249,6 +297,7 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
   data->dtime_in_hour = 1.0;  // assume an hourly dataset
   data->ndata_file    = 1;
 
+  // load the PETSc Vec
   PetscViewer viewer;
   PetscCall(VecCreate(PETSC_COMM_SELF, &data->data_vec));
   PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, data->file, FILE_MODE_READ, &viewer));
@@ -259,9 +308,11 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
   PetscCall(VecGetSize(data->data_vec, &size));
   PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
+  // set n and s
   data->ndata  = data->data_ptr[0];
   data->stride = data->data_ptr[1];
 
+  // check the length of the PETSc Vec is consistent with n and s values
   PetscCheck((size - 2) / data->stride == data->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The length (=%d) of loaded Vec does is not consistent with first (N = %d) and second (stride = %d) in the Vec", size, data->ndata,
              data->stride);
@@ -328,7 +379,7 @@ static PetscErrorCode SetupUnstructuredDatasetMapping(RDy rdy, PetscInt bc_idx, 
       }
     }
 
-    if (1) {
+    if (0) {
       PetscInt idx = data->data2mesh_idx[icell];
       printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, data->data_xc[idx], data->data_yc[idx]);
     }
@@ -367,7 +418,11 @@ static PetscErrorCode OpenANewUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// set spatially raster rainfall rate
+/// @brief Set spatially varying BC conditions from an unstructured dataset
+/// @param data        [in]  Pointer to a UnstructuredDataset struct
+/// @param cur_time    [in]  Current time
+/// @param data_values [out] BC values for boundary cells
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_time, PetscReal *data_values) {
   PetscFunctionBegin;
 
@@ -390,7 +445,9 @@ PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_t
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// close the currently open rain dataset and open a new dataset file
+/// @brief close the currently open raster dataset file and open a new file
+/// @param data [inout] Pointer to a RasterDataset
+/// @return PETSC_SUCESS on success
 static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
 
@@ -412,7 +469,6 @@ static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
   PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
   // check to ensure the size and header information of the new rainfall data is the same as the older one
-  PetscCheck(ndata == data->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER, "The ndata of previous and new rainfal do not match");
   PetscCheck(data->ncols == (PetscInt)data->data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The number of columns in the previous and new rainfal do not match");
   PetscCheck(data->nrows == (PetscInt)data->data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER,
@@ -426,7 +482,10 @@ static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// for each local RDycore grid cell, find the nearest neighbor cell in the rainfall dataset
+/// @brief For each local RDycore grid cell, find the nearest neighbor cell in the raster dataset
+/// @param rdy   [in]    A RDy struct
+/// @param *data [inout] A pointer to a RasterDataset struct
+/// @return PETSC_SUCESS on success
 static PetscErrorCode SetupRasterDatasetMapping(RDy rdy, RasterDataset *data) {
   PetscFunctionBegin;
 
@@ -479,7 +538,13 @@ static PetscErrorCode SetupRasterDatasetMapping(RDy rdy, RasterDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// set spatially raster rainfall rate
+/// @brief Set rainfall rate for local cells from a spatially raster rainfall dataset. It is assumed that
+///        rainfall rate is mm/hr.
+/// @param data     [in]  A pointer to RasterDataset struct
+/// @param cur_time [in]  Current time
+/// @param ncells   [in]  Number of local cells
+/// @param *rain    [out] Rainfall rate for local cells
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetRasterDataset(RasterDataset *data, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
@@ -499,7 +564,12 @@ PetscErrorCode SetRasterDataset(RasterDataset *data, PetscReal cur_time, PetscIn
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// set spatially homogeneous rainfall rate for all grid cells
+/// @brief Sets rainfall value for local grid cells based on spatially homogenous, temporally-varying rainfall dataset
+/// @param homogeneous_rain [in]  A pointer to HomogeneousDataset
+/// @param cur_time         [in]  Current time
+/// @param ncells           [in]  Number of local cells
+/// @param *rain            [out] Rainfall rate for local cells
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetHomogeneousRainfall(HomogeneousDataset *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
@@ -521,6 +591,12 @@ PetscErrorCode SetHomogeneousRainfall(HomogeneousDataset *homogeneous_rain, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Set saptially homogeneous water height boundary condition for all boundary cells
+/// @param bc_data    [in]  Pointer to a HomogeneousDataset struct
+/// @param cur_time   [in]  Current time
+/// @param num_values [in]  Number of boundary cells
+/// @param bc_values  [out] Values for boundary condition. Note: hu and hv are set to zero
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetHomogeneousBoundary(HomogeneousDataset *bc_data, PetscReal cur_time, PetscInt num_values, PetscReal *bc_values) {
   PetscFunctionBegin;
 
@@ -545,16 +621,23 @@ PetscErrorCode SetHomogeneousBoundary(HomogeneousDataset *bc_data, PetscReal cur
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// save information about rainfall dataset from command line options
+/// @brief Save information about rainfall dataset from the command line options.
+///        Supported rainfall datasets types include:
+///        - contant rainfall
+///        - spatially homogeneous, temporally varying rainfall
+///        - spatially and temporing varying rainfall files in raster format
+///
+/// @param *rain_dataset [inout] Pointer to a SourceSink struct
+/// @return PETSC_SUCESS on success
 PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
-  PetscBool flag;
-
-  // set default rainfall
+  // set default settings
   rain_dataset->type                               = UNSET;
   rain_dataset->constant.rate                      = 0.0;
   rain_dataset->homogeneous.temporally_interpolate = PETSC_FALSE;
+
+  PetscBool flag;
 
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, &flag));
   if (flag) rain_dataset->type = CONSTANT;
@@ -599,19 +682,23 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
         .tm_min   = date[4],
         .tm_isdst = -1,
     };
-
-    rain_dataset->raster.ndata = 0;
   }
 #undef NUM_RASTER_RAIN_DATE_VALUES
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Save information about boundary condition dataset from the command line options.
+///        Supported boundary condition dataset types include:
+///        - spatially homogeneous, temporally varying boundary condition
+///        - spatially and temporing varying boundary condition files in unstructured grid format
+///
+/// @param *bc [inout] Pointer to a BoundaryCondition struct
+/// @return PETSC_SUCESS on success
 PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscFunctionBegin;
 
-  PetscBool flag;
-
+  // set default settings
   bc->type                               = UNSET;
   bc->ndata                              = 0;
   bc->dirichlet_bc_idx                   = -1;
@@ -619,6 +706,8 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   bc->unstructured.ndata                 = 0;
   bc->unstructured.stride                = 0;
   bc->unstructured.mesh_bc_ncells        = 0;
+
+  PetscBool flag;
 
   PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bc->homogeneous.filename, sizeof(bc->homogeneous.filename), &flag));
   if (flag) bc->type = HOMOGENEOUS;
@@ -668,9 +757,17 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Sets up the rainfall source that is specified via command line
+/// @param rdy           [in]  A RDy struct
+/// @param n             [in]  Number of local cells on which rainfall source will be applied
+/// @param *rain_dataset [out] Pointer to a Sourcesink struct
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_dataset) {
   PetscFunctionBegin;
+
+  // parse the command line arguments related to rainfall
   PetscCall(ParseRainfallDataOptions(rain_dataset));
+
   switch (rain_dataset->type) {
     case UNSET:
       break;
@@ -695,6 +792,11 @@ PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datase
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief First get the rainfall values from the rainfall dataset and then set those values in RDy
+/// @param rdy           [inout] A RDy struct
+/// @param time          [in]    Current time
+/// @param *rain_dataset [inout] A pointer to a SourceSink dataset
+/// @return PETSC_SUCESS on success
 PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
@@ -720,6 +822,9 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Close rainfall dataset and free up memory.
+/// @param rain_dataset [inout] Pointer to a SourceSink struct
+/// @return PETSC_SUCESS on success
 PetscErrorCode CloseRainfallDataset(SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
@@ -740,12 +845,17 @@ PetscErrorCode CloseRainfallDataset(SourceSink *rain_dataset) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Set up boundary condition based on command line options
+/// @param rdy   [in]    A RDy struct
+/// @param *data [inout] Pointer to a BoundaryCondition struct
+/// @return PETSC_SUCESS on success
 PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
 
   PetscCall(ParseBoundaryDataOptions(bc_dataset));
+
   switch (bc_dataset->type) {
     case UNSET:
       break;
@@ -794,6 +904,11 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief First get the boundary values from the boundary condition dataset and then set those values in RDy
+/// @param rdy        [in]  A RDy struct
+/// @param time       [in]  Current time
+/// @param bc_dataset [out] Pointer to a BoundaryCondition
+/// @return PETSC_SUCESS on success
 PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -819,6 +934,9 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Close the boundary condition dataset and free up memory
+/// @param bc_dataset [inout] Pointer to a BoundaryCondition struct
+/// @return PETSC_SUCESS on success
 PetscErrorCode CloseBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
   switch (bc_dataset->type) {
