@@ -1,0 +1,66 @@
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  final_time       : 1.0
+  time_step        : 0.5
+  coupling_interval: 1.0
+  unit             : seconds
+
+output:
+  format: xdmf
+  step_interval: 20
+  batch_size: 20
+  time_series:
+    boundary_fluxes: 1
+
+grid:
+  file: simons.exo
+
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: domain
+    flow: domain_flow_ic
+
+boundaries:
+  - name: ocean_boundary
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [ocean_boundary]
+    flow: outflow_bc
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    height: 1
+    x_momentum: 0
+    y_momentum: 0
+  - name: outflow_bc
+    type: dirichlet
+    height: 5
+    x_momentum: 0
+    y_momentum: 0
