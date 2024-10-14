@@ -47,10 +47,10 @@ typedef struct {
   PetscReal xlc, ylc;      // cell centroid coordinates
   PetscReal cellsize;      // dx = dy of cell
 
-  PetscInt  *data2mesh_idx;
-  PetscReal *data_xc, *data_yc;
-  PetscReal *mesh_xc, *mesh_yc;
-  PetscInt   mesh_ncells_local;
+  PetscInt   mesh_ncells_local;  // number of cells in RDycore meshes
+  PetscInt  *data2mesh_idx;      // for each RDycore cell, the index of the data in the raster dataset
+  PetscReal *data_xc, *data_yc;  // x and y coordinates of data in the raster dataset
+  PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore cells
 
 } RasterDataset;
 
@@ -71,36 +71,33 @@ typedef struct {
   PetscInt ndata;
   PetscInt stride;
 
-  PetscInt  *data2mesh_idx;
-  PetscReal *data_xc, *data_yc;
-  PetscReal *mesh_bc_xc, *mesh_bc_yc;
-  PetscInt   mesh_bc_ncells;
+  PetscInt   mesh_nelements;     // number of cells or boundary edges in RDycore mesh
+  PetscInt  *data2mesh_idx;      // for each RDycore element (cells or boundary edges), the index of the data in the unstructured dataset
+  PetscReal *data_xc, *data_yc;  // x and y coordinates of data
+  PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore elments
 
 } UnstructuredDataset;
 
 typedef struct {
   DatasetType         type;
-  ConstantDataset     constant;
-  HomogeneousDataset  homogeneous;
-  RasterDataset       raster;
-  UnstructuredDataset unstructured;
+  ConstantDataset     constant;      // spatio-temporally constant rainfall
+  HomogeneousDataset  homogeneous;   // spatially-constnat, temporally-varying rainfall
+  RasterDataset       raster;        // spatio-temporally varying rainfall in raster format
+  UnstructuredDataset unstructured;  // spatio-temporally varying rainfall in unstructured grid format
 
-  PetscInt   ndata;
-  PetscReal *data_for_rdycore;
+  PetscInt   ndata;             // size of source-sink data for RDycore
+  PetscReal *data_for_rdycore;  // values of source-sink for RDycore
 } SourceSink;
 
 typedef struct {
   DatasetType         type;
-  HomogeneousDataset  homogeneous;
-  UnstructuredDataset unstructured;
+  HomogeneousDataset  homogeneous;   // spatially-homogeneous, temporally-varying BC
+  UnstructuredDataset unstructured;  // spatio-temporally varying BC in unstructured grid format
 
-  PetscInt   ndata;
-  PetscInt   dirichlet_bc_idx;
-  PetscReal *data_for_rdycore;
+  PetscInt   ndata;             // size of boundary condition data for RDycore
+  PetscInt   dirichlet_bc_idx;  // ID of the dirichlet BC in RDycore
+  PetscReal *data_for_rdycore;  // values of boundary condition for RDycore
 } BoundaryCondition;
-
-// open a Vec that contains data in the following format:
-//
 
 /// @brief Loads a PETSc Vec in binary format that contains the data in the
 ///        following format:
@@ -321,6 +318,10 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Sets up the mapping between the unstructured grid dataset cells and the
+///        local cells (for source-sink condition) or boundary edges (for boundary condition).
+/// @param data Pointer to a UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
 static PetscErrorCode SetupUnstructuredDatasetMapping(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
@@ -351,12 +352,12 @@ static PetscErrorCode SetupUnstructuredDatasetMapping(UnstructuredDataset *data)
   PetscCall(VecRestoreArray(vec, &vec_ptr));
   PetscCall(VecDestroy(&vec));
 
-  PetscCalloc1(data->mesh_bc_ncells, &data->data2mesh_idx);
+  PetscCalloc1(data->mesh_nelements, &data->data2mesh_idx);
 
   // for each boundary edge, find nearest dataset cell
-  for (PetscInt icell = 0; icell < data->mesh_bc_ncells; icell++) {
-    PetscReal xc = data->mesh_bc_xc[icell];
-    PetscReal yc = data->mesh_bc_yc[icell];
+  for (PetscInt icell = 0; icell < data->mesh_nelements; icell++) {
+    PetscReal xc = data->mesh_xc[icell];
+    PetscReal yc = data->mesh_yc[icell];
 
     PetscReal min_dist;
     for (PetscInt kk = 0; kk < data->ndata; kk++) {
@@ -430,7 +431,7 @@ PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_t
   PetscInt physics_stride = 3;
   PetscInt stride         = data->stride;
 
-  for (PetscInt icell = 0; icell < data->mesh_bc_ncells; icell++) {
+  for (PetscInt icell = 0; icell < data->mesh_nelements; icell++) {
     PetscInt idx = data->data2mesh_idx[icell] * stride;
 
     for (PetscInt ii = 0; ii < stride; ii++) {
@@ -771,7 +772,7 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   bc->homogeneous.temporally_interpolate = PETSC_FALSE;
   bc->unstructured.ndata                 = 0;
   bc->unstructured.stride                = 0;
-  bc->unstructured.mesh_bc_ncells        = 0;
+  bc->unstructured.mesh_nelements        = 0;
 
   PetscInt dataset_type_count = 0;  // number of number of datatypes specified via command line
 
@@ -870,15 +871,15 @@ PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datase
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
 
-      rain_dataset->unstructured.mesh_bc_ncells = n;
+      rain_dataset->unstructured.mesh_nelements = n;
 
       // allocate memory to save x/y coordinates of local cells
-      PetscCalloc1(n, &rain_dataset->unstructured.mesh_bc_xc);
-      PetscCalloc1(n, &rain_dataset->unstructured.mesh_bc_yc);
+      PetscCalloc1(n, &rain_dataset->unstructured.mesh_xc);
+      PetscCalloc1(n, &rain_dataset->unstructured.mesh_yc);
 
       // get x/y coordinates of local cells from RDycore
-      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_bc_xc));
-      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_bc_yc));
+      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_xc));
+      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_yc));
 
       // set up the mapping between the dataset and local cells
       PetscCall(SetupUnstructuredDatasetMapping(&rain_dataset->unstructured));
@@ -994,15 +995,15 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
     PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
     if ((bc_dataset->type == UNSTRUCTRED) & (num_edges_dirc_bc > 0)) {
-      bc_dataset->unstructured.mesh_bc_ncells = num_edges_dirc_bc;
+      bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
       // allocate memory to save x/y coordinates of the boundary edges
-      PetscCalloc1(bc_dataset->unstructured.mesh_bc_ncells, &bc_dataset->unstructured.mesh_bc_xc);
-      PetscCalloc1(bc_dataset->unstructured.mesh_bc_ncells, &bc_dataset->unstructured.mesh_bc_yc);
+      PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_xc);
+      PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_yc);
 
       // get the x/y coordinates of the boundary edges from RDycore
-      PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_bc_ncells, bc_dataset->unstructured.mesh_bc_xc));
-      PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_bc_ncells, bc_dataset->unstructured.mesh_bc_yc));
+      PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_xc));
+      PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_yc));
 
       // set up the mapping between the dataset and boundary edges
       PetscCall(SetupUnstructuredDatasetMapping(&bc_dataset->unstructured));
