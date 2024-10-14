@@ -79,10 +79,11 @@ typedef struct {
 } UnstructuredDataset;
 
 typedef struct {
-  DatasetType        type;
-  ConstantDataset    constant;
-  HomogeneousDataset homogeneous;
-  RasterDataset      raster;
+  DatasetType         type;
+  ConstantDataset     constant;
+  HomogeneousDataset  homogeneous;
+  RasterDataset       raster;
+  UnstructuredDataset unstructured;
 
   PetscInt   ndata;
   PetscReal *data_for_rdycore;
@@ -320,7 +321,7 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SetupUnstructuredDatasetMapping(RDy rdy, PetscInt bc_idx, UnstructuredDataset *data) {
+static PetscErrorCode SetupUnstructuredDatasetMapping(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
   PetscViewer  viewer;
@@ -351,11 +352,6 @@ static PetscErrorCode SetupUnstructuredDatasetMapping(RDy rdy, PetscInt bc_idx, 
   PetscCall(VecDestroy(&vec));
 
   PetscCalloc1(data->mesh_bc_ncells, &data->data2mesh_idx);
-  PetscCalloc1(data->mesh_bc_ncells, &data->mesh_bc_xc);
-  PetscCalloc1(data->mesh_bc_ncells, &data->mesh_bc_yc);
-
-  PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_idx, data->mesh_bc_ncells, data->mesh_bc_xc));
-  PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_idx, data->mesh_bc_ncells, data->mesh_bc_yc));
 
   // for each boundary edge, find nearest dataset cell
   for (PetscInt icell = 0; icell < data->mesh_bc_ncells; icell++) {
@@ -384,7 +380,6 @@ static PetscErrorCode SetupUnstructuredDatasetMapping(RDy rdy, PetscInt bc_idx, 
       printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, data->data_xc[idx], data->data_yc[idx]);
     }
   }
-  printf("\n");
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -431,14 +426,19 @@ PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_t
     OpenANewUnstructuredDataset(data);
   }
 
-  PetscInt offset = 2;
-  PetscInt stride = data->stride;
+  PetscInt offset         = 2;
+  PetscInt physics_stride = 3;
+  PetscInt stride         = data->stride;
 
   for (PetscInt icell = 0; icell < data->mesh_bc_ncells; icell++) {
     PetscInt idx = data->data2mesh_idx[icell] * stride;
 
     for (PetscInt ii = 0; ii < stride; ii++) {
-      data_values[icell * stride] = data->data_ptr[idx + ii + offset];
+      data_values[icell * physics_stride + ii] = data->data_ptr[idx + ii + offset];
+    }
+
+    for (PetscInt ii = stride; ii < physics_stride; ii++) {
+      data_values[icell * physics_stride + ii] = 0.0;
     }
   }
 
@@ -661,46 +661,95 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
 
   // raster rainfall dataset
 #define NUM_RASTER_RAIN_DATE_VALUES 5  // number of parameters expected for raster rain date
-  PetscBool raster_dir_flag;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
-
-  PetscInt  date[NUM_RASTER_RAIN_DATE_VALUES];
-  PetscInt  ndate = NUM_RASTER_RAIN_DATE_VALUES;
   PetscBool raster_start_date_flag;
-  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-raster_rain_start_date", date, &ndate, &raster_start_date_flag));
-  if (raster_start_date_flag) {
-    dataset_type_count++;
+  {
+    PetscBool raster_dir_flag;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
 
-    PetscCheck(ndate == NUM_RASTER_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
-               "Expect %d values when using -raster_rain_start_date YY,MO,DD,HH,MM", NUM_RASTER_RAIN_DATE_VALUES);
-    PetscCheck(raster_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
-               "Need to specify path to spatially raster rainfall via -raster_rain_dir <dir>");
+    PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
+    PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
+    PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-raster_rain_start_date", date, &ndate, &raster_start_date_flag));
+    if (raster_start_date_flag) {
+      dataset_type_count++;
 
-    rain_dataset->type = RASTER;
+      PetscCheck(ndate == NUM_RASTER_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Expect %d values when using -raster_rain_start_date YY,MO,DD,HH,MM", NUM_RASTER_RAIN_DATE_VALUES);
+      PetscCheck(raster_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Need to specify path to spatially raster rainfall via -raster_rain_dir <dir>");
 
-    rain_dataset->raster.start_date = (struct tm){
-        .tm_year  = date[0] - 1900,
-        .tm_mon   = date[1] - 1,
-        .tm_mday  = date[2],
-        .tm_hour  = date[3],
-        .tm_min   = date[4],
-        .tm_isdst = -1,
-    };
+      rain_dataset->type = RASTER;
 
-    rain_dataset->raster.current_date = (struct tm){
-        .tm_year  = date[0] - 1900,
-        .tm_mon   = date[1] - 1,
-        .tm_mday  = date[2],
-        .tm_hour  = date[3],
-        .tm_min   = date[4],
-        .tm_isdst = -1,
-    };
+      rain_dataset->raster.start_date = (struct tm){
+          .tm_year  = date[0] - 1900,
+          .tm_mon   = date[1] - 1,
+          .tm_mday  = date[2],
+          .tm_hour  = date[3],
+          .tm_min   = date[4],
+          .tm_isdst = -1,
+      };
+
+      rain_dataset->raster.current_date = (struct tm){
+          .tm_year  = date[0] - 1900,
+          .tm_mon   = date[1] - 1,
+          .tm_mday  = date[2],
+          .tm_hour  = date[3],
+          .tm_min   = date[4],
+          .tm_isdst = -1,
+      };
+    }
   }
 #undef NUM_RASTER_RAIN_DATE_VALUES
 
+  // unstructured rainfall dataset
+#define NUM_UNSTRUCTURED_RAIN_DATE_VALUES 5  // number of parameters expected for unstructured rain date
+  PetscBool unstructured_start_date_flag;
+  {
+    PetscBool unstructured_rain_dir_flag;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_dir", rain_dataset->unstructured.dir, sizeof(rain_dataset->unstructured.dir),
+                                    &unstructured_rain_dir_flag));
+
+    PetscInt date[NUM_UNSTRUCTURED_RAIN_DATE_VALUES];
+    PetscInt ndate = NUM_UNSTRUCTURED_RAIN_DATE_VALUES;
+    PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-unstructured_rain_start_date", date, &ndate, &unstructured_start_date_flag));
+    if (unstructured_start_date_flag) {
+      dataset_type_count++;
+
+      PetscCheck(ndate == NUM_UNSTRUCTURED_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Expect %d values when using -unstructured_rain_start_date YY,MO,DD,HH,MM", NUM_UNSTRUCTURED_RAIN_DATE_VALUES);
+      PetscCheck(unstructured_rain_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Need to specify path to unstructured BC data via -unstructured_rain_dir <dir>");
+
+      PetscBool flag;
+      PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_mesh_file", rain_dataset->unstructured.mesh_file,
+                                      sizeof(rain_dataset->unstructured.mesh_file), &flag));
+      PetscCheck(flag, PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify the mesh file -unstructured_rain_mesh_file <file>");
+
+      rain_dataset->type = UNSTRUCTRED;
+
+      rain_dataset->unstructured.start_date = (struct tm){
+          .tm_year  = date[0] - 1900,
+          .tm_mon   = date[1] - 1,
+          .tm_mday  = date[2],
+          .tm_hour  = date[3],
+          .tm_min   = date[4],
+          .tm_isdst = -1,
+      };
+
+      rain_dataset->unstructured.current_date = (struct tm){
+          .tm_year  = date[0] - 1900,
+          .tm_mon   = date[1] - 1,
+          .tm_mday  = date[2],
+          .tm_hour  = date[3],
+          .tm_min   = date[4],
+          .tm_isdst = -1,
+      };
+    }
+  }
+#undef NUM_UNSTRUCTURED_RAIN_DATE_VALUES
+
   PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "More than one rainfall cannot be specified. Rainfall types sepcified : Constat %d; Homogeneous %d; Raster %d ", constant_rain_flag,
-             homogeneous_rain_flag, raster_start_date_flag);
+             "More than one rainfall cannot be specified. Rainfall types sepcified : Constat %d; Homogeneous %d; Raster %d; Unsturcutred %d",
+             constant_rain_flag, homogeneous_rain_flag, raster_start_date_flag, unstructured_start_date_flag);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -817,6 +866,23 @@ PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datase
       PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset->raster));
       break;
     case UNSTRUCTRED:
+      rain_dataset->ndata = n;
+      PetscCalloc1(n, &rain_dataset->data_for_rdycore);
+      PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
+
+      rain_dataset->unstructured.mesh_bc_ncells = n;
+
+      // allocate memory to save x/y coordinates of local cells
+      PetscCalloc1(n, &rain_dataset->unstructured.mesh_bc_xc);
+      PetscCalloc1(n, &rain_dataset->unstructured.mesh_bc_yc);
+
+      // get x/y coordinates of local cells from RDycore
+      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_bc_xc));
+      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_bc_yc));
+
+      // set up the mapping between the dataset and local cells
+      PetscCall(SetupUnstructuredDatasetMapping(&rain_dataset->unstructured));
+
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -846,6 +912,8 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
     case UNSTRUCTRED:
+      PetscCall(SetUnstructuredDataset(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
+      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
   }
 
@@ -927,7 +995,17 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
 
     if ((bc_dataset->type == UNSTRUCTRED) & (num_edges_dirc_bc > 0)) {
       bc_dataset->unstructured.mesh_bc_ncells = num_edges_dirc_bc;
-      PetscCall(SetupUnstructuredDatasetMapping(rdy, bc_dataset->dirichlet_bc_idx, &bc_dataset->unstructured));
+
+      // allocate memory to save x/y coordinates of the boundary edges
+      PetscCalloc1(bc_dataset->unstructured.mesh_bc_ncells, &bc_dataset->unstructured.mesh_bc_xc);
+      PetscCalloc1(bc_dataset->unstructured.mesh_bc_ncells, &bc_dataset->unstructured.mesh_bc_yc);
+
+      // get the x/y coordinates of the boundary edges from RDycore
+      PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_bc_ncells, bc_dataset->unstructured.mesh_bc_xc));
+      PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_bc_ncells, bc_dataset->unstructured.mesh_bc_yc));
+
+      // set up the mapping between the dataset and boundary edges
+      PetscCall(SetupUnstructuredDatasetMapping(&bc_dataset->unstructured));
     }
   }
 
