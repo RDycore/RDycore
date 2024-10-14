@@ -637,30 +637,43 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   rain_dataset->constant.rate                      = 0.0;
   rain_dataset->homogeneous.temporally_interpolate = PETSC_FALSE;
 
-  PetscBool flag;
-
-  PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, &flag));
-  if (flag) rain_dataset->type = CONSTANT;
-
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_rain_file", rain_dataset->homogeneous.filename,
-                                  sizeof(rain_dataset->homogeneous.filename), &flag));
-  if (flag) rain_dataset->type = HOMOGENEOUS;
-
   PetscCall(
       PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
 
-  PetscBool sp_hetero_dir_flag;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &sp_hetero_dir_flag));
+  PetscInt dataset_type_count = 0;  // number of number of datatypes specified via command line
 
+  // spatiotemporally constant rainfall
+  PetscBool constant_rain_flag;
+  PetscCall(PetscOptionsGetReal(NULL, NULL, "-constant_rain_rate", &rain_dataset->constant.rate, &constant_rain_flag));
+  if (constant_rain_flag) {
+    dataset_type_count++;
+    rain_dataset->type = CONSTANT;
+  }
+
+  // spatially-homogenous, temporally-varying rainfall dataset
+  PetscBool homogeneous_rain_flag;
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_rain_file", rain_dataset->homogeneous.filename,
+                                  sizeof(rain_dataset->homogeneous.filename), &homogeneous_rain_flag));
+  if (homogeneous_rain_flag) {
+    dataset_type_count++;
+    rain_dataset->type = HOMOGENEOUS;
+  }
+
+  // raster rainfall dataset
 #define NUM_RASTER_RAIN_DATE_VALUES 5  // number of parameters expected for raster rain date
-  PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
-  PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
-  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-raster_rain_start_date", date, &ndate, &flag));
-  if (flag) {
+  PetscBool raster_dir_flag;
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
+
+  PetscInt  date[NUM_RASTER_RAIN_DATE_VALUES];
+  PetscInt  ndate = NUM_RASTER_RAIN_DATE_VALUES;
+  PetscBool raster_start_date_flag;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-raster_rain_start_date", date, &ndate, &raster_start_date_flag));
+  if (raster_start_date_flag) {
+    dataset_type_count++;
+
     PetscCheck(ndate == NUM_RASTER_RAIN_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
                "Expect %d values when using -raster_rain_start_date YY,MO,DD,HH,MM", NUM_RASTER_RAIN_DATE_VALUES);
-    PetscCheck(rain_dataset->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER, "Can only specify homogeneous or raster rainfall datasets.");
-    PetscCheck(sp_hetero_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
+    PetscCheck(raster_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
                "Need to specify path to spatially raster rainfall via -raster_rain_dir <dir>");
 
     rain_dataset->type = RASTER;
@@ -685,6 +698,10 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   }
 #undef NUM_RASTER_RAIN_DATE_VALUES
 
+  PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "More than one rainfall cannot be specified. Rainfall types sepcified : Constat %d; Homogeneous %d; Raster %d ", constant_rain_flag,
+             homogeneous_rain_flag, raster_start_date_flag);
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -707,27 +724,37 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   bc->unstructured.stride                = 0;
   bc->unstructured.mesh_bc_ncells        = 0;
 
-  PetscBool flag;
-
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bc->homogeneous.filename, sizeof(bc->homogeneous.filename), &flag));
-  if (flag) bc->type = HOMOGENEOUS;
+  PetscInt dataset_type_count = 0;  // number of number of datatypes specified via command line
 
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_bc", &bc->homogeneous.temporally_interpolate, NULL));
 
+  // spatially-homogeneous, temporally-varying boundary condition dataset
+  PetscBool homogenous_bc_flag;
+  PetscCall(
+      PetscOptionsGetString(NULL, NULL, "-homogeneous_bc_file", bc->homogeneous.filename, sizeof(bc->homogeneous.filename), &homogenous_bc_flag));
+  if (homogenous_bc_flag) {
+    dataset_type_count++;
+    bc->type = HOMOGENEOUS;
+  }
+
+  // unstructured boundary condition dataset
+#define NUM_UNSTRUCTURED_BC_DATE_VALUES 5  // number of parameters expected for raster rain date
   PetscBool unstructured_bc_dir_flag;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_dir", bc->unstructured.dir, sizeof(bc->unstructured.dir), &unstructured_bc_dir_flag));
 
-#define NUM_UNSTRUCTURED_BC_DATE_VALUES 5  // number of parameters expected for raster rain date
-  PetscInt date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
-  PetscInt ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
-  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-unstructured_bc_start_date", date, &ndate, &flag));
-  if (flag) {
+  PetscInt  date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
+  PetscInt  ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
+  PetscBool unstructured_start_date_flag;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-unstructured_bc_start_date", date, &ndate, &unstructured_start_date_flag));
+  if (unstructured_start_date_flag) {
+    dataset_type_count++;
+
     PetscCheck(ndate == NUM_UNSTRUCTURED_BC_DATE_VALUES, PETSC_COMM_WORLD, PETSC_ERR_USER,
                "Expect %d values when using -unstructured_bc_start_date YY,MO,DD,HH,MM", NUM_UNSTRUCTURED_BC_DATE_VALUES);
-    PetscCheck(bc->type != HOMOGENEOUS, PETSC_COMM_WORLD, PETSC_ERR_USER, "Can only specify homogeneous or unstructured BC datasets.");
     PetscCheck(unstructured_bc_dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
                "Need to specify path to unstructured BC data via -unstructured_bc_dir <dir>");
 
+    PetscBool flag;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_mesh_file", bc->unstructured.mesh_file, sizeof(bc->unstructured.mesh_file), &flag));
     PetscCheck(flag, PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify the mesh file -unstructured_bc_mesh_file <file>");
 
@@ -751,8 +778,11 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
         .tm_isdst = -1,
     };
   }
-
 #undef NUM_UNSTRUCTURED_BC_DATE_VALUES
+
+  PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "More than one boundary condition cannot be specified. Rainfall types sepcified : Homogeneous %d; Raster %d ", homogenous_bc_flag,
+             unstructured_start_date_flag);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
