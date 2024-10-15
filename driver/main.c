@@ -456,7 +456,7 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
 /// @brief Closes the currently open Vec and loads in the next binary file in the Vec
 /// @param data A pointer to UnstructuredDataset
 /// @return PETSC_SUCESS on success
-static PetscErrorCode OpenANewUnstructuredDataset(UnstructuredDataset *data) {
+static PetscErrorCode OpenNextUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
   // close the existing file
@@ -488,7 +488,7 @@ static PetscErrorCode OpenANewUnstructuredDataset(UnstructuredDataset *data) {
 /// @brief Closes the currently open Vec and free up memory used for mapping
 /// @param data A pointer to UnstructuredDataset struct
 /// @return PETSC_SUCESS on success
-static PetscErrorCode DestroyUnstruturedcDataset(UnstructuredDataset *data) {
+static PetscErrorCode DestroyUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
   // close the existing file
@@ -509,12 +509,12 @@ static PetscErrorCode DestroyUnstruturedcDataset(UnstructuredDataset *data) {
 /// @param cur_time    [in]  Current time
 /// @param data_values [out] BC values for boundary cells
 /// @return PETSC_SUCESS on success
-PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_time, PetscReal *data_values) {
+PetscErrorCode SetUnstructuredData(UnstructuredDataset *data, PetscReal cur_time, PetscReal *data_values) {
   PetscFunctionBegin;
 
   // Is it time to open a new file?
   if (cur_time / 3600.0 >= (data->ndata_file) * data->dtime_in_hour) {
-    OpenANewUnstructuredDataset(data);
+    OpenNextUnstructuredDataset(data);
   }
 
   PetscInt offset         = 2;
@@ -539,7 +539,7 @@ PetscErrorCode SetUnstructuredDataset(UnstructuredDataset *data, PetscReal cur_t
 /// @brief close the currently open raster dataset file and open a new file
 /// @param data [inout] Pointer to a RasterDataset
 /// @return PETSC_SUCESS on success
-static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
+static PetscErrorCode OpenNextRasterDataset(RasterDataset *data) {
   PetscFunctionBegin;
 
   // close the existing file
@@ -636,12 +636,12 @@ static PetscErrorCode CreateRasterDatasetMapping(RDy rdy, RasterDataset *data) {
 /// @param ncells   [in]  Number of local cells
 /// @param *rain    [out] Rainfall rate for local cells
 /// @return PETSC_SUCESS on success
-PetscErrorCode SetRasterDataset(RasterDataset *data, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
+PetscErrorCode SetRasterData(RasterDataset *data, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
   // Is it time to open a new file?
   if (cur_time / 3600.0 >= (data->ndata_file) * data->dtime_in_hour) {
-    OpenANewRasterDataset(data);
+    OpenNextRasterDataset(data);
   }
 
   PetscInt  offset                = data->header_offset;
@@ -1029,11 +1029,11 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
     case RASTER:
-      PetscCall(SetRasterDataset(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      PetscCall(SetRasterData(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
     case UNSTRUCTURED:
-      PetscCall(SetUnstructuredDataset(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
+      PetscCall(SetUnstructuredData(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
   }
@@ -1063,7 +1063,7 @@ PetscErrorCode DestroyRainfallDataset(SourceSink *rain_dataset) {
       break;
     case UNSTRUCTURED:
       PetscFree(rain_dataset->data_for_rdycore);
-      PetscCall(DestroyUnstruturedcDataset(&rain_dataset->unstructured));
+      PetscCall(DestroyUnstructuredDataset(&rain_dataset->unstructured));
       break;
   }
 
@@ -1171,7 +1171,7 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
       case RASTER:
         break;
       case UNSTRUCTURED:
-        PetscCall(SetUnstructuredDataset(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
+        PetscCall(SetUnstructuredData(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
         PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
         break;
     }
@@ -1205,7 +1205,7 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
         PetscCall(PetscFree(bc_dataset->unstructured.mesh_xc));
         PetscCall(PetscFree(bc_dataset->unstructured.mesh_yc));
       }
-      PetscCall(DestroyUnstruturedcDataset(&bc_dataset->unstructured));
+      PetscCall(DestroyUnstructuredDataset(&bc_dataset->unstructured));
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
