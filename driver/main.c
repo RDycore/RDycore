@@ -517,19 +517,14 @@ PetscErrorCode SetUnstructuredData(UnstructuredDataset *data, PetscReal cur_time
     OpenNextUnstructuredDataset(data);
   }
 
-  PetscInt offset         = 2;
-  PetscInt physics_stride = 3;
-  PetscInt stride         = data->stride;
+  PetscInt offset = 2;
+  PetscInt stride = data->stride;
 
   for (PetscInt icell = 0; icell < data->mesh_nelements; icell++) {
     PetscInt idx = data->data2mesh_idx[icell] * stride;
 
     for (PetscInt ii = 0; ii < stride; ii++) {
-      data_values[icell * physics_stride + ii] = data->data_ptr[idx + ii + offset];
-    }
-
-    for (PetscInt ii = stride; ii < physics_stride; ii++) {
-      data_values[icell * physics_stride + ii] = 0.0;
+      data_values[icell * stride + ii] = data->data_ptr[idx + ii + offset];
     }
   }
 
@@ -980,10 +975,12 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
 
       break;
     case UNSTRUCTURED:
-      rain_dataset->ndata     = n;
-      PetscInt physics_stride = 3;
-      PetscCalloc1(physics_stride * n, &rain_dataset->data_for_rdycore);
+      rain_dataset->ndata = n;
+
+      PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
+
+      PetscCheck((rain_dataset->unstructured.stride == 1), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of rainfall dataset is not 1.");
 
       rain_dataset->unstructured.mesh_nelements = n;
 
@@ -1119,6 +1116,8 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
     MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
     PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
                "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
+
+    PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
 
     bc_dataset->ndata            = num_edges_dirc_bc * 3;
     bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
