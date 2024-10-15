@@ -266,14 +266,6 @@ static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
   data->ylc      = data->data_ptr[3];
   data->cellsize = data->data_ptr[4];
 
-  if (0) {
-    printf("ncols = %" PetscInt_FMT "\n", data->ncols);
-    printf("nrows = %" PetscInt_FMT "\n", data->nrows);
-    printf("xlc   = %f\n", data->xlc);
-    printf("ylc   = %f\n", data->ylc);
-    printf("size  = %f\n", data->cellsize);
-  }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -443,11 +435,6 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
         }
       }
     }
-
-    if (0) {
-      PetscInt idx = data->data2mesh_idx[icell];
-      printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, data->data_xc[idx], data->data_yc[idx]);
-    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -613,11 +600,6 @@ static PetscErrorCode CreateRasterDatasetMapping(RDy rdy, RasterDataset *data) {
         }
         idx++;
       }
-    }
-
-    if (0) {
-      PetscInt idx = data->data2mesh_idx[icell];
-      printf("%04" PetscInt_FMT " %f %f %02" PetscInt_FMT " %f %f\n", icell, xc, yc, idx, data->data_xc[idx], data->data_yc[idx]);
     }
   }
 
