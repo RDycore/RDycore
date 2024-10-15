@@ -638,7 +638,7 @@ PetscErrorCode SetRasterData(RasterDataset *data, PetscReal cur_time, PetscInt n
 /// @param ncells           [in]  Number of local cells
 /// @param *rain            [out] Rainfall rate for local cells
 /// @return PETSC_SUCESS on success
-PetscErrorCode SetHomogeneousRainfall(HomogeneousDataset *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
+PetscErrorCode SetHomogeneousData(HomogeneousDataset *homogeneous_rain, PetscReal cur_time, PetscInt ncells, PetscReal *rain) {
   PetscFunctionBegin;
 
   PetscReal    cur_rain;
@@ -1004,7 +1004,7 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
     case HOMOGENEOUS:
-      PetscCall(SetHomogeneousRainfall(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      PetscCall(SetHomogeneousData(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
     case RASTER:
