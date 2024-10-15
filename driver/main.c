@@ -335,8 +335,9 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
 
   // check the length of the PETSc Vec is consistent with n and s values
   PetscCheck((size - 2) / data->stride == data->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "The length (=%d) of loaded Vec does is not consistent with first (N = %d) and second (stride = %d) in the Vec", size, data->ndata,
-             data->stride);
+             "The length (=%" PetscInt_FMT ") of loaded Vec does is not consistent with first (N = %" PetscInt_FMT
+             ") and second (stride = %" PetscInt_FMT ") in the Vec",
+             size, data->ndata, data->stride);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -407,7 +408,8 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
   PetscCalloc1(data->ndata, &data->data_yc);
 
   PetscInt stride = vec_ptr[1];
-  PetscCheck(stride == 2, PETSC_COMM_WORLD, PETSC_ERR_USER, "Stride (= %d) of unstructured dataset is unexpected.", (PetscInt)vec_ptr[1]);
+  PetscCheck(stride == 2, PETSC_COMM_WORLD, PETSC_ERR_USER, "Stride (= %" PetscInt_FMT ") of unstructured dataset is unexpected.",
+             (PetscInt)vec_ptr[1]);
 
   PetscInt offset = 2;
   for (PetscInt i = 0; i < data->ndata; i++) {
@@ -978,8 +980,9 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
 
       break;
     case UNSTRUCTURED:
-      rain_dataset->ndata = n;
-      PetscCalloc1(n, &rain_dataset->data_for_rdycore);
+      rain_dataset->ndata     = n;
+      PetscInt physics_stride = 3;
+      PetscCalloc1(physics_stride * n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
 
       rain_dataset->unstructured.mesh_nelements = n;
