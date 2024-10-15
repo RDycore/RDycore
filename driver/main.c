@@ -196,7 +196,7 @@ static PetscErrorCode OpenHomogeneousDataset(HomogeneousDataset *data) {
 /// @brief Destroys the open PETSc Vec corresponding to a spatially homogeneous, temporally varying dataset
 /// @param *data [inout] Pointer to the HomogeneousDataset
 /// @return PETSC_SUCESS on success
-static PetscErrorCode CloseHomogeneousDataset(HomogeneousDataset *data) {
+static PetscErrorCode DestroyHomogeneousDataset(HomogeneousDataset *data) {
   PetscFunctionBegin;
 
   PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
@@ -273,6 +273,26 @@ static PetscErrorCode OpenRasterDataset(RasterDataset *data) {
     printf("ylc   = %f\n", data->ylc);
     printf("size  = %f\n", data->cellsize);
   }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Closes the dataset currently open and frees up memory
+/// @param data Pointer to a RasterDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode DestroyRasterDataset(RasterDataset *data) {
+  PetscFunctionBegin;
+
+  // close the file
+  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
+  PetscCall(VecDestroy(&data->data_vec));
+
+  // Free up memory
+  PetscCall(PetscFree(data->mesh_xc));
+  PetscCall(PetscFree(data->mesh_yc));
+  PetscCall(PetscFree(data->data_xc));
+  PetscCall(PetscFree(data->data_yc));
+  PetscCall(PetscFree(data->data2mesh_idx));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -368,7 +388,7 @@ static PetscErrorCode WriteMappingForDebugging(char *filename, PetscInt ncells, 
 ///        local cells (for source-sink condition) or boundary edges (for boundary condition).
 /// @param data Pointer to a UnstructuredDataset struct
 /// @return PETSC_SUCESS on success
-static PetscErrorCode SetupUnstructuredDatasetMapping(UnstructuredDataset *data) {
+static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
   PetscViewer  viewer;
@@ -431,6 +451,9 @@ static PetscErrorCode SetupUnstructuredDatasetMapping(UnstructuredDataset *data)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Closes the currently open Vec and loads in the next binary file in the Vec
+/// @param data A pointer to UnstructuredDataset
+/// @return PETSC_SUCESS on success
 static PetscErrorCode OpenANewUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
@@ -456,6 +479,25 @@ static PetscErrorCode OpenANewUnstructuredDataset(UnstructuredDataset *data) {
   PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
   data->ndata_file++;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Closes the currently open Vec and free up memory used for mapping
+/// @param data A pointer to UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode DestroyUnstruturedcDataset(UnstructuredDataset *data) {
+  PetscFunctionBegin;
+
+  // close the existing file
+  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
+  PetscCall(VecDestroy(&data->data_vec));
+
+  PetscCall(PetscFree(data->data_xc));
+  PetscCall(PetscFree(data->data_yc));
+  PetscCall(PetscFree(data->mesh_xc));
+  PetscCall(PetscFree(data->mesh_yc));
+  PetscCall(PetscFree(data->data2mesh_idx));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -533,7 +575,7 @@ static PetscErrorCode OpenANewRasterDataset(RasterDataset *data) {
 /// @param rdy   [in]    A RDy struct
 /// @param *data [inout] A pointer to a RasterDataset struct
 /// @return PETSC_SUCESS on success
-static PetscErrorCode SetupRasterDatasetMapping(RDy rdy, RasterDataset *data) {
+static PetscErrorCode CreateRasterDatasetMapping(RDy rdy, RasterDataset *data) {
   PetscFunctionBegin;
 
   PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_ncells_local));
@@ -899,7 +941,7 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
 /// @param n             [in]  Number of local cells on which rainfall source will be applied
 /// @param *rain_dataset [out] Pointer to a Sourcesink struct
 /// @return PETSC_SUCESS on success
-PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_dataset) {
+PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
   PetscMPIInt rank;
@@ -925,7 +967,7 @@ PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datase
       rain_dataset->ndata = n;
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenRasterDataset(&rain_dataset->raster));
-      PetscCall(SetupRasterDatasetMapping(rdy, &rain_dataset->raster));
+      PetscCall(CreateRasterDatasetMapping(rdy, &rain_dataset->raster));
 
       if (rain_dataset->raster.output_map) {
         sprintf(debug_file, "map.source-sink.raster.rank_%d.bin", rank);
@@ -951,7 +993,7 @@ PetscErrorCode SetupRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datase
       PetscCall(RDyGetLocalCellYCentroids(rdy, n, rain_dataset->unstructured.mesh_yc));
 
       // set up the mapping between the dataset and local cells
-      PetscCall(SetupUnstructuredDatasetMapping(&rain_dataset->unstructured));
+      PetscCall(CreateUnstructuredDatasetMapping(&rain_dataset->unstructured));
 
       if (rain_dataset->unstructured.output_map) {
         sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
@@ -999,20 +1041,26 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
 /// @brief Close rainfall dataset and free up memory.
 /// @param rain_dataset [inout] Pointer to a SourceSink struct
 /// @return PETSC_SUCESS on success
-PetscErrorCode CloseRainfallDataset(SourceSink *rain_dataset) {
+PetscErrorCode DestroyRainfallDataset(SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
   switch (rain_dataset->type) {
     case UNSET:
       break;
     case CONSTANT:
+      PetscFree(rain_dataset->data_for_rdycore);
       break;
     case HOMOGENEOUS:
-      PetscCall(CloseHomogeneousDataset(&rain_dataset->homogeneous));
+      PetscFree(rain_dataset->data_for_rdycore);
+      PetscCall(DestroyHomogeneousDataset(&rain_dataset->homogeneous));
       break;
     case RASTER:
+      PetscFree(rain_dataset->data_for_rdycore);
+      PetscCall(DestroyRasterDataset(&rain_dataset->raster));
       break;
     case UNSTRUCTRED:
+      PetscFree(rain_dataset->data_for_rdycore);
+      PetscCall(DestroyUnstruturedcDataset(&rain_dataset->unstructured));
       break;
   }
 
@@ -1023,7 +1071,7 @@ PetscErrorCode CloseRainfallDataset(SourceSink *rain_dataset) {
 /// @param rdy   [in]    A RDy struct
 /// @param *data [inout] Pointer to a BoundaryCondition struct
 /// @return PETSC_SUCESS on success
-PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
+PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -1085,7 +1133,7 @@ PetscErrorCode SetupBoundaryCondition(RDy rdy, BoundaryCondition *bc_dataset) {
       PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_yc));
 
       // set up the mapping between the dataset and boundary edges
-      PetscCall(SetupUnstructuredDatasetMapping(&bc_dataset->unstructured));
+      PetscCall(CreateUnstructuredDatasetMapping(&bc_dataset->unstructured));
 
       if (bc_dataset->unstructured.output_map) {
         sprintf(debug_file, "map.bc.unstructured.rank_%d.bin", rank);
@@ -1132,19 +1180,29 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
 /// @brief Close the boundary condition dataset and free up memory
 /// @param bc_dataset [inout] Pointer to a BoundaryCondition struct
 /// @return PETSC_SUCESS on success
-PetscErrorCode CloseBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
+PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
+
+  if (bc_dataset->ndata) {
+    PetscCall(PetscFree(bc_dataset->data_for_rdycore));
+  }
+
   switch (bc_dataset->type) {
     case UNSET:
       break;
     case CONSTANT:
       break;
     case HOMOGENEOUS:
-      PetscCall(CloseHomogeneousDataset(&bc_dataset->homogeneous));
+      PetscCall(DestroyHomogeneousDataset(&bc_dataset->homogeneous));
       break;
     case RASTER:
       break;
     case UNSTRUCTRED:
+      if (bc_dataset->ndata) {
+        PetscCall(PetscFree(bc_dataset->unstructured.mesh_xc));
+        PetscCall(PetscFree(bc_dataset->unstructured.mesh_yc));
+      }
+      PetscCall(DestroyUnstruturedcDataset(&bc_dataset->unstructured));
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1179,8 +1237,9 @@ int main(int argc, char *argv[]) {
     PetscInt n;
     PetscCall(RDyGetNumLocalCells(rdy, &n));
 
-    PetscCall(SetupRainfallDataset(rdy, n, &rain_dataset));
-    PetscCall(SetupBoundaryCondition(rdy, &bc_dataset));
+    // create rainfall and boundary condition datasets
+    PetscCall(CreateRainfallDataset(rdy, n, &rain_dataset));
+    PetscCall(CreateBoundaryConditionDataset(rdy, &bc_dataset));
 
     // allocate arrays for inspecting simulation data
     PetscReal *h, *hu, *hv;
@@ -1234,12 +1293,12 @@ int main(int argc, char *argv[]) {
     }
 
     // clean up
-    PetscCall(CloseRainfallDataset(&rain_dataset));
-    PetscCall(CloseBoundaryConditionDataset(&bc_dataset));
+    PetscCall(DestroyRainfallDataset(&rain_dataset));
+    PetscCall(DestroyBoundaryConditionDataset(&bc_dataset));
 
-    PetscFree(h);
-    PetscFree(hu);
-    PetscFree(hv);
+    PetscCall(PetscFree(h));
+    PetscCall(PetscFree(hu));
+    PetscCall(PetscFree(hv));
     PetscCall(RDyDestroy(&rdy));
   }
 
