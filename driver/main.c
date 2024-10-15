@@ -11,7 +11,7 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
-typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, RASTER, UNSTRUCTRED } DatasetType;
+typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, RASTER, UNSTRUCTURED } DatasetType;
 
 typedef struct {
   PetscReal rate;
@@ -821,7 +821,7 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
                                       sizeof(rain_dataset->unstructured.mesh_file), &flag));
       PetscCheck(flag, PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify the mesh file -unstructured_rain_mesh_file <file>");
 
-      rain_dataset->type = UNSTRUCTRED;
+      rain_dataset->type = UNSTRUCTURED;
 
       rain_dataset->unstructured.start_date = (struct tm){
           .tm_year  = date[0] - 1900,
@@ -907,7 +907,7 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_mesh_file", bc->unstructured.mesh_file, sizeof(bc->unstructured.mesh_file), &flag));
     PetscCheck(flag, PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify the mesh file -unstructured_bc_mesh_file <file>");
 
-    bc->type = UNSTRUCTRED;
+    bc->type = UNSTRUCTURED;
 
     bc->unstructured.start_date = (struct tm){
         .tm_year  = date[0] - 1900,
@@ -977,7 +977,7 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       }
 
       break;
-    case UNSTRUCTRED:
+    case UNSTRUCTURED:
       rain_dataset->ndata = n;
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
@@ -1029,7 +1029,7 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       PetscCall(SetRasterDataset(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
-    case UNSTRUCTRED:
+    case UNSTRUCTURED:
       PetscCall(SetUnstructuredDataset(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
@@ -1058,7 +1058,7 @@ PetscErrorCode DestroyRainfallDataset(SourceSink *rain_dataset) {
       PetscFree(rain_dataset->data_for_rdycore);
       PetscCall(DestroyRasterDataset(&rain_dataset->raster));
       break;
-    case UNSTRUCTRED:
+    case UNSTRUCTURED:
       PetscFree(rain_dataset->data_for_rdycore);
       PetscCall(DestroyUnstruturedcDataset(&rain_dataset->unstructured));
       break;
@@ -1092,7 +1092,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       break;
     case RASTER:
       break;
-    case UNSTRUCTRED:
+    case UNSTRUCTURED:
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
       break;
   }
@@ -1121,7 +1121,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
     bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
     PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
-    if ((bc_dataset->type == UNSTRUCTRED) & (num_edges_dirc_bc > 0)) {
+    if ((bc_dataset->type == UNSTRUCTURED) & (num_edges_dirc_bc > 0)) {
       bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
       // allocate memory to save x/y coordinates of the boundary edges
@@ -1167,7 +1167,7 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
         break;
       case RASTER:
         break;
-      case UNSTRUCTRED:
+      case UNSTRUCTURED:
         PetscCall(SetUnstructuredDataset(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
         PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
         break;
@@ -1197,7 +1197,7 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
       break;
     case RASTER:
       break;
-    case UNSTRUCTRED:
+    case UNSTRUCTURED:
       if (bc_dataset->ndata) {
         PetscCall(PetscFree(bc_dataset->unstructured.mesh_xc));
         PetscCall(PetscFree(bc_dataset->unstructured.mesh_yc));
