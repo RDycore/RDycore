@@ -27,6 +27,9 @@ display_help() {
     echo "  --config 1: Without debugging, 64bit indices, and HDF5 1.14.3"
     echo "  --config 2: With debugging, 64bit indices, and HDF5 1.14.3"
     echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.12.2.1"
+    echo
+    echo "For Compy (--mach compy): "
+    echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.10.5"
     echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
     echo
 
@@ -115,6 +118,18 @@ elif [ "$mach" = "frontier"  ]; then
 #    fi
 #  fi
 #
+
+elif [ "$mach" = "compy" ]; then
+   MODULE_FILE=$DIR/modules.compy.intel
+   export PETSC_DIR=/compyfs/bish218/rdycore/shared/petsc
+   if [ "$config" -eq 3 ]; then
+     export PETSC_ARCH=opt-32bit-v3.22.0
+   else
+     echo "Unsupported config for Compy"
+     display_help
+     exit
+   fi
+
 else
   echo "Could not determine the machine. mach=$mach"
   display_help
