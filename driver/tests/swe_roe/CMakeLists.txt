@@ -198,6 +198,6 @@ file(COPY
 
 foreach(np 1) # test on 1 processes
   foreach(config basic)
-      add_test(simons_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_output_map -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_output_map ${${config}_args})
+      add_test(simons_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_bc_output_map -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_output_map ${${config}_args})
   endforeach()
 endforeach()
