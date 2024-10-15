@@ -114,7 +114,7 @@ foreach(np 1 2)
   endforeach()
 endforeach()
 
-# houston-harvey test with spatially homogenous rainfall
+# houston-harvey test with spatially homogeneous rainfall
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.yaml
       ${MESH_DIR}/Houston1km_with_z.exo
@@ -124,11 +124,11 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -homogeneous_rain Houston1km.rain.${PETSC_ID_TYPE}.bin -bc Houston1km.bc.${PETSC_ID_TYPE}.bin -interpolate_bc ${${config}_args})
+    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
   endforeach()
 endforeach()
 
-# houston-harvey test with spatially homogenous rainfall
+# houston-harvey test with spatially homogeneous rainfall
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.adaptive_timestep.yaml
       ${MESH_DIR}/Houston1km_with_z.exo
@@ -138,7 +138,7 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain Houston1km.rain.${PETSC_ID_TYPE}.bin -bc Houston1km.bc.${PETSC_ID_TYPE}.bin -interpolate_bc ${${config}_args})
+    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
   endforeach()
 endforeach()
 
@@ -149,7 +149,7 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_hetro_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -heterogeneous_rain_start_date 2017,8,26,0,0 -heterogeneous_rain_dir ./ ${${config}_args})
+    add_test(houston_hetro_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ ${${config}_args})
   endforeach()
 endforeach()
 
@@ -178,5 +178,26 @@ foreach(np 1 2) # test on 1 processes
     foreach(lang c f90)
       add_test(swe_roe_mixed_elements_ic_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} mixed_elements_ic_file.yaml ${${config}_args})
     endforeach()
+  endforeach()
+endforeach()
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/simons-bc-${PETSC_ID_TYPE})
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/simons-ss-${PETSC_ID_TYPE})
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/Simons.OceanDirichletBC.yaml
+     ${MESH_DIR}/simons.exo
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY
+      ${CONDITION_DIR}/simons-bc/2011-08-27:14-00.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/simons-bc/simons_bc_x_y.${PETSC_ID_TYPE}.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/simons-bc-${PETSC_ID_TYPE})
+file(COPY
+      ${CONDITION_DIR}/simons-ss/2011-08-27:14-00.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/simons-ss/simons_forcing_x_y.${PETSC_ID_TYPE}.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/simons-ss-${PETSC_ID_TYPE})
+
+foreach(np 1) # test on 1 processes
+  foreach(config basic)
+      add_test(simons_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_bc_output_map -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_output_map ${${config}_args})
   endforeach()
 endforeach()

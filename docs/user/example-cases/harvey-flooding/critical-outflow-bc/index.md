@@ -15,8 +15,8 @@ binary files contains the following information:
 The start date and the location of MRMS dataset is specified to the RDycore
 driver through the following two command line options:
 
-1. `-heterogeneous_rain_start_date YYYY,MM,DD,HH,SS`, and
-2. `-heterogeneous_rain_dir <path/to/the/mrms/dataset>`
+1. `-raster_rain_start_date YYYY,MM,DD,HH,SS`, and
+2. `-raster_rain_dir <path/to/the/mrms/dataset>`
 
 The MRMS dataset and mesh are available on Perlmutter and Frontier under
 the RDycore's project directoy. Apart from the MRMS dataset, following the four
