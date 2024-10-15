@@ -1099,13 +1099,13 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
     PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
                "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
 
-    PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
-
     bc_dataset->ndata            = num_edges_dirc_bc * 3;
     bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
     PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
     if ((bc_dataset->type == UNSTRUCTURED) & (num_edges_dirc_bc > 0)) {
+      PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
+
       bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
       // allocate memory to save x/y coordinates of the boundary edges
