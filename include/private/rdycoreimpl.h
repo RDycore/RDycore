@@ -168,17 +168,40 @@ struct _p_RDy {
   // time₋stepping solver
   TS ts;
 
-  // solution vectors (global and local)
-  Vec X, X_local;
+  // host solution vectors (global and local)
+  Vec u_global, u_local;
 
-  // residual vector
-  Vec R;
+  // host residual vector
+  Vec residual;
 
-  // vector to store fluxes through internal and boundary edges
-  Vec F_dup;
+  // CEED (device) solver data
+  struct {
+    // CEED context and resource name
+    Ceed context;
+    char resource[PETSC_MAX_PATH_LEN];
 
-  // source-sink vector
-  Vec swe_src;
+    // CEED (composite) operators for fluxes and sources
+    CeedOperator flux_operator;
+    CeedOperator source_operator;
+
+    // on-device vectors
+    CeedVector u_local;
+    CeedVector rhs, sources;
+
+    CeedScalar dt;
+
+    // host vector storing fluxes
+    Vec host_fluxes;
+  } ceed;
+
+  // PETSc (host) solver data
+  struct {
+    // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
+    void *context;
+
+    // source-sink vector
+    Vec sources;
+  } petsc;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
@@ -190,23 +213,6 @@ struct _p_RDy {
   //-------------------
   PetscViewer           output_viewer;
   PetscViewerAndFormat *output_vf;
-
-  //--------------
-  // CEED support
-  //--------------
-  Ceed ceed;
-  char ceed_resource[PETSC_MAX_PATH_LEN];
-  // RHS operator (optional)
-  struct {
-    CeedOperator op_edges;
-    CeedOperator op_src;
-    CeedVector   u_local_ceed, u_ceed;
-    CeedVector   f_ceed, s_ceed;
-    CeedScalar   dt;
-  } ceed_rhs;
-
-  // Non-CEED solver data (must be cast to e. g. PetscRiemannDataSWE*)
-  void *petsc_rhs;
 };
 
 // these are used by both the main (RDycore) driver and the MMS driver
@@ -218,9 +224,9 @@ PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 
-// shallow water equations functions
-PETSC_INTERN PetscErrorCode InitSWE(RDy);
-PETSC_INTERN PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
+// solver-related functions
+PETSC_INTERN PetscErrorCode InitSolvers(RDy);
+PETSC_INTERN PetscErrorCode DestroySolvers(RDy);
 
 // output functions
 PETSC_INTERN PetscErrorCode GetOutputDirectory(RDy, char dir[PETSC_MAX_PATH_LEN]);

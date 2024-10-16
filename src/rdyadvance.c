@@ -213,16 +213,16 @@ static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   RDyLogDebug(rdy, "Performing preload calibration...");
 
   // create a "preload" solution so we can advance one step
-  Vec X_preload;
-  PetscCall(VecDuplicate(rdy->X, &X_preload));
-  PetscCall(VecCopy(rdy->X, X_preload));
+  Vec u_preload;
+  PetscCall(VecDuplicate(rdy->u_global, &u_preload));
+  PetscCall(VecCopy(rdy->u_global, u_preload));
 
   // take a single internal step to warm up the cache
-  PetscCall(TSSetSolution(rdy->ts, X_preload));
+  PetscCall(TSSetSolution(rdy->ts, u_preload));
   PetscCall(TSStep(rdy->ts));
 
   // clean up
-  PetscCall(VecDestroy(&X_preload));
+  PetscCall(VecDestroy(&u_preload));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -301,7 +301,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetMaxTime(rdy->ts, next_coupling_time));
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
-  PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
 
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
   courant_num_diags->is_set                   = PETSC_FALSE;
@@ -313,7 +313,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(TSSetTime(rdy->ts, time));
     PetscCall(TSSetStepNumber(rdy->ts, step));
   } else {
-    PetscCall(TSSolve(rdy->ts, rdy->X));
+    PetscCall(TSSolve(rdy->ts, rdy->u_global));
   }
   PetscPreLoadEnd();
 

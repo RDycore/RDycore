@@ -78,10 +78,10 @@ elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ferror-limit=10")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla")
-
-  # emit compile_commands.json for use with clangd
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
+
+# emit compile_commands.json for use with clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set linker flags where appropriate
 if (APPLE)

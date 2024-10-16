@@ -4,8 +4,7 @@
 #include <private/rdysweimpl.h>
 #include <stddef.h>  // for offsetof
 
-PetscClassId  RDY_CLASSID;
-PetscLogEvent RDY_CeedOperatorApply;
+extern PetscLogEvent RDY_CeedOperatorApply;
 
 // these functions are implemented in swe_flux_petsc.c
 PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
@@ -75,18 +74,20 @@ static PetscErrorCode InitMPITypesAndOps(void) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
+
 // create solvers and vectors
 static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscFunctionBegin;
 
-  if (!rdy->ceed_resource[0]) {
-    // swe_src is only needed for PETSc source operator
-    PetscCall(VecDuplicate(rdy->X, &rdy->swe_src));
-    PetscCall(VecZeroEntries(rdy->swe_src));
+  if (!rdy->ceed.resource[0]) {
+    // initialize the sources vector
+    PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
+    PetscCall(VecZeroEntries(rdy->petsc.sources));
   }
 
   PetscInt n_dof;
-  PetscCall(VecGetSize(rdy->X, &n_dof));
+  PetscCall(VecGetSize(rdy->u_global, &n_dof));
 
   // set up a TS solver
   PetscCall(TSCreate(rdy->comm, &rdy->ts));
@@ -107,13 +108,13 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
-  PetscCall(TSSetRHSFunction(rdy->ts, rdy->R, RHSFunctionSWE, rdy));
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->residual, RHSFunctionSWE, rdy));
 
   if (!rdy->config.time.adaptive.enable) {
     PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
   }
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
-  PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
   PetscCall(TSSetTime(rdy->ts, 0.0));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 
@@ -127,37 +128,38 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 // create flux and source operators
 static PetscErrorCode CreateOperators(RDy rdy) {
   PetscFunctionBegin;
-  if (rdy->ceed_resource[0]) {
+  if (rdy->ceed.resource[0]) {
     RDyLogDebug(rdy, "Setting up CEED Operators...");
 
     // create the operators themselves
-    PetscCall(CreateSWEFluxOperator(rdy->ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                    rdy->config.physics.flow.tiny_h, &rdy->ceed_rhs.op_edges));
+    PetscCall(CreateSWEFluxOperator(rdy->ceed.context, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
+                                    rdy->config.physics.flow.tiny_h, &rdy->ceed.flux_operator));
 
-    PetscCall(CreateSWESourceOperator(rdy->ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
-                                      &rdy->ceed_rhs.op_src));
+    PetscCall(CreateSWESourceOperator(rdy->ceed.context, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
+                                      &rdy->ceed.source_operator));
 
     // create associated vectors for storage
     int num_comp = 3;
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.u_local_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed_rhs.f_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.s_ceed));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed_rhs.u_ceed));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed.context, rdy->mesh.num_cells * num_comp, &rdy->ceed.u_local));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed.context, rdy->mesh.num_cells * num_comp, &rdy->ceed.rhs));
+    PetscCallCEED(CeedVectorCreate(rdy->ceed.context, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed.sources));
 
     PetscBool ceed_enabled = PETSC_TRUE;
-    PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc_rhs));
+    PetscCall(
+        CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc.context));
 
     // reset the time step size
-    rdy->ceed_rhs.dt = 0.0;
+    rdy->ceed.dt = 0.0;
   } else {
     // allocate storage for our PETSc implementation of the  flux and
     // source terms
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
     int       num_comp     = 3;
     PetscBool ceed_enabled = PETSC_FALSE;
-    PetscCall(CreatePetscSWEFluxForInternalEdges(&rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, &rdy->petsc_rhs));
-    PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc_rhs));
-    PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc_rhs));
+    PetscCall(CreatePetscSWEFluxForInternalEdges(&rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, &rdy->petsc.context));
+    PetscCall(
+        CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc.context));
+    PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc.context));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -173,8 +175,6 @@ PetscErrorCode InitSWE(RDy rdy) {
 
   // set up MPI types and operators used by SWE physics
   PetscCall(InitMPITypesAndOps());
-  PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
-  PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply));
 
   // sets up solvers, operators, all that stuff
   PetscCall(CreateSolvers(rdy));
@@ -189,10 +189,10 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
   PetscFunctionBeginUser;
 
   // update the timestep for the ceed operators if necessary
-  if (rdy->ceed_rhs.dt != dt) {
-    PetscCall(SWEFluxOperatorSetTimeStep(rdy->ceed_rhs.op_edges, dt));
-    PetscCall(SWESourceOperatorSetTimeStep(rdy->ceed_rhs.op_src, dt));
-    rdy->ceed_rhs.dt = dt;
+  if (rdy->ceed.dt != dt) {
+    PetscCall(SWEFluxOperatorSetTimeStep(rdy->ceed.flux_operator, dt));
+    PetscCall(SWESourceOperatorSetTimeStep(rdy->ceed.source_operator, dt));
+    rdy->ceed.dt = dt;
   }
 
   {
@@ -215,8 +215,8 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     PetscMemType mem_type;
     Vec          F_local;
 
-    CeedVector u_local_ceed = rdy->ceed_rhs.u_local_ceed;
-    CeedVector f_ceed       = rdy->ceed_rhs.f_ceed;
+    CeedVector u_local_ceed = rdy->ceed.u_local;
+    CeedVector f_ceed       = rdy->ceed.rhs;
 
     // 1. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
     PetscCall(VecGetArrayAndMemType(U_local, &u_local, &mem_type));
@@ -230,7 +230,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     // 3. Apply the CeedOpeator associated with the internal and boundary edges
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(rdy->ceed_rhs.op_edges, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApply(rdy->ceed.flux_operator, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
@@ -256,8 +256,8 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     //
     // a) Pre-CeedOperatorApply stage:
     //    - Set memory pointer of a CeedVector (u_local_ceed) is set to PETSc Vec (U_local)
-    //    - A copy of the PETSc Vec F is made as F_dup. Then, memory pointer of a CeedVector (riemannf_ceed)
-    //      to the F_dup.
+    //    - A copy of the PETSc Vec F is made as host_fluxes. Then, memory pointer of a CeedVector (riemannf_ceed)
+    //      to the host_fluxes.
     //    - Set memory pointer of a CeedVector (s_ceed) is set to PETSc Vec (F)
     //
     // b) CeedOperatorApply stage
@@ -269,13 +269,13 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     // 1. Get the CeedVector associated with the "riemannf" CeedOperatorField
     CeedOperatorField riemannf_field;
     CeedVector        riemannf_ceed;
-    SWESourceOperatorGetRiemannFlux(rdy->ceed_rhs.op_src, &riemannf_field);
+    SWESourceOperatorGetRiemannFlux(rdy->ceed.source_operator, &riemannf_field);
     PetscCallCEED(CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed));
 
-    PetscScalar *u, *f, *f_dup;
+    PetscScalar *u, *f, *host_fluxes;
     PetscMemType mem_type;
-    CeedVector   u_local_ceed = rdy->ceed_rhs.u_local_ceed;
-    CeedVector   s_ceed       = rdy->ceed_rhs.s_ceed;
+    CeedVector   u_local_ceed = rdy->ceed.u_local;
+    CeedVector   s_ceed       = rdy->ceed.sources;
 
     // 2. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
     PetscCall(VecGetArrayAndMemType(U_local, &u, &mem_type));
@@ -283,11 +283,11 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
     // 3. Make a duplicate copy of the F as the values will be used as input for the CeedOperator
     //    corresponding to the source-sink term
-    PetscCall(VecCopy(F, rdy->F_dup));
+    PetscCall(VecCopy(F, rdy->ceed.host_fluxes));
 
-    // 4. Sets the pointer of a CeedVector to a PETSc Vec: F_dup --> riemannf_ceed
-    PetscCall(VecGetArrayAndMemType(rdy->F_dup, &f_dup, &mem_type));
-    PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f_dup));
+    // 4. Sets the pointer of a CeedVector to a PETSc Vec: host_fluxes --> riemannf_ceed
+    PetscCall(VecGetArrayAndMemType(rdy->ceed.host_fluxes, &host_fluxes, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, host_fluxes));
 
     // 5. Sets the pointer of a CeedVector to a PETSc Vec: F --> s_ceed
     PetscCall(VecGetArrayAndMemType(F, &f, &mem_type));
@@ -296,13 +296,13 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     // 6. Apply the source CeedOperator
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, U_local, F, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(rdy->ceed_rhs.op_src, u_local_ceed, s_ceed, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApply(rdy->ceed.source_operator, u_local_ceed, s_ceed, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, U_local, F, 0, 0));
 
     // 7. Reset memory pointer of CeedVectors
     PetscCallCEED(CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f));
-    PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &f_dup));
+    PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &host_fluxes));
     PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u));
 
     // 8. Restore pointers to the PETSc Vecs
@@ -422,8 +422,8 @@ PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
 
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
 
-  if (rdy->ceed_resource[0]) {
-    PetscCall(CeedFindMaxCourantNumber(rdy->ceed_rhs.op_edges, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->comm,
+  if (rdy->ceed.resource[0]) {
+    PetscCall(CeedFindMaxCourantNumber(rdy->ceed.flux_operator, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->comm,
                                        &courant_num_diags->max_courant_num));
     courant_num_diags->is_set = PETSC_TRUE;
   } else {
@@ -438,10 +438,10 @@ PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
 // Parameters:
 //  ts  - the solver
 //  t   - the simulation time [seconds]
-//  X   - the solution vector at time t
+//  U   - the solution vector at time t
 //  F   - the right hand side vector to be evaluated at time t
 //  ctx - a generic pointer to our RDy object
-PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
+PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   PetscFunctionBegin;
 
   RDy rdy = ctx;
@@ -452,17 +452,17 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 
   PetscCall(VecZeroEntries(F));
 
-  // populate the local X vector
-  PetscCall(DMGlobalToLocalBegin(dm, X, INSERT_VALUES, rdy->X_local));
-  PetscCall(DMGlobalToLocalEnd(dm, X, INSERT_VALUES, rdy->X_local));
+  // populate the local U vector
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
 
   // get courant number diagnostics
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
   courant_num_diags->max_courant_num          = 0.0;
 
   // compute the right hand side
-  if (rdy->ceed_resource[0]) {
-    PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->X_local, F));
+  if (rdy->ceed.resource[0]) {
+    PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->u_local, F));
     if (0) {
       PetscInt nstep;
       PetscCall(TSGetStepNumber(ts, &nstep));

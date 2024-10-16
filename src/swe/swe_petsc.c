@@ -10,7 +10,7 @@ static const PetscReal GRAVITY = 9.806;
 
 /// For computing fluxes, allocates structs to hold values left and right
 /// of internal edges. This must be called before CreatePetscSWESource.
-PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncomp, PetscInt num_internal_edges, void **petsc_rhs) {
+PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncomp, PetscInt num_internal_edges, void **petsc_context) {
   PetscFunctionBegin;
 
   RiemannDataSWE datal, datar;
@@ -38,7 +38,7 @@ PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncom
   data_swe->data_internal_edges  = data_edge_internal;
 
   // set the pointer
-  *petsc_rhs = data_swe;
+  *petsc_context = data_swe;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -46,7 +46,7 @@ PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncom
 /// For computing fluxes, allocates structs to hold values left and right
 /// of boundary edges. This must be called after CreatePetscSWEFluxForInternalEdges.
 PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt ncomp, PetscInt nbnd, RDyBoundary *boundaries, PetscBool ceed_enabled,
-                                                  void **petsc_rhs) {
+                                                  void **petsc_context) {
   PetscFunctionBegin;
 
   // create an array of data structures to hold values for cells left/right of an edge
@@ -88,7 +88,7 @@ PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt ncom
   if (!ceed_enabled) {
     // for the PETSc version, the data structure for internal edges has been already created.
     // so, use the existing pointer.
-    data_swe = *petsc_rhs;
+    data_swe = *petsc_context;
   } else {
     // for the CEED version, the data structures for internal edges are not created. so,
     // allocate memory for the pointer.
@@ -103,13 +103,13 @@ PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *edges, PetscInt ncom
   data_swe->data_bnd_edges = data_edge_bnd;
 
   // set the pointer for the CEED version
-  if (ceed_enabled) *petsc_rhs = data_swe;
+  if (ceed_enabled) *petsc_context = data_swe;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Allocates a struct for computing the source/sink term
-PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
+PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_context) {
   PetscFunctionBegin;
 
   PetscInt num = mesh->num_cells;
@@ -119,16 +119,16 @@ PetscErrorCode CreatePetscSWESource(RDyMesh *mesh, void *petsc_rhs) {
 
   PetscCall(RiemannDataSWECreate(num, data));
 
-  PetscRiemannDataSWE *data_swe = petsc_rhs;
+  PetscRiemannDataSWE *data_swe = petsc_context;
   data_swe->data_cells          = *data;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode DestroyPetscSWEFlux(void *petsc_rhs, PetscBool ceed_enabled, PetscInt num_boundaries) {
+PetscErrorCode DestroyPetscSWEFlux(void *petsc_context, PetscBool ceed_enabled, PetscInt num_boundaries) {
   PetscFunctionBeginUser;
 
-  PetscRiemannDataSWE *data_swe = petsc_rhs;
+  PetscRiemannDataSWE *data_swe = petsc_context;
 
   if (!ceed_enabled) {
     PetscCall(RiemannDataSWEDestroy(data_swe->datal_internal_edges));
@@ -293,17 +293,17 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
   RDyEdges *edges = &mesh->edges;
 
   // Get pointers to vector data
-  PetscScalar *x_ptr, *f_ptr;
-  PetscCall(VecGetArray(rdy->X_local, &x_ptr));
+  PetscScalar *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
 
   PetscInt ndof;
-  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCall(VecGetBlockSize(rdy->u_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   PetscInt num = mesh->num_internal_edges;
 
-  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  PetscRiemannDataSWE *data_swe = rdy->petsc.context;
   RiemannDataSWE      *datal    = &data_swe->datal_internal_edges;
   RiemannDataSWE      *datar    = &data_swe->datar_internal_edges;
   RiemannDataSWE      *datac    = &data_swe->data_cells;
@@ -351,8 +351,8 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
     if (r != -1) {  // internal edge
       PetscReal edge_len = edges->lengths[iedge];
 
-      PetscReal hl = x_ptr[l * ndof + 0];
-      PetscReal hr = x_ptr[r * ndof + 0];
+      PetscReal hl = u_ptr[l * ndof + 0];
+      PetscReal hr = u_ptr[r * ndof + 0];
 
       if (!(hr < tiny_h && hl < tiny_h)) {
         PetscReal areal = cells->areas[l];
@@ -382,7 +382,7 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
   }
 
   // Restore vectors
-  PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -572,18 +572,18 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
   PetscFunctionBeginUser;
 
   // Get pointers to vector data
-  PetscScalar *x_ptr, *f_ptr;
-  PetscCall(VecGetArray(rdy->X_local, &x_ptr));
+  PetscScalar *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
 
   PetscInt ndof;
-  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCall(VecGetBlockSize(rdy->u_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
 
   // loop over all boundaries and apply boundary conditions
-  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  PetscRiemannDataSWE *data_swe = rdy->petsc.context;
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary         boundary      = rdy->boundaries[b];
     RDyCondition        boundary_cond = rdy->boundary_conditions[b];
@@ -608,7 +608,7 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
   }
 
   // Restore vectors
-  PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -621,27 +621,27 @@ PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy) {
   RDyMesh *mesh = &rdy->mesh;
 
   PetscInt ndof;
-  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCall(VecGetBlockSize(rdy->u_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   // Get access to Vec
-  PetscScalar *x_ptr;
-  PetscCall(VecGetArray(rdy->X_local, &x_ptr));
+  PetscScalar *u_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
 
-  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  PetscRiemannDataSWE *data_swe = rdy->petsc.context;
   RiemannDataSWE      *data     = &data_swe->data_cells;
 
   // Collect the h/hu/hv for cells to compute u/v
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    data->h[icell]  = x_ptr[icell * ndof + 0];
-    data->hu[icell] = x_ptr[icell * ndof + 1];
-    data->hv[icell] = x_ptr[icell * ndof + 2];
+    data->h[icell]  = u_ptr[icell * ndof + 0];
+    data->hu[icell] = u_ptr[icell * ndof + 1];
+    data->hv[icell] = u_ptr[icell * ndof + 2];
   }
 
   // Compute u/v for cells
   PetscCall(GetVelocityFromMomentum(rdy->config.physics.flow.tiny_h, data));
 
-  PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -654,16 +654,16 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   RDyCells *cells = &mesh->cells;
 
   // Get access to Vec
-  PetscScalar *x_ptr, *f_ptr, *swe_src_ptr;
-  PetscCall(VecGetArray(rdy->X_local, &x_ptr));
-  PetscCall(VecGetArray(rdy->swe_src, &swe_src_ptr));
+  PetscScalar *u_ptr, *f_ptr, *sources_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
+  PetscCall(VecGetArray(rdy->petsc.sources, &sources_ptr));
   PetscCall(VecGetArray(F, &f_ptr));
 
   PetscInt ndof;
-  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCall(VecGetBlockSize(rdy->u_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  PetscRiemannDataSWE *data_swe = rdy->petsc.context;
   RiemannDataSWE      *data     = &data_swe->data_cells;
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
@@ -705,15 +705,15 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
         tby = (hv + dt * Fsum_y - dt * bedy) * factor;
       }
 
-      f_ptr[idx * ndof + 0] += swe_src_ptr[idx * ndof + 0];
-      f_ptr[idx * ndof + 1] += -bedx - tbx + swe_src_ptr[idx * ndof + 1];
-      f_ptr[idx * ndof + 2] += -bedy - tby + swe_src_ptr[idx * ndof + 2];
+      f_ptr[idx * ndof + 0] += sources_ptr[idx * ndof + 0];
+      f_ptr[idx * ndof + 1] += -bedx - tbx + sources_ptr[idx * ndof + 1];
+      f_ptr[idx * ndof + 2] += -bedy - tby + sources_ptr[idx * ndof + 2];
     }
   }
 
   // Restore vectors
-  PetscCall(VecRestoreArray(rdy->X_local, &x_ptr));
-  PetscCall(VecRestoreArray(rdy->swe_src, &swe_src_ptr));
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->petsc.sources, &sources_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -722,10 +722,10 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
 // Sets Dirichlet boundary values on the boundary with the given index. NOTE
 // that the boundary index b identifies the bth boundary in RDycore's array of
 // boundaries and boundary conditions, and NOT the boundary with ID b.
-PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_rhs, PetscInt boundary_index, RiemannDataSWE *boundary_data) {
+PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_context, PetscInt boundary_index, RiemannDataSWE *boundary_data) {
   PetscFunctionBegin;
 
-  PetscRiemannDataSWE *data_swe = petsc_rhs;
+  PetscRiemannDataSWE *data_swe = petsc_context;
   *boundary_data                = data_swe->datar_bnd_edges[boundary_index];
 
   PetscFunctionReturn(PETSC_SUCCESS);

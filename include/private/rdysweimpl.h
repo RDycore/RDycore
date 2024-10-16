@@ -27,6 +27,8 @@ typedef struct {
   RiemannDataSWE      data_cells;
 } PetscRiemannDataSWE;
 
+PETSC_INTERN PetscErrorCode InitSWE(RDy);
+
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary *, RDyCondition *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);

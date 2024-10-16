@@ -240,13 +240,13 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
   }
 #endif
-  PetscCall(PetscObjectSetName((PetscObject)rdy->X, "solution"));
-  PetscCall(VecLoad(rdy->X, viewer));
+  PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "solution"));
+  PetscCall(VecLoad(rdy->u_global, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
 
   // read the newly loaded solution vector into the timestepper
-  PetscCall(TSSetSolution(rdy->ts, rdy->X));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

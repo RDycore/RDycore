@@ -113,8 +113,8 @@ PetscErrorCode OverrideParameters(RDy rdy) {
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
   {
     PetscCall(PetscOptionsReal("-dt", "time step size (seconds)", "", rdy->dt, &rdy->dt, NULL));
-    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed_resource, rdy->ceed_resource,
-                                 sizeof rdy->ceed_resource, NULL));
+    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed.resource, rdy->ceed.resource,
+                                 sizeof rdy->ceed.resource, NULL));
     PetscCall(PetscOptionsString("-restart", "restart from the given checkpoint file", "", rdy->config.restart.file, rdy->config.restart.file,
                                  sizeof rdy->config.restart.file, NULL));
   }
@@ -474,13 +474,13 @@ PetscErrorCode InitBoundaries(RDy rdy) {
         RDySurfaceCompositionSpec surface_comp = rdy->config.surface_composition[isurf_comp];          \
         if (!strcmp(surface_comp.region, region.name)) {                                               \
           if (mat_prop_vec) {                                                                          \
-            PetscScalar *x_ptr;                                                                        \
-            PetscCall(VecGetArray(mat_prop_vec, &x_ptr));                                              \
+            PetscScalar *u_ptr;                                                                        \
+            PetscCall(VecGetArray(mat_prop_vec, &u_ptr));                                              \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
               PetscInt cell                    = region.cell_ids[c];                                   \
-              materials_by_cell[cell].property = x_ptr[c];                                             \
+              materials_by_cell[cell].property = u_ptr[c];                                             \
             }                                                                                          \
-            PetscCall(VecRestoreArray(mat_prop_vec, &x_ptr));                                          \
+            PetscCall(VecRestoreArray(mat_prop_vec, &u_ptr));                                          \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
@@ -718,7 +718,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->X));
+  PetscCall(VecZeroEntries(rdy->u_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -729,10 +729,10 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->X, &n_local));
-  PetscCall(VecGetBlockSize(rdy->X, &ndof));
-  PetscScalar *x_ptr;
-  PetscCall(VecGetArray(rdy->X, &x_ptr));
+  PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
+  PetscScalar *u_ptr;
+  PetscCall(VecGetArray(rdy->u_global, &u_ptr));
 
   // initialize flow conditions
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
@@ -750,7 +750,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscCall(VecLoad(natural, viewer));
       PetscCall(PetscViewerDestroy(&viewer));
 
-      // check the block size of the initial condition vector agrees with the block size of rdy->X
+      // check the block size of the initial condition vector agrees with the block size of rdy->u_global
       PetscInt nblocks_nat;
       PetscCall(VecGetBlockSize(natural, &nblocks_nat));
       PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
@@ -784,7 +784,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
               for (PetscInt idof = 0; idof < ndof; idof++) {
-                x_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
+                u_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
               }
             }
           }
@@ -793,9 +793,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
-              x_ptr[3 * cell_id]     = mupEval(flow_ic.height);
-              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
-              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
+              u_ptr[3 * cell_id]     = mupEval(flow_ic.height);
+              u_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
+              u_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
             }
           }
         }
@@ -806,7 +806,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // TODO: salinity and sediment initial conditions go here.
 
-  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->u_global, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -933,8 +933,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(PrintConfig(rdy));
 
   // initialize CEED if needed
-  if (rdy->ceed_resource[0]) {
-    PetscCallCEED(CeedInit(rdy->ceed_resource, &rdy->ceed));
+  if (rdy->ceed.resource[0]) {
+    PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
   }
 
   RDyLogDebug(rdy, "Creating DMs...");
@@ -962,8 +962,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing shallow water equations solver...");
-  PetscCall(InitSWE(rdy));
+  RDyLogDebug(rdy, "Initializing solvers...");
+  PetscCall(InitSolvers(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));
