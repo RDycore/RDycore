@@ -8,6 +8,7 @@ add_library(rdycore
   rdydm.c
   rdymesh.c
   rdymms.c
+  rdyrefine.c
   rdysetup.c
   swe/physics_swe.c
   swe/swe_petsc.c
