@@ -113,12 +113,17 @@ PetscErrorCode OverrideParameters(RDy rdy) {
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
   {
     PetscCall(PetscOptionsReal("-dt", "time step size (seconds)", "", rdy->dt, &rdy->dt, NULL));
-    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed_resource, rdy->ceed_resource,
-                                 sizeof rdy->ceed_resource, NULL));
+    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed.resource, rdy->ceed.resource,
+                                 sizeof rdy->ceed.resource, NULL));
     PetscCall(PetscOptionsString("-restart", "restart from the given checkpoint file", "", rdy->config.restart.file, rdy->config.restart.file,
                                  sizeof rdy->config.restart.file, NULL));
   }
   PetscOptionsEnd();
+
+  // initialize a CEED context if needed, assuming ownership
+  if (rdy->ceed.resource[0]) {
+    PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -127,9 +132,8 @@ PetscErrorCode OverrideParameters(RDy rdy) {
 static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
 
-  // Currently, we do a linear search on the name of the condition, which is O(N)
-  // for N regions. If this is too slow, we can sort the conditions by name and
-  // use binary search, which is O(log2 N).
+  // NOTE: linear search on N condition names is O(N) complexity; binary search
+  // NOTE: would be O(log2 N) if N is uncomfortable
   *index = -1;
   for (PetscInt i = 0; i < rdy->config.num_flow_conditions; ++i) {
     if (!strcmp(rdy->config.flow_conditions[i].name, name)) {
@@ -145,9 +149,7 @@ static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *ind
 static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
 
-  // Currently, we do a linear search on the name of the condition, which is O(N)
-  // for N regions. If this is too slow, we can sort the conditions by name and
-  // use binary search, which is O(log2 N).
+  // NOTE: could be optimized as above
   *index = -1;
   for (PetscInt i = 0; i < rdy->config.num_sediment_conditions; ++i) {
     if (!strcmp(rdy->config.sediment_conditions[i].name, name)) {
@@ -163,9 +165,7 @@ static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt 
 static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
 
-  // Currently, we do a linear search on the name of the condition, which is O(N)
-  // for N regions. If this is too slow, we can sort the conditions by name and
-  // use binary search, which is O(log2 N).
+  // NOTE: could be optimized as above
   *index = -1;
   for (PetscInt i = 0; i < rdy->config.num_salinity_conditions; ++i) {
     if (!strcmp(rdy->config.salinity_conditions[i].name, name)) {
@@ -182,12 +182,12 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
 PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionBegin;
 
-  // Count and fetch regions.
+  // count and fetch regions
   PetscInt c_start, c_end;  // starting and ending cell points
   PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Cell Sets", &label));
-  // If we didn't find any regions, we can't perform the simulation.
+  // if we didn't find any regions, we can't perform the simulation
   PetscCheck(label, rdy->comm, PETSC_ERR_USER, "No regions (cell sets) found in grid! Cannot assign initial conditions.");
   PetscCall(DMLabelGetNumValues(label, &rdy->num_regions));
   PetscCheck(rdy->num_regions <= MAX_NUM_REGIONS, rdy->comm, PETSC_ERR_USER,
@@ -244,22 +244,21 @@ PetscErrorCode InitRegions(RDy rdy) {
 PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionBegin;
 
-  // Extract edges on the domain boundary.
+  // extract edges on the domain boundary
   DMLabel boundary_edge_label;
   PetscCall(DMGetLabel(rdy->dm, "boundary_edges", &boundary_edge_label));
   IS boundary_edge_is;
   PetscCall(DMLabelGetStratumIS(boundary_edge_label, 1, &boundary_edge_is));
   PetscBool boundary_edge_present = (boundary_edge_is != NULL);
 
-  // Keep track of whether edges on the domain boundary have been assigned to
-  // any boundaries.
+  // track whether edges on the domain boundary have been assigned to boundaries
   PetscInt e_start, e_end;  // starting and ending edge points
   DMPlexGetHeightStratum(rdy->dm, 1, &e_start, &e_end);
 
   IS       unassigned_edges_is;
   PetscInt num_edges_invalid = 0;
 
-  // First remove all edges that are not valid. The invalid edges are:
+  // first remove all edges that are not valid; invalid edges are
   // - edges between two non-local(=ghost) cells, and
   // - a boundary edge of a non-local(=ghost) cell
   if (boundary_edge_present) {
@@ -303,10 +302,10 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   }
   PetscInt unassigned_edge_boundary_id = 0;  // boundary ID for unassigned edges
 
-  // Count boundaries. We rely on face sets in our grids to express
-  // boundary conditions. All edges on the domain boundary not assigned to other
+  // count boundaries relying on face sets in our grids to express
+  // boundary conditions; all edges on the domain boundary not assigned to other
   // boundaries are assigned to a special boundary to which we apply reflecting
-  // boundary conditions.
+  // boundary conditions
   DMLabel label;
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   PetscInt        num_boundaries_in_file = 0;
@@ -474,13 +473,13 @@ PetscErrorCode InitBoundaries(RDy rdy) {
         RDySurfaceCompositionSpec surface_comp = rdy->config.surface_composition[isurf_comp];          \
         if (!strcmp(surface_comp.region, region.name)) {                                               \
           if (mat_prop_vec) {                                                                          \
-            PetscScalar *x_ptr;                                                                        \
-            PetscCall(VecGetArray(mat_prop_vec, &x_ptr));                                              \
+            PetscScalar *prop_ptr;                                                                     \
+            PetscCall(VecGetArray(mat_prop_vec, &prop_ptr));                                           \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
               PetscInt cell                    = region.cell_ids[c];                                   \
-              materials_by_cell[cell].property = x_ptr[c];                                             \
+              materials_by_cell[cell].property = prop_ptr[c];                                          \
             }                                                                                          \
-            PetscCall(VecRestoreArray(mat_prop_vec, &x_ptr));                                          \
+            PetscCall(VecRestoreArray(mat_prop_vec, &prop_ptr));                                       \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
@@ -718,7 +717,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->X));
+  PetscCall(VecZeroEntries(rdy->u_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -729,10 +728,10 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->X, &n_local));
-  PetscCall(VecGetBlockSize(rdy->X, &ndof));
-  PetscScalar *x_ptr;
-  PetscCall(VecGetArray(rdy->X, &x_ptr));
+  PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
+  PetscScalar *u_ptr;
+  PetscCall(VecGetArray(rdy->u_global, &u_ptr));
 
   // initialize flow conditions
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
@@ -750,7 +749,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscCall(VecLoad(natural, viewer));
       PetscCall(PetscViewerDestroy(&viewer));
 
-      // check the block size of the initial condition vector agrees with the block size of rdy->X
+      // check the block size of the initial condition vector agrees with the block size of rdy->u_global
       PetscInt nblocks_nat;
       PetscCall(VecGetBlockSize(natural, &nblocks_nat));
       PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
@@ -784,7 +783,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
               for (PetscInt idof = 0; idof < ndof; idof++) {
-                x_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
+                u_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
               }
             }
           }
@@ -793,9 +792,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
-              x_ptr[3 * cell_id]     = mupEval(flow_ic.height);
-              x_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
-              x_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
+              u_ptr[ndof * cell_id]     = mupEval(flow_ic.height);
+              u_ptr[ndof * cell_id + 1] = mupEval(flow_ic.x_momentum);
+              u_ptr[ndof * cell_id + 2] = mupEval(flow_ic.y_momentum);
             }
           }
         }
@@ -806,7 +805,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // TODO: salinity and sediment initial conditions go here.
 
-  PetscCall(VecRestoreArray(rdy->X, &x_ptr));
+  PetscCall(VecRestoreArray(rdy->u_global, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -932,11 +931,6 @@ PetscErrorCode RDySetup(RDy rdy) {
   // print configuration info
   PetscCall(PrintConfig(rdy));
 
-  // initialize CEED if needed
-  if (rdy->ceed_resource[0]) {
-    PetscCallCEED(CeedInit(rdy->ceed_resource, &rdy->ceed));
-  }
-
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
@@ -962,8 +956,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing shallow water equations solver...");
-  PetscCall(InitSWE(rdy));
+  RDyLogDebug(rdy, "Initializing solvers...");
+  PetscCall(InitSolvers(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));

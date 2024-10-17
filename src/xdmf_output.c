@@ -40,10 +40,10 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(DMGetUseNatural(rdy->dm, &use_natural));
   if (use_natural) {
     PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-    PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->X, natural));
-    PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, rdy->X, natural));
+    PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->u_global, natural));
+    PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, rdy->u_global, natural));
   } else {
-    natural = rdy->X;
+    natural = rdy->u_global;
     PetscCall(PetscObjectReference((PetscObject)natural));
   }
 

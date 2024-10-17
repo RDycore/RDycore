@@ -123,8 +123,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   // destroy FV mesh
   if ((*rdy)->mesh.num_cells) {
-    PetscBool ceed_enabled = ((*rdy)->ceed_resource[0]);
-    PetscCall(DestroyPetscSWEFlux((*rdy)->petsc_rhs, ceed_enabled, (*rdy)->num_boundaries));
     RDyMeshDestroy((*rdy)->mesh);
   }
 
@@ -155,11 +153,12 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
   // destroy vectors
-  if ((*rdy)->swe_src) VecDestroy(&((*rdy)->swe_src));
-  if ((*rdy)->R) VecDestroy(&((*rdy)->R));
-  if ((*rdy)->X) VecDestroy(&((*rdy)->X));
-  if ((*rdy)->X_local) VecDestroy(&((*rdy)->X_local));
-  if ((*rdy)->F_dup) VecDestroy(&((*rdy)->F_dup));
+  if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
+  if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
+  if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
+  if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
+
+  PetscCall(DestroySolvers(*rdy));
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));
@@ -168,17 +167,9 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
-  // destroy libCEED parts if they exist
-  PetscCallCEED(CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_edges));
-  PetscCallCEED(CeedOperatorDestroy(&(*rdy)->ceed_rhs.op_src));
-  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.u_local_ceed));
-  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.u_ceed));
-  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.f_ceed));
-  PetscCallCEED(CeedVectorDestroy(&(*rdy)->ceed_rhs.s_ceed));
-
-  // clean up CEED if needed
-  if ((*rdy)->ceed_resource[0]) {
-    PetscCallCEED(CeedDestroy(&((*rdy)->ceed)));
+  // destroy our CEED context as needed
+  if ((*rdy)->ceed.resource[0]) {
+    PetscCallCEED(CeedDestroy(&((*rdy)->ceed.context)));
   }
 
   // close the log file if needed

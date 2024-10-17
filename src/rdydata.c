@@ -86,13 +86,13 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
 
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  if (rdy->ceed_resource[0]) {  // ceed
+  if (rdy->ceed.resource[0]) {  // ceed
     PetscInt size = ndof * num_edges;
-    PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed_rhs.op_edges, &rdy->mesh, rdy->boundaries[boundary_index], size, values));
+    PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed.flux_operator, &rdy->mesh, rdy->boundaries[boundary_index], size, values));
   } else {  // petsc
     // fetch the boundary data
     RiemannDataSWE bdata;
-    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc_rhs, boundary_index, &bdata));
+    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc.context, boundary_index, &bdata));
 
     // set the boundary values
     RDyCells *cells = &rdy->mesh.cells;
@@ -121,12 +121,12 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
 static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscReal *x;
-  PetscCall(VecGetArray(rdy->X, &x));
+  PetscReal *u;
+  PetscCall(VecGetArray(rdy->u_global, &u));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    values[i] = x[3 * i + idof];
+    values[i] = u[3 * i + idof];
   }
-  PetscCall(VecRestoreArray(rdy->X, &x));
+  PetscCall(VecRestoreArray(rdy->u_global, &u));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -181,11 +181,11 @@ PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, Pets
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed_resource[0]) {  // ceed
-    PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed_rhs.op_src, values));
+  if (rdy->ceed.resource[0]) {  // ceed
+    PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed.source_operator, values));
   } else {  // petsc
     PetscInt idof = 0;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -196,11 +196,11 @@ PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed_resource[0]) {
-    PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed_rhs.op_src, values));
+  if (rdy->ceed.resource[0]) {
+    PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 1;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -210,11 +210,11 @@ PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed_resource[0]) {
-    PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed_rhs.op_src, values));
+  if (rdy->ceed.resource[0]) {
+    PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 2;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->swe_src, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -383,8 +383,8 @@ PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed_resource[0]) {  // ceed
-    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));
+  if (rdy->ceed.resource[0]) {  // ceed
+    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed.source_operator, n_values));
   } else {  // petsc
     for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
       n_values[icell] = rdy->materials_by_cell[icell].manning;
@@ -399,8 +399,8 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed_resource[0]) {  // ceed
-    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed_rhs.op_src, n_values));
+  if (rdy->ceed.resource[0]) {  // ceed
+    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed.source_operator, n_values));
   } else {  // petsc
     for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
       rdy->materials_by_cell[icell].manning = n_values[icell];
@@ -412,13 +412,13 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
 
 PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic) {
   PetscFunctionBegin;
-  PetscCall(VecCopy(ic, rdy->X));
+  PetscCall(VecCopy(ic, rdy->u_global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
   PetscFunctionBegin;
-  PetscCall(VecDuplicate(rdy->X, prog_vec));
+  PetscCall(VecDuplicate(rdy->u_global, prog_vec));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

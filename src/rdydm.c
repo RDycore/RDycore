@@ -108,9 +108,9 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMSetType(rdy->dm, DMPLEX));
 
   // if we're using CEED, set Vec and Mat types based on the selected backend
-  if (rdy->ceed_resource[0]) {
+  if (rdy->ceed.resource[0]) {
     CeedMemType mem_type_backend;
-    PetscCallCEED(CeedGetPreferredMemType(rdy->ceed, &mem_type_backend));
+    PetscCallCEED(CeedGetPreferredMemType(rdy->ceed.context, &mem_type_backend));
     VecType vec_type = NULL;
     switch (mem_type_backend) {
       case CEED_MEM_HOST:
@@ -118,7 +118,7 @@ PetscErrorCode CreateDM(RDy rdy) {
         break;
       case CEED_MEM_DEVICE: {
         const char *resolved;
-        PetscCallCEED(CeedGetResource(rdy->ceed, &resolved));
+        PetscCallCEED(CeedGetResource(rdy->ceed.context, &resolved));
         if (strstr(resolved, "/gpu/cuda")) vec_type = VECCUDA;
         else if (strstr(resolved, "/gpu/hip")) vec_type = VECKOKKOS;
         else if (strstr(resolved, "/gpu/sycl")) vec_type = VECKOKKOS;
@@ -237,11 +237,11 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
 PetscErrorCode CreateVectors(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->X));
-  PetscCall(VecDuplicate(rdy->X, &rdy->R));
-  PetscCall(VecViewFromOptions(rdy->X, NULL, "-vec_view"));
-  PetscCall(VecDuplicate(rdy->X, &rdy->F_dup));
-  PetscCall(DMCreateLocalVector(rdy->dm, &rdy->X_local));
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->u_global));
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->rhs));
+  PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
+  PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

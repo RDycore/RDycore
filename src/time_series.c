@@ -71,7 +71,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   // make sure the number of degrees of freedom is the same as the number of
   // boundary fluxes
   PetscInt ndof;
-  PetscCall(VecGetBlockSize(rdy->X_local, &ndof));
+  PetscCall(VecGetBlockSize(rdy->u_local, &ndof));
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "ndof must be the same as # of boundary fluxes (3)");
 
   // count the number of global boundary edges (excluding those for
@@ -253,14 +253,14 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
 static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscRiemannDataSWE *data_swe = rdy->petsc_rhs;
+  PetscRiemannDataSWE *data_swe = rdy->petsc.context;
 
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary boundary = rdy->boundaries[b];
 
     // fetch the flux accumulation field for this boundary
     CeedOperatorField bflux;
-    PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed_rhs.op_edges, boundary, &bflux));
+    PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed.flux_operator, boundary, &bflux));
 
     // get the vector storing the boundary data and make it available on the host
     CeedVector bflux_vec;
@@ -295,7 +295,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
     // if we're using CEED, we need to fetch the boundary fluxes from the
     // flux operator
-    if (rdy->ceed_resource[0]) {
+    if (rdy->ceed.resource[0]) {
       FetchCeedBoundaryFluxes(rdy);
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));

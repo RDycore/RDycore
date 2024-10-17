@@ -147,8 +147,8 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(OverrideParameters(rdy));
 
   // initialize CEED if needed
-  if (rdy->ceed_resource[0]) {
-    PetscCallCEED(CeedInit(rdy->ceed_resource, &rdy->ceed));
+  if (rdy->ceed.resource[0]) {
+    PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
   }
 
   // if a refinement level is not specified, set the base refinement level
@@ -183,12 +183,12 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
   PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
-  RDyLogDebug(rdy, "Initializing shallow water equations solver...");
-  PetscCall(InitSWE(rdy));
+  RDyLogDebug(rdy, "Initializing solvers...");
+  PetscCall(InitSolvers(rdy));
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
-  PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->X));
+  PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
   PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
   PetscCall(RDyMMSUpdateMaterialProperties(rdy));
 
@@ -445,7 +445,7 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
   // initialize the material properties on each region
   PetscInt n_local;
-  PetscCall(VecGetLocalSize(rdy->X, &n_local));
+  PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
 
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
@@ -492,7 +492,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   Vec error;
   PetscCall(RDyCreatePrognosticVec(rdy, &error));
   PetscCall(RDyMMSComputeSolution(rdy, time, error));
-  PetscCall(VecAYPX(error, -1.0, rdy->X));
+  PetscCall(VecAYPX(error, -1.0, rdy->u_global));
 
   PetscInt ndof;
   PetscCall(VecGetBlockSize(error, &ndof));
@@ -598,7 +598,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
     PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r + base_refinement);
 
     // run the problem to completion
-    PetscCall(TSSolve(rdys[r]->ts, rdys[r]->X));
+    PetscCall(TSSolve(rdys[r]->ts, rdys[r]->u_global));
 
     // compute error norms for this refinement level
     PetscCall(RDyMMSComputeErrorNorms(rdys[r], final_time, L1_norms[r], L2_norms[r], Linf_norms[r], NULL, NULL));
