@@ -1260,7 +1260,7 @@ deposited by size class <span class="arithmatex">\(p\)</span> on the bed floor.<
 <p>Each sediment concentration <span class="arithmatex">\(c_p\)</span> evolves in time according to its own transport
 equation</p>
 <div class="arithmatex">\[\begin{equation}
-\frac{\partial (hc)_{i}}{\partial t} + \nabla\cdot(h c_p \vec{u}) = e_p + e_{rp} + r_p + r_{rp} - d_p \tag{1}\label{1}
+\frac{\partial (hc)_p}{\partial t} + \nabla\cdot(h c_p \vec{u}) = e_p + e_{rp} + r_p + r_{rp} - d_p \tag{1}\label{1}
 \end{equation}\]</div>
 <p>where</p>
 <ul>
@@ -1281,7 +1281,7 @@ re-entrainment rates:</p>
 <p>All size classes deposit their layers to the bed floor, changing the bed
 elevation according to the ordinary differential equation</p>
 <div class="arithmatex">\[\begin{equation}
-(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{i=1}^{I}(d_p - e_p - e_{rp} - r_p - r_{rp})\tag{3}\label{3}
+(1-\beta)\rho_{s}\frac{\partial z}{\partial t} = \sum_{p=1}^{P}(d_p - e_p - e_{rp} - r_p - r_{rp})\tag{3}\label{3}
 \end{equation}\]</div>
 <p>where </p>
 <ul>
@@ -1328,8 +1328,8 @@ obtained with a best fit using experimental data. For example, <span class="arit
 clay and 1.13 for loam.</p>
 <h4 id="overland-flow-driven-entrainment-and-re-entrainment-rates">Overland flow-driven entrainment and re-entrainment rates</h4>
 <div class="arithmatex">\[\begin{eqnarray}
-r_p &amp;=&amp; (1-H)p_{i}\frac{F(\Omega-\Omega_{cr})}{J} \\
-r_{rp} &amp;=&amp; H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
+r_p &amp;=&amp; (1-H)f_p}\frac{F(\Omega-\Omega_{cr})}{J} \\
+r_{rp} &amp;=&amp; H\frac{M_p}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
 \end{eqnarray}\]</div>
 <p>where</p>
 <ul>
@@ -1345,7 +1345,7 @@ r_{rp} &amp;=&amp; H\frac{M_{i}}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-
 </ul>
 <h4 id="size-class-deposition-rate">Size class deposition rate</h4>
 <div class="arithmatex">\[\begin{equation}
-d_p = v_p c_{i} \tag{7}\label{7}
+d_p = v_p c_p \tag{7}\label{7}
 \end{equation}\]</div>
 <p>where <span class="arithmatex">\(v_p\)</span> is the <em>settling velocity</em> of each size class with concentration
 <span class="arithmatex">\(c_p\)</span>, given as mass per unit volume. This model assumes that</p>
@@ -1365,7 +1365,7 @@ sediment size-class concentrations:</p>
     vh     \\
     c_1 h \\
     \vdots \\
-    c_I h
+    c_P h
   \end{bmatrix}.
 \end{align}\]</div>
 <p>We also augment the flux vectors <span class="arithmatex">\(\mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{G}\)</span> from the shallow
@@ -1379,7 +1379,7 @@ equations:</p>
     u v h                     \\
     c_1 u h                   \\
     \vdots                    \\
-    c_I u h
+    c_P u h
   \end{bmatrix},
 \end{align}\]</div>
 <div class="arithmatex">\[\begin{align}
@@ -1390,20 +1390,20 @@ equations:</p>
     v^2 h + \frac{1}{2} g h^2 \\
     c_1 v h                   \\
     \vdots                    \\
-    c_I v h
+    c_P v h
   \end{bmatrix}.
 \end{align}\]</div>
-<p>We also augment the shallow water equation source vector <span class="arithmatex">\(\mathbf{S}\)</span> with
-the (re)attachment, (re)entrainment, and deposition terms:</p>
+<p>Additionally, we augment the shallow water equation source vector <span class="arithmatex">\(\mathbf{S}\)</span>
+with the (re)attachment, (re)entrainment, and deposition terms:</p>
 <div class="arithmatex">\[\begin{align}
 \mathbf{S} =
   \begin{bmatrix}
     Q
     -g h\frac{\partial z}{\partial x} - C_D u\sqrt{u^2 + v^2} \\[.5em]
     -g h\frac{\partial z}{\partial y} - C_D v\sqrt{u^2 + v^2} \\
-    e_1 + e_{r1} + r_1 + r_{r1} - d_{1}                                 \\
+    e_1 + e_{r1} + r_1 + r_{r1} - d_1                                 \\
     \vdots                                                          \\
-    e_I + e_{rI} + r_I + r_{rI} - d_I 
+    e_P + e_{rP} + r_P + r_{rP} - d_P
   \end{bmatrix}.
 \end{align}\]</div>
 <p>Finally, to represent the deposition of mass on the bed floor, we define a
@@ -1411,17 +1411,17 @@ the (re)attachment, (re)entrainment, and deposition terms:</p>
 <div class="arithmatex">\[\begin{align}
 \mathbf{M} =
   \begin{bmatrix}
-    M_{1}    \\[.5em]
+    M_1    \\[.5em]
     \vdots   \\
-    M_{I} 
+    M_P
   \end{bmatrix},
 \end{align}\]</div>
 <div class="arithmatex">\[\begin{align}
 \mathbf{D} =
   \begin{bmatrix}
-    d_{1}-e_{r1}-r_{r1} \\[.5em]
+    d_1-e_{r1}-r_{r1} \\[.5em]
     \vdots              \\
-    d_{I}-e_{rI}-r_{rI}  
+    d_P-e_{rI}-r_{rP}
   \end{bmatrix}.
 \end{align}\]</div>
 <p>With these augmented and additional quantities, we can merge the H-R equations
@@ -1472,9 +1472,9 @@ from the <span class="arithmatex">\(x\)</span> axis, the normal flux is</p>
     hu_{\parallel}                                                                  \\[.5em]
     huu_{\parallel} + \frac{1}{2}gh^{2}cos \phi + \frac{1}{24}g\Delta h^{2}cos \phi \\
     hvu_{\parallel} + \frac{1}{2}gh^{2}sin \phi + \frac{1}{24}g\Delta h^{2}sin \phi \\
-    hc_{1}u_{\parallel}                                                             \\
+    hc_1 u_{\parallel}                                                             \\
     \vdots                                                                          \\
-    hc_{I}u_{\parallel}                                                             \\
+    hc_P u_{\parallel}                                                             \\
   \end{bmatrix}\tag{11}\label{11}.
 \end{align}\]</div>
 <p>The last terms in the second and third rows of <span class="arithmatex">\(\eqref{11}\)</span> are <em>hydrostatic
@@ -1482,13 +1482,13 @@ thrust correction</em> terms suggested by Bradford and Sanders [2002]. These ter
 balance the bed slope terms for the still water condition.</p>
 <p>The fluxes at the interface between cells can be approximated with Roe's method:</p>
 <div class="arithmatex">\[\begin{equation}
-\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} = 
+\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} =
 \frac{1}{2} \left(\mathbf{F}_{\parallel,L} + \mathbf{F}_{\parallel,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
 \end{equation}\]</div>
 <p>where the subscript <span class="arithmatex">\(f\)</span> annotates the interface between two adjacent cells,
 <span class="arithmatex">\(L\)</span> and <span class="arithmatex">\(R\)</span> indicate the "left" and "right" states for the interface, and
 <span class="arithmatex">\(\Delta\)</span> denotes the difference in quantities across the interface. The terms
-<span class="arithmatex">\(\mathbf{\hat{R}}\)</span> and <span class="arithmatex">\(\mathbf{\hat{\Lambda}}\)</span> are the right eigenvector and the 
+<span class="arithmatex">\(\mathbf{\hat{R}}\)</span> and <span class="arithmatex">\(\mathbf{\hat{\Lambda}}\)</span> are the right eigenvector and the
 eigenvalue of the Jacobian of <span class="arithmatex">\(\mathbf{F}_{\parallel}\)</span>, and
 <span class="arithmatex">\(\mathbf{\Delta}\mathbf{\hat{V}}=\hat{L}\Delta U\)</span> denotes the wave strength,
 with <span class="arithmatex">\(\hat{L}\)</span> the left eigenvector of the Jacobian of <span class="arithmatex">\(\mathbf{F}_{\parallel}\)</span>.</p>
@@ -1498,9 +1498,9 @@ with <span class="arithmatex">\(\hat{L}\)</span> the left eigenvector of the Jac
     1                         &amp; 0           &amp; 1                         &amp; 0      &amp; \ldots &amp; 0      \\
     \hat{u}-\hat{a}cos \theta &amp; -sin \theta &amp; \hat{u}+\hat{a}cos \theta &amp; 0      &amp; \ldots &amp; 0      \\
     \hat{v}-\hat{a}sin \theta &amp;  cos \theta &amp; \hat{v}+\hat{a}sin \theta &amp; 0      &amp; \ldots &amp; 0      \\
-    \hat{c_{1}}               &amp; 0           &amp; \hat{c_{1}}               &amp; 1      &amp; \ldots &amp; 0      \\
+    \hat{c_1}               &amp; 0           &amp; \hat{c_1}               &amp; 1      &amp; \ldots &amp; 0      \\
     \vdots                    &amp; \vdots      &amp; \vdots                    &amp; \vdots &amp; \ddots &amp; \vdots \\ 
-    \hat{c_{I}}               &amp; 0           &amp; \hat{c_{I}}               &amp; 0      &amp; \ldots &amp; 1      \\
+    \hat{c_P}               &amp; 0           &amp; \hat{c_P}               &amp; 0      &amp; \ldots &amp; 1      \\
   \end{bmatrix}
 \end{align}\]</div>
 <div class="arithmatex">\[\begin{align}
@@ -1520,9 +1520,9 @@ with <span class="arithmatex">\(\hat{L}\)</span> the left eigenvector of the Jac
     \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
     \hat{h}u_\perp                                                          \\[.5em]
     \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\perp}{\hat{a}} \right) \\[.5em]
-    (c_{1}h)_{R} - (c_{1}h)_{L} - \hat{c_{1}}(h_{R}-h_{L})                      \\[.5em]
+    (c_1 h)_{R} - (c_1 h)_{L} - \hat{c_1}(h_{R}-h_{L})                      \\[.5em]
     \vdots                                                                      \\[.5em]
-    (c_{I}h)_{R} - (c_{I}h)_{L} - \hat{c_{I}}(h_{R}-h_{L})                      \\[.5em]
+    (c_P h)_{R} - (c_P h)_{L} - \hat{c_P}(h_{R}-h_{L})                      \\[.5em]
   \end{bmatrix}
 \end{align}\]</div>
 <p>Above,</p>
@@ -1537,14 +1537,14 @@ with <span class="arithmatex">\(\hat{L}\)</span> the left eigenvector of the Jac
 \hat{u}   &amp;=&amp; \frac{\sqrt{h_L}u_L + \sqrt{h_R}u_R}{\sqrt{h_L}+\sqrt{h_R}} \\
 \hat{v}   &amp;=&amp; \frac{\sqrt{h_L}v_L + \sqrt{h_R}v_R}{\sqrt{h_L}+\sqrt{h_R}} \\
 \hat{a}   &amp;=&amp; \sqrt{\frac{g}{2}(h_L + h_R)}                               \\
-\hat{c_i} &amp;=&amp; \frac{\sqrt{h_L}c_{i,L}+\sqrt{h_R} c_{i,R}}{\sqrt{h_L}+\sqrt{h_R}} 
+\hat{c_i} &amp;=&amp; \frac{\sqrt{h_L}c_{i,L}+\sqrt{h_R} c_{i,R}}{\sqrt{h_L}+\sqrt{h_R}}
 \end{eqnarray}\]</div>
-<p>The asterisks indicate that the eigenvalues <span class="arithmatex">\(\hat{\lambda}_{1}=\hat{u}_{\parallel}-\hat{a}\)</span>
-and <span class="arithmatex">\(\hat{\lambda}_{3}=\hat{u}_{\parallel}+\hat{a}\)</span> are adjusted because Roe's 
+<p>The asterisks indicate that the eigenvalues <span class="arithmatex">\(\hat{\lambda}_1=\hat{u}_{\parallel}-\hat{a}\)</span>
+and <span class="arithmatex">\(\hat{\lambda}_{3}=\hat{u}_{\parallel}+\hat{a}\)</span> are adjusted because Roe's
 method does not provide correct fluxes for critical flow:</p>
 <div class="arithmatex">\[\begin{equation}
-|\hat{\lambda}_{1}|^{*} = \frac{\hat{\lambda}_{1}^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
-\quad if \quad -\Delta \lambda /2 &lt; \hat{\lambda}_{1} &lt; \Delta \lambda /2
+|\hat{\lambda}_1|^{*} = \frac{\hat{\lambda}_1^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
+\quad if \quad -\Delta \lambda /2 &lt; \hat{\lambda}_1 &lt; \Delta \lambda /2
 \end{equation}\]</div>
 <div class="arithmatex">\[\begin{equation}
 |\hat{\lambda}_{3}|^{*} = \frac{\hat{\lambda}_{3}^{2}}{\Delta \lambda} + \frac{\Delta \lambda}{4}
