@@ -80,7 +80,7 @@ static PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscFunctionBegin;
 
-  if (!rdy->ceed.resource[0]) {
+  if (!CeedEnabled(rdy)) {
     // initialize the sources vector
     PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
     PetscCall(VecZeroEntries(rdy->petsc.sources));
@@ -128,7 +128,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 // create flux and source operators
 static PetscErrorCode CreateOperators(RDy rdy) {
   PetscFunctionBegin;
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     RDyLogDebug(rdy, "Setting up CEED Operators...");
 
     // create the operators themselves
@@ -422,7 +422,7 @@ PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
 
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
 
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     PetscCall(CeedFindMaxCourantNumber(rdy->ceed.flux_operator, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->comm,
                                        &courant_num_diags->max_courant_num));
     courant_num_diags->is_set = PETSC_TRUE;
@@ -461,7 +461,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   courant_num_diags->max_courant_num          = 0.0;
 
   // compute the right hand side
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->u_local, F));
     if (0) {
       PetscInt nstep;

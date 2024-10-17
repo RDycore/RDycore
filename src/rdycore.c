@@ -168,7 +168,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy our CEED context as needed
-  if ((*rdy)->ceed.resource[0]) {
+  if (CeedEnabled(*rdy)) {
     PetscCallCEED(CeedDestroy(&((*rdy)->ceed.context)));
   }
 

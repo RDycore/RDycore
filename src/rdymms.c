@@ -146,11 +146,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
 
-  // initialize CEED if needed
-  if (rdy->ceed.resource[0]) {
-    PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
-  }
-
   // if a refinement level is not specified, set the base refinement level
   PetscInt refine_level = 0;
   PetscOptionsGetInt(NULL, NULL, "-dm_refine", &refine_level, NULL);

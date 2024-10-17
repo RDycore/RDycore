@@ -295,7 +295,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
     // if we're using CEED, we need to fetch the boundary fluxes from the
     // flux operator
-    if (rdy->ceed.resource[0]) {
+    if (CeedEnabled(rdy)) {
       FetchCeedBoundaryFluxes(rdy);
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));

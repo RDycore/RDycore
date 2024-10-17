@@ -24,13 +24,13 @@ PetscErrorCode InitSolvers(RDy rdy) {
 PetscErrorCode DestroySolvers(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscBool ceed_enabled = (rdy->ceed.resource[0]);
+  PetscBool ceed_enabled = CeedEnabled(rdy);
 
   if (rdy->petsc.context) {
     PetscCall(DestroyPetscSWEFlux(rdy->petsc.context, ceed_enabled, rdy->num_boundaries));
   }
 
-  if (rdy->ceed.resource[0]) {
+  if (ceed_enabled) {
     PetscCallCEED(CeedOperatorDestroy(&rdy->ceed.flux_operator));
     PetscCallCEED(CeedOperatorDestroy(&rdy->ceed.source_operator));
     PetscCallCEED(CeedVectorDestroy(&rdy->ceed.u_local));

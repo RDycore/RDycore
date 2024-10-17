@@ -86,7 +86,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
 
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  if (rdy->ceed.resource[0]) {  // ceed
+  if (CeedEnabled(rdy)) {
     PetscInt size = ndof * num_edges;
     PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed.flux_operator, &rdy->mesh, rdy->boundaries[boundary_index], size, values));
   } else {  // petsc
@@ -181,7 +181,7 @@ PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, Pets
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed.resource[0]) {  // ceed
+  if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed.source_operator, values));
   } else {  // petsc
     PetscInt idof = 0;
@@ -196,7 +196,7 @@ PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 1;
@@ -210,7 +210,7 @@ PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 2;
@@ -383,7 +383,7 @@ PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed.resource[0]) {  // ceed
+  if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetManningsN(rdy->ceed.source_operator, n_values));
   } else {  // petsc
     for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
@@ -399,7 +399,7 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (rdy->ceed.resource[0]) {  // ceed
+  if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetManningsN(rdy->ceed.source_operator, n_values));
   } else {  // petsc
     for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {

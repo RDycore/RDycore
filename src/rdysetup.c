@@ -121,7 +121,7 @@ PetscErrorCode OverrideParameters(RDy rdy) {
   PetscOptionsEnd();
 
   // initialize a CEED context if needed, assuming ownership
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
   }
 
