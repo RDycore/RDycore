@@ -1,5 +1,6 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdysolversimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 

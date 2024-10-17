@@ -4,6 +4,7 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdysolversimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()

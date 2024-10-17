@@ -255,10 +255,10 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     // in the following three stages:
     //
     // a) Pre-CeedOperatorApply stage:
-    //    - Set memory pointer of a CeedVector (u_local_ceed) is set to PETSc Vec (U_local)
+    //    - Set memory pointer of a CeedVector (u_local_ceed) to PETSc Vec (U_local)
     //    - A copy of the PETSc Vec F is made as host_fluxes. Then, memory pointer of a CeedVector (riemannf_ceed)
-    //      to the host_fluxes.
-    //    - Set memory pointer of a CeedVector (s_ceed) is set to PETSc Vec (F)
+    //      to host_fluxes.
+    //    - Set memory pointer of a CeedVector (s_ceed) to PETSc Vec (F)
     //
     // b) CeedOperatorApply stage
     //    - Apply the CeedOparator in which u_local_ceed is an input, while s_ceed is an output.
