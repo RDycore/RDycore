@@ -82,7 +82,7 @@ typedef struct {
       PetscReal water_mass;
       PetscReal x_momentum;
       PetscReal y_momentum;
-    } * fluxes;
+    } *fluxes;
   } boundary_fluxes;
 } RDyTimeSeriesData;
 
@@ -231,6 +231,12 @@ PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 static inline PetscBool     CeedEnabled(RDy rdy) { return (rdy->ceed.resource[0]) ? PETSC_TRUE : PETSC_FALSE; }
+PETSC_INTERN PetscErrorCode InitInitialConditions(RDy);
+PETSC_INTERN PetscErrorCode InitSources(RDy);
+
+// solver-related functions
+PETSC_INTERN PetscErrorCode InitSolvers(RDy);
+PETSC_INTERN PetscErrorCode DestroySolvers(RDy);
 
 // output functions
 PETSC_INTERN PetscErrorCode GetOutputDirectory(RDy, char dir[PETSC_MAX_PATH_LEN]);

@@ -289,6 +289,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
       }
     }
 
+    printf("num_edges_invalid = %d\n",num_edges_invalid);
     if (num_edges_invalid) {  // remove invalid edges, if any
       IS invalid_is, new_unassigned_edges_is;
 
@@ -313,7 +314,9 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   IS              boundary_id_is;
   const PetscInt *boundary_ids;
   if (label) {  // found face sets!
+    printf("Label found\n");
     PetscCall(DMLabelGetNumValues(label, &num_boundaries_in_file));
+    printf("num_boundaries_in_file = %d\n",num_boundaries_in_file);
     PetscCheck(num_boundaries_in_file <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER,
                "Number of boundaries in mesh (%" PetscInt_FMT ") exceeds MAX_NUM_BOUNDARIES (%d)", num_boundaries_in_file, MAX_NUM_BOUNDARIES);
 
@@ -350,6 +353,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
         PetscInt num_edges;
         PetscCall(ISGetLocalSize(edge_is, &num_edges));
         RDyLogDebug(rdy, "  Found boundary %" PetscInt_FMT " (%" PetscInt_FMT " edges)", boundary_id, num_edges);
+        ISView(edge_is, PETSC_VIEWER_STDOUT_WORLD);
 
         // we can't use this boundary ID for unassigned edges
         if (unassigned_edge_boundary_id == boundary_id) ++unassigned_edge_boundary_id;
@@ -371,6 +375,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
     PetscCall(ISDestroy(&boundary_id_is));
   } else {
     // no Face Tags label, but we might still need the Allreduce
+    printf("No label found: rdy->config.num_boundaries = %d\n",rdy->config.num_boundaries);
     if (rdy->config.num_boundaries > 0) {
       PetscMPIInt boundary_in_file[MAX_NUM_BOUNDARIES];
       memset(boundary_in_file, 0, sizeof(PetscMPIInt) * rdy->config.num_boundaries);
@@ -387,6 +392,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   if (boundary_edge_present) {
     PetscCall(ISGetLocalSize(unassigned_edges_is, &num_unassigned_edges));
   }
+  printf("num_unassigned_edges = %d\n",num_unassigned_edges);
   if (num_unassigned_edges > 0) {
     RDyLogDebug(rdy, "Adding boundary %" PetscInt_FMT " for %" PetscInt_FMT " unassigned boundary edges", unassigned_edge_boundary_id,
                 num_unassigned_edges);
@@ -397,6 +403,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
     }
     // add these edges to a new boundary with the given ID
     PetscCall(DMLabelSetStratumIS(label, unassigned_edge_boundary_id, unassigned_edges_is));
+    PetscCall(ISView(unassigned_edges_is, PETSC_VIEWER_STDOUT_WORLD));
     ++rdy->num_boundaries;
   }
   if (boundary_edge_present) {
@@ -534,7 +541,7 @@ static PetscErrorCode InitMaterials(RDy rdy) {
 
 // sets up initial conditions
 //   can be run after refinement
-static PetscErrorCode InitInitialConditions(RDy rdy) {
+PetscErrorCode InitInitialConditions(RDy rdy) {
   PetscFunctionBegin;
 
   // allocate storage for by-region initial conditions
@@ -587,7 +594,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
 
 // sets up sources
 //   can be run after refinement
-static PetscErrorCode InitSources(RDy rdy) {
+PetscErrorCode InitSources(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->config.num_sources > 0) {
     // allocate storage for sources
