@@ -607,7 +607,7 @@ static PetscErrorCode CreateRasterDatasetMapping(RDy rdy, RasterDataset *data) {
 }
 
 /// @brief Set rainfall rate for local cells from a spatially raster rainfall dataset. It is assumed that
-///        rainfall rate is mm/hr.
+///        rainfall rate is m/s.
 /// @param data     [in]  A pointer to RasterDataset struct
 /// @param cur_time [in]  Current time
 /// @param ncells   [in]  Number of local cells
@@ -621,12 +621,11 @@ PetscErrorCode SetRasterData(RasterDataset *data, PetscReal cur_time, PetscInt n
     OpenNextRasterDataset(data);
   }
 
-  PetscInt  offset                = data->header_offset;
-  PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
+  PetscInt offset = data->header_offset;
 
   for (PetscInt icell = 0; icell < ncells; icell++) {
     PetscInt idx = data->data2mesh_idx[icell];
-    rain[icell]  = data->data_ptr[idx + offset] * mm_per_hr_2_m_per_sec;
+    rain[icell]  = data->data_ptr[idx + offset];
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

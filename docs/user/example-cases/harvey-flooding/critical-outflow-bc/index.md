@@ -10,7 +10,7 @@ binary files contains the following information:
 - `xlc`      : x coordinate of the lower left corner [m]
 - `ylc`      : y coordinate of the lower left corner [m]
 - `cellsize` : size of grid cells in the rainfall dataset [m]
-- `data`     : rainfall rate for ncols * nrows cells [mm/hr]
+- `data`     : rainfall rate for ncols * nrows cells [m/]
 
 The start date and the location of MRMS dataset is specified to the RDycore
 driver through the following two command line options:
