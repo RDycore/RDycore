@@ -81,7 +81,7 @@ typedef struct {
       PetscReal water_mass;
       PetscReal x_momentum;
       PetscReal y_momentum;
-    } * fluxes;
+    } *fluxes;
   } boundary_fluxes;
 } RDyTimeSeriesData;
 
@@ -221,6 +221,8 @@ PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
+PETSC_INTERN PetscErrorCode InitInitialConditions(RDy);
+PETSC_INTERN PetscErrorCode InitSources(RDy);
 
 // solver-related functions
 PETSC_INTERN PetscErrorCode InitSolvers(RDy);

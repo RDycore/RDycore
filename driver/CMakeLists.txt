@@ -12,6 +12,13 @@ add_executable(rdycore_mms
 set_target_properties(rdycore_mms PROPERTIES OUTPUT_NAME rdycore_mms)
 target_link_libraries(rdycore_mms PRIVATE ${RDYCORE_LIBRARIES})
 
+# AMR C driver
+add_executable(rdycore_amr
+  amr.c
+)
+set_target_properties(rdycore_amr PROPERTIES OUTPUT_NAME rdycore_amr)
+target_link_libraries(rdycore_amr PRIVATE ${RDYCORE_LIBRARIES})
+
 # MMS Fortran driver
 add_executable(rdycore_mms_f90
   mms.F90
