@@ -378,22 +378,6 @@ PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellManningsNs(RDy rdy, const PetscInt size, PetscReal *n_values) {
-  PetscFunctionBegin;
-
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  if (CeedEnabled(rdy)) {
-    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed.source_operator, n_values));
-  } else {  // petsc
-    for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
-      n_values[icell] = rdy->materials_by_cell[icell].manning;
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal *n_values) {
   PetscFunctionBegin;
 
