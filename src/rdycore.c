@@ -154,7 +154,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   // destroy vectors
   if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
-  if ((*rdy)->residual) VecDestroy(&((*rdy)->residual));
+  if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
   if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
   if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
 

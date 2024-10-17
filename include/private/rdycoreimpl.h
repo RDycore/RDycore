@@ -171,8 +171,8 @@ struct _p_RDy {
   // host solution vectors (global and local)
   Vec u_global, u_local;
 
-  // host residual vector
-  Vec residual;
+  // host right-hand-side (residual) vector
+  Vec rhs;
 
   // CEED (device) solver data
   struct {

@@ -473,13 +473,13 @@ PetscErrorCode InitBoundaries(RDy rdy) {
         RDySurfaceCompositionSpec surface_comp = rdy->config.surface_composition[isurf_comp];          \
         if (!strcmp(surface_comp.region, region.name)) {                                               \
           if (mat_prop_vec) {                                                                          \
-            PetscScalar *u_ptr;                                                                        \
-            PetscCall(VecGetArray(mat_prop_vec, &u_ptr));                                              \
+            PetscScalar *prop_ptr;                                                                     \
+            PetscCall(VecGetArray(mat_prop_vec, &prop_ptr));                                           \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
               PetscInt cell                    = region.cell_ids[c];                                   \
-              materials_by_cell[cell].property = u_ptr[c];                                             \
+              materials_by_cell[cell].property = prop_ptr[c];                                          \
             }                                                                                          \
-            PetscCall(VecRestoreArray(mat_prop_vec, &u_ptr));                                          \
+            PetscCall(VecRestoreArray(mat_prop_vec, &prop_ptr));                                       \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
@@ -792,9 +792,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
           for (PetscInt c = 0; c < region.num_cells; ++c) {
             PetscInt cell_id = region.cell_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
-              u_ptr[3 * cell_id]     = mupEval(flow_ic.height);
-              u_ptr[3 * cell_id + 1] = mupEval(flow_ic.x_momentum);
-              u_ptr[3 * cell_id + 2] = mupEval(flow_ic.y_momentum);
+              u_ptr[ndof * cell_id]     = mupEval(flow_ic.height);
+              u_ptr[ndof * cell_id + 1] = mupEval(flow_ic.x_momentum);
+              u_ptr[ndof * cell_id + 2] = mupEval(flow_ic.y_momentum);
             }
           }
         }

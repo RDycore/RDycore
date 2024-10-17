@@ -108,7 +108,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
-  PetscCall(TSSetRHSFunction(rdy->ts, rdy->residual, RHSFunctionSWE, rdy));
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, RHSFunctionSWE, rdy));
 
   if (!rdy->config.time.adaptive.enable) {
     PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));

@@ -238,7 +238,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->u_global));
-  PetscCall(VecDuplicate(rdy->u_global, &rdy->residual));
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->rhs));
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
