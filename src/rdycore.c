@@ -167,6 +167,11 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
+  // destroy our CEED context as needed
+  if ((*rdy)->ceed.resource[0]) {
+    PetscCallCEED(CeedDestroy(&((*rdy)->ceed.context)));
+  }
+
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));

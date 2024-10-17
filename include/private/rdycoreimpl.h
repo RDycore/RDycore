@@ -176,22 +176,20 @@ struct _p_RDy {
 
   // CEED (device) solver data
   struct {
-    // CEED context and resource name
-    Ceed context;
+    // CEED resource name -- used to determine the backend
     char resource[PETSC_MAX_PATH_LEN];
 
-    // CEED (composite) operators for fluxes and sources
+    Ceed context;
+
     CeedOperator flux_operator;
     CeedOperator source_operator;
 
-    // on-device vectors
     CeedVector u_local;
     CeedVector rhs, sources;
 
     CeedScalar dt;
 
-    // host vector storing fluxes
-    Vec host_fluxes;
+    Vec host_fluxes;  // edge fluxes copied to host for diagnostics
   } ceed;
 
   // PETSc (host) solver data

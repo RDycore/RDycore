@@ -185,7 +185,7 @@ PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, Pets
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed.source_operator, values));
   } else {  // petsc
     PetscInt idof = 0;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->ceed.host_fluxes, idof, values));
+    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -197,7 +197,7 @@ PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
   PetscCall(CheckNumLocalCells(rdy, size));
 
   if (rdy->ceed.resource[0]) {
-    PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed.flux_operator, values));
+    PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 1;
     PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
