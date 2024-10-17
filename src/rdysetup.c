@@ -4,8 +4,7 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
-#include <private/rdysolversimpl.h>
-#include <private/rdysweimpl.h>
+#include <private/rdyoperatorsimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
@@ -208,6 +207,7 @@ PetscErrorCode InitRegions(RDy rdy) {
     PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
     if (cell_is) {
       RDyRegion *region = &rdy->regions[r];
+      region->index     = r;
       region->id        = region_id;
 
       // fish the region's name out of our region config data
@@ -957,8 +957,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing solvers...");
-  PetscCall(InitSolvers(rdy));
+  RDyLogDebug(rdy, "Initializing operators...");
+  PetscCall(InitOperators(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));

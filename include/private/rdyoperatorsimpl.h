@@ -1,5 +1,5 @@
-#ifndef RDYSOLVERSIMPL_H
-#define RDYSOLVERSIMPL_H
+#ifndef RDYOPERATORSIMPL_H
+#define RDYOPERATORSIMPL_H
 
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
@@ -49,15 +49,15 @@ typedef struct {
   };
 } SourceData;
 
-PETSC_INTERN PetscErrorCode InitSolvers(RDy);
-PETSC_INTERN PetscErrorCode DestroySolvers(RDy);
+PETSC_INTERN PetscErrorCode InitOperators(RDy);
+PETSC_INTERN PetscErrorCode DestroyOperators(RDy);
 
-PETSC_INTERN PetscErrorCode GetBoundaryData(RDy, PetscInt, BoundaryData *);
+PETSC_INTERN PetscErrorCode AcquireBoundaryData(RDy, RDyBoundary, BoundaryData *);
 PETSC_INTERN PetscErrorCode SetBoundaryValues(BoundaryData, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode CommitBoundaryValues(BoundaryData);
+PETSC_INTERN PetscErrorCode ReleaseBoundaryData(BoundaryData *);
 
-PETSC_INTERN PetscErrorCode GetSourceData(RDy, PetscInt, SourceData *);
+PETSC_INTERN PetscErrorCode AcquireSourceData(RDy, RDyRegion, SourceData *);
 PETSC_INTERN PetscErrorCode SetSourceValues(SourceData, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode CommitSourceValues(SourceData);
+PETSC_INTERN PetscErrorCode ReleaseSourceData(SourceData *);
 
 #endif

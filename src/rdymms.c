@@ -8,7 +8,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
-#include <private/rdysolversimpl.h>
+#include <private/rdyoperatorsimpl.h>
 
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
@@ -179,8 +179,8 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
   PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
-  RDyLogDebug(rdy, "Initializing solvers...");
-  PetscCall(InitSolvers(rdy));
+  RDyLogDebug(rdy, "Initializing operators...");
+  PetscCall(InitOperators(rdy));
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");

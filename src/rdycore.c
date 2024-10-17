@@ -1,6 +1,6 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdysolversimpl.h>
+#include <private/rdyoperatorsimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
@@ -159,7 +159,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
   if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
 
-  PetscCall(DestroySolvers(*rdy));
+  PetscCall(DestroyOperators(*rdy));
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));

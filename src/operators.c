@@ -1,6 +1,6 @@
 #include <ceed/ceed.h>
 #include <petscdmceed.h>
-#include <private/rdysolversimpl.h>
+#include <private/rdyoperatorsimpl.h>
 #include <private/rdysweimpl.h>
 
 // CEED uses C99 VLA features for shaping multidimensional
@@ -15,8 +15,8 @@
 static PetscClassId RDY_CLASSID;
 PetscLogEvent       RDY_CeedOperatorApply;
 
-// initializes solvers for physics specified in the input configuration
-PetscErrorCode InitSolvers(RDy rdy) {
+// initializes operators for physics specified in the input configuration
+PetscErrorCode InitOperators(RDy rdy) {
   PetscFunctionBegin;
 
   // register a logging event for applying our CEED operator
@@ -29,9 +29,23 @@ PetscErrorCode InitSolvers(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// frees all resources devoted to solvers
-PetscErrorCode DestroySolvers(RDy rdy) {
+// frees all resources devoted to operators
+PetscErrorCode DestroyOperators(RDy rdy) {
   PetscFunctionBegin;
+
+  // is anyone manipulating boundary data, source data, etc?
+  if (rdy->lock.boundary_data) {
+    for (PetscInt i = 0; i < rdy->num_boundaries; ++i) {
+      PetscCheck(rdy->lock.boundary_data[i] == NULL, rdy->comm, PETSC_ERR_USER, "Could not destroy RDycore: boundary data is in use");
+    }
+  }
+  if (rdy->lock.source_data) {
+    for (PetscInt i = 0; i < rdy->num_regions; ++i) {
+      PetscCheck(rdy->lock.source_data[i] == NULL, rdy->comm, PETSC_ERR_USER, "Could not destroy RDycore: source data is in use");
+    }
+  }
+  PetscFree(rdy->lock.boundary_data);
+  PetscFree(rdy->lock.source_data);
 
   PetscBool ceed_enabled = CeedEnabled(rdy);
 
@@ -52,15 +66,19 @@ PetscErrorCode DestroySolvers(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// produces a BoundaryData object corresponding to the boundary with the given
-// index
-PetscErrorCode GetBoundaryData(RDy rdy, PetscInt boundary_index, BoundaryData *boundary_data) {
+// acquires exclusive access to boundary data for flux operators
+PetscErrorCode AcquireBoundaryData(RDy rdy, RDyBoundary boundary, BoundaryData *boundary_data) {
   PetscFunctionBegin;
-
-  PetscCheck(boundary_index >= 0 && boundary_index < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
-             "Invalid boundary index for boundary data: %" PetscInt_FMT, boundary_index);
-  boundary_data->rdy      = rdy;
-  boundary_data->boundary = rdy->boundaries[boundary_index];
+  if (!rdy->lock.boundary_data) {
+    PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->lock.boundary_data));
+  }
+  PetscCheck(boundary.index >= 0 && boundary.index < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
+             "Invalid boundary for boundary data (index: %" PetscInt_FMT ")", boundary.index);
+  PetscCheck(!rdy->lock.boundary_data[boundary.index], rdy->comm, PETSC_ERR_USER,
+             "Could not acquire lock on boundary data -- another entity has access");
+  rdy->lock.boundary_data[boundary.index] = boundary_data;
+  boundary_data->rdy                      = rdy;
+  boundary_data->boundary                 = boundary;
   PetscCall(VecGetBlockSize(rdy->u_global, &boundary_data->num_components));
 
   if (CeedEnabled(rdy)) {
@@ -100,24 +118,31 @@ PetscErrorCode SetBoundaryValues(BoundaryData boundary_data, PetscInt component,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CommitBoundaryValues(BoundaryData boundary_data) {
+PetscErrorCode ReleaseBoundaryData(BoundaryData *boundary_data) {
   PetscFunctionBegin;
-  if (CeedEnabled(boundary_data.rdy)) {
+  if (CeedEnabled(boundary_data->rdy)) {
     // send the boundary values to the device
-    PetscCallCEED(CeedVectorRestoreArray(boundary_data.ceed.vec, &boundary_data.ceed.data));
+    PetscCallCEED(CeedVectorRestoreArray(boundary_data->ceed.vec, &boundary_data->ceed.data));
   } else {
     // FIXME: PETSc stuff goes here
   }
+  boundary_data->rdy->lock.boundary_data[boundary_data->boundary.index] = NULL;
+  *boundary_data                                                        = (BoundaryData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode GetSourceData(RDy rdy, PetscInt region_index, SourceData *source_data) {
+PetscErrorCode AcquireSourceData(RDy rdy, RDyRegion region, SourceData *source_data) {
   PetscFunctionBegin;
 
-  PetscCheck(region_index >= 0 && region_index < rdy->num_regions, rdy->comm, PETSC_ERR_USER, "Invalid region index for source data: %" PetscInt_FMT,
-             region_index);
-  source_data->rdy    = rdy;
-  source_data->region = rdy->regions[region_index];
+  if (!rdy->lock.boundary_data) {
+    PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->lock.boundary_data));
+  }
+  PetscCheck(region.index >= 0 && region.index < rdy->num_regions, rdy->comm, PETSC_ERR_USER,
+             "Invalid region for source data (index: %" PetscInt_FMT ")", region.index);
+  PetscCheck(!rdy->lock.source_data[region.index], rdy->comm, PETSC_ERR_USER, "Could not acquire lock on source data -- another entity has access");
+  rdy->lock.source_data[region.index] = source_data;
+  source_data->rdy                    = rdy;
+  source_data->region                 = rdy->regions[region.index];
   PetscCall(VecGetBlockSize(rdy->u_global, &source_data->num_components));
 
   if (CeedEnabled(rdy)) {
@@ -158,14 +183,16 @@ PetscErrorCode SetSourceValues(SourceData source_data, PetscInt component, Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CommitSourceValues(SourceData source_data) {
+PetscErrorCode ReleaseSourceData(SourceData *source_data) {
   PetscFunctionBegin;
-  if (CeedEnabled(source_data.rdy)) {
+  if (CeedEnabled(source_data->rdy)) {
     // send the boundary values to the device
-    PetscCallCEED(CeedVectorRestoreArray(source_data.ceed.vec, &source_data.ceed.data));
+    PetscCallCEED(CeedVectorRestoreArray(source_data->ceed.vec, &source_data->ceed.data));
   } else {
     // FIXME: PETSc stuff goes here
   }
+  source_data->rdy->lock.source_data[source_data->region.index] = NULL;
+  *source_data                                                  = (SourceData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

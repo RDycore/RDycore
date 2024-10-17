@@ -30,6 +30,7 @@ typedef struct {
 typedef struct {
   char      name[MAX_NAME_LEN + 1];  // region name
   PetscInt  id;                      // region ID (as specified in mesh file)
+  PetscInt  index;                   // index of region witin RDycore region list
   PetscInt *cell_ids;
   PetscInt  num_cells;
 } RDyRegion;
@@ -200,6 +201,12 @@ struct _p_RDy {
     // source-sink vector
     Vec sources;
   } petsc;
+
+  // locks on operator data for exclusive access (see rdyoperatorimpl.h)
+  struct {
+    void **boundary_data;
+    void **source_data;
+  } lock;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
