@@ -67,7 +67,7 @@ PetscErrorCode DestroyOperators(RDy rdy) {
 }
 
 // acquires exclusive access to boundary data for flux operators
-PetscErrorCode AcquireBoundaryData(RDy rdy, RDyBoundary boundary, BoundaryData *boundary_data) {
+PetscErrorCode GetOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBoundaryData *boundary_data) {
   PetscFunctionBegin;
   if (!rdy->lock.boundary_data) {
     PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->lock.boundary_data));
@@ -87,51 +87,69 @@ PetscErrorCode AcquireBoundaryData(RDy rdy, RDyBoundary boundary, BoundaryData *
     PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.flux_operator, &sub_ops));
     CeedOperator flux_op = sub_ops[1 + boundary_data->boundary.index];
 
-    // fetch the array storing the boundary values
+    // fetch the relevant vector
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(flux_op, "q_dirichlet", &field));
-    CeedVector vec;
-    PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-    PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &boundary_data->ceed.data));
+    PetscCallCEED(CeedOperatorFieldGetVector(field, &boundary_data->storage.ceed.vec));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // sets boundary values for the given component on the boundary associated with
-// the given boundary data
-PetscErrorCode SetBoundaryValues(BoundaryData boundary_data, PetscInt component, PetscReal *boundary_values) {
+// the given operator boundary data
+PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, PetscInt component, PetscReal *boundary_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled(boundary_data.rdy)) {
-    CeedScalar(*dirichlet_values)[boundary_data.num_components];
-    *((CeedScalar **)&dirichlet_values) = boundary_data.ceed.data;
+  if (CeedEnabled(boundary_data->rdy)) {
+    // if this is the first update, get access to the vector's data
+    if (!boundary_data->storage.updated) {
+      PetscCallCEED(CeedVectorGetArray(boundary_data->storage.ceed.vec, CEED_MEM_HOST, &boundary_data->storage.ceed.data));
+      boundary_data->storage.updated = PETSC_TRUE;
+    }
 
-    // copy the boundary values into place
-    for (CeedInt i = 0; i < boundary_data.boundary.num_edges; ++i) {
-      dirichlet_values[i][component] = boundary_values[i];
+    // reshape for multicomponent access
+    CeedScalar(*values)[boundary_data->num_components];
+    *((CeedScalar **)&values) = boundary_data->storage.ceed.data;
+
+    // set the data
+    for (CeedInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
+      values[e][component] = boundary_values[e];
     }
   } else {
-    // FIXME: PETSc stuff goes here
+    // if this is the first update, get access to the vector's data
+    if (!boundary_data->storage.updated) {
+      PetscCall(VecGetArray(boundary_data->storage.petsc.vec, &boundary_data->storage.petsc.data));
+      boundary_data->storage.updated = PETSC_TRUE;
+    }
+
+    // set the data
+    PetscReal *u = boundary_data->storage.petsc.data;
+    for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
+      u[e * boundary_data->num_components + component] = boundary_values[e];
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode ReleaseBoundaryData(BoundaryData *boundary_data) {
+PetscErrorCode RestoreOperatorBoundaryData(OperatorBoundaryData *boundary_data) {
   PetscFunctionBegin;
   if (CeedEnabled(boundary_data->rdy)) {
-    // send the boundary values to the device
-    PetscCallCEED(CeedVectorRestoreArray(boundary_data->ceed.vec, &boundary_data->ceed.data));
+    if (boundary_data->storage.updated) {
+      PetscCallCEED(CeedVectorRestoreArray(boundary_data->storage.ceed.vec, &boundary_data->storage.ceed.data));
+    }
   } else {
-    // FIXME: PETSc stuff goes here
+    if (boundary_data->storage.updated) {
+      PetscCall(VecRestoreArray(boundary_data->storage.petsc.vec, &boundary_data->storage.petsc.data));
+    }
   }
   boundary_data->rdy->lock.boundary_data[boundary_data->boundary.index] = NULL;
-  *boundary_data                                                        = (BoundaryData){0};
+  *boundary_data                                                        = (OperatorBoundaryData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode AcquireSourceData(RDy rdy, RDyRegion region, SourceData *source_data) {
+PetscErrorCode GetOperatorSourceData(RDy rdy, RDyRegion region, OperatorSourceData *source_data) {
   PetscFunctionBegin;
 
   if (!rdy->lock.boundary_data) {
@@ -151,48 +169,77 @@ PetscErrorCode AcquireSourceData(RDy rdy, RDyRegion region, SourceData *source_d
     PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.flux_operator, &sub_ops));
     CeedOperator source_op = sub_ops[0];
 
-    // fetch the array storing the source values
-    // FIXME: this is only valid for SWE
+    // fetch the relevant vector
     CeedOperatorField field;
-    PetscCallCEED(CeedOperatorGetFieldByName(source_op, "swe_src", &field));
-    CeedVector vec;
-    PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-    PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &source_data->ceed.data));
+    PetscCallCEED(CeedOperatorGetFieldByName(source_op, "swe_src", &field));  // FIXME: only valid for SWE
+    PetscCallCEED(CeedOperatorFieldGetVector(field, &source_data->sources.ceed.vec));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// sets source values for the given component in the region associated with the
-// given source data
-PetscErrorCode SetSourceValues(SourceData source_data, PetscInt component, PetscReal *source_values) {
+// sets values of the source term for the given component in the region
+// associated with the given operator source data
+PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled(source_data.rdy)) {
-    CeedScalar(*values)[source_data.num_components];
-    *((CeedScalar **)&values) = source_data.ceed.data;
+  if (CeedEnabled(source_data->rdy)) {
+    // if this is the first update, get access to the vector's data
+    if (!source_data->sources.updated) {
+      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
+      source_data->sources.updated = PETSC_TRUE;
+    }
 
-    // copy the boundary values into place
-    for (CeedInt i = 0; i < source_data.region.num_cells; ++i) {
+    // reshape for multicomponent access
+    CeedScalar(*values)[source_data->num_components];
+    *((CeedScalar **)&values) = source_data->sources.ceed.data;
+
+    // set the values
+    for (CeedInt i = 0; i < source_data->region.num_cells; ++i) {
       values[i][component] = source_values[i];
     }
   } else {
-    // FIXME: PETSc stuff goes here
+    // if this is the first update, get access to the vector's data
+    if (!source_data->sources.updated) {
+      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
+      source_data->sources.updated = PETSC_TRUE;
+    }
+
+    // set the values
+    PetscReal *s = source_data->sources.petsc.data;
+    for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
+      s[i * source_data->num_components + component] = source_values[i];
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode ReleaseSourceData(SourceData *source_data) {
+PetscErrorCode RestoreOperatorSourceData(OperatorSourceData *source_data) {
   PetscFunctionBegin;
   if (CeedEnabled(source_data->rdy)) {
-    // send the boundary values to the device
-    PetscCallCEED(CeedVectorRestoreArray(source_data->ceed.vec, &source_data->ceed.data));
-  } else {
-    // FIXME: PETSc stuff goes here
+    if (source_data->sources.updated) {
+      PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
+    }
+    if (source_data->mannings.updated) {
+      PetscCallCEED(CeedVectorRestoreArray(source_data->mannings.ceed.vec, &source_data->mannings.ceed.data));
+    }
+    if (source_data->flux_divergence.updated) {
+      PetscCallCEED(CeedVectorRestoreArray(source_data->flux_divergence.ceed.vec, &source_data->flux_divergence.ceed.data));
+    }
+  } else {  // petsc
+    if (source_data->sources.updated) {
+      PetscCall(VecRestoreArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
+    }
+    if (source_data->mannings.updated) {
+      PetscCall(VecRestoreArray(source_data->mannings.petsc.vec, &source_data->mannings.petsc.data));
+    }
+    if (source_data->flux_divergence.updated) {
+      PetscCall(VecRestoreArray(source_data->flux_divergence.petsc.vec, &source_data->flux_divergence.petsc.data));
+    }
   }
   source_data->rdy->lock.source_data[source_data->region.index] = NULL;
-  *source_data                                                  = (SourceData){0};
+  *source_data                                                  = (OperatorSourceData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
