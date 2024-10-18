@@ -49,6 +49,10 @@ typedef struct {
   OperatorVectorData storage;
 } OperatorBoundaryData;
 
+PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
+PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
+
 // This type allows the direct manipulation of source values on the entire
 // domain for the system of equations being solved by RDycore.
 typedef struct {
@@ -58,16 +62,44 @@ typedef struct {
   PetscInt num_components;
   // underlying data storage
   OperatorVectorData sources;
-  OperatorVectorData mannings;
-  OperatorVectorData flux_divergence;
 } OperatorSourceData;
-
-PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
-PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
 
 PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, OperatorSourceData *);
 PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(RDy, OperatorSourceData *);
+
+// This type allows the direct manipulation of operator material properties on
+// the entire domain for the system of equations being solved by RDycore.
+typedef struct {
+  // associated RDy object
+  RDy rdy;
+  // underlying data storage
+  OperatorVectorData mannings;  // mannings coefficient
+} OperatorMaterialData;
+
+// operator material properties enum
+typedef enum {
+  OPERATOR_MANNINGS = 0,
+} OperatorMaterialDataIndex;
+
+PETSC_INTERN PetscErrorCode GetOperatorMaterialData(RDy, OperatorMaterialData *);
+PETSC_INTERN PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *, OperatorMaterialDataIndex, PetscReal *);
+PETSC_INTERN PetscErrorCode RestoreOperatorMaterialData(RDy, OperatorMaterialData *);
+
+// This type allows the direct manipulation of flux divergences exchanged
+// between the flux and source operators on the entire domain for the system of
+// equations being solved by RDycore.
+typedef struct {
+  // associated RDy object
+  RDy rdy;
+  // number of components in the underlying system
+  PetscInt num_components;
+  // underlying data storage
+  OperatorVectorData storage;
+} OperatorFluxDivergenceData;
+
+PETSC_INTERN PetscErrorCode GetOperatorFluxDivergenceData(RDy, OperatorFluxDivergenceData *);
+PETSC_INTERN PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RestoreOperatorFluxDivergenceData(RDy, OperatorFluxDivergenceData *);
 
 #endif

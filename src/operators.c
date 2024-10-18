@@ -216,25 +216,174 @@ PetscErrorCode RestoreOperatorSourceData(RDy rdy, OperatorSourceData *source_dat
     if (source_data->sources.updated) {
       PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
     }
-    if (source_data->mannings.updated) {
-      PetscCallCEED(CeedVectorRestoreArray(source_data->mannings.ceed.vec, &source_data->mannings.ceed.data));
-    }
-    if (source_data->flux_divergence.updated) {
-      PetscCallCEED(CeedVectorRestoreArray(source_data->flux_divergence.ceed.vec, &source_data->flux_divergence.ceed.data));
-    }
   } else {  // petsc
     if (source_data->sources.updated) {
       PetscCall(VecRestoreArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
     }
-    if (source_data->mannings.updated) {
-      PetscCall(VecRestoreArray(source_data->mannings.petsc.vec, &source_data->mannings.petsc.data));
-    }
-    if (source_data->flux_divergence.updated) {
-      PetscCall(VecRestoreArray(source_data->flux_divergence.petsc.vec, &source_data->flux_divergence.petsc.data));
-    }
   }
   source_data->rdy->lock.source_data = NULL;
   *source_data                       = (OperatorSourceData){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode GetOperatorMaterialData(RDy rdy, OperatorMaterialData *material_data) {
+  PetscFunctionBegin;
+  *material_data = (OperatorMaterialData){0};
+  PetscCheck(!rdy->lock.material_data, rdy->comm, PETSC_ERR_USER, "Could not acquire lock on material data -- another entity has access");
+  rdy->lock.material_data = material_data;
+  material_data->rdy      = rdy;
+
+  if (CeedEnabled(rdy)) {
+    // NOTE: our SWE-specific source operator has only one sub operator
+    CeedOperator *sub_ops;
+    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
+    CeedOperator source_op = sub_ops[0];
+
+    // fetch the relevant material property vectors
+    CeedOperatorField field;
+    PetscCallCEED(CeedOperatorGetFieldByName(source_op, "mannings_s", &field));  // FIXME: only valid for SWE
+    PetscCallCEED(CeedOperatorFieldGetVector(field, &material_data->mannings.ceed.vec));
+  } else {
+    material_data->mannings.petsc.vec = rdy->petsc.sources;  // FIXME: incorrect!
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// sets values of the given operator material property
+PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, OperatorMaterialDataIndex index, PetscReal *material_values) {
+  PetscFunctionBegin;
+
+  // pick the appropriate data vector
+  OperatorVectorData vector_data;
+  switch (index) {
+    case OPERATOR_MANNINGS:
+      vector_data = material_data->mannings;
+      break;
+  }
+
+  if (CeedEnabled(material_data->rdy)) {
+    // if this is the first update, get access to the vector's data
+    if (!vector_data.updated) {
+      PetscCallCEED(CeedVectorGetArray(vector_data.ceed.vec, CEED_MEM_HOST, &vector_data.ceed.data));
+      vector_data.updated = PETSC_TRUE;
+    }
+
+    CeedScalar *values = vector_data.ceed.data;
+
+    // set the values
+    for (CeedInt i = 0; i < material_data->rdy->mesh.num_owned_cells; ++i) {
+      values[i] = material_values[i];
+    }
+  } else {
+    // if this is the first update, get access to the vector's data
+    if (!vector_data.updated) {
+      PetscCall(VecGetArray(vector_data.petsc.vec, &vector_data.petsc.data));
+      vector_data.updated = PETSC_TRUE;
+    }
+
+    // set the values
+    PetscReal *m = vector_data.petsc.data;
+    for (PetscInt i = 0; i < material_data->rdy->mesh.num_owned_cells; ++i) {
+      m[i] = material_values[i];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RestoreOperatorMaterialData(RDy rdy, OperatorMaterialData *material_data) {
+  PetscFunctionBegin;
+  PetscCheck(rdy == material_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator material data: wrong RDy");
+  if (CeedEnabled(material_data->rdy)) {
+    if (material_data->mannings.updated) {
+      PetscCallCEED(CeedVectorRestoreArray(material_data->mannings.ceed.vec, &material_data->mannings.ceed.data));
+    }
+  } else {  // petsc
+    if (material_data->mannings.updated) {
+      PetscCall(VecRestoreArray(material_data->mannings.petsc.vec, &material_data->mannings.petsc.data));
+    }
+  }
+  material_data->rdy->lock.material_data = NULL;
+  *material_data                         = (OperatorMaterialData){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode GetOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData *flux_div_data) {
+  PetscFunctionBegin;
+  *flux_div_data = (OperatorFluxDivergenceData){0};
+  PetscCheck(!rdy->lock.flux_div_data, rdy->comm, PETSC_ERR_USER, "Could not acquire lock on flux divergence data -- another entity has access");
+  rdy->lock.flux_div_data = flux_div_data;
+  flux_div_data->rdy      = rdy;
+  PetscCall(VecGetBlockSize(rdy->u_global, &flux_div_data->num_components));
+
+  if (CeedEnabled(rdy)) {
+    // NOTE: our SWE-specific source operator has only one sub operator
+    CeedOperator *sub_ops;
+    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
+    CeedOperator source_op = sub_ops[0];
+
+    // fetch the relevant vector
+    CeedOperatorField field;
+    PetscCallCEED(CeedOperatorGetFieldByName(source_op, "riemannf", &field));  // FIXME: only valid for SWE
+    PetscCallCEED(CeedOperatorFieldGetVector(field, &flux_div_data->storage.ceed.vec));
+  } else {
+    flux_div_data->storage.petsc.vec = rdy->petsc.sources;  // FIXME: incorrect!
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// sets values of the source term for the given component
+PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_div_data, PetscInt component, PetscReal *flux_div_values) {
+  PetscFunctionBegin;
+
+  if (CeedEnabled(flux_div_data->rdy)) {
+    // if this is the first update, get access to the vector's data
+    if (!flux_div_data->storage.updated) {
+      PetscCallCEED(CeedVectorGetArray(flux_div_data->storage.ceed.vec, CEED_MEM_HOST, &flux_div_data->storage.ceed.data));
+      flux_div_data->storage.updated = PETSC_TRUE;
+    }
+
+    // reshape for multicomponent access
+    CeedScalar(*values)[flux_div_data->num_components];
+    *((CeedScalar **)&values) = flux_div_data->storage.ceed.data;
+
+    // set the values
+    for (CeedInt i = 0; i < flux_div_data->rdy->mesh.num_owned_cells; ++i) {
+      values[i][component] = flux_div_values[i];
+    }
+  } else {
+    // if this is the first update, get access to the vector's data
+    if (!flux_div_data->storage.updated) {
+      PetscCall(VecGetArray(flux_div_data->storage.petsc.vec, &flux_div_data->storage.petsc.data));
+      flux_div_data->storage.updated = PETSC_TRUE;
+    }
+
+    // set the values
+    PetscReal *div_f = flux_div_data->storage.petsc.data;
+    for (PetscInt i = 0; i < flux_div_data->rdy->mesh.num_owned_cells; ++i) {
+      div_f[i * flux_div_data->num_components + component] = flux_div_values[i];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RestoreOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData *flux_div_data) {
+  PetscFunctionBegin;
+  PetscCheck(rdy == flux_div_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator flux divergence data: wrong RDy");
+  if (CeedEnabled(flux_div_data->rdy)) {
+    if (flux_div_data->storage.updated) {
+      PetscCallCEED(CeedVectorRestoreArray(flux_div_data->storage.ceed.vec, &flux_div_data->storage.ceed.data));
+    }
+  } else {  // petsc
+    if (flux_div_data->storage.updated) {
+      PetscCall(VecRestoreArray(flux_div_data->storage.petsc.vec, &flux_div_data->storage.petsc.data));
+    }
+  }
+  flux_div_data->rdy->lock.flux_div_data = NULL;
+  *flux_div_data                         = (OperatorFluxDivergenceData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

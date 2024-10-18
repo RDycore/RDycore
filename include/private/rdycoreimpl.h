@@ -204,8 +204,10 @@ struct _p_RDy {
 
   // locks on operator data for exclusive access (see rdyoperatorimpl.h)
   struct {
-    void **boundary_data;  // per-boundary operators
-    void  *source_data;    // one source operator for the domain
+    void **boundary_data;  // per-boundary operator boundary data
+    void  *source_data;    // operator source data for the domain
+    void  *material_data;  // operator material data for the domain
+    void  *flux_div_data;  // operator flux divergence data for the domain
   } lock;
 
   // time series bookkeeping
