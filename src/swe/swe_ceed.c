@@ -608,30 +608,6 @@ static PetscErrorCode SetOperatorFieldComponent(CeedOperator op, CeedInt sub_op_
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-// sets the per-cell water source for the given CEED SWE source operator
-PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator source_op, PetscReal *swe_src) {
-  PetscFunctionBeginUser;
-  CeedInt sub_op_idx = 0, icomp = 0;
-  PetscCall(SetOperatorFieldComponent(source_op, sub_op_idx, "swe_src", icomp, swe_src));
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// sets the per-cell x-momentum source for the given CEED SWE source operator
-PetscErrorCode SWESourceOperatorSetXMomentumSource(CeedOperator source_op, PetscReal *swe_src) {
-  PetscFunctionBeginUser;
-  CeedInt sub_op_idx = 0, icomp = 1;
-  PetscCall(SetOperatorFieldComponent(source_op, sub_op_idx, "swe_src", icomp, swe_src));
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// sets the per-cell y-momentum source for the given CEED SWE source operator
-PetscErrorCode SWESourceOperatorSetYMomentumSource(CeedOperator source_op, PetscReal *swe_src) {
-  PetscFunctionBeginUser;
-  CeedInt sub_op_idx = 0, icomp = 2;
-  PetscCall(SetOperatorFieldComponent(source_op, sub_op_idx, "swe_src", icomp, swe_src));
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the Riemann flux.
 PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {

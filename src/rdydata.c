@@ -158,25 +158,6 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetSourceVecForLocalCells(RDy rdy, Vec src_vec, PetscInt idof, PetscReal *values) {
-  PetscFunctionBegin;
-
-  PetscInt ndof;
-  PetscCall(VecGetBlockSize(src_vec, &ndof));
-
-  PetscCheck(idof < ndof, rdy->comm, PETSC_ERR_USER, "The block index (%" PetscInt_FMT ") exceeds the total number of blocks = %" PetscInt_FMT ")",
-             idof, ndof);
-
-  PetscReal *s;
-  PetscCall(VecGetArray(src_vec, &s));
-  for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    s[i * ndof + idof] = values[i];
-  }
-  PetscCall(VecRestoreArray(src_vec, &s));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
 
@@ -186,15 +167,6 @@ PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, Pets
   PetscCall(GetOperatorSourceData(rdy, &source_data));
   PetscCall(SetOperatorSourceValues(&source_data, 0, values));
   PetscCall(RestoreOperatorSourceData(rdy, &source_data));
-
-  /* FIXME: remove the code called here if unneeded!
-  if (CeedEnabled(rdy)) {
-    PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed.source_operator, values));
-  } else {  // petsc
-    PetscInt idof = 0;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
-  }
-  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -209,14 +181,6 @@ PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
   PetscCall(SetOperatorSourceValues(&source_data, 1, values));
   PetscCall(RestoreOperatorSourceData(rdy, &source_data));
 
-  /* FIXME: remove the code called here if unneeded!
-  if (CeedEnabled(rdy)) {
-    PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed.source_operator, values));
-  } else {
-    PetscInt idof = 1;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
-  }
-  */
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -230,14 +194,6 @@ PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
   PetscCall(SetOperatorSourceValues(&source_data, 2, values));
   PetscCall(RestoreOperatorSourceData(rdy, &source_data));
 
-  /* FIXME: remove the code called here if unneeded!
-  if (CeedEnabled(rdy)) {
-    PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed.source_operator, values));
-  } else {
-    PetscInt idof = 2;
-    PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
-  }
-  */
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
