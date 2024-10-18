@@ -370,46 +370,6 @@ PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-// Gets the field representing Dirіchlet boundary values for the given boundary.
-PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_values) {
-  PetscFunctionBeginUser;
-
-  // get the relevant boundary sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(flux_op, &sub_ops));
-  CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
-
-  // fetch the field
-  PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "q_dirichlet", boundary_values));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator flux_op, RDyMesh *mesh, RDyBoundary boundary, PetscInt size,
-                                                         PetscReal *boundary_values) {
-  PetscFunctionBeginUser;
-
-  // fetch the array storing the boundary values
-  CeedOperatorField dirichlet_field;
-  PetscCall(SWEFluxOperatorGetDirichletBoundaryValues(flux_op, boundary, &dirichlet_field));
-  CeedVector dirichlet_vector;
-  PetscCallCEED(CeedOperatorFieldGetVector(dirichlet_field, &dirichlet_vector));
-  CeedInt num_comp = 3;
-  CeedScalar(*dirichlet_ceed)[num_comp];
-  PetscCallCEED(CeedVectorGetArray(dirichlet_vector, CEED_MEM_HOST, (CeedScalar **)&dirichlet_ceed));
-
-  // set the boundary values
-  for (CeedInt i = 0; i < boundary.num_edges; ++i) {
-    dirichlet_ceed[i][0] = boundary_values[num_comp * i];
-    dirichlet_ceed[i][1] = boundary_values[num_comp * i + 1];
-    dirichlet_ceed[i][2] = boundary_values[num_comp * i + 2];
-  }
-
-  // copy the values into the CEED operator
-  PetscCallCEED(CeedVectorRestoreArray(dirichlet_vector, (CeedScalar **)&dirichlet_ceed));
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
 // Given a computational mesh, creates a source operator for the shallow water
 // equations that computes source terms. The resulting operator can be
 // manipulated by libCEED calls.

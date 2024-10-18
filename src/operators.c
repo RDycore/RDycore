@@ -130,9 +130,10 @@ PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, Pe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorBoundaryData(RDy rdy, OperatorBoundaryData *boundary_data) {
+PetscErrorCode RestoreOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBoundaryData *boundary_data) {
   PetscFunctionBegin;
   PetscCheck(rdy == boundary_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong RDy");
+  PetscCheck(boundary.index == boundary_data->boundary.index, rdy->comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong boundary");
   if (CeedEnabled(boundary_data->rdy)) {
     if (boundary_data->storage.updated) {
       PetscCallCEED(CeedVectorRestoreArray(boundary_data->storage.ceed.vec, &boundary_data->storage.ceed.data));

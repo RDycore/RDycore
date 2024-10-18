@@ -88,8 +88,28 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
   if (CeedEnabled(rdy)) {
-    PetscInt size = ndof * num_edges;
-    PetscCall(SWEFluxOperatorSetDirichletBoundaryValues(rdy->ceed.flux_operator, &rdy->mesh, rdy->boundaries[boundary_index], size, values));
+    // FIXME: we'd like to do this for both CEED and PETSc
+    // FIXME: also, I don't think we should be setting boundary values with a
+    // FIXME: strided array, since it makes non-SWE situations more complicated
+
+    // shuffle DOF into component arrays
+    // FIXME: we fix ndof at 3 for now; we'll fix this later
+    PetscReal *bvalues[3];
+    PetscCalloc1(num_edges, &bvalues[0]);
+    PetscCalloc1(num_edges, &bvalues[1]);
+    PetscCalloc1(num_edges, &bvalues[2]);
+    for (PetscInt i = 0; i < num_edges; ++i) {
+      bvalues[0][i] = values[3 * i + 0];
+      bvalues[1][i] = values[3 * i + 1];
+      bvalues[2][i] = values[3 * i + 2];
+    }
+
+    OperatorBoundaryData boundary_data;
+    PetscCall(GetOperatorBoundaryData(rdy, boundary, &boundary_data));
+    for (PetscInt c = 0; c < ndof; ++c) {
+      PetscCall(SetOperatorBoundaryValues(&boundary_data, c, bvalues[c]));
+    }
+    PetscCall(RestoreOperatorBoundaryData(rdy, boundary, &boundary_data));
   } else {  // petsc
     // fetch the boundary data
     RiemannDataSWE bdata;

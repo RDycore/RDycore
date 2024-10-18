@@ -64,7 +64,7 @@ typedef struct {
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, OperatorBoundaryData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
 
 PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, OperatorSourceData *);
 PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
