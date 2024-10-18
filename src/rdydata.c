@@ -1,4 +1,5 @@
 #include <private/rdycoreimpl.h>
+#include <private/rdyoperatorsimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
@@ -181,12 +182,19 @@ PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, Pets
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
+  OperatorSourceData source_data;
+  PetscCall(GetOperatorSourceData(rdy, &source_data));
+  PetscCall(SetOperatorSourceValues(&source_data, 0, values));
+  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+
+  /* FIXME: remove the code called here if unneeded!
   if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetWaterSource(rdy->ceed.source_operator, values));
   } else {  // petsc
     PetscInt idof = 0;
     PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -196,12 +204,19 @@ PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
+  OperatorSourceData source_data;
+  PetscCall(GetOperatorSourceData(rdy, &source_data));
+  PetscCall(SetOperatorSourceValues(&source_data, 1, values));
+  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+
+  /* FIXME: remove the code called here if unneeded!
   if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetXMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 1;
     PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
+  */
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -210,12 +225,19 @@ PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
+  OperatorSourceData source_data;
+  PetscCall(GetOperatorSourceData(rdy, &source_data));
+  PetscCall(SetOperatorSourceValues(&source_data, 2, values));
+  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+
+  /* FIXME: remove the code called here if unneeded!
   if (CeedEnabled(rdy)) {
     PetscCall(SWESourceOperatorSetYMomentumSource(rdy->ceed.source_operator, values));
   } else {
     PetscInt idof = 2;
     PetscCall(RDySetSourceVecForLocalCells(rdy, rdy->petsc.sources, idof, values));
   }
+  */
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

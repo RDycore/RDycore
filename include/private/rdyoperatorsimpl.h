@@ -49,13 +49,11 @@ typedef struct {
   OperatorVectorData storage;
 } OperatorBoundaryData;
 
-// This type allows the direct manipulation of source values for the system
-// of equations being solved by RDycore.
+// This type allows the direct manipulation of source values on the entire
+// domain for the system of equations being solved by RDycore.
 typedef struct {
   // associated RDy object
   RDy rdy;
-  // associated region
-  RDyRegion region;
   // number of components in the underlying system
   PetscInt num_components;
   // underlying data storage
@@ -66,10 +64,10 @@ typedef struct {
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(OperatorBoundaryData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, OperatorBoundaryData *);
 
-PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, RDyRegion, OperatorSourceData *);
-PETSC_INTERN PetscErrorCode SetSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(OperatorSourceData *);
+PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, OperatorSourceData *);
+PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(RDy, OperatorSourceData *);
 
 #endif
