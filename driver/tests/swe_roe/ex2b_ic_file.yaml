@@ -18,9 +18,9 @@ time:
   unit: hours
   max_step: 1000
 
-output:
-  format: xdmf
-  step_interval: 100
+#output:
+#  format: xdmf
+#  step_interval: 100
 
 grid:
   file: DamBreak_grid5x10.exo

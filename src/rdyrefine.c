@@ -5,6 +5,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
+#include <private/rdysweimpl.h>
 
 #define MAX_COMP_NAME_LENGTH 20
 
@@ -154,15 +155,15 @@ static PetscErrorCode InitSolutionFromCoarseRDy(Vec X_coarse, RDy rdy_fine) {
   PetscCall(VecGetBlockSize(X_coarse, &ndof_coarse));
 
   PetscInt n_local_fine, ndof_fine;
-  PetscCall(VecGetLocalSize(rdy_fine->X, &n_local_fine));
-  PetscCall(VecGetBlockSize(rdy_fine->X, &ndof_fine));
+  PetscCall(VecGetLocalSize(rdy_fine->u_global, &n_local_fine));
+  PetscCall(VecGetBlockSize(rdy_fine->u_global, &ndof_fine));
 
   PetscCheck(ndof_coarse == ndof_fine, rdy_fine->comm, PETSC_ERR_USER, "The block size is not same");
   PetscInt ndof = ndof_fine;
 
   PetscScalar *x_ptr_coarse, *x_ptr_fine;
   PetscCall(VecGetArray(X_coarse, &x_ptr_coarse));
-  PetscCall(VecGetArray(rdy_fine->X, &x_ptr_fine));
+  PetscCall(VecGetArray(rdy_fine->u_global, &x_ptr_fine));
 
   PetscInt num_refined_cells = 4; // assuming homogeneous refinement over the entire domain
 
@@ -177,7 +178,7 @@ static PetscErrorCode InitSolutionFromCoarseRDy(Vec X_coarse, RDy rdy_fine) {
   }
 
   PetscCall(VecRestoreArray(X_coarse, &x_ptr_coarse));
-  PetscCall(VecRestoreArray(rdy_fine->X, &x_ptr_fine));
+  PetscCall(VecRestoreArray(rdy_fine->u_global, &x_ptr_fine));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -210,11 +211,10 @@ static PetscErrorCode RDyDestroyBoundaries(RDy rdy) {
 static PetscErrorCode RDyDestroyVecs(RDy rdy) {
   PetscFunctionBegin;
 
-  if (rdy->swe_src) VecDestroy(&(rdy->swe_src));
-  if (rdy->R) VecDestroy(&(rdy->R));
-  if (rdy->X) VecDestroy(&(rdy->X));
-  if (rdy->X_local) VecDestroy(&(rdy->X_local));
-  if (rdy->F_dup) VecDestroy(&(rdy->F_dup));
+  if (rdy->petsc.sources) VecDestroy(&(rdy->petsc.sources));
+  if (rdy->rhs) VecDestroy(&(rdy->rhs));
+  if (rdy->u_global) VecDestroy(&(rdy->u_global));
+  if (rdy->u_local) VecDestroy(&(rdy->u_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -228,8 +228,8 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
 
   Vec U_coarse;
-  PetscCall(VecDuplicate(rdy_coarse->X, &U_coarse));
-  PetscCall(VecCopy(rdy_coarse->X, U_coarse));
+  PetscCall(VecDuplicate(rdy_coarse->u_global, &U_coarse));
+  PetscCall(VecCopy(rdy_coarse->u_global, U_coarse));
 
   RDyRegion *regions = NULL;
   PetscInt num_regions;
