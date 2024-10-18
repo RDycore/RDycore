@@ -1049,7 +1049,7 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   PetscCall(PetscOptionsHasName(NULL, "ref_", "-dm_refine", &rdy->refine));
   if (rdy->config.grid.file[0] != '\0') PetscCall(PetscOptionsSetValue(NULL, "-dm_plex_filename", rdy->config.grid.file));
   PetscCall(PetscOptionsSetValue(NULL, "-dist_dm_distribute_save_sf", "true"));
-  if (loc_refine) PetscCall(PetscOptionsSetValue(NULL, "-dm_plex_transform_label_match_strata", "true"));
+  PetscCall(PetscOptionsSetValue(NULL, "-dm_plex_transform_label_match_strata", "true"));
   if (rdy->refine) PetscCall(PetscOptionsSetValue(NULL, "-ref_dm_plex_transform_label_match_strata", "true"));
 
   //--------
