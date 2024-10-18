@@ -382,7 +382,11 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
   PetscCall(CheckNumLocalCells(rdy, size));
 
   if (CeedEnabled(rdy)) {
-    PetscCall(SWESourceOperatorSetManningsN(rdy->ceed.source_operator, n_values));
+    // FIXME: we'd like to do this for both CEED and PETSc
+    OperatorMaterialData material_data;
+    PetscCall(GetOperatorMaterialData(rdy, &material_data));
+    PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
+    PetscCall(RestoreOperatorMaterialData(rdy, &material_data));
   } else {  // petsc
     for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
       rdy->materials_by_cell[icell].manning = n_values[icell];
