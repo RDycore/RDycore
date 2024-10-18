@@ -76,6 +76,39 @@ static PetscErrorCode InitRegionsFromCoarseRDy(RDy rdy_coarse, RDy rdy_fine) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt *num_regions, RDyRegion **regions) {
+  PetscFunctionBegin;
+
+  *num_regions = rdy_coarse->num_regions;
+
+  PetscCall(PetscCalloc1(*num_regions, regions));
+
+  for (PetscInt r = 0; r < rdy_coarse->num_regions; ++r) {
+    RDyRegion *region_coarse = &rdy_coarse->regions[r];
+    RDyRegion *region_fine   = regions[r];
+
+    region_fine->id = region_coarse->id;
+    strcpy(region_fine->name, region_coarse->name);
+
+    PetscInt num_refined_cells = 4; // assuming homogeneous refinement over the entire domain
+    region_fine->num_cells = region_coarse->num_cells * num_refined_cells;
+
+    if (region_fine->num_cells > 0) {
+      PetscCall(PetscCalloc1(region_fine->num_cells, &region_fine->cell_ids));
+
+      PetscInt count = 0;
+      for (PetscInt i = 0; i < region_coarse->num_cells; ++i) {
+        for (PetscInt j = 0; j < num_refined_cells; j++) {
+          region_fine->cell_ids[count] = region_coarse->cell_ids[i] * num_refined_cells + j;
+          count++;
+        }
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode InitMaterialsFromCoarseRDy(RDy rdy_coarse, RDy rdy_fine) {
   PetscFunctionBegin;
 
@@ -94,22 +127,41 @@ static PetscErrorCode InitMaterialsFromCoarseRDy(RDy rdy_coarse, RDy rdy_fine) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode InitSolutionFromCoarseRDy(RDy rdy_coarse, RDy rdy_fine) {
+static PetscErrorCode CreateMaterialsFromCoarseRDy(RDy rdy_coarse, PetscInt *num_cells, RDyMaterial **materials_by_cell) {
+  PetscFunctionBegin;
+
+  PetscInt num_refined_cells = 4; // assuming homogeneous refinement over the entire domain
+
+  *num_cells = rdy_coarse->mesh.num_cells * num_refined_cells;
+  PetscCall(PetscCalloc1(*num_cells, materials_by_cell));
+
+  PetscInt count = 0;
+  for (PetscInt i = 0; i < rdy_coarse->mesh.num_cells; i++) {
+    for (PetscInt j = 0; j < num_refined_cells; j++) {
+      (*materials_by_cell)[count].manning = rdy_coarse->materials_by_cell[i].manning;
+      count++;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode InitSolutionFromCoarseRDy(Vec X_coarse, RDy rdy_fine) {
   PetscFunctionBegin;
 
   PetscInt n_local_coarse, ndof_coarse;
-  PetscCall(VecGetLocalSize(rdy_coarse->X, &n_local_coarse));
-  PetscCall(VecGetBlockSize(rdy_coarse->X, &ndof_coarse));
+  PetscCall(VecGetLocalSize(X_coarse, &n_local_coarse));
+  PetscCall(VecGetBlockSize(X_coarse, &ndof_coarse));
 
   PetscInt n_local_fine, ndof_fine;
   PetscCall(VecGetLocalSize(rdy_fine->X, &n_local_fine));
   PetscCall(VecGetBlockSize(rdy_fine->X, &ndof_fine));
 
-  PetscCheck(ndof_coarse == ndof_fine, rdy_coarse->comm, PETSC_ERR_USER, "The block size is not same");
+  PetscCheck(ndof_coarse == ndof_fine, rdy_fine->comm, PETSC_ERR_USER, "The block size is not same");
   PetscInt ndof = ndof_fine;
 
   PetscScalar *x_ptr_coarse, *x_ptr_fine;
-  PetscCall(VecGetArray(rdy_coarse->X, &x_ptr_coarse));
+  PetscCall(VecGetArray(X_coarse, &x_ptr_coarse));
   PetscCall(VecGetArray(rdy_fine->X, &x_ptr_fine));
 
   PetscInt num_refined_cells = 4; // assuming homogeneous refinement over the entire domain
@@ -124,8 +176,45 @@ static PetscErrorCode InitSolutionFromCoarseRDy(RDy rdy_coarse, RDy rdy_fine) {
     }
   }
 
-  PetscCall(VecRestoreArray(rdy_coarse->X, &x_ptr_coarse));
+  PetscCall(VecRestoreArray(X_coarse, &x_ptr_coarse));
   PetscCall(VecRestoreArray(rdy_fine->X, &x_ptr_fine));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyDestroyRegions(RDy rdy) {
+  PetscFunctionBegin;
+
+  for (PetscInt i = 0; i < rdy->num_regions; ++i) {
+    if (rdy->regions[i].cell_ids) {
+      PetscFree(rdy->regions[i].cell_ids);
+    }
+  }
+  if (rdy->regions) PetscFree(rdy->regions);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyDestroyBoundaries(RDy rdy) {
+  PetscFunctionBegin;
+
+  for (PetscInt i = 0; i < rdy->num_boundaries; ++i) {
+    if (rdy->boundaries[i].edge_ids) {
+      PetscFree(rdy->boundaries[i].edge_ids);
+    }
+  }
+  if (rdy->boundaries) PetscFree(rdy->boundaries);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyDestroyVecs(RDy rdy) {
+  PetscFunctionBegin;
+
+  if (rdy->swe_src) VecDestroy(&(rdy->swe_src));
+  if (rdy->R) VecDestroy(&(rdy->R));
+  if (rdy->X) VecDestroy(&(rdy->X));
+  if (rdy->X_local) VecDestroy(&(rdy->X_local));
+  if (rdy->F_dup) VecDestroy(&(rdy->F_dup));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -133,16 +222,24 @@ static PetscErrorCode InitSolutionFromCoarseRDy(RDy rdy_coarse, RDy rdy_fine) {
 PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscFunctionBegin;
 
-  printf("++++++++++++++++++++++++++++++++++\n");
-  printf("In RDyRefine\n");
-  printf("++++++++++++++++++++++++++++++++++\n");
-
   DM dm_fine;
   PetscCall(DMRefine(rdy_coarse->dm, PETSC_COMM_WORLD, &dm_fine));
   PetscCall(DMCopyDisc(rdy_coarse->dm, dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
-  printf("\n");
 
+  Vec U_coarse;
+  PetscCall(VecDuplicate(rdy_coarse->X, &U_coarse));
+  PetscCall(VecCopy(rdy_coarse->X, U_coarse));
+
+  RDyRegion *regions = NULL;
+  PetscInt num_regions;
+  PetscCall(CreateRegionsFromCoarseRDy(rdy_coarse, &num_regions, &regions));
+
+  RDyMaterial *materials_by_cell = NULL;
+  PetscInt num_cells;
+  PetscCall(CreateMaterialsFromCoarseRDy(rdy_coarse, &num_cells, &materials_by_cell));
+
+  /*  
   RDy rdy_fine;
   PetscCall(RDyCreate(rdy_coarse->global_comm, rdy_coarse->config_file, &rdy_fine));
 
@@ -172,7 +269,9 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscCall(CreateVectors(rdy_fine));      // global and local vectors, residuals
 
   RDyLogDebug(rdy_coarse, "FINE: Initializing regions...");
-  PetscCall(InitRegionsFromCoarseRDy(rdy_coarse, rdy_fine));
+  rdy_fine->num_regions = num_regions;
+  rdy_fine->regions = regions;
+  //PetscCall(InitRegionsFromCoarseRDy(rdy_coarse, rdy_fine));
 
   RDyLogDebug(rdy_coarse, "FINE: Initializing initial conditions and sources...");
   PetscCall(InitInitialConditions(rdy_fine));
@@ -186,8 +285,11 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscCall(InitBoundaryConditions(rdy_fine));
 
   // ++++++++++++++++++++++++++++++++++++++++++++++++++
-  PetscCall(InitMaterialsFromCoarseRDy(rdy_coarse, rdy_fine));
-  PetscCall(InitSolutionFromCoarseRDy(rdy_coarse, rdy_fine));
+  rdy_fine->materials_by_cell = materials_by_cell;
+  //PetscCall(InitMaterialsFromCoarseRDy(rdy_coarse, rdy_fine));
+
+
+  PetscCall(InitSolutionFromCoarseRDy(U_coarse, rdy_fine));
   // ++++++++++++++++++++++++++++++++++++++++++++++++++
 
   PetscCall(InitSWE(rdy_fine)); // Sets up CEED solvers/Operators
@@ -203,6 +305,41 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
   while (!RDyFinished(rdy_fine)) {
     PetscCall(RDyAdvance(rdy_fine));
   }
+ 
+ */
+
+  PetscCall(RDyDestroyVecs(rdy_coarse));
+  PetscCall(RDyDestroyBoundaries(rdy_coarse));
+  PetscCall(PetscCalloc1(rdy_coarse->num_boundaries, &rdy_coarse->boundaries));
+
+  PetscCall(DMDestroy(&rdy_coarse->aux_dm));
+  PetscCall(DMDestroy(&rdy_coarse->dm));
+
+  rdy_coarse->dm  = dm_fine;
+  PetscSection sec;
+  PetscCall(CreateSectionForSWE(rdy_coarse, &sec));
+  // embed the section's data in our grid and toss the section
+  PetscCall(DMSetLocalSection(rdy_coarse->dm, sec));
+  PetscCall(DMViewFromOptions(rdy_coarse->dm, NULL, "-dm_fine_view"));
+
+  PetscCall(CreateAuxiliaryDM(rdy_coarse));  // for diagnostics
+  PetscCall(CreateVectors(rdy_coarse));      // global and local vectors, residuals
+
+  PetscCall(RDyDestroyRegions(rdy_coarse));
+  rdy_coarse->num_regions = num_regions;
+  rdy_coarse->regions = regions;
+
+  PetscCall(RDyMeshDestroy(rdy_coarse->mesh));
+  PetscCall(RDyMeshCreateFromDM(rdy_coarse->dm, &rdy_coarse->mesh));
+
+  PetscFree(rdy_coarse->materials_by_cell);
+  rdy_coarse->materials_by_cell = materials_by_cell;
+
+  PetscCall(InitSolutionFromCoarseRDy(U_coarse, rdy_coarse));
+
+  PetscCall(InitSWE(rdy_coarse)); // Sets up CEED solvers/Operators
+
+  PetscCall(InitDirichletBoundaryConditions(rdy_coarse));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
