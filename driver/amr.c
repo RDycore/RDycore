@@ -36,6 +36,10 @@ int main(int argc, char *argv[]) {
 
     PetscCall(RDyRefine(rdy));
 
+    while (!RDyFinished(rdy)) {
+      PetscCall(RDyAdvance(rdy));
+    }
+
     PetscCall(RDyDestroy(&rdy));
   }
 
