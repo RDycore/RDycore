@@ -32,17 +32,10 @@ PETSC_INTERN PetscErrorCode InitSWE(RDy);
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary *, RDyCondition *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);
-PETSC_INTERN PetscErrorCode SWEFluxOperatorGetDirichletBoundaryValues(CeedOperator, RDyBoundary, CeedOperatorField *);
-PETSC_INTERN PetscErrorCode SWEFluxOperatorSetDirichletBoundaryValues(CeedOperator, RDyMesh *, RDyBoundary boundary, PetscInt size, PetscReal *);
 
 PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator, PetscReal);
-PETSC_INTERN PetscErrorCode SWESourceOperatorGetWaterSource(CeedOperator, const char *, CeedOperatorField *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator, CeedOperatorField *);
-PETSC_INTERN PetscErrorCode SWESourceOperatorSetWaterSource(CeedOperator, PetscReal *);
-PETSC_INTERN PetscErrorCode SWESourceOperatorSetXMomentumSource(CeedOperator, PetscReal *);
-PETSC_INTERN PetscErrorCode SWESourceOperatorSetYMomentumSource(CeedOperator, PetscReal *);
-PETSC_INTERN PetscErrorCode SWESourceOperatorSetManningsN(CeedOperator, PetscReal *);
 
 PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);

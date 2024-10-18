@@ -152,9 +152,6 @@ program rdycore_f90
       PetscCallA(RDyGetLocalCellZCentroids(rdy_, n, values, ierr))
       PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, n, nat_id, ierr))
 
-      PetscCallA(RDyGetLocalCellManningsNs(rdy_, n, values, ierr))
-      PetscCallA(RDySetManningsNForLocalCells(rdy_, n, values, ierr))
-
       values(:) = 0.d0
       PetscCallA(RDySetXMomentumSourceForLocalCells(rdy_, n, values, ierr))
       PetscCallA(RDySetYMomentumSourceForLocalCells(rdy_, n, values, ierr))
