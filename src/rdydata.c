@@ -110,6 +110,9 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
       PetscCall(SetOperatorBoundaryValues(&boundary_data, c, bvalues[c]));
     }
     PetscCall(RestoreOperatorBoundaryData(rdy, boundary, &boundary_data));
+    PetscFree(bvalues[0]);
+    PetscFree(bvalues[1]);
+    PetscFree(bvalues[2]);
   } else {  // petsc
     // fetch the boundary data
     RiemannDataSWE bdata;
