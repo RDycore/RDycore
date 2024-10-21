@@ -108,7 +108,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMSetType(rdy->dm, DMPLEX));
 
   // if we're using CEED, set Vec and Mat types based on the selected backend
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     CeedMemType mem_type_backend;
     PetscCallCEED(CeedGetPreferredMemType(rdy->ceed.context, &mem_type_backend));
     VecType vec_type = NULL;
