@@ -1,6 +1,6 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdyoperatorsimpl.h>
+#include <private/rdyoperatordataimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 

@@ -8,7 +8,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
-#include <private/rdyoperatorsimpl.h>
+#include <private/rdyoperatordataimpl.h>
 
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
