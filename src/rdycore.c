@@ -117,6 +117,63 @@ PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rd
 /// PETSC_FALSE if not
 PetscBool RDyRestarted(RDy rdy) { return rdy->config.restart.file[0]; }
 
+/// @brief Destroys PETSc Vecs associated with the DM
+/// @param rdy A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode RDyDestroyVectors(RDy *rdy) {
+  PetscFunctionBegin;
+  // destroy vectors
+  if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
+  if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
+  if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
+  if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Destroy data structures for regions
+/// @param rdy A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode RDyDestroyRegions(RDy *rdy) {
+  PetscFunctionBegin;
+
+  for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
+    if ((*rdy)->regions[i].cell_ids) {
+      PetscFree((*rdy)->regions[i].cell_ids);
+    }
+  }
+  if ((*rdy)->regions) PetscFree((*rdy)->regions);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Destroy boundariy data structures
+/// @param rdy A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
+  PetscFunctionBegin;
+
+  for (PetscInt i = 0; i < (*rdy)->num_boundaries; ++i) {
+    if ((*rdy)->boundaries[i].edge_ids) {
+      PetscFree((*rdy)->boundaries[i].edge_ids);
+    }
+  }
+  if ((*rdy)->boundaries) PetscFree((*rdy)->boundaries);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Destroy data structures for materials
+/// @param rdy A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode RDyDestroyMaterials(RDy *rdy) {
+  PetscFunctionBegin;
+
+  if ((*rdy)->materials_by_cell) PetscFree((*rdy)->materials_by_cell);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Destroys the given RDy object, freeing any allocated resources.
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
@@ -133,31 +190,18 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->boundary_conditions) PetscFree((*rdy)->boundary_conditions);
 
   // destroy materials
-  if ((*rdy)->materials_by_cell) PetscFree((*rdy)->materials_by_cell);
+  PetscCall(RDyDestroyMaterials(rdy));
 
-  // destroy regions and boundaries
-  for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
-    if ((*rdy)->regions[i].cell_ids) {
-      PetscFree((*rdy)->regions[i].cell_ids);
-    }
-  }
-  if ((*rdy)->regions) PetscFree((*rdy)->regions);
+  // destroy regions
+  PetscCall(RDyDestroyRegions(rdy));
 
-  for (PetscInt i = 0; i < (*rdy)->num_boundaries; ++i) {
-    if ((*rdy)->boundaries[i].edge_ids) {
-      PetscFree((*rdy)->boundaries[i].edge_ids);
-    }
-  }
-  if ((*rdy)->boundaries) PetscFree((*rdy)->boundaries);
+  // destroy materials
+  PetscCall(RDyDestroyBoundaries(rdy));
 
   // destroy solver
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
-  // destroy vectors
-  if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
-  if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
-  if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
-  if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
+  PetscCall(RDyDestroyVectors(rdy));
 
   PetscCall(DestroyOperators(*rdy));
 
