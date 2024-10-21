@@ -147,7 +147,7 @@ PetscErrorCode RDyDestroyRegions(RDy *rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Destroy boundariy data structures
+/// @brief Destroy boundary data structures
 /// @param rdy A RDy struct
 /// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {

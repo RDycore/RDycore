@@ -19,5 +19,6 @@ PETSC_INTERN PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFie
 PETSC_INTERN PetscErrorCode CreateDM(RDy rdy);
 PETSC_INTERN PetscErrorCode CreateAuxiliaryDM(RDy rdy);
 PETSC_INTERN PetscErrorCode CreateVectors(RDy rdy);
+PETSC_INTERN PetscErrorCode CreateSectionForSWE(RDy, PetscSection *);
 
 #endif

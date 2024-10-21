@@ -61,7 +61,7 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spe
 }
 
 /// This function creates one Section with 3 DOFs for SWE.
-static PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
+PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
   PetscInt n_field                             = 1;
   PetscInt n_field_comps[1]                    = {3};
   char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
