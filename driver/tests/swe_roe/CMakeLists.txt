@@ -123,7 +123,7 @@ file (COPY
       ${CONDITION_DIR}/Houston1km.rain.${PETSC_ID_TYPE}.bin
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
-  foreach(config basic)
+  foreach(config basic ceed)
     add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
   endforeach()
 endforeach()
@@ -148,8 +148,8 @@ file (COPY
       ${CONDITION_DIR}/2017-08-26:01-00.${PETSC_ID_TYPE}.bin
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
-  foreach(config basic)
-    add_test(houston_hetro_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ ${${config}_args})
+  foreach(config basic ceed)
+    add_test(houston_hetero_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ ${${config}_args})
   endforeach()
 endforeach()
 

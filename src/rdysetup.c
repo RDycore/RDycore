@@ -4,7 +4,7 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
-#include <private/rdysweimpl.h>
+#include <private/rdyoperatordataimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
@@ -121,7 +121,7 @@ PetscErrorCode OverrideParameters(RDy rdy) {
   PetscOptionsEnd();
 
   // initialize a CEED context if needed, assuming ownership
-  if (rdy->ceed.resource[0]) {
+  if (CeedEnabled(rdy)) {
     PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
   }
 
@@ -207,6 +207,7 @@ PetscErrorCode InitRegions(RDy rdy) {
     PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
     if (cell_is) {
       RDyRegion *region = &rdy->regions[r];
+      region->index     = r;
       region->id        = region_id;
 
       // fish the region's name out of our region config data
@@ -956,8 +957,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing solvers...");
-  PetscCall(InitSolvers(rdy));
+  RDyLogDebug(rdy, "Initializing operators...");
+  PetscCall(InitOperators(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));

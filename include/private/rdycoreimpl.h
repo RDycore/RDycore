@@ -30,6 +30,7 @@ typedef struct {
 typedef struct {
   char      name[MAX_NAME_LEN + 1];  // region name
   PetscInt  id;                      // region ID (as specified in mesh file)
+  PetscInt  index;                   // index of region witin RDycore region list
   PetscInt *cell_ids;
   PetscInt  num_cells;
 } RDyRegion;
@@ -201,6 +202,14 @@ struct _p_RDy {
     Vec sources;
   } petsc;
 
+  // locks on operator data for exclusive access (see rdyoperatorimpl.h)
+  struct {
+    void **boundary_data;  // per-boundary operator boundary data
+    void  *source_data;    // operator source data for the domain
+    void  *material_data;  // operator material data for the domain
+    void  *flux_div_data;  // operator flux divergence data for the domain
+  } lock;
+
   // time series bookkeeping
   RDyTimeSeriesData time_series;
 
@@ -221,10 +230,7 @@ PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
-
-// solver-related functions
-PETSC_INTERN PetscErrorCode InitSolvers(RDy);
-PETSC_INTERN PetscErrorCode DestroySolvers(RDy);
+static inline PetscBool     CeedEnabled(RDy rdy) { return (rdy->ceed.resource[0]) ? PETSC_TRUE : PETSC_FALSE; }
 
 // output functions
 PETSC_INTERN PetscErrorCode GetOutputDirectory(RDy, char dir[PETSC_MAX_PATH_LEN]);

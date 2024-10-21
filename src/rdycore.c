@@ -1,5 +1,6 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdyoperatordataimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
@@ -158,7 +159,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
   if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
 
-  PetscCall(DestroySolvers(*rdy));
+  PetscCall(DestroyOperators(*rdy));
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));
@@ -168,7 +169,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy our CEED context as needed
-  if ((*rdy)->ceed.resource[0]) {
+  if (CeedEnabled(*rdy)) {
     PetscCallCEED(CeedDestroy(&((*rdy)->ceed.context)));
   }
 
