@@ -222,6 +222,16 @@ static PetscErrorCode RDyDestroyVecs(RDy rdy) {
 PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscFunctionBegin;
 
+  PetscInt cStart, cEnd;
+  DMLabel label;
+
+  PetscCall(DMPlexGetHeightStratum(rdy_coarse->dm, 0, &cStart, &cEnd));
+  PetscCall(DMCreateLabel(rdy_coarse->dm, "adapt"));
+  PetscCall(DMGetLabel(rdy_coarse->dm, "adapt", &label));
+  for (PetscInt c = cStart; c < cEnd; c++) {
+    PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
+  }
+
   DM dm_fine;
   PetscCall(DMRefine(rdy_coarse->dm, PETSC_COMM_WORLD, &dm_fine));
   PetscCall(DMCopyDisc(rdy_coarse->dm, dm_fine));
