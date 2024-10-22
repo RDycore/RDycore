@@ -6,7 +6,7 @@
 
 extern PetscLogEvent RDY_CeedOperatorApply;
 
-// these functions are implemented in swe_flux_petsc.c
+// these functions are implemented in swe_petsc.c
 PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
 PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
 PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy);
@@ -250,8 +250,8 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     //
     // a) Pre-CeedOperatorApply stage:
     //    - Set memory pointer of a CeedVector (u_local_ceed) to PETSc Vec (U_local)
-    //    - A copy of the PETSc Vec F is made as host_fluxes. Then, memory pointer of a CeedVector (riemannf_ceed)
-    //      to host_fluxes.
+    //    - A copy of the PETSc Vec F is made as flux_divergences. Then, memory pointer of a CeedVector (riemannf_ceed)
+    //      to flux_divergences.
     //    - Set memory pointer of a CeedVector (s_ceed) to PETSc Vec (F)
     //
     // b) CeedOperatorApply stage
@@ -266,7 +266,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     SWESourceOperatorGetRiemannFlux(rdy->ceed.source_operator, &riemannf_field);
     PetscCallCEED(CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed));
 
-    PetscScalar *u, *f, *host_fluxes;
+    PetscScalar *u, *f, *flux_divergences;
     PetscMemType mem_type;
     CeedVector   u_local_ceed = rdy->ceed.u_local;
     CeedVector   s_ceed       = rdy->ceed.sources;
@@ -277,11 +277,11 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
     // 3. Make a duplicate copy of the F as the values will be used as input for the CeedOperator
     //    corresponding to the source-sink term
-    PetscCall(VecCopy(F, rdy->ceed.host_fluxes));
+    PetscCall(VecCopy(F, rdy->ceed.flux_divergences));
 
-    // 4. Sets the pointer of a CeedVector to a PETSc Vec: host_fluxes --> riemannf_ceed
-    PetscCall(VecGetArrayAndMemType(rdy->ceed.host_fluxes, &host_fluxes, &mem_type));
-    PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, host_fluxes));
+    // 4. Sets the pointer of a CeedVector to a PETSc Vec: flux_divergences --> riemannf_ceed
+    PetscCall(VecGetArrayAndMemType(rdy->ceed.flux_divergences, &flux_divergences, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, flux_divergences));
 
     // 5. Sets the pointer of a CeedVector to a PETSc Vec: F --> s_ceed
     PetscCall(VecGetArrayAndMemType(F, &f, &mem_type));
@@ -296,7 +296,7 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
 
     // 7. Reset memory pointer of CeedVectors
     PetscCallCEED(CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f));
-    PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &host_fluxes));
+    PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &flux_divergences));
     PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u));
 
     // 8. Restore pointers to the PETSc Vecs

@@ -243,7 +243,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
   if (CeedEnabled(rdy)) {
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
+    PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.flux_divergences));
   } else {
     // initialize the sources vector
     PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));

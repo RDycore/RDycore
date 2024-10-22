@@ -181,7 +181,7 @@ struct _p_RDy {
 
     CeedScalar dt;
 
-    Vec host_fluxes;  // edge fluxes copied to host for diagnostics
+    Vec flux_divergences;  // flux divergences used for source terms
   } ceed;
 
   // PETSc (host) solver data
@@ -189,8 +189,7 @@ struct _p_RDy {
     // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
     void *context;
 
-    // source-sink vector
-    Vec sources;
+    Vec sources;  // source-sink vector
   } petsc;
 
   // locks on operator data for exclusive access (see rdyoperatorimpl.h)
