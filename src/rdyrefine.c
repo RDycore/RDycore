@@ -6,6 +6,7 @@
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdyoperatordataimpl.h>
 
 #define MAX_COMP_NAME_LENGTH 20
 
@@ -347,7 +348,9 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
 
   PetscCall(InitSolutionFromCoarseRDy(U_coarse, rdy_coarse));
 
-  PetscCall(InitSWE(rdy_coarse)); // Sets up CEED solvers/Operators
+  PetscCall(DestroyOperators(rdy_coarse));
+  PetscCall(CreateSolvers(rdy_coarse));
+  PetscCall(CreateOperators(rdy_coarse));
 
   PetscCall(InitDirichletBoundaryConditions(rdy_coarse));
 

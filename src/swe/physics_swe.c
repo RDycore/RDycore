@@ -77,14 +77,8 @@ static PetscErrorCode InitMPITypesAndOps(void) {
 static PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 
 // create solvers and vectors
-static PetscErrorCode CreateSolvers(RDy rdy) {
+PetscErrorCode CreateSolvers(RDy rdy) {
   PetscFunctionBegin;
-
-  if (!CeedEnabled(rdy)) {
-    // initialize the sources vector
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
-    PetscCall(VecZeroEntries(rdy->petsc.sources));
-  }
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->u_global, &n_dof));
@@ -126,7 +120,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 }
 
 // create flux and source operators
-static PetscErrorCode CreateOperators(RDy rdy) {
+PetscErrorCode CreateOperators(RDy rdy) {
   PetscFunctionBegin;
   if (CeedEnabled(rdy)) {
     RDyLogDebug(rdy, "Setting up CEED Operators...");
@@ -150,6 +144,11 @@ static PetscErrorCode CreateOperators(RDy rdy) {
 
     // reset the time step size
     rdy->ceed.dt = 0.0;
+
+    // initialize the sources vector
+    PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
+    PetscCall(VecZeroEntries(rdy->ceed.host_fluxes));
+
   } else {
     // allocate storage for our PETSc implementation of the  flux and
     // source terms
@@ -160,6 +159,11 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     PetscCall(
         CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc.context));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc.context));
+
+    // initialize the sources vector
+    PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
+    PetscCall(VecZeroEntries(rdy->petsc.sources));
+
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
