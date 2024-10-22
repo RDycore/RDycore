@@ -80,12 +80,6 @@ static PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscFunctionBegin;
 
-  if (!CeedEnabled(rdy)) {
-    // initialize the sources vector
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
-    PetscCall(VecZeroEntries(rdy->petsc.sources));
-  }
-
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->u_global, &n_dof));
 

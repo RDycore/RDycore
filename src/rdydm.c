@@ -61,7 +61,7 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spe
 }
 
 /// This function creates one Section with 3 DOFs for SWE.
-static PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
+PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
   PetscInt n_field                             = 1;
   PetscInt n_field_comps[1]                    = {3};
   char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
@@ -240,8 +240,15 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->u_global));
   PetscCall(VecDuplicate(rdy->u_global, &rdy->rhs));
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
-  PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
+
+  if (CeedEnabled(rdy)) {
+    PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
+  } else {
+    // initialize the sources vector
+    PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
+    PetscCall(VecZeroEntries(rdy->petsc.sources));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
