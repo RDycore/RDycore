@@ -9,6 +9,9 @@
 PETSC_INTERN PetscErrorCode InitOperators(RDy);
 PETSC_INTERN PetscErrorCode DestroyOperators(RDy);
 
+// creation of sections for configuration-specific physics
+PETSC_INTERN PetscErrorCode CreateSection(RDy, PetscSection *);
+
 //----------------------
 // Operator Data Access
 //----------------------

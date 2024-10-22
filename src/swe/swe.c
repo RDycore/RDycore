@@ -3,6 +3,9 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 #include <stddef.h>  // for offsetof
+                     //
+// maximum length of the name of a prognostic or diagnostic field component
+#define MAX_COMP_NAME_LENGTH 20
 
 extern PetscLogEvent RDY_CeedOperatorApply;
 
@@ -162,6 +165,41 @@ static PetscErrorCode CreateOperators(RDy rdy) {
 //---------------------------
 // End debugging diagnostics
 //---------------------------
+
+// This function creates a PetscSection appropriate for the shallow water equations.
+PetscErrorCode CreateSWESection(RDy rdy, PetscSection *section) {
+  PetscFunctionBegin;
+  PetscInt n_field                             = 1;
+  PetscInt n_field_comps[1]                    = {3};
+  char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
+          "Height",
+          "MomentumX",
+          "MomentumY",
+  };
+
+  PetscCall(PetscSectionCreate(rdy->comm, section));
+  PetscCall(PetscSectionSetNumFields(*section, n_field));
+  PetscInt n_field_dof_tot = 0;
+  for (PetscInt f = 0; f < n_field; ++f) {
+    PetscCall(PetscSectionSetFieldComponents(*section, f, n_field_comps[f]));
+    for (PetscInt c = 0; c < n_field_comps[f]; ++c, ++n_field_dof_tot) {
+      PetscCall(PetscSectionSetComponentName(*section, f, c, comp_names[c]));
+    }
+  }
+
+  // set the number of degrees of freedom in each cell
+  PetscInt c_start, c_end;  // starting and ending cell points
+  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
+  PetscCall(PetscSectionSetChart(*section, c_start, c_end));
+  for (PetscInt c = c_start; c < c_end; ++c) {
+    for (PetscInt f = 0; f < n_field; ++f) {
+      PetscCall(PetscSectionSetFieldDof(*section, c, f, n_field_comps[f]));
+    }
+    PetscCall(PetscSectionSetDof(*section, c, n_field_dof_tot));
+  }
+  PetscCall(PetscSectionSetUp(*section));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 // This function initializes SWE physics for the given dycore.
 PetscErrorCode InitSWE(RDy rdy) {

@@ -61,6 +61,16 @@ PetscErrorCode DestroyOperators(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode CreateSection(RDy rdy, PetscSection *section) {
+  PetscFunctionBegin;
+
+  // for now, pass the call to CreateSWESection
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCall(CreateSWESection(rdy, section));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // acquires exclusive access to boundary data for flux operators
 PetscErrorCode GetOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBoundaryData *boundary_data) {
   PetscFunctionBegin;
