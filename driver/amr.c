@@ -34,6 +34,8 @@ int main(int argc, char *argv[]) {
     PetscCall(RDyCreate(comm, argv[1], &rdy));
     PetscCall(RDySetup(rdy));
 
+    PetscCall(RDyAdvance(rdy));
+
     PetscCall(RDyRefine(rdy));
 
     while (!RDyFinished(rdy)) {

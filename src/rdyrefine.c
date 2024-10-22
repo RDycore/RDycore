@@ -349,7 +349,19 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscCall(InitSolutionFromCoarseRDy(U_coarse, rdy_coarse));
 
   PetscCall(DestroyOperators(rdy_coarse));
+
+  // save time and timestep
+  PetscReal time, dt;
+  PetscCall(TSGetTime(rdy_coarse->ts, &time));
+  PetscCall(TSGetTimeStep(rdy_coarse->ts, &dt));
+
+  // create solvers
   PetscCall(CreateSolvers(rdy_coarse));
+
+  // set time and timestep
+  PetscCall(TSSetTime(rdy_coarse->ts, time));
+  PetscCall(TSSetTimeStep(rdy_coarse->ts, dt));
+
   PetscCall(CreateOperators(rdy_coarse));
 
   PetscCall(InitDirichletBoundaryConditions(rdy_coarse));
