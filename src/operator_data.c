@@ -324,10 +324,11 @@ PetscErrorCode GetOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData
 
     // fetch the relevant vector
     CeedOperatorField field;
-    PetscCallCEED(CeedOperatorGetFieldByName(source_op, "riemannf", &field));  // FIXME: only valid for SWE
+    PetscCallCEED(CeedOperatorGetFieldByName(source_op, "riemannf", &field));
     PetscCallCEED(CeedOperatorFieldGetVector(field, &flux_div_data->storage.ceed.vec));
   } else {
-    flux_div_data->storage.petsc.vec = rdy->petsc.sources;  // FIXME: incorrect!
+    // FIXME: our PETSc implementation currently stores flux divergences in the RHS vector
+    // flux_div_data->storage.petsc.vec = rdy->petsc.flux_divergences;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
