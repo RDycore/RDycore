@@ -55,7 +55,6 @@ PetscErrorCode DestroyOperators(RDy rdy) {
     PetscCallCEED(CeedVectorDestroy(&rdy->ceed.u_local));
     PetscCallCEED(CeedVectorDestroy(&rdy->ceed.rhs));
     PetscCallCEED(CeedVectorDestroy(&rdy->ceed.sources));
-    if (rdy->ceed.host_fluxes) VecDestroy(&rdy->ceed.host_fluxes);
     // the CEED context belongs to RDycore itself, so we don't delete it
   }
 

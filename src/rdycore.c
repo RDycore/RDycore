@@ -127,6 +127,8 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
   if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
   if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
+  if ((*rdy)->ceed.host_fluxes) PetscCall(VecDestroy(&(*rdy)->ceed.host_fluxes));
+  if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
