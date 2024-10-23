@@ -153,7 +153,8 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
     int       num_comp     = 3;
     PetscBool ceed_enabled = PETSC_FALSE;
-    PetscCall(CreatePetscSWEFluxForInternalEdges(&rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, &rdy->petsc.context));
+    PetscCall(CreatePetscSWEFluxForInternalEdges(&rdy->mesh.edges, num_comp, rdy->mesh.num_internal_edges, rdy->config.physics.flow.tiny_h,
+                                                 &rdy->petsc.context));
     PetscCall(
         CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, &rdy->petsc.context));
     PetscCall(CreatePetscSWESource(&rdy->mesh, rdy->petsc.context));

@@ -1,6 +1,5 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdysweimpl.h>
 #include <rdycore.h>
 
 PetscErrorCode RDyGetNumGlobalCells(RDy rdy, PetscInt *num_cells_global) {
@@ -93,60 +92,31 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
              "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.flow->type);
 
-  // dispatch this call to CEED or PETSc
-  PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  if (CeedEnabled(rdy)) {
-    // FIXME: we'd like to do this for both CEED and PETSc
-    // FIXME: also, I don't think we should be setting boundary values with a
-    // FIXME: strided array, since it makes non-SWE situations more complicated
-
-    // shuffle DOF into component arrays
-    // FIXME: we fix ndof at 3 for now; we'll fix this later
-    PetscReal *bvalues[3];
-    PetscCalloc1(num_edges, &bvalues[0]);
-    PetscCalloc1(num_edges, &bvalues[1]);
-    PetscCalloc1(num_edges, &bvalues[2]);
-    for (PetscInt i = 0; i < num_edges; ++i) {
-      bvalues[0][i] = values[3 * i + 0];
-      bvalues[1][i] = values[3 * i + 1];
-      bvalues[2][i] = values[3 * i + 2];
-    }
-
-    OperatorBoundaryData boundary_data;
-    PetscCall(GetOperatorBoundaryData(rdy, boundary, &boundary_data));
-    for (PetscInt c = 0; c < ndof; ++c) {
-      PetscCall(SetOperatorBoundaryValues(&boundary_data, c, bvalues[c]));
-    }
-    PetscCall(RestoreOperatorBoundaryData(rdy, boundary, &boundary_data));
-    PetscFree(bvalues[0]);
-    PetscFree(bvalues[1]);
-    PetscFree(bvalues[2]);
-  } else {  // petsc
-    // fetch the boundary data
-    RiemannDataSWE bdata;
-    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc.context, boundary_index, &bdata));
-
-    // set the boundary values
-    RDyCells *cells = &rdy->mesh.cells;
-    RDyEdges *edges = &rdy->mesh.edges;
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      PetscInt iedge = boundary.edge_ids[e];
-      PetscInt icell = edges->cell_ids[2 * iedge];
-      if (cells->is_local[icell]) {
-        bdata.h[e]  = values[3 * e];
-        bdata.hu[e] = values[3 * e + 1];
-        bdata.hv[e] = values[3 * e + 2];
-
-        if (bdata.h[e] > tiny_h) {
-          bdata.u[e] = values[3 * e + 1] / bdata.h[e];
-          bdata.v[e] = values[3 * e + 2] / bdata.h[e];
-        } else {
-          bdata.u[e] = 0.0;
-          bdata.v[e] = 0.0;
-        }
-      }
-    }
+  // shuffle DOF into component arrays
+  // FIXME: we fix ndof at 3 for now; we'll fix this later
+  PetscReal *bvalues[3];
+  PetscCalloc1(num_edges, &bvalues[0]);
+  PetscCalloc1(num_edges, &bvalues[1]);
+  PetscCalloc1(num_edges, &bvalues[2]);
+  for (PetscInt i = 0; i < num_edges; ++i) {
+    bvalues[0][i] = values[3 * i + 0];
+    bvalues[1][i] = values[3 * i + 1];
+    bvalues[2][i] = values[3 * i + 2];
   }
+
+  // set boundary values
+  OperatorBoundaryData boundary_data;
+  PetscCall(GetOperatorBoundaryData(&rdy->operator, boundary, &boundary_data));
+  for (PetscInt c = 0; c < ndof; ++c) {
+    PetscCall(SetOperatorBoundaryValues(&boundary_data, c, bvalues[c]));
+  }
+  PetscCall(RestoreOperatorBoundaryData(&rdy->operator, boundary, &boundary_data));
+
+  // clean up
+  PetscFree(bvalues[0]);
+  PetscFree(bvalues[1]);
+  PetscFree(bvalues[2]);
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -233,9 +203,9 @@ PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, Pets
   PetscCall(CheckNumLocalCells(rdy, size));
 
   OperatorSourceData source_data;
-  PetscCall(GetOperatorSourceData(rdy, &source_data));
+  PetscCall(GetOperatorSourceData(&rdy->operator, & source_data));
   PetscCall(SetOperatorSourceValues(&source_data, 0, values));
-  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+  PetscCall(RestoreOperatorSourceData(&rdy->operator, & source_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -246,9 +216,9 @@ PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
   PetscCall(CheckNumLocalCells(rdy, size));
 
   OperatorSourceData source_data;
-  PetscCall(GetOperatorSourceData(rdy, &source_data));
+  PetscCall(GetOperatorSourceData(&rdy->operator, & source_data));
   PetscCall(SetOperatorSourceValues(&source_data, 1, values));
-  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+  PetscCall(RestoreOperatorSourceData(&rdy->operator, & source_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -259,9 +229,9 @@ PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, 
   PetscCall(CheckNumLocalCells(rdy, size));
 
   OperatorSourceData source_data;
-  PetscCall(GetOperatorSourceData(rdy, &source_data));
+  PetscCall(GetOperatorSourceData(&rdy->operator, & source_data));
   PetscCall(SetOperatorSourceValues(&source_data, 2, values));
-  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+  PetscCall(RestoreOperatorSourceData(&rdy->operator, & source_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -437,12 +407,12 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // FIXME: we'd like to do this for both CEED and PETSc
     OperatorMaterialData material_data;
-    PetscCall(GetOperatorMaterialData(rdy, &material_data));
+    PetscCall(GetOperatorMaterialData(&rdy->operator, &material_data));
     PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
-    PetscCall(RestoreOperatorMaterialData(rdy, &material_data));
+    PetscCall(RestoreOperatorMaterialData(&rdy->operator, &material_data));
   } else {  // petsc
     for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
       PetscInt cell_id                        = rdy->mesh.cells.owned_to_local[i];

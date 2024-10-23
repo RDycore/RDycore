@@ -25,6 +25,7 @@ typedef struct {
   RiemannDataSWE     *datal_bnd_edges, *datar_bnd_edges;
   RiemannEdgeDataSWE *data_bnd_edges;
   RiemannDataSWE      data_cells;
+  PetscReal           tiny_h;  // minimum water height
 } PetscRiemannDataSWE;
 
 PETSC_INTERN PetscErrorCode InitSWE(RDy);
