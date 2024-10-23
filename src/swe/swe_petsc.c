@@ -36,6 +36,7 @@ PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncom
   data_swe->datal_internal_edges = datal;
   data_swe->datar_internal_edges = datar;
   data_swe->data_internal_edges  = data_edge_internal;
+  data_swe->tiny_h               = tiny_h;
 
   // set the pointer
   *petsc_context = data_swe;
