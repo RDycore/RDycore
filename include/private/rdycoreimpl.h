@@ -3,9 +3,11 @@
 
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
+#include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
+#include <private/rdyoperatorimpl.h>
 #include <rdycore.h>
 
 // Diagnostic structure that captures information about the conditions under
@@ -34,16 +36,6 @@ typedef struct {
   PetscInt *cell_ids;
   PetscInt  num_cells;
 } RDyRegion;
-
-// This type defines a boundary consisting of edges identified by their local
-// indices.
-typedef struct {
-  char      name[MAX_NAME_LEN + 1];  // boundary name
-  PetscInt  id;                      // boundary ID (as specified in mesh file)
-  PetscInt  index;                   // index of boundary within RDycore boundary list
-  PetscInt *edge_ids;
-  PetscInt  num_edges;
-} RDyBoundary;
 
 // This type defines a "condition" representing
 // * an initial condition or source/sink associated with a region
@@ -169,45 +161,14 @@ struct _p_RDy {
   // time₋stepping solver
   TS ts;
 
-  // host solution vectors (global and local)
+  // solution vectors (global and local)
   Vec u_global, u_local;
 
-  // host right-hand-side (residual) vector
+  // right-hand-side (time derivative) vector
   Vec rhs;
 
-  // CEED (device) solver data
-  struct {
-    // CEED resource name -- used to determine the backend
-    char resource[PETSC_MAX_PATH_LEN];
-
-    Ceed context;
-
-    CeedOperator flux_operator;
-    CeedOperator source_operator;
-
-    CeedVector u_local;
-    CeedVector rhs, sources;
-
-    CeedScalar dt;
-
-    Vec flux_divergences;  // flux divergences used for source terms
-  } ceed;
-
-  // PETSc (host) solver data
-  struct {
-    // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
-    void *context;
-
-    Vec sources;  // source-sink vector
-  } petsc;
-
-  // locks on operator data for exclusive access (see rdyoperatorimpl.h)
-  struct {
-    void **boundary_data;  // per-boundary operator boundary data
-    void  *source_data;    // operator source data for the domain
-    void  *material_data;  // operator material data for the domain
-    void  *flux_div_data;  // operator flux divergence data for the domain
-  } lock;
+  // operator representing the underlying physical system
+  Operator operator;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
@@ -229,7 +190,6 @@ PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
-static inline PetscBool     CeedEnabled(RDy rdy) { return (rdy->ceed.resource[0]) ? PETSC_TRUE : PETSC_FALSE; }
 
 PETSC_INTERN PetscErrorCode RDyDestroyVectors(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyRegions(RDy *);

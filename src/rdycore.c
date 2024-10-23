@@ -1,6 +1,5 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
-#include <private/rdyoperatorsimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
@@ -123,12 +122,13 @@ PetscBool RDyRestarted(RDy rdy) { return rdy->config.restart.file[0]; }
 PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   PetscFunctionBegin;
   // destroy vectors
-  if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
+  // FIXME: revisit!
+  // if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
   if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
   if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
   if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
-  if ((*rdy)->ceed.flux_divergences) PetscCall(VecDestroy(&(*rdy)->ceed.flux_divergences));
-  if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
+  // if ((*rdy)->ceed.flux_divergences) PetscCall(VecDestroy(&(*rdy)->ceed.flux_divergences));
+  // if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -215,9 +215,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy our CEED context as needed
-  if (CeedEnabled(*rdy)) {
-    PetscCallCEED(CeedDestroy(&((*rdy)->ceed.context)));
-  }
+  SetCeedResource(NULL);
 
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {

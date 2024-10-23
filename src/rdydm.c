@@ -2,7 +2,6 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
-#include <private/rdyoperatorsimpl.h>
 #include <rdycore.h>
 
 /// Create a new cell-centered DM (cc_dm) from a given DM and adds a number of given
@@ -71,7 +70,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMSetType(rdy->dm, DMPLEX));
 
   // if we're using CEED, set Vec and Mat types based on the selected backend
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     CeedMemType mem_type_backend;
     PetscCallCEED(CeedGetPreferredMemType(rdy->ceed.context, &mem_type_backend));
     VecType vec_type = NULL;
