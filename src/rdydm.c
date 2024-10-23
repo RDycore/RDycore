@@ -2,7 +2,7 @@
 #include <petscdmplex.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
-#include <private/rdyoperatordataimpl.h>
+#include <private/rdyoperatorsimpl.h>
 #include <rdycore.h>
 
 /// Create a new cell-centered DM (cc_dm) from a given DM and adds a number of given
