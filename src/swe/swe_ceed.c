@@ -310,21 +310,6 @@ static PetscErrorCode CreateSWEBoundaryFluxSubOperator(RDyMesh *mesh, RDyBoundar
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-// Gets the field representing the boundary flux for the given boundary.
-PetscErrorCode SWEOperatorGetBoundaryFlux(Operator *op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
-  PetscFunctionBeginUser;
-
-  // get the relevant boundary sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux_operator, &sub_ops));
-  CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
-
-  // fetch the field
-  PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "flux", boundary_flux));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
 // Given a computational mesh, creates a source operator for the shallow water
 // equations that computes source terms. The resulting operator can be
 // manipulated by libCEED calls.
