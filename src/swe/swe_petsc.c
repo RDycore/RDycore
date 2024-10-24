@@ -737,10 +737,10 @@ PetscErrorCode GetPetscSWEDirichletBoundaryValues(void *petsc_context, PetscInt 
 static PetscErrorCode ApplyPetscSWEOperator(RDy rdy, PetscReal t, Vec u, Vec dudt) {
   PetscFunctionBegin;
 
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  CourantNumberDiagnostics *courant_diags = &rdy->operator.courant_diags;
   PetscCall(ComputeSWEDiagnosticVariables(rdy));
-  PetscCall(SWERHSFunctionForInternalEdges(rdy, dudt, courant_num_diags));
-  PetscCall(SWERHSFunctionForBoundaryEdges(rdy, dudt, courant_num_diags));
+  PetscCall(SWERHSFunctionForInternalEdges(rdy, dudt, courant_diags));
+  PetscCall(SWERHSFunctionForBoundaryEdges(rdy, dudt, courant_diags));
   PetscCall(AddSWESourceTerm(rdy, dudt));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -755,6 +755,10 @@ PetscErrorCode CreatePetscSWEOperator(RDy rdy, Operator *operator) {
 
   operator->petsc.rdy   = rdy;
   operator->petsc.apply = ApplyPetscSWEOperator;
+
+  // no local update to Courant diagnostics is needed--the application of the
+  // operator keeps everything up to date
+  operator->update_local_courant_diags = NULL;
 
   // allocate storage for our PETSc implementation of the  flux and
   // source terms

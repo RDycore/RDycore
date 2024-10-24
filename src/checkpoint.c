@@ -223,7 +223,7 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
     PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
   } else if (strstr(filename, ".h5")) {  // HDF5
     PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_READ, &viewer));
-    PetscCall(PetscViewerHDF5PushTimestepping(viewer));  // FIXME: seems to be needed
+    PetscCall(PetscViewerHDF5PushTimestepping(viewer));  // NOTE: seems to be needed
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid checkpoint file: %s", filename);
   }

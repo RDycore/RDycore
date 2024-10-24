@@ -3,6 +3,10 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdysweimpl.h>
 
+//-------------------------
+// CEED context management
+//-------------------------
+
 // global CEED resource name and context
 static char ceed_resource[PETSC_MAX_PATH_LEN + 1] = {0};
 static Ceed ceed_context;
@@ -56,6 +60,70 @@ PetscErrorCode SetCeedResource(char *resource) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+//-----------------------
+// Debugging diagnostics
+//-----------------------
+
+// MPI datatype corresponding to CourantNumberDiagnostics. Created during
+// CreateSWEOperator.
+static MPI_Datatype courant_num_diags_type;
+
+// MPI operator used to determine the prevailing diagnostics for the maximum
+// courant number on all processes. Created during CreateSWEOperator.
+static MPI_Op courant_num_diags_op;
+
+// function backing the above MPI operator
+static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
+  CourantNumberDiagnostics *in_diags     = in_vec;
+  CourantNumberDiagnostics *result_diags = result_vec;
+
+  // select the item with the maximum courant number
+  for (int i = 0; i < *len; ++i) {
+    if (in_diags[i].max_courant_num > result_diags[i].max_courant_num) {
+      result_diags[i] = in_diags[i];
+    }
+  }
+}
+
+// this function destroys the MPI type and operator associated with CourantNumberDiagnostics
+static void DestroyCourantNumberDiagnostics(void) {
+  MPI_Op_free(&courant_num_diags_op);
+  MPI_Type_free(&courant_num_diags_type);
+}
+// this function initializes some MPI machinery for the above Courant number
+// diagnostics, and is called by CreateBasicOperator, which is called when a
+// CEED or PETSc Operator is created
+static PetscErrorCode InitCourantNumberDiagnostics(void) {
+  PetscFunctionBegin;
+
+  static PetscBool initialized = PETSC_FALSE;
+
+  if (!initialized) {
+    // create an MPI data type for the CourantNumberDiagnostics struct
+    const int      num_blocks             = 4;
+    const int      block_lengths[4]       = {1, 1, 1, 1};
+    const MPI_Aint block_displacements[4] = {
+        offsetof(CourantNumberDiagnostics, max_courant_num),
+        offsetof(CourantNumberDiagnostics, global_edge_id),
+        offsetof(CourantNumberDiagnostics, global_cell_id),
+        offsetof(CourantNumberDiagnostics, is_set),
+    };
+    MPI_Datatype block_types[4] = {MPIU_REAL, MPI_INT, MPI_INT, MPIU_BOOL};
+    MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
+    MPI_Type_commit(&courant_num_diags_type);
+
+    // create a corresponding reduction operator for the new type
+    MPI_Op_create(FindCourantNumberDiagnostics, 1, &courant_num_diags_op);
+
+    // make sure the operator and the type are destroyed upon exit
+    PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
+
+    initialized = PETSC_TRUE;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
 #pragma GCC diagnostic push
@@ -83,6 +151,8 @@ PetscErrorCode CreateSection(RDy rdy, PetscSection *section) {
 static PetscErrorCode CreateBasicOperator(DM dm, RDyMesh *mesh, PetscInt num_components, PetscInt num_boundaries, RDyBoundary *boundaries,
                                           Operator *op) {
   PetscFunctionBegin;
+
+  PetscCall(InitCourantNumberDiagnostics());
 
   op->dm             = dm;
   op->mesh           = mesh;
@@ -247,9 +317,9 @@ PetscErrorCode GetCeedInteriorFluxSubOperator(Operator *op, CeedOperator *interi
 // 5. "courant_number" - the Courant numbers for the x and y velocities
 //
 // @param op               [in] the operator to which the boundary flux sub-operator is added
-// @param boundary_index   [in] the index identifying the boundary associated with the sub-operator
+// @param boundary         [in] the boundary associated with the sub-operator
 // @param interior_flux_op [in] the sub-operator computing the boundary fluxes
-PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_index, CeedOperator boundary_flux_op) {
+PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *op, RDyBoundary boundary, CeedOperator boundary_flux_op) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -257,12 +327,12 @@ PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_in
   PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't add a CEED boundary flux operator: CEED is disabled");
 
   // check the boundary index
-  PetscCheck(boundary_index >= 0, comm, PETSC_ERR_USER, "Can't add a CEED boundary flux operator: negative boundary index %" PetscInt_FMT,
-             boundary_index);
+  PetscCheck(boundary.index >= 0, comm, PETSC_ERR_USER, "Can't add a CEED boundary flux operator: negative boundary index %" PetscInt_FMT,
+             boundary.index);
   CeedInt num_sub_operators;
   PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
-  PetscCheck(boundary_index == num_sub_operators - 1, comm, PETSC_ERR_USER,
-             "Invalid CEED boundary flux sub-operator index: %" PetscInt_FMT " (should be %" PetscInt_FMT ")", boundary_index, num_sub_operators - 1);
+  PetscCheck(boundary.index == num_sub_operators - 1, comm, PETSC_ERR_USER,
+             "Invalid CEED boundary flux sub-operator index: %" PetscInt_FMT " (should be %" PetscInt_FMT ")", boundary.index, num_sub_operators - 1);
 
   // check for required input, output fields
   const char *required_inputs[] = {
@@ -293,23 +363,23 @@ PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_in
 /// Retrieves a boundary flux sub-operator added to the operator by a prior
 /// call to AddCeedBoundaryFluxOperator(), throwing an error if no such call was
 /// made.
-PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_index, CeedOperator *boundary_flux_op) {
+PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *op, RDyBoundary boundary, CeedOperator *boundary_flux_op) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't get CEED boundary flux sub-operator: CEED is disabled");
-  PetscCheck(boundary_index >= 1 && boundary_index < 1 + op->num_boundaries, comm, PETSC_ERR_USER,
-             "Can't get CEED boundary flux operator: invalid boundary index (%" PetscInt_FMT ")", boundary_index);
+  PetscCheck(boundary.index >= 0 && boundary.index < op->num_boundaries, comm, PETSC_ERR_USER,
+             "Can't get CEED boundary flux operator: invalid boundary index (%" PetscInt_FMT ")", boundary.index);
 
   CeedInt num_sub_operators;
   PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
-  PetscCheck(num_sub_operators >= 1 + boundary_index, comm, PETSC_ERR_USER,
-             "Can't find CEED boundary flux sub-operator with boundary index %" PetscInt_FMT, boundary_index);
+  PetscCheck(num_sub_operators >= 1 + boundary.index, comm, PETSC_ERR_USER,
+             "Can't find CEED boundary flux sub-operator with boundary index %" PetscInt_FMT, boundary.index);
   CeedOperator *sub_operators;
   PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux_operator, &sub_operators));
 
-  *boundary_flux_op = sub_operators[1 + boundary_index];
+  *boundary_flux_op = sub_operators[1 + boundary.index];
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -329,7 +399,7 @@ PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_in
 // 1. "cell" - the accumulated sources in each cell
 //
 // @param op               [in] the operator to which the boundary flux sub-operator is added
-// @param boundary_index   [in] the index identifying the boundary associated with the sub-operator
+// @param boundary         [in] the boundary associated with the sub-operator
 // @param interior_flux_op [in] the sub-operator computing the boundary fluxes
 PetscErrorCode AddCeedSourceSubOperator(Operator *op, CeedOperator source_op) {
   PetscFunctionBegin;
@@ -342,8 +412,8 @@ PetscErrorCode AddCeedSourceSubOperator(Operator *op, CeedOperator source_op) {
   const char *required_inputs[] = {
       "geom",       "swe_src",
       "mannings_n",  // FIXME: SWE-specific!
-      "riemannf",    // FIXME: SWE-specific!
-      "q",           // FIXME: SWE-specific!
+      "riemannf",
+      "q",  // FIXME: SWE-specific!
       NULL,
   };
   for (PetscInt f = 0; required_inputs[f]; ++f) {
@@ -595,6 +665,15 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec du
 /// \param [out]   dudt the locally right hand side storing the computed time derivative of u
 PetscErrorCode ApplyOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
   PetscFunctionBegin;
+
+  // reset courant number diagnostics
+  op->courant_diags = (CourantNumberDiagnostics){
+      .max_courant_num = 0.0,
+      .global_edge_id  = -1,
+      .global_cell_id  = -1,
+      .is_set          = PETSC_FALSE,
+  };
+
   if (CeedEnabled()) {
     PetscCall(ApplyCeedOperator(op, t, u, dudt));
   } else {
@@ -603,27 +682,36 @@ PetscErrorCode ApplyOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// FIXME: these support the courant number diagnostics below, but we need to
-// FIXME: generalize
-extern PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, MPI_Comm comm,
-                                               PetscReal *max_courant_number);
-extern PetscErrorCode PetscFindMaxCourantNumber(RDy rdy, PetscReal *max_courant_number);
-
-/// Retrieves the maximum Courant number computed by the operator in its last
-/// application.
-/// \param [inout] op                 the operator
-/// \param [out]   max_courant_number the maximum Courant number computed
-PetscErrorCode GetOperatorMaxCourantNumber(Operator *op, PetscReal *max_courant_number) {
+/// Updates the Courant number diagnostics with information about the most
+/// recent application of the operator.
+/// \param [inout] op    the operator
+PetscErrorCode UpdateOperatorCourantNumberDiagnostics(Operator *op) {
   PetscFunctionBegin;
-  // FIXME: this is hardwired to SWE at the moment
+
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
-  if (CeedEnabled()) {
-    PetscCall(CeedFindMaxCourantNumber(op->ceed.flux_operator, op->mesh, op->num_boundaries, op->boundaries, comm, max_courant_number));
-  } else {
-    PetscCall(PetscFindMaxCourantNumber(op->petsc.rdy, max_courant_number));
+  // update diagnostics locally (if needed)
+  if (op->update_local_courant_diags) {
+    PetscCall(op->update_local_courant_diags(op, &op->courant_diags));
   }
+
+  // reduce and set updated flag
+  MPI_Allreduce(MPI_IN_PLACE, &op->courant_diags, 1, courant_num_diags_type, courant_num_diags_op, comm);
+  op->courant_diags.is_set = PETSC_TRUE;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Retrieves information about the conditions under which the maximum Courant
+/// was encountered in the last call to UpdateOperatorCourantNumberDiagnostics.
+/// \param [inout] op    the operator
+/// \param [out]   diags information about the maximum Courant number
+PetscErrorCode GetOperatorCourantNumberDiagnostics(Operator *op, CourantNumberDiagnostics *diags) {
+  PetscFunctionBegin;
+
+  *diags = op->courant_diags;
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

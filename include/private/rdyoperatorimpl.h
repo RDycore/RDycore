@@ -16,6 +16,18 @@ PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
 // creation of sections for configuration-specific physics
 PETSC_INTERN PetscErrorCode CreateSection(RDy, PetscSection *);
 
+typedef struct Operator Operator;
+
+// Diagnostic structure that captures information about the conditions under
+// which the maximum courant number is encountered. If you change this struct,
+// update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
+typedef struct {
+  PetscReal max_courant_num;  // maximum courant number
+  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
+  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
+  PetscBool is_set;           // true if max_courant_num is set, otherwise false
+} CourantNumberDiagnostics;
+
 //-------------
 // RDyOperator
 //-------------
@@ -30,7 +42,7 @@ PETSC_INTERN PetscErrorCode CreateSection(RDy, PetscSection *);
 // NOTE: implementation of an operator of this type actually uses two CeedOperators:
 // NOTE: 1. A "flux operator", which computes Riemann fluxes using a finite volume method
 // NOTE: 2. A "source operator", which add source terms
-typedef struct {
+typedef struct Operator {
   // DM associated with solution vector
   DM dm;
 
@@ -65,6 +77,10 @@ typedef struct {
     } petsc;
   };
 
+  // courant number diagnostics and local update function (no MPI)
+  CourantNumberDiagnostics courant_diags;
+  PetscErrorCode (*update_local_courant_diags)(Operator *, CourantNumberDiagnostics *);
+
   // locks on operator data for exclusive access
   struct {
     void **boundary_data;  // per-boundary operator boundary data
@@ -77,8 +93,8 @@ typedef struct {
 PETSC_INTERN PetscErrorCode CreateCeedOperator(DM, RDyMesh *, PetscInt, PetscInt, RDyBoundary *, Operator *);
 PETSC_INTERN PetscErrorCode AddCeedInteriorFluxSubOperator(Operator *, CeedOperator);
 PETSC_INTERN PetscErrorCode GetCeedInteriorFluxSubOperator(Operator *, CeedOperator *);
-PETSC_INTERN PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *, PetscInt, CeedOperator);
-PETSC_INTERN PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *, PetscInt, CeedOperator *);
+PETSC_INTERN PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *, RDyBoundary, CeedOperator);
+PETSC_INTERN PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *, RDyBoundary, CeedOperator *);
 PETSC_INTERN PetscErrorCode AddCeedSourceSubOperator(Operator *, CeedOperator);
 PETSC_INTERN PetscErrorCode GetCeedSourceSubOperator(Operator *, CeedOperator *);
 
@@ -87,7 +103,9 @@ PETSC_INTERN PetscErrorCode DestroyOperator(Operator *);
 
 PETSC_INTERN PetscErrorCode SetOperatorTimeStep(Operator *, PetscReal);
 PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
-PETSC_INTERN PetscErrorCode GetOperatorMaxCourantNumber(Operator *, PetscReal *);
+
+PETSC_INTERN PetscErrorCode UpdateOperatorCourantNumberDiagnostics(Operator *);
+PETSC_INTERN PetscErrorCode GetOperatorCourantNumberDiagnostics(Operator *, CourantNumberDiagnostics *);
 
 //----------------------
 // Operator Data Access

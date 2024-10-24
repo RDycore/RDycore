@@ -870,10 +870,6 @@ static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
   PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
 
-  // get courant number diagnostics
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  courant_num_diags->max_courant_num          = 0.0;
-
   // compute the right hand side
   PetscCall(ApplyOperator(&rdy->operator, t, U, F));
 
@@ -898,9 +894,9 @@ static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   // if debug-level logging is enabled, find the latest global maximum Courant number
   // and log it.
   if (rdy->config.logging.level >= LOG_DEBUG) {
-    CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-    PetscCall(GetOperatorMaxCourantNumber(&rdy->operator, & courant_num_diags->max_courant_num));
-    courant_num_diags->is_set = PETSC_TRUE;
+    PetscCall(UpdateOperatorCourantNumberDiagnostics(&rdy->operator));
+    CourantNumberDiagnostics courant_diags;
+    PetscCall(GetOperatorCourantNumberDiagnostics(&rdy->operator, & courant_diags));
 
     PetscReal time;
     PetscInt  stepnum;
@@ -909,7 +905,7 @@ static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
     const char *units = TimeUnitAsString(rdy->config.time.unit);
 
     RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
-                courant_num_diags->max_courant_num);
+                courant_diags.max_courant_num);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1090,13 +1086,6 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
-
-  RDyLogDebug(rdy, "Initializing courant number diagnostics...");
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  courant_num_diags->max_courant_num          = 0.0;
-  courant_num_diags->global_edge_id           = -1;
-  courant_num_diags->global_cell_id           = -1;
-  courant_num_diags->is_set                   = PETSC_FALSE;
 
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data
