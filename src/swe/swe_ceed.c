@@ -461,18 +461,22 @@ PetscErrorCode SWESourceOperatorGetRiemannFlux(Operator *op, CeedOperatorField *
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-PetscErrorCode CreateSWEOperator(RDy rdy) {
+// FIXME: this is here to support our janky E3SM boundary edge flux coupling;
+// FIXME: there's probably a better way to do this
+extern PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *, PetscInt, PetscInt, RDyBoundary *, PetscBool, PetscReal, Operator *);
+
+PetscErrorCode CreateCeedSWEOperator(RDy rdy, Operator *operator) {
   PetscFunctionBegin;
 
   const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
 
   PetscInt num_comp = 3;
-  PetscCall(CreateCeedOperator(rdy->dm, &rdy->mesh, num_comp, rdy->num_boundaries, rdy->boundaries, &rdy->operator));
+  PetscCall(CreateCeedOperator(rdy->dm, &rdy->mesh, num_comp, rdy->num_boundaries, rdy->boundaries, operator));
 
   CeedOperator interior_flux_op;
   PetscCall(CreateSWEInteriorFluxSubOperator(&rdy->mesh, tiny_h, &interior_flux_op));
   if (0) PetscCallCEED(CeedOperatorView(interior_flux_op, stdout));
-  PetscCall(AddCeedInteriorFluxSubOperator(&rdy->operator, interior_flux_op));
+  PetscCall(AddCeedInteriorFluxSubOperator(operator, interior_flux_op));
 
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     CeedOperator boundary_flux_op;
@@ -480,12 +484,25 @@ PetscErrorCode CreateSWEOperator(RDy rdy) {
     RDyCondition boundary_condition = rdy->boundary_conditions[b];
     PetscCall(CreateSWEBoundaryFluxSubOperator(&rdy->mesh, boundary, boundary_condition, tiny_h, &boundary_flux_op));
     if (0) PetscCallCEED(CeedOperatorView(boundary_flux_op, stdout));
-    PetscCall(AddCeedBoundaryFluxSubOperator(&rdy->operator, b, boundary_flux_op));
+    PetscCall(AddCeedBoundaryFluxSubOperator(operator, b, boundary_flux_op));
   }
 
   CeedOperator source_op;
   PetscCall(CreateSWESourceOperator(&rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, tiny_h, &source_op));
-  PetscCall(AddCeedSourceSubOperator(&rdy->operator, source_op));
+  PetscCall(AddCeedSourceSubOperator(operator, source_op));
+
+  // create associated vectors for storage
+  Ceed ceed = CeedContext();
+  PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_cells * num_comp, &operator->ceed.u_local));
+  PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_cells * num_comp, &operator->ceed.rhs));
+  PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_owned_cells * num_comp, &operator->ceed.sources));
+
+  // FIXME: I'm not sure what to thing of this vvv
+  PetscBool ceed_enabled = PETSC_TRUE;
+  PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, tiny_h, operator));
+
+  // reset the operator's time step size
+  operator->ceed.dt = 0.0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
