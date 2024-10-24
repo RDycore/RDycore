@@ -7,8 +7,6 @@
 // maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
 
-extern PetscLogEvent RDY_CeedOperatorApply;
-
 // create flux and source operators
 static PetscErrorCode CreateOperator(RDy rdy, Operator *operator) {
   PetscFunctionBegin;

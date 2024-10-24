@@ -144,11 +144,13 @@ typedef struct {
   // number of components in the underlying system
   PetscInt num_components;
   // underlying data storage
-  OperatorVectorData storage;
+  OperatorVectorData values;  // boundary values
+  OperatorVectorData fluxes;  // boundary fluxes
 } OperatorBoundaryData;
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(Operator *, RDyBoundary, OperatorBoundaryData *);
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(OperatorBoundaryData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(Operator *, RDyBoundary, OperatorBoundaryData *);
 
 // This type allows the direct manipulation of source values on the entire
