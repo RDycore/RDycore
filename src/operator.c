@@ -46,55 +46,8 @@ PetscErrorCode SetCeedResource(char *resource) {
 static PetscClassId RDY_CLASSID;
 PetscLogEvent       RDY_CeedOperatorApply;
 
-// initializes operators for physics specified in the input configuration
-PetscErrorCode InitOperators(RDy rdy) {
-  PetscFunctionBegin;
-
-  // register a logging event for applying our CEED operator
-  PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
-  PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply));
-
-  // just pass the call along for now
-  InitSWE(rdy);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-// frees all resources devoted to operators
-PetscErrorCode DestroyOperators(RDy rdy) {
-  PetscFunctionBegin;
-
-  // is anyone manipulating boundary data, source data, etc?
-  if (rdy->lock.boundary_data) {
-    for (PetscInt i = 0; i < rdy->num_boundaries; ++i) {
-      PetscCheck(rdy->lock.boundary_data[i] == NULL, rdy->comm, PETSC_ERR_USER, "Could not destroy RDycore: boundary data is in use");
-    }
-  }
-  PetscCheck(rdy->lock.source_data == NULL, rdy->comm, PETSC_ERR_USER, "Could not destroy RDycore: source data is in use");
-  PetscFree(rdy->lock.boundary_data);
-  PetscFree(rdy->lock.source_data);
-
-  PetscBool ceed_enabled = CeedEnabled(rdy);
-
-  if (rdy->petsc.context) {
-    PetscCall(DestroyPetscSWEFlux(rdy->petsc.context, ceed_enabled, rdy->num_boundaries));
-  }
-
-  if (ceed_enabled) {
-    PetscCallCEED(CeedOperatorDestroy(&rdy->ceed.flux_operator));
-    PetscCallCEED(CeedOperatorDestroy(&rdy->ceed.source_operator));
-    PetscCallCEED(CeedVectorDestroy(&rdy->ceed.u_local));
-    PetscCallCEED(CeedVectorDestroy(&rdy->ceed.rhs));
-    PetscCallCEED(CeedVectorDestroy(&rdy->ceed.sources));
-    // the CEED context belongs to RDycore itself, so we don't delete it
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-=======
 /// Creates a PetscSection appropriate for the selected system.
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
+/// FIXME: this belongs somewhere else
 PetscErrorCode CreateSection(RDy rdy, PetscSection *section) {
   PetscFunctionBegin;
 
@@ -105,28 +58,6 @@ PetscErrorCode CreateSection(RDy rdy, PetscSection *section) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-<<<<<<< HEAD
-// acquires exclusive access to boundary data for flux operators
-PetscErrorCode GetOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBoundaryData *boundary_data) {
-  PetscFunctionBegin;
-  *boundary_data = (OperatorBoundaryData){0};
-  if (!rdy->lock.boundary_data) {
-    PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->lock.boundary_data));
-  }
-  PetscCheck(boundary.index >= 0 && boundary.index < rdy->num_boundaries, rdy->comm, PETSC_ERR_USER,
-             "Invalid boundary for boundary data (index: %" PetscInt_FMT ")", boundary.index);
-  PetscCheck(!rdy->lock.boundary_data[boundary.index], rdy->comm, PETSC_ERR_USER,
-             "Could not acquire lock on boundary data -- another entity has access");
-  rdy->lock.boundary_data[boundary.index] = boundary_data;
-  boundary_data->rdy                      = rdy;
-  boundary_data->boundary                 = boundary;
-  PetscCall(VecGetBlockSize(rdy->u_global, &boundary_data->num_components));
-
-  if (CeedEnabled(rdy)) {
-    // get the relevant boundary sub-operator
-    CeedOperator *sub_ops;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.flux_operator, &sub_ops));
-=======
 static PetscErrorCode CreateBasicOperator(DM dm, RDyMesh *mesh, PetscInt num_components, PetscInt num_boundaries, RDyBoundary *boundaries,
                                           Operator *op) {
   PetscFunctionBegin;
@@ -173,9 +104,12 @@ static PetscErrorCode CreateBasicOperator(DM dm, RDyMesh *mesh, PetscInt num_com
 /// @param [in]  num_boundaries the number of boundaries in the computational domain
 /// @param [in]  boundaries a pointer to an array of boundaries
 /// @param [out] op a newly created "empty" operator, ready for assembly
-/// @
 PetscErrorCode CreateCeedOperator(DM dm, RDyMesh *mesh, PetscInt num_components, PetscInt num_boundaries, RDyBoundary *boundaries, Operator *op) {
   PetscFunctionBegin;
+
+  // register a logging event for applying our CEED operator
+  PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
+  PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply));
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -194,17 +128,37 @@ PetscErrorCode CreateCeedOperator(DM dm, RDyMesh *mesh, PetscInt num_components,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode AddCeedInteriorFluxOperator(Operator *op, CeedOperator interior_flux_op) {
+// Adds a sub-operator that computes fluxes between interior cells to the given
+// Operator. This should be the first CEED flux sub-operator added to the
+// Operator. The sub-operator is consumed in the process.
+//
+// The following input fields should be present:
+//
+// 1. "geom"    - a set of geometric parameters
+// 2. "q_left"  - the state in the "left" cell of an edge for each flux computed
+// 3. "q_right" - the state in the "right" cell of an edge for each flux computed
+//
+// The following output fields should be present:
+//
+// 1. "geom"           - a set of computed geometric parameters
+// 2. "cell_left"      - the left state corresponding to the Riemann flux
+// 3. "cell_right"     - the right state corresponding to the Riemann flux
+// 4. "flux"           - the Riemann flux through the edge separating left and right cells
+// 5. "courant_number" - the Courant numbers for the x and y velocities
+//
+// @param op               [in] the operator to which the interior flux sub-operator is added
+// @param interior_flux_op [in] the sub-operator computing the interior fluxes
+PetscErrorCode AddCeedInteriorFluxSubOperator(Operator *op, CeedOperator interior_flux_op) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't add a CEED interior flux operator: CEED is disabled");
+  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't add a CEED sub-interior flux operator: CEED is disabled");
 
   // this should be the first sub-operator added
   CeedInt num_sub_operators;
   PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
-  PetscCheck(num_sub_operators == 0, comm, PETSC_ERR_USER, "CEED interior flux operator must be the first sub-operator added");
+  PetscCheck(num_sub_operators == 0, comm, PETSC_ERR_USER, "CEED interior flux sub-operator must be the first sub-operator added");
 
   // check for required input, output fields
   const char *required_inputs[] = {
@@ -216,7 +170,7 @@ PetscErrorCode AddCeedInteriorFluxOperator(Operator *op, CeedOperator interior_f
   for (PetscInt f = 0; required_inputs[f]; ++f) {
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(interior_flux_op, required_inputs[f], &field));
-    PetscCheck(field, comm, PETSC_ERR_USER, "CEED interior flux operator missing required input field: %s", required_inputs[f]);
+    PetscCheck(field, comm, PETSC_ERR_USER, "CEED interior flux sub-operator missing required input field: %s", required_inputs[f]);
   }
   const char *required_outputs[] = {
       "geom", "cell_left", "cell_right", "flux", "courant_number", NULL,
@@ -224,15 +178,56 @@ PetscErrorCode AddCeedInteriorFluxOperator(Operator *op, CeedOperator interior_f
   for (PetscInt f = 0; required_outputs[f]; ++f) {
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(interior_flux_op, required_outputs[f], &field));
-    PetscCheck(field, comm, PETSC_ERR_USER, "CEED interior flux operator missing required output field: %s", required_outputs[f]);
+    PetscCheck(field, comm, PETSC_ERR_USER, "CEED interior flux sub-operator missing required output field: %s", required_outputs[f]);
   }
 
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux_operator, interior_flux_op));
+  PetscCallCEED(CeedOperatorDestroy(&interior_flux_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode AddCeedBoundaryFluxOperator(Operator *op, PetscInt boundary_index, CeedOperator boundary_flux_op) {
+/// Retrieves the interior flux sub-operator added to the operator by a prior
+/// call to AddCeedInteriorFluxOperator(), throwing an error if no such call was
+/// made.
+PetscErrorCode GetCeedInteriorFluxSubOperator(Operator *op, CeedOperator *interior_flux_op) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't get CEED interior flux sub-operator: CEED is disabled");
+
+  CeedInt num_sub_operators;
+  PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
+  PetscCheck(num_sub_operators >= 1, comm, PETSC_ERR_USER, "Can't get CEED interior flux sub-operator: no operator was assigned!");
+  CeedOperator *sub_operators;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux_operator, &sub_operators));
+
+  *interior_flux_op = sub_operators[0];
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Adds a sub-operator that computes fluxes on boundary cells to the given
+// Operator. This should be called once for each boundary in the domain, and
+// it should be called after the interior flux sub-operator has been added to
+// the Operator. The sub-operator is consumed in the process.
+//
+// The following input fields should be present:
+//
+// 1. "geom"    - a set of geometric parameters
+// 2. "q_left"  - the state in the "left" cell of an edge for each flux computed
+//
+// The following output fields should be present:
+//
+// 1. "geom"           - a set of computed geometric parameters
+// 2. "cell_left"      - the left state corresponding to the Riemann flux
+// 4. "flux"           - the Riemann flux through the edge separating left and right cells
+// 5. "courant_number" - the Courant numbers for the x and y velocities
+//
+// @param op               [in] the operator to which the boundary flux sub-operator is added
+// @param boundary_index   [in] the index identifying the boundary associated with the sub-operator
+// @param interior_flux_op [in] the sub-operator computing the boundary fluxes
+PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_index, CeedOperator boundary_flux_op) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -245,7 +240,7 @@ PetscErrorCode AddCeedBoundaryFluxOperator(Operator *op, PetscInt boundary_index
   CeedInt num_sub_operators;
   PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
   PetscCheck(boundary_index == num_sub_operators - 1, comm, PETSC_ERR_USER,
-             "Invalid CEED boundary flux sub-operator index: %" PetscInt_FMT " (should be %" PetscInt_FMT ")");
+             "Invalid CEED boundary flux sub-operator index: %" PetscInt_FMT " (should be %" PetscInt_FMT ")", boundary_index, num_sub_operators - 1);
 
   // check for required input, output fields
   const char *required_inputs[] = {
@@ -256,7 +251,7 @@ PetscErrorCode AddCeedBoundaryFluxOperator(Operator *op, PetscInt boundary_index
   for (PetscInt f = 0; required_inputs[f]; ++f) {
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, required_inputs[f], &field));
-    PetscCheck(field, comm, PETSC_ERR_USER, "CEED boundary flux operator missing required input field: %s", required_inputs[f]);
+    PetscCheck(field, comm, PETSC_ERR_USER, "CEED boundary flux sub-operator missing required input field: %s", required_inputs[f]);
   }
   const char *required_outputs[] = {
       "geom", "cell_left", "flux", "courant_number", NULL,
@@ -264,21 +259,62 @@ PetscErrorCode AddCeedBoundaryFluxOperator(Operator *op, PetscInt boundary_index
   for (PetscInt f = 0; required_outputs[f]; ++f) {
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, required_outputs[f], &field));
-    PetscCheck(field, comm, PETSC_ERR_USER, "CEED boundary flux operator missing required output field: %s", required_outputs[f]);
+    PetscCheck(field, comm, PETSC_ERR_USER, "CEED boundary flux sub-operator missing required output field: %s", required_outputs[f]);
   }
 
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux_operator, boundary_flux_op));
+  PetscCallCEED(CeedOperatorDestroy(&boundary_flux_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode AddCeedSourceOperator(Operator *op, CeedOperator source_op) {
+/// Retrieves a boundary flux sub-operator added to the operator by a prior
+/// call to AddCeedBoundaryFluxOperator(), throwing an error if no such call was
+/// made.
+PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *op, PetscInt boundary_index, CeedOperator *boundary_flux_op) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't add a CEED source operator: CEED is disabled");
-  PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source_operator, source_op));
+  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't get CEED boundary flux sub-operator: CEED is disabled");
+  PetscCheck(boundary_index >= 1 && boundary_index < 1 + op->num_boundaries, comm, PETSC_ERR_USER,
+             "Can't get CEED boundary flux operator: invalid boundary index (%" PetscInt_FMT ")", boundary_index);
+
+  CeedInt num_sub_operators;
+  PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
+  PetscCheck(num_sub_operators >= 1 + boundary_index, comm, PETSC_ERR_USER,
+             "Can't find CEED boundary flux sub-operator with boundary index %" PetscInt_FMT, boundary_index);
+  CeedOperator *sub_operators;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux_operator, &sub_operators));
+
+  *boundary_flux_op = sub_operators[1 + boundary_index];
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Adds a sub-operator that computes source terms on all cells in the
+// computational domain to the given Operator. This can be called to add as
+// many source sub-operators as necessary to implement the Operator. The sub-
+// operator is consumed in the process.
+//
+// The following input fields should be present:
+//
+// 1. "geom"     - a set of geometric parameters
+// 2. "swe_src"  - source data already present in the cells
+// 3. "riemannf" - the Riemann flux divergence stored in the cells
+//
+// The following output fields should be present:
+//
+// 1. "cell" - the accumulated sources in each cell
+//
+// @param op               [in] the operator to which the boundary flux sub-operator is added
+// @param boundary_index   [in] the index identifying the boundary associated with the sub-operator
+// @param interior_flux_op [in] the sub-operator computing the boundary fluxes
+PetscErrorCode AddCeedSourceSubOperator(Operator *op, CeedOperator source_op) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't add a CEED source sub-operator: CEED is disabled");
 
   // check for required input, output fields
   const char *required_inputs[] = {
@@ -291,7 +327,7 @@ PetscErrorCode AddCeedSourceOperator(Operator *op, CeedOperator source_op) {
   for (PetscInt f = 0; required_inputs[f]; ++f) {
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(source_op, required_inputs[f], &field));
-    PetscCheck(field, comm, PETSC_ERR_USER, "CEED source operator missing required input field: %s", required_inputs[f]);
+    PetscCheck(field, comm, PETSC_ERR_USER, "CEED source sub-operator missing required input field: %s", required_inputs[f]);
   }
   const char *required_outputs[] = {
       "cell",
@@ -300,12 +336,45 @@ PetscErrorCode AddCeedSourceOperator(Operator *op, CeedOperator source_op) {
   for (PetscInt f = 0; required_outputs[f]; ++f) {
     CeedOperatorField field;
     PetscCallCEED(CeedOperatorGetFieldByName(source_op, required_outputs[f], &field));
-    PetscCheck(field, comm, PETSC_ERR_USER, "CEED source operator missing required output field: %s", required_outputs[f]);
+    PetscCheck(field, comm, PETSC_ERR_USER, "CEED source sub-operator missing required output field: %s", required_outputs[f]);
   }
+
+  PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source_operator, source_op));
+  PetscCallCEED(CeedOperatorDestroy(&source_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Retrieves the interior flux CeedOperator added to the operator by a prior
+/// call to AddCeedSourceOperator(), throwing an error if no such call was
+/// made.
+PetscErrorCode GetCeedSourceSubOperator(Operator *op, CeedOperator *source_op) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(CeedEnabled(), comm, PETSC_ERR_USER, "Can't get CEED source sub-operator: CEED is disabled");
+
+  CeedInt num_sub_operators;
+  PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source_operator, &num_sub_operators));
+  PetscCheck(num_sub_operators >= 1, comm, PETSC_ERR_USER, "Can't get CEED source sub-operator: no operator was assigned!");
+  CeedOperator *sub_operators;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source_operator, &sub_operators));
+
+  // FIXME: this assumes the existence of only 1 source sub-operator (not enforced!)
+  *source_op = sub_operators[1 + op->num_boundaries];
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates an operator implemented by PETSc functions for a domain represented
+/// by the given mesh and boundaries.
+///
+/// @param [in]  dm the DM associated with the solution vector
+/// @param [in]  mesh a mesh defining the computational domain
+/// @param [in]  num_components the number of components in the solution vector
+/// @param [in]  num_boundaries the number of boundaries in the computational domain
+/// @param [in]  boundaries a pointer to an array of boundaries
+/// @param [out] op a newly created operator
 PetscErrorCode CreatePetscOperator(DM dm, RDyMesh *mesh, PetscInt num_components, PetscInt num_boundaries, RDyBoundary *boundaries, Operator *op) {
   PetscFunctionBegin;
 
@@ -354,7 +423,7 @@ PetscErrorCode DestroyOperator(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode UpdateCeedOperatorTimeStep(CeedOperator op, PetscReal dt) {
+static PetscErrorCode SetCeedOperatorTimeStep(CeedOperator op, PetscReal dt) {
   PetscFunctionBeginUser;
 
   // CEED operators store the time step under the "time step" label
@@ -368,31 +437,31 @@ static PetscErrorCode UpdateCeedOperatorTimeStep(CeedOperator op, PetscReal dt) 
 PetscErrorCode SetOperatorTimeStep(Operator *op, PetscReal dt) {
   PetscFunctionBegin;
   if (CeedEnabled()) {
-    PetscCall(UpdateCeedOperatorTimeStep(op->ceed.flux_operator, dt));
-    PetscCall(UpdateCeedOperatorTimeStep(op->ceed.source_operator, dt));
+    PetscCall(SetCeedOperatorTimeStep(op->ceed.flux_operator, dt));
+    PetscCall(SetCeedOperatorTimeStep(op->ceed.source_operator, dt));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
-static PetscErrorCode ApplyCeedOperators(Operator *op, PetscReal t, Vec u, Vec dudt) {
+static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
   PetscFunctionBegin;
   {
     // The computation of fluxes across internal and boundary edges via CeedOperator is done
     // in the following three stages:
     //
-    // a) Pre-CeedOperatorApply stage:
-    //    - Set memory pointer of a CeedVector (u_local_ceed) is set to PETSc Vec (U_local)
-    //    - Ask DM to "get" a PETSc Vec (F_local), then set memory pointer of a CeedVector (f_ceed)
-    //      to the F_local PETSc Vec.
+    // a) pre-CeedOperatorApply stage
+    //    - point a CeedVector (u_local_ceed) at the PETSc Vec (u)
+    //    - get an appropriate PETSc Vec from the DM (F_local), and point
+    //      the CeedVector f_ceed at it
     //
     // b) CeedOperatorApply stage
-    //    - Apply the CeedOparator in which u_local_ceed is an input, while f_ceed is an output.
+    //    - apply the CEED flux operator(s), transforming u_local_ceed -> f_ceed
     //
-    // c) Post-CeedOperatorApply stage:
-    //    - Add values in F_local to F via Local-to-Global scatter.
-    //    - Clean up memory
+    // c) post-CeedOperatorApply stage
+    //    - accumulate values from F_local to dudt via local-to-global scatter
+    //    - clean up
 
     PetscScalar *u_local, *f;
     PetscMemType mem_type;
@@ -425,11 +494,11 @@ static PetscErrorCode ApplyCeedOperators(Operator *op, PetscReal t, Vec u, Vec d
     PetscCall(VecRestoreArrayAndMemType(F_local, &f));
     PetscCall(VecRestoreArrayAndMemType(u, &u_local));
 
-    // 6. Zero out values in du/dt and then add F_local to F via Local-to-Global scatter
+    // 6. Zero out values in du/dt and then add F_local to F via local-to-global scatter
     PetscCall(VecZeroEntries(dudt));
     PetscCall(DMLocalToGlobal(op->dm, F_local, ADD_VALUES, dudt));
 
-    // 7. Restor the F_local
+    // 7. Restore the F_local
     PetscCall(DMRestoreLocalVector(op->dm, &F_local));
   }
 
@@ -495,7 +564,7 @@ static PetscErrorCode ApplyCeedOperators(Operator *op, PetscReal t, Vec u, Vec d
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ApplyPetscOperators(Operator *op, PetscReal t, Vec u, Vec dudt) {
+static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
   PetscFunctionBegin;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -509,9 +578,9 @@ static PetscErrorCode ApplyPetscOperators(Operator *op, PetscReal t, Vec u, Vec 
 PetscErrorCode ApplyOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
   PetscFunctionBegin;
   if (CeedEnabled()) {
-    PetscCall(ApplyCeedOperators(op, t, u, dudt));
+    PetscCall(ApplyCeedOperator(op, t, u, dudt));
   } else {
-    PetscCall(ApplyPetscOperators(op, t, u, dudt));
+    PetscCall(ApplyPetscOperator(op, t, u, dudt));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -540,7 +609,6 @@ PetscErrorCode GetOperatorBoundaryData(Operator *op, RDyBoundary boundary, Opera
     // get the relevant boundary sub-operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux_operator, &sub_ops));
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     CeedOperator flux_op = sub_ops[1 + boundary_data->boundary.index];
 
     // fetch the relevant vector
@@ -557,11 +625,7 @@ PetscErrorCode GetOperatorBoundaryData(Operator *op, RDyBoundary boundary, Opera
 PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, PetscInt component, PetscReal *boundary_values) {
   PetscFunctionBegin;
 
-<<<<<<< HEAD
-  if (CeedEnabled(boundary_data->rdy)) {
-=======
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     // if this is the first update, get access to the vector's data
     if (!boundary_data->storage.updated) {
       PetscCallCEED(CeedVectorGetArray(boundary_data->storage.ceed.vec, CEED_MEM_HOST, &boundary_data->storage.ceed.data));
@@ -583,18 +647,11 @@ PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, Pe
       boundary_data->storage.updated = PETSC_TRUE;
     }
 
-<<<<<<< HEAD
-=======
-    /* FIXME: eventually, we can have something like this vvv
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     // set the data
     PetscReal *u = boundary_data->storage.petsc.data;
     for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
       u[e * boundary_data->num_components + component] = boundary_values[e];
     }
-<<<<<<< HEAD
-=======
-    */
 
     Operator   *op       = boundary_data->op;
     RDyBoundary boundary = boundary_data->boundary;
@@ -614,19 +671,11 @@ PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, Pe
         values[e] = boundary_values[3 * e + component];
       }
     }
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-<<<<<<< HEAD
-PetscErrorCode RestoreOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBoundaryData *boundary_data) {
-  PetscFunctionBegin;
-  PetscCheck(rdy == boundary_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong RDy");
-  PetscCheck(boundary.index == boundary_data->boundary.index, rdy->comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong boundary");
-  if (CeedEnabled(boundary_data->rdy)) {
-=======
 PetscErrorCode RestoreOperatorBoundaryData(Operator *op, RDyBoundary boundary, OperatorBoundaryData *boundary_data) {
   PetscFunctionBegin;
 
@@ -636,34 +685,10 @@ PetscErrorCode RestoreOperatorBoundaryData(Operator *op, RDyBoundary boundary, O
 
   PetscCheck(boundary.index == boundary_data->boundary.index, comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong boundary");
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     if (boundary_data->storage.updated) {
       PetscCallCEED(CeedVectorRestoreArray(boundary_data->storage.ceed.vec, &boundary_data->storage.ceed.data));
     }
   } else {
-<<<<<<< HEAD
-    if (boundary_data->storage.updated) {
-      PetscCall(VecRestoreArray(boundary_data->storage.petsc.vec, &boundary_data->storage.petsc.data));
-    }
-  }
-  boundary_data->rdy->lock.boundary_data[boundary_data->boundary.index] = NULL;
-  *boundary_data                                                        = (OperatorBoundaryData){0};
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode GetOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
-  PetscFunctionBegin;
-  *source_data = (OperatorSourceData){0};
-  PetscCheck(!rdy->lock.source_data, rdy->comm, PETSC_ERR_USER, "Could not acquire lock on source data -- another entity has access");
-  rdy->lock.source_data = source_data;
-  source_data->rdy      = rdy;
-  PetscCall(VecGetBlockSize(rdy->u_global, &source_data->num_components));
-
-  if (CeedEnabled(rdy)) {
-    // NOTE: our SWE-specific source operator has only one sub operator
-    CeedOperator *sub_ops;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
-=======
     /* FIXME: soon we can have this vvv
        if (boundary_data->storage.updated) {
        PetscCall(VecRestoreArray(boundary_data->storage.petsc.vec, &boundary_data->storage.petsc.data));
@@ -708,7 +733,6 @@ PetscErrorCode GetOperatorSourceData(Operator *op, OperatorSourceData *source_da
     // NOTE: our SWE-specific source operator has only one sub operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source_operator, &sub_ops));
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     CeedOperator source_op = sub_ops[0];
 
     // fetch the relevant vector
@@ -716,11 +740,7 @@ PetscErrorCode GetOperatorSourceData(Operator *op, OperatorSourceData *source_da
     PetscCallCEED(CeedOperatorGetFieldByName(source_op, "swe_src", &field));  // FIXME: only valid for SWE
     PetscCallCEED(CeedOperatorFieldGetVector(field, &source_data->sources.ceed.vec));
   } else {
-<<<<<<< HEAD
-    source_data->sources.petsc.vec = rdy->petsc.sources;
-=======
     source_data->sources.petsc.vec = op->petsc.sources;
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -730,11 +750,7 @@ PetscErrorCode GetOperatorSourceData(Operator *op, OperatorSourceData *source_da
 PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
 
-<<<<<<< HEAD
-  if (CeedEnabled(source_data->rdy)) {
-=======
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     // if this is the first update, get access to the vector's data
     if (!source_data->sources.updated) {
       PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
@@ -746,11 +762,7 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
     *((CeedScalar **)&values) = source_data->sources.ceed.data;
 
     // set the values
-<<<<<<< HEAD
-    for (CeedInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-=======
     for (CeedInt i = 0; i < source_data->op->mesh->num_owned_cells; ++i) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
       values[i][component] = source_values[i];
     }
   } else {
@@ -762,11 +774,7 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
 
     // set the values
     PetscReal *s = source_data->sources.petsc.data;
-<<<<<<< HEAD
-    for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-=======
     for (PetscInt i = 0; i < source_data->op->mesh->num_owned_cells; ++i) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
       s[i * source_data->num_components + component] = source_values[i];
     }
   }
@@ -774,7 +782,6 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-<<<<<<< HEAD
 // sets values of the source term for the given component
 PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
@@ -811,11 +818,6 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
-  PetscFunctionBegin;
-  PetscCheck(rdy == source_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong RDy");
-  if (CeedEnabled(source_data->rdy)) {
-=======
 PetscErrorCode RestoreOperatorSourceData(Operator *op, OperatorSourceData *source_data) {
   PetscFunctionBegin;
 
@@ -824,7 +826,6 @@ PetscErrorCode RestoreOperatorSourceData(Operator *op, OperatorSourceData *sourc
   PetscCheck(op == source_data->op, comm, PETSC_ERR_USER, "Could not restore operator source data: wrong operator");
 
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     if (source_data->sources.updated) {
       PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
     }
@@ -833,24 +834,6 @@ PetscErrorCode RestoreOperatorSourceData(Operator *op, OperatorSourceData *sourc
       PetscCall(VecRestoreArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
     }
   }
-<<<<<<< HEAD
-  source_data->rdy->lock.source_data = NULL;
-  *source_data                       = (OperatorSourceData){0};
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode GetOperatorMaterialData(RDy rdy, OperatorMaterialData *material_data) {
-  PetscFunctionBegin;
-  *material_data = (OperatorMaterialData){0};
-  PetscCheck(!rdy->lock.material_data, rdy->comm, PETSC_ERR_USER, "Could not acquire lock on material data -- another entity has access");
-  rdy->lock.material_data = material_data;
-  material_data->rdy      = rdy;
-
-  if (CeedEnabled(rdy)) {
-    // NOTE: our SWE-specific source operator has only one sub operator
-    CeedOperator *sub_ops;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
-=======
   source_data->op->lock.source_data = NULL;
   *source_data                      = (OperatorSourceData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -871,7 +854,6 @@ PetscErrorCode GetOperatorMaterialData(Operator *op, OperatorMaterialData *mater
     // NOTE: our SWE-specific source operator has only one sub operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source_operator, &sub_ops));
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     CeedOperator source_op = sub_ops[0];
 
     // fetch the relevant material property vectors
@@ -879,11 +861,7 @@ PetscErrorCode GetOperatorMaterialData(Operator *op, OperatorMaterialData *mater
     PetscCallCEED(CeedOperatorGetFieldByName(source_op, "mannings_s", &field));  // FIXME: only valid for SWE
     PetscCallCEED(CeedOperatorFieldGetVector(field, &material_data->mannings.ceed.vec));
   } else {
-<<<<<<< HEAD
-    material_data->mannings.petsc.vec = rdy->petsc.sources;  // FIXME: incorrect!
-=======
     material_data->mannings.petsc.vec = op->petsc.sources;  // FIXME: incorrect!
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -901,11 +879,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
       break;
   }
 
-<<<<<<< HEAD
-  if (CeedEnabled(material_data->rdy)) {
-=======
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     // if this is the first update, get access to the vector's data
     if (!vector_data.updated) {
       PetscCallCEED(CeedVectorGetArray(vector_data.ceed.vec, CEED_MEM_HOST, &vector_data.ceed.data));
@@ -915,11 +889,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
     CeedScalar *values = vector_data.ceed.data;
 
     // set the values
-<<<<<<< HEAD
-    for (CeedInt i = 0; i < material_data->rdy->mesh.num_owned_cells; ++i) {
-=======
     for (CeedInt i = 0; i < material_data->op->mesh->num_owned_cells; ++i) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
       values[i] = material_values[i];
     }
   } else {
@@ -931,11 +901,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
 
     // set the values
     PetscReal *m = vector_data.petsc.data;
-<<<<<<< HEAD
-    for (PetscInt i = 0; i < material_data->rdy->mesh.num_owned_cells; ++i) {
-=======
     for (PetscInt i = 0; i < material_data->op->mesh->num_owned_cells; ++i) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
       m[i] = material_values[i];
     }
   }
@@ -943,12 +909,6 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-<<<<<<< HEAD
-PetscErrorCode RestoreOperatorMaterialData(RDy rdy, OperatorMaterialData *material_data) {
-  PetscFunctionBegin;
-  PetscCheck(rdy == material_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator material data: wrong RDy");
-  if (CeedEnabled(material_data->rdy)) {
-=======
 PetscErrorCode RestoreOperatorMaterialData(Operator *op, OperatorMaterialData *material_data) {
   PetscFunctionBegin;
 
@@ -957,7 +917,6 @@ PetscErrorCode RestoreOperatorMaterialData(Operator *op, OperatorMaterialData *m
   PetscCheck(op == material_data->op, comm, PETSC_ERR_USER, "Could not restore operator material data: wrong operator");
 
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     if (material_data->mannings.updated) {
       PetscCallCEED(CeedVectorRestoreArray(material_data->mannings.ceed.vec, &material_data->mannings.ceed.data));
     }
@@ -966,25 +925,6 @@ PetscErrorCode RestoreOperatorMaterialData(Operator *op, OperatorMaterialData *m
       PetscCall(VecRestoreArray(material_data->mannings.petsc.vec, &material_data->mannings.petsc.data));
     }
   }
-<<<<<<< HEAD
-  material_data->rdy->lock.material_data = NULL;
-  *material_data                         = (OperatorMaterialData){0};
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode GetOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData *flux_div_data) {
-  PetscFunctionBegin;
-  *flux_div_data = (OperatorFluxDivergenceData){0};
-  PetscCheck(!rdy->lock.flux_div_data, rdy->comm, PETSC_ERR_USER, "Could not acquire lock on flux divergence data -- another entity has access");
-  rdy->lock.flux_div_data = flux_div_data;
-  flux_div_data->rdy      = rdy;
-  PetscCall(VecGetBlockSize(rdy->u_global, &flux_div_data->num_components));
-
-  if (CeedEnabled(rdy)) {
-    // NOTE: our SWE-specific source operator has only one sub operator
-    CeedOperator *sub_ops;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
-=======
   material_data->op->lock.material_data = NULL;
   *material_data                        = (OperatorMaterialData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1006,7 +946,6 @@ PetscErrorCode GetOperatorFluxDivergenceData(Operator *op, OperatorFluxDivergenc
     // NOTE: our SWE-specific source operator has only one sub operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source_operator, &sub_ops));
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     CeedOperator source_op = sub_ops[0];
 
     // fetch the relevant vector
@@ -1025,11 +964,7 @@ PetscErrorCode GetOperatorFluxDivergenceData(Operator *op, OperatorFluxDivergenc
 PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_div_data, PetscInt component, PetscReal *flux_div_values) {
   PetscFunctionBegin;
 
-<<<<<<< HEAD
-  if (CeedEnabled(flux_div_data->rdy)) {
-=======
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     // if this is the first update, get access to the vector's data
     if (!flux_div_data->storage.updated) {
       PetscCallCEED(CeedVectorGetArray(flux_div_data->storage.ceed.vec, CEED_MEM_HOST, &flux_div_data->storage.ceed.data));
@@ -1041,11 +976,7 @@ PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_
     *((CeedScalar **)&values) = flux_div_data->storage.ceed.data;
 
     // set the values
-<<<<<<< HEAD
-    for (CeedInt i = 0; i < flux_div_data->rdy->mesh.num_owned_cells; ++i) {
-=======
     for (CeedInt i = 0; i < flux_div_data->op->mesh->num_owned_cells; ++i) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
       values[i][component] = flux_div_values[i];
     }
   } else {
@@ -1057,11 +988,7 @@ PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_
 
     // set the values
     PetscReal *div_f = flux_div_data->storage.petsc.data;
-<<<<<<< HEAD
-    for (PetscInt i = 0; i < flux_div_data->rdy->mesh.num_owned_cells; ++i) {
-=======
     for (PetscInt i = 0; i < flux_div_data->op->mesh->num_owned_cells; ++i) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
       div_f[i * flux_div_data->num_components + component] = flux_div_values[i];
     }
   }
@@ -1069,12 +996,6 @@ PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-<<<<<<< HEAD
-PetscErrorCode RestoreOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData *flux_div_data) {
-  PetscFunctionBegin;
-  PetscCheck(rdy == flux_div_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator flux divergence data: wrong RDy");
-  if (CeedEnabled(flux_div_data->rdy)) {
-=======
 PetscErrorCode RestoreOperatorFluxDivergenceData(Operator *op, OperatorFluxDivergenceData *flux_div_data) {
   PetscFunctionBegin;
 
@@ -1083,7 +1004,6 @@ PetscErrorCode RestoreOperatorFluxDivergenceData(Operator *op, OperatorFluxDiver
   PetscCheck(op == flux_div_data->op, comm, PETSC_ERR_USER, "Could not restore operator flux divergence data: wrong operator");
 
   if (CeedEnabled()) {
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
     if (flux_div_data->storage.updated) {
       PetscCallCEED(CeedVectorRestoreArray(flux_div_data->storage.ceed.vec, &flux_div_data->storage.ceed.data));
     }
@@ -1092,13 +1012,8 @@ PetscErrorCode RestoreOperatorFluxDivergenceData(Operator *op, OperatorFluxDiver
       PetscCall(VecRestoreArray(flux_div_data->storage.petsc.vec, &flux_div_data->storage.petsc.data));
     }
   }
-<<<<<<< HEAD
-  flux_div_data->rdy->lock.flux_div_data = NULL;
-  *flux_div_data                         = (OperatorFluxDivergenceData){0};
-=======
   flux_div_data->op->lock.flux_div_data = NULL;
   *flux_div_data                        = (OperatorFluxDivergenceData){0};
->>>>>>> f21b28e (Intermediate commit -- some deep surgery.)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

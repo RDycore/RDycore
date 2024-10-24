@@ -4,7 +4,7 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
-#include <private/rdyoperatorimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
@@ -856,6 +856,15 @@ static PetscErrorCode InitSourceConditions(RDy rdy) {
       }
     }
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// initializes operators for physics specified in the input configuration
+PetscErrorCode InitOperator(RDy rdy) {
+  PetscFunctionBegin;
+
+  // just pass the call along for now
+  InitSWEOperator(rdy);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -971,8 +980,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing operators...");
-  PetscCall(InitOperators(rdy));
+  RDyLogDebug(rdy, "Initializing operator...");
+  PetscCall(InitOperator(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));

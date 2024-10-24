@@ -205,7 +205,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   PetscCall(RDyDestroyVectors(rdy));
 
-  PetscCall(DestroyOperators(*rdy));
+  PetscCall(DestroyOperator(&(*rdy)->operator));
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));

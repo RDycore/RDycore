@@ -28,17 +28,11 @@ typedef struct {
   PetscReal           tiny_h;  // minimum water height
 } PetscRiemannDataSWE;
 
-PETSC_INTERN PetscErrorCode InitSWE(RDy);
-
 PETSC_INTERN PetscErrorCode CreateSWESection(RDy, PetscSection *);
 
-PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary *, RDyCondition *, PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
-PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);
-
-PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial *, PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator, PetscReal);
-PETSC_INTERN PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode CreateSWEOperator(RDy, Operator *);
+PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(Operator *, RDyBoundary, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode SWESourceOperatorGetRiemannFlux(Operator *, CeedOperatorField *);
 
 PETSC_INTERN PetscErrorCode RiemannDataSWECreate(PetscInt, RiemannDataSWE *);
 PETSC_INTERN PetscErrorCode RiemannDataSWEDestroy(RiemannDataSWE);

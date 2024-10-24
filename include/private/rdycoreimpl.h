@@ -196,6 +196,9 @@ PETSC_INTERN PetscErrorCode RDyDestroyRegions(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyMaterials(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyBoundaries(RDy *);
 
+// configuration-specific operator initialization
+PETSC_INTERN PetscErrorCode InitOperator(RDy);
+
 // output functions
 PETSC_INTERN PetscErrorCode GetOutputDirectory(RDy, char dir[PETSC_MAX_PATH_LEN]);
 PETSC_INTERN PetscErrorCode GenerateIndexedFilename(const char *, const char *, PetscInt, PetscInt, const char *, char *);
