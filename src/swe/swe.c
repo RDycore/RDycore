@@ -19,11 +19,12 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F);
 // Debugging diagnostics
 //-----------------------
 
-// MPI datatype corresponding to CourantNumberDiagnostics. Created during InitSWE.
+// MPI datatype corresponding to CourantNumberDiagnostics. Created during
+// CreateSWEOperator.
 static MPI_Datatype courant_num_diags_type;
 
 // MPI operator used to determine the prevailing diagnostics for the maximum
-// courant number on all processes. Created during InitSWE.
+// courant number on all processes. Created during CreateSWEOperator.
 static MPI_Op courant_num_diags_op;
 
 // function backing the above MPI operator
@@ -45,7 +46,7 @@ static void DestroyCourantNumberDiagnostics(void) {
   MPI_Type_free(&courant_num_diags_type);
 }
 
-// this function is called by InitSWE to initialize the above type(s) and op(s).
+// this function is called by InitSWEOpeⅹator to initialize the above globals
 static PetscErrorCode InitMPITypesAndOps(void) {
   PetscFunctionBegin;
 
@@ -77,7 +78,7 @@ static PetscErrorCode InitMPITypesAndOps(void) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
+static PetscErrorCode SWERHSFunction(TS, PetscReal, Vec, Vec, void *);
 
 // create solvers and vectors
 static PetscErrorCode CreateSolvers(RDy rdy) {
@@ -105,7 +106,7 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
-  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, RHSFunctionSWE, rdy));
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, SWERHSFunction, rdy));
 
   if (!rdy->config.time.adaptive.enable) {
     PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
@@ -125,15 +126,9 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 // create flux and source operators
 static PetscErrorCode CreateOperators(RDy rdy) {
   PetscFunctionBegin;
-  if (CeedEnabled(rdy)) {
-    RDyLogDebug(rdy, "Setting up CEED Operators...");
-
-    // create the operators themselves
-    PetscCall(CreateSWEFluxOperator(rdy->ceed.context, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                    rdy->config.physics.flow.tiny_h, &rdy->ceed.flux_operator));
-
-    PetscCall(CreateSWESourceOperator(rdy->ceed.context, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
-                                      &rdy->ceed.source_operator));
+  if (CeedEnabled()) {
+    RDyLogDebug(rdy, "Setting up CEED implementation...");
+    PetscCall(CreateSWEOperator(rdy));
 
     // create associated vectors for storage
     int num_comp = 3;
@@ -474,7 +469,7 @@ PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
 //  U   - the solution vector at time t
 //  F   - the right hand side vector to be evaluated at time t
 //  ctx - a generic pointer to our RDy object
-PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+PetscErrorCode SWERHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   PetscFunctionBegin;
 
   RDy rdy = ctx;

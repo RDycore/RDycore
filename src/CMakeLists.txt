@@ -10,7 +10,7 @@ add_library(rdycore
   rdymms.c
   rdysetup.c
   operator.c
-  swe/physics_swe.c
+  swe/swe.c
   swe/swe_petsc.c
   swe/swe_ceed.c
   time_series.c

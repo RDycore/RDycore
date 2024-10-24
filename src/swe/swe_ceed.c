@@ -40,12 +40,14 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, PetscReal tiny_h, CeedOperator *flux_op) {
+static PetscErrorCode CreateSWEInteriorFluxSubOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   CeedInt   num_comp = 3;
   RDyCells *cells    = &mesh->cells;
   RDyEdges *edges    = &mesh->edges;
+
+  Ceed ceed = CeedContext();
 
   CeedQFunction qf;
   CeedInt       num_comp_geom = 4, num_comp_cnum = 2;
@@ -156,9 +158,11 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
-                                                 CeedOperator *flux_op) {
+static PetscErrorCode CreateSWEBoundaryFluxSubOperator(RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
+                                                       CeedOperator *flux_op) {
   PetscFunctionBeginUser;
+
+  Ceed ceed = CeedContext();
 
   CeedInt   num_comp = 3;
   RDyCells *cells    = &mesh->cells;
@@ -306,62 +310,13 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-// Creates a flux operator for the shallow water equations that produces
-// solutions to the related riemann problem for cells separated by edges on the
-// given computational mesh. The resulting operator can be manipulated by
-// libCEED calls.
-// @param [in]  ceed The Ceed context used to create the operator
-// @param [in]  mesh The computational mesh for which the operator is created
-// @param [in]  num_boundaries The number of boundaries (disjoint edge sets) on the mesh
-// @param [in]  boundaries An array of disjoint edge sets representing mesh boundaries
-// @param [in]  boundary_conditions An array of metadata defining boundary conditions the operator will enforce
-// @param [in]  tiny_h the minimum height threshold for water flow
-// @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions,
-                                     PetscReal tiny_h, CeedOperator *flux_op) {
-  PetscFunctionBeginUser;
-
-  // create a composite operator consisting of interior and boundary flux
-  // operators
-  PetscCallCEED(CeedCompositeOperatorCreate(ceed, flux_op));
-
-  CeedOperator interior_op;
-  PetscCall(CreateInteriorFluxOperator(ceed, mesh, tiny_h, &interior_op));
-  PetscCallCEED(CeedCompositeOperatorAddSub(*flux_op, interior_op));
-  PetscCallCEED(CeedOperatorDestroy(&interior_op));
-
-  for (CeedInt b = 0; b < num_boundaries; b++) {
-    CeedOperator boundary_op;
-    RDyBoundary  boundary           = boundaries[b];
-    RDyCondition boundary_condition = boundary_conditions[b];
-    PetscCall(CreateBoundaryFluxOperator(ceed, mesh, boundary, boundary_condition, tiny_h, &boundary_op));
-    PetscCallCEED(CeedCompositeOperatorAddSub(*flux_op, boundary_op));
-    PetscCallCEED(CeedOperatorDestroy(&boundary_op));
-  }
-
-  if (0) PetscCallCEED(CeedOperatorView(*flux_op, stdout));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// updates the time step used by the SWE flux operator
-PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator flux_op, PetscReal dt) {
-  PetscFunctionBeginUser;
-
-  CeedContextFieldLabel label;
-  PetscCallCEED(CeedOperatorGetContextFieldLabel(flux_op, "time step", &label));
-  PetscCallCEED(CeedOperatorSetContextDouble(flux_op, label, &dt));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
 // Gets the field representing the boundary flux for the given boundary.
-PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
+PetscErrorCode SWEOperatorGetBoundaryFlux(Operator *op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
   PetscFunctionBeginUser;
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(flux_op, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux_operator, &sub_ops));
   CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
 
   // fetch the field
@@ -379,11 +334,11 @@ PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary 
 // @param [in]  materials_by_cell An array of RDyMaterials defining cellwise material properties
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
-PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial *materials_by_cell, PetscReal tiny_h,
-                                       CeedOperator *source_op) {
+PetscErrorCode CreateSWESourceOperator(RDyMesh *mesh, PetscInt num_cells, RDyMaterial *materials_by_cell, PetscReal tiny_h, CeedOperator *source_op) {
   PetscFunctionBeginUser;
 
-  PetscCallCEED(CeedCompositeOperatorCreate(ceed, source_op));
+  Ceed ceed = CeedContext();
+
   CeedInt   num_comp = 3;
   RDyCells *cells    = &mesh->cells;
 
@@ -473,16 +428,13 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     }
 
     {
-      CeedOperator op;
-      PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, &op));
-      PetscCallCEED(CeedOperatorSetField(op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-      PetscCallCEED(CeedOperatorSetField(op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
-      PetscCallCEED(CeedOperatorSetField(op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n));
-      PetscCallCEED(CeedOperatorSetField(op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf));
-      PetscCallCEED(CeedOperatorSetField(op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-      PetscCallCEED(CeedOperatorSetField(op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-      PetscCallCEED(CeedCompositeOperatorAddSub(*source_op, op));
-      PetscCallCEED(CeedOperatorDestroy(&op));
+      PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, source_op));
+      PetscCallCEED(CeedOperatorSetField(*source_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
+      PetscCallCEED(CeedOperatorSetField(*source_op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
+      PetscCallCEED(CeedOperatorSetField(*source_op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n));
+      PetscCallCEED(CeedOperatorSetField(*source_op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf));
+      PetscCallCEED(CeedOperatorSetField(*source_op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+      PetscCallCEED(CeedOperatorSetField(*source_op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
     }
     PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
     PetscCallCEED(CeedElemRestrictionDestroy(&restrict_mannings_n));
@@ -491,35 +443,51 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
     PetscCallCEED(CeedVectorDestroy(&geom));
   }
 
-  if (0) PetscCallCEED(CeedOperatorView(*source_op, stdout));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// updates the time step used by the SWE source operator
-PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator source_op, PetscReal dt) {
-  PetscFunctionBeginUser;
-
-  CeedContextFieldLabel label;
-  PetscCallCEED(CeedOperatorGetContextFieldLabel(source_op, "time step", &label));
-  PetscCallCEED(CeedOperatorSetContextDouble(source_op, label, &dt));
-
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 // Given a shallow water equations source operator created by
 // CreateSWESourceOperator, fetches the field representing the Riemann flux.
-PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {
+PetscErrorCode SWESourceOperatorGetRiemannFlux(Operator *op, CeedOperatorField *riemann_flux_field) {
   PetscFunctionBeginUser;
 
   // get the source sub-operator responsible for the water source (the first one)
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(source_op, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source_operator, &sub_ops));
   CeedOperator riemannf_source_op = sub_ops[0];
 
   // fetch the field
   PetscCallCEED(CeedOperatorGetFieldByName(riemannf_source_op, "riemannf", riemann_flux_field));
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
+
+PetscErrorCode CreateSWEOperator(RDy rdy) {
+  PetscFunctionBegin;
+
+  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+
+  PetscInt num_comp = 3;
+  PetscCall(CreateCeedOperator(rdy->dm, &rdy->mesh, num_comp, rdy->num_boundaries, rdy->boundaries, &rdy->operator));
+
+  CeedOperator interior_flux_op;
+  PetscCall(CreateSWEInteriorFluxSubOperator(&rdy->mesh, tiny_h, &interior_flux_op));
+  if (0) PetscCallCEED(CeedOperatorView(interior_flux_op, stdout));
+  PetscCall(AddCeedInteriorFluxSubOperator(&rdy->operator, interior_flux_op));
+
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    CeedOperator boundary_flux_op;
+    RDyBoundary  boundary           = rdy->boundaries[b];
+    RDyCondition boundary_condition = rdy->boundary_conditions[b];
+    PetscCall(CreateSWEBoundaryFluxSubOperator(&rdy->mesh, boundary, boundary_condition, tiny_h, &boundary_flux_op));
+    if (0) PetscCallCEED(CeedOperatorView(boundary_flux_op, stdout));
+    PetscCall(AddCeedBoundaryFluxSubOperator(&rdy->operator, b, boundary_flux_op));
+  }
+
+  CeedOperator source_op;
+  PetscCall(CreateSWESourceOperator(&rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, tiny_h, &source_op));
+  PetscCall(AddCeedSourceSubOperator(&rdy->operator, source_op));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 #pragma GCC diagnostic   pop

@@ -6,7 +6,7 @@
 #include <private/rdyboundaryimpl.h>
 #include <private/rdymeshimpl.h>
 
-// CEdD initialization, availability, context, useful for creating CEED
+// CEED initialization, availability, context, useful for creating CEED
 // sub-operators
 PETSC_INTERN PetscErrorCode SetCeedResource(char *);
 PETSC_INTERN PetscBool      CeedEnabled(void);
@@ -14,10 +14,6 @@ PETSC_INTERN Ceed           CeedContext(void);
 
 // creation of sections for configuration-specific physics
 PETSC_INTERN PetscErrorCode CreateSection(RDy, PetscSection *);
-
-// initialization/finalization functions
-PETSC_INTERN PetscErrorCode InitOperators(RDy);
-PETSC_INTERN PetscErrorCode DestroyOperators(RDy);
 
 //-------------
 // RDyOperator
@@ -76,9 +72,12 @@ typedef struct {
 } Operator;
 
 PETSC_INTERN PetscErrorCode CreateCeedOperator(DM, RDyMesh *, PetscInt, PetscInt, RDyBoundary *, Operator *);
-PETSC_INTERN PetscErrorCode AddCeedInteriorFluxOperator(Operator *, CeedOperator);
-PETSC_INTERN PetscErrorCode AddCeedBoundaryFluxOperator(Operator *, PetscInt, CeedOperator);
-PETSC_INTERN PetscErrorCode AddCeedSourceOperator(Operator *, CeedOperator);
+PETSC_INTERN PetscErrorCode AddCeedInteriorFluxSubOperator(Operator *, CeedOperator);
+PETSC_INTERN PetscErrorCode GetCeedInteriorFluxSubOperator(Operator *, CeedOperator *);
+PETSC_INTERN PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *, PetscInt, CeedOperator);
+PETSC_INTERN PetscErrorCode GetCeedBoundaryFluxSubOperator(Operator *, PetscInt, CeedOperator *);
+PETSC_INTERN PetscErrorCode AddCeedSourceSubOperator(Operator *, CeedOperator);
+PETSC_INTERN PetscErrorCode GetCeedSourceSubOperator(Operator *, CeedOperator *);
 
 PETSC_INTERN PetscErrorCode CreatePetscOperator(DM, RDyMesh *, PetscInt, PetscInt, RDyBoundary *, Operator *);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator *);
