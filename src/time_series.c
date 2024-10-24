@@ -160,6 +160,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   // flux data itself (mass, x-momentum, y-momentum, edge x normal, edge y normal)
   // (add a padding byte to the end to prevent a 0-length VLA in case we don't
   // have any local boundary edges)
+  // FIXME: this is SWE-dependent, and should be generalized to num_data = num_comp + 2
   PetscInt   num_data = 5;
   PetscReal *local_flux_data;
   PetscCall(PetscCalloc1(num_data * num_local_edges + 1, &local_flux_data));

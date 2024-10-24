@@ -538,7 +538,7 @@ static PetscErrorCode UpdateLocalCourantDiagnostics(Operator *op, CourantNumberD
 }
 
 // FIXME: this is here to support our janky E3SM boundary edge flux coupling;
-// FIXME: there's probably a better way to do this
+// FIXME: we should move this to a regular PETSc Vec and hook it up to OperatorBoundaryData
 extern PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *, PetscInt, PetscInt, RDyBoundary *, PetscBool, PetscReal, Operator *);
 
 PetscErrorCode CreateCeedSWEOperator(RDy rdy, Operator *operator) {
@@ -573,7 +573,7 @@ PetscErrorCode CreateCeedSWEOperator(RDy rdy, Operator *operator) {
   PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_cells * num_comp, &operator->ceed.rhs));
   PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_owned_cells * num_comp, &operator->ceed.sources));
 
-  // FIXME: I'm not sure what to thing of this vvv
+  // FIXME: boundary fluxes should be stored in a PETSc vector and hooked up to OperatorBoundaryData
   PetscBool ceed_enabled = PETSC_TRUE;
   PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, tiny_h, operator));
 
