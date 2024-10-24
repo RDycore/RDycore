@@ -14,6 +14,28 @@ PetscBool CeedEnabled(void) { return (ceed_resource[0]) ? PETSC_TRUE : PETSC_FAL
 /// returns PETSC_TRUE
 Ceed CeedContext(void) { return ceed_context; }
 
+/// retrieves the appropriate PETSc Vec type for the selected CEED backend
+PetscErrorCode GetCeedVecType(VecType *vec_type) {
+  PetscFunctionBegin;
+
+  CeedMemType mem_type_backend;
+  PetscCallCEED(CeedGetPreferredMemType(ceed_context, &mem_type_backend));
+  switch (mem_type_backend) {
+    case CEED_MEM_HOST:
+      *vec_type = VECSTANDARD;
+      break;
+    case CEED_MEM_DEVICE: {
+      const char *resolved;
+      PetscCallCEED(CeedGetResource(ceed_context, &resolved));
+      if (strstr(resolved, "/gpu/cuda")) *vec_type = VECCUDA;
+      else if (strstr(resolved, "/gpu/hip")) *vec_type = VECKOKKOS;
+      else if (strstr(resolved, "/gpu/sycl")) *vec_type = VECKOKKOS;
+      else *vec_type = VECSTANDARD;
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Sets the CEED resource string to the given string, initializing the global
 /// CEED context if the argument is specified. If CEED has already been enabled
 /// with a different resource, a call to this function deletes the global
@@ -407,6 +429,7 @@ PetscErrorCode DestroyOperator(Operator *op) {
   PetscBool ceed_enabled = CeedEnabled();
 
   if (op->petsc.context) {
+    // FIXME: SWE-specific logic!
     PetscCall(DestroyPetscSWEFlux(op->petsc.context, ceed_enabled, op->num_boundaries));
   }
 
@@ -521,7 +544,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec du
     // 1. Get the CeedVector associated with the "riemannf" CeedOperatorField
     CeedOperatorField riemannf_field;
     CeedVector        riemannf_ceed;
-    SWESourceOperatorGetRiemannFlux(op->ceed.source_operator, &riemannf_field);
+    SWESourceOperatorGetRiemannFlux(op, &riemannf_field);
     PetscCallCEED(CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed));
 
     PetscScalar *u_ptr, *f, *flux_divergences;
@@ -564,14 +587,9 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec du
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// Applies the given operator to the local solution vector at the given time,
 /// computing and storing its time derivative.
-/// \param [inout] rdy  the dycore
+/// \param [inout] op   the operator
 /// \param [in]    t    the time at which the operator is applied
 /// \param [in]    u    the local solution vector
 /// \param [out]   dudt the locally right hand side storing the computed time derivative of u
@@ -580,7 +598,31 @@ PetscErrorCode ApplyOperator(Operator *op, PetscReal t, Vec u, Vec dudt) {
   if (CeedEnabled()) {
     PetscCall(ApplyCeedOperator(op, t, u, dudt));
   } else {
-    PetscCall(ApplyPetscOperator(op, t, u, dudt));
+    PetscCall(op->petsc.apply(op->petsc.rdy, t, u, dudt));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// FIXME: these support the courant number diagnostics below, but we need to
+// FIXME: generalize
+extern PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, MPI_Comm comm,
+                                               PetscReal *max_courant_number);
+extern PetscErrorCode PetscFindMaxCourantNumber(RDy rdy, PetscReal *max_courant_number);
+
+/// Retrieves the maximum Courant number computed by the operator in its last
+/// application.
+/// \param [inout] op                 the operator
+/// \param [out]   max_courant_number the maximum Courant number computed
+PetscErrorCode GetOperatorMaxCourantNumber(Operator *op, PetscReal *max_courant_number) {
+  PetscFunctionBegin;
+  // FIXME: this is hardwired to SWE at the moment
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  if (CeedEnabled()) {
+    PetscCall(CeedFindMaxCourantNumber(op->ceed.flux_operator, op->mesh, op->num_boundaries, op->boundaries, comm, max_courant_number));
+  } else {
+    PetscCall(PetscFindMaxCourantNumber(op->petsc.rdy, max_courant_number));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -647,7 +689,8 @@ PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, Pe
       boundary_data->storage.updated = PETSC_TRUE;
     }
 
-    /* FIXME: eventually, we can have something like this vvv
+    /* FIXME: eventually, we can have something like this vvv, but for now we're
+     * FIXME: SWE-specific
     // set the data
     PetscReal *u = boundary_data->storage.petsc.data;
     for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
@@ -691,7 +734,7 @@ PetscErrorCode RestoreOperatorBoundaryData(Operator *op, RDyBoundary boundary, O
       PetscCallCEED(CeedVectorRestoreArray(boundary_data->storage.ceed.vec, &boundary_data->storage.ceed.data));
     }
   } else {
-    /* FIXME: soon we can have this vvv
+    /* FIXME: soon we can have this vvv, but for now we're SWE-specific
        if (boundary_data->storage.updated) {
        PetscCall(VecRestoreArray(boundary_data->storage.petsc.vec, &boundary_data->storage.petsc.data));
        }

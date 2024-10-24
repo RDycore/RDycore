@@ -11,6 +11,7 @@
 PETSC_INTERN PetscErrorCode SetCeedResource(char *);
 PETSC_INTERN PetscBool      CeedEnabled(void);
 PETSC_INTERN Ceed           CeedContext(void);
+PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
 
 // creation of sections for configuration-specific physics
 PETSC_INTERN PetscErrorCode CreateSection(RDy, PetscSection *);
@@ -57,8 +58,10 @@ typedef struct {
       CeedScalar dt;  // time step associated with operator
     } ceed;
     struct {
-      void *context;  // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
-      Vec   sources;  // source-sink vector
+      RDy rdy;                                            // here because our PETSc impl uses lots of things (FIXME)
+      PetscErrorCode (*apply)(RDy, PetscReal, Vec, Vec);  // apply() function
+      void *context;                                      // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
+      Vec   sources;                                      // source-sink vector
     } petsc;
   };
 
@@ -84,6 +87,7 @@ PETSC_INTERN PetscErrorCode DestroyOperator(Operator *);
 
 PETSC_INTERN PetscErrorCode SetOperatorTimeStep(Operator *, PetscReal);
 PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
+PETSC_INTERN PetscErrorCode GetOperatorMaxCourantNumber(Operator *, PetscReal *);
 
 //----------------------
 // Operator Data Access

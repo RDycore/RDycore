@@ -122,7 +122,7 @@ PetscErrorCode OverrideParameters(RDy rdy) {
   PetscOptionsEnd();
 
   // enable CEED as needed
-  PetscCall(EnableCeedResource(ceed_resource));
+  PetscCall(SetCeedResource(ceed_resource));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -845,12 +845,126 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// This is the right-hand-side function used by our timestepping solver for
+// the shallow water equations.
+// Parameters:
+//  ts  - the solver
+//  t   - the simulation time [seconds]
+//  U   - the solution vector at time t
+//  F   - the right hand side vector to be evaluated at time t
+//  ctx - a generic pointer to our RDy object
+static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+  DM  dm  = rdy->dm;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(VecZeroEntries(F));
+
+  // populate the local U vector
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+
+  // get courant number diagnostics
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  courant_num_diags->max_courant_num          = 0.0;
+
+  // compute the right hand side
+  PetscCall(SetOperatorTimeStep(&rdy->operator, dt));
+  PetscCall(ApplyOperator(&rdy->operator, t, U, F));
+
+  if (0) {
+    PetscInt nstep;
+    PetscCall(TSGetStepNumber(ts, &nstep));
+
+    char file[PETSC_MAX_PATH_LEN];
+    if (CeedEnabled()) {
+      sprintf(file, "F_ceed_nstep%" PetscInt_FMT "_N%d.bin", nstep, rdy->nproc);
+    } else {
+      sprintf(file, "F_petsc_nstep%" PetscInt_FMT "_N%d.bin", nstep, rdy->nproc);
+    }
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
+    PetscCall(VecView(F, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
+
+  // if debug-level logging is enabled, find the latest global maximum Courant number
+  // and log it.
+  if (rdy->config.logging.level >= LOG_DEBUG) {
+    CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+    PetscCall(GetOperatorMaxCourantNumber(&rdy->operator, & courant_num_diags->max_courant_num));
+    courant_num_diags->is_set = PETSC_TRUE;
+
+    PetscReal time;
+    PetscInt  stepnum;
+    PetscCall(TSGetTime(ts, &time));
+    PetscCall(TSGetStepNumber(ts, &stepnum));
+    const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
+                courant_num_diags->max_courant_num);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// create solvers
+static PetscErrorCode CreateSolver(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt n_dof;
+  PetscCall(VecGetSize(rdy->u_global, &n_dof));
+
+  // set up a TS solver
+  PetscCall(TSCreate(rdy->comm, &rdy->ts));
+  PetscCall(TSSetProblemType(rdy->ts, TS_NONLINEAR));
+  switch (rdy->config.numerics.temporal) {
+    case TEMPORAL_EULER:
+      PetscCall(TSSetType(rdy->ts, TSEULER));
+      break;
+    case TEMPORAL_RK4:
+      PetscCall(TSSetType(rdy->ts, TSRK));
+      PetscCall(TSRKSetType(rdy->ts, TSRK4));
+      break;
+    case TEMPORAL_BEULER:
+      PetscCall(TSSetType(rdy->ts, TSBEULER));
+      break;
+  }
+  PetscCall(TSSetDM(rdy->ts, rdy->dm));
+  PetscCall(TSSetApplicationContext(rdy->ts, rdy));
+
+  if (!rdy->config.time.adaptive.enable) {
+    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
+  }
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+
+  // apply any solver-related options supplied on the command line
+  PetscCall(TSSetFromOptions(rdy->ts));
+  PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
+
+  // set the function that evaluates the RHS for the solver
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, RHSFunction, rdy));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // initializes operators for physics specified in the input configuration
 PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionBegin;
 
-  // just pass the call along for now
-  InitSWEOperator(rdy);
+  // we only support SWE at the moment
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCall(InitSWE(rdy));
+
+  PetscCall(CreateSolver(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

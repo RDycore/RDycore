@@ -249,18 +249,22 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// FIXME: for SWE-specific boundary flux retrieval
+extern PetscErrorCode SWEOperatorGetBoundaryFlux(Operator *, RDyBoundary, CeedOperatorField *);
+
 // fetches boundary fluxes from the CEED (SWE) flux operator
 static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscRiemannDataSWE *data_swe = rdy->petsc.context;
+  PetscRiemannDataSWE *data_swe = rdy->operator.petsc.context;
 
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary boundary = rdy->boundaries[b];
 
     // fetch the flux accumulation field for this boundary
+    // FIXME: SWE-specific!
     CeedOperatorField bflux;
-    PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed.flux_operator, boundary, &bflux));
+    PetscCall(SWEOperatorGetBoundaryFlux(&rdy->operator, boundary, &bflux));
 
     // get the vector storing the boundary data and make it available on the host
     CeedVector bflux_vec;
@@ -295,7 +299,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
     // if we're using CEED, we need to fetch the boundary fluxes from the
     // flux operator
-    if (CeedEnabled(rdy)) {
+    if (CeedEnabled()) {
       FetchCeedBoundaryFluxes(rdy);
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
