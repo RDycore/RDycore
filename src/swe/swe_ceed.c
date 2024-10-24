@@ -461,6 +461,97 @@ PetscErrorCode SWESourceOperatorGetRiemannFlux(Operator *op, CeedOperatorField *
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
+static PetscErrorCode UpdateLocalCourantNumberForInternalEdges(Operator *op, CourantNumberDiagnostics *diags) {
+  PetscFunctionBegin;
+
+  CeedOperator interior_flux_op;
+  PetscCall(GetCeedInteriorFluxSubOperator(op, &interior_flux_op));
+
+  // fetch the field
+  CeedOperatorField courant_num;
+  PetscCallCEED(CeedOperatorGetFieldByName(interior_flux_op, "courant_number", &courant_num));
+
+  CeedVector courant_num_vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+
+  CeedScalar(*courant_num_data)[2];  // values to the left/right of an edge
+  PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+
+  RDyEdges *edges       = &op->mesh->edges;
+  RDyCells *cells       = &op->mesh->cells;
+  PetscInt  iedge_owned = 0;
+  for (PetscInt ii = 0; ii < op->mesh->num_internal_edges; ii++) {
+    if (edges->is_owned[ii]) {
+      CeedScalar local_max = fmax(courant_num_data[iedge_owned][0], courant_num_data[iedge_owned][1]);
+      if (local_max > diags->max_courant_num) {
+        diags->max_courant_num = local_max;
+        diags->global_edge_id  = edges->global_ids[ii];
+        diags->global_cell_id  = cells->global_ids[edges->cell_ids[2 * ii]];
+      }
+      iedge_owned++;
+    }
+  }
+  PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode UpdateLocalCourantNumberForBoundaryEdges(Operator *op, CourantNumberDiagnostics *diags) {
+  PetscFunctionBegin;
+
+  // loop over all boundaries
+  for (PetscInt b = 0; b < op->num_boundaries; ++b) {
+    RDyBoundary boundary = op->boundaries[b];
+
+    CeedOperator boundary_flux_op;
+    PetscCall(GetCeedBoundaryFluxSubOperator(op, boundary, &boundary_flux_op));
+
+    // fetch the field
+    CeedOperatorField courant_num;
+    PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "courant_number", &courant_num));
+
+    // get access to the data
+    CeedVector courant_num_vec;
+    PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+    CeedScalar(*courant_num_data)[1];
+    PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+
+    // find the maximum value
+    RDyEdges *edges = &op->mesh->edges;
+    RDyCells *cells = &op->mesh->cells;
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      CeedScalar local_max = courant_num_data[e][0];
+      if (local_max > diags->max_courant_num) {
+        diags->max_courant_num = local_max;
+        PetscInt edge_id       = boundary.edge_ids[e];
+        diags->global_edge_id  = edges->global_ids[edge_id];
+        diags->global_cell_id  = cells->global_ids[edges->cell_ids[2 * edge_id]];
+      }
+    }
+
+    // restores the pointer
+    PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Finds the global maximum Courant number across all internal and boundary edges.
+/// @param [in] op_edges A CeedOperator object for edges
+/// @param [in] num_boundaries Total number of boundaries
+/// @param [in] boundaries A RDyBoundary object
+/// @param [in] comm A MPI_Comm object
+/// @param [out] *max_courant_number Global maximum value of courant number
+/// @return 0 on sucess, or a non-zero error code on failure
+static PetscErrorCode UpdateLocalCourantDiagnostics(Operator *op, CourantNumberDiagnostics *diags) {
+  PetscFunctionBegin;
+
+  PetscCall(UpdateLocalCourantNumberForInternalEdges(op, diags));
+  PetscCall(UpdateLocalCourantNumberForBoundaryEdges(op, diags));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // FIXME: this is here to support our janky E3SM boundary edge flux coupling;
 // FIXME: there's probably a better way to do this
 extern PetscErrorCode CreatePetscSWEFluxForBoundaryEdges(RDyEdges *, PetscInt, PetscInt, RDyBoundary *, PetscBool, PetscReal, Operator *);
@@ -484,7 +575,7 @@ PetscErrorCode CreateCeedSWEOperator(RDy rdy, Operator *operator) {
     RDyCondition boundary_condition = rdy->boundary_conditions[b];
     PetscCall(CreateSWEBoundaryFluxSubOperator(&rdy->mesh, boundary, boundary_condition, tiny_h, &boundary_flux_op));
     if (0) PetscCallCEED(CeedOperatorView(boundary_flux_op, stdout));
-    PetscCall(AddCeedBoundaryFluxSubOperator(operator, b, boundary_flux_op));
+    PetscCall(AddCeedBoundaryFluxSubOperator(operator, boundary, boundary_flux_op));
   }
 
   CeedOperator source_op;
@@ -500,6 +591,8 @@ PetscErrorCode CreateCeedSWEOperator(RDy rdy, Operator *operator) {
   // FIXME: I'm not sure what to thing of this vvv
   PetscBool ceed_enabled = PETSC_TRUE;
   PetscCall(CreatePetscSWEFluxForBoundaryEdges(&rdy->mesh.edges, num_comp, rdy->num_boundaries, rdy->boundaries, ceed_enabled, tiny_h, operator));
+
+  operator->update_local_courant_diags = UpdateLocalCourantDiagnostics;
 
   // reset the operator's time step size
   operator->ceed.dt = 0.0;

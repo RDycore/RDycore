@@ -9,75 +9,6 @@
 
 extern PetscLogEvent RDY_CeedOperatorApply;
 
-// these functions are implemented in swe_petsc.c
-PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
-PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagnostics *courant_num_diags);
-PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy);
-PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F);
-
-//-----------------------
-// Debugging diagnostics
-//-----------------------
-
-// MPI datatype corresponding to CourantNumberDiagnostics. Created during
-// CreateSWEOperator.
-static MPI_Datatype courant_num_diags_type;
-
-// MPI operator used to determine the prevailing diagnostics for the maximum
-// courant number on all processes. Created during CreateSWEOperator.
-static MPI_Op courant_num_diags_op;
-
-// function backing the above MPI operator
-static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
-  CourantNumberDiagnostics *in_diags     = in_vec;
-  CourantNumberDiagnostics *result_diags = result_vec;
-
-  // select the item with the maximum courant number
-  for (int i = 0; i < *len; ++i) {
-    if (in_diags[i].max_courant_num > result_diags[i].max_courant_num) {
-      result_diags[i] = in_diags[i];
-    }
-  }
-}
-
-// this function destroys the MPI type and operator associated with CourantNumberDiagnostics
-static void DestroyCourantNumberDiagnostics(void) {
-  MPI_Op_free(&courant_num_diags_op);
-  MPI_Type_free(&courant_num_diags_type);
-}
-
-// this function is called by InitSWEOpeⅹator to initialize the above globals
-static PetscErrorCode InitMPITypesAndOps(void) {
-  PetscFunctionBegin;
-
-  static PetscBool initialized = PETSC_FALSE;
-
-  if (!initialized) {
-    // create an MPI data type for the CourantNumberDiagnostics struct
-    const int      num_blocks             = 4;
-    const int      block_lengths[4]       = {1, 1, 1, 1};
-    const MPI_Aint block_displacements[4] = {
-        offsetof(CourantNumberDiagnostics, max_courant_num),
-        offsetof(CourantNumberDiagnostics, global_edge_id),
-        offsetof(CourantNumberDiagnostics, global_cell_id),
-        offsetof(CourantNumberDiagnostics, is_set),
-    };
-    MPI_Datatype block_types[4] = {MPIU_REAL, MPI_INT, MPI_INT, MPIU_BOOL};
-    MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
-    MPI_Type_commit(&courant_num_diags_type);
-
-    // create a corresponding reduction operator for the new type
-    MPI_Op_create(FindCourantNumberDiagnostics, 1, &courant_num_diags_op);
-
-    // make sure the operator and the type are destroyed upon exit
-    PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
-
-    initialized = PETSC_TRUE;
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 // create flux and source operators
 static PetscErrorCode CreateOperator(RDy rdy, Operator *operator) {
   PetscFunctionBegin;
@@ -135,10 +66,6 @@ PetscErrorCode CreateSWESection(RDy rdy, PetscSection *section) {
 PetscErrorCode InitSWE(RDy rdy) {
   PetscFunctionBeginUser;
 
-  // set up MPI types and operators used by SWE physics
-  PetscCall(InitMPITypesAndOps());
-
-  // sets up solvers, operators, all that stuff
   PetscCall(CreateOperator(rdy, &rdy->operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
