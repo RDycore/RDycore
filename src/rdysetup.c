@@ -845,8 +845,9 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// This is the right-hand-side function used by our timestepping solver for
-// the shallow water equations.
+// This is the right-hand-side function used by our timestepping solver. It
+// relies on the selected operator for all specific physics.
+//
 // Parameters:
 //  ts  - the solver
 //  t   - the simulation time [seconds]
@@ -861,6 +862,7 @@ static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
 
   PetscScalar dt;
   PetscCall(TSGetTimeStep(ts, &dt));
+  PetscCall(SetOperatorTimeStep(&rdy->operator, dt));
 
   PetscCall(VecZeroEntries(F));
 
@@ -873,9 +875,9 @@ static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   courant_num_diags->max_courant_num          = 0.0;
 
   // compute the right hand side
-  PetscCall(SetOperatorTimeStep(&rdy->operator, dt));
   PetscCall(ApplyOperator(&rdy->operator, t, U, F));
 
+  // write out F if needed
   if (0) {
     PetscInt nstep;
     PetscCall(TSGetStepNumber(ts, &nstep));
@@ -956,7 +958,7 @@ static PetscErrorCode CreateSolver(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// initializes operators for physics specified in the input configuration
+// initializes an operator for physics specified in the input configuration
 PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionBegin;
 
