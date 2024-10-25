@@ -227,6 +227,7 @@ static const cyaml_schema_field_t output_time_series_fields_schema[] = {
 
 // mapping of output fields to members of RDyOutputSection
 static const cyaml_schema_field_t output_fields_schema[] = {
+    CYAML_FIELD_STRING("directory", CYAML_FLAG_OPTIONAL, RDyOutputSection, directory, 0),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_INT("step_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, step_interval),
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
@@ -736,6 +737,8 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
   SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.coupling_interval, INVALID_REAL);
+
+  if (!config->output.directory[0]) strcpy(config->output.directory, "output");
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

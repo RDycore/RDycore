@@ -156,14 +156,15 @@ typedef struct {
 
 // all output parameters
 typedef struct {
-  PetscBool       enable;            // true if output is requested
-  RDyOutputFormat format;            // file format
-  PetscInt        step_interval;     // output interval [steps between outputs]
-  PetscInt        time_interval;     // temporal interval at which output is written
-  RDyTimeUnit     time_unit;         // unit of time for temporal interval
-  PetscInt        batch_size;        // number of timesteps per output file (if available)
-  RDyTimeSeries   time_series;       // time series appended to text (.dat) files
-  PetscReal       prev_output_time;  // previous time at which output was written
+  PetscBool       enable;                         // true if output is requested
+  char            directory[PETSC_MAX_PATH_LEN];  // output directory
+  RDyOutputFormat format;                         // file format
+  PetscInt        step_interval;                  // output interval [steps between outputs]
+  PetscInt        time_interval;                  // temporal interval at which output is written
+  RDyTimeUnit     time_unit;                      // unit of time for temporal interval
+  PetscInt        batch_size;                     // number of timesteps per output file (if available)
+  RDyTimeSeries   time_series;                    // time series appended to text (.dat) files
+  PetscReal       prev_output_time;               // previous time at which output was written
 } RDyOutputSection;
 
 // ------------

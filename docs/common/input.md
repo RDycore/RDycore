@@ -400,6 +400,7 @@ RDycore. The parameters that define these discretizations are
 
 ```yaml
 output:
+  directory: output
   format: xdmf
   step_interval: 100
   batch_size: 1
@@ -410,6 +411,7 @@ output:
 The `output` section control simulation output, including visualization and
 time series data (and excluding checkpoint data). Relevant parameters are
 
+* `directory`: the name of the directory to which output is written. It can be a relative or absolute path, and is created if it doesn't already exist. Default value: `output`
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
     * `binary`: output is written using PETSc's binary data format
