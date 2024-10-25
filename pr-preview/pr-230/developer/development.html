@@ -1,0 +1,1458 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../common/installation.html">
+      
+      
+        <link rel="next" href="organization.html">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.42">
+    
+    
+      
+        <title>Development Process - RDycore: A River / Flooding dynamical core for E3SM</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.0253249f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rdycore-development-process" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RDycore: A River / Flooding dynamical core for E3SM
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Development Process
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RDycore: A River / Flooding dynamical core for E3SM
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/input.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    YAML Input Specification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/mms.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MMS Driver
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    RDycore Example Cases
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            RDycore Example Cases
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/dam-break/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Idealized dam break problem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5_3" id="__nav_2_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Hurricane Harvey
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            Hurricane Harvey
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    With MRMS rainfall and outflow BC
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    With average rainfall and ocean BC
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    E3SM-RDycore Example Cases
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            E3SM-RDycore Example Cases
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hurricane Harvey
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Developer Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Developer Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Development Process
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="development.html" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Development Process
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#git-code-repository-and-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Git Code Repository and Workflow
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Git Code Repository and Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keep-it-short-and-simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      Keep it short and simple!
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#third-party-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Third-Party Libraries
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cmake-build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake Build System
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CMake Build System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cmake-targets-and-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake targets and dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modern-cmake" class="md-nav__link">
+    <span class="md-ellipsis">
+      "Modern CMake"
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ctest-automated-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      CTest Automated Testing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#github-continuous-integration-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      GitHub Continuous Integration Environment
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="organization.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Code Structure and Organization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="style.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Style Guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tools.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer Tools
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ceed.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    SWE implementation using libCEED
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Theory Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Theory Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/swe.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shallow Water Equations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/sediment.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sediment Transport
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#git-code-repository-and-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Git Code Repository and Workflow
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Git Code Repository and Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keep-it-short-and-simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      Keep it short and simple!
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#third-party-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Third-Party Libraries
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cmake-build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake Build System
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CMake Build System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cmake-targets-and-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake targets and dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modern-cmake" class="md-nav__link">
+    <span class="md-ellipsis">
+      "Modern CMake"
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ctest-automated-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      CTest Automated Testing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#github-continuous-integration-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      GitHub Continuous Integration Environment
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+<h1 id="rdycore-development-process">RDycore Development Process</h1>
+<p>Here we discuss the practices and tools used to develop RDycore. The RDycore
+team is a small interdisciplinary team, and our development process is tailored
+to its particular needs. These needs necessarily evolve over the lifecycle of
+the project, so this process is likely to change from time to time.</p>
+<p><em>There is no single process that works best in every situation.</em> This is as true
+for software development as it is for the approximations used in basic science
+and mathematical modeling, and for rules of engagement in all human activites.
+The working styles, expertise, and needs of individual team members determine
+the shape of the process that makes them most productive.</p>
+<h2 id="git-code-repository-and-workflow">Git Code Repository and Workflow</h2>
+<p>Like all E3SM "ecosystem" projects, RDycore stores its source code
+in a <a href="https://www.github.com/RDycore/RDycore">GitHub repository</a>. The
+<a href="https://www.github.com/RDycore">RDycore GitHub Organization</a> contains this
+and other repositories related to the project.</p>
+<p>We develop RDycore using the <a href="https://www.atlassian.com/git/tutorials/comparing-workflows/feature-branch-workflow">Git feature branch workflow</a>,
+which is among the more popular Git-based development methodologies. In this
+workflow:</p>
+<ul>
+<li>the <a href="https://github.com/RDycore/RDycore/tree/main">main branch</a> contains the
+  latest working code that has passed all tests and quality controls</li>
+<li>all work on any new feature or bugfix is performed by one or more team members
+  in a "feature branch" created from this main branch</li>
+<li>when work in a feature branch is finished and ready for incorporation into
+  the main branch, one of the participating team members creates a pull request
+  which, upon successful review, is merged to the <code>main</code> branch<ul>
+<li>each pull request to be merged with the <code>main</code> branch triggers a set of
+  automated tests that build RDycore, run its test suite, and perform some
+  basic quality checks (code formatting, test coverage, etc)</li>
+<li>one or more members of the RDycore team must be assigned to review the
+  code changes in the feature branch before it can be merged</li>
+<li>a code reviewer can ask questions about, request changes to, or approve
+  the code in the pull request</li>
+<li>at least one approval from a reviewer is required to merge the pull
+  request (which may or may not require conflicts to be resolved between
+  the feature branch and the <code>main</code> branch)</li>
+</ul>
+</li>
+</ul>
+<h3 id="keep-it-short-and-simple">Keep it short and simple!</h3>
+<p>Because long-lived feature branches are correlated with increasing numbers of
+merge conflicts and other inconsistent states within the repository, it is
+recommended that feature branches are <strong>short-lived</strong>, <strong>tightly-scoped</strong>, and
+merged in a timely fashion. Such branches are also much easier to review for
+errors and inconsistencies.</p>
+<p>Occasionally, it may be necessary to create a long-lived feature branch. Such a
+branch must be managed actively and carefully to accommodate the complexity it
+introduces to the development process. Reviewing a long-lived feature branch is
+a difficult and time-intensive process, so make sure you know what you're
+getting into if you think you need one.</p>
+<h2 id="third-party-libraries">Third-Party Libraries</h2>
+<p>RDycore relies on <a href="http://petsc.org/release">PETSc</a> for much of its
+functionality, including most of its third-party libraries such as NetCDF,
+HDF5, and Exodus. You can find details for installing the right version of
+PETSc with all the necessary third-party libraries in the <a href="../common/installation.html">installation guide</a>.</p>
+<p>Additionally, RDycore uses a few other libraries not available from PETSc:</p>
+<ul>
+<li><a href="https://github.com/tlsa/libcyaml">libcyaml</a> - A schema-based YAML parser we
+  use to parse RDycore's flexible and expressive <a href="../common/input.html">input format</a></li>
+<li><a href="https://pyyaml.org/wiki/LibYAML">libyaml</a> - the original C YAML parser, which
+  is used by <code>libcyaml</code> above</li>
+<li><a href="https://cmocka.org/">cmocka</a> - a C unit testing framework that we use for
+  testing some low-level features</li>
+</ul>
+<p>These libraries are imported into the RDycore repo as <a href="https://git-scm.com/book/en/v2/Git-Tools-Submodules">Git submodules</a>.
+Git submodules are like "repos within a repo", which is a half-baked concept
+that makes them tricky to use at times, but you won't spend much time thinking
+about them unless one of the above libraries is updated. Usually, all you have
+to do is type</p>
+<div class="highlight"><pre><span></span><code>git submodule update --init --recursive
+</code></pre></div>
+<p>from the top level of the RDycore source tree, which ensures that the submodules
+in your local Git workspace are consistent with the branch you're working in.</p>
+<h2 id="cmake-build-system">CMake Build System</h2>
+<p>Like all E3SM-related projects, RDycore uses <a href="https://cmake.org/">CMake</a> as a
+configuration/build system. CMake is the most common build system for C and C++
+projects. It can be very complicated if all of its features are used
+indiscriminately, and it's difficult even to understand all of its features.
+The RDycore project has tried to confine its CMake usage to the bare essentials,
+in the interest of creating a simple and reproducible build and development
+environment.</p>
+<p>Here we describe the basic structure of our CMake setup. For instructions on
+how to build RDycore using this build system, refer to the <a href="../common/installation.html">installation guide</a>.</p>
+<p>The build system is composed of a set of <code>CMakeLists.txt</code> files that define
+various parts of RDycore:</p>
+<ul>
+<li>The <code>CMakeLists.txt</code> file in the top-level source directory defines the
+  project and configures PETSc and compilers and refers to other directories
+  containing their own <code>CMakeLists.txt</code> files.</li>
+<li>The <code>external</code> directory has its own <code>CMakeLists.txt</code> file that builds the
+  third-party libraries that aren't available as part of PETSc's distribution.</li>
+<li>The <code>src</code> directory contains all the source files, and the <code>CMakeLists.txt</code>
+  therein builds the RDycore C library. A <code>tests</code> subdirectory has a <code>CMakeLists.txt</code>
+  file that defines unit tests for the library, and the <code>f90-mod</code> subdirectory
+  has one that builds the Fortran library.</li>
+<li>The <code>driver</code> directory contains source files for the C and Fortran standalone
+  driver programs and other developer tools, and the <code>CMakeLists.txt</code> file
+  defines their build configurations. A <code>tests</code> subdirectory defines several
+  tests for these drivers and tools.</li>
+<li>Various other directories have <code>CMakeLists.txt</code> files that perform tasks
+  related to their content.</li>
+</ul>
+<h3 id="cmake-targets-and-dependencies">CMake targets and dependencies</h3>
+<p>Like Make, CMake defines "targets" to build and expresses dependenceis between
+these targets to determine the order in which everything is built. For example,
+the RDycore standalone driver (represented by the <code>rdycore_exe</code> target defined
+in <a href="https://github.com/RDycore/RDycore/blob/main/driver/CMakeLists.txt">driver/CMakeLists.txt</a>)
+depends upon the RDycore C library (the <code>rdycore</code> target in <a href="https://github.com/RDycore/RDycore/blob/main/src/CMakeLists.txt">src/CMakeLists.txt</a>),
+so the <code>rydcore</code> target must be built before the <code>rdycore_exe</code> target.</p>
+<p>If you're curious about how CMake works in detail, Kitware has a <a href="https://cmake.org/cmake/help/latest/guide/tutorial/index.html">tutorial</a>
+on their CMake website.</p>
+<h3 id="modern-cmake">"Modern CMake"</h3>
+<p>You might hear a CMake enthusiast refer to "Modern CMake". This refers to the
+practice of setting build properties on specific targets (with commands like
+<a href="https://cmake.org/cmake/help/latest/command/target_include_directories.html">target_include_directories</a>
+and <a href="https://cmake.org/cmake/help/latest/command/target_link_libraries.html">target_link_libraries</a>)
+instead of setting these properties globally (with <a href="https://cmake.org/cmake/help/latest/command/include_directories.html">include_directories</a>
+and <a href="https://cmake.org/cmake/help/latest/command/link_libraries.html">link_libraries</a>).</p>
+<p>Using target-specific properties makes it easier to find issues with the build
+system. We adhere as much as possible to this practice in the development of
+RDycore.</p>
+<h2 id="ctest-automated-testing">CTest Automated Testing</h2>
+<p>The <code>CMakeLists.txt</code> files within the test-related directories (<a href="https://github.com/RDycore/RDycore/tree/main/src/tests">src/tests</a>
+and <a href="https://github.com/RDycore/RDycore/tree/main/driver/tests">driver/tests</a>
+define tests that are run when you type <code>make test</code>. These tests use <a href="https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html">CTest</a>,
+which is an automated testing system built into CMake. The link in the previous
+sentence is a good resource for learning about this testing system, but you can
+also just run <code>make test</code> after you've successfully built RDycore to see it in
+action. The results of this command (testing logs, lists of failed tests, etc)
+can be found in the <code>Testing/Temporary</code> folder within your build directory.</p>
+<h2 id="github-continuous-integration-environment">GitHub Continuous Integration Environment</h2>
+<p>Previously, we mentioned that any pull request for a feature branch to be merged
+to the <code>main</code> branch triggers an automated set of tests and quality checks.
+These tests and checks, which we refer to as RDycore's "continuous integration
+(CI) environment", are implemented using <a href="https://docs.github.com/en/actions">GitHub Actions</a>.</p>
+<p>"Github Actions" are sets of logic that does work on things in repositories.
+These Actions can be assembled into "GitHub Actions workflows" that perform tasks such as
+building RDycore or running unit tests. GitHub Actions workflows are triggered
+by events in a GitHub repository such as pull requests, merges, the creation of
+issues, etc. Each workflow can pass or fail, making it convenient to use them
+as criteria for accepting new code contributions.</p>
+<p>Each GitHub Actions workflow is defined by a YAML file placed in the <a href="https://github.com/RDycore/RDycore/tree/main/.github/workflows">.github/workflows</a>
+directory. The following workflows are defined for RDycore and are triggered by
+a pull request to the <code>main</code> branch:</p>
+<ul>
+<li><code>auto_test</code>: builds RDycore in a container in which PETSc is installed and
+  runs all of its unit tests, generating a code coverage reports. This workflow
+  fails if any of these operations cannot be completed successfully.</li>
+<li><code>clang-format-check</code>: checks C source code formatting on selected files,
+  failing if the code has not been formatted correctly. For information on
+  code formatting, see our <a href="style.html">style guide</a>.</li>
+<li><code>gh-pages</code>: publishes updated documentation generated by <a href="https://www.mkdocs.org/">mkdocs</a>
+  from Markdown files in the <code>docs</code> directory. The documentation is published to
+  RDycore's <a href="https://rdycore.github.io/RDycore/">GitHub Page</a>, and a preview is
+  generated on the pull request page for inspection prior to a merge.</li>
+</ul>
+<p>For details on the syntax of the YAML files used to define these workflows, see
+the <a href="https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions">GitHub Actions documentation</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
+      
+        <script src="../javascript/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
