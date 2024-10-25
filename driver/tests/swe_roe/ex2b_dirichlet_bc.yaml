@@ -16,6 +16,7 @@ time:
   max_step: 100
 
 output:
+  directory: dirichlet-bc-output
   format: xdmf
   step_interval: 100
   batch_size: 20

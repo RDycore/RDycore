@@ -10,16 +10,16 @@ extern PetscReal ConvertTimeToSeconds(PetscReal time, RDyTimeUnit time_unit);
 extern PetscReal ConvertTimeFromSeconds(PetscReal time, RDyTimeUnit time_unit);
 
 /// Returns the name of the output directory:
-/// * "output"                        (single-run mode)
-/// * "output/<ensemble-member-name>" (ensemble mode)
+/// * <output_dir>                         (single-run mode)
+/// * <output_dir>/<ensemble-member-name>" (ensemble mode)
 PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
   PetscFunctionBegin;
   static char output_dir[PETSC_MAX_PATH_LEN] = {0};
   if (!output_dir[0]) {
     if (rdy->config.ensemble.size > 1) {
-      sprintf(output_dir, "output/%s", rdy->config.ensemble.members[rdy->ensemble_member_index].name);
+      sprintf(output_dir, "%s/%s", rdy->config.output.directory, rdy->config.ensemble.members[rdy->ensemble_member_index].name);
     } else {
-      strcpy(output_dir, "output");
+      sprintf(output_dir, "%s", rdy->config.output.directory);
     }
   }
   strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);
@@ -51,9 +51,9 @@ static PetscErrorCode CreateOutputDirectory(RDy rdy) {
   PetscCall(GetOutputDirectory(rdy, output_dir));
   RDyLogDebug(rdy, "Creating output directory %s...", output_dir);
 
-  // create the output/ directory on global rank 0
+  // create the output directory on global rank 0
   if (rdy->config.ensemble.size > 1) {
-    PetscCall(CreateDirectory(rdy->global_comm, "output"));
+    PetscCall(CreateDirectory(rdy->global_comm, rdy->config.output.directory));
   }
   PetscCall(CreateDirectory(rdy->comm, output_dir));
   MPI_Barrier(rdy->global_comm);
