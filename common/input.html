@@ -1793,6 +1793,7 @@ RDycore. The parameters that define these discretizations are</p>
 </ul>
 <h2 id="output"><code>output</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">output</span>
 <span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xdmf</span>
 <span class="w">  </span><span class="nt">step_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
@@ -1802,6 +1803,7 @@ RDycore. The parameters that define these discretizations are</p>
 <p>The <code>output</code> section control simulation output, including visualization and
 time series data (and excluding checkpoint data). Relevant parameters are</p>
 <ul>
+<li><code>directory</code>: the name of the directory to which output is written. It can be a relative or absolute path, and is created if it doesn't already exist. Default value: <code>output</code></li>
 <li><code>format</code>: the format of the output written. Available options are<ul>
 <li><code>none</code>: no output is written. This is the default value.</li>
 <li><code>binary</code>: output is written using PETSc's binary data format</li>
