@@ -190,14 +190,5 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
-  // FIXME: tuck these away
-  if (CeedEnabled()) {
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->operator.ceed.flux_divergences));
-  } else {
-    // initialize the sources vector
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->operator.petsc.sources));
-    PetscCall(VecZeroEntries(rdy->operator.petsc.sources));
-  }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }

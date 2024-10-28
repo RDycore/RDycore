@@ -2,8 +2,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
-#include <stddef.h>  // for offsetof
-                     //
+
 // maximum length of the name of a prognostic or diagnostic field component
 #define MAX_COMP_NAME_LENGTH 20
 

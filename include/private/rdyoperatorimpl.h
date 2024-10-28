@@ -74,6 +74,8 @@ typedef struct Operator {
       PetscErrorCode (*apply)(RDy, PetscReal, Vec, Vec);  // apply() function
       void *context;                                      // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
       Vec   sources;                                      // source-sink vector
+      Vec  *boundary_values;                              // per-boundary Dirichlet values
+      Vec  *boundary_fluxes;                              // per-boundary fluxes for E3SM <-> RDycore coupling
     } petsc;
   };
 
@@ -150,6 +152,7 @@ typedef struct {
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(Operator *, RDyBoundary, OperatorBoundaryData *);
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode AddOperatorBoundaryFluxes(OperatorBoundaryData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(OperatorBoundaryData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(Operator *, RDyBoundary, OperatorBoundaryData *);
 

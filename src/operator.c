@@ -160,6 +160,28 @@ static PetscErrorCode CreateBasicOperator(DM dm, RDyMesh *mesh, PetscInt num_com
   op->num_boundaries = num_boundaries;
   op->boundaries     = boundaries;
 
+  // create vectors according to the selected implementation
+  if (CeedEnabled()) {
+    // PETSc Vec storing flux divergences
+    PetscCall(DMCreateGlobalVector(dm, &op->ceed.flux_divergences));
+  } else {
+    // source vector
+    PetscCall(DMCreateGlobalVector(dm, &op->petsc.sources));
+    PetscCall(VecZeroEntries(op->petsc.sources));
+
+    // boundary value and flux vectors (local data only)
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes));
+    for (PetscInt b = 0; b < num_boundaries; ++b) {
+      RDyBoundary boundary = boundaries[b];
+      PetscInt    size     = num_components * boundary.num_edges;
+      PetscCall(VecCreateSeq(PETSC_COMM_SELF, size, &op->petsc.boundary_values[b]));
+      PetscCall(VecCreateSeq(PETSC_COMM_SELF, size, &op->petsc.boundary_fluxes[b]));
+      PetscCall(VecZeroEntries(op->petsc.boundary_values[b]));
+      PetscCall(VecZeroEntries(op->petsc.boundary_fluxes[b]));
+    }
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -454,7 +476,7 @@ PetscErrorCode GetCeedSourceSubOperator(Operator *op, CeedOperator *source_op) {
   PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source_operator, &sub_operators));
 
   // FIXME: this assumes the existence of only 1 source sub-operator (not enforced!)
-  *source_op = sub_operators[1 + op->num_boundaries];
+  *source_op = sub_operators[0];
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -509,6 +531,12 @@ PetscErrorCode DestroyOperator(Operator *op) {
     PetscCallCEED(CeedVectorDestroy(&op->ceed.u_local));
     PetscCallCEED(CeedVectorDestroy(&op->ceed.rhs));
     PetscCallCEED(CeedVectorDestroy(&op->ceed.sources));
+  } else {
+    PetscCall(VecDestroy(&op->petsc.sources));
+    for (PetscInt b = 0; b < op->num_boundaries; ++b) {
+      PetscCall(VecDestroy(&op->petsc.boundary_values[b]));
+      PetscCall(VecDestroy(&op->petsc.boundary_fluxes[b]));
+    }
   }
 
   *op = (Operator){0};
@@ -748,6 +776,9 @@ PetscErrorCode GetOperatorBoundaryData(Operator *op, RDyBoundary boundary, Opera
 
     PetscCallCEED(CeedOperatorGetFieldByName(flux_op, "flux", &field));
     PetscCallCEED(CeedOperatorFieldGetVector(field, &boundary_data->fluxes.ceed.vec));
+  } else {
+    boundary_data->values.petsc.vec = op->petsc.boundary_values[boundary.index];
+    boundary_data->fluxes.petsc.vec = op->petsc.boundary_fluxes[boundary.index];
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -780,10 +811,8 @@ PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, Pe
       boundary_data->values.updated = PETSC_TRUE;
     }
 
-    /* FIXME: eventually, we can have something like this vvv, but for now we're
-     * FIXME: SWE-specific
-    // set the data
-    PetscReal *u = boundary_data->storage.petsc.data;
+    // set the boundary values
+    PetscReal *u = boundary_data->values.petsc.data;
     for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
       u[e * boundary_data->num_components + component] = boundary_values[e];
     }
@@ -811,13 +840,42 @@ PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, Pe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Copies boundary flux data for the selected component into the supplied
-/// array.
-/// NOTE: if you call this function, the subsequent call to RestoreOperatorBoundaryData()
-/// NOTE: will zero boundary fluxes.
+/// Accumulates boundary flux data in the supplied array for the selected
+/// component. NOTE: you should only need to call this for PETSc operator implementations
 /// @param [in]  boundary_data boundary data associated with a given operator/boundary
 /// @param [in]  component the component of interest
-/// @param [out] data      the array to which the flux (edge) data is copied
+/// @param [in]  fluxes      an array of boundary flux data to accumulate
+PetscErrorCode AddOperatorBoundaryFluxes(OperatorBoundaryData *boundary_data, PetscInt component, PetscReal *fluxes) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)boundary_data->op->dm, &comm));
+  PetscCheck(!CeedEnabled(), comm, PETSC_ERR_USER, "Call to AccumulateOperatorBoundaryFluxes prohibited for CEED operator implementations!");
+
+  // if this is the first fetch, get access to the vector's data and mark it
+  // to be zeroed upon restoration
+  if (!boundary_data->fluxes.updated) {
+    PetscCall(VecGetArray(boundary_data->fluxes.petsc.vec, &boundary_data->fluxes.petsc.data));
+    boundary_data->fluxes.updated = PETSC_TRUE;
+  }
+
+  PetscInt  num_comp = boundary_data->num_components;
+  RDyEdges *edges    = &boundary_data->op->mesh->edges;
+  for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
+    PetscInt  iedge    = boundary_data->boundary.edge_ids[e];
+    PetscInt  iflux    = num_comp * e + component;
+    PetscReal edge_len = edges->lengths[iedge];
+    boundary_data->fluxes.petsc.data[iflux] += edge_len * fluxes[e];
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Copies accumulated boundary flux data for the selected component into the
+/// supplied array, zeroing/resetting the accumulation
+/// @param [in]  boundary_data boundary data associated with a given operator/boundary
+/// @param [in]  component the component of interest
+/// @param [out] fluxes    the array to which the flux (edge) data is copied
 PetscErrorCode GetOperatorBoundaryFluxes(OperatorBoundaryData *boundary_data, PetscInt component, PetscReal *fluxes) {
   PetscFunctionBegin;
 
@@ -830,14 +888,27 @@ PetscErrorCode GetOperatorBoundaryFluxes(OperatorBoundaryData *boundary_data, Pe
     }
 
     // reshape for multicomponent access
-    CeedScalar(*bfluxes)[boundary_data->num_components];
-    *((CeedScalar **)&bfluxes) = boundary_data->fluxes.ceed.data;
+    CeedScalar(*boundary_fluxes)[boundary_data->num_components];
+    *((CeedScalar **)&boundary_fluxes) = boundary_data->fluxes.ceed.data;
 
+    // fetch boundary fluxes and zero them in the operator
     for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
-      fluxes[e] = bfluxes[component][e];
+      fluxes[e]                     = boundary_fluxes[component][e];
+      boundary_fluxes[component][e] = 0.0;
     }
   } else {
-    // FIXME: need to move some stuff here
+    if (!boundary_data->fluxes.updated) {
+      PetscCall(VecGetArray(boundary_data->fluxes.petsc.vec, &boundary_data->fluxes.petsc.data));
+      boundary_data->fluxes.updated = PETSC_TRUE;
+    }
+
+    // fetch boundary fluxes and zero them in the operator
+    PetscInt num_comp = boundary_data->num_components;
+    for (PetscInt e = 0; e < boundary_data->boundary.num_edges; ++e) {
+      PetscInt index                          = num_comp * e + component;
+      fluxes[e]                               = boundary_data->fluxes.petsc.data[index];
+      boundary_data->fluxes.petsc.data[index] = 0.0;
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -857,14 +928,11 @@ PetscErrorCode RestoreOperatorBoundaryData(Operator *op, RDyBoundary boundary, O
     }
     if (boundary_data->fluxes.updated) {
       PetscCallCEED(CeedVectorRestoreArray(boundary_data->fluxes.ceed.vec, &boundary_data->fluxes.ceed.data));
-      PetscCallCEED(CeedVectorSetValue(boundary_data->fluxes.ceed.vec, 0.0));  // reset flux accumulation
     }
   } else {
-    /* FIXME: soon we can have this vvv, but for now we're SWE-specific
-       if (boundary_data->storage.updated) {
-       PetscCall(VecRestoreArray(boundary_data->values.petsc.vec, &boundary_data->values.petsc.data));
-       }
-     */
+    if (boundary_data->values.updated) {
+      PetscCall(VecRestoreArray(boundary_data->values.petsc.vec, &boundary_data->values.petsc.data));
+    }
     RiemannDataSWE bdata;
     PetscCall(GetPetscSWEDirichletBoundaryValues(op->petsc.context, boundary.index, &bdata));
 
@@ -880,6 +948,11 @@ PetscErrorCode RestoreOperatorBoundaryData(Operator *op, RDyBoundary boundary, O
         bdata.u[e] = 0.0;
         bdata.v[e] = 0.0;
       }
+    }
+
+    // handle boundary fluxes
+    if (boundary_data->fluxes.updated) {
+      PetscCall(VecRestoreArray(boundary_data->fluxes.petsc.vec, &boundary_data->fluxes.petsc.data));
     }
   }
 

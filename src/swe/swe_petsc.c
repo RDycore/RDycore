@@ -431,6 +431,9 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
   PetscCheck(rdy->config.numerics.riemann == RIEMANN_ROE, rdy->comm, PETSC_ERR_USER, "Invalid Riemann solver selected! (Only roe is supported)");
   PetscCall(ComputeRoeFlux(boundary.num_edges, datal, datar, sn, cn, flux_vec_bnd, amax_vec_bnd));
 
+  OperatorBoundaryData boundary_data;
+  PetscCall(GetOperatorBoundaryData(&rdy->operator, boundary, &boundary_data));
+
   // Save the flux values in the Vec based by TS
   PetscInt ndof      = 3;
   PetscInt num_edges = boundary.num_edges;
@@ -452,6 +455,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
           courant_num_diags->global_cell_id  = cells->global_ids[icell];
         }
 
+        // evaluate the RHS contribution
         PetscInt idx = cells->local_to_owned[icell];
         for (PetscInt idof = 0; idof < ndof; idof++) {
           F[ndof * idx + idof] += flux_vec_bnd[e * ndof + idof] * (-edge_len / cell_area);
@@ -460,7 +464,19 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
     }
   }
 
-  PetscCall(AccumulateBoundaryFluxes(rdy, boundary, num_edges, ndof, flux_vec_bnd));
+  // accumulate boundary fluxes for E3SM coupling
+  PetscReal *boundary_fluxes;
+  PetscCall(PetscCalloc1(boundary.num_edges, &boundary_fluxes));
+  for (PetscInt comp = 0; comp < ndof; ++comp) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      PetscInt  iedge    = boundary.edge_ids[e];
+      PetscReal edge_len = edges->lengths[iedge];
+      boundary_fluxes[e] = flux_vec_bnd[e * ndof + comp] * edge_len;
+    }
+    PetscCall(AddOperatorBoundaryFluxes(&boundary_data, comp, boundary_fluxes));
+  }
+  PetscFree(boundary_fluxes);
+  PetscCall(RestoreOperatorBoundaryData(&rdy->operator, boundary, &boundary_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -760,8 +776,7 @@ PetscErrorCode CreatePetscSWEOperator(RDy rdy, Operator *operator) {
   // operator keeps everything up to date
   operator->update_local_courant_diags = NULL;
 
-  // allocate storage for our PETSc implementation of the  flux and
-  // source terms
+  // allocate storage for our PETSc implementation of the flux and source terms
   RDyLogDebug(rdy, "Allocating PETSc data structures for fluxes and sources...");
   int       num_comp     = 3;
   PetscBool ceed_enabled = PETSC_FALSE;
