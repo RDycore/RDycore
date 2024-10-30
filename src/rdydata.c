@@ -314,6 +314,13 @@ static PetscErrorCode RDyGetIDimCentroidOfBoundaryEdgeOrCell(RDy rdy, const Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyGetBoundaryID(RDy rdy, const PetscInt boundary_index, PetscInt *id) {
+  PetscFunctionBegin;
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  *id = rdy->boundaries[boundary_index].id;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetBoundaryEdgeXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_TRUE;
