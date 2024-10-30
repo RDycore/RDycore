@@ -115,7 +115,8 @@ typedef enum {
   CONDITION_DIRICHLET = 0,    // Dirichlet condition (value is specified)
   CONDITION_NEUMANN,          // Neumann condition (derivative is specified)
   CONDITION_REFLECTING,       // Reflecting condition
-  CONDITION_CRITICAL_OUTFLOW  // Critical flow
+  CONDITION_CRITICAL_OUTFLOW, // Critical flow
+  CONDITION_RUNOFF            // Runoff that is a source to the dh/dt equation
 } RDyConditionType;
 
 #endif
