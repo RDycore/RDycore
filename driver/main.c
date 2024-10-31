@@ -1254,20 +1254,28 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
     case UNSET:
       break;
     case CONSTANT:
-      PetscCall(SetConstantRainfall(rain_dataset->constant.rate, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetConstantRainfall(rain_dataset->constant.rate, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case HOMOGENEOUS:
-      PetscCall(SetHomogeneousData(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetHomogeneousData(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case RASTER:
-      PetscCall(SetRasterData(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetRasterData(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case UNSTRUCTURED:
-      PetscCall(SetUnstructuredData(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetUnstructuredData(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case MULTI_HOMOGENEOUS:
       MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
@@ -1374,15 +1382,19 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
       PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend ApplyBoundaryCondition for boundary condition of type CONSTANT");
       break;
     case HOMOGENEOUS:
-      PetscCall(SetHomogeneousBoundary(&bc_dataset->homogeneous, time, bc_dataset->ndata / 3, bc_dataset->data_for_rdycore));
-      PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
+      if (bc_dataset->ndata) {
+        PetscCall(SetHomogeneousBoundary(&bc_dataset->homogeneous, time, bc_dataset->ndata / 3, bc_dataset->data_for_rdycore));
+        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
+      }
       break;
     case RASTER:
       PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend ApplyBoundaryCondition for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
-      PetscCall(SetUnstructuredData(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
-      PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
+      if (bc_dataset->ndata) {
+        PetscCall(SetUnstructuredData(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
+        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
+      }
       break;
     case MULTI_HOMOGENEOUS:
       MultiHomogeneousDataset *multi_hdata = &bc_dataset->multihomogeneous;
@@ -1391,8 +1403,10 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
         PetscInt bc_idx   = multi_hdata->dirichlet_bc_idx[ibc];
         PetscInt nedges   = multi_hdata->ndata_for_rdycore[ibc] / 3;
 
-        PetscCall(SetHomogeneousBoundary(&multi_hdata->data[data_idx], time, nedges, multi_hdata->data_for_rdycore[ibc]));
-        PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, multi_hdata->data_for_rdycore[ibc]));
+        if (nedges) {
+          PetscCall(SetHomogeneousBoundary(&multi_hdata->data[data_idx], time, nedges, multi_hdata->data_for_rdycore[ibc]));
+          PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, multi_hdata->data_for_rdycore[ibc]));
+        }
       }
       break;
   }
