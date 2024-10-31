@@ -102,6 +102,7 @@ PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt
 
 PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, PetscReal values);
 PETSC_EXTERN PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal *values);

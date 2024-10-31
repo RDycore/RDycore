@@ -43,6 +43,14 @@ static PetscErrorCode CheckBoundaryNumEdges(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
+  PetscFunctionBegin;
+  PetscCheck(region_index <= rdy->num_regions, rdy->comm, PETSC_ERR_USER,
+             "Region index (%" PetscInt_FMT ") exceeds the max number of regions (%" PetscInt_FMT ")", region_index, rdy->num_regions);
+  PetscCheck(region_index >= 0, rdy->comm, PETSC_ERR_USER, "Region index (%" PetscInt_FMT ") cannot be less than zero.", region_index);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
   PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
@@ -178,6 +186,32 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
   PetscCall(CheckNumLocalCells(rdy, size));
   PetscInt idof = 2;
   PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, PetscReal value) {
+  PetscFunctionBegin;
+  PetscCall(CheckRegionIndex(rdy, region_idx));
+
+  RDyRegion region = rdy->regions[region_idx];
+
+  if (region.num_cells) {
+    PetscReal *source_values;
+    PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &source_values));
+
+    RDyMesh  *mesh  = &rdy->mesh;
+    RDyCells *cells = &mesh->cells;
+
+    for (PetscInt c = 0; c < region.num_cells; c++) {
+      PetscInt cell_id = region.cell_ids[c];
+      if (cells->is_local[cell_id]) source_values[cell_id] = value;
+    }
+
+    PetscCall(RDySetWaterSourceForLocalCells(rdy, rdy->mesh.num_owned_cells, source_values));
+
+    PetscCall(PetscFree(source_values));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

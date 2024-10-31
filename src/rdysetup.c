@@ -849,31 +849,14 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
 static PetscErrorCode InitSourceConditions(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscReal *source_values;
-  PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &source_values));
-
-  PetscInt src_defined = PETSC_FALSE;
-
-  for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; c++) source_values[c] = 0.0;
-
   for (PetscInt r = 0; r < rdy->num_regions; r++) {
-    RDyCondition src    = rdy->sources[r];
-    RDyRegion    region = rdy->regions[r];
+    RDyCondition src = rdy->sources[r];
 
     if (src.is_defined) {
-      src_defined                = PETSC_TRUE;
       RDyFlowCondition *flow_src = src.flow;
-
-      for (PetscInt c = 0; c < region.num_cells; ++c) {
-        PetscInt cell_id       = region.cell_ids[c];
-        source_values[cell_id] = mupEval(flow_src->value);
-      }
+      PetscCall(RDySetWaterSourceForRegion(rdy, r, mupEval(flow_src->value)));
     }
   }
-
-  if (src_defined) PetscCall(RDySetWaterSourceForLocalCells(rdy, rdy->mesh.num_owned_cells, source_values));
-
-  PetscCall(PetscFree(source_values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

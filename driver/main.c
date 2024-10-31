@@ -82,17 +82,6 @@ typedef struct {
 } UnstructuredDataset;
 
 typedef struct {
-  DatasetType         type;
-  ConstantDataset     constant;      // spatio-temporally constant rainfall
-  HomogeneousDataset  homogeneous;   // spatially-constnat, temporally-varying rainfall
-  RasterDataset       raster;        // spatio-temporally varying rainfall in raster format
-  UnstructuredDataset unstructured;  // spatio-temporally varying rainfall in unstructured grid format
-
-  PetscInt   ndata;             // size of source-sink data for RDycore
-  PetscReal *data_for_rdycore;  // values of source-sink for RDycore
-} SourceSink;
-
-typedef struct {
   HomogeneousDataset *data;   // multiple spatially-homogeneous, temporally varying BCs
   PetscInt            ndata;  // number of multiple spatially-homogeneous datasets
   PetscInt           *region_ids;
@@ -108,9 +97,21 @@ typedef struct {
 
 typedef struct {
   DatasetType             type;
+  ConstantDataset         constant;          // spatio-temporally constant rainfall
+  HomogeneousDataset      homogeneous;       // spatially-constnat, temporally-varying rainfall
+  RasterDataset           raster;            // spatio-temporally varying rainfall in raster format
+  UnstructuredDataset     unstructured;      // spatio-temporally varying rainfall in unstructured grid format
+  MultiHomogeneousDataset multihomogeneous;  // multipile spatially-constnat, temporally-varying rainfall
+
+  PetscInt   ndata;             // size of source-sink data for RDycore
+  PetscReal *data_for_rdycore;  // values of source-sink for RDycore
+} SourceSink;
+
+typedef struct {
+  DatasetType             type;
   HomogeneousDataset      homogeneous;       // spatially-homogeneous, temporally-varying BC
   UnstructuredDataset     unstructured;      // spatio-temporally varying BC in unstructured grid format
-  MultiHomogeneousDataset multihomogeneous;  //
+  MultiHomogeneousDataset multihomogeneous;  // multipile spatially-constnat, temporally-varying BC
 
   PetscInt   ndata;             // size of boundary condition data for RDycore
   PetscInt   dirichlet_bc_idx;  // ID of the dirichlet BC in RDycore
@@ -555,7 +556,7 @@ static PetscErrorCode DoPreprocessForUnstructuredDataset(RDy rdy, BoundaryCondit
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPreprocessForMultiHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode DoPreprocessForBoundaryMultiHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -1006,6 +1007,39 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   }
 #undef NUM_UNSTRUCTURED_RAIN_DATE_VALUES
 
+#define MAX_DATASETS 20  // max number of homogeneous datasets specified via command line
+
+  char     *filenames[PETSC_MAX_PATH_LEN];
+  PetscInt  nfiles = MAX_DATASETS;
+  PetscBool multi_files_flag;
+
+  PetscCall(PetscOptionsGetStringArray(NULL, NULL, "-homogeneous_rain_files", filenames, &nfiles, &multi_files_flag));
+
+  PetscInt  region_ids[MAX_DATASETS];
+  PetscInt  nsources = MAX_DATASETS;
+  PetscBool multi_rainfall_flag;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-homogeneous_rain_region_ids", region_ids, &nsources, &multi_rainfall_flag));
+
+  PetscCheck(multi_files_flag == multi_rainfall_flag, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "Both -homogeneous_rain_files and -homogeneous_rain_region_ids need to specified");
+  if (multi_files_flag) {
+    PetscCheck(nfiles == nsources, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "The number of -homogeneous_rain_files and -homogeneous_rain_region_ids are not the same");
+    rain_dataset->type = MULTI_HOMOGENEOUS;
+    dataset_type_count++;
+
+    rain_dataset->multihomogeneous.ndata = nfiles;
+
+    PetscCall(PetscMalloc1(rain_dataset->multihomogeneous.ndata, &rain_dataset->multihomogeneous.data));
+    PetscCalloc1(rain_dataset->multihomogeneous.ndata, &rain_dataset->multihomogeneous.region_ids);
+
+    for (PetscInt ifile = 0; ifile < rain_dataset->multihomogeneous.ndata; ifile++) {
+      PetscCall(PetscStrcpy(rain_dataset->multihomogeneous.data[ifile].filename, filenames[ifile]));
+      rain_dataset->multihomogeneous.region_ids[ifile] = region_ids[ifile];
+    }
+  }
+#undef MAX_DATASETS
+
   PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
              "More than one rainfall cannot be specified. Rainfall types sepcified : Constat %d; Homogeneous %d; Raster %d; Unsturcutred %d",
              constant_rain_flag, homogeneous_rain_flag, raster_start_date_flag, unstructured_start_date_flag);
@@ -1093,9 +1127,8 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
 
 #define MAX_DATASETS 20  // max number of homogeneous datasets specified via command line
 
-  char    *filenames[PETSC_MAX_PATH_LEN];
-  PetscInt nfiles = MAX_DATASETS;
-  ;
+  char     *filenames[PETSC_MAX_PATH_LEN];
+  PetscInt  nfiles = MAX_DATASETS;
   PetscBool multi_files_flag;
 
   PetscCall(PetscOptionsGetStringArray(NULL, NULL, "-homogeneous_bc_files", filenames, &nfiles, &multi_files_flag));
@@ -1203,7 +1236,7 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       }
       break;
     case MULTI_HOMOGENEOUS:
-      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend CreateRainfallDataset for boundary condition of type RASTER");
+      PetscCall(OpenMultiHomogeneousDataset(&rain_dataset->multihomogeneous));
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1237,7 +1270,13 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       break;
     case MULTI_HOMOGENEOUS:
-      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend ApplyRainfallDataset for boundary condition of type RASTER");
+      MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
+      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
+        PetscInt  size = 1;
+        PetscReal data;
+        PetscCall(SetHomogeneousData(&multi_hdata->data[idata], time, size, &data));
+        PetscCall(RDySetWaterSourceForRegion(rdy, multi_hdata->region_ids[idata], data));
+      }
       break;
   }
 
@@ -1269,7 +1308,11 @@ PetscErrorCode DestroyRainfallDataset(SourceSink *rain_dataset) {
       PetscCall(DestroyUnstructuredDataset(&rain_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
-      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend DestroyRainfallDataset for boundary condition of type RASTER");
+      MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
+      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
+        PetscCall(DestroyHomogeneousDataset(&multi_hdata->data[idata]));
+      }
+      PetscCall(PetscFree(multi_hdata->data));
       break;
   }
 
@@ -1308,7 +1351,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
-      PetscCall(DoPreprocessForMultiHomogeneousDataset(rdy, bc_dataset));
+      PetscCall(DoPreprocessForBoundaryMultiHomogeneousDataset(rdy, bc_dataset));
       PetscCall(OpenMultiHomogeneousDataset(&bc_dataset->multihomogeneous));
       break;
   }
