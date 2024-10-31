@@ -598,40 +598,37 @@ static PetscErrorCode InitSources(RDy rdy) {
       RDyCondition *src              = &rdy->sources[r];
       RDyRegion     region           = rdy->regions[r];
       PetscInt      region_src_index = -1;
+
+      src->is_defined = PETSC_FALSE;
+
       for (PetscInt isrc = 0; isrc < rdy->config.num_sources; ++isrc) {
         if (!strcmp(rdy->config.sources[isrc].region, region.name)) {
           region_src_index = isrc;
           break;
         }
       }
+
       if (region_src_index != -1) {
+        src->is_defined = PETSC_TRUE;
+
         RDyRegionConditionSpec src_spec = rdy->config.sources[region_src_index];
+
         if (strlen(src_spec.flow)) {
           PetscInt flow_index;
           PetscCall(FindFlowCondition(rdy, src_spec.flow, &flow_index));
           PetscCheck(flow_index != -1, rdy->comm, PETSC_ERR_USER, "source flow condition '%s' for region '%s' was not found!", src_spec.flow,
                      region.name);
           RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
-          PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER, "flow source '%s' for region '%s' is not of dirichlet type!",
+          PetscCheck(flow_cond->type == CONDITION_RUNOFF, rdy->comm, PETSC_ERR_USER, "flow source '%s' for region '%s' is not of runoff type!",
                      flow_cond->name, region.name);
           src->flow = flow_cond;
         }
 
         if (rdy->config.physics.sediment && strlen(src_spec.sediment)) {
-          PetscInt sed_index;
-          PetscCall(FindSedimentCondition(rdy, src_spec.sediment, &sed_index));
-          RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
-          PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "sediment source '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
-          src->sediment = sed_cond;
+          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for sediments.");
         }
         if (rdy->config.physics.salinity && strlen(src_spec.salinity)) {
-          PetscInt sal_index;
-          PetscCall(FindSalinityCondition(rdy, src_spec.salinity, &sal_index));
-          RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
-          PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                     "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
-          src->salinity = sal_cond;
+          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for salinity.");
         }
       }
     }
@@ -846,6 +843,41 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Initializes the source term for the SWE solver
+/// @param rdy A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode InitSourceConditions(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscReal *source_values;
+  PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &source_values));
+
+  PetscInt src_defined = PETSC_FALSE;
+
+  for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; c++) source_values[c] = 0.0;
+
+  for (PetscInt r = 0; r < rdy->num_regions; r++) {
+    RDyCondition src    = rdy->sources[r];
+    RDyRegion    region = rdy->regions[r];
+
+    if (src.is_defined) {
+      src_defined                = PETSC_TRUE;
+      RDyFlowCondition *flow_src = src.flow;
+
+      for (PetscInt c = 0; c < region.num_cells; ++c) {
+        PetscInt cell_id       = region.cell_ids[c];
+        source_values[cell_id] = mupEval(flow_src->value);
+      }
+    }
+  }
+
+  if (src_defined) PetscCall(RDySetWaterSourceForLocalCells(rdy, rdy->mesh.num_owned_cells, source_values));
+
+  PetscCall(PetscFree(source_values));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // the name of the log file set by RDySetLogFile below
 static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 
@@ -962,6 +994,9 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));
+
+  // initialize the source terms
+  PetscCall(InitSourceConditions(rdy));
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
