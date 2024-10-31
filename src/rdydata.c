@@ -201,7 +201,7 @@ PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, Pe
 
     // get the values for source term associated with h component
     OperatorSourceData source_data;
-    PetscInt component = 0;
+    PetscInt           component = 0;
     PetscCall(GetOperatorSourceData(rdy, &source_data));
     PetscCall(GetOperatorSourceValues(&source_data, component, source_values));
     PetscCall(RestoreOperatorSourceData(rdy, &source_data));

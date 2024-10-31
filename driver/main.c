@@ -1275,7 +1275,7 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
         PetscInt  size = 1;
         PetscReal data;
         PetscCall(SetHomogeneousData(&multi_hdata->data[idata], time, size, &data));
-        PetscCall(RDySetWaterSourceForRegion(rdy, multi_hdata->region_ids[idata], data));
+        PetscCall(RDySetWaterSourceForRegion(rdy, multi_hdata->region_ids[idata] - 1, data));
       }
       break;
   }
