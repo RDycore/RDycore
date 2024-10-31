@@ -849,12 +849,14 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
 static PetscErrorCode InitSourceConditions(RDy rdy) {
   PetscFunctionBegin;
 
-  for (PetscInt r = 0; r < rdy->num_regions; r++) {
-    RDyCondition src = rdy->sources[r];
+  if (rdy->config.num_sources > 0) {
+    for (PetscInt r = 0; r < rdy->num_regions; r++) {
+      RDyCondition src = rdy->sources[r];
 
-    if (src.is_defined) {
-      RDyFlowCondition *flow_src = src.flow;
-      PetscCall(RDySetWaterSourceForRegion(rdy, r, mupEval(flow_src->value)));
+      if (src.is_defined) {
+        RDyFlowCondition *flow_src = src.flow;
+        PetscCall(RDySetWaterSourceForRegion(rdy, r, mupEval(flow_src->value)));
+      }
     }
   }
 
