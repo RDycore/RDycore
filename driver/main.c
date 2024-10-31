@@ -466,7 +466,7 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPreprocessForHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -497,7 +497,7 @@ static PetscErrorCode DoPreprocessForHomogeneousDataset(RDy rdy, BoundaryConditi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPreprocessForUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -525,7 +525,7 @@ static PetscErrorCode DoPreprocessForUnstructuredDataset(RDy rdy, BoundaryCondit
   bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
   PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
-  if (num_edges_dirc_bc > 0) {
+  if ((num_edges_dirc_bc > 0) & (num_edges_dirc_bc > 0)) {
     PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
 
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
@@ -556,7 +556,7 @@ static PetscErrorCode DoPreprocessForUnstructuredDataset(RDy rdy, BoundaryCondit
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPreprocessForBoundaryMultiHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -1340,19 +1340,19 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type CONSTANT");
       break;
     case HOMOGENEOUS:
-      PetscCall(DoPreprocessForHomogeneousDataset(rdy, bc_dataset));
       PetscCall(OpenHomogeneousDataset(&bc_dataset->homogeneous));
+      PetscCall(DoPostprocessForHomogeneousDataset(rdy, bc_dataset));
       break;
     case RASTER:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
-      PetscCall(DoPreprocessForUnstructuredDataset(rdy, bc_dataset));
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
+      PetscCall(DoPostprocessForUnstructuredDataset(rdy, bc_dataset));
       break;
     case MULTI_HOMOGENEOUS:
-      PetscCall(DoPreprocessForBoundaryMultiHomogeneousDataset(rdy, bc_dataset));
       PetscCall(OpenMultiHomogeneousDataset(&bc_dataset->multihomogeneous));
+      PetscCall(DoPostprocessForBoundaryMultiHomogeneousDataset(rdy, bc_dataset));
       break;
   }
 
