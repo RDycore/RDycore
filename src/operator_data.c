@@ -208,6 +208,42 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// sets values of the source term for the given component
+PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
+  PetscFunctionBegin;
+
+  if (CeedEnabled(source_data->rdy)) {
+    // if this is the first update, get access to the vector's data
+    if (!source_data->sources.updated) {
+      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
+      source_data->sources.updated = PETSC_TRUE;
+    }
+
+    // reshape for multicomponent access
+    CeedScalar(*values)[source_data->num_components];
+    *((CeedScalar **)&values) = source_data->sources.ceed.data;
+
+    // set the values
+    for (CeedInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
+      source_values[i] = values[i][component];
+    }
+  } else {
+    // if this is the first update, get access to the vector's data
+    if (!source_data->sources.updated) {
+      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
+      source_data->sources.updated = PETSC_TRUE;
+    }
+
+    // set the values
+    PetscReal *s = source_data->sources.petsc.data;
+    for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
+      source_values[i] = s[i * source_data->num_components + component];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RestoreOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
   PetscFunctionBegin;
   PetscCheck(rdy == source_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong RDy");

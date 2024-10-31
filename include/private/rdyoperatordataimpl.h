@@ -66,6 +66,7 @@ typedef struct {
 
 PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, OperatorSourceData *);
 PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode GetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(RDy, OperatorSourceData *);
 
 // This type allows the direct manipulation of operator material properties on

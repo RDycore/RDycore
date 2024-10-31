@@ -199,12 +199,22 @@ PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, Pe
     PetscReal *source_values;
     PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &source_values));
 
+    // get the values for source term associated with h component
+    OperatorSourceData source_data;
+    PetscInt component = 0;
+    PetscCall(GetOperatorSourceData(rdy, &source_data));
+    PetscCall(GetOperatorSourceValues(&source_data, component, source_values));
+    PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+
     RDyMesh  *mesh  = &rdy->mesh;
     RDyCells *cells = &mesh->cells;
 
+    // update the source term for the cells in the region that are local
     for (PetscInt c = 0; c < region.num_cells; c++) {
       PetscInt cell_id = region.cell_ids[c];
-      if (cells->is_local[cell_id]) source_values[cell_id] = value;
+      if (cells->is_local[cell_id]) {
+        source_values[cell_id] = value;
+      }
     }
 
     PetscCall(RDySetWaterSourceForLocalCells(rdy, rdy->mesh.num_owned_cells, source_values));
