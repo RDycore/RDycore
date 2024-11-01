@@ -1,0 +1,108 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses a file
+# to specify the initial conditions (and a corresponding Exodus mesh).
+
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  final_time       : 0.005
+  unit             : seconds
+  max_step         : 10
+  coupling_interval: 0.005
+
+output:
+  format: xdmf
+  step_interval: 1
+  batch_size: 20
+  time_series:
+    boundary_fluxes: 1
+
+grid:
+  file: quad_tri_mesh.exo
+
+# one region represents the whole domain
+regions:
+  - name: quad
+    grid_region_id: 1
+  - name: tri_1
+    grid_region_id: 2
+  - name: tri_2
+    grid_region_id: 3
+
+surface_composition:
+  - region: quad
+    material: smooth
+  - region: tri_1
+    material: smooth
+  - region: tri_2
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: quad
+    flow: domain_flow_ic
+  - region: tri_1
+    flow: domain_flow_ic
+  - region: tri_2
+    flow: domain_flow_ic
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    height: 3.0
+    x_momentum: 0
+    y_momentum: 0
+  - name: river_bc
+    type: dirichlet
+    height: 5
+    x_momentum: 0
+    y_momentum: 0
+  - name: outflow_bc
+    type: critical-outflow
+  - name: runoff_on_quads
+    type: runoff
+    value: 0.1
+  - name: placeholder_runoff
+    type: runoff
+    value: 0.0
+  - name: runoff_on_triangle
+    type: runoff
+    value: 0.0002
+
+boundaries:
+  - name: right
+    grid_boundary_id: 1
+  - name: left
+    grid_boundary_id: 2
+  - name: top
+    grid_boundary_id: 3
+  - name: bottom
+    grid_boundary_id: 4
+
+boundary_conditions:
+  - boundaries: [right, left, bottom]
+    flow: river_bc
+  - boundaries: [top]
+    flow: outflow_bc
+
+sources:
+  - region: quad
+    flow: placeholder_runoff
+  - region: tri_1
+    flow: runoff_on_triangle
+  - region: tri_2
+    flow: placeholder_runoff

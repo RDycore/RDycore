@@ -128,7 +128,7 @@ foreach(np 1 2)
   endforeach()
 endforeach()
 
-# houston-harvey test with spatially homogeneous rainfall
+# houston-harvey test with spatially homogeneous rainfall with adaptive timestepping
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.adaptive_timestep.yaml
       ${MESH_DIR}/Houston1km_with_z.exo
@@ -201,3 +201,19 @@ foreach(np 1) # test on 1 processes
       add_test(simons_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_bc_output_map -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_output_map ${${config}_args})
   endforeach()
 endforeach()
+
+# Test for specifying multi-homogeneous boundary and source-sink files
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/quad_tri_mesh.yaml
+     ${MESH_DIR}/quad_tri_mesh.exo
+     ${CONDITION_DIR}/Houston1km.bc.${PETSC_ID_TYPE}.bin
+     ${CONDITION_DIR}/Houston1km.rain.${PETSC_ID_TYPE}.bin
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1) # test on 1 processes
+  foreach(config basic ceed preload)
+    foreach(lang c f90)
+      add_test(swe_roe_mixed_elements_ic_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} quad_tri_mesh.yaml -homogeneous_rain_files Houston1km.rain.${PETSC_ID_TYPE}.bin,Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_rain_region_ids 1,3 -homogeneous_bc_files Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin -homogeneous_bc_region_ids   1,2,4 ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
