@@ -156,7 +156,8 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
   PetscReal *u;
   PetscCall(VecGetArray(rdy->u_global, &u));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    values[i] = u[3 * i + idof];
+    PetscInt cell_id = rdy->mesh.cells.owned_to_local[i];
+    values[i]        = u[3 * cell_id + idof];
   }
   PetscCall(VecRestoreArray(rdy->u_global, &u));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -213,7 +214,8 @@ PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, Pe
     for (PetscInt c = 0; c < region.num_cells; c++) {
       PetscInt cell_id = region.cell_ids[c];
       if (cells->is_local[cell_id]) {
-        source_values[cell_id] = value;
+        PetscInt owned_cell_id       = cells->local_to_owned[cell_id];
+        source_values[owned_cell_id] = value;
       }
     }
 
@@ -442,8 +444,9 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
     PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
     PetscCall(RestoreOperatorMaterialData(rdy, &material_data));
   } else {  // petsc
-    for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
-      rdy->materials_by_cell[icell].manning = n_values[icell];
+    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
+      PetscInt cell_id                        = rdy->mesh.cells.owned_to_local[i];
+      rdy->materials_by_cell[cell_id].manning = n_values[i];
     }
   }
 

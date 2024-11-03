@@ -501,7 +501,8 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   memset(L2_norms, 0, ndof * sizeof(PetscReal));
   memset(Linf_norms, 0, ndof * sizeof(PetscReal));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    PetscReal area = rdy->mesh.cells.areas[i];
+    PetscInt  cell_id = rdy->mesh.cells.owned_to_local[i];
+    PetscReal area    = rdy->mesh.cells.areas[cell_id];
 
     for (PetscInt dof = 0; dof < ndof; ++dof) {
       PetscReal e_dof = e[ndof * i + dof];
