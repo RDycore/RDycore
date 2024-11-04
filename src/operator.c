@@ -493,7 +493,7 @@ PetscErrorCode CreatePetscOperator(DM dm, RDyMesh *mesh, PetscInt num_components
   PetscFunctionBegin;
 
   MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
   PetscCheck(!CeedEnabled(), comm, PETSC_ERR_USER, "Can't create a PETSc operator: CEED is enabled");
 
   PetscCall(CreateBasicOperator(dm, mesh, num_components, num_boundaries, boundaries, op));
@@ -591,31 +591,30 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec du
     CeedVector u_local_ceed = op->ceed.u_local;
     CeedVector f_ceed       = op->ceed.rhs;
 
-    // 1. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
+    // 1. point the CeedVector u_local_ceed to the PETSc Vec u_local
     PetscCall(VecGetArrayAndMemType(u, &u_local, &mem_type));
     PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local));
 
-    // 2. Sets the pointer of a CeedVector to a PETSc Vec: f_ceed --> F_local
+    // 2. point the CeedVector f_ceed to the PETSc Vec F_local
     PetscCall(DMGetLocalVector(op->dm, &F_local));
     PetscCall(VecGetArrayAndMemType(F_local, &f, &mem_type));
     PetscCallCEED(CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
 
-    // 3. Apply the CeedOperator associated with the internal and boundary edges
+    // 3. apply the CeedOperator associated with the internal and boundary edges
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply, u, dudt, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
     PetscCallCEED(CeedOperatorApply(op->ceed.flux_operator, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply, u, dudt, 0, 0));
 
-    // 4. Resets memory pointer of CeedVectors
+    // 4. dissociates the CeedVectors from the PETSc Vecs
     PetscCallCEED(CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f));
     PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u_local));
-
-    // 5. Restore pointers to the PETSc Vecs
     PetscCall(VecRestoreArrayAndMemType(F_local, &f));
     PetscCall(VecRestoreArrayAndMemType(u, &u_local));
 
-    // 6. Zero out values in du/dt and then add F_local to F via local-to-global scatter
+    // 6. zeroes values in the PETSc Vec du/dt and accumulates from F_local via
+    //    a local-to-global scatter
     PetscCall(VecZeroEntries(dudt));
     PetscCall(DMLocalToGlobal(op->dm, F_local, ADD_VALUES, dudt));
 
@@ -639,7 +638,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec du
     // c) Post-CeedOperatorApply stage:
     //    - Clean up memory
 
-    // 1. Get the CeedVector associated with the "riemannf" CeedOperatorField
+    // 1. get the CeedVector associated with the "riemannf" CeedOperatorField
     CeedOperatorField riemannf_field;
     CeedVector        riemannf_ceed;
     SWESourceOperatorGetRiemannFlux(op, &riemannf_field);
@@ -650,19 +649,19 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal t, Vec u, Vec du
     CeedVector   u_local_ceed = op->ceed.u_local;
     CeedVector   s_ceed       = op->ceed.sources;
 
-    // 2. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
+    // 2. point the CeedVector u_local_ceed at the PETSc Vec u
     PetscCall(VecGetArrayAndMemType(u, &u_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_ptr));
 
-    // 3. Make a duplicate copy of the F as the values will be used as input for the CeedOperator
-    //    corresponding to the source-sink term
+    // 3. duplicate dudt so the values can be used as input for the source-sink
+    //    sub-operator
     PetscCall(VecCopy(dudt, op->ceed.flux_divergences));
 
     // 4. Sets the pointer of a CeedVector to a PETSc Vec: flux_divergences --> riemannf_ceed
     PetscCall(VecGetArrayAndMemType(op->ceed.flux_divergences, &flux_divergences, &mem_type));
     PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, flux_divergences));
 
-    // 5. Sets the pointer of a CeedVector to a PETSc Vec: F --> s_ceed
+    // 5. Sets the pointer of a CeedVector to a PETSc Vec: dudt --> s_ceed
     PetscCall(VecGetArrayAndMemType(dudt, &f, &mem_type));
     PetscCallCEED(CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
 
@@ -850,7 +849,7 @@ PetscErrorCode AddOperatorBoundaryFluxes(OperatorBoundaryData *boundary_data, Pe
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)boundary_data->op->dm, &comm));
-  PetscCheck(!CeedEnabled(), comm, PETSC_ERR_USER, "Call to AccumulateOperatorBoundaryFluxes prohibited for CEED operator implementations!");
+  PetscCheck(!CeedEnabled(), comm, PETSC_ERR_USER, "Call to AddOperatorBoundaryFluxes prohibited for CEED operator implementations!");
 
   // if this is the first fetch, get access to the vector's data and mark it
   // to be zeroed upon restoration

@@ -1,7 +1,6 @@
-
 # RDycore SWE physics with CEED
 
-Here we describe the RDycore's implemetation of 2D shallow water equation (SWE) that uses [libCEED](https://github.com/CEED/libCEED). The combination of PETSc and libCEED provides RDDycore algorithimic and hardware protability.
+Here we describe the RDycore's implementation of the 2D shallow water equations (SWE) that uses [libCEED](https://github.com/CEED/libCEED). The combination of PETSc and libCEED provides RDDycore algorithimic and hardware protability.
 
 - RDycore uses PETSc's `TS` solvers that provide support for multiple time-integrators such as forward euler, RK4, etc., which can be selected at run time (e.g. `--ts_type euler`, `--ts_type rk4`, etc). 
 - Using libCEED allows RDycore to compute the [RHSFunction](https://petsc.org/main/manualpages/TS/TSSetRHSFunction/) for PETSc's explicit `TS` methods on CPU or GPU, which can also be selected at runtime via
