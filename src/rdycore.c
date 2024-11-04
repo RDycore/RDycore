@@ -123,10 +123,9 @@ PetscBool RDyRestarted(RDy rdy) { return rdy->config.restart.file[0]; }
 PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   PetscFunctionBegin;
   // destroy vectors
-  if ((*rdy)->petsc.sources) VecDestroy(&((*rdy)->petsc.sources));
-  if ((*rdy)->rhs) VecDestroy(&((*rdy)->rhs));
-  if ((*rdy)->u_global) VecDestroy(&((*rdy)->u_global));
-  if ((*rdy)->u_local) VecDestroy(&((*rdy)->u_local));
+  if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
+  if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
+  if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
   if ((*rdy)->ceed.host_fluxes) PetscCall(VecDestroy(&(*rdy)->ceed.host_fluxes));
   if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
 
