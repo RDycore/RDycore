@@ -778,27 +778,29 @@ static PetscErrorCode InitSolution(RDy rdy) {
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id = region.cell_ids[c];
+            PetscInt cell_id       = region.cell_ids[c];
+            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_id];
             if (rdy->mesh.cells.is_local[cell_id]) {  // skip ghost cells
               for (PetscInt idof = 0; idof < ndof; idof++) {
-                u_ptr[ndof * cell_id + idof] = local_ptr[ndof * cell_id + idof];
+                u_ptr[ndof * owned_cell_id + idof] = local_ptr[ndof * cell_id + idof];
               }
             }
           }
           PetscCall(VecRestoreArray(local, &local_ptr));
+          PetscCall(VecDestroy(&local));
         } else {
           for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id = region.cell_ids[c];
+            PetscInt cell_id       = region.cell_ids[c];
+            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_id];
             if (rdy->mesh.cells.is_local[cell_id]) {  // skip ghost cells
-              u_ptr[ndof * cell_id]     = mupEval(flow_ic.height);
-              u_ptr[ndof * cell_id + 1] = mupEval(flow_ic.x_momentum);
-              u_ptr[ndof * cell_id + 2] = mupEval(flow_ic.y_momentum);
+              u_ptr[ndof * owned_cell_id]     = mupEval(flow_ic.height);
+              u_ptr[ndof * owned_cell_id + 1] = mupEval(flow_ic.x_momentum);
+              u_ptr[ndof * owned_cell_id + 2] = mupEval(flow_ic.y_momentum);
             }
           }
         }
       }
     }
-    PetscCall(VecDestroy(&local));
   }
 
   // TODO: salinity and sediment initial conditions go here.
