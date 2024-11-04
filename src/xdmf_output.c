@@ -73,7 +73,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscFree(comp));
 
   // clean up
-  PetscCall(VecDestroy(&natural));
+  if (use_natural) PetscCall(VecDestroy(&natural));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
   PetscCall(PetscViewerPopFormat(viewer));
   PetscCall(PetscViewerDestroy(&viewer));
