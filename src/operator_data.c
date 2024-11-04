@@ -189,8 +189,7 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
 
     // set the values
     for (CeedInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id            = source_data->rdy->mesh.cells.owned_to_local[i];
-      values[cell_id][component] = source_values[i];
+      values[i][component] = source_values[i];
     }
   } else {
     // if this is the first update, get access to the vector's data
@@ -202,8 +201,7 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
     // set the values
     PetscReal *s = source_data->sources.petsc.data;
     for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id                                      = source_data->rdy->mesh.cells.owned_to_local[i];
-      s[cell_id * source_data->num_components + component] = source_values[i];
+      s[i * source_data->num_components + component] = source_values[i];
     }
   }
 
@@ -227,8 +225,7 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
 
     // set the values
     for (CeedInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id  = source_data->rdy->mesh.cells.owned_to_local[i];
-      source_values[i] = values[cell_id][component];
+      source_values[i] = values[i][component];
     }
   } else {
     // if this is the first update, get access to the vector's data
@@ -240,8 +237,7 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
     // set the values
     PetscReal *s = source_data->sources.petsc.data;
     for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id  = source_data->rdy->mesh.cells.owned_to_local[i];
-      source_values[i] = s[cell_id * source_data->num_components + component];
+      source_values[i] = s[i * source_data->num_components + component];
     }
   }
 
@@ -312,8 +308,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
 
     // set the values
     for (CeedInt i = 0; i < material_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id = material_data->rdy->mesh.cells.owned_to_local[i];
-      values[cell_id] = material_values[i];
+      values[i] = material_values[i];
     }
   } else {
     // if this is the first update, get access to the vector's data
@@ -325,8 +320,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
     // set the values
     PetscReal *m = vector_data.petsc.data;
     for (PetscInt i = 0; i < material_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id = material_data->rdy->mesh.cells.owned_to_local[i];
-      m[cell_id]      = material_values[i];
+      m[i] = material_values[i];
     }
   }
 
@@ -392,8 +386,7 @@ PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_
 
     // set the values
     for (CeedInt i = 0; i < flux_div_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id            = flux_div_data->rdy->mesh.cells.owned_to_local[i];
-      values[cell_id][component] = flux_div_values[i];
+      values[i][component] = flux_div_values[i];
     }
   } else {
     // if this is the first update, get access to the vector's data
@@ -405,8 +398,7 @@ PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_
     // set the values
     PetscReal *div_f = flux_div_data->storage.petsc.data;
     for (PetscInt i = 0; i < flux_div_data->rdy->mesh.num_owned_cells; ++i) {
-      CeedInt cell_id                                            = flux_div_data->rdy->mesh.cells.owned_to_local[i];
-      div_f[cell_id * flux_div_data->num_components + component] = flux_div_values[i];
+      div_f[i * flux_div_data->num_components + component] = flux_div_values[i];
     }
   }
 
