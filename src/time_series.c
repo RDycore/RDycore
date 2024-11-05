@@ -243,7 +243,11 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   // zero the boundary fluxes so they can begin reaccumulating
   // NOTE that there are 3 fluxes (and not 5)
   if (rdy->time_series.boundary_fluxes.fluxes) {
-    memset(rdy->time_series.boundary_fluxes.fluxes, 0, rdy->time_series.boundary_fluxes.offsets[rdy->num_boundaries] * sizeof(PetscReal));
+    for (PetscInt e = 0; e < rdy->time_series.boundary_fluxes.offsets[rdy->num_boundaries]; e++) {
+      rdy->time_series.boundary_fluxes.fluxes[e].water_mass = 0.0;
+      rdy->time_series.boundary_fluxes.fluxes[e].x_momentum = 0.0;
+      rdy->time_series.boundary_fluxes.fluxes[e].y_momentum = 0.0;
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
