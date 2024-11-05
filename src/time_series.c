@@ -88,7 +88,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
         if (rdy->mesh.cells.is_local[cell_id]) ++num_boundary_edges;
       }
     }
-    rdy->time_series.boundary_fluxes.offsets[b + 1] = ndof * num_boundary_edges;
+    rdy->time_series.boundary_fluxes.offsets[b + 1] = num_boundary_edges;
   }
 
   // gather per-process numbers of local boundary edges
@@ -108,7 +108,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscCall(GatherBoundaryFluxMetadata(rdy));
 
   // allocate (local) boundary flux storage
-  PetscCall(PetscCalloc1(3 * num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
+  PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
