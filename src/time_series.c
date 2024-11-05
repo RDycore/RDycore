@@ -88,7 +88,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
         if (rdy->mesh.cells.is_local[cell_id]) ++num_boundary_edges;
       }
     }
-    rdy->time_series.boundary_fluxes.offsets[b + 1] = ndof * num_boundary_edges;
+    rdy->time_series.boundary_fluxes.offsets[b + 1] = num_boundary_edges;
   }
 
   // gather per-process numbers of local boundary edges
@@ -108,7 +108,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscCall(GatherBoundaryFluxMetadata(rdy));
 
   // allocate (local) boundary flux storage
-  PetscCall(PetscCalloc1(3 * num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
+  PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -243,7 +243,11 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   // zero the boundary fluxes so they can begin reaccumulating
   // NOTE that there are 3 fluxes (and not 5)
   if (rdy->time_series.boundary_fluxes.fluxes) {
-    memset(rdy->time_series.boundary_fluxes.fluxes, 0, 3 * num_global_edges * sizeof(PetscReal));
+    for (PetscInt e = 0; e < rdy->time_series.boundary_fluxes.offsets[rdy->num_boundaries]; e++) {
+      rdy->time_series.boundary_fluxes.fluxes[e].water_mass = 0.0;
+      rdy->time_series.boundary_fluxes.fluxes[e].x_momentum = 0.0;
+      rdy->time_series.boundary_fluxes.fluxes[e].y_momentum = 0.0;
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
