@@ -1,8 +1,8 @@
 module purge
 module load craype-x86-milan
-module load libfabric/1.15.2.0
+module load libfabric/1.20.1
 module load craype-network-ofi
-module load xpmem/2.6.2-2.5_2.38__gd067c3f.shasta
+module load xpmem/2.6.2-2.5_2.40__gd067c3f.shasta
 module load cpe/23.12
 module load gpu/1.0
 module load conda/Miniconda3-py311_23.11.0-2
