@@ -11,7 +11,7 @@ static void usage(const char *exe_name) {
   fprintf(stderr, "%s <input.yaml>\n\n", exe_name);
 }
 
-typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, RASTER, UNSTRUCTURED } DatasetType;
+typedef enum { UNSET = 0, CONSTANT, HOMOGENEOUS, RASTER, UNSTRUCTURED, MULTI_HOMOGENEOUS } DatasetType;
 
 typedef struct {
   PetscReal rate;
@@ -82,20 +82,36 @@ typedef struct {
 } UnstructuredDataset;
 
 typedef struct {
-  DatasetType         type;
-  ConstantDataset     constant;      // spatio-temporally constant rainfall
-  HomogeneousDataset  homogeneous;   // spatially-constnat, temporally-varying rainfall
-  RasterDataset       raster;        // spatio-temporally varying rainfall in raster format
-  UnstructuredDataset unstructured;  // spatio-temporally varying rainfall in unstructured grid format
+  HomogeneousDataset *data;   // multiple spatially-homogeneous, temporally varying BCs
+  PetscInt            ndata;  // number of multiple spatially-homogeneous datasets
+  PetscInt           *region_ids;
+
+  PetscInt  ndirichlet_bcs;
+  PetscInt *dirichlet_bc_idx;
+  PetscInt *dirichlet_bc_to_data_idx;
+
+  PetscReal **data_for_rdycore;
+  PetscReal  *ndata_for_rdycore;
+
+} MultiHomogeneousDataset;
+
+typedef struct {
+  DatasetType             type;
+  ConstantDataset         constant;          // spatio-temporally constant rainfall
+  HomogeneousDataset      homogeneous;       // spatially-constnat, temporally-varying rainfall
+  RasterDataset           raster;            // spatio-temporally varying rainfall in raster format
+  UnstructuredDataset     unstructured;      // spatio-temporally varying rainfall in unstructured grid format
+  MultiHomogeneousDataset multihomogeneous;  // multipile spatially-constnat, temporally-varying rainfall
 
   PetscInt   ndata;             // size of source-sink data for RDycore
   PetscReal *data_for_rdycore;  // values of source-sink for RDycore
 } SourceSink;
 
 typedef struct {
-  DatasetType         type;
-  HomogeneousDataset  homogeneous;   // spatially-homogeneous, temporally-varying BC
-  UnstructuredDataset unstructured;  // spatio-temporally varying BC in unstructured grid format
+  DatasetType             type;
+  HomogeneousDataset      homogeneous;       // spatially-homogeneous, temporally-varying BC
+  UnstructuredDataset     unstructured;      // spatio-temporally varying BC in unstructured grid format
+  MultiHomogeneousDataset multihomogeneous;  // multipile spatially-constnat, temporally-varying BC
 
   PetscInt   ndata;             // size of boundary condition data for RDycore
   PetscInt   dirichlet_bc_idx;  // ID of the dirichlet BC in RDycore
@@ -334,6 +350,16 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode OpenMultiHomogeneousDataset(MultiHomogeneousDataset *multi_data) {
+  PetscFunctionBegin;
+
+  for (PetscInt idata = 0; idata < multi_data->ndata; idata++) {
+    PetscCall(OpenHomogeneousDataset(&multi_data->data[idata]));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Saves out the mapping of a dataset to RDycore as a binary Vec
 /// @param filename [in] Name of the map file
 /// @param ncells   [in] Number of RDycore's elements
@@ -434,6 +460,164 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
           data->data2mesh_idx[icell] = kk;
         }
       }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm = PETSC_COMM_WORLD;
+
+  PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
+  PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+  for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
+    PetscInt num_edges, bc_type;
+    PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
+    PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
+    if (bc_type == CONDITION_DIRICHLET) {
+      PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
+                 "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
+      dirc_bc_idx       = ibc;
+      num_edges_dirc_bc = num_edges;
+    }
+  }
+
+  PetscMPIInt global_dirc_bc_idx = -1;
+  MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
+             "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
+
+  bc_dataset->ndata            = num_edges_dirc_bc * 3;
+  bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
+  PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm = PETSC_COMM_WORLD;
+
+  PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
+  PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+  for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
+    PetscInt num_edges, bc_type;
+    PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
+    PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
+    if (bc_type == CONDITION_DIRICHLET) {
+      PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
+                 "When BC file specified via -unstructured_bc_dir argument, only one CONDITION_DIRICHLET can be present in the yaml");
+      dirc_bc_idx       = ibc;
+      num_edges_dirc_bc = num_edges;
+    }
+  }
+
+  PetscMPIInt global_dirc_bc_idx = -1;
+  MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
+             "The BC file specified via -unstructured_bc_dir argument, but no CONDITION_DIRICHLET found in the yaml");
+
+  bc_dataset->ndata            = num_edges_dirc_bc * 3;
+  bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
+  PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
+
+  if ((num_edges_dirc_bc > 0) & (num_edges_dirc_bc > 0)) {
+    PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
+
+    bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
+
+    // allocate memory to save x/y coordinates of the boundary edges
+    PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_xc);
+    PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_yc);
+
+    // get the x/y coordinates of the boundary edges from RDycore
+    PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_xc));
+    PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_yc));
+
+    // set up the mapping between the dataset and boundary edges
+    PetscCall(CreateUnstructuredDatasetMapping(&bc_dataset->unstructured));
+
+    if (bc_dataset->unstructured.output_map) {
+      PetscMPIInt rank;
+      MPI_Comm_rank(comm, &rank);
+      static char debug_file[PETSC_MAX_PATH_LEN] = {0};
+      sprintf(debug_file, "map.bc.unstructured.rank_%d.bin", rank);
+
+      PetscCall(WriteMappingForDebugging(debug_file, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.data2mesh_idx,
+                                         bc_dataset->unstructured.data_xc, bc_dataset->unstructured.data_yc, bc_dataset->unstructured.mesh_xc,
+                                         bc_dataset->unstructured.mesh_yc));
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm = PETSC_COMM_WORLD;
+
+  MultiHomogeneousDataset *multihomogeneous = &bc_dataset->multihomogeneous;
+  multihomogeneous->ndirichlet_bcs          = 0;
+
+  PetscInt nbcs;
+  PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+
+  if (nbcs > 0) {
+    PetscInt *boundary_id, *boundary_nedges, *boundary_type;
+
+    PetscCalloc1(nbcs, &boundary_id);
+    PetscCalloc1(nbcs, &boundary_nedges);
+    PetscCalloc1(nbcs, &boundary_type);
+
+    // extract info from RDycore abount boundary conditions
+    for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
+      PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &boundary_nedges[ibc]));
+      PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &boundary_type[ibc]));
+      PetscCall(RDyGetBoundaryID(rdy, ibc, &boundary_id[ibc]));
+      if (boundary_type[ibc] == CONDITION_DIRICHLET) multihomogeneous->ndirichlet_bcs++;
+    }
+
+    if (multihomogeneous->ndirichlet_bcs > 0) {
+      PetscCalloc1(multihomogeneous->ndirichlet_bcs, &multihomogeneous->dirichlet_bc_idx);
+      PetscCalloc1(multihomogeneous->ndirichlet_bcs, &multihomogeneous->dirichlet_bc_to_data_idx);
+      PetscCalloc1(multihomogeneous->ndirichlet_bcs, &multihomogeneous->ndata_for_rdycore);
+
+      PetscCall(PetscMalloc1(multihomogeneous->ndirichlet_bcs, &multihomogeneous->data_for_rdycore));
+
+      PetscInt count = 0;
+      for (PetscInt i = 0; i < nbcs; i++) {
+        if (boundary_type[i] == CONDITION_DIRICHLET) {
+          // initialize the BC index
+          multihomogeneous->dirichlet_bc_idx[count]         = -1;
+          multihomogeneous->dirichlet_bc_to_data_idx[count] = -1;
+          PetscBool found                                   = PETSC_FALSE;
+
+          for (PetscInt j = 0; j < multihomogeneous->ndata; j++) {
+            if (boundary_id[i] == multihomogeneous->region_ids[j]) {
+              found = PETSC_TRUE;
+
+              multihomogeneous->dirichlet_bc_idx[count]         = i;
+              multihomogeneous->dirichlet_bc_to_data_idx[count] = j;
+              multihomogeneous->ndata_for_rdycore[count]        = boundary_nedges[i] * 3;
+
+              PetscCall(PetscMalloc1(multihomogeneous->ndata_for_rdycore[count], &multihomogeneous->data_for_rdycore[count]));
+              break;
+            }
+          }
+
+          PetscCheck(found, comm, PETSC_ERR_USER, "A dirichlet BC is not mapped onto the -homogeneous_bc_region_ids");
+          count++;
+        }
+      }
+
+      PetscFree(boundary_id);
+      PetscFree(boundary_nedges);
+      PetscFree(boundary_type);
     }
   }
 
@@ -823,6 +1007,39 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   }
 #undef NUM_UNSTRUCTURED_RAIN_DATE_VALUES
 
+#define MAX_DATASETS 20  // max number of homogeneous datasets specified via command line
+
+  char     *filenames[PETSC_MAX_PATH_LEN];
+  PetscInt  nfiles = MAX_DATASETS;
+  PetscBool multi_files_flag;
+
+  PetscCall(PetscOptionsGetStringArray(NULL, NULL, "-homogeneous_rain_files", filenames, &nfiles, &multi_files_flag));
+
+  PetscInt  region_ids[MAX_DATASETS];
+  PetscInt  nsources = MAX_DATASETS;
+  PetscBool multi_rainfall_flag;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-homogeneous_rain_region_ids", region_ids, &nsources, &multi_rainfall_flag));
+
+  PetscCheck(multi_files_flag == multi_rainfall_flag, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "Both -homogeneous_rain_files and -homogeneous_rain_region_ids need to specified");
+  if (multi_files_flag) {
+    PetscCheck(nfiles == nsources, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "The number of -homogeneous_rain_files and -homogeneous_rain_region_ids are not the same");
+    rain_dataset->type = MULTI_HOMOGENEOUS;
+    dataset_type_count++;
+
+    rain_dataset->multihomogeneous.ndata = nfiles;
+
+    PetscCall(PetscMalloc1(rain_dataset->multihomogeneous.ndata, &rain_dataset->multihomogeneous.data));
+    PetscCalloc1(rain_dataset->multihomogeneous.ndata, &rain_dataset->multihomogeneous.region_ids);
+
+    for (PetscInt ifile = 0; ifile < rain_dataset->multihomogeneous.ndata; ifile++) {
+      PetscCall(PetscStrcpy(rain_dataset->multihomogeneous.data[ifile].filename, filenames[ifile]));
+      rain_dataset->multihomogeneous.region_ids[ifile] = region_ids[ifile];
+    }
+  }
+#undef MAX_DATASETS
+
   PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
              "More than one rainfall cannot be specified. Rainfall types sepcified : Constat %d; Homogeneous %d; Raster %d; Unsturcutred %d",
              constant_rain_flag, homogeneous_rain_flag, raster_start_date_flag, unstructured_start_date_flag);
@@ -908,9 +1125,43 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   }
 #undef NUM_UNSTRUCTURED_BC_DATE_VALUES
 
+#define MAX_DATASETS 20  // max number of homogeneous datasets specified via command line
+
+  char     *filenames[PETSC_MAX_PATH_LEN];
+  PetscInt  nfiles = MAX_DATASETS;
+  PetscBool multi_files_flag;
+
+  PetscCall(PetscOptionsGetStringArray(NULL, NULL, "-homogeneous_bc_files", filenames, &nfiles, &multi_files_flag));
+
+  PetscInt  region_ids[MAX_DATASETS];
+  PetscInt  nbcs = MAX_DATASETS;
+  PetscBool multi_bc_flag;
+  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-homogeneous_bc_region_ids", region_ids, &nbcs, &multi_bc_flag));
+
+  PetscCheck(multi_files_flag == multi_bc_flag, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "Both -homogeneous_bc_files and -homogeneous_bc_region_ids need to specified");
+  if (multi_files_flag) {
+    PetscCheck(nfiles == nbcs, PETSC_COMM_WORLD, PETSC_ERR_USER,
+               "The number of -homogeneous_bc_files and -homogeneous_bc_region_ids are not the same");
+    bc->type = MULTI_HOMOGENEOUS;
+    dataset_type_count++;
+
+    bc->multihomogeneous.ndata = nfiles;
+
+    PetscCall(PetscMalloc1(bc->multihomogeneous.ndata, &bc->multihomogeneous.data));
+    PetscCalloc1(bc->multihomogeneous.ndata, &bc->multihomogeneous.region_ids);
+
+    for (PetscInt ifile = 0; ifile < bc->multihomogeneous.ndata; ifile++) {
+      PetscCall(PetscStrcpy(bc->multihomogeneous.data[ifile].filename, filenames[ifile]));
+      bc->multihomogeneous.region_ids[ifile] = region_ids[ifile];
+    }
+  }
+#undef MAX_DATASETS
+
   PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "More than one boundary condition cannot be specified. Rainfall types sepcified : Homogeneous %d; Raster %d ", homogenous_bc_flag,
-             unstructured_start_date_flag);
+             "More than one boundary condition cannot be specified. Rainfall types sepcified : Homogeneous %" PetscInt_FMT "; Raster %" PetscInt_FMT
+             "; Multi-Homogeneous %" PetscInt_FMT,
+             homogenous_bc_flag, unstructured_start_date_flag, multi_files_flag);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -984,6 +1235,9 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
                                            rain_dataset->unstructured.mesh_yc));
       }
       break;
+    case MULTI_HOMOGENEOUS:
+      PetscCall(OpenMultiHomogeneousDataset(&rain_dataset->multihomogeneous));
+      break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1000,20 +1254,37 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
     case UNSET:
       break;
     case CONSTANT:
-      PetscCall(SetConstantRainfall(rain_dataset->constant.rate, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetConstantRainfall(rain_dataset->constant.rate, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case HOMOGENEOUS:
-      PetscCall(SetHomogeneousData(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetHomogeneousData(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case RASTER:
-      PetscCall(SetRasterData(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetRasterData(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
       break;
     case UNSTRUCTURED:
-      PetscCall(SetUnstructuredData(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
-      PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      if (rain_dataset->ndata) {
+        PetscCall(SetUnstructuredData(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+      }
+      break;
+    case MULTI_HOMOGENEOUS:
+      MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
+      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
+        PetscInt  size = 1;
+        PetscReal data;
+        PetscCall(SetHomogeneousData(&multi_hdata->data[idata], time, size, &data));
+        PetscCall(RDySetWaterSourceForRegion(rdy, multi_hdata->region_ids[idata] - 1, data));
+      }
       break;
   }
 
@@ -1044,6 +1315,13 @@ PetscErrorCode DestroyRainfallDataset(SourceSink *rain_dataset) {
       PetscFree(rain_dataset->data_for_rdycore);
       PetscCall(DestroyUnstructuredDataset(&rain_dataset->unstructured));
       break;
+    case MULTI_HOMOGENEOUS:
+      MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
+      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
+        PetscCall(DestroyHomogeneousDataset(&multi_hdata->data[idata]));
+      }
+      PetscCall(PetscFree(multi_hdata->data));
+      break;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1060,7 +1338,6 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
 
   PetscMPIInt rank;
   MPI_Comm_rank(comm, &rank);
-  static char debug_file[PETSC_MAX_PATH_LEN] = {0};
 
   PetscCall(ParseBoundaryDataOptions(bc_dataset));
 
@@ -1068,64 +1345,23 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
     case UNSET:
       break;
     case CONSTANT:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type CONSTANT");
       break;
     case HOMOGENEOUS:
       PetscCall(OpenHomogeneousDataset(&bc_dataset->homogeneous));
+      PetscCall(DoPostprocessForHomogeneousDataset(rdy, bc_dataset));
       break;
     case RASTER:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
+      PetscCall(DoPostprocessForUnstructuredDataset(rdy, bc_dataset));
       break;
-  }
-
-  if (bc_dataset->type != UNSET) {
-    PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
-    PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
-    for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
-      PetscInt num_edges, bc_type;
-      PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
-      PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
-      if (bc_type == CONDITION_DIRICHLET) {
-        PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                   "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
-        dirc_bc_idx       = ibc;
-        num_edges_dirc_bc = num_edges;
-      }
-    }
-
-    PetscMPIInt global_dirc_bc_idx = -1;
-    MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
-    PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
-               "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
-
-    bc_dataset->ndata            = num_edges_dirc_bc * 3;
-    bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
-    PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
-
-    if ((bc_dataset->type == UNSTRUCTURED) & (num_edges_dirc_bc > 0)) {
-      PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
-
-      bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
-
-      // allocate memory to save x/y coordinates of the boundary edges
-      PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_xc);
-      PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_yc);
-
-      // get the x/y coordinates of the boundary edges from RDycore
-      PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_xc));
-      PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_yc));
-
-      // set up the mapping between the dataset and boundary edges
-      PetscCall(CreateUnstructuredDatasetMapping(&bc_dataset->unstructured));
-
-      if (bc_dataset->unstructured.output_map) {
-        sprintf(debug_file, "map.bc.unstructured.rank_%d.bin", rank);
-        PetscCall(WriteMappingForDebugging(debug_file, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.data2mesh_idx,
-                                           bc_dataset->unstructured.data_xc, bc_dataset->unstructured.data_yc, bc_dataset->unstructured.mesh_xc,
-                                           bc_dataset->unstructured.mesh_yc));
-      }
-    }
+    case MULTI_HOMOGENEOUS:
+      PetscCall(OpenMultiHomogeneousDataset(&bc_dataset->multihomogeneous));
+      PetscCall(DoPostprocessForBoundaryMultiHomogeneousDataset(rdy, bc_dataset));
+      break;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1139,23 +1375,40 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
 PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
-  if (bc_dataset->ndata) {
-    switch (bc_dataset->type) {
-      case UNSET:
-        break;
-      case CONSTANT:
-        break;
-      case HOMOGENEOUS:
+  switch (bc_dataset->type) {
+    case UNSET:
+      break;
+    case CONSTANT:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend ApplyBoundaryCondition for boundary condition of type CONSTANT");
+      break;
+    case HOMOGENEOUS:
+      if (bc_dataset->ndata) {
         PetscCall(SetHomogeneousBoundary(&bc_dataset->homogeneous, time, bc_dataset->ndata / 3, bc_dataset->data_for_rdycore));
         PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
-        break;
-      case RASTER:
-        break;
-      case UNSTRUCTURED:
+      }
+      break;
+    case RASTER:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend ApplyBoundaryCondition for boundary condition of type RASTER");
+      break;
+    case UNSTRUCTURED:
+      if (bc_dataset->ndata) {
         PetscCall(SetUnstructuredData(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
         PetscCall(RDySetDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
-        break;
-    }
+      }
+      break;
+    case MULTI_HOMOGENEOUS:
+      MultiHomogeneousDataset *multi_hdata = &bc_dataset->multihomogeneous;
+      for (PetscInt ibc = 0; ibc < multi_hdata->ndirichlet_bcs; ibc++) {
+        PetscInt data_idx = multi_hdata->dirichlet_bc_to_data_idx[ibc];
+        PetscInt bc_idx   = multi_hdata->dirichlet_bc_idx[ibc];
+        PetscInt nedges   = multi_hdata->ndata_for_rdycore[ibc] / 3;
+
+        if (nedges) {
+          PetscCall(SetHomogeneousBoundary(&multi_hdata->data[data_idx], time, nedges, multi_hdata->data_for_rdycore[ibc]));
+          PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, multi_hdata->data_for_rdycore[ibc]));
+        }
+      }
+      break;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1187,6 +1440,24 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
         PetscCall(PetscFree(bc_dataset->unstructured.mesh_yc));
       }
       PetscCall(DestroyUnstructuredDataset(&bc_dataset->unstructured));
+      break;
+    case MULTI_HOMOGENEOUS:
+      MultiHomogeneousDataset *multi_hdata = &bc_dataset->multihomogeneous;
+      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
+        PetscCall(DestroyHomogeneousDataset(&multi_hdata->data[idata]));
+      }
+      PetscCall(PetscFree(multi_hdata->data));
+
+      if (multi_hdata->ndirichlet_bcs) {
+        PetscCall(PetscFree(multi_hdata->dirichlet_bc_idx));
+        PetscCall(PetscFree(multi_hdata->dirichlet_bc_to_data_idx));
+        PetscCall(PetscFree(multi_hdata->ndata_for_rdycore));
+
+        for (PetscInt i = 0; i < multi_hdata->ndirichlet_bcs; i++) {
+          PetscCall(PetscFree(multi_hdata->data_for_rdycore[i]));
+        }
+        PetscCall(PetscFree(multi_hdata->data_for_rdycore));
+      }
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);

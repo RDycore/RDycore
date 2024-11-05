@@ -427,6 +427,7 @@ static const cyaml_strval_t condition_types[] = {
     {"neumann",          CONDITION_NEUMANN         },
     {"reflecting",       CONDITION_REFLECTING      },
     {"critical-outflow", CONDITION_CRITICAL_OUTFLOW},
+    {"runoff",           CONDITION_RUNOFF},
 };
 
 // schema for flow condition fields
@@ -438,6 +439,7 @@ static const cyaml_schema_field_t flow_condition_fields_schema[] = {
     CYAML_FIELD_STRING("y_momentum", CYAML_FLAG_OPTIONAL, RDyFlowCondition, y_momentum_expression, 1),
     CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyFlowCondition, file, 1),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyFlowCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
+    CYAML_FIELD_STRING("value", CYAML_FLAG_OPTIONAL, RDyFlowCondition, value_expression, 1),
     CYAML_FIELD_END
 };
 
@@ -872,10 +874,10 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
-      PetscCheck(flow_cond->height_expression[0] || flow_cond->file[0], comm, PETSC_ERR_USER, "Missing height specification for flow_conditions.%s",
-                 flow_cond->name);
-      PetscCheck(flow_cond->file[0] || (flow_cond->x_momentum_expression[0] && flow_cond->y_momentum_expression[0]), comm, PETSC_ERR_USER,
-                 "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
+      PetscCheck(flow_cond->height_expression[0] || flow_cond->file[0] || flow_cond->value_expression[0], comm, PETSC_ERR_USER,
+                 "Missing or incomplete height specification for flow_conditions.%s", flow_cond->name);
+      PetscCheck(flow_cond->file[0] || (flow_cond->x_momentum_expression[0] && flow_cond->y_momentum_expression[0]) || flow_cond->value_expression[0],
+                 comm, PETSC_ERR_USER, "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }
   }
 
@@ -1019,8 +1021,10 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
     mupSetExpr(flow_cond->height, flow_cond->height_expression);
     flow_cond->x_momentum = mupCreate(muBASETYPE_FLOAT);
     flow_cond->y_momentum = mupCreate(muBASETYPE_FLOAT);
+    flow_cond->value      = mupCreate(muBASETYPE_FLOAT);
     mupSetExpr(flow_cond->x_momentum, flow_cond->x_momentum_expression);
     mupSetExpr(flow_cond->y_momentum, flow_cond->y_momentum_expression);
+    mupSetExpr(flow_cond->value, flow_cond->value_expression);
   }
 
   // sediment conditions

@@ -43,6 +43,14 @@ static PetscErrorCode CheckBoundaryNumEdges(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
+  PetscFunctionBegin;
+  PetscCheck(region_index < rdy->num_regions, rdy->comm, PETSC_ERR_USER,
+             "Region index (%" PetscInt_FMT ") exceeds the max number of regions (%" PetscInt_FMT ")", region_index, rdy->num_regions);
+  PetscCheck(region_index >= 0, rdy->comm, PETSC_ERR_USER, "Region index (%" PetscInt_FMT ") cannot be less than zero.", region_index);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
   PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
@@ -148,7 +156,8 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
   PetscReal *u;
   PetscCall(VecGetArray(rdy->u_global, &u));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    values[i] = u[3 * i + idof];
+    PetscInt cell_id = rdy->mesh.cells.owned_to_local[i];
+    values[i]        = u[3 * cell_id + idof];
   }
   PetscCall(VecRestoreArray(rdy->u_global, &u));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -178,6 +187,43 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
   PetscCall(CheckNumLocalCells(rdy, size));
   PetscInt idof = 2;
   PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, PetscReal value) {
+  PetscFunctionBegin;
+  PetscCall(CheckRegionIndex(rdy, region_idx));
+
+  RDyRegion region = rdy->regions[region_idx];
+
+  if (region.num_cells) {
+    PetscReal *source_values;
+    PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &source_values));
+
+    // get the values for source term associated with h component
+    OperatorSourceData source_data;
+    PetscInt           component = 0;
+    PetscCall(GetOperatorSourceData(rdy, &source_data));
+    PetscCall(GetOperatorSourceValues(&source_data, component, source_values));
+    PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+
+    RDyMesh  *mesh  = &rdy->mesh;
+    RDyCells *cells = &mesh->cells;
+
+    // update the source term for the cells in the region that are local
+    for (PetscInt c = 0; c < region.num_cells; c++) {
+      PetscInt cell_id = region.cell_ids[c];
+      if (cells->is_local[cell_id]) {
+        PetscInt owned_cell_id       = cells->local_to_owned[cell_id];
+        source_values[owned_cell_id] = value;
+      }
+    }
+
+    PetscCall(RDySetWaterSourceForLocalCells(rdy, rdy->mesh.num_owned_cells, source_values));
+
+    PetscCall(PetscFree(source_values));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -314,6 +360,13 @@ static PetscErrorCode RDyGetIDimCentroidOfBoundaryEdgeOrCell(RDy rdy, const Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyGetBoundaryID(RDy rdy, const PetscInt boundary_index, PetscInt *id) {
+  PetscFunctionBegin;
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  *id = rdy->boundaries[boundary_index].id;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetBoundaryEdgeXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscBool data_for_edge = PETSC_TRUE;
@@ -391,8 +444,9 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
     PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
     PetscCall(RestoreOperatorMaterialData(rdy, &material_data));
   } else {  // petsc
-    for (PetscInt icell = 0; icell < rdy->mesh.num_owned_cells; ++icell) {
-      rdy->materials_by_cell[icell].manning = n_values[icell];
+    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
+      PetscInt cell_id                        = rdy->mesh.cells.owned_to_local[i];
+      rdy->materials_by_cell[cell_id].manning = n_values[i];
     }
   }
 
