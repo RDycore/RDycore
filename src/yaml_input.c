@@ -875,7 +875,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
       PetscCheck(flow_cond->height_expression[0] || flow_cond->file[0] || flow_cond->value_expression[0], comm, PETSC_ERR_USER,
-                 "Missing height specification for flow_conditions.%s", flow_cond->name);
+                 "Missing or incomplete height specification for flow_conditions.%s", flow_cond->name);
       PetscCheck(flow_cond->file[0] || (flow_cond->x_momentum_expression[0] && flow_cond->y_momentum_expression[0]) || flow_cond->value_expression[0],
                  comm, PETSC_ERR_USER, "Missing or incomplete momentum specification for flow_conditions.%s", flow_cond->name);
     }

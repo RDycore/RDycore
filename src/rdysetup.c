@@ -599,8 +599,6 @@ static PetscErrorCode InitSources(RDy rdy) {
       RDyRegion     region           = rdy->regions[r];
       PetscInt      region_src_index = -1;
 
-      src->is_defined = PETSC_FALSE;
-
       for (PetscInt isrc = 0; isrc < rdy->config.num_sources; ++isrc) {
         if (!strcmp(rdy->config.sources[isrc].region, region.name)) {
           region_src_index = isrc;
@@ -609,8 +607,6 @@ static PetscErrorCode InitSources(RDy rdy) {
       }
 
       if (region_src_index != -1) {
-        src->is_defined = PETSC_TRUE;
-
         RDyRegionConditionSpec src_spec = rdy->config.sources[region_src_index];
 
         if (strlen(src_spec.flow)) {
@@ -855,8 +851,8 @@ static PetscErrorCode InitSourceConditions(RDy rdy) {
     for (PetscInt r = 0; r < rdy->num_regions; r++) {
       RDyCondition src = rdy->sources[r];
 
-      if (src.is_defined) {
-        RDyFlowCondition *flow_src = src.flow;
+      RDyFlowCondition *flow_src = src.flow;
+      if (flow_src) {
         PetscCall(RDySetWaterSourceForRegion(rdy, r, mupEval(flow_src->value)));
       }
     }

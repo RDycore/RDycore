@@ -54,9 +54,6 @@ typedef struct {
   RDySedimentCondition *sediment;
   RDySalinityCondition *salinity;
 
-  // true if either RDyFlowCondition, RDySedimentCondition, or RDySalinityCondition is set
-  PetscBool is_defined;
-
   // value(s) associated with the condition
   PetscReal value;
 

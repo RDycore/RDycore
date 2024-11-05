@@ -264,7 +264,7 @@ typedef struct {
   MathExpression    height_expression;      // expression for water height
   MathExpression    x_momentum_expression;  // expression for water y-momentum
   MathExpression    y_momentum_expression;  // expression for water y-momentum
-  MathExpression    value_expression;       // expression for water y-momentum
+  MathExpression    value_expression;       // expression for value
   void             *height;                 // muparser-backed functional form
   void             *x_momentum;             // muparser-backed functional form
   void             *y_momentum;             // muparser-backed functional form

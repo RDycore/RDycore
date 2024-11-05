@@ -45,7 +45,7 @@ static PetscErrorCode CheckBoundaryNumEdges(RDy rdy, const PetscInt boundary_ind
 
 static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
   PetscFunctionBegin;
-  PetscCheck(region_index <= rdy->num_regions, rdy->comm, PETSC_ERR_USER,
+  PetscCheck(region_index < rdy->num_regions, rdy->comm, PETSC_ERR_USER,
              "Region index (%" PetscInt_FMT ") exceeds the max number of regions (%" PetscInt_FMT ")", region_index, rdy->num_regions);
   PetscCheck(region_index >= 0, rdy->comm, PETSC_ERR_USER, "Region index (%" PetscInt_FMT ") cannot be less than zero.", region_index);
   PetscFunctionReturn(PETSC_SUCCESS);
