@@ -331,16 +331,9 @@ static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edge
   CeedScalar(*courant_num_data)[2];  // values to the left/right of an edge
   PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
 
-  // RDyMesh  *mesh  = &rdy->mesh;
-  RDyEdges *edges = &mesh->edges;
-
-  PetscInt iedge_owned = 0;
-  for (PetscInt ii = 0; ii < mesh->num_internal_edges; ii++) {
-    if (edges->is_owned[ii]) {
-      CeedScalar local_max = fmax(courant_num_data[iedge_owned][0], courant_num_data[iedge_owned][1]);
-      *max_courant_number  = fmax(*max_courant_number, local_max);
-      iedge_owned++;
-    }
+  for (PetscInt ii = 0; ii < mesh->num_owned_internal_edges; ii++) {
+    CeedScalar local_max = fmax(courant_num_data[ii][0], courant_num_data[ii][1]);
+    *max_courant_number  = fmax(*max_courant_number, local_max);
   }
   PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
 
