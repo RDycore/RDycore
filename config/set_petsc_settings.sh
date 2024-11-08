@@ -91,11 +91,11 @@ elif [ "$mach" = "frontier"  ]; then
   export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc_v3.22.0
 
   if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-debug-64bit-gcc-11-2-0-v3.22.0
+      export PETSC_ARCH=gnugpu-hdf5_1_14_3-opt-64bit-gcc-12-3-0-v3.22.0
   elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=frontier-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-v3.22.0
+      export PETSC_ARCH=gnugpu-hdf5_1_14_3-debug-64bit-gcc-12-3-0-v3.22.0
   elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=frontier-gpu-opt-32bit-gcc-12-3-0-v3.22.0
+      export PETSC_ARCH=gnugpu-opt-32bit-gcc-12-3-0-v3.22.0
   fi
 
 #elif [ "$mach" = "aurora"  ]; then
