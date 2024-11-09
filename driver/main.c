@@ -52,7 +52,7 @@ typedef struct {
   PetscReal *data_xc, *data_yc;  // x and y coordinates of data in the raster dataset
   PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore cells
 
-  PetscBool output_map;  // if true, writes the mapping between the RDycore cells and the dataset
+  PetscBool output_map_for_debugging;  // if true, writes the mapping between the RDycore cells and the dataset
 } RasterDataset;
 
 typedef struct {
@@ -77,7 +77,7 @@ typedef struct {
   PetscReal *data_xc, *data_yc;  // x and y coordinates of data
   PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore elments
 
-  PetscBool output_map;  // if true, writes the mapping between the RDycore cells and the dataset
+  PetscBool output_map_for_debugging;  // if true, writes the mapping between the RDycore cells and the dataset
 
 } UnstructuredDataset;
 
@@ -541,7 +541,7 @@ static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondi
     // set up the mapping between the dataset and boundary edges
     PetscCall(CreateUnstructuredDatasetMapping(&bc_dataset->unstructured));
 
-    if (bc_dataset->unstructured.output_map) {
+    if (bc_dataset->unstructured.output_map_for_debugging) {
       PetscMPIInt rank;
       MPI_Comm_rank(comm, &rank);
       static char debug_file[PETSC_MAX_PATH_LEN] = {0};
@@ -885,13 +885,13 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
   // set default settings
-  rain_dataset->type                               = UNSET;
-  rain_dataset->constant.rate                      = 0.0;
-  rain_dataset->homogeneous.temporally_interpolate = PETSC_FALSE;
-  rain_dataset->unstructured.ndata                 = 0;
-  rain_dataset->unstructured.stride                = 0;
-  rain_dataset->unstructured.mesh_nelements        = 0;
-  rain_dataset->unstructured.output_map            = PETSC_FALSE;
+  rain_dataset->type                                  = UNSET;
+  rain_dataset->constant.rate                         = 0.0;
+  rain_dataset->homogeneous.temporally_interpolate    = PETSC_FALSE;
+  rain_dataset->unstructured.ndata                    = 0;
+  rain_dataset->unstructured.stride                   = 0;
+  rain_dataset->unstructured.mesh_nelements           = 0;
+  rain_dataset->unstructured.output_map_for_debugging = PETSC_FALSE;
 
   PetscCall(
       PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
@@ -922,7 +922,7 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
     PetscBool raster_dir_flag;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
 
-    PetscOptionsGetBool(NULL, NULL, "-raster_rain_output_map", &rain_dataset->raster.output_map, NULL);
+    PetscOptionsGetBool(NULL, NULL, "-raster_rain_output_map_for_debugging", &rain_dataset->raster.output_map_for_debugging, NULL);
 
     PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
@@ -966,7 +966,7 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_dir", rain_dataset->unstructured.dir, sizeof(rain_dataset->unstructured.dir),
                                     &unstructured_rain_dir_flag));
 
-    PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_output_map", &rain_dataset->unstructured.output_map, NULL);
+    PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_output_map_for_debugging", &rain_dataset->unstructured.output_map_for_debugging, NULL);
 
     PetscInt date[NUM_UNSTRUCTURED_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_UNSTRUCTURED_RAIN_DATE_VALUES;
@@ -1058,14 +1058,14 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscFunctionBegin;
 
   // set default settings
-  bc->type                               = UNSET;
-  bc->ndata                              = 0;
-  bc->dirichlet_bc_idx                   = -1;
-  bc->homogeneous.temporally_interpolate = PETSC_FALSE;
-  bc->unstructured.ndata                 = 0;
-  bc->unstructured.stride                = 0;
-  bc->unstructured.mesh_nelements        = 0;
-  bc->unstructured.output_map            = PETSC_FALSE;
+  bc->type                                  = UNSET;
+  bc->ndata                                 = 0;
+  bc->dirichlet_bc_idx                      = -1;
+  bc->homogeneous.temporally_interpolate    = PETSC_FALSE;
+  bc->unstructured.ndata                    = 0;
+  bc->unstructured.stride                   = 0;
+  bc->unstructured.mesh_nelements           = 0;
+  bc->unstructured.output_map_for_debugging = PETSC_FALSE;
 
   PetscInt dataset_type_count = 0;  // number of number of datatypes specified via command line
 
@@ -1085,7 +1085,7 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscBool unstructured_bc_dir_flag;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_dir", bc->unstructured.dir, sizeof(bc->unstructured.dir), &unstructured_bc_dir_flag));
 
-  PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_output_map", &bc->unstructured.output_map, NULL);
+  PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_output_map_for_debugging", &bc->unstructured.output_map_for_debugging, NULL);
 
   PetscInt  date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
   PetscInt  ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
@@ -1198,7 +1198,7 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       PetscCall(OpenRasterDataset(&rain_dataset->raster));
       PetscCall(CreateRasterDatasetMapping(rdy, &rain_dataset->raster));
 
-      if (rain_dataset->raster.output_map) {
+      if (rain_dataset->raster.output_map_for_debugging) {
         sprintf(debug_file, "map.source-sink.raster.rank_%d.bin", rank);
         PetscCall(WriteMappingForDebugging(debug_file, rain_dataset->raster.mesh_ncells_local, rain_dataset->raster.data2mesh_idx,
                                            rain_dataset->raster.data_xc, rain_dataset->raster.data_yc, rain_dataset->raster.mesh_xc,
@@ -1227,7 +1227,7 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       // set up the mapping between the dataset and local cells
       PetscCall(CreateUnstructuredDatasetMapping(&rain_dataset->unstructured));
 
-      if (rain_dataset->unstructured.output_map) {
+      if (rain_dataset->unstructured.output_map_for_debugging) {
         sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
         PetscCall(WriteMappingForDebugging(debug_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx,
                                            rain_dataset->unstructured.data_xc, rain_dataset->unstructured.data_yc, rain_dataset->unstructured.mesh_xc,
