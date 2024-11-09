@@ -478,6 +478,12 @@ PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyCreateOneDOFGlobalVec(RDy rdy, Vec *global) {
+  PetscFunctionBegin;
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyWriteOneDOFGlobalVecToBinaryFile(RDy rdy, const char filename[], Vec *global) {
   PetscFunctionBegin;
 

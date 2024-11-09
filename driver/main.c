@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
   char file[PETSC_MAX_PATH_LEN];
+  char map_file[PETSC_MAX_PATH_LEN];
 
   struct tm start_date, current_date;  // start and current date for rainfall dataset
 
@@ -53,12 +54,15 @@ typedef struct {
   PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore cells
 
   PetscBool write_map_for_debugging;  // if true, write the map between the RDycore cells and the dataset for debugging
+  PetscBool write_map;                // if true, write the map between the RDycore cells and the dataset
+  PetscBool read_map;                 // if true, read the map between the RDycore cells and the dataset
 } RasterDataset;
 
 typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
   char file[PETSC_MAX_PATH_LEN];
   char mesh_file[PETSC_MAX_PATH_LEN];
+  char map_file[PETSC_MAX_PATH_LEN];
 
   PetscReal dtime_in_hour;
   PetscInt  ndata_file;
@@ -78,7 +82,8 @@ typedef struct {
   PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore elments
 
   PetscBool write_map_for_debugging;  // if true, write the mapping between the RDycore cells and the dataset for debugging
-
+  PetscBool write_map;                // if true, write the map between the RDycore cells and the dataset
+  PetscBool read_map;                 // if true, read the map between the RDycore cells and the dataset
 } UnstructuredDataset;
 
 typedef struct {
@@ -360,6 +365,28 @@ static PetscErrorCode OpenMultiHomogeneousDataset(MultiHomogeneousDataset *multi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Write out the map of dataset-to-mesh
+/// @param rdy      [in] A pointer to RDy struct
+/// @param filename [in] Name of the map file
+/// @param ncells   [in] Number of RDycore's local cells
+/// @param d2m      [in] Index of dataset-to-mesh map
+/// @return PETSC_SUCESS on success
+static PetscErrorCode WriteMap(RDy rdy, char *filename, PetscInt ncells, PetscInt *d2m) {
+  PetscFunctionBegin;
+  Vec          global;
+  PetscScalar *global_ptr;
+  PetscCall(RDyCreateOneDOFGlobalVec(rdy, &global));
+
+  PetscCall(VecGetArray(global, &global_ptr));
+  for (PetscInt i = 0; i < ncells; i++) global_ptr[i] = d2m[i];
+  PetscCall(VecRestoreArray(global, &global_ptr));
+
+  PetscCall(RDyWriteOneDOFGlobalVecToBinaryFile(rdy, filename, &global));
+
+  PetscCall(VecDestroy(&global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Saves out the mapping of a dataset to RDycore as a binary Vec
 /// @param filename [in] Name of the map file
 /// @param ncells   [in] Number of RDycore's elements
@@ -550,6 +577,10 @@ static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondi
       PetscCall(WriteMappingForDebugging(debug_file, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.data2mesh_idx,
                                          bc_dataset->unstructured.data_xc, bc_dataset->unstructured.data_yc, bc_dataset->unstructured.mesh_xc,
                                          bc_dataset->unstructured.mesh_yc));
+    }
+
+    if (bc_dataset->unstructured.write_map) {
+      PetscCall(WriteMap(rdy, bc_dataset->unstructured.map_file, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.data2mesh_idx));
     }
   }
 
@@ -892,6 +923,7 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   rain_dataset->unstructured.stride                  = 0;
   rain_dataset->unstructured.mesh_nelements          = 0;
   rain_dataset->unstructured.write_map_for_debugging = PETSC_FALSE;
+  rain_dataset->unstructured.write_map               = PETSC_FALSE;
 
   PetscCall(
       PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
@@ -923,6 +955,10 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
 
     PetscOptionsGetBool(NULL, NULL, "-raster_rain_write_map_for_debugging", &rain_dataset->raster.write_map_for_debugging, NULL);
+    PetscOptionsGetString(NULL, NULL, "-raster_rain_write_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
+                          &rain_dataset->raster.write_map);
+    PetscOptionsGetString(NULL, NULL, "-raster_rain_read_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
+                          &rain_dataset->raster.read_map);
 
     PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
@@ -967,6 +1003,10 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
                                     &unstructured_rain_dir_flag));
 
     PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_write_map_for_debugging", &rain_dataset->unstructured.write_map_for_debugging, NULL);
+    PetscOptionsGetString(NULL, NULL, "-unstructured_rain_write_map_file", rain_dataset->unstructured.map_file,
+                          sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.write_map);
+    PetscOptionsGetString(NULL, NULL, "-unstructured_rain_read_map_file", rain_dataset->unstructured.map_file,
+                          sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.read_map);
 
     PetscInt date[NUM_UNSTRUCTURED_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_UNSTRUCTURED_RAIN_DATE_VALUES;
@@ -1086,6 +1126,10 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_dir", bc->unstructured.dir, sizeof(bc->unstructured.dir), &unstructured_bc_dir_flag));
 
   PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_write_map_for_debugging", &bc->unstructured.write_map_for_debugging, NULL);
+  PetscOptionsGetString(NULL, NULL, "-unstructured_bc_write_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
+                        &bc->unstructured.write_map);
+  PetscOptionsGetString(NULL, NULL, "-unstructured_bc_read_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
+                        &bc->unstructured.read_map);
 
   PetscInt  date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
   PetscInt  ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
@@ -1205,6 +1249,10 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
                                            rain_dataset->raster.mesh_yc));
       }
 
+      if (rain_dataset->raster.write_map) {
+        PetscCall(WriteMap(rdy, rain_dataset->raster.map_file, rain_dataset->raster.mesh_ncells_local, rain_dataset->raster.data2mesh_idx));
+      }
+
       break;
     case UNSTRUCTURED:
       rain_dataset->ndata = n;
@@ -1233,6 +1281,12 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
                                            rain_dataset->unstructured.data_xc, rain_dataset->unstructured.data_yc, rain_dataset->unstructured.mesh_xc,
                                            rain_dataset->unstructured.mesh_yc));
       }
+
+      if (rain_dataset->unstructured.write_map) {
+        PetscCall(
+            WriteMap(rdy, rain_dataset->unstructured.map_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx));
+      }
+
       break;
     case MULTI_HOMOGENEOUS:
       PetscCall(OpenMultiHomogeneousDataset(&rain_dataset->multihomogeneous));
