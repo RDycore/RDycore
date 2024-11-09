@@ -478,6 +478,29 @@ PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyWriteOneDOFGlobalVecToBinaryFile(RDy rdy, const char filename[], Vec *global) {
+  PetscFunctionBegin;
+
+  // create a naturally-ordered vector with a stride equal to the number of
+  Vec natural;
+  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+
+  // scatter global-to-natural
+  PetscCall(DMPlexGlobalToNaturalBegin(rdy->aux_dm, *global, natural));
+  PetscCall(DMPlexGlobalToNaturalEnd(rdy->aux_dm, *global, natural));
+
+  // write the data to file
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+  PetscCall(VecView(natural, viewer));
+
+  // free up memory
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(VecDestroy(&natural));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // reads data for a single DOF from a binary file into a global Vec
 PetscErrorCode RDyReadOneDOFGlobalVecFromBinaryFile(RDy rdy, const char filename[], Vec *global) {
   PetscFunctionBegin;
