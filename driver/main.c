@@ -500,6 +500,27 @@ static PetscErrorCode CreateUnstructuredDatasetMap(UnstructuredDataset *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], PetscInt ncells, PetscInt **data2mesh_idx) {
+  PetscFunctionBegin;
+
+  PetscCalloc1(ncells, data2mesh_idx);
+
+  Vec global;
+  PetscCall(RDyReadOneDOFGlobalVecFromBinaryFile(rdy, filename, &global));
+
+  // for each boundary edge, find nearest dataset cell
+  PetscScalar *global_ptr;
+  PetscCall(VecGetArray(global, &global_ptr));
+  for (PetscInt ii = 0; ii < ncells; ii++) {
+    *data2mesh_idx[ii] = global_ptr[ii];
+  }
+  PetscCall(VecRestoreArray(global, &global_ptr));
+
+  PetscCall(VecDestroy(&global));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -1282,7 +1303,12 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
 
       // set up the mapping between the dataset and local cells
       PetscCall(ReadUnstructuredDataset(&rain_dataset->unstructured));
-      PetscCall(CreateUnstructuredDatasetMap(&rain_dataset->unstructured));
+      if (rain_dataset->unstructured.read_map) {
+        PetscCall(ReadRainfallDatasetMap(rdy, rain_dataset->unstructured.map_file, rain_dataset->unstructured.mesh_nelements,
+                                         &rain_dataset->unstructured.data2mesh_idx));
+      } else {
+        PetscCall(CreateUnstructuredDatasetMap(&rain_dataset->unstructured));
+      }
 
       if (rain_dataset->unstructured.write_map_for_debugging) {
         sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
