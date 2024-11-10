@@ -430,13 +430,10 @@ static PetscErrorCode WriteMappingForDebugging(char *filename, PetscInt ncells, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Sets up the mapping between the unstructured grid dataset cells and the
-///        local cells (for source-sink condition) or boundary edges (for boundary condition).
-/// @param data Pointer to a UnstructuredDataset struct
+/// @brief Reads an unstructure dataset that is a PETSc Vec in bainry format
+/// @param data A pointer to a UnstructuredDataset struct
 /// @return PETSC_SUCESS on success
-static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data) {
-  PetscFunctionBegin;
-
+static PetscErrorCode ReadUnstructuredDataset(UnstructuredDataset *data) {
   PetscViewer  viewer;
   Vec          vec;
   PetscScalar *vec_ptr;
@@ -464,6 +461,16 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
 
   PetscCall(VecRestoreArray(vec, &vec_ptr));
   PetscCall(VecDestroy(&vec));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Sets up the mapping between the unstructured grid dataset cells and the
+///        local cells (for source-sink condition) or boundary edges (for boundary condition).
+/// @param data Pointer to a UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode CreateUnstructuredDatasetMap(UnstructuredDataset *data) {
+  PetscFunctionBegin;
 
   PetscCalloc1(data->mesh_nelements, &data->data2mesh_idx);
 
@@ -566,7 +573,8 @@ static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondi
     PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_yc));
 
     // set up the mapping between the dataset and boundary edges
-    PetscCall(CreateUnstructuredDatasetMapping(&bc_dataset->unstructured));
+    PetscCall(ReadUnstructuredDataset(&bc_dataset->unstructured));
+    PetscCall(CreateUnstructuredDatasetMap(&bc_dataset->unstructured));
 
     if (bc_dataset->unstructured.write_map_for_debugging) {
       PetscMPIInt rank;
@@ -1273,7 +1281,8 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       PetscCall(RDyGetLocalCellYCentroids(rdy, n, rain_dataset->unstructured.mesh_yc));
 
       // set up the mapping between the dataset and local cells
-      PetscCall(CreateUnstructuredDatasetMapping(&rain_dataset->unstructured));
+      PetscCall(ReadUnstructuredDataset(&rain_dataset->unstructured));
+      PetscCall(CreateUnstructuredDatasetMap(&rain_dataset->unstructured));
 
       if (rain_dataset->unstructured.write_map_for_debugging) {
         sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
