@@ -440,15 +440,15 @@ static PetscErrorCode WriteMappingForDebugging(char *filename, PetscInt ncells, 
 /// @param *xc Holds cell centeroid x coordinate value for local cells
 /// @param *yc Holds cell centeroid y coordinate value for local cells
 /// @return PETSC_SUCESS on success
-static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscReal *xc, PetscReal *yc) {
+static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscReal **xc, PetscReal **yc) {
   PetscFunctionBegin;
 
   // allocate memory
-  PetscCalloc1(n, &xc);
-  PetscCalloc1(n, &yc);
+  PetscCalloc1(n, xc);
+  PetscCalloc1(n, yc);
 
-  PetscCall(RDyGetLocalCellXCentroids(rdy, n, xc));
-  PetscCall(RDyGetLocalCellYCentroids(rdy, n, yc));
+  PetscCall(RDyGetLocalCellXCentroids(rdy, n, *xc));
+  PetscCall(RDyGetLocalCellYCentroids(rdy, n, *yc));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -460,16 +460,16 @@ static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, Petsc
 /// @param *xc   Holds cell centeroid x coordinate value for local cells
 /// @param *yc   Holds cell centeroid y coordinate value for local cells
 /// @return PETSC_SUCESS on success
-static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscInt bc_id, PetscReal *xc, PetscReal *yc) {
+static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscInt bc_id, PetscReal **xc, PetscReal **yc) {
   PetscFunctionBegin;
 
   // allocate memory
-  PetscCalloc1(n, &xc);
-  PetscCalloc1(n, &yc);
+  PetscCalloc1(n, xc);
+  PetscCalloc1(n, yc);
 
   // get the x/y coordinates of the boundary edges from RDycore
-  PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_id, n, xc));
-  PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_id, n, yc));
+  PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_id, n, *xc));
+  PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_id, n, *yc));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -554,11 +554,16 @@ static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], Pet
   Vec global;
   PetscCall(RDyReadOneDOFGlobalVecFromBinaryFile(rdy, filename, &global));
 
+  PetscInt size;
+  VecGetLocalSize(global, &size);
+  PetscCheck(ncells == size, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The ncells (=%" PetscInt_FMT ") does not match the local size of global Vec (=%" PetscInt_FMT ")", ncells, size);
+
   // for each boundary edge, find nearest dataset cell
   PetscScalar *global_ptr;
   PetscCall(VecGetArray(global, &global_ptr));
   for (PetscInt ii = 0; ii < ncells; ii++) {
-    *data2mesh_idx[ii] = global_ptr[ii];
+    (*data2mesh_idx)[ii] = global_ptr[ii];
   }
   PetscCall(VecRestoreArray(global, &global_ptr));
 
@@ -576,6 +581,8 @@ static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], Pet
 /// @return
 static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt *num_edges_dirc_bc, PetscInt *global_dirc_bc_idx,
                                         PetscBool *multiple_dirc_bcs_present) {
+  PetscFunctionBegin;
+
   MPI_Comm comm = PETSC_COMM_WORLD;
 
   // initialize values
@@ -643,7 +650,7 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, PetscIn
 
   // get the x/y coordinates of local cells from RDycore
   rain_dataset->unstructured.mesh_nelements = n;
-  PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, n, rain_dataset->unstructured.mesh_xc, rain_dataset->unstructured.mesh_yc));
+  PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, n, &rain_dataset->unstructured.mesh_xc, &rain_dataset->unstructured.mesh_yc));
 
   // read the coordinates of dataset
   PetscCall(ReadUnstructuredDatasetCoordinates(&rain_dataset->unstructured));
@@ -695,8 +702,8 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
     // get the x/y coordinates of the boundary edges from RDycore
-    PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset->unstructured.mesh_xc,
-                                                      bc_dataset->unstructured.mesh_yc));
+    PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, &bc_dataset->unstructured.mesh_xc,
+                                                      &bc_dataset->unstructured.mesh_yc));
 
     // read the coordinates of dataset
     PetscCall(ReadUnstructuredDatasetCoordinates(&bc_dataset->unstructured));
@@ -831,9 +838,11 @@ static PetscErrorCode DestroyUnstructuredDataset(UnstructuredDataset *data) {
 
   PetscCall(PetscFree(data->data_xc));
   PetscCall(PetscFree(data->data_yc));
-  PetscCall(PetscFree(data->mesh_xc));
-  PetscCall(PetscFree(data->mesh_yc));
-  PetscCall(PetscFree(data->data2mesh_idx));
+  if (data->mesh_nelements) {
+    PetscCall(PetscFree(data->mesh_xc));
+    PetscCall(PetscFree(data->mesh_yc));
+    PetscCall(PetscFree(data->data2mesh_idx));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1510,7 +1519,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
-      PetscInt expected_data_stride = 1;
+      PetscInt expected_data_stride = 3;
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured, expected_data_stride));
       PetscCall(DoPostprocessForBoundaryUnstructuredDataset(rdy, bc_dataset));
       break;
@@ -1591,10 +1600,6 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
     case RASTER:
       break;
     case UNSTRUCTURED:
-      if (bc_dataset->ndata) {
-        PetscCall(PetscFree(bc_dataset->unstructured.mesh_xc));
-        PetscCall(PetscFree(bc_dataset->unstructured.mesh_yc));
-      }
       PetscCall(DestroyUnstructuredDataset(&bc_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
