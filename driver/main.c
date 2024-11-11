@@ -646,7 +646,7 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
   bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
   PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
-  if ((num_edges_dirc_bc > 0) & (num_edges_dirc_bc > 0)) {
+  if ((num_edges_dirc_bc > 0)) {
     PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
 
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
