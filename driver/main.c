@@ -563,27 +563,59 @@ static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
-  PetscFunctionBegin;
-
+/// @brief Finds information about dirichlet BC
+/// @param rdy                        [in]  A pointer to RDy struct
+/// @param *dirc_bc_idx               [out] ID of a dirichlet BC
+/// @param *num_edges_dirc_bc         [out] Number of boundary edges on which the dirichlet BC is applied
+/// @param *global_dirc_bc_idx        [out] The maximum ID of a dirichlet BC across all MPI ranks
+/// @param *multiple_dirc_bcs_present [out] Is PETSC_TRUE if multiple diriclet BCs were found
+/// @return
+static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt *num_edges_dirc_bc, PetscInt *global_dirc_bc_idx,
+                                        PetscBool *multiple_dirc_bcs_present) {
   MPI_Comm comm = PETSC_COMM_WORLD;
 
-  PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
+  // initialize values
+  *dirc_bc_idx               = -1;
+  *global_dirc_bc_idx        = -1;
+  *num_edges_dirc_bc         = 0;
+  *multiple_dirc_bcs_present = PETSC_FALSE;
+
+  // find the number of BCs
+  PetscInt nbcs;
   PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+
+  // loop through all BCs and find info about dirichlet BC
   for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
     PetscInt num_edges, bc_type;
     PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
     PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
+
     if (bc_type == CONDITION_DIRICHLET) {
-      PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                 "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
-      dirc_bc_idx       = ibc;
-      num_edges_dirc_bc = num_edges;
+      if (*dirc_bc_idx != -1) *multiple_dirc_bcs_present = PETSC_TRUE;
+      *dirc_bc_idx       = ibc;
+      *num_edges_dirc_bc = num_edges;
     }
   }
 
-  PetscMPIInt global_dirc_bc_idx = -1;
-  MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  // find the ID of dirichlet BC across all ranks, which is need to check if a dirichlet BC was present on at least on rank
+  MPI_Allreduce(dirc_bc_idx, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+  PetscFunctionBegin;
+
+  MPI_Comm  comm        = PETSC_COMM_WORLD;
+  PetscInt  dirc_bc_idx = 0, num_edges_dirc_bc = 0, global_dirc_bc_idx = -1;
+  PetscBool multiple_dirc_bcs_present;
+
+  // find the info about the dirichlet BC
+  PetscCall(FindDirichletBCID(rdy, &dirc_bc_idx, &num_edges_dirc_bc, &global_dirc_bc_idx, &multiple_dirc_bcs_present));
+
+  // perform checks
+  PetscCheck(multiple_dirc_bcs_present == PETSC_FALSE, comm, PETSC_ERR_USER,
+             "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
   PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
              "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
 
@@ -597,24 +629,16 @@ static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, Bounda
 static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
-  MPI_Comm comm = PETSC_COMM_WORLD;
+  MPI_Comm  comm        = PETSC_COMM_WORLD;
+  PetscInt  dirc_bc_idx = 0, num_edges_dirc_bc = 0, global_dirc_bc_idx = -1;
+  PetscBool multiple_dirc_bcs_present;
 
-  PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
-  PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
-  for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
-    PetscInt num_edges, bc_type;
-    PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
-    PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
-    if (bc_type == CONDITION_DIRICHLET) {
-      PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                 "When BC file specified via -unstructured_bc_dir argument, only one CONDITION_DIRICHLET can be present in the yaml");
-      dirc_bc_idx       = ibc;
-      num_edges_dirc_bc = num_edges;
-    }
-  }
+  // find the info about the dirichlet BC
+  PetscCall(FindDirichletBCID(rdy, &dirc_bc_idx, &num_edges_dirc_bc, &global_dirc_bc_idx, &multiple_dirc_bcs_present));
 
-  PetscMPIInt global_dirc_bc_idx = -1;
-  MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  // perform checks
+  PetscCheck(multiple_dirc_bcs_present == PETSC_FALSE, comm, PETSC_ERR_USER,
+             "When BC file specified via -unstructured_bc_dir argument, only one CONDITION_DIRICHLET can be present in the yaml");
   PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
              "The BC file specified via -unstructured_bc_dir argument, but no CONDITION_DIRICHLET found in the yaml");
 
@@ -628,7 +652,8 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
     // get the x/y coordinates of the boundary edges from RDycore
-    PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset->unstructured.mesh_xc, bc_dataset->unstructured.mesh_yc));
+    PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset->unstructured.mesh_xc,
+                                                      bc_dataset->unstructured.mesh_yc));
 
     // set up the mapping between the dataset and boundary edges
     PetscCall(ReadUnstructuredDatasetCoordinates(&bc_dataset->unstructured));
