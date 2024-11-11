@@ -630,6 +630,47 @@ static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, Bounda
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, PetscInt n, SourceSink *rain_dataset) {
+  PetscFunctionBegin;
+
+  PetscMPIInt rank;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+
+  static char debug_file[PETSC_MAX_PATH_LEN] = {0};
+
+  rain_dataset->ndata = n;
+  PetscCalloc1(n, &rain_dataset->data_for_rdycore);
+
+  // get the x/y coordinates of local cells from RDycore
+  rain_dataset->unstructured.mesh_nelements = n;
+  PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, n, rain_dataset->unstructured.mesh_xc, rain_dataset->unstructured.mesh_yc));
+
+  // read the coordinates of dataset
+  PetscCall(ReadUnstructuredDatasetCoordinates(&rain_dataset->unstructured));
+
+  // read or create the mapping between the dataset and local cells
+  if (rain_dataset->unstructured.read_map) {
+    PetscCall(ReadRainfallDatasetMap(rdy, rain_dataset->unstructured.map_file, rain_dataset->unstructured.mesh_nelements,
+                                     &rain_dataset->unstructured.data2mesh_idx));
+  } else {
+    PetscCall(CreateUnstructuredDatasetMap(&rain_dataset->unstructured));
+  }
+
+  if (rain_dataset->unstructured.write_map_for_debugging) {
+    sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
+    PetscCall(WriteMappingForDebugging(debug_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx,
+                                       rain_dataset->unstructured.data_xc, rain_dataset->unstructured.data_yc, rain_dataset->unstructured.mesh_xc,
+                                       rain_dataset->unstructured.mesh_yc));
+  }
+
+  if (rain_dataset->unstructured.write_map) {
+    PetscCall(
+        WriteMap(rdy, rain_dataset->unstructured.map_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -657,7 +698,7 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
     PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset->unstructured.mesh_xc,
                                                       bc_dataset->unstructured.mesh_yc));
 
-    // set up the mapping between the dataset and boundary edges
+    // read the coordinates of dataset
     PetscCall(ReadUnstructuredDatasetCoordinates(&bc_dataset->unstructured));
 
     // set up the mapping between the dataset and boundary edges
@@ -1346,38 +1387,9 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
 
       break;
     case UNSTRUCTURED:
-      rain_dataset->ndata = n;
-
-      PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscInt expected_data_stride = 1;
       PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured, expected_data_stride));
-
-      // set coordinates of RDycore's mesh
-      rain_dataset->unstructured.mesh_nelements = n;
-      PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, n, rain_dataset->unstructured.mesh_xc, rain_dataset->unstructured.mesh_yc));
-
-      // read the coordinates of dataset
-      PetscCall(ReadUnstructuredDatasetCoordinates(&rain_dataset->unstructured));
-
-      // read or create the mapping between the dataset and local cells
-      if (rain_dataset->unstructured.read_map) {
-        PetscCall(ReadRainfallDatasetMap(rdy, rain_dataset->unstructured.map_file, rain_dataset->unstructured.mesh_nelements,
-                                         &rain_dataset->unstructured.data2mesh_idx));
-      } else {
-        PetscCall(CreateUnstructuredDatasetMap(&rain_dataset->unstructured));
-      }
-
-      if (rain_dataset->unstructured.write_map_for_debugging) {
-        sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
-        PetscCall(WriteMappingForDebugging(debug_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx,
-                                           rain_dataset->unstructured.data_xc, rain_dataset->unstructured.data_yc, rain_dataset->unstructured.mesh_xc,
-                                           rain_dataset->unstructured.mesh_yc));
-      }
-
-      if (rain_dataset->unstructured.write_map) {
-        PetscCall(
-            WriteMap(rdy, rain_dataset->unstructured.map_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx));
-      }
+      PetscCall(DoPostprocessForSourceUnstructuredDataset(rdy, n, rain_dataset));
 
       break;
     case MULTI_HOMOGENEOUS:
