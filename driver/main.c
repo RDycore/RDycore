@@ -323,7 +323,7 @@ static PetscErrorCode DestroyRasterDataset(RasterDataset *data) {
 ///
 /// @param *data [inout] A UnstructuredDataset struct
 /// @return PETSC_SUCESS on success
-static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
+static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data, PetscInt expected_data_stride) {
   PetscFunctionBegin;
 
   PetscCall(DetermineDatasetFilename(&data->current_date, data->dir, data->file));
@@ -351,6 +351,10 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
              "The length (=%" PetscInt_FMT ") of loaded Vec does is not consistent with first (N = %" PetscInt_FMT
              ") and second (stride = %" PetscInt_FMT ") in the Vec",
              size, data->ndata, data->stride);
+
+  // check the dataset stride is as expected
+  PetscCheck(data->stride == expected_data_stride, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The data stride is %" PetscInt_FMT ", while the expected stride is %" PetscInt_FMT ".", data->stride, expected_data_stride);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -647,8 +651,6 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
   PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
   if ((num_edges_dirc_bc > 0)) {
-    PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
-
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
     // get the x/y coordinates of the boundary edges from RDycore
@@ -1347,8 +1349,8 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       rain_dataset->ndata = n;
 
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
-      PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
-      PetscCheck((rain_dataset->unstructured.stride == 1), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of rainfall dataset is not 1.");
+      PetscInt expected_data_stride = 1;
+      PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured, expected_data_stride));
 
       // set coordinates of RDycore's mesh
       rain_dataset->unstructured.mesh_nelements = n;
@@ -1496,7 +1498,8 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
-      PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
+      PetscInt expected_data_stride = 1;
+      PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured, expected_data_stride));
       PetscCall(DoPostprocessForBoundaryUnstructuredDataset(rdy, bc_dataset));
       break;
     case MULTI_HOMOGENEOUS:
