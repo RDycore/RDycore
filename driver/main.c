@@ -563,7 +563,7 @@ static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -594,7 +594,7 @@ static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondit
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -1465,14 +1465,14 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       break;
     case HOMOGENEOUS:
       PetscCall(OpenHomogeneousDataset(&bc_dataset->homogeneous));
-      PetscCall(DoPostprocessForHomogeneousDataset(rdy, bc_dataset));
+      PetscCall(DoPostprocessForBoundaryHomogeneousDataset(rdy, bc_dataset));
       break;
     case RASTER:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
-      PetscCall(DoPostprocessForUnstructuredDataset(rdy, bc_dataset));
+      PetscCall(DoPostprocessForBoundaryUnstructuredDataset(rdy, bc_dataset));
       break;
     case MULTI_HOMOGENEOUS:
       PetscCall(OpenMultiHomogeneousDataset(&bc_dataset->multihomogeneous));
