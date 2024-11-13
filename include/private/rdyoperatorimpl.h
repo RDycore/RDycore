@@ -28,6 +28,8 @@ typedef struct {
   PetscBool is_set;           // true if max_courant_num is set, otherwise false
 } CourantNumberDiagnostics;
 
+PetscErrorCode PetscFindMaxCourantNumber(RDy, PetscReal *);
+
 //-------------
 // RDyOperator
 //-------------
@@ -168,6 +170,7 @@ typedef struct {
 } OperatorSourceData;
 
 PETSC_INTERN PetscErrorCode GetOperatorSourceData(Operator *, OperatorSourceData *);
+PETSC_INTERN PetscErrorCode GetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(Operator *, OperatorSourceData *);
 

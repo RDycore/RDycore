@@ -162,14 +162,6 @@ PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *mesh, Pe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode PetscFindMaxCourantNumber(RDy rdy, PetscReal *max_courant_number) {
-  PetscFunctionBegin;
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
-  *max_courant_number = courant_num_diags->max_courant_num;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// @brief Finds the maximum Courant number for the libCEED and the PETSc version of SWE implementation
 /// @param [inout] rdy An RDy object
 /// @return 0 on success, or a non-zero error code on failure

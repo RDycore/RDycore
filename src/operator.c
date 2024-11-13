@@ -124,6 +124,14 @@ static PetscErrorCode InitCourantNumberDiagnostics(void) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode PetscFindMaxCourantNumber(RDy rdy, PetscReal *max_courant_number) {
+  PetscFunctionBegin;
+  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
+  MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
+  *max_courant_number = courant_num_diags->max_courant_num;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
 #pragma GCC diagnostic push
@@ -354,7 +362,7 @@ PetscErrorCode AddCeedBoundaryFluxSubOperator(Operator *op, RDyBoundary boundary
   CeedInt num_sub_operators;
   PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.flux_operator, &num_sub_operators));
   PetscCheck(boundary.index == num_sub_operators - 1, comm, PETSC_ERR_USER,
-             "Invalid CEED boundary flux sub-operator index: %" PetscInt_FMT " (should be %" PetscInt_FMT ")", boundary.index, num_sub_operators - 1);
+             "Invalid CEED boundary flux sub-operator index: %" PetscInt_FMT " (should be %" CeedInt_FMT ")", boundary.index, num_sub_operators - 1);
 
   // check for required input, output fields
   const char *required_inputs[] = {
@@ -984,6 +992,45 @@ PetscErrorCode GetOperatorSourceData(Operator *op, OperatorSourceData *source_da
     PetscCallCEED(CeedOperatorFieldGetVector(field, &source_data->sources.ceed.vec));
   } else {
     source_data->sources.petsc.vec = op->petsc.sources;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Copies source data for the selected component into the supplied array.
+/// @param [in]  source_data source data associated with a given operator
+/// @param [in]  component the component of interest
+/// @param [out] sources   the array to which the source data is copied
+PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
+  PetscFunctionBegin;
+
+  if (CeedEnabled()) {
+    // if this is the first fetch, get access to the vector's data and mark it
+    // to be zeroed upon restoration
+    if (!source_data->sources.updated) {
+      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
+      source_data->sources.updated = PETSC_TRUE;
+    }
+
+    // reshape for multicomponent access
+    CeedScalar(*values)[source_data->num_components];
+    *((CeedScalar **)&values) = source_data->sources.ceed.data;
+
+    // fetch source data
+    for (CeedInt i = 0; i < source_data->op->mesh->num_owned_cells; ++i) {
+      source_values[i] = values[component][i];
+    }
+  } else {
+    if (!source_data->sources.updated) {
+      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
+      source_data->sources.updated = PETSC_TRUE;
+    }
+
+    // fetch sources
+    PetscReal *s = source_data->sources.petsc.data;
+    for (PetscInt i = 0; i < source_data->op->mesh->num_owned_cells; ++i) {
+      source_values[i] = s[i * source_data->num_components + component];
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
