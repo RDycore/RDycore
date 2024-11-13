@@ -1159,8 +1159,7 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
 #undef MAX_DATASETS
 
   PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "More than one boundary condition cannot be specified. Rainfall types sepcified : Homogeneous %" PetscInt_FMT "; Raster %" PetscInt_FMT
-             "; Multi-Homogeneous %" PetscInt_FMT,
+             "More than one boundary condition cannot be specified. Rainfall types specified : Homogeneous %u; Raster %u; Multi-Homogeneous %u",
              homogenous_bc_flag, unstructured_start_date_flag, multi_files_flag);
 
   PetscFunctionReturn(PETSC_SUCCESS);
