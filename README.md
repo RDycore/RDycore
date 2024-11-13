@@ -14,7 +14,7 @@ To build RDycore, you need:
 * reliable C and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
   or [Mpich](https://www.mpich.org/))
-* [PETSc](https://gitlab.com/petsc/petsc) `v3.21.4` or later
+* [PETSc](https://gitlab.com/petsc/petsc) `v3.22.0` or later
 
 You can obtain all of these freely (except perhaps your favorite Fortran
 compiler) on the Linux and Mac platforms. On Linux, just use your favorite
