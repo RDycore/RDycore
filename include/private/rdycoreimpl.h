@@ -3,6 +3,7 @@
 
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
+#include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
@@ -34,16 +35,6 @@ typedef struct {
   PetscInt *cell_ids;
   PetscInt  num_cells;
 } RDyRegion;
-
-// This type defines a boundary consisting of edges identified by their local
-// indices.
-typedef struct {
-  char      name[MAX_NAME_LEN + 1];  // boundary name
-  PetscInt  id;                      // boundary ID (as specified in mesh file)
-  PetscInt  index;                   // index of boundary within RDycore boundary list
-  PetscInt *edge_ids;
-  PetscInt  num_edges;
-} RDyBoundary;
 
 // This type defines a "condition" representing
 // * an initial condition or source/sink associated with a region

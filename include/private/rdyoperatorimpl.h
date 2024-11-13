@@ -1,9 +1,9 @@
-#ifndef RDYOPERATORSIMPL_H
-#define RDYOPERATORSIMPL_H
+#ifndef RDYOPERATORIMPL_H
+#define RDYOPERATORIMPL_H
 
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
-#include <private/rdycoreimpl.h>
+#include <private/rdyboundaryimpl.h>
 
 // initialization/finalization functions
 PETSC_INTERN PetscErrorCode InitOperators(RDy);

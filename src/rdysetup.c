@@ -4,7 +4,7 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
-#include <private/rdyoperatordataimpl.h>
+#include <private/rdyoperatorimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
