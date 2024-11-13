@@ -1625,7 +1625,7 @@ The interface for the "SWE operator" is visible in the private header
   exascale library.</li>
 </ul>
 <p>The SWE operators are created and configured in the <code>InitSWE</code> function, which
-lives in <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/physics_swe.c"><code>swe/physics_swe.c</code></a>.</p>
+lives in <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe.c"><code>swe/swe.c</code></a>.</p>
 <p>The <code>libceed</code>-based "device" code for these operators is defined within <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed.c"><code>swe/swe_ceed.c</code></a>
 and the header file <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed_impl.h"><code>swe/swe_ceed_impl.h</code></a>.
 The latter file defines inline <a href="https://libceed.org/en/latest/api/CeedQFunction/#ceedqfunction"><code>CeedQFunction</code></a>s
