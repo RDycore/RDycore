@@ -1,5 +1,5 @@
 #include <private/rdycoreimpl.h>
-#include <private/rdyoperatordataimpl.h>
+#include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 

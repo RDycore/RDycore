@@ -254,7 +254,7 @@ All operator code has two parts:
   exascale library.
 
 The SWE operators are created and configured in the `InitSWE` function, which
-lives in [`swe/physics_swe.c`](https://github.com/RDycore/RDycore/blob/main/src/swe/physics_swe.c).
+lives in [`swe/swe.c`](https://github.com/RDycore/RDycore/blob/main/src/swe/swe.c).
 
 The `libceed`-based "device" code for these operators is defined within [`swe/swe_ceed.c`](https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed.c)
 and the header file [`swe/swe_ceed_impl.h`](https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed_impl.h).

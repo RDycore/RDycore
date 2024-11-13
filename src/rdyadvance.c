@@ -17,9 +17,10 @@ PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
   static char output_dir[PETSC_MAX_PATH_LEN] = {0};
   if (!output_dir[0]) {
     if (rdy->config.ensemble.size > 1) {
-      sprintf(output_dir, "%s/%s", rdy->config.output.directory, rdy->config.ensemble.members[rdy->ensemble_member_index].name);
+      snprintf(output_dir, PETSC_MAX_PATH_LEN - 1, "%s/%s", rdy->config.output.directory,
+               rdy->config.ensemble.members[rdy->ensemble_member_index].name);
     } else {
-      sprintf(output_dir, "%s", rdy->config.output.directory);
+      snprintf(output_dir, PETSC_MAX_PATH_LEN - 1, "%s", rdy->config.output.directory);
     }
   }
   strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);

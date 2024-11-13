@@ -1,6 +1,6 @@
 #include <ceed/ceed.h>
 #include <petscdmceed.h>
-#include <private/rdyoperatordataimpl.h>
+#include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
 
 // CEED uses C99 VLA features for shaping multidimensional
