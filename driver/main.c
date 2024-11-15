@@ -1277,12 +1277,11 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
       }
       break;
     case MULTI_HOMOGENEOUS:
-      MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
-      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
+      for (PetscInt idata = 0; idata < rain_dataset->multihomogeneous.ndata; idata++) {
         PetscInt  size = 1;
         PetscReal data;
-        PetscCall(SetHomogeneousData(&multi_hdata->data[idata], time, size, &data));
-        PetscCall(RDySetWaterSourceForRegion(rdy, multi_hdata->region_ids[idata] - 1, data));
+        PetscCall(SetHomogeneousData(&rain_dataset->multihomogeneous.data[idata], time, size, &data));
+        PetscCall(RDySetWaterSourceForRegion(rdy, rain_dataset->multihomogeneous.region_ids[idata] - 1, data));
       }
       break;
   }
@@ -1315,11 +1314,10 @@ PetscErrorCode DestroyRainfallDataset(SourceSink *rain_dataset) {
       PetscCall(DestroyUnstructuredDataset(&rain_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
-      MultiHomogeneousDataset *multi_hdata = &rain_dataset->multihomogeneous;
-      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
-        PetscCall(DestroyHomogeneousDataset(&multi_hdata->data[idata]));
+      for (PetscInt idata = 0; idata < rain_dataset->multihomogeneous.ndata; idata++) {
+        PetscCall(DestroyHomogeneousDataset(&rain_dataset->multihomogeneous.data[idata]));
       }
-      PetscCall(PetscFree(multi_hdata->data));
+      PetscCall(PetscFree(rain_dataset->multihomogeneous.data));
       break;
   }
 
@@ -1396,15 +1394,15 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
       }
       break;
     case MULTI_HOMOGENEOUS:
-      MultiHomogeneousDataset *multi_hdata = &bc_dataset->multihomogeneous;
-      for (PetscInt ibc = 0; ibc < multi_hdata->ndirichlet_bcs; ibc++) {
-        PetscInt data_idx = multi_hdata->dirichlet_bc_to_data_idx[ibc];
-        PetscInt bc_idx   = multi_hdata->dirichlet_bc_idx[ibc];
-        PetscInt nedges   = multi_hdata->ndata_for_rdycore[ibc] / 3;
+      for (PetscInt ibc = 0; ibc < bc_dataset->multihomogeneous.ndirichlet_bcs; ibc++) {
+        PetscInt data_idx = bc_dataset->multihomogeneous.dirichlet_bc_to_data_idx[ibc];
+        PetscInt bc_idx   = bc_dataset->multihomogeneous.dirichlet_bc_idx[ibc];
+        PetscInt nedges   = bc_dataset->multihomogeneous.ndata_for_rdycore[ibc] / 3;
 
         if (nedges) {
-          PetscCall(SetHomogeneousBoundary(&multi_hdata->data[data_idx], time, nedges, multi_hdata->data_for_rdycore[ibc]));
-          PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, multi_hdata->data_for_rdycore[ibc]));
+          PetscCall(
+              SetHomogeneousBoundary(&bc_dataset->multihomogeneous.data[data_idx], time, nedges, bc_dataset->multihomogeneous.data_for_rdycore[ibc]));
+          PetscCall(RDySetDirichletBoundaryValues(rdy, bc_idx, nedges, 3, bc_dataset->multihomogeneous.data_for_rdycore[ibc]));
         }
       }
       break;
@@ -1441,21 +1439,20 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
       PetscCall(DestroyUnstructuredDataset(&bc_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
-      MultiHomogeneousDataset *multi_hdata = &bc_dataset->multihomogeneous;
-      for (PetscInt idata = 0; idata < multi_hdata->ndata; idata++) {
-        PetscCall(DestroyHomogeneousDataset(&multi_hdata->data[idata]));
+      for (PetscInt idata = 0; idata < bc_dataset->multihomogeneous.ndata; idata++) {
+        PetscCall(DestroyHomogeneousDataset(&bc_dataset->multihomogeneous.data[idata]));
       }
-      PetscCall(PetscFree(multi_hdata->data));
+      PetscCall(PetscFree(bc_dataset->multihomogeneous.data));
 
-      if (multi_hdata->ndirichlet_bcs) {
-        PetscCall(PetscFree(multi_hdata->dirichlet_bc_idx));
-        PetscCall(PetscFree(multi_hdata->dirichlet_bc_to_data_idx));
-        PetscCall(PetscFree(multi_hdata->ndata_for_rdycore));
+      if (bc_dataset->multihomogeneous.ndirichlet_bcs) {
+        PetscCall(PetscFree(bc_dataset->multihomogeneous.dirichlet_bc_idx));
+        PetscCall(PetscFree(bc_dataset->multihomogeneous.dirichlet_bc_to_data_idx));
+        PetscCall(PetscFree(bc_dataset->multihomogeneous.ndata_for_rdycore));
 
-        for (PetscInt i = 0; i < multi_hdata->ndirichlet_bcs; i++) {
-          PetscCall(PetscFree(multi_hdata->data_for_rdycore[i]));
+        for (PetscInt i = 0; i < bc_dataset->multihomogeneous.ndirichlet_bcs; i++) {
+          PetscCall(PetscFree(bc_dataset->multihomogeneous.data_for_rdycore[i]));
         }
-        PetscCall(PetscFree(multi_hdata->data_for_rdycore));
+        PetscCall(PetscFree(bc_dataset->multihomogeneous.data_for_rdycore));
       }
       break;
   }

@@ -108,23 +108,9 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMSetType(rdy->dm, DMPLEX));
 
   // if we're using CEED, set Vec and Mat types based on the selected backend
-  if (CeedEnabled(rdy)) {
-    CeedMemType mem_type_backend;
-    PetscCallCEED(CeedGetPreferredMemType(rdy->ceed.context, &mem_type_backend));
+  if (CeedEnabled()) {
     VecType vec_type = NULL;
-    switch (mem_type_backend) {
-      case CEED_MEM_HOST:
-        vec_type = VECSTANDARD;
-        break;
-      case CEED_MEM_DEVICE: {
-        const char *resolved;
-        PetscCallCEED(CeedGetResource(rdy->ceed.context, &resolved));
-        if (strstr(resolved, "/gpu/cuda")) vec_type = VECCUDA;
-        else if (strstr(resolved, "/gpu/hip")) vec_type = VECKOKKOS;
-        else if (strstr(resolved, "/gpu/sycl")) vec_type = VECKOKKOS;
-        else vec_type = VECSTANDARD;
-      }
-    }
+    PetscCall(GetCeedVecType(&vec_type));
     PetscCall(DMSetVecType(rdy->dm, vec_type));
 
     MatType mat_type = NULL;
@@ -242,7 +228,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
   } else {
     // initialize the sources vector

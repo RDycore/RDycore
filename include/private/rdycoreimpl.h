@@ -9,6 +9,13 @@
 #include <private/rdymeshimpl.h>
 #include <rdycore.h>
 
+// CEED initialization, availability, context, useful for creating CEED
+// sub-operators
+PETSC_INTERN PetscErrorCode SetCeedResource(char *);
+PETSC_INTERN PetscBool      CeedEnabled(void);
+PETSC_INTERN Ceed           CeedContext(void);
+PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
+
 // Diagnostic structure that captures information about the conditions under
 // which the maximum courant number is encountered. If you change this struct,
 // update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
@@ -168,11 +175,6 @@ struct _p_RDy {
 
   // CEED (device) solver data
   struct {
-    // CEED resource name -- used to determine the backend
-    char resource[PETSC_MAX_PATH_LEN];
-
-    Ceed context;
-
     CeedOperator flux_operator;
     CeedOperator source_operator;
 
@@ -221,7 +223,6 @@ PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
-static inline PetscBool     CeedEnabled(RDy rdy) { return (rdy->ceed.resource[0]) ? PETSC_TRUE : PETSC_FALSE; }
 
 PETSC_INTERN PetscErrorCode RDyDestroyVectors(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyRegions(RDy *);

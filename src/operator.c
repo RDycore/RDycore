@@ -43,7 +43,7 @@ PetscErrorCode DestroyOperators(RDy rdy) {
   PetscFree(rdy->lock.boundary_data);
   PetscFree(rdy->lock.source_data);
 
-  PetscBool ceed_enabled = CeedEnabled(rdy);
+  PetscBool ceed_enabled = CeedEnabled();
 
   if (rdy->petsc.context) {
     PetscCall(DestroyPetscSWEFlux(rdy->petsc.context, ceed_enabled, rdy->num_boundaries));
@@ -77,7 +77,7 @@ PetscErrorCode GetOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBo
   boundary_data->boundary                 = boundary;
   PetscCall(VecGetBlockSize(rdy->u_global, &boundary_data->num_components));
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // get the relevant boundary sub-operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.flux_operator, &sub_ops));
@@ -97,7 +97,7 @@ PetscErrorCode GetOperatorBoundaryData(RDy rdy, RDyBoundary boundary, OperatorBo
 PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *boundary_data, PetscInt component, PetscReal *boundary_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled(boundary_data->rdy)) {
+  if (CeedEnabled()) {
     // if this is the first update, get access to the vector's data
     if (!boundary_data->storage.updated) {
       PetscCallCEED(CeedVectorGetArray(boundary_data->storage.ceed.vec, CEED_MEM_HOST, &boundary_data->storage.ceed.data));
@@ -133,7 +133,7 @@ PetscErrorCode RestoreOperatorBoundaryData(RDy rdy, RDyBoundary boundary, Operat
   PetscFunctionBegin;
   PetscCheck(rdy == boundary_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong RDy");
   PetscCheck(boundary.index == boundary_data->boundary.index, rdy->comm, PETSC_ERR_USER, "Could not restore operator boundary data: wrong boundary");
-  if (CeedEnabled(boundary_data->rdy)) {
+  if (CeedEnabled()) {
     if (boundary_data->storage.updated) {
       PetscCallCEED(CeedVectorRestoreArray(boundary_data->storage.ceed.vec, &boundary_data->storage.ceed.data));
     }
@@ -155,7 +155,7 @@ PetscErrorCode GetOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
   source_data->rdy      = rdy;
   PetscCall(VecGetBlockSize(rdy->u_global, &source_data->num_components));
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // NOTE: our SWE-specific source operator has only one sub operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
@@ -176,7 +176,7 @@ PetscErrorCode GetOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
 PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled(source_data->rdy)) {
+  if (CeedEnabled()) {
     // if this is the first update, get access to the vector's data
     if (!source_data->sources.updated) {
       PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
@@ -212,7 +212,7 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
 PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled(source_data->rdy)) {
+  if (CeedEnabled()) {
     // if this is the first update, get access to the vector's data
     if (!source_data->sources.updated) {
       PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
@@ -247,7 +247,7 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
 PetscErrorCode RestoreOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
   PetscFunctionBegin;
   PetscCheck(rdy == source_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong RDy");
-  if (CeedEnabled(source_data->rdy)) {
+  if (CeedEnabled()) {
     if (source_data->sources.updated) {
       PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
     }
@@ -268,7 +268,7 @@ PetscErrorCode GetOperatorMaterialData(RDy rdy, OperatorMaterialData *material_d
   rdy->lock.material_data = material_data;
   material_data->rdy      = rdy;
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // NOTE: our SWE-specific source operator has only one sub operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
@@ -297,7 +297,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
       break;
   }
 
-  if (CeedEnabled(material_data->rdy)) {
+  if (CeedEnabled()) {
     // if this is the first update, get access to the vector's data
     if (!vector_data.updated) {
       PetscCallCEED(CeedVectorGetArray(vector_data.ceed.vec, CEED_MEM_HOST, &vector_data.ceed.data));
@@ -330,7 +330,7 @@ PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *material_data, Op
 PetscErrorCode RestoreOperatorMaterialData(RDy rdy, OperatorMaterialData *material_data) {
   PetscFunctionBegin;
   PetscCheck(rdy == material_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator material data: wrong RDy");
-  if (CeedEnabled(material_data->rdy)) {
+  if (CeedEnabled()) {
     if (material_data->mannings.updated) {
       PetscCallCEED(CeedVectorRestoreArray(material_data->mannings.ceed.vec, &material_data->mannings.ceed.data));
     }
@@ -352,7 +352,7 @@ PetscErrorCode GetOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData
   flux_div_data->rdy      = rdy;
   PetscCall(VecGetBlockSize(rdy->u_global, &flux_div_data->num_components));
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // NOTE: our SWE-specific source operator has only one sub operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(rdy->ceed.source_operator, &sub_ops));
@@ -373,7 +373,7 @@ PetscErrorCode GetOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData
 PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_div_data, PetscInt component, PetscReal *flux_div_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled(flux_div_data->rdy)) {
+  if (CeedEnabled()) {
     // if this is the first update, get access to the vector's data
     if (!flux_div_data->storage.updated) {
       PetscCallCEED(CeedVectorGetArray(flux_div_data->storage.ceed.vec, CEED_MEM_HOST, &flux_div_data->storage.ceed.data));
@@ -408,7 +408,7 @@ PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *flux_
 PetscErrorCode RestoreOperatorFluxDivergenceData(RDy rdy, OperatorFluxDivergenceData *flux_div_data) {
   PetscFunctionBegin;
   PetscCheck(rdy == flux_div_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator flux divergence data: wrong RDy");
-  if (CeedEnabled(flux_div_data->rdy)) {
+  if (CeedEnabled()) {
     if (flux_div_data->storage.updated) {
       PetscCallCEED(CeedVectorRestoreArray(flux_div_data->storage.ceed.vec, &flux_div_data->storage.ceed.data));
     }

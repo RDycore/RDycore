@@ -95,7 +95,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
 
   // dispatch this call to CEED or PETSc
   PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // FIXME: we'd like to do this for both CEED and PETSc
     // FIXME: also, I don't think we should be setting boundary values with a
     // FIXME: strided array, since it makes non-SWE situations more complicated
@@ -437,7 +437,7 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     // FIXME: we'd like to do this for both CEED and PETSc
     OperatorMaterialData material_data;
     PetscCall(GetOperatorMaterialData(rdy, &material_data));

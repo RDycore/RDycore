@@ -110,20 +110,19 @@ PetscErrorCode OverrideParameters(RDy rdy) {
     rdy->dt = ConvertTimeToSeconds(rdy->dt, rdy->config.time.unit);
   }
 
+  char ceed_resource[PETSC_MAX_PATH_LEN] = {0};
   PetscOptionsBegin(rdy->comm, NULL, "RDycore options", "");
   {
     PetscCall(PetscOptionsReal("-dt", "time step size (seconds)", "", rdy->dt, &rdy->dt, NULL));
-    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", rdy->ceed.resource, rdy->ceed.resource,
-                                 sizeof rdy->ceed.resource, NULL));
+    PetscCall(PetscOptionsString("-ceed", "Ceed resource (/cpu/self, /gpu/cuda, /gpu/hip, ...)", "", ceed_resource, ceed_resource,
+                                 sizeof ceed_resource, NULL));
     PetscCall(PetscOptionsString("-restart", "restart from the given checkpoint file", "", rdy->config.restart.file, rdy->config.restart.file,
                                  sizeof rdy->config.restart.file, NULL));
   }
   PetscOptionsEnd();
 
-  // initialize a CEED context if needed, assuming ownership
-  if (CeedEnabled(rdy)) {
-    PetscCallCEED(CeedInit(rdy->ceed.resource, &rdy->ceed.context));
-  }
+  // enable CEED as needed
+  PetscCallCEED(SetCeedResource(ceed_resource));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
