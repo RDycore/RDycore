@@ -1,12 +1,11 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 
-// global CEED resource name and context
-static char ceed_resource[PETSC_MAX_PATH_LEN + 1] = {0};
+// global CEED context
 static Ceed ceed_context;
 
 /// returns true iff CEED is enabled
-PetscBool CeedEnabled(void) { return (ceed_resource[0]) ? PETSC_TRUE : PETSC_FALSE; }
+PetscBool CeedEnabled(void) { return (ceed_context != NULL); }
 
 /// returns the global CEED context, which is only valid if CeedEnabled()
 /// returns PETSC_TRUE
@@ -42,14 +41,12 @@ PetscErrorCode GetCeedVecType(VecType *vec_type) {
 /// @param resource a CEED resource string, possibly empty or NULL
 PetscErrorCode SetCeedResource(char *resource) {
   PetscFunctionBegin;
-  if (ceed_resource[0]) {  // we already have a context
+  if (ceed_context) {  // we already have a context
     CeedDestroy(&ceed_context);
+    ceed_context = NULL;
   }
   if (resource && resource[0]) {
-    strncpy(ceed_resource, resource, PETSC_MAX_PATH_LEN);
-    PetscCallCEED(CeedInit(ceed_resource, &ceed_context));
-  } else {
-    ceed_resource[0] = 0;
+    PetscCallCEED(CeedInit(resource, &ceed_context));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
