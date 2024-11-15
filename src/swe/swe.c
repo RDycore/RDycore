@@ -12,68 +12,6 @@ PetscErrorCode SWERHSFunctionForBoundaryEdges(RDy rdy, Vec F, CourantNumberDiagn
 PetscErrorCode ComputeSWEDiagnosticVariables(RDy rdy);
 PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F);
 
-//-----------------------
-// Debugging diagnostics
-//-----------------------
-
-// MPI datatype corresponding to CourantNumberDiagnostics. Created during InitSWE.
-static MPI_Datatype courant_num_diags_type;
-
-// MPI operator used to determine the prevailing diagnostics for the maximum
-// courant number on all processes. Created during InitSWE.
-static MPI_Op courant_num_diags_op;
-
-// function backing the above MPI operator
-static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
-  CourantNumberDiagnostics *in_diags     = in_vec;
-  CourantNumberDiagnostics *result_diags = result_vec;
-
-  // select the item with the maximum courant number
-  for (int i = 0; i < *len; ++i) {
-    if (in_diags[i].max_courant_num > result_diags[i].max_courant_num) {
-      result_diags[i] = in_diags[i];
-    }
-  }
-}
-
-// this function destroys the MPI type and operator associated with CourantNumberDiagnostics
-static void DestroyCourantNumberDiagnostics(void) {
-  MPI_Op_free(&courant_num_diags_op);
-  MPI_Type_free(&courant_num_diags_type);
-}
-
-// this function is called by InitSWE to initialize the above type(s) and op(s).
-static PetscErrorCode InitMPITypesAndOps(void) {
-  PetscFunctionBegin;
-
-  static PetscBool initialized = PETSC_FALSE;
-
-  if (!initialized) {
-    // create an MPI data type for the CourantNumberDiagnostics struct
-    const int      num_blocks             = 4;
-    const int      block_lengths[4]       = {1, 1, 1, 1};
-    const MPI_Aint block_displacements[4] = {
-        offsetof(CourantNumberDiagnostics, max_courant_num),
-        offsetof(CourantNumberDiagnostics, global_edge_id),
-        offsetof(CourantNumberDiagnostics, global_cell_id),
-        offsetof(CourantNumberDiagnostics, is_set),
-    };
-    MPI_Datatype block_types[4] = {MPIU_REAL, MPI_INT, MPI_INT, MPIU_BOOL};
-    MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &courant_num_diags_type);
-    MPI_Type_commit(&courant_num_diags_type);
-
-    // create a corresponding reduction operator for the new type
-    MPI_Op_create(FindCourantNumberDiagnostics, 1, &courant_num_diags_op);
-
-    // make sure the operator and the type are destroyed upon exit
-    PetscCall(RDyOnFinalize(DestroyCourantNumberDiagnostics));
-
-    initialized = PETSC_TRUE;
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 static PetscErrorCode RHSFunctionSWE(TS, PetscReal, Vec, Vec, void *);
 
 // create solvers and vectors
@@ -167,9 +105,6 @@ static PetscErrorCode CreateOperators(RDy rdy) {
 // This function initializes SWE physics for the given dycore.
 PetscErrorCode InitSWE(RDy rdy) {
   PetscFunctionBeginUser;
-
-  // set up MPI types and operators used by SWE physics
-  PetscCall(InitMPITypesAndOps());
 
   // sets up solvers, operators, all that stuff
   PetscCall(CreateSolvers(rdy));
@@ -397,8 +332,6 @@ static PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *m
   PetscCall(CeedFindMaxCourantNumberInternalEdges(op_edges, mesh, max_courant_number));
   PetscCall(CeedFindMaxCourantNumberBoundaryEdges(op_edges, num_boundaries, boundaries, max_courant_number));
 
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, max_courant_number, 1, MPI_DOUBLE, MPI_MAX, comm));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -411,13 +344,14 @@ PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
 
   if (CeedEnabled()) {
+    // we need to extract the maximum courant number from the operator in the
+    // CEED case; in the PETSc case it's already set for this process
     PetscCall(CeedFindMaxCourantNumber(rdy->ceed.flux_operator, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->comm,
                                        &courant_num_diags->max_courant_num));
-    courant_num_diags->is_set = PETSC_TRUE;
-  } else {
-    MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, courant_num_diags_type, courant_num_diags_op, rdy->comm);
-    courant_num_diags->is_set = PETSC_TRUE;
   }
+
+  // reduce the courant diagnostics across all processes
+  MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, MPI_COURANT_NUMBER_DIAGNOSTICS, MPI_MAX_COURANT_NUMBER, rdy->comm);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

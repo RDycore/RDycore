@@ -26,6 +26,12 @@ typedef struct {
   PetscBool is_set;           // true if max_courant_num is set, otherwise false
 } CourantNumberDiagnostics;
 
+// MPI datatype and operator for reducing CourantNumberDiagnostics with MPI_AllReduce,
+// and related initialization function
+extern MPI_Datatype         MPI_COURANT_NUMBER_DIAGNOSTICS;
+extern MPI_Op               MPI_MAX_COURANT_NUMBER;
+PETSC_INTERN PetscErrorCode InitCourantNumberDiagnostics(void);
+
 // This type defines a material with specific properties.
 // (undefined properties are set to INVALID_INT/INVALID_REAL)
 typedef struct {
