@@ -213,7 +213,8 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
-  // destroy our CEED context as needed
+  // destroy our CEED context if needed by setting its resource to NULL
+  // (this works whether or not the CEED resource has been set previously)
   PetscCall(SetCeedResource(NULL));
 
   // close the log file if needed
