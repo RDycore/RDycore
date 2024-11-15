@@ -16,8 +16,13 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
     if (!petsc_initialized) {
       PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
     }
+
+    // initialize our Courant number diagnostics MPI datatype / operator
+    PetscCall(InitCourantNumberDiagnostics());
+
     initialized_ = PETSC_TRUE;
   }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -33,6 +38,10 @@ PetscErrorCode RDyInitFortran(void) {
       // no need for PetscInitializeFortran because PetscInitialize is
       // called before this function in the rdycore Fortran module.
     }
+
+    // initialize our Courant number diagnostics MPI datatype / operator
+    PetscCall(InitCourantNumberDiagnostics());
+
     initialized_ = PETSC_TRUE;
   }
   PetscFunctionReturn(PETSC_SUCCESS);

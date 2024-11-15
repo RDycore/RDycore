@@ -2,6 +2,7 @@
 add_library(rdycore
   ceed.c
   checkpoint.c
+  courant.c
   ensemble.c
   rdyadvance.c
   rdycore.c
