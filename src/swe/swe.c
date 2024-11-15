@@ -122,21 +122,22 @@ static PetscErrorCode CreateSolvers(RDy rdy) {
 // create flux and source operators
 static PetscErrorCode CreateOperators(RDy rdy) {
   PetscFunctionBegin;
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     RDyLogDebug(rdy, "Setting up CEED Operators...");
 
     // create the operators themselves
-    PetscCall(CreateSWEFluxOperator(rdy->ceed.context, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions,
-                                    rdy->config.physics.flow.tiny_h, &rdy->ceed.flux_operator));
+    Ceed ceed = CeedContext();
+    PetscCall(CreateSWEFluxOperator(ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions, rdy->config.physics.flow.tiny_h,
+                                    &rdy->ceed.flux_operator));
 
-    PetscCall(CreateSWESourceOperator(rdy->ceed.context, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
+    PetscCall(CreateSWESourceOperator(ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
                                       &rdy->ceed.source_operator));
 
     // create associated vectors for storage
     int num_comp = 3;
-    PetscCallCEED(CeedVectorCreate(rdy->ceed.context, rdy->mesh.num_cells * num_comp, &rdy->ceed.u_local));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed.context, rdy->mesh.num_cells * num_comp, &rdy->ceed.rhs));
-    PetscCallCEED(CeedVectorCreate(rdy->ceed.context, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed.sources));
+    PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed.u_local));
+    PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_cells * num_comp, &rdy->ceed.rhs));
+    PetscCallCEED(CeedVectorCreate(ceed, rdy->mesh.num_owned_cells * num_comp, &rdy->ceed.sources));
 
     PetscBool ceed_enabled = PETSC_TRUE;
     PetscCall(
@@ -409,7 +410,7 @@ PetscErrorCode SWEFindMaxCourantNumber(RDy rdy) {
 
   CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
 
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     PetscCall(CeedFindMaxCourantNumber(rdy->ceed.flux_operator, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->comm,
                                        &courant_num_diags->max_courant_num));
     courant_num_diags->is_set = PETSC_TRUE;
@@ -448,7 +449,7 @@ PetscErrorCode RHSFunctionSWE(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   courant_num_diags->max_courant_num          = 0.0;
 
   // compute the right hand side
-  if (CeedEnabled(rdy)) {
+  if (CeedEnabled()) {
     PetscCall(RDyCeedOperatorApply(rdy, dt, rdy->u_local, F));
     if (0) {
       PetscInt nstep;

@@ -1,5 +1,6 @@
 # Main library -- we list all source files here (incl. those in subdirectories)
 add_library(rdycore
+  ceed.c
   checkpoint.c
   ensemble.c
   rdyadvance.c
