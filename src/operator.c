@@ -180,18 +180,11 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
   PetscFunctionBegin;
 
   // if this is the first update, get access to the vector's data
-  // (only the source data that obtained the lock actually gains access to
-  //  the array)
-  OperatorSourceData *source_data_with_lock = source_data->rdy->lock.source_data;
   if (!source_data->sources.updated) {
-    if (source_data == source_data_with_lock) {
-      if (CeedEnabled()) {
-        PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
-      } else {
-        PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
-      }
+    if (CeedEnabled()) {
+      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
     } else {
-      source_data->sources.ceed.data = source_data_with_lock->sources.ceed.data;
+      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
     }
     source_data->sources.updated = PETSC_TRUE;
   }
@@ -232,18 +225,11 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
   PetscFunctionBegin;
 
   // if this is the first update, get access to the vector's data
-  // (only the source data that obtained the lock actually gains access to
-  //  the array)
-  OperatorSourceData *source_data_with_lock = source_data->rdy->lock.source_data;
   if (!source_data->sources.updated) {
-    if (source_data == source_data_with_lock) {
-      if (CeedEnabled()) {
-        PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
-      } else {
-        PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
-      }
+    if (CeedEnabled()) {
+      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
     } else {
-      source_data->sources.ceed.data = source_data_with_lock->sources.ceed.data;
+      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
     }
     source_data->sources.updated = PETSC_TRUE;
   }
@@ -285,15 +271,10 @@ PetscErrorCode RestoreOperatorSourceData(RDy rdy, RDyRegion region, OperatorSour
   PetscCheck(rdy == source_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong RDy");
   PetscCheck(region.index == source_data->region.index, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong region");
 
-  // only the source data that obtained the lock actually gains access to
-  // the array
-  OperatorSourceData *source_data_with_lock = source_data->rdy->lock.source_data;
-  if (source_data->sources.updated && source_data == source_data_with_lock) {
-    if (CeedEnabled()) {
-      PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
-    } else {  // petsc
-      PetscCall(VecRestoreArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
-    }
+  if (CeedEnabled()) {
+    PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
+  } else {  // petsc
+    PetscCall(VecRestoreArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
   }
   source_data->rdy->lock.source_data = NULL;
   *source_data                       = (OperatorSourceData){0};
