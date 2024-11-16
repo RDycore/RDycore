@@ -4,6 +4,7 @@
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
 #include <private/rdyboundaryimpl.h>
+#include <private/rdyregionimpl.h>
 
 // initialization/finalization functions
 PETSC_INTERN PetscErrorCode InitOperators(RDy);
@@ -36,7 +37,7 @@ typedef struct {
   PetscBool updated;  // true iff updated
 } OperatorVectorData;
 
-// This type allows the direct manipulation of per-boundary values for the
+// This type allows the direct manipulation of boundary values for the
 // system of equations being solved by RDycore.
 typedef struct {
   // associated RDy object
@@ -53,21 +54,23 @@ PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(RDy, RDyBoundary, OperatorBo
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
 
-// This type allows the direct manipulation of source values on the entire
-// domain for the system of equations being solved by RDycore.
+// This type allows the direct manipulation of source values on a specific
+// region for the system of equations being solved by RDycore.
 typedef struct {
   // associated RDy object
   RDy rdy;
+  // associated region
+  RDyRegion region;
   // number of components in the underlying system
   PetscInt num_components;
   // underlying data storage
   OperatorVectorData sources;
 } OperatorSourceData;
 
-PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, OperatorSourceData *);
+PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, RDyRegion, OperatorSourceData *);
 PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode GetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(RDy, OperatorSourceData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(RDy, RDyRegion, OperatorSourceData *);
 
 // This type allows the direct manipulation of operator material properties on
 // the entire domain for the system of equations being solved by RDycore.

@@ -142,17 +142,20 @@ PetscErrorCode RestoreOperatorBoundaryData(RDy rdy, RDyBoundary boundary, Operat
       PetscCall(VecRestoreArray(boundary_data->storage.petsc.vec, &boundary_data->storage.petsc.data));
     }
   }
-  boundary_data->rdy->lock.boundary_data[boundary_data->boundary.index] = NULL;
-  *boundary_data                                                        = (OperatorBoundaryData){0};
+  boundary_data->rdy->lock.boundary_data[boundary.index] = NULL;
+  *boundary_data                                         = (OperatorBoundaryData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode GetOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
+PetscErrorCode GetOperatorSourceData(RDy rdy, RDyRegion region, OperatorSourceData *source_data) {
   PetscFunctionBegin;
   *source_data = (OperatorSourceData){0};
   PetscCheck(!rdy->lock.source_data, rdy->comm, PETSC_ERR_USER, "Could not acquire lock on source data -- another entity has access");
+  PetscCheck(region.index >= 0 && region.index < rdy->num_regions, rdy->comm, PETSC_ERR_USER,
+             "Invalid region for source data (index: %" PetscInt_FMT ")", region.index);
   rdy->lock.source_data = source_data;
   source_data->rdy      = rdy;
+  source_data->region   = region;
   PetscCall(VecGetBlockSize(rdy->u_global, &source_data->num_components));
 
   if (CeedEnabled()) {
@@ -176,32 +179,48 @@ PetscErrorCode GetOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
 PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled()) {
-    // if this is the first update, get access to the vector's data
-    if (!source_data->sources.updated) {
-      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
-      source_data->sources.updated = PETSC_TRUE;
+  // if this is the first update, get access to the vector's data
+  // (only the source data that obtained the lock actually gains access to
+  //  the array)
+  OperatorSourceData *source_data_with_lock = source_data->rdy->lock.source_data;
+  if (!source_data->sources.updated) {
+    if (source_data == source_data_with_lock) {
+      if (CeedEnabled()) {
+        PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
+      } else {
+        PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
+      }
+    } else {
+      source_data->sources.ceed.data = source_data_with_lock->sources.ceed.data;
     }
+    source_data->sources.updated = PETSC_TRUE;
+  }
 
+  RDyMesh  *mesh  = &source_data->rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  // fetch values -- the underlying vector is the set of all owned cells in
+  // the computational domain, so we have to sift through indices
+  if (CeedEnabled()) {
     // reshape for multicomponent access
     CeedScalar(*values)[source_data->num_components];
     *((CeedScalar **)&values) = source_data->sources.ceed.data;
 
-    // set the values
-    for (CeedInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      values[i][component] = source_values[i];
+    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
+      PetscInt cell_id = source_data->region.cell_ids[c];
+      if (cells->is_local[cell_id]) {
+        PetscInt owned_cell_id           = cells->local_to_owned[cell_id];
+        values[owned_cell_id][component] = source_values[c];
+      }
     }
   } else {
-    // if this is the first update, get access to the vector's data
-    if (!source_data->sources.updated) {
-      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
-      source_data->sources.updated = PETSC_TRUE;
-    }
-
-    // set the values
     PetscReal *s = source_data->sources.petsc.data;
-    for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      s[i * source_data->num_components + component] = source_values[i];
+    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
+      PetscInt cell_id = source_data->region.cell_ids[c];
+      if (cells->is_local[cell_id]) {
+        PetscInt owned_cell_id                                     = cells->local_to_owned[cell_id];
+        s[owned_cell_id * source_data->num_components + component] = source_values[c];
+      }
     }
   }
 
@@ -212,47 +231,67 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
 PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt component, PetscReal *source_values) {
   PetscFunctionBegin;
 
-  if (CeedEnabled()) {
-    // if this is the first update, get access to the vector's data
-    if (!source_data->sources.updated) {
-      PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
-      source_data->sources.updated = PETSC_TRUE;
+  // if this is the first update, get access to the vector's data
+  // (only the source data that obtained the lock actually gains access to
+  //  the array)
+  OperatorSourceData *source_data_with_lock = source_data->rdy->lock.source_data;
+  if (!source_data->sources.updated) {
+    if (source_data == source_data_with_lock) {
+      if (CeedEnabled()) {
+        PetscCallCEED(CeedVectorGetArray(source_data->sources.ceed.vec, CEED_MEM_HOST, &source_data->sources.ceed.data));
+      } else {
+        PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
+      }
+    } else {
+      source_data->sources.ceed.data = source_data_with_lock->sources.ceed.data;
     }
+    source_data->sources.updated = PETSC_TRUE;
+  }
 
+  RDyMesh  *mesh  = &source_data->rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  // fetch values -- the underlying vector is the set of all owned cells in
+  // the computational domain, so we have to sift through indices
+  if (CeedEnabled()) {
     // reshape for multicomponent access
     CeedScalar(*values)[source_data->num_components];
     *((CeedScalar **)&values) = source_data->sources.ceed.data;
 
-    // set the values
-    for (CeedInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      source_values[i] = values[i][component];
+    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
+      PetscInt cell_id = source_data->region.cell_ids[c];
+      if (cells->is_local[cell_id]) {
+        PetscInt owned_cell_id = cells->local_to_owned[cell_id];
+        source_values[c]       = values[owned_cell_id][component];
+      }
     }
   } else {
-    // if this is the first update, get access to the vector's data
-    if (!source_data->sources.updated) {
-      PetscCall(VecGetArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
-      source_data->sources.updated = PETSC_TRUE;
-    }
-
-    // set the values
     PetscReal *s = source_data->sources.petsc.data;
-    for (PetscInt i = 0; i < source_data->rdy->mesh.num_owned_cells; ++i) {
-      source_values[i] = s[i * source_data->num_components + component];
+
+    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
+      PetscInt cell_id = source_data->region.cell_ids[c];
+      if (cells->is_local[cell_id]) {
+        PetscInt owned_cell_id = cells->local_to_owned[cell_id];
+        source_values[c]       = s[owned_cell_id * source_data->num_components + component];
+      }
     }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorSourceData(RDy rdy, OperatorSourceData *source_data) {
+PetscErrorCode RestoreOperatorSourceData(RDy rdy, RDyRegion region, OperatorSourceData *source_data) {
   PetscFunctionBegin;
   PetscCheck(rdy == source_data->rdy, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong RDy");
-  if (CeedEnabled()) {
-    if (source_data->sources.updated) {
+  PetscCheck(region.index == source_data->region.index, rdy->comm, PETSC_ERR_USER, "Could not restore operator source data: wrong region");
+
+  // only the source data that obtained the lock actually gains access to
+  // the array
+  OperatorSourceData *source_data_with_lock = source_data->rdy->lock.source_data;
+  if (source_data->sources.updated && source_data == source_data_with_lock) {
+    if (CeedEnabled()) {
       PetscCallCEED(CeedVectorRestoreArray(source_data->sources.ceed.vec, &source_data->sources.ceed.data));
-    }
-  } else {  // petsc
-    if (source_data->sources.updated) {
+    } else {  // petsc
       PetscCall(VecRestoreArray(source_data->sources.petsc.vec, &source_data->sources.petsc.data));
     }
   }

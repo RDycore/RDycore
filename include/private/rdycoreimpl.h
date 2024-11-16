@@ -7,6 +7,7 @@
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
+#include <private/rdyregionimpl.h>
 #include <rdycore.h>
 
 // CEED initialization, availability, context, useful for creating CEED
@@ -38,16 +39,6 @@ typedef struct {
   char      name[MAX_NAME_LEN + 1];
   PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
 } RDyMaterial;
-
-// This type defines a region consisting of cells identified by their local
-// indices.
-typedef struct {
-  char      name[MAX_NAME_LEN + 1];  // region name
-  PetscInt  id;                      // region ID (as specified in mesh file)
-  PetscInt  index;                   // index of region witin RDycore region list
-  PetscInt *cell_ids;
-  PetscInt  num_cells;
-} RDyRegion;
 
 // This type defines a "condition" representing
 // * an initial condition or source/sink associated with a region
@@ -197,14 +188,14 @@ struct _p_RDy {
     // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
     void *context;
 
-    // source-sink vector
+    // source-sink vector for domain
     Vec sources;
   } petsc;
 
   // locks on operator data for exclusive access (see rdyoperatorimpl.h)
   struct {
     void **boundary_data;  // per-boundary operator boundary data
-    void  *source_data;    // operator source data for the domain
+    void  *source_data;    // domain operator source data
     void  *material_data;  // operator material data for the domain
     void  *flux_div_data;  // operator flux divergence data for the domain
   } lock;

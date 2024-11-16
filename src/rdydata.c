@@ -198,28 +198,17 @@ PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, Pe
 
   if (region.num_cells) {
     PetscReal *source_values;
-    PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &source_values));
-
-    // get the values for source term associated with h component
-    OperatorSourceData source_data;
-    PetscInt           component = 0;
-    PetscCall(GetOperatorSourceData(rdy, &source_data));
-    PetscCall(GetOperatorSourceValues(&source_data, component, source_values));
-    PetscCall(RestoreOperatorSourceData(rdy, &source_data));
-
-    RDyMesh  *mesh  = &rdy->mesh;
-    RDyCells *cells = &mesh->cells;
-
-    // update the source term for the cells in the region that are local
+    PetscCall(PetscCalloc1(region.num_cells, &source_values));
     for (PetscInt c = 0; c < region.num_cells; c++) {
-      PetscInt cell_id = region.cell_ids[c];
-      if (cells->is_local[cell_id]) {
-        PetscInt owned_cell_id       = cells->local_to_owned[cell_id];
-        source_values[owned_cell_id] = value;
-      }
+      source_values[c] = value;
     }
 
-    PetscCall(RDySetWaterSourceForLocalCells(rdy, rdy->mesh.num_owned_cells, source_values));
+    // update the water (height) source term for the local cells in the region
+    OperatorSourceData source_data;
+    PetscInt           component = 0;
+    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
+    PetscCall(SetOperatorSourceValues(&source_data, component, source_values));
+    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
 
     PetscCall(PetscFree(source_values));
   }
@@ -227,42 +216,58 @@ PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, Pe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values) {
+static PetscErrorCode SetSourceComponentForLocalCells(RDy rdy, const PetscInt component, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  OperatorSourceData source_data;
-  PetscCall(GetOperatorSourceData(rdy, &source_data));
-  PetscCall(SetOperatorSourceValues(&source_data, 0, values));
-  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
 
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion region = rdy->regions[r];
+
+    OperatorSourceData source_data;
+    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
+
+    PetscReal *source_values = NULL;
+    PetscCall(PetscCalloc1(region.num_cells, &source_values));
+    for (PetscInt c = 0; c < region.num_cells; c++) {
+      source_values[c] = values[c];
+    }
+
+    // update the source term for the cells in the region that are local
+    for (PetscInt c = 0; c < region.num_cells; c++) {
+      PetscInt cell_id = region.cell_ids[c];
+      if (cells->is_local[cell_id]) {
+        PetscInt owned_cell_id = cells->local_to_owned[cell_id];
+        source_values[c]       = values[owned_cell_id];
+      }
+    }
+    PetscCall(SetOperatorSourceValues(&source_data, component, source_values));
+    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
+
+    PetscFree(source_values);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetWaterSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetSourceComponentForLocalCells(rdy, 0, rdy->mesh.num_owned_cells, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDySetXMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  OperatorSourceData source_data;
-  PetscCall(GetOperatorSourceData(rdy, &source_data));
-  PetscCall(SetOperatorSourceValues(&source_data, 1, values));
-  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
-
+  PetscCall(SetSourceComponentForLocalCells(rdy, 1, rdy->mesh.num_owned_cells, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDySetYMomentumSourceForLocalCells(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  OperatorSourceData source_data;
-  PetscCall(GetOperatorSourceData(rdy, &source_data));
-  PetscCall(SetOperatorSourceValues(&source_data, 2, values));
-  PetscCall(RestoreOperatorSourceData(rdy, &source_data));
-
+  PetscCall(SetSourceComponentForLocalCells(rdy, 2, rdy->mesh.num_owned_cells, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
