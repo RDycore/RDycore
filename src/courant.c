@@ -2,11 +2,11 @@
 
 // MPI datatype corresponding to CourantNumberDiagnostics. Created during
 // CreateSWEOperator.
-MPI_Datatype MPI_COURANT_NUMBER_DIAGNOSTICS = {0};
+MPI_Datatype MPI_COURANT_NUMBER_DIAGNOSTICS = MPI_DATATYPE_NULL;
 
 // MPI operator used to determine the prevailing diagnostics for the maximum
 // courant number on all processes. Created during CreateSWEOperator.
-MPI_Op MPI_MAX_COURANT_NUMBER = {0};
+MPI_Op MPI_MAX_COURANT_NUMBER = MPI_OP_NULL;
 
 // function implementing the above MPI operator
 static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *len, MPI_Datatype *type) {
