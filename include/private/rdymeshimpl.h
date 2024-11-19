@@ -82,9 +82,6 @@ typedef struct {
   // global IDs of vertices in local numbering
   PetscInt *global_ids;
 
-  // PETSC_TRUE iff vertex is attached to a local cell
-  PetscBool *is_local;
-
   // numbers of cells attached to vertices
   PetscInt *num_cells;
   // numbers of edges attached to vertices
@@ -115,11 +112,6 @@ typedef struct {
   PetscInt *internal_edge_ids;
   // local IDs of boundary edges
   PetscInt *boundary_edge_ids;
-
-  // PETSC_TRUE iff edge is shared by locally owned cells, OR
-  // if it is shared by a local cell c1 and non-local cell c2 such that
-  // global ID(c1) < global ID(c2).
-  PetscBool *is_local;
 
   // IDs of vertices attached to edges
   PetscInt *vertex_ids;

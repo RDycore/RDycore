@@ -222,8 +222,6 @@ static PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, PetscInt ncells_p
   PetscCall(PetscCalloc1(num_vertices, &vertices->num_edges));
   FILL(num_vertices, vertices->global_ids, -1);
 
-  PetscCall(PetscCalloc1(num_vertices, &vertices->is_local));
-
   PetscCall(PetscCalloc1(num_vertices, &vertices->points));
 
   PetscCall(PetscCalloc1(num_vertices + 1, &vertices->edge_offsets));
@@ -384,7 +382,6 @@ static PetscErrorCode RDyVerticesDestroy(RDyVertices vertices) {
 
   PetscCall(PetscFree(vertices.ids));
   PetscCall(PetscFree(vertices.global_ids));
-  PetscCall(PetscFree(vertices.is_local));
   PetscCall(PetscFree(vertices.num_cells));
   PetscCall(PetscFree(vertices.num_edges));
   PetscCall(PetscFree(vertices.cell_offsets));
