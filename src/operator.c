@@ -189,31 +189,21 @@ PetscErrorCode SetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
     source_data->sources.updated = PETSC_TRUE;
   }
 
-  RDyMesh  *mesh  = &source_data->rdy->mesh;
-  RDyCells *cells = &mesh->cells;
-
-  // fetch values -- the underlying vector is the set of all owned cells in
-  // the computational domain, so we have to sift through indices
+  // fetch values
   if (CeedEnabled()) {
     // reshape for multicomponent access
     CeedScalar(*values)[source_data->num_components];
     *((CeedScalar **)&values) = source_data->sources.ceed.data;
 
-    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
-      PetscInt cell_id = source_data->region.cell_ids[c];
-      if (cells->is_local[cell_id]) {
-        PetscInt owned_cell_id           = cells->local_to_owned[cell_id];
-        values[owned_cell_id][component] = source_values[c];
-      }
+    for (PetscInt c = 0; c < source_data->region.num_owned_cells; ++c) {
+      PetscInt owned_cell_id           = source_data->region.owned_cell_global_ids[c];
+      values[owned_cell_id][component] = source_values[c];
     }
   } else {
     PetscReal *s = source_data->sources.petsc.data;
-    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
-      PetscInt cell_id = source_data->region.cell_ids[c];
-      if (cells->is_local[cell_id]) {
-        PetscInt owned_cell_id                                     = cells->local_to_owned[cell_id];
-        s[owned_cell_id * source_data->num_components + component] = source_values[c];
-      }
+    for (PetscInt c = 0; c < source_data->region.num_owned_cells; ++c) {
+      PetscInt owned_cell_id                                     = source_data->region.owned_cell_global_ids[c];
+      s[owned_cell_id * source_data->num_components + component] = source_values[c];
     }
   }
 
@@ -234,9 +224,6 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
     source_data->sources.updated = PETSC_TRUE;
   }
 
-  RDyMesh  *mesh  = &source_data->rdy->mesh;
-  RDyCells *cells = &mesh->cells;
-
   // fetch values -- the underlying vector is the set of all owned cells in
   // the computational domain, so we have to sift through indices
   if (CeedEnabled()) {
@@ -244,22 +231,16 @@ PetscErrorCode GetOperatorSourceValues(OperatorSourceData *source_data, PetscInt
     CeedScalar(*values)[source_data->num_components];
     *((CeedScalar **)&values) = source_data->sources.ceed.data;
 
-    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
-      PetscInt cell_id = source_data->region.cell_ids[c];
-      if (cells->is_local[cell_id]) {
-        PetscInt owned_cell_id = cells->local_to_owned[cell_id];
-        source_values[c]       = values[owned_cell_id][component];
-      }
+    for (PetscInt c = 0; c < source_data->region.num_owned_cells; ++c) {
+      PetscInt owned_cell_id = source_data->region.owned_cell_global_ids[c];
+      source_values[c]       = values[owned_cell_id][component];
     }
   } else {
     PetscReal *s = source_data->sources.petsc.data;
 
-    for (PetscInt c = 0; c < source_data->region.num_cells; ++c) {
-      PetscInt cell_id = source_data->region.cell_ids[c];
-      if (cells->is_local[cell_id]) {
-        PetscInt owned_cell_id = cells->local_to_owned[cell_id];
-        source_values[c]       = s[owned_cell_id * source_data->num_components + component];
-      }
+    for (PetscInt c = 0; c < source_data->region.num_owned_cells; ++c) {
+      PetscInt owned_cell_id = source_data->region.owned_cell_global_ids[c];
+      source_values[c]       = s[owned_cell_id * source_data->num_components + component];
     }
   }
 

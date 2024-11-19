@@ -31,7 +31,7 @@ typedef struct {
   /// natural IDs of cells in local numbering
   PetscInt *natural_ids;
 
-  /// PETSC_TRUE iff corresponding cell is locally stored
+  /// PETSC_TRUE iff corresponding cell is owned (locally stored)
   PetscBool *is_local;
 
   /// numbers of cell vertices

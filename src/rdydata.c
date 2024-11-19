@@ -196,10 +196,10 @@ PetscErrorCode RDySetWaterSourceForRegion(RDy rdy, const PetscInt region_idx, Pe
 
   RDyRegion region = rdy->regions[region_idx];
 
-  if (region.num_cells) {
+  if (region.num_owned_cells) {
     PetscReal *source_values;
-    PetscCall(PetscCalloc1(region.num_cells, &source_values));
-    for (PetscInt c = 0; c < region.num_cells; c++) {
+    PetscCall(PetscCalloc1(region.num_owned_cells, &source_values));
+    for (PetscInt c = 0; c < region.num_owned_cells; c++) {
       source_values[c] = value;
     }
 
@@ -221,9 +221,6 @@ static PetscErrorCode SetSourceComponentForLocalCells(RDy rdy, const PetscInt co
 
   PetscCall(CheckNumLocalCells(rdy, size));
 
-  RDyMesh  *mesh  = &rdy->mesh;
-  RDyCells *cells = &mesh->cells;
-
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
 
@@ -231,19 +228,11 @@ static PetscErrorCode SetSourceComponentForLocalCells(RDy rdy, const PetscInt co
     PetscCall(GetOperatorSourceData(rdy, region, &source_data));
 
     PetscReal *source_values = NULL;
-    PetscCall(PetscCalloc1(region.num_cells, &source_values));
-    for (PetscInt c = 0; c < region.num_cells; c++) {
+    PetscCall(PetscCalloc1(region.num_owned_cells, &source_values));
+    for (PetscInt c = 0; c < region.num_owned_cells; c++) {
       source_values[c] = values[c];
     }
 
-    // update the source term for the cells in the region that are local
-    for (PetscInt c = 0; c < region.num_cells; c++) {
-      PetscInt cell_id = region.cell_ids[c];
-      if (cells->is_local[cell_id]) {
-        PetscInt owned_cell_id = cells->local_to_owned[cell_id];
-        source_values[c]       = values[owned_cell_id];
-      }
-    }
     PetscCall(SetOperatorSourceValues(&source_data, component, source_values));
     PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
 

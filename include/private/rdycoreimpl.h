@@ -222,7 +222,6 @@ PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 
 PETSC_INTERN PetscErrorCode RDyDestroyVectors(RDy *);
-PETSC_INTERN PetscErrorCode RDyDestroyRegions(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyMaterials(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyBoundaries(RDy *);
 

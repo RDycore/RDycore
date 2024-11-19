@@ -177,7 +177,7 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
 }
 
 // initializes mesh region data
-//   can be run after refinement
+//   can be run after refinement and FV mesh construction
 PetscErrorCode InitRegions(RDy rdy) {
   PetscFunctionBegin;
 
@@ -217,19 +217,39 @@ PetscErrorCode InitRegions(RDy rdy) {
         }
       }
 
-      PetscInt num_cells;
-      PetscCall(ISGetLocalSize(cell_is, &num_cells));
-      if (num_cells > 0) {
-        RDyLogDebug(rdy, "  Found region %" PetscInt_FMT " (%" PetscInt_FMT " cells)", region_id, num_cells);
-        region->num_cells = num_cells;
-        PetscCall(PetscCalloc1(region->num_cells, &region->cell_ids));
+      // read local cell IDs
+      PetscInt num_local_cells;
+      PetscCall(ISGetLocalSize(cell_is, &num_local_cells));
+      if (num_local_cells > 0) {
+        RDyLogDebug(rdy, "  Found region %" PetscInt_FMT " (%" PetscInt_FMT " cells)", region_id, num_local_cells);
+        region->num_local_cells = num_local_cells;
+        PetscCall(PetscCalloc1(region->num_local_cells, &region->cell_local_ids));
+
+        const PetscInt *cell_ids;
+        PetscCall(ISGetIndices(cell_is, &cell_ids));
+        for (PetscInt i = 0; i < num_local_cells; ++i) {
+          region->cell_local_ids[i] = cell_ids[i] - c_start;
+        }
+        PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+
+        // construct global IDs for owned cells
+        region->num_owned_cells = 0;
+        for (PetscInt i = 0; i < num_local_cells; ++i) {
+          if (rdy->mesh.cells.local_to_owned[region->cell_local_ids[i]] != -1) {
+            ++region->num_owned_cells;
+          }
+        }
+        PetscCall(PetscCalloc1(region->num_owned_cells, &region->owned_cell_global_ids));
+        PetscInt k = 0;
+        for (PetscInt i = 0; i < num_local_cells; ++i) {
+          PetscInt owned_cell_global_id = rdy->mesh.cells.local_to_owned[region->cell_local_ids[i]];
+          if (owned_cell_global_id != -1) {
+            region->owned_cell_global_ids[k] = owned_cell_global_id;
+            ++k;
+          }
+        }
       }
-      const PetscInt *cell_ids;
-      PetscCall(ISGetIndices(cell_is, &cell_ids));
-      for (PetscInt i = 0; i < num_cells; ++i) {
-        region->cell_ids[i] = cell_ids[i] - c_start;
-      }
-      PetscCall(ISRestoreIndices(cell_is, &cell_ids));
+
       PetscCall(ISDestroy(&cell_is));
     }
   }
@@ -475,15 +495,15 @@ PetscErrorCode InitBoundaries(RDy rdy) {
           if (mat_prop_vec) {                                                                          \
             PetscScalar *prop_ptr;                                                                     \
             PetscCall(VecGetArray(mat_prop_vec, &prop_ptr));                                           \
-            for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
-              PetscInt cell                    = region.cell_ids[c];                                   \
+            for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
+              PetscInt cell                    = region.cell_local_ids[c];                             \
               materials_by_cell[cell].property = prop_ptr[c];                                          \
             }                                                                                          \
             PetscCall(VecRestoreArray(mat_prop_vec, &prop_ptr));                                       \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
-            for (PetscInt c = 0; c < region.num_cells; ++c) {                                          \
-              PetscInt cell                    = region.cell_ids[c];                                   \
+            for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
+              PetscInt cell                    = region.cell_local_ids[c];                             \
               materials_by_cell[cell].property = mupEval(mat_props_spec.property.value);               \
             }                                                                                          \
           }                                                                                            \
@@ -772,26 +792,23 @@ static PetscErrorCode InitSolution(RDy rdy) {
         if (local) {
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
-          for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id       = region.cell_ids[c];
-            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_id];
-            if (rdy->mesh.cells.is_local[cell_id]) {  // skip ghost cells
+          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+            PetscInt cell_local_id = region.cell_local_ids[c];
+            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+            if (rdy->mesh.cells.is_local[cell_local_id]) {  // skip ghost cells
               for (PetscInt idof = 0; idof < ndof; idof++) {
-                u_ptr[ndof * owned_cell_id + idof] = local_ptr[ndof * cell_id + idof];
+                u_ptr[ndof * owned_cell_id + idof] = local_ptr[ndof * cell_local_id + idof];
               }
             }
           }
           PetscCall(VecRestoreArray(local, &local_ptr));
           PetscCall(VecDestroy(&local));
         } else {
-          for (PetscInt c = 0; c < region.num_cells; ++c) {
-            PetscInt cell_id       = region.cell_ids[c];
-            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_id];
-            if (rdy->mesh.cells.is_local[cell_id]) {  // skip ghost cells
-              u_ptr[ndof * owned_cell_id]     = mupEval(flow_ic.height);
-              u_ptr[ndof * owned_cell_id + 1] = mupEval(flow_ic.x_momentum);
-              u_ptr[ndof * owned_cell_id + 2] = mupEval(flow_ic.y_momentum);
-            }
+          for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+            PetscInt owned_cell_id          = region.owned_cell_global_ids[c];
+            u_ptr[ndof * owned_cell_id]     = mupEval(flow_ic.height);
+            u_ptr[ndof * owned_cell_id + 1] = mupEval(flow_ic.x_momentum);
+            u_ptr[ndof * owned_cell_id + 2] = mupEval(flow_ic.y_momentum);
           }
         }
       }
@@ -951,15 +968,15 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
   PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
 
+  RDyLogDebug(rdy, "Creating FV mesh...");
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
 
   RDyLogDebug(rdy, "Initializing initial conditions and sources...");
   PetscCall(InitInitialConditions(rdy));
   PetscCall(InitSources(rdy));
-
-  RDyLogDebug(rdy, "Creating FV mesh...");
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
