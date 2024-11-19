@@ -274,7 +274,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
   PetscInt l = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       cell_x[l] = rdy->mesh.cells.centroids[icell].X[0];
       cell_y[l] = rdy->mesh.cells.centroids[icell].X[1];
       ++l;
@@ -333,7 +333,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
     l = 0;
     for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-      if (cells->is_local[icell]) {
+      if (cells->is_owned[icell]) {
         PetscReal Cd = GRAVITY * Square(n[l]) * PetscPowReal(h[l], -1.0 / 3.0);
 
         h_source[l] = dhdt[l] + u[l] * dhdx[l] + h[l] * dudx[l] + v[l] * dhdy[l] + h[l] * dvdy[l];

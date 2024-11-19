@@ -298,9 +298,9 @@ PetscErrorCode InitBoundaries(RDy rdy) {
 
       // check if the edge is valid
       if (cell_id_2 >= 0) {
-        edge_valid = (cells->is_local[cell_id_1] || cells->is_local[cell_id_2]);
+        edge_valid = (cells->is_owned[cell_id_1] || cells->is_owned[cell_id_2]);
       } else {
-        edge_valid = cells->is_local[cell_id_1];
+        edge_valid = cells->is_owned[cell_id_1];
       }
 
       if (!edge_valid) {
@@ -795,7 +795,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_local_id = region.cell_local_ids[c];
             PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
-            if (rdy->mesh.cells.is_local[cell_local_id]) {  // skip ghost cells
+            if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
               for (PetscInt idof = 0; idof < ndof; idof++) {
                 u_ptr[ndof * owned_cell_id + idof] = local_ptr[ndof * cell_local_id + idof];
               }

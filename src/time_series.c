@@ -20,7 +20,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
         PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
-        if (rdy->mesh.cells.is_local[cell_id]) {
+        if (rdy->mesh.cells.is_owned[cell_id]) {
           local_flux_md[num_md * n]     = rdy->mesh.edges.centroids[edge_id].X[0];
           local_flux_md[num_md * n + 1] = rdy->mesh.edges.centroids[edge_id].X[1];
           local_flux_md[num_md * n + 2] = bc.flow->type;
@@ -85,7 +85,7 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
         PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
-        if (rdy->mesh.cells.is_local[cell_id]) ++num_boundary_edges;
+        if (rdy->mesh.cells.is_owned[cell_id]) ++num_boundary_edges;
       }
     }
     rdy->time_series.boundary_fluxes.offsets[b + 1] = num_boundary_edges;
@@ -139,7 +139,7 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt 
         PetscInt  edge_id  = boundary.edge_ids[e];
         PetscInt  cell_id  = rdy->mesh.edges.cell_ids[2 * edge_id];
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
-        if (rdy->mesh.cells.is_local[cell_id]) {
+        if (rdy->mesh.cells.is_owned[cell_id]) {
           time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * fluxes[e * ndof + 0];
           time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * fluxes[e * ndof + 1];
           time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * fluxes[e * ndof + 2];
@@ -173,7 +173,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
         PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
-        if (rdy->mesh.cells.is_local[cell_id]) {
+        if (rdy->mesh.cells.is_owned[cell_id]) {
           local_flux_data[num_data * n]     = rdy->time_series.boundary_fluxes.fluxes[n].water_mass;
           local_flux_data[num_data * n + 1] = rdy->time_series.boundary_fluxes.fluxes[n].x_momentum;
           local_flux_data[num_data * n + 2] = rdy->time_series.boundary_fluxes.fluxes[n].y_momentum;

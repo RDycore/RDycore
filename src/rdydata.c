@@ -132,7 +132,7 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       PetscInt iedge = boundary.edge_ids[e];
       PetscInt icell = edges->cell_ids[2 * iedge];
-      if (cells->is_local[icell]) {
+      if (cells->is_owned[icell]) {
         bdata.h[e]  = values[3 * e];
         bdata.hu[e] = values[3 * e + 1];
         bdata.hv[e] = values[3 * e + 2];
@@ -269,7 +269,7 @@ static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, Pets
 
   PetscInt count = 0;
   for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       x[count++] = cells->centroids[icell].X[idim];
     }
   }
@@ -305,7 +305,7 @@ PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal *val
 
   PetscInt count = 0;
   for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       values[count++] = cells->areas[icell];
     }
   }
@@ -321,7 +321,7 @@ PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt 
 
   PetscInt count = 0;
   for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       values[count++] = cells->natural_ids[icell];
     }
   }
