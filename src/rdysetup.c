@@ -235,16 +235,15 @@ PetscErrorCode InitRegions(RDy rdy) {
         // construct global IDs for owned cells
         region->num_owned_cells = 0;
         for (PetscInt i = 0; i < num_local_cells; ++i) {
-          if (rdy->mesh.cells.local_to_owned[region->cell_local_ids[i]] != -1) {
+          if (rdy->mesh.cells.is_owned[region->cell_local_ids[i]]) {
             ++region->num_owned_cells;
           }
         }
         PetscCall(PetscCalloc1(region->num_owned_cells, &region->owned_cell_global_ids));
         PetscInt k = 0;
         for (PetscInt i = 0; i < num_local_cells; ++i) {
-          PetscInt owned_cell_global_id = rdy->mesh.cells.local_to_owned[region->cell_local_ids[i]];
-          if (owned_cell_global_id != -1) {
-            region->owned_cell_global_ids[k] = owned_cell_global_id;
+          if (rdy->mesh.cells.is_owned[region->cell_local_ids[i]]) {
+            region->owned_cell_global_ids[k] = rdy->mesh.cells.local_to_owned[region->cell_local_ids[i]];
             ++k;
           }
         }

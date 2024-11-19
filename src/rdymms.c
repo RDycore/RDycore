@@ -167,13 +167,13 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
   PetscCall(SnapVerticesToBathymetry(rdy));
 
-  RDyLogDebug(rdy, "Initializing regions...");
-  PetscCall(InitRegions(rdy));
-
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
+  RDyLogDebug(rdy, "Initializing regions...");
+  PetscCall(InitRegions(rdy));
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
