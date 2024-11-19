@@ -34,8 +34,6 @@ static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_
   FILL(num_cells, cells->natural_ids, -1);
 
   PetscCall(PetscCalloc1(num_cells, &cells->is_owned));
-  PetscCall(PetscCalloc1(num_cells, &cells->is_owned));
-
   PetscCall(PetscCalloc1(num_cells, &cells->local_to_owned));
   FILL(num_cells, cells->local_to_owned, -1);
 
@@ -409,7 +407,6 @@ static PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 
   PetscCall(PetscCalloc1(num_edges, &edges->is_owned));
   PetscCall(PetscCalloc1(num_edges, &edges->is_internal));
-  PetscCall(PetscCalloc1(num_edges, &edges->is_owned));
 
   PetscCall(PetscCalloc1(2 * num_edges, &edges->cell_ids));
   FILL(2 * num_edges, edges->cell_ids, -1);
@@ -515,7 +512,6 @@ static PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(PetscFree(edges.vertex_ids));
   PetscCall(PetscFree(edges.cell_ids));
   PetscCall(PetscFree(edges.is_internal));
-  PetscCall(PetscFree(edges.is_owned));
   PetscCall(PetscFree(edges.normals));
   PetscCall(PetscFree(edges.centroids));
   PetscCall(PetscFree(edges.lengths));
