@@ -153,8 +153,8 @@ program rdycore_f90
       PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, n, nat_id, ierr))
 
       values(:) = 0.d0
-      PetscCallA(RDySetXMomentumSourceForLocalCells(rdy_, n, values, ierr))
-      PetscCallA(RDySetYMomentumSourceForLocalCells(rdy_, n, values, ierr))
+      PetscCallA(RDySetDomainXMomentumSource(rdy_, n, values, ierr))
+      PetscCallA(RDySetDomainYMomentumSource(rdy_, n, values, ierr))
 
       ! get information about boundary conditions
       dirc_bc_idx = 0
@@ -200,14 +200,14 @@ program rdycore_f90
         ! apply a 1 mm/hr rain over the entire domain
         if (.not. rain_specified) then
           rain(:) = 1.d0/3600.d0/1000.d0
-          PetscCallA(RDySetWaterSourceForLocalCells(rdy_, n, rain, ierr))
+          PetscCallA(RDySetDomainWaterSource(rdy_, n, rain, ierr))
         else
           PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
           call getcurrentdata(rain_ptr, nrain, cur_time, interpolate_rain, cur_rain_idx, cur_rain)
           if (interpolate_rain .or. cur_rain_idx /= prev_rain_idx) then
             prev_rain_idx = cur_rain_idx
             rain(:) = cur_rain
-            PetscCallA(RDySetWaterSourceForLocalCells(rdy_, n, rain, ierr))
+            PetscCallA(RDySetDomainWaterSource(rdy_, n, rain, ierr))
           endif
         endif
 

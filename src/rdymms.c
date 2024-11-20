@@ -353,9 +353,9 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       }
     }
 
-    PetscCall(RDySetWaterSourceForLocalCells(rdy, N, h_source));
-    PetscCall(RDySetXMomentumSourceForLocalCells(rdy, N, hu_source));
-    PetscCall(RDySetYMomentumSourceForLocalCells(rdy, N, hv_source));
+    PetscCall(RDySetDomainWaterSource(rdy, N, h_source));
+    PetscCall(RDySetDomainXMomentumSource(rdy, N, hu_source));
+    PetscCall(RDySetDomainYMomentumSource(rdy, N, hv_source));
 
     PetscCall(PetscFree(h));
     PetscCall(PetscFree(u));

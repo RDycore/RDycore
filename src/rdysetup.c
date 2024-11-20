@@ -868,7 +868,7 @@ static PetscErrorCode InitSourceConditions(RDy rdy) {
 
       RDyFlowCondition *flow_src = src.flow;
       if (flow_src) {
-        PetscCall(RDySetWaterSourceForRegion(rdy, r, mupEval(flow_src->value)));
+        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, r, mupEval(flow_src->value)));
       }
     }
   }
