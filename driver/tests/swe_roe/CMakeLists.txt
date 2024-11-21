@@ -147,9 +147,14 @@ file (COPY
       ${CONDITION_DIR}/2017-08-26:00-00.${PETSC_ID_TYPE}.bin
       ${CONDITION_DIR}/2017-08-26:01-00.${PETSC_ID_TYPE}.bin
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2)
+foreach(np 1)
   foreach(config basic ceed)
-    add_test(houston_hetero_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ ${${config}_args})
+    add_test(houston_hetero_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -raster_rain_write_map_file houston_raster.${PETSC_ID_TYPE}.map ./ ${${config}_args})
+  endforeach()
+endforeach()
+foreach(np 2)
+  foreach(config basic ceed)
+    add_test(houston_hetero_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -raster_rain_read_map_file houston_raster.${PETSC_ID_TYPE}.map ./ ${${config}_args})
   endforeach()
 endforeach()
 
