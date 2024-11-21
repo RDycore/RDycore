@@ -1365,6 +1365,7 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
   // parse the command line arguments related to rainfall
   PetscCall(ParseRainfallDataOptions(rain_dataset));
 
+  PetscInt expected_data_stride;
   switch (rain_dataset->type) {
     case UNSET:
       break;
@@ -1396,7 +1397,7 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
 
       break;
     case UNSTRUCTURED:
-      PetscInt expected_data_stride = 1;
+      expected_data_stride = 1;
       PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured, expected_data_stride));
       PetscCall(DoPostprocessForSourceUnstructuredDataset(rdy, n, rain_dataset));
 
@@ -1505,6 +1506,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
 
   PetscCall(ParseBoundaryDataOptions(bc_dataset));
 
+  PetscInt expected_data_stride;
   switch (bc_dataset->type) {
     case UNSET:
       break;
@@ -1519,7 +1521,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
-      PetscInt expected_data_stride = 3;
+      expected_data_stride = 3;
       PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured, expected_data_stride));
       PetscCall(DoPostprocessForBoundaryUnstructuredDataset(rdy, bc_dataset));
       break;
