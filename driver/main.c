@@ -1255,25 +1255,25 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
     case CONSTANT:
       if (rain_dataset->ndata) {
         PetscCall(SetConstantRainfall(rain_dataset->constant.rate, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetRegionalWaterSource(rdy, 0, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       }
       break;
     case HOMOGENEOUS:
       if (rain_dataset->ndata) {
         PetscCall(SetHomogeneousData(&rain_dataset->homogeneous, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetRegionalWaterSource(rdy, 0, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       }
       break;
     case RASTER:
       if (rain_dataset->ndata) {
         PetscCall(SetRasterData(&rain_dataset->raster, time, rain_dataset->ndata, rain_dataset->data_for_rdycore));
-        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetRegionalWaterSource(rdy, 0, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       }
       break;
     case UNSTRUCTURED:
       if (rain_dataset->ndata) {
         PetscCall(SetUnstructuredData(&rain_dataset->unstructured, time, rain_dataset->data_for_rdycore));
-        PetscCall(RDySetWaterSourceForLocalCells(rdy, rain_dataset->ndata, rain_dataset->data_for_rdycore));
+        PetscCall(RDySetRegionalWaterSource(rdy, 0, rain_dataset->ndata, rain_dataset->data_for_rdycore));
       }
       break;
     case MULTI_HOMOGENEOUS:
@@ -1281,7 +1281,7 @@ PetscErrorCode ApplyRainfallDataset(RDy rdy, PetscReal time, SourceSink *rain_da
         PetscInt  size = 1;
         PetscReal data;
         PetscCall(SetHomogeneousData(&rain_dataset->multihomogeneous.data[idata], time, size, &data));
-        PetscCall(RDySetWaterSourceForRegion(rdy, rain_dataset->multihomogeneous.region_ids[idata] - 1, data));
+        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, rain_dataset->multihomogeneous.region_ids[idata] - 1, data));
       }
       break;
   }

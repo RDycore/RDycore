@@ -446,7 +446,7 @@ PetscErrorCode CreateSWESourceOperator(Ceed ceed, RDyMesh *mesh, PetscInt num_ce
       PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
       PetscCallCEED(CeedVectorGetArray(mannings_n, CEED_MEM_HOST, (CeedScalar **)&n));
       for (CeedInt c = 0, oc = 0; c < mesh->num_cells; c++) {
-        if (!cells->is_local[c]) continue;
+        if (!cells->is_owned[c]) continue;
 
         offset_q[oc] = c * num_comp;
         offset_c[oc] = cells->local_to_owned[c] * num_comp;

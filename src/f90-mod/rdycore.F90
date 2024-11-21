@@ -24,7 +24,7 @@ module rdycore
             RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
-            RDySetWaterSourceForLocalCells, RDySetXMomentumSourceForLocalCells, RDySetYMomentumSourceForLocalCells, &
+            RDySetRegionalWaterSource, RDySetRegionalXMomentumSource, RDySetRegionalYMomentumSource, &
             RDySetManningsNForLocalCells, RDySetInitialConditions, &
             RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile
 
@@ -331,24 +331,27 @@ module rdycore
       type(c_ptr), value, intent(in) :: values
     end function
 
-    integer(c_int) function rdysetwatersourceforlocalcells_(rdy, size, watsrc) bind(c, name="RDySetWaterSourceForLocalCells")
+    integer(c_int) function rdysetregionalwatersource_(rdy, region_idx, size, watsrc) bind(c, name="RDySetRegionalWaterSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt, value, intent(in)    :: size
+      PetscInt   , value, intent(in) :: region_idx
+      PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
-    integer(c_int) function rdysetxmomentumsourceforlocalcells_(rdy, size, xmomsrc) bind(c, name="RDySetXMomentumSourceForLocalCells")
+    integer(c_int) function rdysetregionalxmomentumsource_(rdy, region_idx, size, xmomsrc) bind(c, name="RDySetRegionalXMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt, value, intent(in)    :: size
+      PetscInt   , value, intent(in) :: region_idx
+      PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: xmomsrc
     end function
 
-    integer(c_int) function rdysetymomentumsourceforlocalcells_(rdy, size, ymomsrc) bind(c, name="RDySetYMomentumSourceForLocalCells")
+    integer(c_int) function rdysetregionalymomentumsource_(rdy, region_idx, size, ymomsrc) bind(c, name="RDySetRegionalYMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt, value, intent(in)    :: size
+      PetscInt   , value, intent(in) :: region_idx
+      PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
@@ -763,28 +766,31 @@ contains
     ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
-  subroutine RDySetWaterSourceForLocalCells(rdy_, size, watsrc, ierr)
+  subroutine RDySetRegionalWaterSource(rdy_, region_idx, size, watsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetwatersourceforlocalcells_(rdy_%c_rdy, size, c_loc(watsrc))
+    ierr = rdysetregionalwatersource_(rdy_%c_rdy, region_idx, size, c_loc(watsrc))
   end subroutine
 
-  subroutine RDySetXMomentumSourceForLocalCells(rdy_, size, xmomsrc, ierr)
+  subroutine RDySetRegionalXMomentumSource(rdy_, region_idx, size, xmomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: xmomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetxmomentumsourceforlocalcells_(rdy_%c_rdy, size, c_loc(xmomsrc))
+    ierr = rdysetregionalxmomentumsource_(rdy_%c_rdy, region_idx, size, c_loc(xmomsrc))
   end subroutine
 
-  subroutine RDySetYMomentumSourceForLocalCells(rdy_, size, ymomsrc, ierr)
+  subroutine RDySetRegionalYMomentumSource(rdy_, region_idx, size, ymomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetymomentumsourceforlocalcells_(rdy_%c_rdy, size, c_loc(ymomsrc))
+    ierr = rdysetregionalymomentumsource_(rdy_%c_rdy, region_idx, size, c_loc(ymomsrc))
   end subroutine
 
   subroutine RDySetManningsNForLocalCells(rdy_, size, n, ierr)

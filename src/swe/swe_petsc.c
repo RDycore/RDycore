@@ -367,12 +367,12 @@ PetscErrorCode SWERHSFunctionForInternalEdges(RDy rdy, Vec F, CourantNumberDiagn
         }
 
         for (PetscInt idof = 0; idof < ndof; idof++) {
-          if (cells->is_local[l]) {
+          if (cells->is_owned[l]) {
             PetscInt idx = cells->local_to_owned[l];
             f_ptr[idx * ndof + idof] += flux_vec_int[ii * ndof + idof] * (-edge_len / areal);
           }
 
-          if (cells->is_local[r]) {
+          if (cells->is_owned[r]) {
             PetscInt idx = cells->local_to_owned[r];
             f_ptr[idx * ndof + idof] += flux_vec_int[ii * ndof + idof] * (edge_len / arear);
           }
@@ -437,7 +437,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
     PetscReal edge_len  = edges->lengths[iedge];
     PetscReal cell_area = cells->areas[icell];
 
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       PetscReal hl = datal->h[e];
       PetscReal hr = datar->h[e];
 
@@ -485,7 +485,7 @@ static PetscErrorCode ApplyReflectingBC(RDy rdy, RDyBoundary boundary, RiemannDa
     PetscInt iedge = boundary.edge_ids[e];
     PetscInt icell = edges->cell_ids[2 * iedge];
 
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       datar->h[e] = datal->h[e];
 
       PetscReal dum1 = Square(sn_vec_bnd[e]) - Square(cn_vec_bnd[e]);
@@ -547,7 +547,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDy rdy, RDyBoundary boundary, Riem
     PetscInt iedge = boundary.edge_ids[e];
     PetscInt icell = edges->cell_ids[2 * iedge];
 
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       PetscReal uperp = datal->u[e] * cn_vec_bnd[e] + datal->v[e] * sn_vec_bnd[e];
       PetscReal q     = datal->h[e] * fabs(uperp);
 
@@ -667,7 +667,7 @@ PetscErrorCode AddSWESourceTerm(RDy rdy, Vec F) {
   RiemannDataSWE      *data     = &data_swe->data_cells;
 
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       PetscReal h  = data->h[icell];
       PetscReal hu = data->hu[icell];
       PetscReal hv = data->hv[icell];

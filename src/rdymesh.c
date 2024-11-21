@@ -33,9 +33,7 @@ static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_
   FILL(num_cells, cells->global_ids, -1);
   FILL(num_cells, cells->natural_ids, -1);
 
-  PetscCall(PetscCalloc1(num_cells, &cells->is_local));
-  PetscCall(PetscCalloc1(num_cells, &cells->is_local));
-
+  PetscCall(PetscCalloc1(num_cells, &cells->is_owned));
   PetscCall(PetscCalloc1(num_cells, &cells->local_to_owned));
   FILL(num_cells, cells->local_to_owned, -1);
 
@@ -127,10 +125,10 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
     PetscInt gref, junkInt;
     PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
     if (gref >= 0) {
-      cells->is_local[icell] = PETSC_TRUE;
+      cells->is_owned[icell] = PETSC_TRUE;
       num_owned_cells++;
     } else {
-      cells->is_local[icell] = PETSC_FALSE;
+      cells->is_owned[icell] = PETSC_FALSE;
     }
 
     PetscCall(DMPlexGetTransitiveClosure(dm, c, use_cone, &pSize, &p));
@@ -156,7 +154,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
 
   PetscInt count = 0;
   for (PetscInt icell = 0; icell < num_cells; icell++) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       cells->local_to_owned[icell] = count;
       cells->owned_to_local[count] = icell;
       count++;
@@ -164,7 +162,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   }
 
   for (PetscInt icell = 0; icell < num_cells; icell++) {
-    if (!cells->is_local[icell]) {
+    if (!cells->is_owned[icell]) {
       cells->local_to_owned[icell] = count;
       count++;
     }
@@ -188,7 +186,7 @@ static PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.ids));
   PetscCall(PetscFree(cells.global_ids));
   PetscCall(PetscFree(cells.natural_ids));
-  PetscCall(PetscFree(cells.is_local));
+  PetscCall(PetscFree(cells.is_owned));
   PetscCall(PetscFree(cells.num_vertices));
   PetscCall(PetscFree(cells.num_edges));
   PetscCall(PetscFree(cells.num_neighbors));
@@ -221,8 +219,6 @@ static PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, PetscInt ncells_p
   PetscCall(PetscCalloc1(num_vertices, &vertices->num_cells));
   PetscCall(PetscCalloc1(num_vertices, &vertices->num_edges));
   FILL(num_vertices, vertices->global_ids, -1);
-
-  PetscCall(PetscCalloc1(num_vertices, &vertices->is_local));
 
   PetscCall(PetscCalloc1(num_vertices, &vertices->points));
 
@@ -384,7 +380,6 @@ static PetscErrorCode RDyVerticesDestroy(RDyVertices vertices) {
 
   PetscCall(PetscFree(vertices.ids));
   PetscCall(PetscFree(vertices.global_ids));
-  PetscCall(PetscFree(vertices.is_local));
   PetscCall(PetscFree(vertices.num_cells));
   PetscCall(PetscFree(vertices.num_edges));
   PetscCall(PetscFree(vertices.cell_offsets));
@@ -410,9 +405,8 @@ static PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
   FILL(num_edges, edges->global_ids, -1);
   FILL(2 * num_edges, edges->vertex_ids, -1);
 
-  PetscCall(PetscCalloc1(num_edges, &edges->is_local));
-  PetscCall(PetscCalloc1(num_edges, &edges->is_internal));
   PetscCall(PetscCalloc1(num_edges, &edges->is_owned));
+  PetscCall(PetscCalloc1(num_edges, &edges->is_internal));
 
   PetscCall(PetscCalloc1(2 * num_edges, &edges->cell_ids));
   FILL(2 * num_edges, edges->cell_ids, -1);
@@ -514,11 +508,10 @@ static PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(PetscFree(edges.global_ids));
   PetscCall(PetscFree(edges.internal_edge_ids));
   PetscCall(PetscFree(edges.boundary_edge_ids));
-  PetscCall(PetscFree(edges.is_local));
+  PetscCall(PetscFree(edges.is_owned));
   PetscCall(PetscFree(edges.vertex_ids));
   PetscCall(PetscFree(edges.cell_ids));
   PetscCall(PetscFree(edges.is_internal));
-  PetscCall(PetscFree(edges.is_owned));
   PetscCall(PetscFree(edges.normals));
   PetscCall(PetscFree(edges.centroids));
   PetscCall(PetscFree(edges.lengths));
@@ -1298,7 +1291,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Count up local cells.
   mesh->num_owned_cells = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; ++icell) {
-    if (mesh->cells.is_local[icell]) {
+    if (mesh->cells.is_owned[icell]) {
       ++mesh->num_owned_cells;
     }
   }

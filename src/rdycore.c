@@ -141,18 +141,16 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Destroy data structures for regions
-/// @param rdy A RDy struct
-/// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyDestroyRegions(RDy *rdy) {
+/// @brief Destroys a region data structure.
+PetscErrorCode DestroyRegion(RDyRegion *region) {
   PetscFunctionBegin;
 
-  for (PetscInt i = 0; i < (*rdy)->num_regions; ++i) {
-    if ((*rdy)->regions[i].cell_ids) {
-      PetscFree((*rdy)->regions[i].cell_ids);
-    }
+  if (region->owned_cell_global_ids) {
+    PetscFree(region->owned_cell_global_ids);
   }
-  if ((*rdy)->regions) PetscFree((*rdy)->regions);
+  if (region->cell_local_ids) {
+    PetscFree(region->cell_local_ids);
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -203,7 +201,10 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscCall(RDyDestroyMaterials(rdy));
 
   // destroy regions
-  PetscCall(RDyDestroyRegions(rdy));
+  for (PetscInt r = 0; r < (*rdy)->num_regions; ++r) {
+    PetscCall(DestroyRegion(&((*rdy)->regions[r])));
+  }
+  PetscFree((*rdy)->regions);
 
   // destroy materials
   PetscCall(RDyDestroyBoundaries(rdy));

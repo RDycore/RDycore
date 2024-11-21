@@ -167,13 +167,13 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
   PetscCall(SnapVerticesToBathymetry(rdy));
 
-  RDyLogDebug(rdy, "Initializing regions...");
-  PetscCall(InitRegions(rdy));
-
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+
+  RDyLogDebug(rdy, "Initializing regions...");
+  PetscCall(InitRegions(rdy));
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
@@ -210,12 +210,12 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
     // Create vectorized (x, y, t) triples for bulk expression evaluation
     PetscReal *cell_x, *cell_y;
-    PetscCall(PetscCalloc1(region.num_cells, &cell_x));
-    PetscCall(PetscCalloc1(region.num_cells, &cell_y));
+    PetscCall(PetscCalloc1(region.num_local_cells, &cell_x));
+    PetscCall(PetscCalloc1(region.num_local_cells, &cell_y));
 
     PetscInt N = 0;  // number of bulk evaluations
-    for (PetscInt c = 0; c < region.num_cells; ++c) {
-      PetscInt cell_id = region.cell_ids[c];
+    for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+      PetscInt cell_id = region.cell_local_ids[c];
       if (3 * cell_id < n_local) {
         cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
         cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
@@ -228,9 +228,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
       // evaluate the manufactured ѕolutions at all (x, y, t)
       PetscReal *h, *u, *v;
-      PetscCall(PetscCalloc1(region.num_cells, &h));
-      PetscCall(PetscCalloc1(region.num_cells, &u));
-      PetscCall(PetscCalloc1(region.num_cells, &v));
+      PetscCall(PetscCalloc1(region.num_local_cells, &h));
+      PetscCall(PetscCalloc1(region.num_local_cells, &u));
+      PetscCall(PetscCalloc1(region.num_local_cells, &v));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
@@ -238,8 +238,8 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       // TODO: salinity and sediment initial conditions go here.
 
       PetscInt l = 0;
-      for (PetscInt c = 0; c < region.num_cells; ++c) {
-        PetscInt cell_id = region.cell_ids[c];
+      for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+        PetscInt cell_id = region.cell_local_ids[c];
         if (3 * cell_id < n_local) {  // skip ghost cells
           x_ptr[3 * cell_id]     = h[l];
           x_ptr[3 * cell_id + 1] = h[l] * u[l];
@@ -274,7 +274,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
   PetscInt l = 0;
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    if (cells->is_local[icell]) {
+    if (cells->is_owned[icell]) {
       cell_x[l] = rdy->mesh.cells.centroids[icell].X[0];
       cell_y[l] = rdy->mesh.cells.centroids[icell].X[1];
       ++l;
@@ -333,7 +333,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
     l = 0;
     for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-      if (cells->is_local[icell]) {
+      if (cells->is_owned[icell]) {
         PetscReal Cd = GRAVITY * Square(n[l]) * PetscPowReal(h[l], -1.0 / 3.0);
 
         h_source[l] = dhdt[l] + u[l] * dhdx[l] + h[l] * dudx[l] + v[l] * dhdy[l] + h[l] * dvdy[l];
@@ -353,9 +353,9 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       }
     }
 
-    PetscCall(RDySetWaterSourceForLocalCells(rdy, N, h_source));
-    PetscCall(RDySetXMomentumSourceForLocalCells(rdy, N, hu_source));
-    PetscCall(RDySetYMomentumSourceForLocalCells(rdy, N, hv_source));
+    PetscCall(RDySetRegionalWaterSource(rdy, 0, N, h_source));
+    PetscCall(RDySetRegionalXMomentumSource(rdy, 0, N, hu_source));
+    PetscCall(RDySetRegionalYMomentumSource(rdy, 0, N, hv_source));
 
     PetscCall(PetscFree(h));
     PetscCall(PetscFree(u));
@@ -448,12 +448,12 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
     // create vectorized (x, y) pairs for bulk expression evaluation
     PetscReal *cell_x, *cell_y;
-    PetscCall(PetscCalloc1(region.num_cells, &cell_x));
-    PetscCall(PetscCalloc1(region.num_cells, &cell_y));
+    PetscCall(PetscCalloc1(region.num_local_cells, &cell_x));
+    PetscCall(PetscCalloc1(region.num_local_cells, &cell_y));
 
     PetscInt N = 0;  // number of bulk evaluations
-    for (PetscInt c = 0; c < region.num_cells; ++c) {
-      PetscInt cell_id = region.cell_ids[c];
+    for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+      PetscInt cell_id = region.cell_local_ids[c];
       if (3 * cell_id < n_local) {
         cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
         cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
