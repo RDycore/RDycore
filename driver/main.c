@@ -609,7 +609,7 @@ static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt
   }
 
   // find the ID of dirichlet BC across all ranks, which is need to check if a dirichlet BC was present on at least on rank
-  MPI_Allreduce(dirc_bc_idx, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  PetscCallMPI(MPIU_Allreduce(dirc_bc_idx, global_dirc_bc_idx, 1, MPIU_INT, MPI_MAX, comm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
