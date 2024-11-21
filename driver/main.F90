@@ -104,10 +104,13 @@ program rdycore_f90
   PetscInt             :: dirc_bc_idx, global_dirc_bc_idx
   PetscInt             :: cur_rain_idx, prev_rain_idx
   PetscInt             :: cur_bc_idx, prev_bc_idx
-  PetscInt             :: region_idx
+  PetscInt             :: region_0
   PetscReal            :: cur_rain, cur_bc
   PetscBool            :: interpolate_rain, interpolate_bc, flg
   PetscInt, parameter  :: ndof = 3
+
+  ! region 0 is the entire domain
+  region_0 = 0
 
   if (command_argument_count() < 1) then
     call usage()
@@ -154,8 +157,8 @@ program rdycore_f90
       PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, n, nat_id, ierr))
 
       values(:) = 0.d0
-      PetscCallA(RDySetRegionalXMomentumSource(rdy_, 0, n, values, ierr))
-      PetscCallA(RDySetRegionalYMomentumSource(rdy_, 0, n, values, ierr))
+      PetscCallA(RDySetRegionalXMomentumSource(rdy_, region_0, n, values, ierr))
+      PetscCallA(RDySetRegionalYMomentumSource(rdy_, region_0, n, values, ierr))
 
       ! get information about boundary conditions
       dirc_bc_idx = 0
@@ -199,17 +202,16 @@ program rdycore_f90
       do while (.not. RDyFinished(rdy_)) ! returns true based on stopping criteria
 
         ! apply a 1 mm/hr rain over the entire domain (region 0)
-        region_idx = 0
         if (.not. rain_specified) then
           rain(:) = 1.d0/3600.d0/1000.d0
-          PetscCallA(RDySetRegionalWaterSource(rdy_, region_idx, n, rain, ierr))
+          PetscCallA(RDySetRegionalWaterSource(rdy_, region_0, n, rain, ierr))
         else
           PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
           call getcurrentdata(rain_ptr, nrain, cur_time, interpolate_rain, cur_rain_idx, cur_rain)
           if (interpolate_rain .or. cur_rain_idx /= prev_rain_idx) then
             prev_rain_idx = cur_rain_idx
             rain(:) = cur_rain
-            PetscCallA(RDySetRegionalWaterSource(rdy_, region_idx, n, rain, ierr))
+            PetscCallA(RDySetRegionalWaterSource(rdy_, region_0, n, rain, ierr))
           endif
         endif
 
