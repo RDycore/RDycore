@@ -190,9 +190,10 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscReal *values) {
+static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckRegionIndex(rdy, region_idx));
+  PetscCall(CheckNumLocalCells(rdy, size));
 
   RDyRegion region = rdy->regions[region_idx];
   if (region.num_owned_cells) {
@@ -208,27 +209,27 @@ static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_
 /// Sets the external water source term on the region with the given index to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
-PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscReal *values) {
+PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 0, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 0, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the external x-momentum term on the region with the given index to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
-PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal *values) {
+PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 1, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 1, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the external y-momentum term on the region with the given index to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
-PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal *values) {
+PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 2, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 2, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -275,103 +276,6 @@ PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_i
 PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value) {
   PetscFunctionBegin;
   PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_idx, 2, value));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode SetDomainSourceComponent(RDy rdy, const PetscInt component, PetscInt size, PetscReal *values) {
-  PetscFunctionBegin;
-
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyRegion  region          = rdy->regions[r];
-    PetscReal *regional_values = NULL;
-    PetscCall(PetscCalloc1(region.num_owned_cells, &regional_values));
-    for (PetscInt c = 0; c < region.num_owned_cells; c++) {
-      regional_values[c] = values[region.owned_cell_global_ids[c]];
-    }
-
-    OperatorSourceData source_data;
-    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
-    PetscCall(SetOperatorSourceValues(&source_data, component, regional_values));
-    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
-
-    PetscFree(regional_values);
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Sets the external water source term on the entire domain to the values in the
-/// given array (whose length is equal to the number of owned cells in the
-/// domain).
-PetscErrorCode RDySetDomainWaterSource(RDy rdy, PetscInt size, PetscReal *values) {
-  PetscFunctionBegin;
-  PetscCall(SetDomainSourceComponent(rdy, 0, size, values));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Sets the external x-momentum source term on the entire domain to the values
-/// in the given array (whose length is equal to the number of owned cells in
-/// the domain).
-PetscErrorCode RDySetDomainXMomentumSource(RDy rdy, PetscInt size, PetscReal *values) {
-  PetscFunctionBegin;
-  PetscCall(SetDomainSourceComponent(rdy, 1, size, values));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Sets the external y-momentum source term on the entire domain to the values
-/// in the given array (whose length is equal to the number of owned cells in
-/// the domain).
-PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *values) {
-  PetscFunctionBegin;
-  PetscCall(SetDomainSourceComponent(rdy, 2, size, values));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode SetHomogeneousDomainSourceComponent(RDy rdy, const PetscInt component, PetscReal value) {
-  PetscFunctionBegin;
-
-  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyRegion  region          = rdy->regions[r];
-    PetscReal *regional_values = NULL;
-    PetscCall(PetscCalloc1(region.num_owned_cells, &regional_values));
-    for (PetscInt c = 0; c < region.num_owned_cells; c++) {
-      regional_values[c] = value;
-    }
-
-    OperatorSourceData source_data;
-    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
-    PetscCall(SetOperatorSourceValues(&source_data, component, regional_values));
-    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
-
-    PetscFree(regional_values);
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Sets the external water source term on the entire domain to the given single
-/// (homogeneous) value.
-PetscErrorCode RDySetHomogeneousDomainWaterSource(RDy rdy, PetscReal value) {
-  PetscFunctionBegin;
-  PetscCall(SetHomogeneousDomainSourceComponent(rdy, 0, value));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Sets the external x-momentum source term on the entire domain to the given
-/// single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousDomainXMomentumSource(RDy rdy, PetscReal value) {
-  PetscFunctionBegin;
-  PetscCall(SetHomogeneousDomainSourceComponent(rdy, 1, value));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Sets the external y-momentum source term on the entire domain to the given
-/// single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousDomainYMomentumSource(RDy rdy, PetscReal value) {
-  PetscFunctionBegin;
-  PetscCall(SetHomogeneousDomainSourceComponent(rdy, 2, value));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

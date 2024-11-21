@@ -88,8 +88,9 @@ contains
     cur_time = (nstep-1)*dtime
 
     ! Set spatially homogeneous rainfall for all grid cells
+    ! (the domain is region 0)
     rain_data(:) = 0.d0
-    PetscCallA(RDySetDomainWaterSource(rdy_, num_cells_owned, rain_data, ierr))
+    PetscCallA(RDySetRegionalWaterSource(rdy_, 0, num_cells_owned, rain_data, ierr))
 
     ! Set the coupling time step
     PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))

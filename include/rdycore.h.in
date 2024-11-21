@@ -102,21 +102,13 @@ PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt
 
 PETSC_EXTERN PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof, PetscReal *values);
 
-PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscReal value);
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);
-
-PETSC_EXTERN PetscErrorCode RDySetDomainWaterSource(RDy rdy, PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetDomainXMomentumSource(RDy rdy, PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *values);
-
-PETSC_EXTERN PetscErrorCode RDySetHomogeneousDomainWaterSource(RDy rdy, PetscReal value);
-PETSC_EXTERN PetscErrorCode RDySetHomogeneousDomainXMomentumSource(RDy rdy, PetscReal value);
-PETSC_EXTERN PetscErrorCode RDySetHomogeneousDomainYMomentumSource(RDy rdy, PetscReal value);
 
 PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic);
