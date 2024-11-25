@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
   char file[PETSC_MAX_PATH_LEN];
+  char map_file[PETSC_MAX_PATH_LEN];
 
   struct tm start_date, current_date;  // start and current date for rainfall dataset
 
@@ -52,13 +53,16 @@ typedef struct {
   PetscReal *data_xc, *data_yc;  // x and y coordinates of data in the raster dataset
   PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore cells
 
-  PetscBool output_map;  // if true, writes the mapping between the RDycore cells and the dataset
+  PetscBool write_map_for_debugging;  // if true, write the map between the RDycore cells and the dataset for debugging
+  PetscBool write_map;                // if true, write the map between the RDycore cells and the dataset
+  PetscBool read_map;                 // if true, read the map between the RDycore cells and the dataset
 } RasterDataset;
 
 typedef struct {
   char dir[PETSC_MAX_PATH_LEN];
   char file[PETSC_MAX_PATH_LEN];
   char mesh_file[PETSC_MAX_PATH_LEN];
+  char map_file[PETSC_MAX_PATH_LEN];
 
   PetscReal dtime_in_hour;
   PetscInt  ndata_file;
@@ -77,8 +81,9 @@ typedef struct {
   PetscReal *data_xc, *data_yc;  // x and y coordinates of data
   PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore elments
 
-  PetscBool output_map;  // if true, writes the mapping between the RDycore cells and the dataset
-
+  PetscBool write_map_for_debugging;  // if true, write the mapping between the RDycore cells and the dataset for debugging
+  PetscBool write_map;                // if true, write the map between the RDycore cells and the dataset
+  PetscBool read_map;                 // if true, read the map between the RDycore cells and the dataset
 } UnstructuredDataset;
 
 typedef struct {
@@ -318,7 +323,7 @@ static PetscErrorCode DestroyRasterDataset(RasterDataset *data) {
 ///
 /// @param *data [inout] A UnstructuredDataset struct
 /// @return PETSC_SUCESS on success
-static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
+static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data, PetscInt expected_data_stride) {
   PetscFunctionBegin;
 
   PetscCall(DetermineDatasetFilename(&data->current_date, data->dir, data->file));
@@ -347,6 +352,10 @@ static PetscErrorCode OpenUnstructuredDataset(UnstructuredDataset *data) {
              ") and second (stride = %" PetscInt_FMT ") in the Vec",
              size, data->ndata, data->stride);
 
+  // check the dataset stride is as expected
+  PetscCheck(data->stride == expected_data_stride, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The data stride is %" PetscInt_FMT ", while the expected stride is %" PetscInt_FMT ".", data->stride, expected_data_stride);
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -357,6 +366,28 @@ static PetscErrorCode OpenMultiHomogeneousDataset(MultiHomogeneousDataset *multi
     PetscCall(OpenHomogeneousDataset(&multi_data->data[idata]));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Write out the map of dataset-to-mesh
+/// @param rdy      [in] A pointer to RDy struct
+/// @param filename [in] Name of the map file
+/// @param ncells   [in] Number of RDycore's local cells
+/// @param d2m      [in] Index of dataset-to-mesh map
+/// @return PETSC_SUCESS on success
+static PetscErrorCode WriteMap(RDy rdy, char *filename, PetscInt ncells, PetscInt *d2m) {
+  PetscFunctionBegin;
+  Vec          global;
+  PetscScalar *global_ptr;
+  PetscCall(RDyCreateOneDOFGlobalVec(rdy, &global));
+
+  PetscCall(VecGetArray(global, &global_ptr));
+  for (PetscInt i = 0; i < ncells; i++) global_ptr[i] = d2m[i];
+  PetscCall(VecRestoreArray(global, &global_ptr));
+
+  PetscCall(RDyWriteOneDOFGlobalVecToBinaryFile(rdy, filename, &global));
+
+  PetscCall(VecDestroy(&global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -403,11 +434,50 @@ static PetscErrorCode WriteMappingForDebugging(char *filename, PetscInt ncells, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Sets up the mapping between the unstructured grid dataset cells and the
-///        local cells (for source-sink condition) or boundary edges (for boundary condition).
-/// @param data Pointer to a UnstructuredDataset struct
+/// @brief Allocates memory and extracts the x,y coordiantes of local cells in the RDycore's mesh
+/// @param rdy A pointer to RDy struct
+/// @param n   Number of local cells
+/// @param *xc Holds cell centeroid x coordinate value for local cells
+/// @param *yc Holds cell centeroid y coordinate value for local cells
 /// @return PETSC_SUCESS on success
-static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data) {
+static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscReal **xc, PetscReal **yc) {
+  PetscFunctionBegin;
+
+  // allocate memory
+  PetscCalloc1(n, xc);
+  PetscCalloc1(n, yc);
+
+  PetscCall(RDyGetLocalCellXCentroids(rdy, n, *xc));
+  PetscCall(RDyGetLocalCellYCentroids(rdy, n, *yc));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Allocates memory and extracts the x,y coordinates of edges corresponding to a boundary edge
+/// @param rdy   A pointer to RDy struct
+/// @param n     Number of edges
+/// @param bc_id ID of the boundary condition
+/// @param *xc   Holds cell centeroid x coordinate value for local cells
+/// @param *yc   Holds cell centeroid y coordinate value for local cells
+/// @return PETSC_SUCESS on success
+static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscInt bc_id, PetscReal **xc, PetscReal **yc) {
+  PetscFunctionBegin;
+
+  // allocate memory
+  PetscCalloc1(n, xc);
+  PetscCalloc1(n, yc);
+
+  // get the x/y coordinates of the boundary edges from RDycore
+  PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_id, n, *xc));
+  PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_id, n, *yc));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Reads coordinates (x,y) of an unstructure dataset from a file that is a PETSc Vec in binary format
+/// @param data A pointer to a UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode ReadUnstructuredDatasetCoordinates(UnstructuredDataset *data) {
   PetscFunctionBegin;
 
   PetscViewer  viewer;
@@ -438,6 +508,16 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
   PetscCall(VecRestoreArray(vec, &vec_ptr));
   PetscCall(VecDestroy(&vec));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Sets up the mapping between the unstructured grid dataset cells and the
+///        local cells (for source-sink condition) or boundary edges (for boundary condition).
+/// @param data Pointer to a UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode CreateUnstructuredDatasetMap(UnstructuredDataset *data) {
+  PetscFunctionBegin;
+
   PetscCalloc1(data->mesh_nelements, &data->data2mesh_idx);
 
   // for each boundary edge, find nearest dataset cell
@@ -466,27 +546,90 @@ static PetscErrorCode CreateUnstructuredDatasetMapping(UnstructuredDataset *data
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], PetscInt ncells, PetscInt **data2mesh_idx) {
+  PetscFunctionBegin;
+
+  PetscCalloc1(ncells, data2mesh_idx);
+
+  Vec global;
+  PetscCall(RDyReadOneDOFGlobalVecFromBinaryFile(rdy, filename, &global));
+
+  PetscInt size;
+  VecGetLocalSize(global, &size);
+  PetscCheck(ncells == size, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "The ncells (=%" PetscInt_FMT ") does not match the local size of global Vec (=%" PetscInt_FMT ")", ncells, size);
+
+  // for each boundary edge, find nearest dataset cell
+  PetscScalar *global_ptr;
+  PetscCall(VecGetArray(global, &global_ptr));
+  for (PetscInt ii = 0; ii < ncells; ii++) {
+    (*data2mesh_idx)[ii] = global_ptr[ii];
+  }
+  PetscCall(VecRestoreArray(global, &global_ptr));
+
+  PetscCall(VecDestroy(&global));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Finds information about dirichlet BC
+/// @param rdy                        [in]  A pointer to RDy struct
+/// @param *dirc_bc_idx               [out] ID of a dirichlet BC
+/// @param *num_edges_dirc_bc         [out] Number of boundary edges on which the dirichlet BC is applied
+/// @param *global_dirc_bc_idx        [out] The maximum ID of a dirichlet BC across all MPI ranks
+/// @param *multiple_dirc_bcs_present [out] Is PETSC_TRUE if multiple diriclet BCs were found
+/// @return
+static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt *num_edges_dirc_bc, PetscMPIInt *global_dirc_bc_idx,
+                                        PetscBool *multiple_dirc_bcs_present) {
   PetscFunctionBegin;
 
   MPI_Comm comm = PETSC_COMM_WORLD;
 
-  PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
+  // initialize values
+  *dirc_bc_idx               = -1;
+  *global_dirc_bc_idx        = -1;
+  *num_edges_dirc_bc         = 0;
+  *multiple_dirc_bcs_present = PETSC_FALSE;
+
+  // find the number of BCs
+  PetscInt nbcs;
   PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
+
+  // loop through all BCs and find info about dirichlet BC
   for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
     PetscInt num_edges, bc_type;
     PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
     PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
+
     if (bc_type == CONDITION_DIRICHLET) {
-      PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                 "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
-      dirc_bc_idx       = ibc;
-      num_edges_dirc_bc = num_edges;
+      if (*dirc_bc_idx != -1) *multiple_dirc_bcs_present = PETSC_TRUE;
+      *dirc_bc_idx       = ibc;
+      *num_edges_dirc_bc = num_edges;
     }
   }
 
+  // find the ID of dirichlet BC across all ranks, which is need to check if a dirichlet BC was present on at least on rank
+  PetscMPIInt idx_32 = (PetscMPIInt)*dirc_bc_idx;  // For 64-bit integer, convert the BC index to 32-bit integer as we don't
+                                                   // number of BCs to require 64-bit integer
+  MPI_Allreduce(&idx_32, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+  PetscFunctionBegin;
+
+  MPI_Comm    comm        = PETSC_COMM_WORLD;
+  PetscInt    dirc_bc_idx = 0, num_edges_dirc_bc = 0;
   PetscMPIInt global_dirc_bc_idx = -1;
-  MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  PetscBool   multiple_dirc_bcs_present;
+
+  // find the info about the dirichlet BC
+  PetscCall(FindDirichletBCID(rdy, &dirc_bc_idx, &num_edges_dirc_bc, &global_dirc_bc_idx, &multiple_dirc_bcs_present));
+
+  // perform checks
+  PetscCheck(multiple_dirc_bcs_present == PETSC_FALSE, comm, PETSC_ERR_USER,
+             "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml");
   PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
              "The BC file specified via -homogeneous_bc_file argument, but no CONDITION_DIRICHLET found in the yaml");
 
@@ -497,27 +640,67 @@ static PetscErrorCode DoPostprocessForHomogeneousDataset(RDy rdy, BoundaryCondit
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+/// @brief Sets up the dataset grid coordinates, the RDycore mesh coordinates, and
+///        the mapping between the dataset and grid by either creating the mapping
+///        on-the-fly or reading an existing mapping file
+/// @param rdy  A pointer to a RDy struct
+/// @param data A pointer to a UnstructuredDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, UnstructuredDataset *data) {
   PetscFunctionBegin;
 
-  MPI_Comm comm = PETSC_COMM_WORLD;
+  PetscMPIInt rank;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
-  PetscInt nbcs, dirc_bc_idx = -1, num_edges_dirc_bc = 0;
-  PetscCall(RDyGetNumBoundaryConditions(rdy, &nbcs));
-  for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
-    PetscInt num_edges, bc_type;
-    PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &num_edges));
-    PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &bc_type));
-    if (bc_type == CONDITION_DIRICHLET) {
-      PetscCheck(dirc_bc_idx == -1, comm, PETSC_ERR_USER,
-                 "When BC file specified via -unstructured_bc_dir argument, only one CONDITION_DIRICHLET can be present in the yaml");
-      dirc_bc_idx       = ibc;
-      num_edges_dirc_bc = num_edges;
-    }
+  static char debug_file[PETSC_MAX_PATH_LEN] = {0};
+
+  // get the x/y coordinates of local cells from RDycore
+  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_nelements));
+  PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, data->mesh_nelements, &data->mesh_xc, &data->mesh_yc));
+
+  // read the coordinates of dataset
+  PetscCall(ReadUnstructuredDatasetCoordinates(data));
+
+  // read or create the mapping between the dataset and local cells
+  if (data->read_map) {
+    PetscCall(ReadRainfallDatasetMap(rdy, data->map_file, data->mesh_nelements, &data->data2mesh_idx));
+  } else {
+    PetscCall(CreateUnstructuredDatasetMap(data));
   }
 
+  if (data->write_map_for_debugging) {
+    sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
+    PetscCall(
+        WriteMappingForDebugging(debug_file, data->mesh_nelements, data->data2mesh_idx, data->data_xc, data->data_yc, data->mesh_xc, data->mesh_yc));
+  }
+
+  if (data->write_map) {
+    PetscCall(WriteMap(rdy, data->map_file, data->mesh_nelements, data->data2mesh_idx));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief If the boundary condition cells are present locally, sets up the dataset grid coordinates,
+///        RDycore mesh edge coordinates, and creates the mapping between the dataset and mesh boundary
+///        edges on-the-fly.
+/// @param rdy        A pointer to a RDy struct
+/// @param bc_dataset A pointer to a BoundaryCondition struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
+  PetscFunctionBegin;
+
+  MPI_Comm    comm        = PETSC_COMM_WORLD;
+  PetscInt    dirc_bc_idx = 0, num_edges_dirc_bc = 0;
   PetscMPIInt global_dirc_bc_idx = -1;
-  MPI_Allreduce(&dirc_bc_idx, &global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  PetscBool   multiple_dirc_bcs_present;
+
+  // find the info about the dirichlet BC
+  PetscCall(FindDirichletBCID(rdy, &dirc_bc_idx, &num_edges_dirc_bc, &global_dirc_bc_idx, &multiple_dirc_bcs_present));
+
+  // perform checks
+  PetscCheck(multiple_dirc_bcs_present == PETSC_FALSE, comm, PETSC_ERR_USER,
+             "When BC file specified via -unstructured_bc_dir argument, only one CONDITION_DIRICHLET can be present in the yaml");
   PetscCheck(global_dirc_bc_idx > -1, comm, PETSC_ERR_USER,
              "The BC file specified via -unstructured_bc_dir argument, but no CONDITION_DIRICHLET found in the yaml");
 
@@ -525,23 +708,20 @@ static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondi
   bc_dataset->dirichlet_bc_idx = global_dirc_bc_idx;
   PetscCalloc1(bc_dataset->ndata, &bc_dataset->data_for_rdycore);
 
-  if ((num_edges_dirc_bc > 0) & (num_edges_dirc_bc > 0)) {
-    PetscCheck((bc_dataset->unstructured.stride == 3), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of boundary condition dataset is not 3.");
-
+  if ((num_edges_dirc_bc > 0)) {
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
-    // allocate memory to save x/y coordinates of the boundary edges
-    PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_xc);
-    PetscCalloc1(bc_dataset->unstructured.mesh_nelements, &bc_dataset->unstructured.mesh_yc);
-
     // get the x/y coordinates of the boundary edges from RDycore
-    PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_xc));
-    PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, global_dirc_bc_idx, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.mesh_yc));
+    PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, &bc_dataset->unstructured.mesh_xc,
+                                                      &bc_dataset->unstructured.mesh_yc));
+
+    // read the coordinates of dataset
+    PetscCall(ReadUnstructuredDatasetCoordinates(&bc_dataset->unstructured));
 
     // set up the mapping between the dataset and boundary edges
-    PetscCall(CreateUnstructuredDatasetMapping(&bc_dataset->unstructured));
+    PetscCall(CreateUnstructuredDatasetMap(&bc_dataset->unstructured));
 
-    if (bc_dataset->unstructured.output_map) {
+    if (bc_dataset->unstructured.write_map_for_debugging) {
       PetscMPIInt rank;
       MPI_Comm_rank(comm, &rank);
       static char debug_file[PETSC_MAX_PATH_LEN] = {0};
@@ -556,6 +736,10 @@ static PetscErrorCode DoPostprocessForUnstructuredDataset(RDy rdy, BoundaryCondi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Perform the setting up of the case when multiple, spatially homogeneous BCs are applied.
+/// @param rdy        A pointer to a RDy struct
+/// @param bc_dataset A pointer to a BoundaryCondition struct
+/// @return PETSC_SUCESS on success
 static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -574,7 +758,7 @@ static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, B
     PetscCalloc1(nbcs, &boundary_nedges);
     PetscCalloc1(nbcs, &boundary_type);
 
-    // extract info from RDycore abount boundary conditions
+    // extract info from RDycore about boundary conditions
     for (PetscInt ibc = 0; ibc < nbcs; ibc++) {
       PetscCall(RDyGetNumBoundaryEdges(rdy, ibc, &boundary_nedges[ibc]));
       PetscCall(RDyGetBoundaryConditionFlowType(rdy, ibc, &boundary_type[ibc]));
@@ -668,9 +852,11 @@ static PetscErrorCode DestroyUnstructuredDataset(UnstructuredDataset *data) {
 
   PetscCall(PetscFree(data->data_xc));
   PetscCall(PetscFree(data->data_yc));
-  PetscCall(PetscFree(data->mesh_xc));
-  PetscCall(PetscFree(data->mesh_yc));
-  PetscCall(PetscFree(data->data2mesh_idx));
+  if (data->mesh_nelements) {
+    PetscCall(PetscFree(data->mesh_xc));
+    PetscCall(PetscFree(data->mesh_yc));
+    PetscCall(PetscFree(data->data2mesh_idx));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -746,26 +932,6 @@ static PetscErrorCode OpenNextRasterDataset(RasterDataset *data) {
 static PetscErrorCode CreateRasterDatasetMapping(RDy rdy, RasterDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_ncells_local));
-  PetscCalloc1(data->mesh_ncells_local, &data->mesh_xc);
-  PetscCalloc1(data->mesh_ncells_local, &data->mesh_yc);
-  PetscCalloc1(data->mesh_ncells_local, &data->data2mesh_idx);
-
-  PetscCalloc1(data->ncols * data->nrows, &data->data_xc);
-  PetscCalloc1(data->ncols * data->nrows, &data->data_yc);
-
-  PetscInt idx = 0;
-  for (PetscInt irow = 0; irow < data->nrows; irow++) {
-    for (PetscInt icol = 0; icol < data->ncols; icol++) {
-      data->data_xc[idx] = data->xlc + icol * data->cellsize + data->cellsize / 2.0;
-      data->data_yc[idx] = data->ylc + (data->nrows - 1 - irow) * data->cellsize + data->cellsize / 2.0;
-      idx++;
-    }
-  }
-
-  PetscCall(RDyGetLocalCellXCentroids(rdy, data->mesh_ncells_local, data->mesh_xc));
-  PetscCall(RDyGetLocalCellYCentroids(rdy, data->mesh_ncells_local, data->mesh_yc));
-
   for (PetscInt icell = 0; icell < data->mesh_ncells_local; icell++) {
     PetscReal min_dist = (PetscMax(data->ncols, data->nrows) + 1) * data->cellsize;
     PetscReal xc       = data->mesh_xc[icell];
@@ -785,6 +951,58 @@ static PetscErrorCode CreateRasterDatasetMapping(RDy rdy, RasterDataset *data) {
         idx++;
       }
     }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Sets up the dataset grid coordinates, the RDycore mesh coordinates, and
+///        the mapping between the dataset and grid by either creating the mapping
+///        on-the-fly or reading an existing mapping file
+/// @param rdy  A pointer to a RDy struct
+/// @param data A pointer to a RasterDataset struct
+/// @return PETSC_SUCESS on success
+static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RasterDataset *data) {
+  PetscFunctionBegin;
+
+  PetscMPIInt rank;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+
+  static char debug_file[PETSC_MAX_PATH_LEN] = {0};
+
+  PetscCalloc1(data->ncols * data->nrows, &data->data_xc);
+  PetscCalloc1(data->ncols * data->nrows, &data->data_yc);
+
+  PetscInt idx = 0;
+  for (PetscInt irow = 0; irow < data->nrows; irow++) {
+    for (PetscInt icol = 0; icol < data->ncols; icol++) {
+      data->data_xc[idx] = data->xlc + icol * data->cellsize + data->cellsize / 2.0;
+      data->data_yc[idx] = data->ylc + (data->nrows - 1 - irow) * data->cellsize + data->cellsize / 2.0;
+      idx++;
+    }
+  }
+
+  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_ncells_local));
+  PetscCalloc1(data->mesh_ncells_local, &data->mesh_xc);
+  PetscCalloc1(data->mesh_ncells_local, &data->mesh_yc);
+  PetscCalloc1(data->mesh_ncells_local, &data->data2mesh_idx);
+
+  PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, data->mesh_ncells_local, &data->mesh_xc, &data->mesh_yc));
+
+  if (data->read_map) {
+    PetscCall(ReadRainfallDatasetMap(rdy, data->map_file, data->mesh_ncells_local, &data->data2mesh_idx));
+  } else {
+    PetscCall(CreateRasterDatasetMapping(rdy, data));
+  }
+
+  if (data->write_map_for_debugging) {
+    sprintf(debug_file, "map.source-sink.raster.rank_%d.bin", rank);
+    PetscCall(WriteMappingForDebugging(debug_file, data->mesh_ncells_local, data->data2mesh_idx, data->data_xc, data->data_yc, data->mesh_xc,
+                                       data->mesh_yc));
+  }
+
+  if (data->write_map) {
+    PetscCall(WriteMap(rdy, data->map_file, data->mesh_ncells_local, data->data2mesh_idx));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -885,13 +1103,14 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
   PetscFunctionBegin;
 
   // set default settings
-  rain_dataset->type                               = UNSET;
-  rain_dataset->constant.rate                      = 0.0;
-  rain_dataset->homogeneous.temporally_interpolate = PETSC_FALSE;
-  rain_dataset->unstructured.ndata                 = 0;
-  rain_dataset->unstructured.stride                = 0;
-  rain_dataset->unstructured.mesh_nelements        = 0;
-  rain_dataset->unstructured.output_map            = PETSC_FALSE;
+  rain_dataset->type                                 = UNSET;
+  rain_dataset->constant.rate                        = 0.0;
+  rain_dataset->homogeneous.temporally_interpolate   = PETSC_FALSE;
+  rain_dataset->unstructured.ndata                   = 0;
+  rain_dataset->unstructured.stride                  = 0;
+  rain_dataset->unstructured.mesh_nelements          = 0;
+  rain_dataset->unstructured.write_map_for_debugging = PETSC_FALSE;
+  rain_dataset->unstructured.write_map               = PETSC_FALSE;
 
   PetscCall(
       PetscOptionsGetBool(NULL, NULL, "-temporally_interpolate_spatially_homogeneous_rain", &rain_dataset->homogeneous.temporally_interpolate, NULL));
@@ -922,7 +1141,11 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
     PetscBool raster_dir_flag;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
 
-    PetscOptionsGetBool(NULL, NULL, "-raster_rain_output_map", &rain_dataset->raster.output_map, NULL);
+    PetscOptionsGetBool(NULL, NULL, "-raster_rain_write_map_for_debugging", &rain_dataset->raster.write_map_for_debugging, NULL);
+    PetscOptionsGetString(NULL, NULL, "-raster_rain_write_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
+                          &rain_dataset->raster.write_map);
+    PetscOptionsGetString(NULL, NULL, "-raster_rain_read_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
+                          &rain_dataset->raster.read_map);
 
     PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
@@ -966,7 +1189,11 @@ PetscErrorCode ParseRainfallDataOptions(SourceSink *rain_dataset) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_dir", rain_dataset->unstructured.dir, sizeof(rain_dataset->unstructured.dir),
                                     &unstructured_rain_dir_flag));
 
-    PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_output_map", &rain_dataset->unstructured.output_map, NULL);
+    PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_write_map_for_debugging", &rain_dataset->unstructured.write_map_for_debugging, NULL);
+    PetscOptionsGetString(NULL, NULL, "-unstructured_rain_write_map_file", rain_dataset->unstructured.map_file,
+                          sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.write_map);
+    PetscOptionsGetString(NULL, NULL, "-unstructured_rain_read_map_file", rain_dataset->unstructured.map_file,
+                          sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.read_map);
 
     PetscInt date[NUM_UNSTRUCTURED_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_UNSTRUCTURED_RAIN_DATE_VALUES;
@@ -1058,14 +1285,14 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscFunctionBegin;
 
   // set default settings
-  bc->type                               = UNSET;
-  bc->ndata                              = 0;
-  bc->dirichlet_bc_idx                   = -1;
-  bc->homogeneous.temporally_interpolate = PETSC_FALSE;
-  bc->unstructured.ndata                 = 0;
-  bc->unstructured.stride                = 0;
-  bc->unstructured.mesh_nelements        = 0;
-  bc->unstructured.output_map            = PETSC_FALSE;
+  bc->type                                 = UNSET;
+  bc->ndata                                = 0;
+  bc->dirichlet_bc_idx                     = -1;
+  bc->homogeneous.temporally_interpolate   = PETSC_FALSE;
+  bc->unstructured.ndata                   = 0;
+  bc->unstructured.stride                  = 0;
+  bc->unstructured.mesh_nelements          = 0;
+  bc->unstructured.write_map_for_debugging = PETSC_FALSE;
 
   PetscInt dataset_type_count = 0;  // number of number of datatypes specified via command line
 
@@ -1085,7 +1312,11 @@ PetscErrorCode ParseBoundaryDataOptions(BoundaryCondition *bc) {
   PetscBool unstructured_bc_dir_flag;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_dir", bc->unstructured.dir, sizeof(bc->unstructured.dir), &unstructured_bc_dir_flag));
 
-  PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_output_map", &bc->unstructured.output_map, NULL);
+  PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_write_map_for_debugging", &bc->unstructured.write_map_for_debugging, NULL);
+  PetscOptionsGetString(NULL, NULL, "-unstructured_bc_write_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
+                        &bc->unstructured.write_map);
+  PetscOptionsGetString(NULL, NULL, "-unstructured_bc_read_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
+                        &bc->unstructured.read_map);
 
   PetscInt  date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
   PetscInt  ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
@@ -1175,11 +1406,11 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
 
   PetscMPIInt rank;
   MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
-  static char debug_file[PETSC_MAX_PATH_LEN] = {0};
 
   // parse the command line arguments related to rainfall
   PetscCall(ParseRainfallDataOptions(rain_dataset));
 
+  PetscInt expected_data_stride;
   switch (rain_dataset->type) {
     case UNSET:
       break;
@@ -1196,43 +1427,15 @@ PetscErrorCode CreateRainfallDataset(RDy rdy, PetscInt n, SourceSink *rain_datas
       rain_dataset->ndata = n;
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
       PetscCall(OpenRasterDataset(&rain_dataset->raster));
-      PetscCall(CreateRasterDatasetMapping(rdy, &rain_dataset->raster));
-
-      if (rain_dataset->raster.output_map) {
-        sprintf(debug_file, "map.source-sink.raster.rank_%d.bin", rank);
-        PetscCall(WriteMappingForDebugging(debug_file, rain_dataset->raster.mesh_ncells_local, rain_dataset->raster.data2mesh_idx,
-                                           rain_dataset->raster.data_xc, rain_dataset->raster.data_yc, rain_dataset->raster.mesh_xc,
-                                           rain_dataset->raster.mesh_yc));
-      }
-
+      PetscCall(DoPostprocessForSourceRasterDataset(rdy, &rain_dataset->raster));
       break;
     case UNSTRUCTURED:
-      rain_dataset->ndata = n;
-
+      expected_data_stride = 1;
+      rain_dataset->ndata  = n;
       PetscCalloc1(n, &rain_dataset->data_for_rdycore);
-      PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured));
 
-      PetscCheck((rain_dataset->unstructured.stride == 1), PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of rainfall dataset is not 1.");
-
-      rain_dataset->unstructured.mesh_nelements = n;
-
-      // allocate memory to save x/y coordinates of local cells
-      PetscCalloc1(n, &rain_dataset->unstructured.mesh_xc);
-      PetscCalloc1(n, &rain_dataset->unstructured.mesh_yc);
-
-      // get x/y coordinates of local cells from RDycore
-      PetscCall(RDyGetLocalCellXCentroids(rdy, n, rain_dataset->unstructured.mesh_xc));
-      PetscCall(RDyGetLocalCellYCentroids(rdy, n, rain_dataset->unstructured.mesh_yc));
-
-      // set up the mapping between the dataset and local cells
-      PetscCall(CreateUnstructuredDatasetMapping(&rain_dataset->unstructured));
-
-      if (rain_dataset->unstructured.output_map) {
-        sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
-        PetscCall(WriteMappingForDebugging(debug_file, rain_dataset->unstructured.mesh_nelements, rain_dataset->unstructured.data2mesh_idx,
-                                           rain_dataset->unstructured.data_xc, rain_dataset->unstructured.data_yc, rain_dataset->unstructured.mesh_xc,
-                                           rain_dataset->unstructured.mesh_yc));
-      }
+      PetscCall(OpenUnstructuredDataset(&rain_dataset->unstructured, expected_data_stride));
+      PetscCall(DoPostprocessForSourceUnstructuredDataset(rdy, &rain_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
       PetscCall(OpenMultiHomogeneousDataset(&rain_dataset->multihomogeneous));
@@ -1338,6 +1541,7 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
 
   PetscCall(ParseBoundaryDataOptions(bc_dataset));
 
+  PetscInt expected_data_stride;
   switch (bc_dataset->type) {
     case UNSET:
       break;
@@ -1346,14 +1550,15 @@ PetscErrorCode CreateBoundaryConditionDataset(RDy rdy, BoundaryCondition *bc_dat
       break;
     case HOMOGENEOUS:
       PetscCall(OpenHomogeneousDataset(&bc_dataset->homogeneous));
-      PetscCall(DoPostprocessForHomogeneousDataset(rdy, bc_dataset));
+      PetscCall(DoPostprocessForBoundaryHomogeneousDataset(rdy, bc_dataset));
       break;
     case RASTER:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Extend CreateBoundaryConditionDataset for boundary condition of type RASTER");
       break;
     case UNSTRUCTURED:
-      PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured));
-      PetscCall(DoPostprocessForUnstructuredDataset(rdy, bc_dataset));
+      expected_data_stride = 3;
+      PetscCall(OpenUnstructuredDataset(&bc_dataset->unstructured, expected_data_stride));
+      PetscCall(DoPostprocessForBoundaryUnstructuredDataset(rdy, bc_dataset));
       break;
     case MULTI_HOMOGENEOUS:
       PetscCall(OpenMultiHomogeneousDataset(&bc_dataset->multihomogeneous));
@@ -1432,10 +1637,6 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
     case RASTER:
       break;
     case UNSTRUCTURED:
-      if (bc_dataset->ndata) {
-        PetscCall(PetscFree(bc_dataset->unstructured.mesh_xc));
-        PetscCall(PetscFree(bc_dataset->unstructured.mesh_yc));
-      }
       PetscCall(DestroyUnstructuredDataset(&bc_dataset->unstructured));
       break;
     case MULTI_HOMOGENEOUS:
