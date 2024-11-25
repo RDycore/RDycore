@@ -93,60 +93,15 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
              "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.flow->type);
 
-  // dispatch this call to CEED or PETSc
-  PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  if (CeedEnabled()) {
-    // FIXME: we'd like to do this for both CEED and PETSc
-    // FIXME: also, I don't think we should be setting boundary values with a
-    // FIXME: strided array, since it makes non-SWE situations more complicated
-
-    // shuffle DOF into component arrays
-    // FIXME: we fix ndof at 3 for now; we'll fix this later
-    PetscReal *bvalues[3];
-    PetscCalloc1(num_edges, &bvalues[0]);
-    PetscCalloc1(num_edges, &bvalues[1]);
-    PetscCalloc1(num_edges, &bvalues[2]);
-    for (PetscInt i = 0; i < num_edges; ++i) {
-      bvalues[0][i] = values[3 * i + 0];
-      bvalues[1][i] = values[3 * i + 1];
-      bvalues[2][i] = values[3 * i + 2];
-    }
-
-    OperatorBoundaryData boundary_data;
-    PetscCall(GetOperatorBoundaryData(rdy, boundary, &boundary_data));
-    for (PetscInt c = 0; c < ndof; ++c) {
-      PetscCall(SetOperatorBoundaryValues(&boundary_data, c, bvalues[c]));
-    }
-    PetscCall(RestoreOperatorBoundaryData(rdy, boundary, &boundary_data));
-    PetscFree(bvalues[0]);
-    PetscFree(bvalues[1]);
-    PetscFree(bvalues[2]);
-  } else {  // petsc
-    // fetch the boundary data
-    RiemannDataSWE bdata;
-    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc.context, boundary_index, &bdata));
-
-    // set the boundary values
-    RDyCells *cells = &rdy->mesh.cells;
-    RDyEdges *edges = &rdy->mesh.edges;
+  OperatorData dirichlet;
+  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+  for (PetscInt comp = 0; comp < dirichlet.num_components; ++comp) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      PetscInt iedge = boundary.edge_ids[e];
-      PetscInt icell = edges->cell_ids[2 * iedge];
-      if (cells->is_owned[icell]) {
-        bdata.h[e]  = values[3 * e];
-        bdata.hu[e] = values[3 * e + 1];
-        bdata.hv[e] = values[3 * e + 2];
-
-        if (bdata.h[e] > tiny_h) {
-          bdata.u[e] = values[3 * e + 1] / bdata.h[e];
-          bdata.v[e] = values[3 * e + 2] / bdata.h[e];
-        } else {
-          bdata.u[e] = 0.0;
-          bdata.v[e] = 0.0;
-        }
-      }
+      dirichlet.values[comp][e] = values[dirichlet.num_components * e + comp];
     }
   }
+  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -193,14 +148,18 @@ PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal
 static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckRegionIndex(rdy, region_idx));
-  PetscCall(CheckNumLocalCells(rdy, size));
-
   RDyRegion region = rdy->regions[region_idx];
+  PetscCheck(size == region.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_idx,
+             region.num_owned_cells);
+
   if (region.num_owned_cells) {
-    OperatorSourceData source_data;
-    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
-    PetscCall(SetOperatorSourceValues(&source_data, component, values));
-    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
+    OperatorData source_data;
+    PetscCall(GetOperatorExternalSource(rdy->operator, region, &source_data));
+    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+      source_data.values[component][c] = values[c];
+    }
+    PetscCall(RestoreOperatorExternalSource(rdy->operator, region, &source_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -237,21 +196,16 @@ static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const Petsc
   PetscFunctionBegin;
   PetscCall(CheckRegionIndex(rdy, region_idx));
 
-  RDyRegion  region = rdy->regions[region_idx];
-  PetscReal *values;
-  PetscCall(PetscCalloc1(region.num_owned_cells, &values));
-  for (PetscInt i = 0; i < region.num_owned_cells; ++i) {
-    values[i] = value;
-  }
-
+  RDyRegion region = rdy->regions[region_idx];
   if (region.num_owned_cells) {
-    OperatorSourceData source_data;
-    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
-    PetscCall(SetOperatorSourceValues(&source_data, component, values));
-    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
+    OperatorData source_data;
+    PetscCall(GetOperatorExternalSource(rdy->operator, region, &source_data));
+    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+      source_data.values[component][c] = value;
+    }
+    PetscCall(RestoreOperatorExternalSource(rdy->operator, region, &source_data));
   }
 
-  PetscFree(values);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -445,13 +399,24 @@ PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal *n_values) {
+PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, const PetscInt size, PetscReal *n_values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckRegionIndex(rdy, region_index));
+  RDyRegion region = rdy->regions[region_index];
+  PetscCheck(size == region.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_index,
+             region.num_owned_cells);
 
+  OperatorData mannings_data;
+  PetscCall(GetOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+  for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+    mannings_data.values[0][c] = n_values[c];
+  }
+  PetscCall(RestoreOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+
+  /* FIXME: get rid of this
   if (CeedEnabled()) {
-    // FIXME: we'd like to do this for both CEED and PETSc
     OperatorMaterialData material_data;
     PetscCall(GetOperatorMaterialData(rdy, &material_data));
     PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
@@ -462,6 +427,7 @@ PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscR
       rdy->materials_by_cell[cell_id].manning = n_values[i];
     }
   }
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

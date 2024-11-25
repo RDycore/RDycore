@@ -821,13 +821,11 @@ static PetscErrorCode InitSolution(RDy rdy) {
 }
 
 // initializes the operator given the information in rdy
-static PetscErrorCode InitOperator(RDy rdy) {
+PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(SetOperatorBoundaries(rdy->operator, rdy->num_boundaries, rdy->boundaries));
-  PetscCall(SetOperatorRegions(rdy->operator, rdy->num_regions, rdy->regions));
-  PetscCall(SetOperatorDomain(rdy->operator, rdy->dm, &rdy->mesh));
-  PetscCall(ReadyOperator(rdy->operator));
+  PetscCall(
+      CreateOperator(rdy->config.physics, rdy->dm, &rdy->mesh, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries, &rdy->operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -973,10 +971,6 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // print configuration info
   PetscCall(PrintConfig(rdy));
-
-  // create an operator for our physics config so CreateDM can use it to
-  // create local sections
-  PetscCall(CreateOperator(rdy->config.physics, &rdy->operator));
 
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector

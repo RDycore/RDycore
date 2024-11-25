@@ -5,6 +5,7 @@
 #include <rdycore.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
+PetscClassId     RDY_CLASSID;
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
@@ -16,6 +17,9 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
     if (!petsc_initialized) {
       PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
     }
+
+    // set up our logging class ID
+    PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
 
     // initialize our Courant number diagnostics MPI datatype / operator
     PetscCall(InitCourantNumberDiagnostics());
@@ -38,6 +42,9 @@ PetscErrorCode RDyInitFortran(void) {
       // no need for PetscInitializeFortran because PetscInitialize is
       // called before this function in the rdycore Fortran module.
     }
+
+    // set up our logging class ID
+    PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
 
     // initialize our Courant number diagnostics MPI datatype / operator
     PetscCall(InitCourantNumberDiagnostics());
@@ -135,8 +142,10 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
+  /* FIXME: we need to figure out how the operator fits into this
   if ((*rdy)->ceed.host_fluxes) PetscCall(VecDestroy(&(*rdy)->ceed.host_fluxes));
   if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -214,7 +223,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   PetscCall(RDyDestroyVectors(rdy));
 
-  PetscCall(DestroyOperators(*rdy));
+  PetscCall(DestroyOperator(&(*rdy)->operator));
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));

@@ -127,6 +127,7 @@ static PetscErrorCode MMSPreStep(TS ts) {
 }
 
 extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
+extern PetscErrorCode InitOperator(RDy rdy);
 
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
@@ -179,8 +180,8 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
   PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
-  RDyLogDebug(rdy, "Initializing operators...");
-  PetscCall(InitOperators(rdy));
+  RDyLogDebug(rdy, "Initializing operator...");
+  PetscCall(InitOperator(rdy));
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");

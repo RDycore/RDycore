@@ -260,17 +260,18 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   // if adaptive time is enabled, try to increase the dt
   RDyTimeAdaptiveSection *time_adap = &rdy->config.time.adaptive;
   if (time_adap->enable) {
-    CourantNumberDiagnostics *cnum_diags = &rdy->courant_num_diags;
+    CourantNumberDiagnostics cnum_diags;
+    PetscCall(GetOperatorCourantNumberDiagnostics(rdy->operator, & cnum_diags));
 
     // if previous courant number is valid
-    if (cnum_diags->is_set) {
+    if (cnum_diags.is_set) {
       // get current timestep
       PetscReal dt = rdy->dt;
 
       PetscReal factor = 0.0;
-      if (cnum_diags->max_courant_num < time_adap->target_courant_number) {
+      if (cnum_diags.max_courant_num < time_adap->target_courant_number) {
         // timestep can be increased, so find the factor by which timestep can be increased
-        factor = PetscMin(time_adap->target_courant_number / cnum_diags->max_courant_num, time_adap->max_increase_factor);
+        factor = PetscMin(time_adap->target_courant_number / cnum_diags.max_courant_num, time_adap->max_increase_factor);
 
         // increase the timestep
         dt *= factor;
@@ -280,7 +281,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
       } else {
         // decrease the timestep
-        factor = time_adap->target_courant_number / cnum_diags->max_courant_num;
+        factor = time_adap->target_courant_number / cnum_diags.max_courant_num;
 
         // decrease the timestep
         dt *= factor;
@@ -304,8 +305,8 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
 
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  courant_num_diags->is_set                   = PETSC_FALSE;
+  // FIXME: maybe we want to do this more systematically, like ResetOperatorDiagnostics?
+  rdy->operator->courant_number_diags.is_set = PETSC_FALSE;
 
   // advance the solution to the specified time (handling preloading if requested)
   PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
@@ -318,7 +319,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   }
   PetscPreLoadEnd();
 
-  if (time_adap->enable & !courant_num_diags->is_set) {
+  CourantNumberDiagnostics courant_num_diags;
+  PetscCall(GetOperatorCourantNumberDiagnostics(rdy->operator, & courant_num_diags));
+  if (time_adap->enable & !courant_num_diags.is_set) {
+    // FIXME: this should be more seamless
     PetscCall(SWEFindMaxCourantNumber(rdy));
   }
 

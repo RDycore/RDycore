@@ -77,6 +77,9 @@ struct _RDyOps {
   PetscErrorCode (*destroy)(void *);
 };
 
+// class ID for PETSc logging events
+extern PetscClassId RDY_CLASSID;
+
 // an application context that stores data relevant to a simulation
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);

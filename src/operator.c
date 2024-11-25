@@ -11,49 +11,111 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-// these are used to register CEED operator events for profiling
-static PetscBool    operator_initialized_ = PETSC_FALSE;
-static PetscClassId RDY_CLASSID_;
-PetscLogEvent       RDY_CeedOperatorApply_;
+// operator logging/profiling events
+PetscLogEvent RDY_CeedOperatorApply_;
 
-// initializes operators for physics specified in the input configuration
-static PetscErrorCode InitOperators(RDy rdy) {
+// defines the distinct boundaries (edges) for the operator
+static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundaries, RDyBoundary *boundaries) {
   PetscFunctionBegin;
 
-  // register a logging event for applying our CEED operator
-  PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
-  PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply));
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(num_boundaries > 0, comm, PETSC_ERR_USER, "Number of operator boundaries must be positive");
+  PetscCheck(boundaries, comm, PETSC_ERR_USER, "Operator boundary array must be non-NULL");
 
-  // just pass the call along for now
-  InitSWE(rdy);
+  PetscCall(PetscCalloc1(num_boundaries, &op->boundaries));
+  memcpy(op->boundaries, boundaries, sizeof(RDyBoundary) * num_boundaries);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// defines the distinct regions of owned cells for the operator
+static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDyRegion *regions) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Number of operator regions must be positive");
+  PetscCheck(regions, comm, PETSC_ERR_USER, "Operator region array must be non-NULL");
+
+  PetscCall(PetscCalloc1(num_regions, &op->regions));
+  memcpy(op->regions, regions, sizeof(RDyRegion) * num_regions);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// defines the computational domain for the operator
+static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(mesh, comm, PETSC_ERR_USER, "Operator mesh must be non-NULL");
+
+  op->dm   = dm;
+  op->mesh = mesh;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ReadyCeedOperator(Operator *op) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ReadyPetscOperator(Operator *op) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// performs all work necessary to make the operator ready for use
+static PetscErrorCode ReadyOperator(Operator *op) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  // make sure preconditions are met
+  PetscCheck(op->dm, comm, PETSC_ERR_USER, "Cannot ready an operator with no associated DM");
+  PetscCheck(op->num_boundaries > 0, comm, PETSC_ERR_USER, "Cannot ready an operator with no boundaries");
+  PetscCheck(op->num_regions > 0, comm, PETSC_ERR_USER, "Cannot ready an operator with no regions");
+  PetscCheck(op->mesh, comm, PETSC_ERR_USER, "Cannot ready an operator with no mesh");
+
+  if (CeedEnabled()) {
+    PetscCall(ReadyCeedOperator(op));
+  } else {
+    PetscCall(ReadyPetscOperator(op));
+  }
+
+  // initialize diagnostics
+  op->courant_number_diags.max_courant_num = 0.0;
+  op->courant_number_diags.global_edge_id  = -1;
+  op->courant_number_diags.global_cell_id  = -1;
+  op->courant_number_diags.is_set          = PETSC_FALSE;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Creates an operator representing the system of equations described in the
 // given configuration.
-PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, Operator **operator) {
+PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_regions, RDyRegion *regions,
+                              PetscInt num_boundaries, RDyBoundary *boundaries, Operator **operator) {
   PetscFunctionBegin;
+
+  static PetscBool first_time = PETSC_TRUE;
+  if (first_time) {
+    // register a logging event for applying our CEED operator
+    PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply_));
+    first_time = PETSC_FALSE;
+  }
 
   PetscCall(PetscCalloc1(1, operator));
   (*operator)->physics_config = physics_config;
 
-  // set up fields for the shallow water equations
-  // FIXME: generalize
-  (*operator)->num_components = 3;
-  PetscCall(PetscCalloc1((*operator)->num_components, (*operator)->field_names));
-  for (PetscInt c = 0; c < (*operator)->num_components; ++c) {
-    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &(*operator)->field_names[c]));
-  }
-  strcpy((*operator)->field_names[0], "Height");
-  strcpy((*operator)->field_names[0], "MomentumX");
-  strcpy((*operator)->field_names[0], "MomentumY");
-
-  // initialize diagnostics
-  (*operator)->local_courant_diags.max_courant_num = 0.0;
-  (*operator)->local_courant_diags.global_edge_id  = -1;
-  (*operator)->local_courant_diags.global_cell_id  = -1;
-  (*operator)->local_courant_diags.is_set          = PETSC_FALSE;
+  PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
+  PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries));
+  PetscCall(SetOperatorRegions(*operator, num_regions, regions));
+  PetscCall(ReadyOperator(*operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -97,119 +159,6 @@ PetscErrorCode DestroyOperator(Operator **op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This function creates a Section from information in the given operator
-/// appropriate for use by the given DM. It does not configure the DM to use
-/// the section, however.
-PetscErrorCode CreateSectionForDMAndOperator(DM dm, Operator *op, PetscSection *sec) {
-  PetscFunctionBeginUser;
-  PetscInt n_field          = 1;
-  PetscInt n_field_comps[1] = {op->num_components};
-  char   **comp_names       = op->field_names;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-
-  PetscCall(PetscSectionCreate(comm, sec));
-  PetscCall(PetscSectionSetNumFields(*sec, n_field));
-
-  PetscInt n_field_dof_tot = 0;
-  for (PetscInt f = 0; f < n_field; ++f) {
-    PetscCall(PetscSectionSetFieldComponents(*sec, f, n_field_comps[f]));
-    for (PetscInt c = 0; c < n_field_comps[f]; ++c, ++n_field_dof_tot) {
-      PetscCall(PetscSectionSetComponentName(*sec, f, c, comp_names[c]));
-    }
-  }
-
-  // set the number of degrees of freedom in each cell
-  PetscInt c_start, c_end;  // starting and ending cell points
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
-  PetscCall(PetscSectionSetChart(*sec, c_start, c_end));
-  for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < n_field; ++f) {
-      PetscCall(PetscSectionSetFieldDof(*sec, c, f, n_field_comps[f]));
-    }
-    PetscCall(PetscSectionSetDof(*sec, c, n_field_dof_tot));
-  }
-  PetscCall(PetscSectionSetUp(*sec));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-// Defines the distinct boundaries (edges) for the operator.
-PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundaries, RDyBoundary *boundaries) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCheck(num_boundaries > 0, comm, PETSC_ERR_USER, "Number of operator boundaries must be positive");
-  PetscCheck(boundaries, comm, PETSC_ERR_USER, "Operator boundary array must be non-NULL");
-
-  PetscCall(PetscCalloc1(num_boundaries, &op->boundaries));
-  memcpy(op->boundaries, boundaries, sizeof(RDyBoundary) * num_boundaries);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-// Defines the distinct regions of owned cells for the operator.
-PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDyRegion *regions) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Number of operator regions must be positive");
-  PetscCheck(regions, comm, PETSC_ERR_USER, "Operator region array must be non-NULL");
-
-  PetscCall(PetscCalloc1(num_regions, &op->regions));
-  memcpy(op->regions, regions, sizeof(RDyRegion) * num_regions);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-// Defines the computational domain for the operator.
-PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCheck(mesh, comm, PETSC_ERR_USER, "Operator mesh must be non-NULL");
-
-  op->dm   = dm;
-  op->mesh = mesh;
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode ReadyCeedOperator(Operator *op) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode ReadyPetscOperator(Operator *op) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-// performs all work necessary to make the operator ready for use
-PetscErrorCode ReadyOperator(Operator *op) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-
-  // make sure preconditions are met
-  PetscCheck(op->dm, comm, PETSC_ERR_USER, "Cannot ready an operator with no associated DM");
-  PetscCheck(op->num_boundaries > 0, comm, PETSC_ERR_USER, "Cannot ready an operator with no boundaries");
-  PetscCheck(op->num_regions > 0, comm, PETSC_ERR_USER, "Cannot ready an operator with no regions");
-  PetscCheck(op->mesh, comm, PETSC_ERR_USER, "Cannot ready an operator with no mesh");
-
-  if (CeedEnabled()) {
-    PetscCall(ReadyCeedOperator(op));
-  } else {
-    PetscCall(ReadyPetscOperator(op));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u, Vec dudt) {
   PetscFunctionBegin;
 
@@ -241,8 +190,17 @@ PetscErrorCode ApplyOperator(Operator *op, PetscReal dt, Vec u, Vec dudt) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode GetLocalOperatorCourantNumberDiagnostics(Operator *op, CourantNumberDiagnostics *diags) {
+PetscErrorCode GetOperatorCourantNumberDiagnostics(Operator *op, CourantNumberDiagnostics *diags) {
   PetscFunctionBegin;
+
+  // reduce the local courant number diagnostics if needed
+  if (!op->courant_number_diags.is_set) {
+    MPI_Comm comm;
+    PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+    MPI_Allreduce(MPI_IN_PLACE, &op->courant_number_diags, 1, MPI_COURANT_NUMBER_DIAGNOSTICS, MPI_MAX_COURANT_NUMBER, comm);
+    op->courant_number_diags.is_set = PETSC_TRUE;
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

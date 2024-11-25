@@ -119,21 +119,11 @@ typedef struct Operator {
   Vec boundary_fluxes;
 
   // courant number diagnostics, local to current MPI process
-  CourantNumberDiagnostics local_courant_diags;
+  CourantNumberDiagnostics courant_number_diags;
 } Operator;
 
-PETSC_INTERN PetscErrorCode CreateOperator(RDyPhysicsSection, Operator **);
+PETSC_INTERN PetscErrorCode CreateOperator(RDyPhysicsSection, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
-
-PETSC_INTERN PetscErrorCode CreateSectionForDMAndOperator(DM, Operator *, PetscSection *);
-
-// these functions configure an operator, and can be called in any order
-PETSC_INTERN PetscErrorCode SetOperatorBoundaries(Operator *, PetscInt, RDyBoundary *);
-PETSC_INTERN PetscErrorCode SetOperatorRegions(Operator *, PetscInt, RDyRegion *);
-PETSC_INTERN PetscErrorCode SetOperatorDomain(Operator *, DM, RDyMesh *);
-
-// call this function after configuring your operator
-PETSC_INTERN PetscErrorCode ReadyOperator(Operator *);
 
 // operator timestepping function
 PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
@@ -159,6 +149,6 @@ PETSC_INTERN PetscErrorCode GetOperatorMaterialProperty(Operator *, RDyRegion, O
 PETSC_INTERN PetscErrorCode RestoreOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
 
 // diagnostics
-PETSC_INTERN PetscErrorCode GetLocalOperatorCourantNumberDiagnostics(Operator *, CourantNumberDiagnostics *);
+PETSC_INTERN PetscErrorCode GetOperatorCourantNumberDiagnostics(Operator *, CourantNumberDiagnostics *);
 
 #endif

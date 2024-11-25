@@ -60,6 +60,48 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// This function creates a Section appropriate for use by the given (primary) DM.
+static PetscErrorCode CreateDMSection(RDyPhysicsSection physics_config, DM dm, PetscSection *sec) {
+  PetscFunctionBeginUser;
+
+  // set up fields for the shallow water equations
+  // FIXME: generalize using physics_config
+  PetscInt    num_fields             = 1;
+  PetscInt    num_field_components[] = {3};
+  const char *component_names[3]     = {
+          "Height",
+          "MomentumX",
+          "MomentumY",
+  };
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
+
+  PetscCall(PetscSectionCreate(comm, sec));
+  PetscCall(PetscSectionSetNumFields(*sec, num_fields));
+
+  PetscInt num_total_dofs = 0;
+  for (PetscInt f = 0; f < num_fields; ++f) {
+    PetscCall(PetscSectionSetFieldComponents(*sec, f, num_field_components[f]));
+    for (PetscInt c = 0; c < num_field_components[f]; ++c, ++num_total_dofs) {
+      PetscCall(PetscSectionSetComponentName(*sec, f, c, component_names[c]));
+    }
+  }
+
+  // set the number of degrees of freedom in each cell
+  PetscInt c_start, c_end;  // starting and ending cell points
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
+  PetscCall(PetscSectionSetChart(*sec, c_start, c_end));
+  for (PetscInt c = c_start; c < c_end; ++c) {
+    for (PetscInt f = 0; f < num_fields; ++f) {
+      PetscCall(PetscSectionSetFieldDof(*sec, c, f, num_field_components[f]));
+    }
+    PetscCall(PetscSectionSetDof(*sec, c, num_total_dofs));
+  }
+  PetscCall(PetscSectionSetUp(*sec));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// This function create the primary DM for RDycore. The Vec and Mat types are
 /// set for CPU or GPUs. Must be called after CreateOperator() so that an
 /// operator is available to create sections.
@@ -96,7 +138,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   // NOTE Need to create section before distribution, so that natural map can be created
   // create a section with (h, hu, hv) as degrees of freedom
   if (!rdy->refine) {
-    PetscCall(CreateSectionForDMAndOperator(rdy->dm, rdy->operator, & sec));
+    PetscCall(CreateDMSection(rdy->config.physics, rdy->dm, &sec));
     // embed the section's data in our grid and toss the section
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   }
@@ -140,7 +182,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // create parallel section and global-to-natural mapping
   if (rdy->refine) {
-    PetscCall(CreateSectionForDMAndOperator(rdy->dm, rdy->operator, & sec));
+    PetscCall(CreateDMSection(rdy->config.physics, rdy->dm, &sec));
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   } else if (size > 1) {
     PetscSF      sfMigration, sfNatural;
@@ -194,6 +236,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
+  /* FIXME: Figure out where we do this in the operator)
   if (CeedEnabled()) {
     PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
   } else {
@@ -201,6 +244,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
     PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
     PetscCall(VecZeroEntries(rdy->petsc.sources));
   }
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
