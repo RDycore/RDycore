@@ -609,9 +609,9 @@ static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt
   }
 
   // find the ID of dirichlet BC across all ranks, which is need to check if a dirichlet BC was present on at least on rank
-  PetscMPIInt tmp = (PetscMPIInt)*dirc_bc_idx;  // For 64-bit integer, convert the BC index to 32-bit integer as we don't
-                                                // number of BCs to require 64-bit integer
-  MPI_Allreduce(&tmp, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  PetscMPIInt idx_32 = (PetscMPIInt)*dirc_bc_idx;  // For 64-bit integer, convert the BC index to 32-bit integer as we don't
+                                                   // number of BCs to require 64-bit integer
+  MPI_Allreduce(&idx_32, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
