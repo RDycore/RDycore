@@ -32,6 +32,7 @@ PETSC_INTERN PetscErrorCode InitCourantNumberDiagnostics(void);
 // operator material property identifiers
 typedef enum {
   OPERATOR_MANNINGS = 0,
+  OPERATOR_NUM_MATERIAL_PROPERTIES,
 } OperatorMaterialPropertyId;
 
 //----------
@@ -105,10 +106,11 @@ typedef struct Operator {
       // [region_index][property_id]
       Vec **material_properties;
 
-      // global flux divergence data vector for entire domain (used only
-      // internally)
-      Vec flux_divergence;
     } petsc;
+
+    // global flux divergence data vector for entire domain (used only
+    // internally)
+    Vec flux_divergence;
   };
 
   //-------------------------------------------
@@ -136,7 +138,7 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 typedef struct {
   PetscInt    num_components;  // number of data components
   PetscReal **values;          // array of values ([component][index])
-  void       *array_pointer;   // pointer to CEED/PETSc array owning data
+  void       *array_pointer;   // pointer to CEED/PETSc array owning data (used internally)
 } OperatorData;
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
