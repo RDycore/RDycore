@@ -4,106 +4,161 @@
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
 #include <private/rdyboundaryimpl.h>
+#include <private/rdyconfigimpl.h>
+#include <private/rdymeshimpl.h>
 #include <private/rdyregionimpl.h>
 
-// initialization/finalization functions
-PETSC_INTERN PetscErrorCode InitOperators(RDy);
-PETSC_INTERN PetscErrorCode DestroyOperators(RDy);
+//--------------------------------
+// Maximum Wave Speed Diagnostics
+//--------------------------------
+
+// This is a diagnostic structure that captures information about the conditions
+// under which the maximum courant number is encountered. If you change this
+// struct, update the call to MPI_Type_create_struct in InitCourantNumberDiagnostics
+// below.
+typedef struct {
+  PetscReal max_courant_num;  // maximum courant number
+  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
+  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
+  PetscBool is_set;           // true if max_courant_num is set, otherwise false
+} CourantNumberDiagnostics;
+
+// MPI datatype and operator for reducing CourantNumberDiagnostics with MPI_AllReduce,
+// and related initialization function
+extern MPI_Datatype         MPI_COURANT_NUMBER_DIAGNOSTICS;
+extern MPI_Op               MPI_MAX_COURANT_NUMBER;
+PETSC_INTERN PetscErrorCode InitCourantNumberDiagnostics(void);
+
+// operator material property identifiers
+typedef enum {
+  OPERATOR_MANNINGS = 0,
+} OperatorMaterialPropertyId;
+
+//----------
+// Operator
+//----------
+
+// This type and its related functions define an interface for creating a
+// nonlinear operator F that computes the time derivative dU/dt of a local
+// solution vector U at time t:
+//
+// F(U, t) -> dU/dt
+//
+// There are two families of operator implementations:
+// 1. CEED implementation: a composite CeedOperator with interior and boundary
+//    flux sub-operators and one or more source sub-operators
+// 2. PETSc implementation: a set of right-hand-side functions and related
+//    vectors
+typedef struct Operator {
+  // physics configuration defining equations in the system
+  RDyPhysicsSection physics_config;
+
+  // number of solution components and component names
+  PetscInt num_components;
+  char   **field_names;
+
+  // DM and mesh defining the computational domain
+  DM       dm;
+  RDyMesh *mesh;
+
+  // regions and boundaries in computational domain local to this process
+  PetscInt     num_regions, num_boundaries;
+  RDyBoundary *regions, *boundaries;
+
+  // CEED/PETSc backends
+  union {
+    struct {
+      // CEED composite operator -- consists of several suboperators. By index,
+      // these suboperators are:
+      //
+      // 0: interior inter-cell fluxes
+      // 1-num_boundaries: boundary inter-cell fluxes
+      // num_boundaries+1-num_boundaries + num_regions: external sources
+      CeedOperator composite;
+
+      // NOTE: all operator data is stored in CeedOperators, so managing
+      // NOTE: resources is simpler than in the PETSc case
+
+      // operator timestep last set
+      PetscReal dt;
+
+      CeedVector u_local;
+      CeedVector rhs, sources;
+
+    } ceed;
+
+    // PETSc operator data
+    struct {
+      // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
+      void *context;
+
+      // array of Dirichlet boundary value vectors, indexed by boundary
+      Vec *boundary_values;
+
+      // array of boundary flux vectors, indexed by boundary
+      Vec *boundary_fluxes;
+
+      // array of regional external source vectors, indexed by region
+      Vec *sources;
+
+      // array of regional material property data Vecs, indexed by
+      // [region_index][property_id]
+      Vec **material_properties;
+
+      // global flux divergence data vector for entire domain (used only
+      // internally)
+      Vec flux_divergence;
+    } petsc;
+  };
+
+  //-------------------------------------------
+  // diagnostics (used by both PETSc and CEED)
+  //-------------------------------------------
+
+  // boundary fluxes on all domain edges
+  Vec boundary_fluxes;
+
+  // courant number diagnostics, local to current MPI process
+  CourantNumberDiagnostics local_courant_diags;
+} Operator;
+
+PETSC_INTERN PetscErrorCode CreateOperator(RDyPhysicsSection, Operator **);
+PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
+
+PETSC_INTERN PetscErrorCode CreateSectionForDMAndOperator(DM, Operator *, PetscSection *);
+
+// these functions configure an operator, and can be called in any order
+PETSC_INTERN PetscErrorCode SetOperatorBoundaries(Operator *, PetscInt, RDyBoundary *);
+PETSC_INTERN PetscErrorCode SetOperatorRegions(Operator *, PetscInt, RDyRegion *);
+PETSC_INTERN PetscErrorCode SetOperatorDomain(Operator *, DM, RDyMesh *);
+
+// call this function after configuring your operator
+PETSC_INTERN PetscErrorCode ReadyOperator(Operator *);
+
+// operator timestepping function
+PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 
 //----------------------
 // Operator Data Access
 //----------------------
 
-// These types and functions allow access to data within operators, such as
-// * boundary values (e.g. for Dirichlet boundary conditions)
-// * source terms (water sources, momentum contributions)
-// * relevant material properties (e.g. Mannings coefficient)
-// * any needed intermediate quantities (e.g. flux divergences computed by the
-//   flux operator and passed to the source operator)
-
-// This type provides access to single- or multi-component vector data in either
-// CEED or PETSc, depending upon whether CEED is enabled.
+// This type provides access to multi-component operator data.
 typedef struct {
-  union {
-    struct {
-      CeedVector  vec;
-      CeedScalar *data;
-    } ceed;
-    struct {
-      Vec        vec;
-      PetscReal *data;
-    } petsc;
-  };
-  PetscBool updated;  // true iff updated
-} OperatorVectorData;
+  PetscInt    num_components;  // number of data components
+  PetscReal **values;          // array of values ([component][index])
+  void       *array_pointer;   // pointer to CEED/PETSc array owning data
+} OperatorData;
 
-// This type allows the direct manipulation of boundary values for the
-// system of equations being solved by RDycore.
-typedef struct {
-  // associated RDy object
-  RDy rdy;
-  // associated boundary
-  RDyBoundary boundary;
-  // number of components in the underlying system
-  PetscInt num_components;
-  // underlying data storage
-  OperatorVectorData storage;
-} OperatorBoundaryData;
+PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorExternalSource(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorExternalSource(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
 
-PETSC_INTERN PetscErrorCode GetOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
-PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(OperatorBoundaryData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryData(RDy, RDyBoundary, OperatorBoundaryData *);
-
-// This type allows the direct manipulation of source values on a specific
-// region for the system of equations being solved by RDycore.
-typedef struct {
-  // associated RDy object
-  RDy rdy;
-  // associated region
-  RDyRegion region;
-  // number of components in the underlying system
-  PetscInt num_components;
-  // underlying data storage
-  OperatorVectorData sources;
-} OperatorSourceData;
-
-PETSC_INTERN PetscErrorCode GetOperatorSourceData(RDy, RDyRegion, OperatorSourceData *);
-PETSC_INTERN PetscErrorCode SetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode GetOperatorSourceValues(OperatorSourceData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorSourceData(RDy, RDyRegion, OperatorSourceData *);
-
-// This type allows the direct manipulation of operator material properties on
-// the entire domain for the system of equations being solved by RDycore.
-typedef struct {
-  // associated RDy object
-  RDy rdy;
-  // underlying data storage
-  OperatorVectorData mannings;  // mannings coefficient
-} OperatorMaterialData;
-
-// operator material properties enum
-typedef enum {
-  OPERATOR_MANNINGS = 0,
-} OperatorMaterialDataIndex;
-
-PETSC_INTERN PetscErrorCode GetOperatorMaterialData(RDy, OperatorMaterialData *);
-PETSC_INTERN PetscErrorCode SetOperatorMaterialValues(OperatorMaterialData *, OperatorMaterialDataIndex, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorMaterialData(RDy, OperatorMaterialData *);
-
-// This type allows the direct manipulation of flux divergences exchanged
-// between the flux and source operators on the entire domain for the system of
-// equations being solved by RDycore.
-typedef struct {
-  // associated RDy object
-  RDy rdy;
-  // number of components in the underlying system
-  PetscInt num_components;
-  // underlying data storage
-  OperatorVectorData storage;
-} OperatorFluxDivergenceData;
-
-PETSC_INTERN PetscErrorCode GetOperatorFluxDivergenceData(RDy, OperatorFluxDivergenceData *);
-PETSC_INTERN PetscErrorCode SetOperatorFluxDivergenceValues(OperatorFluxDivergenceData *, PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RestoreOperatorFluxDivergenceData(RDy, OperatorFluxDivergenceData *);
+// diagnostics
+PETSC_INTERN PetscErrorCode GetLocalOperatorCourantNumberDiagnostics(Operator *, CourantNumberDiagnostics *);
 
 #endif

@@ -7,6 +7,7 @@
 #include <private/rdyconfigimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
+#include <private/rdyoperatorimpl.h>
 #include <private/rdyregionimpl.h>
 #include <rdycore.h>
 
@@ -16,22 +17,6 @@ PETSC_INTERN PetscErrorCode SetCeedResource(char *);
 PETSC_INTERN PetscBool      CeedEnabled(void);
 PETSC_INTERN Ceed           CeedContext(void);
 PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
-
-// Diagnostic structure that captures information about the conditions under
-// which the maximum courant number is encountered. If you change this struct,
-// update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
-typedef struct {
-  PetscReal max_courant_num;  // maximum courant number
-  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
-  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
-  PetscBool is_set;           // true if max_courant_num is set, otherwise false
-} CourantNumberDiagnostics;
-
-// MPI datatype and operator for reducing CourantNumberDiagnostics with MPI_AllReduce,
-// and related initialization function
-extern MPI_Datatype         MPI_COURANT_NUMBER_DIAGNOSTICS;
-extern MPI_Op               MPI_MAX_COURANT_NUMBER;
-PETSC_INTERN PetscErrorCode InitCourantNumberDiagnostics(void);
 
 // This type defines a material with specific properties.
 // (undefined properties are set to INVALID_INT/INVALID_REAL)
@@ -170,40 +155,11 @@ struct _p_RDy {
   // host right-hand-side (residual) vector
   Vec rhs;
 
-  // CEED (device) solver data
-  struct {
-    CeedOperator flux_operator;
-    CeedOperator source_operator;
-
-    CeedVector u_local;
-    CeedVector rhs, sources;
-
-    CeedScalar dt;
-
-    Vec host_fluxes;  // edge fluxes copied to host for diagnostics
-  } ceed;
-
-  // PETSc (host) solver data
-  struct {
-    // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
-    void *context;
-
-    // source-sink vector for domain
-    Vec sources;
-  } petsc;
-
-  // locks on operator data for exclusive access (see rdyoperatorimpl.h)
-  struct {
-    void **boundary_data;  // per-boundary operator boundary data
-    void  *source_data;    // domain operator source data
-    void  *material_data;  // operator material data for the domain
-    void  *flux_div_data;  // operator flux divergence data for the domain
-  } lock;
+  // operator representing the system of equations
+  Operator *operator;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
-
-  CourantNumberDiagnostics courant_num_diags;
 
   //-------------------
   // Simulatіon output

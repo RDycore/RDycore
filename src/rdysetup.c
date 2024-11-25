@@ -820,6 +820,18 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// initializes the operator given the information in rdy
+static PetscErrorCode InitOperator(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(SetOperatorBoundaries(rdy->operator, rdy->num_boundaries, rdy->boundaries));
+  PetscCall(SetOperatorRegions(rdy->operator, rdy->num_regions, rdy->regions));
+  PetscCall(SetOperatorDomain(rdy->operator, rdy->dm, &rdy->mesh));
+  PetscCall(ReadyOperator(rdy->operator));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // initialize the data on the right hand side of the boundary edges
 static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionBegin;
@@ -962,6 +974,10 @@ PetscErrorCode RDySetup(RDy rdy) {
   // print configuration info
   PetscCall(PrintConfig(rdy));
 
+  // create an operator for our physics config so CreateDM can use it to
+  // create local sections
+  PetscCall(CreateOperator(rdy->config.physics, &rdy->operator));
+
   RDyLogDebug(rdy, "Creating DMs...");
   PetscCall(CreateDM(rdy));           // for mesh and solution vector
   PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
@@ -987,8 +1003,8 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing operators...");
-  PetscCall(InitOperators(rdy));
+  RDyLogDebug(rdy, "Initializing operator...");
+  PetscCall(InitOperator(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));
@@ -998,13 +1014,6 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
-
-  RDyLogDebug(rdy, "Initializing courant number diagnostics...");
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  courant_num_diags->max_courant_num          = 0.0;
-  courant_num_diags->global_edge_id           = -1;
-  courant_num_diags->global_cell_id           = -1;
-  courant_num_diags->is_set                   = PETSC_FALSE;
 
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data

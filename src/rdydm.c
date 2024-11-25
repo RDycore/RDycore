@@ -60,43 +60,9 @@ PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This function creates one Section with 3 DOFs for SWE.
-PetscErrorCode CreateSectionForSWE(RDy rdy, PetscSection *sec) {
-  PetscInt n_field                             = 1;
-  PetscInt n_field_comps[1]                    = {3};
-  char     comp_names[3][MAX_COMP_NAME_LENGTH] = {
-          "Height",
-          "MomentumX",
-          "MomentumY",
-  };
-
-  PetscFunctionBeginUser;
-  PetscCall(PetscSectionCreate(rdy->comm, sec));
-  PetscCall(PetscSectionSetNumFields(*sec, n_field));
-  PetscInt n_field_dof_tot = 0;
-  for (PetscInt f = 0; f < n_field; ++f) {
-    PetscCall(PetscSectionSetFieldComponents(*sec, f, n_field_comps[f]));
-    for (PetscInt c = 0; c < n_field_comps[f]; ++c, ++n_field_dof_tot) {
-      PetscCall(PetscSectionSetComponentName(*sec, f, c, comp_names[c]));
-    }
-  }
-
-  // set the number of degrees of freedom in each cell
-  PetscInt c_start, c_end;  // starting and ending cell points
-  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &c_start, &c_end));
-  PetscCall(PetscSectionSetChart(*sec, c_start, c_end));
-  for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < n_field; ++f) {
-      PetscCall(PetscSectionSetFieldDof(*sec, c, f, n_field_comps[f]));
-    }
-    PetscCall(PetscSectionSetDof(*sec, c, n_field_dof_tot));
-  }
-  PetscCall(PetscSectionSetUp(*sec));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// This function create the primary DM for RDycore. The Vec and Mat types are
-/// set for CPU or GPUs.
+/// set for CPU or GPUs. Must be called after CreateOperator() so that an
+/// operator is available to create sections.
 PetscErrorCode CreateDM(RDy rdy) {
   PetscSection sec;
   PetscMPIInt  size;
@@ -130,7 +96,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   // NOTE Need to create section before distribution, so that natural map can be created
   // create a section with (h, hu, hv) as degrees of freedom
   if (!rdy->refine) {
-    PetscCall(CreateSectionForSWE(rdy, &sec));
+    PetscCall(CreateSectionForDMAndOperator(rdy->dm, rdy->operator, & sec));
     // embed the section's data in our grid and toss the section
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   }
@@ -174,7 +140,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // create parallel section and global-to-natural mapping
   if (rdy->refine) {
-    PetscCall(CreateSectionForSWE(rdy, &sec));
+    PetscCall(CreateSectionForDMAndOperator(rdy->dm, rdy->operator, & sec));
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   } else if (size > 1) {
     PetscSF      sfMigration, sfNatural;
