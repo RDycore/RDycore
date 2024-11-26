@@ -35,6 +35,27 @@ typedef enum {
   OPERATOR_NUM_MATERIAL_PROPERTIES,
 } OperatorMaterialPropertyId;
 
+//------------------------------
+// PETSc (CEED-like) "operator"
+//------------------------------
+
+typedef struct _p_PetscOperator *PetscOperator;
+
+struct _p_PetscOperator {
+  void *context;
+  PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec);
+  struct {
+    PetscInt       num_suboperators;
+    PetscOperator *suboperators;
+  } composite;
+};
+
+PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void *, Vec, Vec), PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscOperatorDestroy(PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);
+PETSC_INTERN PetscErrorCode PetscOperatorApply(PetscOperator, PetscReal, Vec, Vec);
+
 //----------
 // Operator
 //----------
@@ -64,7 +85,8 @@ typedef struct Operator {
 
   // regions and boundaries in computational domain local to this process
   PetscInt     num_regions, num_boundaries;
-  RDyBoundary *regions, *boundaries;
+  RDyRegion   *regions;
+  RDyBoundary *boundaries;
 
   // CEED/PETSc backends
   union {
@@ -90,8 +112,8 @@ typedef struct Operator {
 
     // PETSc operator data
     struct {
-      // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
-      void *context;
+      // PETSc composite operator
+      PetscOperator composite;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
       Vec *boundary_values;

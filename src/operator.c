@@ -127,26 +127,25 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
 
   // suboperator 0: fluxes between interior cells
   CeedOperator interior_flux_op;
-  PetscCall(CreateSWEInteriorFluxOperator(ceed, op->mesh, tiny_h, &interior_flux_op));
+  PetscCall(CreateSWECeedInteriorFluxOperator(op->mesh, tiny_h, &interior_flux_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.composite, interior_flux_op));
   PetscCallCEED(CeedOperatorDestroy(&interior_flux_op));
 
   // suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
-    CeedOperator boundary_op;
-    RDyBoundary  boundary           = op->boundaries[b];
-    RDyCondition boundary_condition = op->boundary_conditions[b];
-    PetscCall(CreateSWEBoundaryFluxOperator(ceed, op->mesh, op->boundary, tiny_h, &boundary_flux_op));
-    PetscCallCEED(CeedCompositeOperatorAddSub(op->composite, boundary_flux_op));
+    CeedOperator boundary_flux_op;
+    RDyBoundary  boundary = op->boundaries[b];
+    PetscCall(CreateSWECeedBoundaryFluxOperator(op->mesh, boundary, tiny_h, &boundary_flux_op));
+    PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.composite, boundary_flux_op));
     PetscCallCEED(CeedOperatorDestroy(&boundary_flux_op));
   }
 
   // suboperators num_boundaries + 1 to num_boundaries + num_regions + 1: external sources
   for (CeedInt r = 0; r < op->num_regions; ++r) {
     CeedOperator source_op;
-    RDyRegion region = op->regions[r];
-    PetscCall(CreateSWEExternalSourceOperator(ceed, op->mesh, tiny_h, &source_op));
-    PetscCallCEED(CeedCompositeOperatorAddSub(op->composite, source_op));
+    RDyRegion    region = op->regions[r];
+    PetscCall(CreateSWECeedExternalSourceOperator(op->mesh, region, tiny_h, &source_op));
+    PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.composite, source_op));
     PetscCallCEED(CeedOperatorDestroy(&source_op));
   }
 
@@ -155,6 +154,37 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
 
 static PetscErrorCode PreparePetscOperator(Operator *op) {
   PetscFunctionBegin;
+
+  PetscCall(PetscCompositeOperatorCreate(&op->petsc.composite));
+
+  PetscReal tiny_h = op->physics_config.flow.tiny_h;
+
+  // set up suboperators for the shallow water equations
+
+  // suboperator 0: fluxes between interior cells
+  PetscOperator interior_flux_op;
+  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, tiny_h, &interior_flux_op));
+  PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, interior_flux_op));
+  PetscCall(PetscOperatorDestroy(&interior_flux_op));
+
+  // suboperators 1 to num_boundaries: fluxes on boundary edges
+  for (CeedInt b = 0; b < op->num_boundaries; ++b) {
+    PetscOperator boundary_flux_op;
+    RDyBoundary   boundary = op->boundaries[b];
+    PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, tiny_h, &boundary_flux_op));
+    PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, boundary_flux_op));
+    PetscCall(PetscOperatorDestroy(&boundary_flux_op));
+  }
+
+  // suboperators num_boundaries + 1 to num_boundaries + num_regions + 1: external sources
+  for (CeedInt r = 0; r < op->num_regions; ++r) {
+    PetscOperator source_op;
+    RDyRegion     region = op->regions[r];
+    PetscCall(CreateSWEPetscExternalSourceOperator(op->mesh, region, tiny_h, &source_op));
+    PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, source_op));
+    PetscCall(PetscOperatorDestroy(&source_op));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

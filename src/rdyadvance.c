@@ -261,7 +261,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   RDyTimeAdaptiveSection *time_adap = &rdy->config.time.adaptive;
   if (time_adap->enable) {
     CourantNumberDiagnostics cnum_diags;
-    PetscCall(GetOperatorCourantNumberDiagnostics(rdy->operator, &cnum_diags));
+    PetscCall(GetOperatorCourantNumberDiagnostics(rdy->operator, & cnum_diags));
 
     // if previous courant number is valid
     if (cnum_diags.is_set) {
