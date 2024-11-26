@@ -3,39 +3,15 @@
 
 #include <ceed/types.h>
 #include <petscsys.h>
-#include <private/rdycoreimpl.h>
-
-typedef struct {
-  PetscInt   N;            // number of data values
-  PetscReal *h, *hu, *hv;  // prognostic SWE variables
-  PetscReal *u, *v;        // diagnostic variables
-} RiemannDataSWE;
-
-typedef struct {
-  PetscInt   N;        // number of data values
-  PetscReal *cn, *sn;  // cosine and sine of the angle between the edge and y-axis
-  PetscReal *flux;     // flux through the edge
-  PetscReal *amax;     // courant number
-} RiemannEdgeDataSWE;
-
-// PETSc (non-CEED) Riemann solver data for SWE
-typedef struct {
-  RiemannDataSWE      datal_internal_edges, datar_internal_edges;
-  RiemannEdgeDataSWE  data_internal_edges;
-  RiemannDataSWE     *datal_bnd_edges, *datar_bnd_edges;
-  RiemannEdgeDataSWE *data_bnd_edges;
-  RiemannDataSWE      data_cells;
-} PetscRiemannDataSWE;
-
-PETSC_INTERN PetscErrorCode InitSWE(RDy);
+#include <private/rdyoperatorimpl.h>
 
 PETSC_INTERN PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *, RDyBoundary, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateSWECeedExternalSourceOperator(RDyMesh *, RDyRegion, PetscReal, CeedOperator *);
 
 PETSC_INTERN PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *, PetscReal, PetscOperator *);
-PETSC_INTERN PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *, RDyBoundary, PetscReal, PetscOperator *);
-PETSC_INTERN PetscErrorCode CreateSWEPetscExternalSourceOperator(RDyMesh *, RDyRegion, PetscReal, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *, RDyBoundary, Vec, PetscReal, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEPetscExternalSourceOperator(RDyMesh *, RDyRegion, Vec, PetscReal, PetscOperator *);
 
 // FIXME: vvv old stuff vvv
 

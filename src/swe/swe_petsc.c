@@ -8,6 +8,28 @@
 // gravitational acceleration [m/s/s]
 static const PetscReal GRAVITY = 9.806;
 
+typedef struct {
+  PetscInt   N;            // number of data values
+  PetscReal *h, *hu, *hv;  // prognostic SWE variables
+  PetscReal *u, *v;        // diagnostic variables
+} RiemannDataSWE;
+
+typedef struct {
+  PetscInt   N;        // number of data values
+  PetscReal *cn, *sn;  // cosine and sine of the angle between the edge and y-axis
+  PetscReal *flux;     // flux through the edge
+  PetscReal *amax;     // courant number
+} RiemannEdgeDataSWE;
+
+// PETSc (non-CEED) Riemann solver data for SWE
+typedef struct {
+  RiemannDataSWE      datal_internal_edges, datar_internal_edges;
+  RiemannEdgeDataSWE  data_internal_edges;
+  RiemannDataSWE     *datal_bnd_edges, *datar_bnd_edges;
+  RiemannEdgeDataSWE *data_bnd_edges;
+  RiemannDataSWE      data_cells;
+} PetscRiemannDataSWE;
+
 /// For computing fluxes, allocates structs to hold values left and right
 /// of internal edges. This must be called before CreatePetscSWESource.
 PetscErrorCode CreatePetscSWEFluxForInternalEdges(RDyEdges *edges, PetscInt ncomp, PetscInt num_internal_edges, void **petsc_context) {
