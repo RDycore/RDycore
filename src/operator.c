@@ -1,5 +1,6 @@
 #include <ceed/ceed.h>
 #include <petscdmceed.h>
+#include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
 
@@ -90,16 +91,19 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
 }
 
 // defines the distinct boundaries (edges) for the operator
-static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundaries, RDyBoundary *boundaries) {
+static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCheck(num_boundaries > 0, comm, PETSC_ERR_USER, "Number of operator boundaries must be positive");
   PetscCheck(boundaries, comm, PETSC_ERR_USER, "Operator boundary array must be non-NULL");
+  PetscCheck(conditions, comm, PETSC_ERR_USER, "Operator boundary conditions array must be non-NULL");
 
   PetscCall(PetscCalloc1(num_boundaries, &op->boundaries));
   memcpy(op->boundaries, boundaries, sizeof(RDyBoundary) * num_boundaries);
+  PetscCall(PetscCalloc1(num_boundaries, &op->boundary_conditions));
+  memcpy(op->boundary_conditions, conditions, sizeof(RDyCondition) * num_boundaries);
 
   if (!CeedEnabled()) {
     PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));
@@ -163,15 +167,17 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
 
   // suboperator 0: fluxes between interior cells
   PetscOperator interior_flux_op;
-  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, tiny_h, &interior_flux_op));
+  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->courant_number_diags, tiny_h, &interior_flux_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, interior_flux_op));
   PetscCall(PetscOperatorDestroy(&interior_flux_op));
 
   // suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
     PetscOperator boundary_flux_op;
-    RDyBoundary   boundary = op->boundaries[b];
-    PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, tiny_h, &boundary_flux_op));
+    RDyBoundary   boundary  = op->boundaries[b];
+    RDyCondition  condition = op->boundary_conditions[b];
+    PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, condition, op->petsc.boundary_values[b], op->petsc.boundary_fluxes[b],
+                                                 &op->courant_number_diags, tiny_h, &boundary_flux_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, boundary_flux_op));
     PetscCall(PetscOperatorDestroy(&boundary_flux_op));
   }
@@ -180,7 +186,8 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   for (CeedInt r = 0; r < op->num_regions; ++r) {
     PetscOperator source_op;
     RDyRegion     region = op->regions[r];
-    PetscCall(CreateSWEPetscExternalSourceOperator(op->mesh, region, tiny_h, &source_op));
+    PetscCall(CreateSWEPetscExternalSourceOperator(op->mesh, region, op->petsc.sources[r], op->petsc.material_properties[OPERATOR_MANNINGS][r],
+                                                   tiny_h, &source_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, source_op));
     PetscCall(PetscOperatorDestroy(&source_op));
   }
@@ -213,7 +220,7 @@ static PetscErrorCode PrepareOperator(Operator *op) {
 // Creates an operator representing the system of equations described in the
 // given configuration.
 PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_regions, RDyRegion *regions,
-                              PetscInt num_boundaries, RDyBoundary *boundaries, Operator **operator) {
+                              PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions, Operator **operator) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -235,9 +242,9 @@ PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, DM domain_dm, RD
   (*operator)->physics_config = physics_config;
 
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
-  PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries));
+  PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
   PetscCall(SetOperatorRegions(*operator, num_regions, regions));
-  PetscCall(ReadyOperator(*operator));
+  PetscCall(PrepareOperator(*operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -250,10 +257,6 @@ PetscErrorCode DestroyOperator(Operator **op) {
   PetscCall(PetscObjectGetComm((PetscObject)(*op)->dm, &comm));
 
   PetscBool ceed_enabled = CeedEnabled();
-
-  if ((*op)->petsc.context) {
-    PetscCall(DestroyPetscSWEFlux((*op)->petsc.context, ceed_enabled, (*op)->num_boundaries));
-  }
 
   if (ceed_enabled) {
     PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.composite)));
@@ -278,6 +281,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
       PetscFree((*op)->petsc.material_properties[p]);
     }
     PetscFree((*op)->petsc.material_properties);
+    PetscCall(PetscOperatorDestroy(&(*op)->petsc.composite));
   }
 
   PetscFree(*op);
@@ -659,6 +663,85 @@ PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, O
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//-----------------
+// PETSc operators
+//-----------------
+
+/// Creates a new PetscOperator with the given context, apply() function and destroy() destructor.
+PetscErrorCode PetscOperatorCreate(void          *context, PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec), PetscErrorCode (*destroy)(void *),
+                                   PetscOperator *op) {
+  PetscFunctionBegin;
+  PetscCall(PetscCalloc1(1, &op));
+  (*op)->context = context;
+  (*op)->apply   = apply;
+  (*op)->destroy = destroy;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Releases resources allocated to the given PetscOperator
+PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
+  PetscFunctionBegin;
+  PetscCall((*op)->destroy((*op)->context));
+  PetscFree(*op);
+  *op = NULL;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Applies the given PetscOperator to the local vector u_local, storing the result
+/// in the global vector f_global
+PetscErrorCode PetscOperatorApply(PetscOperator op, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBegin;
+  PetscCall(op->apply(op->context, dt, u_local, f_global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+typedef struct {
+  PetscInt       num_suboperators, capacity;
+  PetscOperator *suboperators;
+} PetscCompositeOperator;
+
+static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBegin;
+  PetscCompositeOperator *composite = context;
+  for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
+    PetscOperatorApply(composite->suboperators[i], dt, u_local, f_global);
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PetscCompositeOperatorDestroy(void *context) {
+  PetscFunctionBegin;
+  PetscCompositeOperator *composite = context;
+  PetscFree(composite->suboperators);
+  PetscFree(composite);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Creates a PetscOperator that applies sub-operators in sequence.
+PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
+  PetscFunctionBegin;
+  PetscCompositeOperator *composite;
+  PetscCall(PetscCalloc1(1, &composite));
+  static const PetscInt initial_capacity = 16;
+  composite->capacity                    = initial_capacity;
+  PetscCall(initial_capacity, &composite->suboperators);
+  PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Appends a sub-operator to the given composite PetscOperator.
+PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_op) {
+  PetscFunctionBegin;
+  PetscCompositeOperator *composite = op->context;
+  if (composite->num_suboperators + 1 > composite->capacity) {
+    composite->capacity *= 2;
+    PetscCall(PetscRealloc(composite->capacity, &composite->suboperators));
+  }
+  composite->suboperators[composite->num_suboperators] = sub_op;
+  ++composite->num_suboperators;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -25,23 +25,6 @@ typedef struct {
   PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
 } RDyMaterial;
 
-// This type defines a "condition" representing
-// * an initial condition or source/sink associated with a region
-// * a boundary condition associated with a boundary
-typedef struct {
-  // flow, sediment, salinity conditions (NULL for none)
-  RDyFlowCondition     *flow;
-  RDySedimentCondition *sediment;
-  RDySalinityCondition *salinity;
-
-  // value(s) associated with the condition
-  PetscReal value;
-
-  // was this boundary condition automatically generated and not explicitly
-  // requested in the config file?
-  PetscBool auto_generated;
-} RDyCondition;
-
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {

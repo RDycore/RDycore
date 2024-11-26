@@ -4,6 +4,7 @@
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
 #include <private/rdyboundaryimpl.h>
+#include <private/rdyconditionimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyregionimpl.h>
@@ -44,17 +45,14 @@ typedef struct _p_PetscOperator *PetscOperator;
 struct _p_PetscOperator {
   void *context;
   PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec);
-  struct {
-    PetscInt       num_suboperators;
-    PetscOperator *suboperators;
-  } composite;
+  PetscErrorCode (*destroy)(void *);
 };
 
-PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
-PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void *, Vec, Vec), PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void *, PetscReal, Vec, Vec), PetscErrorCode (*)(void *), PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscOperatorDestroy(PetscOperator *);
-PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);
 PETSC_INTERN PetscErrorCode PetscOperatorApply(PetscOperator, PetscReal, Vec, Vec);
+PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);
 
 //----------
 // Operator
@@ -87,6 +85,9 @@ typedef struct Operator {
   PetscInt     num_regions, num_boundaries;
   RDyRegion   *regions;
   RDyBoundary *boundaries;
+
+  // boundary conditions corresponding to boundaries
+  RDyCondition *boundary_conditions;
 
   // CEED/PETSc backends
   union {
@@ -127,7 +128,6 @@ typedef struct Operator {
       // array of regional material property data Vecs, indexed by
       // [region_index][property_id]
       Vec **material_properties;
-
     } petsc;
 
     // global flux divergence data vector for entire domain (used only
@@ -146,7 +146,8 @@ typedef struct Operator {
   CourantNumberDiagnostics courant_number_diags;
 } Operator;
 
-PETSC_INTERN PetscErrorCode CreateOperator(RDyPhysicsSection, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, Operator **);
+PETSC_INTERN PetscErrorCode CreateOperator(RDyPhysicsSection, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *,
+                                           Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
 // operator timestepping function
