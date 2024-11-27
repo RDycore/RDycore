@@ -542,10 +542,6 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscReal dt, Vec u_local
     }
   }
 
-  // accumulate our boundary fluxes in RDycore's time series
-  // FIXME: this now happens elsewhere, since we store boundary fluxes in a vector
-  // PetscCall(AccumulateBoundaryFluxes(rdy, boundary, num_edges, ndof, flux_vec_bnd));
-
   // restore vectors
   PetscCall(VecRestoreArray(u_local, &u_ptr));
   PetscCall(VecRestoreArray(f_global, &f_ptr));

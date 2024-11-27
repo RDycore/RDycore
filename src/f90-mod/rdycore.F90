@@ -25,7 +25,7 @@ module rdycore
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetRegionalWaterSource, RDySetRegionalXMomentumSource, RDySetRegionalYMomentumSource, &
-            RDySetManningsNForLocalCells, RDySetInitialConditions, &
+            RDySetRegionalManningsN, RDySetInitialConditions, &
             RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile
 
   ! RDycore uses double-precision floating point numbers
@@ -355,10 +355,11 @@ module rdycore
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
-    integer(c_int) function rdysetmanningsnforlocalcells_(rdy, size, n) bind(c, name="RDySetManningsNForLocalCells")
+    integer(c_int) function rdysetregionalmanningsn_(rdy, region_idx, size, n) bind(c, name="RDySetRegionalManningsN")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt, value, intent(in)    :: size
+      PetscInt   , value, intent(in) :: region_idx
+      PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: n
     end function
 
@@ -793,12 +794,13 @@ contains
     ierr = rdysetregionalymomentumsource_(rdy_%c_rdy, region_idx, size, c_loc(ymomsrc))
   end subroutine
 
-  subroutine RDySetManningsNForLocalCells(rdy_, size, n, ierr)
+  subroutine RDySetRegionalManningsN(rdy_, region_idx, size, n, ierr)
     type(RDy),       intent(inout)       :: rdy_
+    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetmanningsnforlocalcells_(rdy_%c_rdy, size, c_loc(n))
+    ierr = rdysetregionalmanningsn_(rdy_%c_rdy, region_idx, size, c_loc(n))
   end subroutine
 
   subroutine RDySetInitialConditions(rdy_, ic, ierr)

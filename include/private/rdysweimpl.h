@@ -7,7 +7,7 @@
 #include <private/rdyoperatorimpl.h>
 
 PETSC_INTERN PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *, PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *, RDyBoundary, PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *, RDyBoundary, RDyCondition, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *, RDyRegion, PetscReal, CeedOperator *);
 
 PETSC_INTERN PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *, OperatorDiagnostics *, PetscReal, PetscOperator *);

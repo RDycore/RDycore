@@ -2,7 +2,6 @@
 add_library(rdycore
   ceed.c
   checkpoint.c
-  courant.c
   ensemble.c
   rdyadvance.c
   rdycore.c
@@ -12,6 +11,7 @@ add_library(rdycore
   rdymms.c
   rdysetup.c
   operator.c
+  operator_diagnostics.c
   swe/swe_petsc.c
   swe/swe_ceed.c
   time_series.c

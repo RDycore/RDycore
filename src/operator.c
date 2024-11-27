@@ -145,8 +145,9 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
   // suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
     CeedOperator boundary_flux_op;
-    RDyBoundary  boundary = op->boundaries[b];
-    PetscCall(CreateSWECeedBoundaryFluxOperator(op->mesh, boundary, tiny_h, &boundary_flux_op));
+    RDyBoundary  boundary  = op->boundaries[b];
+    RDyCondition condition = op->boundary_conditions[b];
+    PetscCall(CreateSWECeedBoundaryFluxOperator(op->mesh, boundary, condition, tiny_h, &boundary_flux_op));
     PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.composite, boundary_flux_op));
     PetscCallCEED(CeedOperatorDestroy(&boundary_flux_op));
   }
@@ -159,6 +160,8 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
     PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.composite, source_op));
     PetscCallCEED(CeedOperatorDestroy(&source_op));
   }
+
+  if (0) PetscCallCEED(CeedOperatorView(op->ceed.composite, stdout));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -308,6 +311,8 @@ PetscErrorCode DestroyOperator(Operator **op) {
 // Operator Application
 //----------------------
 
+static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
+
 static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
@@ -319,7 +324,123 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.composite, label, &op->ceed.dt));
   }
 
-  // FIXME
+  {
+    // The computation of fluxes across internal and boundary edges via CeedOperator is done
+    // in the following three stages:
+    //
+    // a) Pre-CeedOperatorApply stage:
+    //    - Set memory pointer of a CeedVector (u_local_ceed) is set to PETSc Vec (u_local)
+    //    - Ask DM to "get" a PETSc Vec (f_local), then set memory pointer of a CeedVector (f_ceed)
+    //      to the f_local PETSc Vec.
+    //
+    // b) CeedOperatorApply stage
+    //    - Apply the CeedOparator in which u_local_ceed is an input, while f_ceed is an output.
+    //
+    // c) Post-CeedOperatorApply stage:
+    //    - Add values in f_local to f_global via Local-to-Global scatter.
+    //    - Clean up memory
+
+    PetscScalar *u_local_ptr, *f;
+    PetscMemType mem_type;
+    Vec          f_local;
+
+    CeedVector u_local_ceed = op->ceed.u_local;
+    CeedVector f_ceed       = op->ceed.rhs;
+
+    // 1. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
+    PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
+
+    // 2. Sets the pointer of a CeedVector to a PETSc Vec: f_ceed --> f_local
+    PetscCall(DMGetLocalVector(op->dm, &f_local));
+    PetscCall(VecGetArrayAndMemType(f_local, &f, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
+
+    // 3. Apply the CeedOpeator associated with the internal and boundary edges
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+    PetscCall(PetscLogGpuTimeBegin());
+    PetscCallCEED(CeedOperatorApply(op->ceed.composite, u_local_ceed, f_ceed, CEED_REQUEST_IMMEDIATE));
+    PetscCall(PetscLogGpuTimeEnd());
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+
+    // 4. Resets memory pointer of CeedVectors
+    PetscCallCEED(CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f));
+    PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u_local_ptr));
+
+    // 5. Restore pointers to the PETSc Vecs
+    PetscCall(VecRestoreArrayAndMemType(f_local, &f));
+    PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
+
+    // 6. Zero out values in F and then add f_local to F via Local-to-Global scatter
+    PetscCall(VecZeroEntries(f_global));
+    PetscCall(DMLocalToGlobal(op->dm, f_local, ADD_VALUES, f_global));
+
+    // 7. Restore the F_local
+    PetscCall(DMRestoreLocalVector(op->dm, &f_local));
+  }
+
+  // FIXME: the stuff below is now bogus--both prior operators are rolled into one composite
+  /*
+  {
+    // The computation of contribution of the source-sink term via CeedOperator is done
+    // in the following three stages:
+    //
+    // a) Pre-CeedOperatorApply stage:
+    //    - Set memory pointer of a CeedVector (u_local_ceed) to PETSc Vec (U_local)
+    //    - A copy of the PETSc Vec F is made as host_fluxes. Then, memory pointer of a CeedVector (riemannf_ceed)
+    //      to host_fluxes.
+    //    - Set memory pointer of a CeedVector (s_ceed) to PETSc Vec (F)
+    //
+    // b) CeedOperatorApply stage
+    //    - Apply the CeedOparator in which u_local_ceed is an input, while s_ceed is an output.
+    //
+    // c) Post-CeedOperatorApply stage:
+    //    - Clean up memory
+
+    // 1. Get the CeedVector associated with the "riemannf" CeedOperatorField
+    CeedOperatorField riemannf_field;
+    CeedVector        riemannf_ceed;
+    SWESourceOperatorGetRiemannFlux(rdy->ceed.source_operator, &riemannf_field);
+    PetscCallCEED(CeedOperatorFieldGetVector(riemannf_field, &riemannf_ceed));
+
+    PetscScalar *u_local_ptr, *f_global_ptr, *host_fluxes;
+    PetscMemType mem_type;
+    CeedVector   u_local_ceed = rdy->ceed.u_local;
+    CeedVector   s_ceed       = rdy->ceed.sources;
+
+    // 2. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
+    PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u));
+
+    // 3. Make a duplicate copy of the F as the values will be used as input for the CeedOperator
+    //    corresponding to the source-sink term
+    PetscCall(VecCopy(f_global, op->ceed.host_fluxes));
+
+    // 4. Sets the pointer of a CeedVector to a PETSc Vec: host_fluxes --> riemannf_ceed
+    PetscCall(VecGetArrayAndMemType(op->ceed.host_fluxes, &host_fluxes, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(riemannf_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, host_fluxes));
+
+    // 5. Sets the pointer of a CeedVector to a PETSc Vec: F --> s_ceed
+    PetscCall(VecGetArrayAndMemType(f_global, &f_global_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(s_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
+
+    // 6. Apply the source CeedOperator
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+    PetscCall(PetscLogGpuTimeBegin());
+    PetscCallCEED(CeedOperatorApply(rdy->ceed.source_operator, u_local_ceed, s_ceed, CEED_REQUEST_IMMEDIATE));
+    PetscCall(PetscLogGpuTimeEnd());
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+
+    // 7. Reset memory pointer of CeedVectors
+    PetscCallCEED(CeedVectorTakeArray(s_ceed, MemTypeP2C(mem_type), &f));
+    PetscCallCEED(CeedVectorTakeArray(riemannf_ceed, MemTypeP2C(mem_type), &host_fluxes));
+    PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u));
+
+    // 8. Restore pointers to the PETSc Vecs
+    PetscCall(VecRestoreArrayAndMemType(U_local, &u));
+    PetscCall(VecRestoreArrayAndMemType(F, &f));
+  }
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

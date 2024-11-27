@@ -415,20 +415,6 @@ PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, con
   }
   PetscCall(RestoreOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
 
-  /* FIXME: get rid of this
-  if (CeedEnabled()) {
-    OperatorMaterialData material_data;
-    PetscCall(GetOperatorMaterialData(rdy, &material_data));
-    PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
-    PetscCall(RestoreOperatorMaterialData(rdy, &material_data));
-  } else {  // petsc
-    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-      PetscInt cell_id                        = rdy->mesh.cells.owned_to_local[i];
-      rdy->materials_by_cell[cell_id].manning = n_values[i];
-    }
-  }
-  */
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -464,11 +464,10 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
     // evaluate and set material properties
     if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      PetscReal *manning;
-      PetscCall(PetscCalloc1(N, &manning));
-      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, manning));
-      PetscCall(RDySetManningsNForLocalCells(rdy, N, manning));
-      PetscCall(PetscFree(manning));
+      OperatorData mannings;
+      PetscCall(GetOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings));
+      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, mannings.values[0]));
+      PetscCall(RestoreOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings));
     }
     PetscCall(PetscFree(cell_x));
     PetscCall(PetscFree(cell_y));
