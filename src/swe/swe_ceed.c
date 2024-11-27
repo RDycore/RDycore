@@ -157,7 +157,7 @@ static PetscErrorCode CreateInteriorFluxOperator(Ceed ceed, RDyMesh *mesh, Petsc
 }
 
 static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
-                                                 CeedOperator *flux_op) {
+                                                 CeedVector *bnd_accum_flux, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   CeedInt   num_comp = 3;
@@ -232,6 +232,10 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
     PetscCallCEED(CeedVectorSetValue(flux, 0.0));
+
+    // create a ceedvector to accumulate fluxes
+    PetscCallCEED(CeedVectorCreate(ceed, num_owned_edges * num_comp, bnd_accum_flux));
+    PetscCallCEED(CeedVectorSetValue(*bnd_accum_flux, 0.0));
 
     // create an element restriction for courant number
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
@@ -329,7 +333,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
 // @param [in]  tiny_h the minimum height threshold for water flow
 // @param [out] flux_op A pointer to the flux operator to be created
 PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions,
-                                     PetscReal tiny_h, CeedOperator *flux_op) {
+                                     PetscReal tiny_h, CeedVector *accum_bnd_fluxes, CeedOperator *flux_op) {
   PetscFunctionBeginUser;
 
   // create a composite operator consisting of interior and boundary flux
@@ -345,7 +349,7 @@ PetscErrorCode CreateSWEFluxOperator(Ceed ceed, RDyMesh *mesh, CeedInt num_bound
     CeedOperator boundary_op;
     RDyBoundary  boundary           = boundaries[b];
     RDyCondition boundary_condition = boundary_conditions[b];
-    PetscCall(CreateBoundaryFluxOperator(ceed, mesh, boundary, boundary_condition, tiny_h, &boundary_op));
+    PetscCall(CreateBoundaryFluxOperator(ceed, mesh, boundary, boundary_condition, tiny_h, &accum_bnd_fluxes[b], &boundary_op));
     PetscCallCEED(CeedCompositeOperatorAddSub(*flux_op, boundary_op));
     PetscCallCEED(CeedOperatorDestroy(&boundary_op));
   }

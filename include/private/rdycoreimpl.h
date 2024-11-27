@@ -184,6 +184,8 @@ struct _p_RDy {
     CeedVector u_local;
     CeedVector rhs, sources;
 
+    CeedVector accum_boundary_fluxes[MAX_NUM_BOUNDARIES];
+
     CeedScalar dt;
 
     Vec host_fluxes;  // edge fluxes copied to host for diagnostics

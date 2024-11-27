@@ -66,7 +66,7 @@ static PetscErrorCode CreateOperators(RDy rdy) {
     // create the operators themselves
     Ceed ceed = CeedContext();
     PetscCall(CreateSWEFluxOperator(ceed, &rdy->mesh, rdy->num_boundaries, rdy->boundaries, rdy->boundary_conditions, rdy->config.physics.flow.tiny_h,
-                                    &rdy->ceed.flux_operator));
+                                    &rdy->ceed.accum_boundary_fluxes[0], &rdy->ceed.flux_operator));
 
     PetscCall(CreateSWESourceOperator(ceed, &rdy->mesh, rdy->mesh.num_cells, rdy->materials_by_cell, rdy->config.physics.flow.tiny_h,
                                       &rdy->ceed.source_operator));
@@ -238,6 +238,28 @@ static PetscErrorCode RDyCeedOperatorApply(RDy rdy, PetscReal dt, Vec U_local, V
     // 8. Restore pointers to the PETSc Vecs
     PetscCall(VecRestoreArrayAndMemType(U_local, &u));
     PetscCall(VecRestoreArrayAndMemType(F, &f));
+  }
+
+  {
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      RDyBoundary boundary = rdy->boundaries[b];
+
+      // auto-generated boundary condition is a reflective wall conditon for
+      // which there is data should not be fetched because the data
+      // for those boundary is not written by out.
+      if (!rdy->boundary_conditions[boundary.index].auto_generated) {
+        // fetch the flux accumulation field for this boundary
+        CeedOperatorField bflux;
+        PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed.flux_operator, boundary, &bflux));
+
+        // get the vector storing the boundary data and make it available on the host
+        CeedVector bflux_vec;
+        PetscCallCEED(CeedOperatorFieldGetVector(bflux, &bflux_vec));
+
+        // accumulate the boundary flux
+        PetscCallCEED(CeedVectorAXPY(rdy->ceed.accum_boundary_fluxes[b], 1.0, bflux_vec));
+      }
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
