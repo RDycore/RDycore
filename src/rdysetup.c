@@ -824,8 +824,110 @@ static PetscErrorCode InitSolution(RDy rdy) {
 PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateOperator(rdy->config.physics, rdy->dm, &rdy->mesh, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries,
+  PetscCall(CreateOperator(&rdy->config, rdy->dm, &rdy->mesh, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries,
                            rdy->boundary_conditions, &rdy->operator));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// This is the right-hand-side function used by our timestepping solver.
+// Parameters:
+//  ts  - the solver
+//  t   - the simulation time [seconds]
+//  U   - the global solution vector at time t
+//  F   - the global right hand side vector to be evaluated at time t
+//  ctx - a generic pointer to our RDy object
+static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy       rdy = ctx;
+  DM        dm  = rdy->dm;
+  Operator *op  = rdy->operator;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(VecZeroEntries(F));
+
+  // populate the local U vector
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+
+  PetscCall(ResetOperatorDiagnostics(op));
+
+  // compute the right hand side
+  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
+  if (0) {
+    PetscInt nstep;
+    PetscCall(TSGetStepNumber(ts, &nstep));
+
+    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
+    char        file[PETSC_MAX_PATH_LEN];
+    sprintf(file, "F_%s_nstep%" PetscInt_FMT "_N%d.bin", backend, nstep, rdy->nproc);
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
+    PetscCall(VecView(F, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
+
+  // if debug-level logging is enabled, find the latest global maximum Courant number
+  // and log it.
+  if (rdy->config.logging.level >= LOG_DEBUG) {
+    PetscCall(UpdateOperatorDiagnostics(op));
+    OperatorDiagnostics diagnostics;
+    PetscCall(GetOperatorDiagnostics(op, &diagnostics));
+
+    PetscReal time;
+    PetscInt  stepnum;
+    PetscCall(TSGetTime(ts, &time));
+    PetscCall(TSGetStepNumber(ts, &stepnum));
+    const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
+                diagnostics.courant_number.max_courant_num);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+static PetscErrorCode InitSolver(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt n_dof;
+  PetscCall(VecGetSize(rdy->u_global, &n_dof));
+
+  // set up a TS solver
+  PetscCall(TSCreate(rdy->comm, &rdy->ts));
+  PetscCall(TSSetProblemType(rdy->ts, TS_NONLINEAR));
+  switch (rdy->config.numerics.temporal) {
+    case TEMPORAL_EULER:
+      PetscCall(TSSetType(rdy->ts, TSEULER));
+      break;
+    case TEMPORAL_RK4:
+      PetscCall(TSSetType(rdy->ts, TSRK));
+      PetscCall(TSRKSetType(rdy->ts, TSRK4));
+      break;
+    case TEMPORAL_BEULER:
+      PetscCall(TSSetType(rdy->ts, TSBEULER));
+      break;
+  }
+  PetscCall(TSSetDM(rdy->ts, rdy->dm));
+  PetscCall(TSSetApplicationContext(rdy->ts, rdy));
+
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
+
+  if (!rdy->config.time.adaptive.enable) {
+    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
+  }
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+
+  // apply any solver-related options supplied on the command line
+  PetscCall(TSSetFromOptions(rdy->ts));
+  PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -866,7 +968,7 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Initializes the source term for the SWE solver
+/// @brief Initializes a homogeneous water source term.
 /// @param rdy A RDy struct
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode InitSourceConditions(RDy rdy) {
@@ -892,7 +994,8 @@ static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 /// Sets the name of the log file for RDycore. If this function is called
 /// before RDySetup, the name passed to it overrides any log filename set in
 /// the YAML config file.
-/// @param log_file [in] the name of the log file written by RDycore
+/// @param [inout] rdy      the RDycore simulator
+/// @param [in]    log_file the name of the log file written by RDycore
 PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionBegin;
   strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
@@ -900,8 +1003,9 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// checks for the -pause option, which pauses RDycore and prints out the PIDs
-// of the MPI processes so that a debugger may be attached
+/// Checks for the -pause option, which pauses RDycore and prints out the PIDs
+/// of the MPI processes so that a debugger may be attached.
+/// @param [in] rdy the RDycore simulator
 PetscErrorCode PauseIfRequested(RDy rdy) {
   PetscFunctionBegin;
 
@@ -945,7 +1049,8 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
 }
 
 /// Performs any setup needed by RDy, reading from the specified configuration
-/// file.
+/// file and overwriting options with command-line arguments.
+/// @param [inout] rdy the RDycore simulator
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
@@ -999,6 +1104,9 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
+
+  RDyLogDebug(rdy, "Initializing solver...");
+  PetscCall(InitSolver(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));

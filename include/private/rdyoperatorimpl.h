@@ -13,15 +13,14 @@
 // Maximum Wave Speed Diagnostics
 //--------------------------------
 
-// This is a diagnostic structure that captures information about the conditions
-// under which the maximum courant number is encountered. If you change this
-// struct, update the call to MPI_Type_create_struct in InitCourantNumberDiagnostics
+// This diagnostic structure captures information about the conditions under
+// which the maximum courant number is encountered. If you change this struct,
+// update the call to MPI_Type_create_struct in InitCourantNumberDiagnostics
 // below.
 typedef struct {
   PetscReal max_courant_num;  // maximum courant number
   PetscInt  global_edge_id;   // edge at which the max courant number was encountered
   PetscInt  global_cell_id;   // cell in which the max courant number was encountered
-  PetscBool is_set;           // true if max_courant_num is set, otherwise false
 } CourantNumberDiagnostics;
 
 // MPI datatype and operator for reducing CourantNumberDiagnostics with MPI_AllReduce,
@@ -30,18 +29,35 @@ extern MPI_Datatype         MPI_COURANT_NUMBER_DIAGNOSTICS;
 extern MPI_Op               MPI_MAX_COURANT_NUMBER;
 PETSC_INTERN PetscErrorCode InitCourantNumberDiagnostics(void);
 
-// operator material property identifiers
-typedef enum {
-  OPERATOR_MANNINGS = 0,
-  OPERATOR_NUM_MATERIAL_PROPERTIES,
-} OperatorMaterialPropertyId;
+//------------------------------
+// General Operator Diagnostics
+//------------------------------
+
+/// This type encapsulates all operator diagnostics.
+typedef struct {
+  /// information about the maximum wave speed
+  CourantNumberDiagnostics courant_number;
+  /// whether the diagnostics are up to date
+  PetscBool updated;
+} OperatorDiagnostics;
 
 //------------------------------
 // PETSc (CEED-like) "operator"
 //------------------------------
 
+// This operator type has a context that stores physics-specific data and two
+// operations:
+//
+// 1. apply(context, dt, u, F), which updates the global right-hand-side vector
+//    F by applying the operator to the local vector u over the timestep dt
+// 2. destroy(context), which deallocates all resources related to the context
+//
+// The PetscOperator resembles the CeedOperator type, which allows us to
+// structure our PETSc-backed physics similarly to CEED-backed physics. Because
+// PETSc runs on CPUs only, the PetscOperator type is much simpler than
+// the CeedOperator type, with no need for concepts like active and passive
+// inputs, restrictions, etc.
 typedef struct _p_PetscOperator *PetscOperator;
-
 struct _p_PetscOperator {
   void *context;
   PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec);
@@ -66,12 +82,12 @@ PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOpe
 //
 // There are two families of operator implementations:
 // 1. CEED implementation: a composite CeedOperator with interior and boundary
-//    flux sub-operators and one or more source sub-operators
-// 2. PETSc implementation: a set of right-hand-side functions and related
-//    vectors
+//    flux sub-operators and region-based source sub-operators
+// 2. PETSc implementation: a composite PetscOperator with a similar set of
+//    sub-operators
 typedef struct Operator {
-  // physics configuration defining equations in the system
-  RDyPhysicsSection physics_config;
+  // simulation configuration defining physics, numerics, etc
+  RDyConfig *config;
 
   // number of solution components and component names
   PetscInt num_components;
@@ -82,17 +98,18 @@ typedef struct Operator {
   RDyMesh *mesh;
 
   // regions and boundaries in computational domain local to this process
-  PetscInt     num_regions, num_boundaries;
-  RDyRegion   *regions;
-  RDyBoundary *boundaries;
+  PetscInt     num_regions;
+  RDyRegion   *regions;  // pointer to RDy-owned regions array
+  PetscInt     num_boundaries;
+  RDyBoundary *boundaries;  // pointer to RDy-owned boundaries array
 
   // boundary conditions corresponding to boundaries
-  RDyCondition *boundary_conditions;
+  RDyCondition *boundary_conditions;  // pointer to RDy-owned boundary_conditions array
 
   // CEED/PETSc backends
   union {
     struct {
-      // CEED composite operator -- consists of several suboperators. By index,
+      // CEED composite operator containing several suboperators. By index,
       // these suboperators are:
       //
       // 0: interior inter-cell fluxes
@@ -113,7 +130,12 @@ typedef struct Operator {
 
     // PETSc operator data
     struct {
-      // PETSc composite operator
+      // PETSc composite operator with sub-operators similar to the CEED
+      // composite operator above. By index, these sub-operators are:
+      //
+      // 0: interior inter-cell fluxes
+      // 1-num_boundaries: boundary inter-cell fluxes
+      // num_boundaries+1-num_boundaries + num_regions: external sources
       PetscOperator composite;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
@@ -139,15 +161,10 @@ typedef struct Operator {
   // diagnostics (used by both PETSc and CEED)
   //-------------------------------------------
 
-  // boundary fluxes on all domain edges
-  Vec boundary_fluxes;
-
-  // courant number diagnostics, local to current MPI process
-  CourantNumberDiagnostics courant_number_diags;
+  OperatorDiagnostics diagnostics;
 } Operator;
 
-PETSC_INTERN PetscErrorCode CreateOperator(RDyPhysicsSection, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *,
-                                           Operator **);
+PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *, Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
 // operator timestepping function
@@ -164,6 +181,12 @@ typedef struct {
   void       *array_pointer;   // pointer to CEED/PETSc array owning data (used internally)
 } OperatorData;
 
+// operator material property identifiers
+typedef enum {
+  OPERATOR_MANNINGS = 0,
+  OPERATOR_NUM_MATERIAL_PROPERTIES,
+} OperatorMaterialPropertyId;
+
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
@@ -174,6 +197,8 @@ PETSC_INTERN PetscErrorCode GetOperatorMaterialProperty(Operator *, RDyRegion, O
 PETSC_INTERN PetscErrorCode RestoreOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
 
 // diagnostics
-PETSC_INTERN PetscErrorCode GetOperatorCourantNumberDiagnostics(Operator *, CourantNumberDiagnostics *);
+PETSC_INTERN PetscErrorCode ResetOperatorDiagnostics(Operator *);
+PETSC_INTERN PetscErrorCode UpdateOperatorDiagnostics(Operator *);
+PETSC_INTERN PetscErrorCode GetOperatorDiagnostics(Operator *, OperatorDiagnostics *);
 
 #endif

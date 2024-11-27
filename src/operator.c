@@ -15,6 +15,10 @@
 // operator logging/profiling events
 PetscLogEvent RDY_CeedOperatorApply_;
 
+//-------------------------------------
+// Operator Construction / Destruction
+//-------------------------------------
+
 // defines the computational domain for the operator
 static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
@@ -68,19 +72,21 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
   PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Number of operator regions must be positive");
   PetscCheck(regions, comm, PETSC_ERR_USER, "Operator region array must be non-NULL");
 
-  PetscCall(PetscCalloc1(num_regions, &op->regions));
-  memcpy(op->regions, regions, sizeof(RDyRegion) * num_regions);
+  // the operator does not manage its boundaries or boundary conditions -- these
+  // are managed by RDy itself
+  op->num_regions = num_regions;
+  op->regions     = regions;
 
   // allocate sequential vectors for each region
   if (!CeedEnabled()) {
-    PetscCall(PetscCalloc1(num_regions, &op->petsc.sources));
+    PetscCall(PetscCalloc1(num_regions, &op->petsc.sources));  // NOLINT(bugprone-sizeof-expression)
     for (PetscInt r = 0; r < num_regions; ++r) {
       PetscCall(CreateSequentialVector(comm, op->num_components, regions[r].num_owned_cells, &op->petsc.sources[r]));
     }
 
     PetscCall(PetscCalloc1(OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));
     for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
-      PetscCall(PetscCalloc1(num_regions, &op->petsc.material_properties[p]));
+      PetscCall(PetscCalloc1(num_regions, &op->petsc.material_properties[p]));  // NOLINT(bugprone-sizeof-expression)
       for (PetscInt r = 0; r < num_regions; ++r) {
         PetscCall(CreateSequentialVector(comm, op->num_components, regions[r].num_owned_cells, &op->petsc.material_properties[p][r]));
       }
@@ -100,14 +106,15 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   PetscCheck(boundaries, comm, PETSC_ERR_USER, "Operator boundary array must be non-NULL");
   PetscCheck(conditions, comm, PETSC_ERR_USER, "Operator boundary conditions array must be non-NULL");
 
-  PetscCall(PetscCalloc1(num_boundaries, &op->boundaries));
-  memcpy(op->boundaries, boundaries, sizeof(RDyBoundary) * num_boundaries);
-  PetscCall(PetscCalloc1(num_boundaries, &op->boundary_conditions));
-  memcpy(op->boundary_conditions, conditions, sizeof(RDyCondition) * num_boundaries);
+  // the operator does not manage its boundaries or boundary conditions -- these
+  // are managed by RDy itself
+  op->num_boundaries      = num_boundaries;
+  op->boundaries          = boundaries;
+  op->boundary_conditions = conditions;
 
   if (!CeedEnabled()) {
-    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));
-    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes));
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));  // NOLINT(bugprone-sizeof-expression)
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes));  // NOLINT(bugprone-sizeof-expression)
 
     for (PetscInt b = 0; b < num_boundaries; ++b) {
       PetscInt num_edges = boundaries[b].num_edges;
@@ -125,7 +132,7 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
   Ceed ceed = CeedContext();
   PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.composite));
 
-  PetscReal tiny_h = op->physics_config.flow.tiny_h;
+  PetscReal tiny_h = op->config->physics.flow.tiny_h;
 
   // set up suboperators for the shallow water equations
 
@@ -148,7 +155,7 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
   for (CeedInt r = 0; r < op->num_regions; ++r) {
     CeedOperator source_op;
     RDyRegion    region = op->regions[r];
-    PetscCall(CreateSWECeedExternalSourceOperator(op->mesh, region, tiny_h, &source_op));
+    PetscCall(CreateSWECeedSourceOperator(op->mesh, region, tiny_h, &source_op));
     PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.composite, source_op));
     PetscCallCEED(CeedOperatorDestroy(&source_op));
   }
@@ -161,13 +168,13 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
 
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.composite));
 
-  PetscReal tiny_h = op->physics_config.flow.tiny_h;
+  PetscReal tiny_h = op->config->physics.flow.tiny_h;
 
   // set up suboperators for the shallow water equations
 
   // suboperator 0: fluxes between interior cells
   PetscOperator interior_flux_op;
-  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->courant_number_diags, tiny_h, &interior_flux_op));
+  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->diagnostics, tiny_h, &interior_flux_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, interior_flux_op));
   PetscCall(PetscOperatorDestroy(&interior_flux_op));
 
@@ -177,7 +184,7 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
     RDyBoundary   boundary  = op->boundaries[b];
     RDyCondition  condition = op->boundary_conditions[b];
     PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, condition, op->petsc.boundary_values[b], op->petsc.boundary_fluxes[b],
-                                                 &op->courant_number_diags, tiny_h, &boundary_flux_op));
+                                                 &op->diagnostics, tiny_h, &boundary_flux_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, boundary_flux_op));
     PetscCall(PetscOperatorDestroy(&boundary_flux_op));
   }
@@ -186,8 +193,8 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   for (CeedInt r = 0; r < op->num_regions; ++r) {
     PetscOperator source_op;
     RDyRegion     region = op->regions[r];
-    PetscCall(CreateSWEPetscExternalSourceOperator(op->mesh, region, op->petsc.sources[r], op->petsc.material_properties[OPERATOR_MANNINGS][r],
-                                                   tiny_h, &source_op));
+    PetscCall(CreateSWEPetscSourceOperator(op->mesh, region, op->petsc.sources[r], op->petsc.material_properties[OPERATOR_MANNINGS][r], tiny_h,
+                                           &source_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, source_op));
     PetscCall(PetscOperatorDestroy(&source_op));
   }
@@ -209,17 +216,23 @@ static PetscErrorCode PrepareOperator(Operator *op) {
   }
 
   // initialize diagnostics
-  op->courant_number_diags.max_courant_num = 0.0;
-  op->courant_number_diags.global_edge_id  = -1;
-  op->courant_number_diags.global_cell_id  = -1;
-  op->courant_number_diags.is_set          = PETSC_FALSE;
+  PetscCall(ResetOperatorDiagnostics(op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Creates an operator representing the system of equations described in the
-// given configuration.
-PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_regions, RDyRegion *regions,
+/// Creates an operator representing the system of equations described in the
+/// given configuration.
+/// @param [in]  config              the configuration defining the physics and numerics for the new operator
+/// @param [in]  domain_dm           a DM representing the computational domain on which the operator is defined
+/// @param [in]  domain_mesh         a mesh containing geometric and topological information for the domain
+/// @param [in]  num_regions         the number of disjoint regions partitioning the computational domain
+/// @param [in]  regions             an array of disjoint regions paratitioning the computational domain
+/// @param [in]  num_boundaries      the number of distinct boundaries bounding the computational domain
+/// @param [in]  boundaries          an array of distinct boundaries bounding the computational domain
+/// @param [in]  boundary_conditions an array of boundary conditions corresponding to the domain boundaries
+/// @param [out] op                  the newly created operator
+PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_regions, RDyRegion *regions,
                               PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions, Operator **operator) {
   PetscFunctionBegin;
 
@@ -239,7 +252,7 @@ PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, DM domain_dm, RD
   }
 
   PetscCall(PetscCalloc1(1, operator));
-  (*operator)->physics_config = physics_config;
+  (*operator)->config = config;
 
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
   PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
@@ -249,7 +262,8 @@ PetscErrorCode CreateOperator(RDyPhysicsSection physics_config, DM domain_dm, RD
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Free all resources devoted to the operator.
+/// Frees all resources devoted to the operator.
+/// @param [out] op the operator to be freed
 PetscErrorCode DestroyOperator(Operator **op) {
   PetscFunctionBegin;
 
@@ -263,7 +277,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
-  } else {
+  } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
       PetscCall(VecDestroy(&(*op)->petsc.boundary_values[b]));
       PetscCall(VecDestroy(&(*op)->petsc.boundary_fluxes[b]));
@@ -290,7 +304,11 @@ PetscErrorCode DestroyOperator(Operator **op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u, Vec dudt) {
+//----------------------
+// Operator Application
+//----------------------
+
+static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
   // update the timestep for the ceed operators if necessary
@@ -301,37 +319,194 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u, Vec d
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.composite, label, &op->ceed.dt));
   }
 
+  // FIXME
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u, Vec dudt) {
+static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
+  PetscCall(PetscOperatorApply(op->petsc.composite, dt, u_local, f_global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode ApplyOperator(Operator *op, PetscReal dt, Vec u, Vec dudt) {
+/// Applies the operator to a local solution vector, storing the result in the
+/// given global vector.
+/// @param [inout] op       the operator to be applied to the solution vector
+/// @param [dt]    dt       the time step over which the operator is applied
+/// @param [in]    u_local  the local solution vector to which the operator is applied
+/// @param [inout] f_global the global vector storing the result of the application
+PetscErrorCode ApplyOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
   if (CeedEnabled()) {
-    PetscCall(ApplyCeedOperator(op, dt, u, dudt));
+    PetscCall(ApplyCeedOperator(op, dt, u_local, f_global));
   } else {
-    PetscCall(ApplyPetscOperator(op, dt, u, dudt));
+    PetscCall(ApplyPetscOperator(op, dt, u_local, f_global));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode GetOperatorCourantNumberDiagnostics(Operator *op, CourantNumberDiagnostics *diags) {
+//----------------------
+// Operator Diagnostics
+//----------------------
+
+/// Resets all operator diagnostics so they can be re-accumulated.
+/// @param [inout] op the operator for which diagnostics are reset
+PetscErrorCode ResetOperatorDiagnostics(Operator *op) {
   PetscFunctionBegin;
 
-  // reduce the local courant number diagnostics if needed
-  if (!op->courant_number_diags.is_set) {
-    MPI_Comm comm;
-    PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-    MPI_Allreduce(MPI_IN_PLACE, &op->courant_number_diags, 1, MPI_COURANT_NUMBER_DIAGNOSTICS, MPI_MAX_COURANT_NUMBER, comm);
-    op->courant_number_diags.is_set = PETSC_TRUE;
+  op->diagnostics.updated        = PETSC_FALSE;
+  op->diagnostics.courant_number = (CourantNumberDiagnostics){
+      .max_courant_num = 0.0,
+      .global_edge_id  = -1,
+      .global_cell_id  = -1,
+  };
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// FIXME: the CEED Courant number logic below makes assumptions about the
+// FIXME: structure of our composite operator that are valid for the shallow
+// FIXME: water equations, but we might need to change it to suit more general
+// FIXME: conditions
+
+static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edges, RDyMesh *mesh, CourantNumberDiagnostics *courant_diags) {
+  PetscFunctionBegin;
+
+  // get the relevant interior sub-operator
+  CeedOperator *sub_ops;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
+  CeedOperator interior_flux_op = sub_ops[0];
+
+  // fetch the field
+  CeedOperatorField courant_num;
+  PetscCallCEED(CeedOperatorGetFieldByName(interior_flux_op, "courant_number", &courant_num));
+
+  CeedVector courant_num_vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+
+  CeedScalar(*courant_num_data)[2];  // values to the left/right of an edge
+  PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+
+  for (PetscInt ii = 0; ii < mesh->num_owned_internal_edges; ii++) {
+    CeedScalar local_max           = fmax(courant_num_data[ii][0], courant_num_data[ii][1]);
+    courant_diags->max_courant_num = fmax(courant_diags->max_courant_num, local_max);
+  }
+  PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/// @brief Loops over all boundary conditions and finds the local maximum Courant number.
+///        If needed, the data is moved from device to host.
+/// @param [in] op_edges A CeedOperator object for edges
+/// @param [in] num_boundaries Total number of boundaries
+/// @param [in] boundaries A RDyBoundary object
+/// @param [in] *max_courant_number Local maximum value of courant number
+/// @return 0 on sucess, or a non-zero error code on failure
+static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edges, PetscInt num_boundaries, RDyBoundary *boundaries,
+                                                            CourantNumberDiagnostics *courant_diags) {
+  PetscFunctionBegin;
+
+  // loop over all boundaries
+  for (PetscInt b = 0; b < num_boundaries; ++b) {
+    RDyBoundary boundary = boundaries[b];
+
+    // get the relevant boundary sub-operator
+    CeedOperator *sub_ops;
+    PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
+    CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
+
+    // fetch the field
+    CeedOperatorField courant_num;
+    PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "courant_number", &courant_num));
+
+    // get access to the data
+    CeedVector courant_num_vec;
+    PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+    CeedScalar(*courant_num_data)[1];
+    PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+
+    // find the maximum value
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      courant_diags->max_courant_num = fmax(courant_diags->max_courant_num, courant_num_data[e][0]);
+    }
+
+    // restores the pointer
+    PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Finds the global maximum Courant number across all internal and boundary edges.
+/// @param [in] op_edges A CeedOperator object for edges
+/// @param [in] num_boundaries Total number of boundaries
+/// @param [in] boundaries A RDyBoundary object
+/// @param [in] comm A MPI_Comm object
+/// @param [out] *max_courant_number Global maximum value of courant number
+/// @return 0 on sucess, or a non-zero error code on failure
+static PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, MPI_Comm comm,
+                                               CourantNumberDiagnostics *courant_diags) {
+  PetscFunctionBegin;
+
+  PetscCall(CeedFindMaxCourantNumberInternalEdges(op_edges, mesh, courant_diags));
+  PetscCall(CeedFindMaxCourantNumberBoundaryEdges(op_edges, num_boundaries, boundaries, courant_diags));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Finds the maximum Courant number for the libCEED and the PETSc version of SWE implementation
+/// @param [inout] rdy An RDy object
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode UpdateCeedCourantNumberDiagnostics(Operator *op) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  CourantNumberDiagnostics *courant_num_diags = &op->diagnostics.courant_number;
+
+  if (CeedEnabled()) {
+    // we need to extract the maximum courant number from the operator in the
+    // CEED case; in the PETSc case it's already set for this process
+    PetscCall(CeedFindMaxCourantNumber(op->ceed.composite, op->mesh, op->num_boundaries, op->boundaries, comm, courant_num_diags));
+  }
+
+  // reduce the courant diagnostics across all processes
+  MPI_Allreduce(MPI_IN_PLACE, courant_num_diags, 1, MPI_COURANT_NUMBER_DIAGNOSTICS, MPI_MAX_COURANT_NUMBER, comm);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Ensures that all operator diagnostics are updated. This can result in data
+/// being copied between memory spaces.
+/// @param [inout] op the operator for which diagnostics are updated
+PetscErrorCode UpdateOperatorDiagnostics(Operator *op) {
+  PetscFunctionBegin;
+  if (!op->diagnostics.updated) {
+    // our PETSc operators should update diagnostics in-place, so we only need
+    // to update things for CEED
+    if (CeedEnabled()) {
+      PetscCall(UpdateCeedCourantNumberDiagnostics(op));
+    }
+
+    // reduce courant diagnostics across all processes
+    MPI_Comm comm;
+    PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+    MPI_Allreduce(MPI_IN_PLACE, &op->diagnostics.courant_number, 1, MPI_COURANT_NUMBER_DIAGNOSTICS, MPI_MAX_COURANT_NUMBER, comm);
+
+    op->diagnostics.updated = PETSC_TRUE;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Retrieves diagnostics from an operator, whether or not they are updated.
+/// @param [in]  op          the operator from which diagnostics are retrieved
+/// @param [out] diagnostics the diagnostics retrieved from the operator
+PetscErrorCode GetOperatorDiagnostics(Operator *op, OperatorDiagnostics *diagnostics) {
+  PetscFunctionBegin;
+  *diagnostics = op->diagnostics;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -424,26 +599,30 @@ static PetscErrorCode RestorePetscOperatorBoundaryData(Operator *op, RDyBoundary
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// acquires exclusive access to boundary values for the operator
-PetscErrorCode GetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_values) {
+/// Provides read-write access to the operator's boundary value array data for
+/// a given boundary.
+/// @param [in]  op the operator for which data access is provided
+/// @param [in]  boundary the boundary for which access to data is provided
+/// @param [out] boundary_value_data the array data to which access is provided
+PetscErrorCode GetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_value_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
-  boundary_values->num_components = op->num_components;
-  PetscCall(PetscCalloc1(op->num_components, &boundary_values->values));
+  boundary_value_data->num_components = op->num_components;
+  PetscCall(PetscCalloc1(op->num_components, &boundary_value_data->values));
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_values));
+    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_values));
+    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_values) {
+PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_value_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -451,34 +630,45 @@ PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary,
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_values));
+    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
   } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_values));
+    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
   }
+  PetscCall(PetscFree(boundary_value_data->values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// acquires exclusive access to boundary fluxes for the operator
-PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_fluxes) {
+/// Provides read-write access to the operator's boundary flux array data for
+/// a given boundary.
+/// @param [in]  op the operator for which data access is provided
+/// @param [in]  boundary the boundary for which access to flux data is provided
+/// @param [out] boundary_flux_data the array data to which access is provided
+PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_flux_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
-  boundary_fluxes->num_components = op->num_components;
-  PetscCall(PetscCalloc1(op->num_components, &boundary_fluxes->values));
+  boundary_flux_data->num_components = op->num_components;
+  PetscCall(PetscCalloc1(op->num_components, &boundary_flux_data->values));
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux", boundary_fluxes));
+    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_fluxes));
+    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_flux_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_fluxes) {
+/// Releases access to the operator's boundary flux array data for a boundary
+/// for which access was provided via @ref GetOperatorBoundaryFluxes. This
+/// operation can cause data to be copied between memory spaces.
+/// @param [in]  op the operator for which data access is released
+/// @param [in]  boundary the boundary for which access to flux data is released
+/// @param [out] boundary_flux_data the array data for which access is released
+PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_flux_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -486,10 +676,11 @@ PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary,
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux", boundary_fluxes));
+    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
   } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_fluxes));
+    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_flux_data));
   }
+  PetscCall(PetscFree(boundary_flux_data->values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -582,6 +773,11 @@ static PetscErrorCode RestorePetscOperatorRegionData(Operator *op, RDyRegion reg
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Provides read-write access to the operator's external source array data for
+/// a given region.
+/// @param [in]  op the operator for which data access is provided
+/// @param [in]  region the region for which access to source data is provided
+/// @param [out] source_data the array data to which access is provided
 PetscErrorCode GetOperatorExternalSource(Operator *op, RDyRegion region, OperatorData *source_data) {
   PetscFunctionBegin;
 
@@ -600,6 +796,12 @@ PetscErrorCode GetOperatorExternalSource(Operator *op, RDyRegion region, Operato
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Releases access to the operator's external source array data for a region
+/// for which access was provided via @ref GetOperatorExternalSource. This
+/// operation can cause data to be copied between memory spaces.
+/// @param [in]  op the operator for which data access is released
+/// @param [in]  region the region for which access to source data is released
+/// @param [out] source_data the array data for which access is released
 PetscErrorCode RestoreOperatorExternalSource(Operator *op, RDyRegion region, OperatorData *source_data) {
   PetscFunctionBegin;
 
@@ -612,6 +814,7 @@ PetscErrorCode RestoreOperatorExternalSource(Operator *op, RDyRegion region, Ope
   } else {
     PetscCallCEED(RestorePetscOperatorRegionData(op, region, op->petsc.sources[region.index], source_data));
   }
+  PetscCall(PetscFree(source_data->values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -624,7 +827,13 @@ const char *material_property_names[] = {
     "manning",
 };
 
-PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id, OperatorData *property) {
+/// Provides read-write access to the operator's material property array data
+/// for a given region and material property.
+/// @param [in]  op the operator for which data access is provided
+/// @param [in]  region the region for which access to material propety data is provided
+/// @param [in]  property_id the ID for the desired material property
+/// @param [out] property_data the array data to which access is provided
+PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -632,11 +841,14 @@ PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, Opera
   PetscCall(CheckOperatorRegion(op, region, comm));
 
   switch (property_id) {
+    // FIXME: only single-component material property data currently supported!
+    property_data->num_components = 1;
+    PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
     case OPERATOR_MANNINGS:
       if (CeedEnabled()) {
-        PetscCall(GetCeedOperatorRegionData(op, region, material_property_names[property_id], property));
+        PetscCall(GetCeedOperatorRegionData(op, region, material_property_names[property_id], property_data));
       } else {
-        PetscCall(GetPetscOperatorRegionData(op, region, op->petsc.material_properties[region.index][property_id], property));
+        PetscCall(GetPetscOperatorRegionData(op, region, op->petsc.material_properties[region.index][property_id], property_data));
       }
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
@@ -645,7 +857,14 @@ PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, Opera
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id, OperatorData *property) {
+/// Releases access to the operator's material property array data for a region
+/// and property for which access was provided via @ref GetOperatorMaterialProperty.
+/// This operation can cause data to be copied between memory spaces.
+/// @param [in]  op the operator for which data access is released
+/// @param [in]  region the region for which access to material propety data is released
+/// @param [in]  property_id the ID for the desired material property
+/// @param [out] property_data the array data for which access is released
+PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -655,13 +874,14 @@ PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, O
   switch (property_id) {
     case OPERATOR_MANNINGS:
       if (CeedEnabled()) {
-        PetscCall(RestoreCeedOperatorRegionData(op, region, material_property_names[property_id], property));
+        PetscCall(RestoreCeedOperatorRegionData(op, region, material_property_names[property_id], property_data));
       } else {
-        PetscCall(RestorePetscOperatorRegionData(op, region, op->petsc.material_properties[region.index][property_id], property));
+        PetscCall(RestorePetscOperatorRegionData(op, region, op->petsc.material_properties[region.index][property_id], property_data));
       }
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
+  PetscCall(PetscFree(property_data->values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -670,18 +890,23 @@ PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, O
 // PETSc operators
 //-----------------
 
-/// Creates a new PetscOperator with the given context, apply() function and destroy() destructor.
+/// Creates a new PetscOperator with behavior defined by the given arguments.
+/// @param [in]  context a pointer to a data structure used by the operator implementation
+/// @param [in]  apply   the function called by PetscOperatorApply
+/// @param [in]  destroy the function called by PetscOperatorDestroy
+/// @param [out] op      the PetscOperator created by this call
 PetscErrorCode PetscOperatorCreate(void          *context, PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec), PetscErrorCode (*destroy)(void *),
                                    PetscOperator *op) {
   PetscFunctionBegin;
-  PetscCall(PetscCalloc1(1, &op));
+  PetscCall(PetscCalloc1(1, &op));  // NOLINT(bugprone-sizeof-expression)
   (*op)->context = context;
   (*op)->apply   = apply;
   (*op)->destroy = destroy;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Releases resources allocated to the given PetscOperator
+/// Releases resources allocated to the given PetscOperator.
+/// @param [inout] op the PetscOperator to be destroyed
 PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
   PetscFunctionBegin;
   PetscCall((*op)->destroy((*op)->context));
@@ -690,8 +915,12 @@ PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Applies the given PetscOperator to the local vector u_local, storing the result
-/// in the global vector f_global
+/// Applies the given PetscOperator to a local solution vector, storing the
+/// results in a global "right-hand-side" vector.
+/// @param [inout] op       the operator being applyed to the solution vector
+/// @param [in]    dt       the timestep over which the operator is applied
+/// @param [in]    u_local  the local solution vector to which the operator is applied
+/// @param [inout] f_global the global vector storing the results of the application
 PetscErrorCode PetscOperatorApply(PetscOperator op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
   PetscCall(op->apply(op->context, dt, u_local, f_global));
@@ -720,19 +949,22 @@ static PetscErrorCode PetscCompositeOperatorDestroy(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Creates a PetscOperator that applies sub-operators in sequence.
+/// Creates a PetscOperator that applies sub-operators in sequence.
+/// @param [out] a pointer to the created (empty) composite operator
 PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite;
   PetscCall(PetscCalloc1(1, &composite));
   static const PetscInt initial_capacity = 16;
   composite->capacity                    = initial_capacity;
-  PetscCall(initial_capacity, &composite->suboperators);
+  PetscCall(PetscCalloc1(initial_capacity, &composite->suboperators));  // NOLINT(bugprone-sizeof-expression)
   PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Appends a sub-operator to the given composite PetscOperator.
+/// @param [inout] op     the composite operator to which a sub-operator is appended
+/// @param [in]    sub_op the suboperator to be appended to the composite operator
 PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_op) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite = op->context;

@@ -16,8 +16,7 @@ static void FindCourantNumberDiagnostics(void *in_vec, void *result_vec, int *le
   // select the item with the maximum courant number
   for (int i = 0; i < *len; ++i) {
     if (in_diags[i].max_courant_num > result_diags[i].max_courant_num) {
-      result_diags[i]        = in_diags[i];
-      result_diags[i].is_set = PETSC_TRUE;  // mark as set
+      result_diags[i] = in_diags[i];
     }
   }
 }
@@ -38,15 +37,14 @@ PetscErrorCode InitCourantNumberDiagnostics(void) {
 
   if (!initialized) {
     // create an MPI data type for the CourantNumberDiagnostics struct
-    const int      num_blocks             = 4;
-    const int      block_lengths[4]       = {1, 1, 1, 1};
-    const MPI_Aint block_displacements[4] = {
+    const int      num_blocks             = 3;
+    const int      block_lengths[3]       = {1, 1, 1};
+    const MPI_Aint block_displacements[3] = {
         offsetof(CourantNumberDiagnostics, max_courant_num),
         offsetof(CourantNumberDiagnostics, global_edge_id),
         offsetof(CourantNumberDiagnostics, global_cell_id),
-        offsetof(CourantNumberDiagnostics, is_set),
     };
-    MPI_Datatype block_types[4] = {MPIU_REAL, MPI_INT, MPI_INT, MPIU_BOOL};
+    MPI_Datatype block_types[3] = {MPIU_REAL, MPI_INT, MPI_INT};
     MPI_Type_create_struct(num_blocks, block_lengths, block_displacements, block_types, &MPI_COURANT_NUMBER_DIAGNOSTICS);
     MPI_Type_commit(&MPI_COURANT_NUMBER_DIAGNOSTICS);
 

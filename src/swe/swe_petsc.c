@@ -206,12 +206,12 @@ static PetscErrorCode ComputeRoeFlux(RiemannStateData *datal, RiemannStateData *
 //------------------------
 
 typedef struct {
-  RDyMesh                  *mesh;           // domain mesh
-  PetscReal                 tiny_h;         // minimum water height for wet conditions
-  RiemannStateData          left_states;    // "left" riemann states on interior edges
-  RiemannStateData          right_states;   // "right" riemann states on interior edges
-  RiemannEdgeData           edges;          // riemann fluxes on interior edges
-  CourantNumberDiagnostics *courant_diags;  // courant number diagnostics
+  RDyMesh             *mesh;          // domain mesh
+  PetscReal            tiny_h;        // minimum water height for wet conditions
+  RiemannStateData     left_states;   // "left" riemann states on interior edges
+  RiemannStateData     right_states;  // "right" riemann states on interior edges
+  RiemannEdgeData      edges;         // riemann fluxes on interior edges
+  OperatorDiagnostics *diagnostics;   // courant number, etc
 } InteriorFluxOperator;
 
 static PetscErrorCode ApplyInteriorFlux(void *context, PetscReal dt, Vec u_local, Vec f_global) {
@@ -284,7 +284,7 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscReal dt, Vec u_local
         PetscReal arear = cells->areas[right_local_cell_id];
 
         PetscReal                 cnum              = amax_vec_int[e] * edge_len / fmin(areal, arear) * dt;
-        CourantNumberDiagnostics *courant_num_diags = interior_flux_op->courant_diags;
+        CourantNumberDiagnostics *courant_num_diags = &interior_flux_op->diagnostics->courant_number;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
           courant_num_diags->global_edge_id  = edges->global_ids[e];
@@ -324,7 +324,13 @@ static PetscErrorCode DestroyInteriorFlux(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, CourantNumberDiagnostics *courant_diags, PetscReal tiny_h, PetscOperator *op) {
+/// Creates a PetscOperator that computes fluxes between pairs of cells on the
+/// domain's interior, suitable for the shallow water equations.
+/// @param [in]    mesh        a mesh representing the domain
+/// @param [inout] diagnostics a set of diagnostics that can be updated by the PetscOperator
+/// @param [in]    tiny_h      the water height below which dry conditions are assumed
+/// @param [out]   op          the newly created PetscOperator
+PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *op) {
   PetscFunctionBegin;
 
   const PetscInt num_comp = 3;
@@ -332,9 +338,9 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, CourantNumberDi
   InteriorFluxOperator *interior_flux_op;
   PetscCall(PetscCalloc1(1, &interior_flux_op));
   *interior_flux_op = (InteriorFluxOperator){
-      .mesh          = mesh,
-      .courant_diags = courant_diags,
-      .tiny_h        = tiny_h,
+      .mesh        = mesh,
+      .diagnostics = diagnostics,
+      .tiny_h      = tiny_h,
   };
 
   // allocate left/right/edge Riemann data structures
@@ -364,18 +370,18 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, CourantNumberDi
 //------------------------
 
 typedef struct {
-  RDyMesh                  *mesh;                // domain mesh (FIXME: needed after construction?)
-  RDyBoundary               boundary;            // boundary associated with this sub-operator
-  RDyCondition              boundary_condition;  // boundary condition associated with this sub-operator
-  Vec                       boundary_values;     // Dirichlet boundary values vector
-  Vec                       boundary_fluxes;     // boundary flux values vector
-  CourantNumberDiagnostics *courant_diags;       // courant number diagnostics
-  PetscReal                 tiny_h;              // minimum water height for wet conditions
-  RiemannStateData          left_states;
-  RiemannStateData          right_states;
-  RiemannEdgeData           edges;
-  PetscReal                *cosines, *sines;  // cosine and sine of the angle between the edge and y-axis
-  PetscReal                *a_max;            // maximum courant number
+  RDyMesh             *mesh;                // domain mesh (FIXME: needed after construction?)
+  RDyBoundary          boundary;            // boundary associated with this sub-operator
+  RDyCondition         boundary_condition;  // boundary condition associated with this sub-operator
+  Vec                  boundary_values;     // Dirichlet boundary values vector
+  Vec                  boundary_fluxes;     // boundary flux values vector
+  OperatorDiagnostics *diagnostics;         // courant number, boundary fluxes
+  PetscReal            tiny_h;              // minimum water height for wet conditions
+  RiemannStateData     left_states;
+  RiemannStateData     right_states;
+  RiemannEdgeData      edges;
+  PetscReal           *cosines, *sines;  // cosine and sine of the angle between the edge and y-axis
+  PetscReal           *a_max;            // maximum courant number
 } BoundaryFluxOperator;
 
 // applies a reflecting boundary condition on the given boundary, computing
@@ -509,7 +515,7 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscReal dt, Vec u_local
 
   // accumulate the flux values in f_global
   RDyCells                 *cells             = &boundary_flux_op->mesh->cells;
-  CourantNumberDiagnostics *courant_num_diags = boundary_flux_op->courant_diags;
+  CourantNumberDiagnostics *courant_num_diags = &boundary_flux_op->diagnostics->courant_number;
   for (PetscInt e = 0; e < boundary.num_edges; ++e) {
     PetscInt  edge_id       = boundary.edge_ids[e];
     PetscReal edge_len      = edges->lengths[edge_id];
@@ -557,8 +563,18 @@ static PetscErrorCode DestroyBoundaryFlux(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Creates a PetscOperator that computes fluxes through edges on the boundary
+/// of a domain, suitable for the shallow water equations.
+/// @param [in]    mesh               a mesh representing the domain
+/// @param [in]    boundary           the boundary through which fluxes are to be computed
+/// @param [in]    boundary_condition the boundary condition associated with the boundary of interest
+/// @param [in]    boundary_values    a Vec storing Dirichlet values (if any) for this boundary
+/// @param [inout] boundary_fluxes    a Vec storing fluxes for this boundary
+/// @param [inout] diagnostics        a set of diagnostics that can be updated by the PetscOperator
+/// @param [in]    tiny_h             the water height below which dry conditions are assumed
+/// @param [out]   op                 the newly created PetscOperator
 PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, Vec boundary_values,
-                                                  Vec boundary_fluxes, CourantNumberDiagnostics *courant_diags, PetscReal tiny_h, PetscOperator *op) {
+                                                  Vec boundary_fluxes, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *op) {
   PetscFunctionBegin;
   BoundaryFluxOperator *boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
@@ -568,7 +584,7 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
       .boundary_condition = boundary_condition,
       .boundary_values    = boundary_values,
       .boundary_fluxes    = boundary_fluxes,
-      .courant_diags      = courant_diags,
+      .diagnostics        = diagnostics,
       .tiny_h             = tiny_h,
   };
 
@@ -688,8 +704,15 @@ static PetscErrorCode DestroySource(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateSWEPetscExternalSourceOperator(RDyMesh *mesh, RDyRegion region, Vec external_source, Vec mannings, PetscReal tiny_h,
-                                                    PetscOperator *op) {
+/// Creates a PetscOperator that computes sources within a region in a domain,
+/// suitable for the shallow water equations.
+/// @param [in]    mesh            a mesh representing the domain
+/// @param [in]    region          the region for which sources are computed
+/// @param [in]    external_source a Vec storing external source values (if any) for this region
+/// @param [in]    mannings        a Vec storing Mannings coefficient values for this region
+/// @param [in]    tiny_h          the water height below which dry conditions are assumed
+/// @param [out]   op              the newly created PetscOperator
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, RDyRegion region, Vec external_source, Vec mannings, PetscReal tiny_h, PetscOperator *op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
