@@ -77,7 +77,13 @@ typedef struct {
       PetscReal water_mass;
       PetscReal x_momentum;
       PetscReal y_momentum;
-    } * fluxes;
+    } *fluxes;
+    // local array of water height left/right of the edge
+    struct {
+      PetscReal h_left;
+      PetscReal h_right;
+    }        *states;
+    PetscReal time_accumulated;
   } boundary_fluxes;
 } RDyTimeSeriesData;
 
@@ -237,7 +243,8 @@ PETSC_INTERN PetscErrorCode ReadCheckpointFile(RDy, const char *);
 
 // time series
 PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);
-PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *);
+PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, PetscReal dt, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *, PetscReal *,
+                                                     PetscReal *);
 PETSC_INTERN PetscErrorCode WriteTimeSeries(TS, PetscInt, PetscReal, Vec, void *);
 PETSC_INTERN PetscErrorCode DestroyTimeSeries(RDy);
 
