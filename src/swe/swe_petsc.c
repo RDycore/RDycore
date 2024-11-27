@@ -277,7 +277,7 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscReal dt, Vec u_local
       PetscReal edge_len = edges->lengths[edge_id];
 
       PetscReal hl = u_ptr[n_dof * left_local_cell_id + 0];
-      PetscReal hr = u_ptr[n_dof * left_local_cell_id + 0];
+      PetscReal hr = u_ptr[n_dof * right_local_cell_id + 0];
 
       if (!(hr < tiny_h && hl < tiny_h)) {  // either cell is "wet"
         PetscReal areal = cells->areas[left_local_cell_id];
