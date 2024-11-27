@@ -468,6 +468,8 @@ PetscErrorCode RiemannEdgeDataSWECreate(PetscInt N, PetscInt ncomp, RiemannEdgeD
   PetscCall(PetscCalloc1(data->N, &data->sn));
   PetscCall(PetscCalloc1(data->N * ncomp, &data->flux));
   PetscCall(PetscCalloc1(data->N, &data->amax));
+  PetscCall(PetscCalloc1(data->N, &data->hl));
+  PetscCall(PetscCalloc1(data->N, &data->hr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

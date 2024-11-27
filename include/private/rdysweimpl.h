@@ -16,6 +16,7 @@ typedef struct {
   PetscReal *cn, *sn;  // cosine and sine of the angle between the edge and y-axis
   PetscReal *flux;     // flux through the edge
   PetscReal *amax;     // courant number
+  PetscReal *hl, *hr;  // water height left and right of the edge
 } RiemannEdgeDataSWE;
 
 // PETSc (non-CEED) Riemann solver data for SWE
@@ -32,6 +33,7 @@ PETSC_INTERN PetscErrorCode InitSWE(RDy);
 PETSC_INTERN PetscErrorCode CreateSWEFluxOperator(Ceed, RDyMesh *, CeedInt n, RDyBoundary *, RDyCondition *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator, PetscReal);
 PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator, RDyBoundary, CeedOperatorField *);
+PETSC_INTERN PetscErrorCode SWEFluxOperatorGetBoundaryWaterHeight(CeedOperator, RDyBoundary, CeedOperatorField *);
 
 PETSC_INTERN PetscErrorCode CreateSWESourceOperator(Ceed, RDyMesh *mesh, PetscInt num_cells, RDyMaterial *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator, PetscReal);

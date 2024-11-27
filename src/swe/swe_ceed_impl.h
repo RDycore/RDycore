@@ -148,6 +148,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*height)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -166,6 +167,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
     }
+    height[0][i] = q_L[0][i];
+    height[1][i] = q_R[0][i];
   }
   return 0;
 }
@@ -175,6 +178,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*height)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -195,6 +199,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
     }
+    height[0][i] = q_L[0][i];
+    height[1][i] = q_L[0][i];
   }
   return 0;
 }
@@ -205,6 +211,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*height)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -227,6 +234,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
     }
+    height[0][i] = q_L[0][i];
+    height[1][i] = qR.h;
   }
   return 0;
 }

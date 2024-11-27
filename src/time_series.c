@@ -149,8 +149,10 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, PetscReal dt, RDyBoundary bound
           time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * fluxes[e * ndof + 0];
           time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * fluxes[e * ndof + 1];
           time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * fluxes[e * ndof + 2];
-          time_series->boundary_fluxes.states[n].h_left += datal[e * ndof + 0];
-          time_series->boundary_fluxes.states[n].h_right += datar[e * ndof + 0];
+          time_series->boundary_fluxes.states[n].h_left += datal[e];
+          time_series->boundary_fluxes.states[n].h_right += datar[e];
+          printf("Accum: %d %f %f %f %f\n", n, time_series->boundary_fluxes.states[n].h_left, time_series->boundary_fluxes.states[n].h_right,
+                 datal[e], datar[e]);
           ++n;
         }
       }
@@ -280,31 +282,46 @@ static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary boundary = rdy->boundaries[b];
 
-    // fetch the flux accumulation field for this boundary
-    CeedOperatorField bflux;
-    PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed.flux_operator, boundary, &bflux));
+    // auto-generated boundary condition is a reflective wall conditon for
+    // which there is data should not be fetched because the data
+    // for those boundary is not written by out.
+    if (!rdy->boundary_conditions[boundary.index].auto_generated) {
+      // fetch the flux accumulation field for this boundary
+      CeedOperatorField bflux, height;
+      PetscCall(SWEFluxOperatorGetBoundaryFlux(rdy->ceed.flux_operator, boundary, &bflux));
+      PetscCall(SWEFluxOperatorGetBoundaryWaterHeight(rdy->ceed.flux_operator, boundary, &height));
 
-    // get the vector storing the boundary data and make it available on the host
-    CeedVector bflux_vec;
-    PetscCallCEED(CeedOperatorFieldGetVector(bflux, &bflux_vec));
-    int num_comp = 3;  // SWE
-    CeedScalar(*bflux_data)[3];
-    PetscCallCEED(CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data));
+      // get the vector storing the boundary data and make it available on the host
+      CeedVector bflux_vec, height_vec;
+      PetscCallCEED(CeedOperatorFieldGetVector(bflux, &bflux_vec));
+      PetscCallCEED(CeedOperatorFieldGetVector(height, &height_vec));
 
-    // hand over the boundary fluxes and zero the flux vector
-    PetscInt            size         = boundary.num_edges;
-    RiemannEdgeDataSWE *data_edge    = &data_swe->data_bnd_edges[b];
-    PetscReal          *flux_vec_bnd = data_edge->flux;
+      int num_comp = 3;  // SWE
+      CeedScalar(*bflux_data)[3];
+      CeedScalar(*height_data)[2];
+      PetscCallCEED(CeedVectorGetArray(bflux_vec, CEED_MEM_HOST, (CeedScalar **)&bflux_data));
+      PetscCallCEED(CeedVectorGetArray(height_vec, CEED_MEM_HOST, (CeedScalar **)&height_data));
 
-    for (PetscInt e = 0; e < size; e++) {
-      for (PetscInt icomp = 0; icomp < num_comp; icomp++) {
-        flux_vec_bnd[e * num_comp + icomp] = bflux_data[e][icomp];
+      // hand over the boundary fluxes and zero the flux vector
+      PetscInt            size         = boundary.num_edges;
+      RiemannEdgeDataSWE *data_edge    = &data_swe->data_bnd_edges[b];
+      PetscReal          *flux_vec_bnd = data_edge->flux;
+      PetscReal          *hl           = data_edge->hl;
+      PetscReal          *hr           = data_edge->hr;
+
+      for (PetscInt e = 0; e < size; e++) {
+        for (PetscInt icomp = 0; icomp < num_comp; icomp++) {
+          flux_vec_bnd[e * num_comp + icomp] = bflux_data[e][icomp];
+        }
+        hl[e] = height_data[e][0];
+        hr[e] = height_data[e][1];
       }
-    }
 
-    // PetscCall(AccumulateBoundaryFluxes(rdy, rdy->dt, boundary, size, num_comp, flux_vec_bnd));
-    PetscCallCEED(CeedVectorRestoreArray(bflux_vec, (CeedScalar **)&bflux_data));
-    PetscCallCEED(CeedVectorSetValue(bflux_vec, 0.0));  // reset flux accumulation
+      PetscCall(AccumulateBoundaryFluxes(rdy, rdy->dt, boundary, size, num_comp, hl, hr, flux_vec_bnd));
+      PetscCallCEED(CeedVectorRestoreArray(bflux_vec, (CeedScalar **)&bflux_data));
+      PetscCallCEED(CeedVectorRestoreArray(height_vec, (CeedScalar **)&height_data));
+      PetscCallCEED(CeedVectorSetValue(bflux_vec, 0.0));  // reset flux accumulation
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

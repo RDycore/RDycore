@@ -184,7 +184,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
                  boundary.id);
   }
   CeedQFunction qf;
-  CeedInt       num_comp_geom = 3, num_comp_cnum = 1;
+  CeedInt       num_comp_geom = 3, num_comp_cnum = 1, num_comp_height = 2;
   PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, func, func_loc, &qf));
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE));
@@ -194,6 +194,7 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   }
   PetscCallCEED(CeedQFunctionAddOutput(qf, "flux", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "courant_number", num_comp_cnum, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "water_height", num_comp_height, CEED_EVAL_NONE));
 
   CeedQFunctionContext qf_context;
   PetscCallCEED(CreateQFunctionContext(ceed, tiny_h, &qf_context));
@@ -201,8 +202,8 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
-  CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum;
-  CeedVector          geom, flux, dirichlet, cnum;
+  CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum, restrict_height;
+  CeedVector          geom, flux, dirichlet, cnum, height;
   {
     CeedInt num_edges = boundary.num_edges;
 
@@ -237,6 +238,13 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp_cnum, num_edges * num_comp_cnum, cnum_strides, &restrict_cnum));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
     PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
+
+    // create an element restriction for water height
+    CeedInt height_strides[] = {num_comp_height, 1, num_comp_height};
+    PetscCallCEED(
+        CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp_height, num_edges * num_comp_height, height_strides, &restrict_height));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_height, &height, NULL));
+    PetscCallCEED(CeedVectorSetValue(height, 0.0));
 
     // create an element restriction for the "left" (interior) input/output
     // states, populate offsets for these states, and set the (invariant)
@@ -293,15 +301,18 @@ static PetscErrorCode CreateBoundaryFluxOperator(Ceed ceed, RDyMesh *mesh, RDyBo
   PetscCallCEED(CeedOperatorSetField(*flux_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*flux_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
   PetscCallCEED(CeedOperatorSetField(*flux_op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
+  PetscCallCEED(CeedOperatorSetField(*flux_op, "water_height", restrict_height, CEED_BASIS_COLLOCATED, height));
 
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_height));
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
+  PetscCallCEED(CeedVectorDestroy(&height));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
@@ -355,18 +366,30 @@ PetscErrorCode SWEFluxOperatorSetTimeStep(CeedOperator flux_op, PetscReal dt) {
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-// Gets the field representing the boundary flux for the given boundary.
-PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
+PetscErrorCode SWEFluxOperatorGetBoundaryField(CeedOperator flux_op, RDyBoundary boundary, const char fieldname[], CeedOperatorField *boundary_flux) {
   PetscFunctionBeginUser;
-
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
   PetscCallCEED(CeedCompositeOperatorGetSubList(flux_op, &sub_ops));
   CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
 
   // fetch the field
-  PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "flux", boundary_flux));
+  PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, fieldname, boundary_flux));
 
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
+
+// Gets the field representing the boundary flux for the given boundary.
+PetscErrorCode SWEFluxOperatorGetBoundaryFlux(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
+  PetscFunctionBeginUser;
+  PetscCall(SWEFluxOperatorGetBoundaryField(flux_op, boundary, "flux", boundary_flux));
+  PetscFunctionReturn(CEED_ERROR_SUCCESS);
+}
+
+// Gets the field representing the boundary flux for the given boundary.
+PetscErrorCode SWEFluxOperatorGetBoundaryWaterHeight(CeedOperator flux_op, RDyBoundary boundary, CeedOperatorField *boundary_flux) {
+  PetscFunctionBeginUser;
+  PetscCall(SWEFluxOperatorGetBoundaryField(flux_op, boundary, "water_height", boundary_flux));
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
