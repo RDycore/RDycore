@@ -109,8 +109,8 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 
   // allocate (local) boundary flux storage
   PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
-
   PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series.boundary_fluxes.states)));
+  rdy->time_series.boundary_fluxes.last_output_time = 0.0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -137,9 +137,6 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, PetscReal dt, RDyBoundary bound
     // if the boundary condition for this boundary is auto-generated,
     // accumulate fluxes locally
     if (!rdy->boundary_conditions[boundary.index].auto_generated) {
-      // increment the accumulation time
-      time_series->boundary_fluxes.time_accumulated += dt;
-
       PetscInt n = rdy->time_series.boundary_fluxes.offsets[boundary.index];
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
         PetscInt  edge_id  = boundary.edge_ids[e];
@@ -233,7 +230,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     } else {
       PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));
 
-      PetscReal time_accum = rdy->time_series.boundary_fluxes.time_accumulated;
+      PetscReal time_accum = time - rdy->time_series.boundary_fluxes.last_output_time;
       for (PetscInt e = 0; e < num_global_edges; ++e) {
         PetscReal edge_xc    = global_flux_md[num_md * e];
         PetscReal edge_yc    = global_flux_md[num_md * e + 1];
@@ -266,7 +263,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
       rdy->time_series.boundary_fluxes.fluxes[e].y_momentum = 0.0;
       rdy->time_series.boundary_fluxes.states[e].h_left     = 0.0;
       rdy->time_series.boundary_fluxes.states[e].h_right    = 0.0;
-      rdy->time_series.boundary_fluxes.time_accumulated     = 0.0;
+      rdy->time_series.boundary_fluxes.last_output_time     = time;
     }
   }
 

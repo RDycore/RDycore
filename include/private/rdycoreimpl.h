@@ -83,7 +83,7 @@ typedef struct {
       PetscReal h_left;
       PetscReal h_right;
     }        *states;
-    PetscReal time_accumulated;
+    PetscReal last_output_time;
   } boundary_fluxes;
 } RDyTimeSeriesData;
 
