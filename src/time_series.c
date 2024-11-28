@@ -129,7 +129,7 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
 
 // Accumulates boundary fluxes on the given boundary from the given array of
 // fluxes on boundary edges.
-PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, PetscReal dt, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *datal, PetscReal *datar,
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *datal, PetscReal *datar,
                                         PetscReal *fluxes) {
   PetscFunctionBegin;
   RDyTimeSeriesData *time_series = &rdy->time_series;
@@ -313,7 +313,7 @@ static PetscErrorCode FetchCeedBoundaryFluxes(RDy rdy) {
         hr[e] = height_data[e][1];
       }
 
-      PetscCall(AccumulateBoundaryFluxes(rdy, rdy->dt, boundary, size, num_comp, hl, hr, flux_vec_bnd));
+      PetscCall(AccumulateBoundaryFluxes(rdy, boundary, size, num_comp, hl, hr, flux_vec_bnd));
 
       PetscCallCEED(CeedVectorRestoreArray(height_vec, (CeedScalar **)&height_data));
 

@@ -457,7 +457,7 @@ static PetscErrorCode ComputeBC(RDy rdy, RDyBoundary boundary, PetscReal tiny_h,
     }
   }
 
-  PetscCall(AccumulateBoundaryFluxes(rdy, rdy->dt, boundary, num_edges, ndof, datal->h, datar->h, flux_vec_bnd));
+  PetscCall(AccumulateBoundaryFluxes(rdy, boundary, num_edges, ndof, datal->h, datar->h, flux_vec_bnd));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
