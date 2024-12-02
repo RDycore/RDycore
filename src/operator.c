@@ -961,10 +961,11 @@ PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, Opera
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorRegion(op, region, comm));
 
+  // FIXME: only single-component material property data currently supported!
+  property_data->num_components = 1;
+  PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
+
   switch (property_id) {
-    // FIXME: only single-component material property data currently supported!
-    property_data->num_components = 1;
-    PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
     case OPERATOR_MANNINGS:
       if (CeedEnabled()) {
         PetscCall(GetCeedOperatorRegionData(op, region, material_property_names[property_id], property_data));

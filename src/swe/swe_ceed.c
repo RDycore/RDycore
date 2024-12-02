@@ -3,6 +3,35 @@
 
 #include "swe_ceed_impl.h"
 
+//---------------------------------
+// CEED SWE flow operator overview
+//---------------------------------
+//
+// The CEED implementation of the shallow water equations operator consists of
+// a single composite operator with several sub-operators chained together. This
+// chain of operators accepts as input a local solution vector and writes its
+// output (the time derivative of the input) to a global "right hand side"
+// vector.
+//
+// Each sub-operator in the chain accepts input fields from its predecessor and
+// produces output fields for its successor. Theses suboperators are (in order):
+//
+// * for the domain: an interior flux sub-operator that accepts the local
+//    solution vector as input and computes the fluxes on pairs of cells on the
+//    interior of the computational domain. This sub-operator is created by the
+//    function CreateSWECeedInteriorFluxOperator.
+// * for each domain boundary: a boundary flux sub-operator that accepts the
+//    local solution vector as input and computes the fluxes into/out of cells
+//    adjacent to boundary edges. Each sub-operator is created by the function
+//    CreateSWECeedBoundaryFluxOperator.
+// * for each domain region: a source sub-operator that accepts input from the
+//   interior and flux sub-operators and adds source terms to produce the
+//   time rate of change of the solution vector. Each regional sub-operator is
+//   created by the function CreateSWESourceOperator.
+//
+// The relevant function documentation includes a comprehensive list of input
+// and output fields for each sub-operator.
+
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
 #pragma GCC diagnostic push
@@ -42,6 +71,34 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
 
 /// Creates a CeedOperator that computes fluxes between pairs of cells on the
 /// domain's interior, suitable for the shallow water equations.
+///
+/// Active input fields:
+///    * `q_left[num_interior_edges][3]` - an array associating a 3-DOF left cell
+///      input state with each edge separating two interior cells
+///    * `q_right[num_interior_edges][3]` - an array associating a 3-DOF right cell
+///      input state with each edge separating two interior cells
+///
+/// Passive input fields:
+///    * `geom[num_interior_edges][4]` - an array associating 4 geometric factors
+///      with each edge separating two interior cells:
+///        1. sin(theta), where theta is the angle between the edge and the y axis
+///        2. cos(theta), where theta is the angle between the edge and the y axis
+///        3. -L / A_l, where L is the edge's length and A_l is the area of the "left" cell
+///        4. L / A_r, where L is the edge's length and A_r is the area of the "right" cell
+///
+/// Active output fields:
+///    * `cell_left[num_interior_edges][3]` - an array associating a 3-DOF left cell
+///      output state with each edge separating two interior cells
+///    * `cell_right[num_interior_edges][3]` - an array associating a 3-DOF right cell
+///      output state with each edge separating two interior cells
+///
+/// Passive output fields:
+///    * `flux[num_interior_edges][3]` - an array associating riemann fluxes
+///      with each edge separating two interior cells
+///    * `courant_number[num_interior_edges][1]` - an array associating the
+///      Courant number (max wave speed) with each edge separating two interior
+///      cells
+///
 /// @param [in]  mesh   a mesh representing the domain
 /// @param [in]  tiny_h the water height below which dry conditions are assumed
 /// @param [out] op     the newly created CeedOperator
@@ -54,6 +111,9 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
   RDyCells *cells    = &mesh->cells;
   RDyEdges *edges    = &mesh->edges;
 
+  // set the inputs and outputs for the Q-function underlying the operator
+  // NOTE: the order in which these inputs and outputs are specified determines
+  // NOTE: their indexing within the Q function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
   CeedInt       num_comp_geom = 4, num_comp_cnum = 2;
   PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, &qf));
@@ -165,6 +225,32 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
 
 /// Creates a CeedOperator that computes fluxes through edges on the boundary
 /// of a domain, suitable for the shallow water equations.
+///
+/// Active input fields:
+///    * `q_left[num_boundary_edges][3]` - an array associating a 3-DOF left
+///      (interior) cell input state with each boundary edge
+///
+/// Passive input fields:
+///    * `geom[num_boundary_edges][3]` - an array associating 3 geometric factors
+///      with each boundary edge:
+///        1. sin(theta), where theta is the angle between the edge and the y axis
+///        2. cos(theta), where theta is the angle between the edge and the y axis
+///        3. -L / A_l, where L is the edge's length and A_l is the area of the
+///           "left" (interior) cell
+///    * `q_dirichlet[num_boundary_edges][3]` - an array associating 3 boundary
+///      values with each boundary edge (**iff the boundary associated with the
+///      sub-operator is assigned a dirichlet boundary condition**)
+///
+/// Active output fields:
+///    * `cell_left[num_boundary_edges][3]` - an array associating a 3-DOF left
+///      (interior) cell output state with each boundary edge
+///
+/// Passive output fields:
+///    * `flux[num_boundary_edges][3]` - an array associating riemann fluxes
+///      with each boundary edge
+///    * `courant_number[num_interior_edges][1]` - an array associating the
+///      Courant number (max wave speed) with each boundary edge
+///
 /// @param [in]  mesh               a mesh representing the domain
 /// @param [in]  boundary           the boundary through which fluxes are to be computed
 /// @param [in]  boundary_condition the boundary condition associated with the boundary of interest
@@ -324,6 +410,36 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 
 /// Creates a CeedOperator that computes sources within a region in a domain,
 /// suitable for the shallow water equations.
+///
+/// Active input fields:
+///    * `q[num_owned_cells][3]` - an array associating a 3-DOF solution input
+///      state with each (owned) cell in the region
+///
+/// Passive input fields:
+///    * `geom[num_owned_cells][2]` - an array associating 2 geometric factors
+///      with each (owned) cell in the region:
+///        1. dz/dx, the derivative of the elevation function z(x, y) w.r.t. x,
+///           evaluated at the cell center
+///        2. dz/dy, the derivative of the elevation function z(x, y) w.r.t. y,
+///           evaluated at the cell center
+///    * `mannings_n[num_owned_cells][1]` - an array associating the Mannings
+///      coefficient for the region's material with each (owned) cell in the
+///      region
+///    * `riemannf[num_owned_cells][3]` - an array associating a 3-component
+///      flux divergence with each (owned) cell in the region
+///    * `swe_src[num_owned_cells][3]` - an array associating 3 external source
+///      components with each (owned) cell in the region
+///
+/// Active output fields:
+///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
+///      value with each (owned) cell in the region
+///
+/// Passive output fields:
+///    * `flux[num_boundary_edges][3]` - an array associating riemann fluxes
+///      with each boundary edge
+///    * `courant_number[num_interior_edges][1]` - an array associating the
+///      Courant number (max wave speed) with each boundary edge
+///
 /// @param [in]  mesh   a mesh representing the domain
 /// @param [in]  region the region for which sources are computed
 /// @param [in]  tiny_h the water height below which dry conditions are assumed
@@ -402,9 +518,6 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDyRegion region, Pets
 
     g[oc][0] = cells->dz_dx[c];
     g[oc][1] = cells->dz_dy[c];
-
-    // FIXME: need to make sure we incorporate this in RestoreOperatorMaterialProperty!
-    // n[oc][0] = materials_by_cell[c].manning;
 
     oc++;
   }
