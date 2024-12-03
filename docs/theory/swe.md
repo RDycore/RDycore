@@ -295,7 +295,7 @@ critical flow.
  
 ### Source terms
 
-Recall that there are three source terms $\mathbf{S}_r, $\mathbf{S}_b$, and
+Recall that there are three source terms $\mathbf{S}_r$, $\mathbf{S}_b$, and
 $\mathbf{S}_f$. In this section, we write the source terms for the momentum
 vector as $\mathbf{S}_b = [0, \mathbf{\vec{S}}_b]^T$ and $\mathbf{S}_f = [0, \mathbf{\vec{S}}_f]^T$
 because their second and third components correspond to the spatial components
@@ -345,12 +345,13 @@ Like the runoff term, this term involves only quantities within a single cell
 and can be approximated by the mean value theorem:
 
 \begin{equation}
-\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} A_i
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u}_i \sqrt{u_i^2 + v_i^2} A_i
 \end{equation}
 
-where $\vec{u} = (u, v)$ is the flow velocity vector. The $x$ and $y$ spatial
-components contribute to the second and third vector components of the integral
-of $\mathbf{S}_r$, respectively.
+where $C_D = g n_i^2 h_i^{-1/3}$ and $\vec{u}_i = (u, v)$
+are, respectively, the drag coefficient and the flow velocity vector in cell $i$.
+The $x$ and $y$ spatial components of $\mathbf{\vec{S}}_f$ contribute to the
+second and third components of the source term.
 
 ## Temporal Discretization
 

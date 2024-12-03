@@ -3,12 +3,12 @@
 
 #include "swe_ceed_impl.h"
 
-//---------------------------------
-// CEED SWE flow operator overview
-//---------------------------------
+//--------------------------------------
+// CEED SWE flow sub-operators overview
+//--------------------------------------
 //
-// The CEED implementation of the shallow water equations operator consists of
-// a single composite operator with several sub-operators chained together. This
+// The CEED implementation of the shallow water equations consists of a single
+// composite operator with several sub-operators chained together. This
 // chain of operators accepts as input a local solution vector and writes its
 // output (the time derivative of the input) to a global "right hand side"
 // vector.
@@ -16,14 +16,14 @@
 // Each sub-operator in the chain accepts input fields from its predecessor and
 // produces output fields for its successor. Theses suboperators are (in order):
 //
-// * for the domain: an interior flux sub-operator that accepts the local
-//    solution vector as input and computes the fluxes on pairs of cells on the
-//    interior of the computational domain. This sub-operator is created by the
-//    function CreateSWECeedInteriorFluxOperator.
+// * for the entire domain: an interior flux sub-operator that accepts the local
+//   solution vector as input and computes the fluxes on pairs of cells on the
+//   interior of the computational domain. This sub-operator is created by the
+//   function CreateSWECeedInteriorFluxOperator.
 // * for each domain boundary: a boundary flux sub-operator that accepts the
-//    local solution vector as input and computes the fluxes into/out of cells
-//    adjacent to boundary edges. Each sub-operator is created by the function
-//    CreateSWECeedBoundaryFluxOperator.
+//   local solution vector as input and computes the fluxes into/out of cells
+//   adjacent to boundary edges. Each sub-operator is created by the function
+//   CreateSWECeedBoundaryFluxOperator.
 // * for each domain region: a source sub-operator that accepts input from the
 //   interior and flux sub-operators and adds source terms to produce the
 //   time rate of change of the solution vector. Each regional sub-operator is
@@ -93,8 +93,8 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
 ///      output state with each edge separating two interior cells
 ///
 /// Passive output fields:
-///    * `flux[num_interior_edges][3]` - an array associating riemann fluxes
-///      with each edge separating two interior cells
+///    * `flux[num_owned_cells][3]` - an array associating riemann fluxes
+///      with each owned cell
 ///    * `courant_number[num_interior_edges][1]` - an array associating the
 ///      Courant number (max wave speed) with each edge separating two interior
 ///      cells
@@ -111,9 +111,9 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
   RDyCells *cells    = &mesh->cells;
   RDyEdges *edges    = &mesh->edges;
 
-  // set the inputs and outputs for the Q-function underlying the operator
+  // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
-  // NOTE: their indexing within the Q function's implementation (swe_ceed_impl.h)
+  // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
   CeedInt       num_comp_geom = 4, num_comp_cnum = 2;
   PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, &qf));
@@ -125,63 +125,66 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
   PetscCallCEED(CeedQFunctionAddOutput(qf, "flux", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "courant_number", num_comp_cnum, CEED_EVAL_NONE));
 
+  // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCallCEED(CreateQFunctionContext(ceed, tiny_h, &qf_context));
+  PetscCall(CreateQFunctionContext(ceed, tiny_h, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
+  // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, q_restrict_r, c_restrict_l, c_restrict_r, restrict_geom, restrict_flux, restrict_cnum;
   CeedVector          geom, flux, cnum;
   {
     CeedInt num_edges = mesh->num_owned_internal_edges;
 
-    // create an element restriction for geometric factors that convert
-    // fluxes to cell states
+    // create a vector of geometric factors that transform fluxes to cell states
     CeedInt g_strides[] = {num_comp_geom, 1, num_comp_geom};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, g_strides, &restrict_geom));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
     PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+    CeedScalar(*g)[4];
+    PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+    for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
+      CeedInt iedge = edges->internal_edge_ids[e];
+      if (!edges->is_owned[iedge]) continue;
+      CeedInt l        = edges->cell_ids[2 * iedge];
+      CeedInt r        = edges->cell_ids[2 * iedge + 1];
+      g[owned_edge][0] = edges->sn[iedge];
+      g[owned_edge][1] = edges->cn[iedge];
+      g[owned_edge][2] = -edges->lengths[iedge] / cells->areas[l];
+      g[owned_edge][3] = edges->lengths[iedge] / cells->areas[r];
+      owned_edge++;
+    }
+    PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-    // create an element restriction for accumulated fluxes
+    // create a vector to store flux divergences
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
     PetscCallCEED(CeedVectorSetValue(flux, 0.0));
 
-    // create an element restriction for courant number
+    // create a vector to store the courant number for each edge
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_cnum, num_edges * num_comp_cnum, cnum_strides, &restrict_cnum));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
     PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
 
-    // create element restrictions for left and right input/output states,
-    // populate offsets for these states, and set the (invariant)
-    // geometric parameters
+    // create element restrictions for (active) left and right input/output states
     CeedInt *q_offset_l, *q_offset_r, *c_offset_l, *c_offset_r;
     PetscCall(PetscMalloc2(num_edges, &q_offset_l, num_edges, &q_offset_r));
     PetscCall(PetscMalloc2(num_edges, &c_offset_l, num_edges, &c_offset_r));
-    CeedScalar(*g)[4];
-    PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
-    for (CeedInt e = 0, oe = 0; e < mesh->num_internal_edges; e++) {
+    for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
       CeedInt iedge = edges->internal_edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      CeedInt l      = edges->cell_ids[2 * iedge];
-      CeedInt r      = edges->cell_ids[2 * iedge + 1];
-      q_offset_l[oe] = l * num_comp;
-      q_offset_r[oe] = r * num_comp;
-      c_offset_l[oe] = cells->local_to_owned[l] * num_comp;
-      c_offset_r[oe] = cells->local_to_owned[r] * num_comp;
-
-      g[oe][0] = edges->sn[iedge];
-      g[oe][1] = edges->cn[iedge];
-      g[oe][2] = -edges->lengths[iedge] / cells->areas[l];
-      g[oe][3] = edges->lengths[iedge] / cells->areas[r];
-      oe++;
+      CeedInt l              = edges->cell_ids[2 * iedge];
+      CeedInt r              = edges->cell_ids[2 * iedge + 1];
+      q_offset_l[owned_edge] = l * num_comp;
+      q_offset_r[owned_edge] = r * num_comp;
+      c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
+      c_offset_r[owned_edge] = cells->local_to_owned[r] * num_comp;
+      owned_edge++;
     }
-    PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
-
-    // create element restrictions for left and right cell states
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,
                                             &q_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_r,
@@ -200,6 +203,7 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
     }
   }
 
+  // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
   PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
   PetscCallCEED(CeedOperatorSetField(*op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
@@ -209,6 +213,7 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
   PetscCallCEED(CeedOperatorSetField(*op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
   PetscCallCEED(CeedOperatorSetField(*op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
 
+  // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
@@ -247,7 +252,7 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
 ///
 /// Passive output fields:
 ///    * `flux[num_boundary_edges][3]` - an array associating riemann fluxes
-///      with each boundary edge
+///      with each boundary edge (to be summed to compute their divergence)
 ///    * `courant_number[num_interior_edges][1]` - an array associating the
 ///      Courant number (max wave speed) with each boundary edge
 ///
@@ -266,6 +271,9 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
   RDyCells *cells    = &mesh->cells;
   RDyEdges *edges    = &mesh->edges;
 
+  // create the Q-function that underlies the operator, and set its inputs and outputs
+  // NOTE: the order in which these inputs and outputs are specified determines
+  // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunctionUser func;
   const char       *func_loc;
   switch (boundary_condition.flow->type) {
@@ -297,12 +305,14 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
   PetscCallCEED(CeedQFunctionAddOutput(qf, "flux", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "courant_number", num_comp_cnum, CEED_EVAL_NONE));
 
+  // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCallCEED(CreateQFunctionContext(ceed, tiny_h, &qf_context));
+  PetscCall(CreateQFunctionContext(ceed, tiny_h, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
+  // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum;
   CeedVector          geom, flux, dirichlet, cnum;
   {
@@ -316,8 +326,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
       PetscCall(PetscMalloc1(num_edges, &offset_dirichlet));
     }
 
-    // create an element restriction for geometric factors that convert
-    // fluxes to cell states
+    // create a vector of geometric factors that transform fluxes to cell states
     CeedInt num_owned_edges = 0;
     for (CeedInt e = 0; e < boundary.num_edges; e++) {
       CeedInt iedge = boundary.edge_ids[e];
@@ -327,42 +336,43 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp_geom, num_edges * num_comp_geom, g_strides, &restrict_geom));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
     PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+    CeedScalar(*g)[3];
+    PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+    for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
+      CeedInt iedge = boundary.edge_ids[e];
+      if (!edges->is_owned[iedge]) continue;
+      CeedInt l        = edges->cell_ids[2 * iedge];
+      g[owned_edge][0] = edges->sn[iedge];
+      g[owned_edge][1] = edges->cn[iedge];
+      g[owned_edge][2] = -edges->lengths[iedge] / cells->areas[l];
+      owned_edge++;
+    }
+    PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-    // create an element restriction for accumulated fluxes
+    // create a vector to store accumulated fluxes (flux divergences)
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
     PetscCallCEED(CeedVectorSetValue(flux, 0.0));
 
-    // create an element restriction for courant number
+    // create a vector to store the courant number for each edge
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp_cnum, num_edges * num_comp_cnum, cnum_strides, &restrict_cnum));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
     PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
 
-    // create an element restriction for the "left" (interior) input/output
-    // states, populate offsets for these states, and set the (invariant)
-    // geometric parameters
-    CeedScalar(*g)[3];
-    PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
-    for (CeedInt e = 0, oe = 0; e < num_edges; e++) {
+    // create an element restriction for the (active) "left" (interior) input/output states
+    for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
       CeedInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
-      CeedInt l      = edges->cell_ids[2 * iedge];
-      q_offset_l[oe] = l * num_comp;
-      c_offset_l[oe] = cells->local_to_owned[l] * num_comp;
+      CeedInt l              = edges->cell_ids[2 * iedge];
+      q_offset_l[owned_edge] = l * num_comp;
+      c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
-        offset_dirichlet[oe] = e * num_comp;
+        offset_dirichlet[owned_edge] = e * num_comp;
       }
-
-      g[oe][0] = edges->sn[iedge];
-      g[oe][1] = edges->cn[iedge];
-      g[oe][2] = -edges->lengths[iedge] / cells->areas[l];
-      oe++;
+      owned_edge++;
     }
-    PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
-
-    // create the element restriction for the left cell states
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             q_offset_l, &q_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
@@ -374,8 +384,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
       PetscCallCEED(CeedElemRestrictionView(c_restrict_l, stdout));
     }
 
-    // if we have Dirichlet boundary values, create a restriction and passive
-    // input vector for them
+    // create a vector to store (Dirichlet) boundary values if needed
     if (offset_dirichlet) {
       PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, num_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                               offset_dirichlet, &restrict_dirichlet));
@@ -386,6 +395,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
     }
   }
 
+  // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
   PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
   PetscCallCEED(CeedOperatorSetField(*op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
@@ -396,6 +406,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
   PetscCallCEED(CeedOperatorSetField(*op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
   PetscCallCEED(CeedOperatorSetField(*op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
 
+  // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
@@ -434,12 +445,6 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 ///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
 ///      value with each (owned) cell in the region
 ///
-/// Passive output fields:
-///    * `flux[num_boundary_edges][3]` - an array associating riemann fluxes
-///      with each boundary edge
-///    * `courant_number[num_interior_edges][1]` - an array associating the
-///      Courant number (max wave speed) with each boundary edge
-///
 /// @param [in]  mesh   a mesh representing the domain
 /// @param [in]  region the region for which sources are computed
 /// @param [in]  tiny_h the water height below which dry conditions are assumed
@@ -452,7 +457,9 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDyRegion region, Pets
   CeedInt   num_comp = 3;
   RDyCells *cells    = &mesh->cells;
 
-  // source term
+  // create the Q-function that underlies the operator, and set its inputs and outputs
+  // NOTE: the order in which these inputs and outputs are specified determines
+  // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
   CeedInt       num_comp_geom = 2, num_comp_swe_src = 3, num_comp_mannings_n = 1;
   PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf));
@@ -463,77 +470,79 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDyRegion region, Pets
   PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE));
 
+  // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCallCEED(CreateQFunctionContext(ceed, tiny_h, &qf_context));
+  PetscCall(CreateQFunctionContext(ceed, tiny_h, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
+  // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_swe, restrict_mannings_n, restrict_riemannf;
-  CeedVector          geom;
-  CeedVector          swe_src;
-  CeedVector          mannings_n;
-  CeedVector          riemannf;
+  CeedVector          geom, swe_src, mannings_n, riemannf;
+  {
+    // create a vector of geometric factors (elevation function derivatives)
+    CeedScalar(*g)[num_comp_geom];
+    CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, region.num_owned_cells, 1, num_comp_geom, region.num_owned_cells * num_comp_geom,
+                                                   strides_geom, &restrict_geom));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
+    PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+    PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+    for (CeedInt c = 0; c < region.num_owned_cells; ++c) {
+      PetscInt owned_cell_id = region.owned_cell_global_ids[c];
+      PetscInt local_cell_id = cells->owned_to_local[owned_cell_id];
+      g[c][0] = cells->dz_dx[local_cell_id];
+      g[c][1] = cells->dz_dy[local_cell_id];
+    }
+    PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-  // Create element restrictions for state
-  CeedInt *offset_c, *offset_q;
-  CeedScalar(*g)[num_comp_geom];
-  CeedScalar(*n)[num_comp_mannings_n];
-  CeedInt num_owned_cells = mesh->num_owned_cells;
-  CeedInt num_cells       = mesh->num_cells;
+    // create a vector of external source terms
+    CeedInt strides_swe_src[] = {num_comp_swe_src, 1, num_comp_swe_src};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, region.num_owned_cells, 1, num_comp_swe_src, region.num_owned_cells * num_comp_swe_src,
+                                                   strides_swe_src, &restrict_swe));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_swe, &swe_src, NULL));
+    PetscCallCEED(CeedVectorSetValue(swe_src, 0.0));
 
-  CeedInt strides_geom[] = {num_comp_geom, 1, num_comp_geom};
-  PetscCallCEED(
-      CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_geom, num_owned_cells * num_comp_geom, strides_geom, &restrict_geom));
-  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
-  PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+    // create a vector that stores Manning's coefficient for the region of interest
+    // NOTE: we zero-initialize this coefficient here; it must be set before use
+    // NOTE: using (Get/Restore)OperatorMaterialProperty
+    CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, region.num_owned_cells, 1, num_comp_mannings_n, region.num_owned_cells * num_comp_mannings_n,
+                                                   strides_mannings_n, &restrict_mannings_n));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL));
+    PetscCallCEED(CeedVectorSetValue(mannings_n, 0.0));
 
-  CeedInt strides_swe_src[] = {num_comp_swe_src, 1, num_comp_swe_src};
-  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_swe_src, num_owned_cells * num_comp_swe_src, strides_swe_src,
-                                                 &restrict_swe));
-  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_swe, &swe_src, NULL));
-  PetscCallCEED(CeedVectorSetValue(swe_src, 0.0));
+    // create a vector that allows access to (previously computed) flux
+    // divergences in this region
+    CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, region.num_owned_cells, 1, num_comp, region.num_owned_cells * num_comp, strides_riemannf,
+                                                   &restrict_riemannf));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL));
+    PetscCallCEED(CeedVectorSetValue(riemannf, 0.0));
 
-  CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
-  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n,
-                                                 strides_mannings_n, &restrict_mannings_n));
-  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL));
-  PetscCallCEED(CeedVectorSetValue(mannings_n, 0.0));
-
-  CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
-  PetscCallCEED(
-      CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf, &restrict_riemannf));
-  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL));
-  PetscCallCEED(CeedVectorSetValue(riemannf, 0.0));
-
-  PetscCall(PetscMalloc1(num_owned_cells, &offset_q));
-  PetscCall(PetscMalloc1(num_owned_cells, &offset_c));
-  PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
-  PetscCallCEED(CeedVectorGetArray(mannings_n, CEED_MEM_HOST, (CeedScalar **)&n));
-  for (CeedInt c = 0, oc = 0; c < mesh->num_cells; c++) {
-    if (!cells->is_owned[c]) continue;
-
-    offset_q[oc] = c * num_comp;
-    offset_c[oc] = cells->local_to_owned[c] * num_comp;
-
-    g[oc][0] = cells->dz_dx[c];
-    g[oc][1] = cells->dz_dy[c];
-
-    oc++;
+    // create element restrictions for (active) input/output cell states
+    CeedInt *offset_c, *offset_q;
+    PetscCall(PetscMalloc1(region.num_owned_cells, &offset_q));
+    PetscCall(PetscMalloc1(region.num_owned_cells, &offset_c));
+    for (CeedInt c = 0; c < region.num_owned_cells; ++c) {
+      PetscInt owned_cell_id = region.owned_cell_global_ids[c];
+      offset_q[c]            = cells->owned_to_local[owned_cell_id] * num_comp;
+      offset_c[c]            = owned_cell_id * num_comp;
+    }
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, region.num_owned_cells, 1, num_comp, 1, region.num_owned_cells * num_comp, CEED_MEM_HOST,
+                                            CEED_COPY_VALUES, offset_q, &restrict_q));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, region.num_owned_cells, 1, num_comp, 1, region.num_owned_cells * num_comp, CEED_MEM_HOST,
+                                            CEED_COPY_VALUES, offset_c, &restrict_c));
+    PetscCall(PetscFree(offset_c));
+    PetscCall(PetscFree(offset_q));
+    if (0) {
+      PetscCallCEED(CeedElemRestrictionView(restrict_q, stdout));
+      PetscCallCEED(CeedElemRestrictionView(restrict_c, stdout));
+    }
   }
-  PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
-  PetscCallCEED(CeedVectorRestoreArray(mannings_n, (CeedScalar **)&n));
-  PetscCallCEED(
-      CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, offset_q, &restrict_q));
-  PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                          offset_c, &restrict_c));
-  PetscCall(PetscFree(offset_c));
-  PetscCall(PetscFree(offset_q));
-  if (0) {
-    PetscCallCEED(CeedElemRestrictionView(restrict_q, stdout));
-    PetscCallCEED(CeedElemRestrictionView(restrict_c, stdout));
-  }
 
+  // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
   PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
   PetscCallCEED(CeedOperatorSetField(*op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
@@ -542,38 +551,13 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDyRegion region, Pets
   PetscCallCEED(CeedOperatorSetField(*op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 
+  // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_mannings_n));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_c));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_q));
   PetscCallCEED(CeedVectorDestroy(&geom));
 
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// updates the time step used by the SWE source operator
-PetscErrorCode SWESourceOperatorSetTimeStep(CeedOperator source_op, PetscReal dt) {
-  PetscFunctionBeginUser;
-
-  CeedContextFieldLabel label;
-  PetscCallCEED(CeedOperatorGetContextFieldLabel(source_op, "time step", &label));
-  PetscCallCEED(CeedOperatorSetContextDouble(source_op, label, &dt));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// Given a shallow water equations source operator created by
-// CreateSWESourceOperator, fetches the field representing the Riemann flux.
-PetscErrorCode SWESourceOperatorGetRiemannFlux(CeedOperator source_op, CeedOperatorField *riemann_flux_field) {
-  PetscFunctionBeginUser;
-
-  // get the source sub-operator responsible for the water source (the first one)
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(source_op, &sub_ops));
-  CeedOperator riemannf_source_op = sub_ops[0];
-
-  // fetch the field
-  PetscCallCEED(CeedOperatorGetFieldByName(riemannf_source_op, "riemannf", riemann_flux_field));
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 

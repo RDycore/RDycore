@@ -606,14 +606,15 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
 //-----------------
 
 typedef struct {
-  RDyMesh  *mesh;      // domain mesh (FIXME: needed after construction?)
-  RDyRegion region;    // region associated with this sub-operator
-  Vec       source;    // regional source vector
-  Vec       mannings;  // regional mannings coefficient vector
-  PetscReal tiny_h;    // minimum water height for wet conditions
+  RDyMesh  *mesh;              // domain mesh (FIXME: needed after construction?)
+  RDyRegion region;            // region associated with this sub-operator
+  Vec       external_sources;  // regional external source vector
+  Vec       mannings;          // regional mannings coefficient vector
+  PetscReal tiny_h;            // minimum water height for wet conditions
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
+// NOTE: previously-computed flux divergences can be extracted from f_global
 static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
@@ -622,7 +623,7 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
 
   SourceOperator *source_op    = context;
   RDyRegion       region       = source_op->region;
-  Vec             source_vec   = source_op->source;
+  Vec             source_vec   = source_op->external_sources;
   Vec             mannings_vec = source_op->mannings;
   RDyMesh        *mesh         = source_op->mesh;
   RDyCells       *cells        = &mesh->cells;
@@ -656,6 +657,7 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
     PetscReal bedx = dz_dx * GRAVITY * h;
     PetscReal bedy = dz_dy * GRAVITY * h;
 
+    // NOTE: we grab flux divergences directly from the RHS vector we've been passed
     PetscReal Fsum_x = f_ptr[n_dof * owned_cell_id + 1];
     PetscReal Fsum_y = f_ptr[n_dof * owned_cell_id + 2];
 
@@ -702,22 +704,24 @@ static PetscErrorCode DestroySource(void *context) {
 
 /// Creates a PetscOperator that computes sources within a region in a domain,
 /// suitable for the shallow water equations.
-/// @param [in]    mesh            a mesh representing the domain
-/// @param [in]    region          the region for which sources are computed
-/// @param [in]    external_source a Vec storing external source values (if any) for this region
-/// @param [in]    mannings        a Vec storing Mannings coefficient values for this region
-/// @param [in]    tiny_h          the water height below which dry conditions are assumed
-/// @param [out]   op              the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, RDyRegion region, Vec external_source, Vec mannings, PetscReal tiny_h, PetscOperator *op) {
+/// @param [in]    mesh             a mesh representing the domain
+/// @param [in]    region           the region for which sources are computed
+/// @param [in]    external_sources a Vec storing external source values (if any) for this region
+/// @param [in]    flux_divergences a Vec storing computed flux divergences for this region
+/// @param [in]    mannings         a Vec storing Mannings coefficient values for this region
+/// @param [in]    tiny_h           the water height below which dry conditions are assumed
+/// @param [out]   op               the newly created PetscOperator
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, RDyRegion region, Vec external_sources, Vec mannings,
+                                            PetscReal tiny_h, PetscOperator *op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (SourceOperator){
-      .mesh     = mesh,
-      .region   = region,
-      .source   = external_source,
-      .mannings = mannings,
-      .tiny_h   = tiny_h,
+      .mesh             = mesh,
+      .region           = region,
+      .external_sources = external_sources,
+      .mannings         = mannings,
+      .tiny_h           = tiny_h,
   };
   PetscCall(PetscOperatorCreate(source_op, ApplySource, DestroySource, op));
   PetscFunctionReturn(PETSC_SUCCESS);

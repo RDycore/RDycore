@@ -30,9 +30,6 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
   op->dm   = dm;
   op->mesh = mesh;
 
-  // create a global vector to store flux divergences
-  PetscCall(DMCreateGlobalVector(op->dm, &op->flux_divergence));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -79,9 +76,9 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
 
   // allocate sequential vectors for each region
   if (!CeedEnabled()) {
-    PetscCall(PetscCalloc1(num_regions, &op->petsc.sources));  // NOLINT(bugprone-sizeof-expression)
+    PetscCall(PetscCalloc1(num_regions, &op->petsc.external_sources));  // NOLINT(bugprone-sizeof-expression)
     for (PetscInt r = 0; r < num_regions; ++r) {
-      PetscCall(CreateSequentialVector(comm, op->num_components, regions[r].num_owned_cells, &op->petsc.sources[r]));
+      PetscCall(CreateSequentialVector(comm, op->num_components, regions[r].num_owned_cells, &op->petsc.external_sources[r]));
     }
 
     PetscCall(PetscCalloc1(OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));
@@ -196,8 +193,7 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   for (CeedInt r = 0; r < op->num_regions; ++r) {
     PetscOperator source_op;
     RDyRegion     region = op->regions[r];
-    PetscCall(CreateSWEPetscSourceOperator(op->mesh, region, op->petsc.sources[r], op->petsc.material_properties[OPERATOR_MANNINGS][r], tiny_h,
-                                           &source_op));
+    PetscCall(CreateSWEPetscSourceOperator(op->mesh, region, op->petsc.external_sources[r], op->petsc.material_properties[OPERATOR_MANNINGS][r], tiny_h, &source_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, source_op));
     PetscCall(PetscOperatorDestroy(&source_op));
   }
@@ -279,7 +275,6 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.composite)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
-    PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
   } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
       PetscCall(VecDestroy(&(*op)->petsc.boundary_values[b]));
@@ -288,9 +283,9 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscFree((*op)->petsc.boundary_values);
     PetscFree((*op)->petsc.boundary_fluxes);
     for (PetscInt r = 0; r < (*op)->num_regions; ++r) {
-      PetscCall(VecDestroy(&(*op)->petsc.sources[r]));
+      PetscCall(VecDestroy(&(*op)->petsc.external_sources[r]));
     }
-    PetscFree((*op)->petsc.sources);
+    PetscFree((*op)->petsc.external_sources);
     for (PetscInt p = 0; p < 1; ++p) {
       for (PetscInt r = 0; r < (*op)->num_regions; ++r) {
         PetscCall(VecDestroy(&(*op)->petsc.material_properties[p][r]));
@@ -319,6 +314,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   // update the timestep for the ceed operators if necessary
   if (op->ceed.dt != dt) {
     op->ceed.dt = dt;
+    // FIXME: check that this is set up properly
     CeedContextFieldLabel label;
     PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.composite, "time step", &label));
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.composite, label, &op->ceed.dt));
@@ -340,21 +336,21 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     //    - Add values in f_local to f_global via Local-to-Global scatter.
     //    - Clean up memory
 
-    PetscScalar *u_local_ptr, *f;
+    PetscScalar *u_local_ptr, *f_local_ptr;
     PetscMemType mem_type;
     Vec          f_local;
 
     CeedVector u_local_ceed = op->ceed.u_local;
     CeedVector f_ceed       = op->ceed.rhs;
 
-    // 1. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> U_local
+    // 1. Sets the pointer of a CeedVector to a PETSc Vec: u_local_ceed --> u_local
     PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(u_local_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
 
     // 2. Sets the pointer of a CeedVector to a PETSc Vec: f_ceed --> f_local
     PetscCall(DMGetLocalVector(op->dm, &f_local));
-    PetscCall(VecGetArrayAndMemType(f_local, &f, &mem_type));
-    PetscCallCEED(CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f));
+    PetscCall(VecGetArrayAndMemType(f_local, &f_local_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(f_ceed, MemTypeP2C(mem_type), CEED_USE_POINTER, f_local_ptr));
 
     // 3. Apply the CeedOpeator associated with the internal and boundary edges
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
@@ -364,11 +360,11 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
     // 4. Resets memory pointer of CeedVectors
-    PetscCallCEED(CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f));
+    PetscCallCEED(CeedVectorTakeArray(f_ceed, MemTypeP2C(mem_type), &f_local_ptr));
     PetscCallCEED(CeedVectorTakeArray(u_local_ceed, MemTypeP2C(mem_type), &u_local_ptr));
 
     // 5. Restore pointers to the PETSc Vecs
-    PetscCall(VecRestoreArrayAndMemType(f_local, &f));
+    PetscCall(VecRestoreArrayAndMemType(f_local, &f_local_ptr));
     PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
 
     // 6. Zero out values in F and then add f_local to F via Local-to-Global scatter
@@ -911,7 +907,7 @@ PetscErrorCode GetOperatorExternalSource(Operator *op, RDyRegion region, Operato
   if (CeedEnabled()) {
     PetscCall(GetCeedOperatorRegionData(op, region, "swe_src", source_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorRegionData(op, region, op->petsc.sources[region.index], source_data));
+    PetscCall(GetPetscOperatorRegionData(op, region, op->petsc.external_sources[region.index], source_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -933,7 +929,7 @@ PetscErrorCode RestoreOperatorExternalSource(Operator *op, RDyRegion region, Ope
   if (CeedEnabled()) {
     PetscCallCEED(RestoreCeedOperatorRegionData(op, region, "swe_src", source_data));
   } else {
-    PetscCallCEED(RestorePetscOperatorRegionData(op, region, op->petsc.sources[region.index], source_data));
+    PetscCallCEED(RestorePetscOperatorRegionData(op, region, op->petsc.external_sources[region.index], source_data));
   }
   PetscCall(PetscFree(source_data->values));
 

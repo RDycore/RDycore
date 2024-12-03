@@ -6,6 +6,15 @@
 #define Square(x) ((x) * (x))
 #define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
 
+// we disable compiler warnings for implicitly-declared math functions known to
+// the JIT compiler
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-function-declaration"
+
+// Q-function context with data attached
 typedef struct SWEContext_ *SWEContext;
 struct SWEContext_ {
   CeedScalar dtime;
@@ -18,6 +27,7 @@ struct SWEState_ {
 };
 typedef struct SWEState_ SWEState;
 
+// riemann solver -- called by other Q-functions
 CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SWEState qL, SWEState qR, CeedScalar sn,
                                               CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar sqrt_gravity = sqrt(gravity);
@@ -109,6 +119,7 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
+// SWE interior flux operator Q-function
 CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -141,6 +152,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   return 0;
 }
 
+// SWE boundary flux operator Q-function (Dirichlet condition)
 CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -170,6 +182,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   return 0;
 }
 
+// SWE boundary flux operator Q-function (reflecting condition)
 CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -199,6 +212,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
   return 0;
 }
 
+// SWE boundary flux operator Q-function (outflow condition)
 CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -231,11 +245,12 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   return 0;
 }
 
+// SWE regional source operator Q-function
 CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
-  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // rain rate
+  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
-  const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  //const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
   const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
   CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   const SWEContext context                  = (SWEContext)ctx;
@@ -259,8 +274,14 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
     const CeedScalar bedx = dz_dx * gravity * h;
     const CeedScalar bedy = dz_dy * gravity * h;
 
-    const CeedScalar Fsum_x = riemannf[1][i];
-    const CeedScalar Fsum_y = riemannf[2][i];
+    // NOTE: all sub-operators including this one are chained into a single
+    // NOTE: composite operator, so we can extract accumulated fluxes from
+    // NOTE: the output vector into which we're accumulating things.
+    // FIXME: ...right???
+    // FIXME: actually, I wouldn't bet on this working. I need to do some more
+    // FIXME: digging to understand the mechanics of (additive) composite operators
+    const CeedScalar Fsum_x = cell[1][i];
+    const CeedScalar Fsum_y = cell[2][i];
 
     CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
@@ -276,14 +297,16 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
       tby = (hv + dt * Fsum_y - dt * bedy) * factor;
     }
 
-    cell[0][i] = riemannf[0][i] + swe_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx + swe_src[1][i];
-    cell[2][i] = riemannf[2][i] - bedy - tby + swe_src[2][i];
+    cell[0][i] = swe_src[0][i];
+    cell[1][i] = -bedx - tbx + swe_src[1][i];
+    cell[2][i] = -bedy - tby + swe_src[2][i];
   }
   return 0;
 }
 
 #pragma GCC diagnostic   pop
+#pragma GCC diagnostic   pop
+#pragma clang diagnostic pop
 #pragma clang diagnostic pop
 
 #endif

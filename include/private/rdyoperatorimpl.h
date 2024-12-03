@@ -75,10 +75,10 @@ PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOpe
 //----------
 
 // This type and its related functions define an interface for creating a
-// nonlinear operator F that computes the time derivative dU/dt of a local
-// solution vector U at time t:
+// nonlinear operator F that computes the time derivative du/dt of a local
+// solution vector u at time t:
 //
-// F(U, t) -> dU/dt
+// F(u, t) -> du/dt
 //
 // There are two families of operator implementations:
 // 1. CEED implementation: a composite CeedOperator with interior and boundary
@@ -109,23 +109,15 @@ typedef struct Operator {
   // CEED/PETSc backends
   union {
     struct {
-      // CEED composite operator containing several suboperators. By index,
-      // these suboperators are:
-      //
-      // 0: interior inter-cell fluxes
-      // 1-num_boundaries: boundary inter-cell fluxes
-      // num_boundaries+1-num_boundaries + num_regions: external sources
+      // CEED operator composed of sub-operators
+      // (see CreateOperator in src/operator.c for config-dependent composition)
       CeedOperator composite;
-
-      // NOTE: all operator data is stored in CeedOperators, so managing
-      // NOTE: resources is simpler than in the PETSc case
 
       // operator timestep last set
       PetscReal dt;
 
-      CeedVector u_local;
-      CeedVector rhs, sources;
-
+      // vectors representing solution, right-hand side
+      CeedVector u_local, rhs;
     } ceed;
 
     // PETSc operator data
@@ -145,16 +137,12 @@ typedef struct Operator {
       Vec *boundary_fluxes;
 
       // array of regional external source vectors, indexed by region
-      Vec *sources;
+      Vec *external_sources;
 
       // array of regional material property data Vecs, indexed by
       // [region_index][property_id]
       Vec **material_properties;
     } petsc;
-
-    // global flux divergence data vector for entire domain (used only
-    // internally)
-    Vec flux_divergence;
   };
 
   //-------------------------------------------
@@ -189,10 +177,13 @@ typedef enum {
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
+
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
+
 PETSC_INTERN PetscErrorCode GetOperatorExternalSource(Operator *, RDyRegion, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorExternalSource(Operator *, RDyRegion, OperatorData *);
+
 PETSC_INTERN PetscErrorCode GetOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
 
