@@ -166,37 +166,35 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
 static PetscErrorCode PreparePetscOperator(Operator *op) {
   PetscFunctionBegin;
 
-  PetscCall(PetscCompositeOperatorCreate(&op->petsc.composite));
+  // set up suboperators for the shallow water equations
+
+  PetscCall(PetscCompositeOperatorCreate(&op->petsc.flux));
+  PetscCall(PetscCompositeOperatorCreate(&op->petsc.source));
 
   PetscReal tiny_h = op->config->physics.flow.tiny_h;
 
-  // set up suboperators for the shallow water equations
-
-  // suboperator 0: fluxes between interior cells
+  // flux suboperator 0: fluxes between interior cells
   PetscOperator interior_flux_op;
   PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->diagnostics, tiny_h, &interior_flux_op));
-  PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, interior_flux_op));
+  PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, interior_flux_op));
   PetscCall(PetscOperatorDestroy(&interior_flux_op));
 
-  // suboperators 1 to num_boundaries: fluxes on boundary edges
+  // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
     PetscOperator boundary_flux_op;
     RDyBoundary   boundary  = op->boundaries[b];
     RDyCondition  condition = op->boundary_conditions[b];
     PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, condition, op->petsc.boundary_values[b], op->petsc.boundary_fluxes[b],
                                                  &op->diagnostics, tiny_h, &boundary_flux_op));
-    PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, boundary_flux_op));
+    PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, boundary_flux_op));
     PetscCall(PetscOperatorDestroy(&boundary_flux_op));
   }
 
-  // suboperators num_boundaries + 1 to num_boundaries + num_regions + 1: external sources
-  for (CeedInt r = 0; r < op->num_regions; ++r) {
-    PetscOperator source_op;
-    PetscCall(
-        CreateSWEPetscSourceOperator(op->mesh, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS], tiny_h, &source_op));
-    PetscCall(PetscCompositeOperatorAddSub(op->petsc.composite, source_op));
-    PetscCall(PetscOperatorDestroy(&source_op));
-  }
+  // domain-wide SWE source operator
+  PetscOperator source_op;
+  PetscCall(CreateSWEPetscSourceOperator(op->mesh, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS], tiny_h, &source_op));
+  PetscCall(PetscCompositeOperatorAddSub(op->petsc.source, source_op));
+  PetscCall(PetscOperatorDestroy(&source_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -213,6 +211,9 @@ static PetscErrorCode PrepareOperator(Operator *op) {
   } else {
     PetscCall(PreparePetscOperator(op));
   }
+
+  // set up our flux divergence vector(s)
+  PetscCall(AddOperatorFluxDivergence(op));
 
   // initialize diagnostics
   PetscCall(ResetOperatorDiagnostics(op));
@@ -276,6 +277,9 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.source)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
+    if ((*op)->ceed.flux_divergence) {
+      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
+    }
   } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
       PetscCall(VecDestroy(&(*op)->petsc.boundary_values[b]));
@@ -288,11 +292,55 @@ PetscErrorCode DestroyOperator(Operator **op) {
       PetscCall(VecDestroy(&(*op)->petsc.material_properties[p]));
     }
     PetscFree((*op)->petsc.material_properties);
-    PetscCall(PetscOperatorDestroy(&(*op)->petsc.composite));
+    PetscCall(PetscOperatorDestroy(&(*op)->petsc.flux));
+    PetscCall(PetscOperatorDestroy(&(*op)->petsc.source));
+  }
+  if ((*op)->flux_divergence) {
+    PetscCall(VecDestroy(&(*op)->flux_divergence));
   }
 
   PetscFree(*op);
   *op = NULL;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets up vectors to manage flux divergences computed by flux sub-operators.
+/// (This should only be called at the end of CreateOperator.)
+PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
+  PetscFunctionBegin;
+
+  // Create a flux divergence PETSc vector with the same characteristics as
+  // the solution vector
+  PetscCall(DMCreateGlobalVector(op->dm, &op->flux_divergence));
+  PetscCall(VecZeroEntries(op->flux_divergence));
+
+  if (CeedEnabled()) {
+    Ceed    ceed               = CeedContext();
+    CeedInt num_comp           = op->num_components;
+    CeedInt num_owned_cells    = op->mesh->num_owned_cells;
+    CeedInt flux_div_strides[] = {num_comp, 1, num_comp};
+
+    // create a vector that provides flux divergence data to the source operator
+    CeedElemRestriction flux_div_restriction;
+    PetscCallCEED(
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, flux_div_strides, &flux_div_restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(flux_div_restriction, &op->ceed.flux_divergence, NULL));
+
+    // add this vector to all source sub-operators
+    CeedInt num_source_suboperators;
+    PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source, &num_source_suboperators));
+    CeedOperator *source_suboperators;
+    PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
+    for (CeedInt i = 0; i < num_source_suboperators; ++i) {
+      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_COLLOCATED, op->ceed.flux_divergence));
+    }
+
+    // clean up (the suboperators keep references to restrictions and vectors)
+    PetscCallCEED(CeedElemRestrictionDestroy(&flux_div_restriction));
+  } else {  // petsc
+    // NOTE: nothing needed here yet!
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -369,19 +417,12 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCallCEED(CeedVectorSetArray(op->ceed.u_local, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
 
     // copy the flux divergences out of f_global for use with the source operator
-    //    corresponding to the source-sink term
-    PetscCall(VecCopy(f_global, op->ceed.flux_divergences));
+    PetscCall(VecCopy(f_global, op->flux_divergence));
 
-    // fetch the CeedVector associated with the "riemannf" CeedOperatorField
-    CeedOperatorField riemannf_field;
-    CeedVector        riemannf_vec;
-    PetscCall(GetSWECeedSourceOperatorFluxDivergenceField(op->ceed.source, &riemannf_field));
-    PetscCallCEED(CeedOperatorFieldGetVector(riemannf_field, &riemannf_vec));
-
-    // point the CeedVector at our flux divergences
+    // point our flux divergence CeedVector at our flux divergence PETSc Vec
     PetscScalar *flux_div_ptr;
-    PetscCall(VecGetArrayAndMemType(op->ceed.flux_divergences, &flux_div_ptr, &mem_type));
-    PetscCallCEED(CeedVectorSetArray(riemannf_vec, MemTypeP2C(mem_type), CEED_USE_POINTER, flux_div_ptr));
+    PetscCall(VecGetArrayAndMemType(op->flux_divergence, &flux_div_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(op->ceed.flux_divergence, MemTypeP2C(mem_type), CEED_USE_POINTER, flux_div_ptr));
 
     // point our source CEED vector at f_global, where the final RHS ends up
     PetscScalar *f_global_ptr;
@@ -397,11 +438,12 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.sources, MemTypeP2C(mem_type), &f_global_ptr));
-    PetscCallCEED(CeedVectorTakeArray(riemannf_vec, MemTypeP2C(mem_type), &flux_div_ptr));
+    PetscCallCEED(CeedVectorTakeArray(op->ceed.flux_divergence, MemTypeP2C(mem_type), &flux_div_ptr));
     PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
 
-    PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
     PetscCall(VecRestoreArrayAndMemType(f_global, &f_global_ptr));
+    PetscCall(VecRestoreArrayAndMemType(op->flux_divergence, &flux_div_ptr));
+    PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -409,7 +451,18 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
 static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
-  PetscCall(PetscOperatorApply(op->petsc.composite, dt, u_local, f_global));
+
+  // apply the composite PETSc flux operators
+  PetscCall(PetscOperatorApply(op->petsc.flux, dt, u_local, f_global));
+
+  // NOTE: we don't need a separate flux divergence vector currently, but if/when
+  // NOTE: we do, we'd do this vvv
+  //// copy the flux divergences out of f_global for use with the source operator
+  // PetscCall(VecCopy(f_global, op->flux_divergence));
+
+  // apply the composite PETSc source operators
+  PetscCall(PetscOperatorApply(op->petsc.source, dt, u_local, f_global));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -799,7 +852,11 @@ static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion re
   CeedScalar(*values)[num_components];
   *((CeedScalar **)&values) = (CeedScalar *)region_data->array_pointer;
   for (PetscInt c = 0; c < num_components; ++c) {
-    region_data->values[c] = values[c];
+    PetscCall(PetscCalloc1(region.num_owned_cells, &region_data->values[c]));
+    for (PetscInt i = 0; i < region.num_owned_cells; ++i) {
+      PetscInt owned_cell_id    = region.owned_cell_global_ids[i];
+      region_data->values[c][i] = values[c][owned_cell_id];
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -810,6 +867,18 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   CeedOperator *sub_ops;
   PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
   CeedOperator source_op = sub_ops[1 + op->num_boundaries + region.index];
+
+  // copy the data into place
+  PetscInt num_components = op->num_components;
+  CeedScalar(*values)[num_components];
+  *((CeedScalar **)&values) = (CeedScalar *)region_data->array_pointer;
+  for (PetscInt c = 0; c < num_components; ++c) {
+    for (PetscInt i = 0; i < region.num_owned_cells; ++i) {
+      PetscInt owned_cell_id   = region.owned_cell_global_ids[i];
+      values[c][owned_cell_id] = region_data->values[c][i];
+    }
+    PetscCall(PetscFree(region_data->values[c]));
+  }
 
   // fetch the relevant vector
   CeedOperatorField field;
@@ -825,7 +894,6 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// FIXME: this needs redoing!
 static PetscErrorCode GetPetscSourceOperatorRegionData(Operator *op, RDyRegion region, Vec vec, OperatorData *region_data) {
   PetscFunctionBegin;
 
@@ -834,7 +902,8 @@ static PetscErrorCode GetPetscSourceOperatorRegionData(Operator *op, RDyRegion r
   for (PetscInt c = 0; c < op->num_components; ++c) {
     PetscCall(PetscCalloc1(region.num_owned_cells, &region_data->values[c]));
     for (PetscInt ce = 0; ce < region.num_owned_cells; ++ce) {
-      region_data->values[c][ce] = data[op->num_components * ce + c];
+      PetscInt owned_cell_id     = region.owned_cell_global_ids[ce];
+      region_data->values[c][ce] = data[op->num_components * owned_cell_id + c];
     }
   }
   region_data->array_pointer = data;
@@ -842,15 +911,16 @@ static PetscErrorCode GetPetscSourceOperatorRegionData(Operator *op, RDyRegion r
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// FIXME: this needs redoing!
 static PetscErrorCode RestorePetscSourceOperatorRegionData(Operator *op, RDyRegion region, Vec vec, OperatorData *region_data) {
   PetscFunctionBegin;
 
   PetscReal *data = region_data->array_pointer;
   for (PetscInt c = 0; c < op->num_components; ++c) {
     for (PetscInt ce = 0; ce < region.num_owned_cells; ++ce) {
-      data[op->num_components * ce + c] = region_data->values[c][ce];
+      PetscInt owned_cell_id                       = region.owned_cell_global_ids[ce];
+      data[op->num_components * owned_cell_id + c] = region_data->values[c][ce];
     }
+    PetscCall(PetscFree(region_data->values[c]));
   }
   PetscCall(VecRestoreArray(vec, &data));
   *region_data = (OperatorData){0};

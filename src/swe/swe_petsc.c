@@ -613,7 +613,8 @@ typedef struct {
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
-// NOTE: previously-computed flux divergences can be extracted from f_global
+// NOTE: we assume that previously-computed flux divergences can be extracted
+// NOTE: directly from f_global
 static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
@@ -638,8 +639,6 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
   PetscCall(VecGetBlockSize(source_vec, &n_dof));
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  // PetscRiemannDataSWE *data_swe = rdy->petsc.context;
-  // RiemannDataSWE      *data     = &data_swe->data_cells;
   for (PetscInt c = 0; c < mesh->num_owned_cells; ++c) {
     PetscInt owned_cell_id = cells->local_to_owned[c];
 

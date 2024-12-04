@@ -109,26 +109,22 @@ typedef struct Operator {
   // CEED/PETSc backends
   union {
     struct {
-      // CEED flux operator (composed of sub-operators, see CreateOperator in src/operator.c)
-      CeedOperator flux;
-
-      // CEED source operator (composed of domain-based operators, see CreateOperator in src/operator.c)
-      CeedOperator source;
+      // CEED flux and source operators (each composed of sub-operators, see
+      // CreateOperator in src/operator.c)
+      CeedOperator flux, source;
 
       // timestep last set on operators
       PetscReal dt;
 
-      // vectors representing solution, right-hand side
-      CeedVector u_local, rhs, sources;
-
-      Vec flux_divergences;
+      // vectors used by operator(s)
+      CeedVector u_local, rhs, sources, flux_divergence;
     } ceed;
 
     // PETSc operator data
     struct {
-      // PETSc composite operator with sub-operators similar to the CEED
-      // composite operator above, but including both flux and source operators.
-      PetscOperator composite;
+      // PETSc composite operators with sub-operators identical in structure to
+      // the CEED composite operators above
+      PetscOperator flux, source;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
       Vec *boundary_values;
@@ -142,6 +138,9 @@ typedef struct Operator {
       // array of domain-wide material property data Vecs, indexed by property_id
       Vec *material_properties;
     } petsc;
+
+    // domain-wide flux divergence data
+    Vec flux_divergence;
   };
 
   //-------------------------------------------
@@ -153,6 +152,9 @@ typedef struct Operator {
 
 PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *, Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
+
+// called internally after operator construction
+PETSC_INTERN PetscErrorCode AddOperatorFluxDivergence(Operator *);
 
 // operator timestepping function
 PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);

@@ -446,9 +446,9 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 ///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
 ///      value with each (owned) cell in the domain
 ///
-/// @param [in]  mesh   a mesh representing the domain
-/// @param [in]  tiny_h the water height below which dry conditions are assumed
-/// @param [out] op     the newly created PetscOperator
+/// @param [in]  mesh            a mesh representing the domain
+/// @param [in]  tiny_h          the water height below which dry conditions are assumed
+/// @param [out] op              the newly created PetscOperator
 PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *op) {
   PetscFunctionBeginUser;
 
@@ -478,8 +478,8 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
   // create vectors (and their supporting restrictions) for the operator
-  CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_swe, restrict_mannings_n, restrict_riemannf;
-  CeedVector          geom, swe_src, mannings_n, riemannf;
+  CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_swe, restrict_mannings_n;
+  CeedVector          geom, swe_src, mannings_n;
   {
     PetscInt num_local_cells = mesh->num_cells;
     PetscInt num_owned_cells = mesh->num_owned_cells;
@@ -516,14 +516,6 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL));
     PetscCallCEED(CeedVectorSetValue(mannings_n, 0.0));
 
-    // create a vector that allows access to (previously computed) flux
-    // divergences in this region
-    CeedInt strides_riemannf[] = {num_comp, 1, num_comp};
-    PetscCallCEED(
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_riemannf, &restrict_riemannf));
-    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_riemannf, &riemannf, NULL));
-    PetscCallCEED(CeedVectorSetValue(riemannf, 0.0));
-
     // create element restrictions for (active) input/output cell states
     CeedInt *offset_c, *offset_q;
     PetscCall(PetscMalloc1(num_owned_cells, &offset_q));
@@ -551,7 +543,6 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
   PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
   PetscCallCEED(CeedOperatorSetField(*op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
   PetscCallCEED(CeedOperatorSetField(*op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n));
-  PetscCallCEED(CeedOperatorSetField(*op, "riemannf", restrict_riemannf, CEED_BASIS_COLLOCATED, riemannf));
   PetscCallCEED(CeedOperatorSetField(*op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 
