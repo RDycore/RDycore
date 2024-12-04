@@ -238,6 +238,10 @@ PetscErrorCode RDyRefine (RDy rdy_coarse) {
   PetscCall(DMCopyDisc(rdy_coarse->dm, dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
 
+  Mat A;
+  Vec Ascale;
+  PetscCall(DMCreateInterpolation(rdy_coarse->dm, dm_fine, &A, &Ascale));
+
   Vec U_coarse;
   PetscCall(VecDuplicate(rdy_coarse->u_global, &U_coarse));
   PetscCall(VecCopy(rdy_coarse->u_global, U_coarse));
