@@ -607,9 +607,8 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
 
 typedef struct {
   RDyMesh  *mesh;              // domain mesh (FIXME: needed after construction?)
-  RDyRegion region;            // region associated with this sub-operator
-  Vec       external_sources;  // regional external source vector
-  Vec       mannings;          // regional mannings coefficient vector
+  Vec       external_sources;  // external source vector
+  Vec       mannings;          // mannings coefficient vector
   PetscReal tiny_h;            // minimum water height for wet conditions
 } SourceOperator;
 
@@ -622,7 +621,6 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
   SourceOperator *source_op    = context;
-  RDyRegion       region       = source_op->region;
   Vec             source_vec   = source_op->external_sources;
   Vec             mannings_vec = source_op->mannings;
   RDyMesh        *mesh         = source_op->mesh;
@@ -631,8 +629,8 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
 
   // access Vec data
   PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
-  PetscCall(VecGetArray(source_vec, &source_ptr));      // regional vector
-  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // regional vector
+  PetscCall(VecGetArray(source_vec, &source_ptr));      // sequential vector
+  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // sequential vector
   PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
   PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
 
@@ -642,17 +640,15 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
 
   // PetscRiemannDataSWE *data_swe = rdy->petsc.context;
   // RiemannDataSWE      *data     = &data_swe->data_cells;
-  for (PetscInt region_cell_id = 0; region_cell_id < region.num_owned_cells; ++region_cell_id) {
-    PetscInt owned_cell_id = region.owned_cell_global_ids[region_cell_id];
-    PetscInt local_cell_id = cells->owned_to_local[region_cell_id];
+  for (PetscInt c = 0; c < mesh->num_owned_cells; ++c) {
+    PetscInt owned_cell_id = cells->local_to_owned[c];
 
-    PetscReal h  = u_ptr[n_dof * local_cell_id + 0];
-    PetscReal hu = u_ptr[n_dof * local_cell_id + 1];
-    PetscReal hv = u_ptr[n_dof * local_cell_id + 2];
+    PetscReal h  = u_ptr[n_dof * c + 0];
+    PetscReal hu = u_ptr[n_dof * c + 1];
+    PetscReal hv = u_ptr[n_dof * c + 2];
 
-    // NOTE: dz_dx and dz_dy use local indices
-    PetscReal dz_dx = cells->dz_dx[local_cell_id];
-    PetscReal dz_dy = cells->dz_dy[local_cell_id];
+    PetscReal dz_dx = cells->dz_dx[c];
+    PetscReal dz_dy = cells->dz_dy[c];
 
     PetscReal bedx = dz_dx * GRAVITY * h;
     PetscReal bedy = dz_dy * GRAVITY * h;
@@ -668,7 +664,7 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
       PetscReal v = hv / h;
 
       // Manning's coefficient
-      PetscReal N_mannings = mannings_ptr[region_cell_id];
+      PetscReal N_mannings = mannings_ptr[c];
 
       // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
       PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
@@ -681,9 +677,9 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
       tby = (hv + dt * Fsum_y - dt * bedy) * factor;
     }
 
-    f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * region_cell_id + 0];
-    f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * region_cell_id + 1];
-    f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * region_cell_id + 2];
+    f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+    f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
+    f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
   }
 
   // restore vectors
@@ -705,20 +701,16 @@ static PetscErrorCode DestroySource(void *context) {
 /// Creates a PetscOperator that computes sources within a region in a domain,
 /// suitable for the shallow water equations.
 /// @param [in]    mesh             a mesh representing the domain
-/// @param [in]    region           the region for which sources are computed
-/// @param [in]    external_sources a Vec storing external source values (if any) for this region
-/// @param [in]    flux_divergences a Vec storing computed flux divergences for this region
-/// @param [in]    mannings         a Vec storing Mannings coefficient values for this region
+/// @param [in]    external_sources a Vec storing external source values (if any) for the domain
+/// @param [in]    mannings         a Vec storing Mannings coefficient values for the domain
 /// @param [in]    tiny_h           the water height below which dry conditions are assumed
 /// @param [out]   op               the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, RDyRegion region, Vec external_sources, Vec mannings,
-                                            PetscReal tiny_h, PetscOperator *op) {
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, PetscReal tiny_h, PetscOperator *op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (SourceOperator){
       .mesh             = mesh,
-      .region           = region,
       .external_sources = external_sources,
       .mannings         = mannings,
       .tiny_h           = tiny_h,

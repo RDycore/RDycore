@@ -109,25 +109,25 @@ typedef struct Operator {
   // CEED/PETSc backends
   union {
     struct {
-      // CEED operator composed of sub-operators
-      // (see CreateOperator in src/operator.c for config-dependent composition)
-      CeedOperator composite;
+      // CEED flux operator (composed of sub-operators, see CreateOperator in src/operator.c)
+      CeedOperator flux;
 
-      // operator timestep last set
+      // CEED source operator (composed of domain-based operators, see CreateOperator in src/operator.c)
+      CeedOperator source;
+
+      // timestep last set on operators
       PetscReal dt;
 
       // vectors representing solution, right-hand side
-      CeedVector u_local, rhs;
+      CeedVector u_local, rhs, sources;
+
+      Vec flux_divergences;
     } ceed;
 
     // PETSc operator data
     struct {
       // PETSc composite operator with sub-operators similar to the CEED
-      // composite operator above. By index, these sub-operators are:
-      //
-      // 0: interior inter-cell fluxes
-      // 1-num_boundaries: boundary inter-cell fluxes
-      // num_boundaries+1-num_boundaries + num_regions: external sources
+      // composite operator above, but including both flux and source operators.
       PetscOperator composite;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
@@ -136,12 +136,11 @@ typedef struct Operator {
       // array of boundary flux vectors, indexed by boundary
       Vec *boundary_fluxes;
 
-      // array of regional external source vectors, indexed by region
-      Vec *external_sources;
+      // domain-wide external source vector
+      Vec external_sources;
 
-      // array of regional material property data Vecs, indexed by
-      // [region_index][property_id]
-      Vec **material_properties;
+      // array of domain-wide material property data Vecs, indexed by property_id
+      Vec *material_properties;
     } petsc;
   };
 

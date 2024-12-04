@@ -250,10 +250,10 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
   const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
-  //const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
-  const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
-  CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  const SWEContext context                  = (SWEContext)ctx;
+  // const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]    = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SWEContext context         = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
