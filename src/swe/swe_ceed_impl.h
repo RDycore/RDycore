@@ -250,10 +250,10 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
   const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
-  // const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
-  const CeedScalar(*q)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
-  CeedScalar(*cell)[CEED_Q_VLA]    = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  const SWEContext context         = (SWEContext)ctx;
+  const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SWEContext context                  = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
@@ -274,14 +274,8 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
     const CeedScalar bedx = dz_dx * gravity * h;
     const CeedScalar bedy = dz_dy * gravity * h;
 
-    // NOTE: all sub-operators including this one are chained into a single
-    // NOTE: composite operator, so we can extract accumulated fluxes from
-    // NOTE: the output vector into which we're accumulating things.
-    // FIXME: ...right???
-    // FIXME: actually, I wouldn't bet on this working. I need to do some more
-    // FIXME: digging to understand the mechanics of (additive) composite operators
-    const CeedScalar Fsum_x = cell[1][i];
-    const CeedScalar Fsum_y = cell[2][i];
+    const CeedScalar Fsum_x = riemannf[1][i];
+    const CeedScalar Fsum_y = riemannf[2][i];
 
     CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {

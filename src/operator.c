@@ -199,6 +199,46 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// sets up a field named "riemannf" for each source sub-operator, associating
+// it with a vector that stores flux divergences computed by flux sub-operators
+static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
+  PetscFunctionBegin;
+
+  // Create a flux divergence PETSc vector with the same characteristics as
+  // the solution vector
+  PetscCall(DMCreateGlobalVector(op->dm, &op->flux_divergence));
+  PetscCall(VecZeroEntries(op->flux_divergence));
+
+  if (CeedEnabled()) {
+    Ceed    ceed               = CeedContext();
+    CeedInt num_comp           = op->num_components;
+    CeedInt num_owned_cells    = op->mesh->num_owned_cells;
+    CeedInt flux_div_strides[] = {num_comp, 1, num_comp};
+
+    // create a vector that provides flux divergence data to the source operator
+    CeedElemRestriction flux_div_restriction;
+    PetscCallCEED(
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, flux_div_strides, &flux_div_restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(flux_div_restriction, &op->ceed.flux_divergence, NULL));
+
+    // add this vector to all source sub-operators
+    CeedInt num_source_suboperators;
+    PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source, &num_source_suboperators));
+    CeedOperator *source_suboperators;
+    PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
+    for (CeedInt i = 0; i < num_source_suboperators; ++i) {
+      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_COLLOCATED, op->ceed.flux_divergence));
+    }
+
+    // clean up (the suboperators keep references to restrictions and vectors)
+    PetscCallCEED(CeedElemRestrictionDestroy(&flux_div_restriction));
+  } else {
+    PetscCall(PetscOperatorSetField(op->petsc.source, "riemannf", op->flux_divergence));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // performs all work necessary to make the operator ready for use
 static PetscErrorCode PrepareOperator(Operator *op) {
   PetscFunctionBegin;
@@ -305,46 +345,6 @@ PetscErrorCode DestroyOperator(Operator **op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets up vectors to manage flux divergences computed by flux sub-operators.
-/// (This should only be called at the end of CreateOperator.)
-PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
-  PetscFunctionBegin;
-
-  // Create a flux divergence PETSc vector with the same characteristics as
-  // the solution vector
-  PetscCall(DMCreateGlobalVector(op->dm, &op->flux_divergence));
-  PetscCall(VecZeroEntries(op->flux_divergence));
-
-  if (CeedEnabled()) {
-    Ceed    ceed               = CeedContext();
-    CeedInt num_comp           = op->num_components;
-    CeedInt num_owned_cells    = op->mesh->num_owned_cells;
-    CeedInt flux_div_strides[] = {num_comp, 1, num_comp};
-
-    // create a vector that provides flux divergence data to the source operator
-    CeedElemRestriction flux_div_restriction;
-    PetscCallCEED(
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, flux_div_strides, &flux_div_restriction));
-    PetscCallCEED(CeedElemRestrictionCreateVector(flux_div_restriction, &op->ceed.flux_divergence, NULL));
-
-    // add this vector to all source sub-operators
-    CeedInt num_source_suboperators;
-    PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source, &num_source_suboperators));
-    CeedOperator *source_suboperators;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
-    for (CeedInt i = 0; i < num_source_suboperators; ++i) {
-      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_COLLOCATED, op->ceed.flux_divergence));
-    }
-
-    // clean up (the suboperators keep references to restrictions and vectors)
-    PetscCallCEED(CeedElemRestrictionDestroy(&flux_div_restriction));
-  } else {  // petsc
-    // NOTE: nothing needed here yet!
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 //----------------------
 // Operator Application
 //----------------------
@@ -360,8 +360,6 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     CeedContextFieldLabel label;
     PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.flux, "time step", &label));
-
-    // FIXME: check that this is set up properly
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.flux, label, &op->ceed.dt));
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.source, label, &op->ceed.dt));
   }
@@ -503,10 +501,10 @@ PetscErrorCode ResetOperatorDiagnostics(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// FIXME: the CEED Courant number logic below makes assumptions about the
-// FIXME: structure of our composite operator that are valid for the shallow
-// FIXME: water equations, but we might need to change it to suit more general
-// FIXME: conditions
+// NOTE: the CEED Courant number logic below makes assumptions about the
+// NOTE: structure of our composite operator that are valid for the shallow
+// NOTE: water equations, but we might need to change it to suit more general
+// NOTE: conditions
 
 static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edges, RDyMesh *mesh, CourantNumberDiagnostics *courant_diags) {
   PetscFunctionBegin;
@@ -995,7 +993,7 @@ PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, Opera
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorRegion(op, region, comm));
 
-  // FIXME: only single-component material property data currently supported!
+  // NOTE: only single-component material property data currently supported!
   property_data->num_components = 1;
   PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
 
@@ -1051,13 +1049,15 @@ PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, O
 /// @param [in]  apply   the function called by PetscOperatorApply
 /// @param [in]  destroy the function called by PetscOperatorDestroy
 /// @param [out] op      the PetscOperator created by this call
-PetscErrorCode PetscOperatorCreate(void          *context, PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec), PetscErrorCode (*destroy)(void *),
-                                   PetscOperator *op) {
+PetscErrorCode PetscOperatorCreate(void *context, PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec),
+                                   PetscErrorCode (*destroy)(void *), PetscOperator *op) {
   PetscFunctionBegin;
   PetscCall(PetscCalloc1(1, &op));  // NOLINT(bugprone-sizeof-expression)
-  (*op)->context = context;
-  (*op)->apply   = apply;
-  (*op)->destroy = destroy;
+  PetscCall(PetscCalloc1(1, &(*op)->fields));
+  (*op)->is_composite = PETSC_FALSE;
+  (*op)->context      = context;
+  (*op)->apply        = apply;
+  (*op)->destroy      = destroy;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1065,6 +1065,8 @@ PetscErrorCode PetscOperatorCreate(void          *context, PetscErrorCode (*appl
 /// @param [inout] op the PetscOperator to be destroyed
 PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
   PetscFunctionBegin;
+  PetscFree((*op)->fields->fields);
+  PetscFree((*op)->fields);
   PetscCall((*op)->destroy((*op)->context));
   PetscFree(*op);
   *op = NULL;
@@ -1079,7 +1081,7 @@ PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
 /// @param [inout] f_global the global vector storing the results of the application
 PetscErrorCode PetscOperatorApply(PetscOperator op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
-  PetscCall(op->apply(op->context, dt, u_local, f_global));
+  PetscCall(op->apply(op->context, op->fields, dt, u_local, f_global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1088,7 +1090,7 @@ typedef struct {
   PetscOperator *suboperators;
 } PetscCompositeOperator;
 
-static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite = context;
   for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
@@ -1115,10 +1117,11 @@ PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
   composite->capacity                    = initial_capacity;
   PetscCall(PetscCalloc1(initial_capacity, &composite->suboperators));  // NOLINT(bugprone-sizeof-expression)
   PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
+  (*op)->is_composite = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Appends a sub-operator to the given composite PetscOperator.
+/// Appends a sub-operator to the given composite PetscOperator.
 /// @param [inout] op     the composite operator to which a sub-operator is appended
 /// @param [in]    sub_op the suboperator to be appended to the composite operator
 PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_op) {
@@ -1130,6 +1133,78 @@ PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_
   }
   composite->suboperators[composite->num_suboperators] = sub_op;
   ++composite->num_suboperators;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Retrieves a PETSc Vec corresponding to the PetscOperator field with the given name.
+/// This is useful for extracting PETSc Vecs for use within operator apply() functions.
+/// @param [in]  fields the set of available fields
+/// @param [in]  name   the name of the desired field
+/// @param [out] vec    points to the field with the desired name (or to NULL if no such field exists)
+PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields fields, const char *name, Vec *vec) {
+  PetscFunctionBegin;
+
+  for (PetscInt f = 0; f < fields->num_fields; ++f) {
+    if (!strcmp(name, fields->fields[f].name)) {  // found it!
+      *vec = fields->fields[f].vec;
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
+  }
+
+  *vec = NULL;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PetscOperatorFieldsAppend(PetscOperatorFields fields, PetscOperatorField field) {
+  PetscFunctionBegin;
+
+  if (fields->num_fields + 1 > fields->capacity) {
+    fields->capacity *= 2;
+    PetscCall(PetscRealloc(fields->capacity, &fields->fields));
+  }
+  fields->fields[fields->num_fields] = field;
+  ++fields->num_fields;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Adds a field with the given name and Vec to the given PETSc operator. If
+/// this is a composite operator, the field is added to all sub-operators. The
+/// operator does NOT manage memory for the PETSc Vec.
+/// @param [inout] op   the operator to which a sub-operator is appended
+/// @param [in]    name the name of the field
+/// @param [in]    vec  the PETSc Vec storing the field's data (NOT managed by the operator)
+PetscErrorCode PetscOperatorSetField(PetscOperator op, const char *name, Vec vec) {
+  PetscFunctionBegin;
+  PetscOperatorField field = {
+      .name = name,
+      .vec  = vec,
+  };
+
+  // look for the existing field
+  PetscInt index = -1;
+  for (PetscInt f = 0; f < op->fields->num_fields; ++f) {
+    if (!strcmp(name, op->fields->fields[f].name)) {
+      index = f;
+    }
+  }
+
+  // replace the existing field or append a new one
+  if (index != -1) {
+    op->fields->fields[index] = field;
+  } else {
+    PetscCall(PetscOperatorFieldsAppend(op->fields, field));
+  }
+
+  if (op->is_composite) {
+    // for simplicity, sub-operators borrow a reference to their parent
+    // operator's set of fields
+    PetscCompositeOperator *composite = op->context;
+    for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
+      composite->suboperators[i]->fields = op->fields;
+    }
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

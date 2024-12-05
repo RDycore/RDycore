@@ -45,6 +45,20 @@ typedef struct {
 // PETSc (CEED-like) "operator"
 //------------------------------
 
+// a "field" associating a symbolic name (e. g. "flux divergence") with a PETSc Vec
+typedef struct {
+  const char *name;
+  Vec         vec;
+} PetscOperatorField;
+
+// a collection of operator fields
+typedef struct {
+  PetscInt            num_fields, capacity;
+  PetscOperatorField *fields;
+} * PetscOperatorFields;
+
+PETSC_INTERN PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields, const char *, Vec *);
+
 // This operator type has a context that stores physics-specific data and two
 // operations:
 //
@@ -59,14 +73,18 @@ typedef struct {
 // inputs, restrictions, etc.
 typedef struct _p_PetscOperator *PetscOperator;
 struct _p_PetscOperator {
-  void *context;
-  PetscErrorCode (*apply)(void *, PetscReal, Vec, Vec);
+  void               *context;
+  PetscOperatorFields fields;
+  PetscBool           is_composite;
+  PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec);
   PetscErrorCode (*destroy)(void *);
 };
 
-PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void *, PetscReal, Vec, Vec), PetscErrorCode (*)(void *), PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void *, PetscOperatorFields, PetscReal, Vec, Vec),
+                                                PetscErrorCode (*)(void *), PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscOperatorDestroy(PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscOperatorApply(PetscOperator, PetscReal, Vec, Vec);
+PETSC_INTERN PetscErrorCode PetscOperatorSetField(PetscOperator, const char *, Vec);
 PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);
 
@@ -152,9 +170,6 @@ typedef struct Operator {
 
 PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *, Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
-
-// called internally after operator construction
-PETSC_INTERN PetscErrorCode AddOperatorFluxDivergence(Operator *);
 
 // operator timestepping function
 PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);

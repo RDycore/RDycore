@@ -101,6 +101,11 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
 ///      Courant number (max wave speed) with each edge separating two interior
 ///      cells
 ///
+/// Q-function context field labels:
+///    * `time step` - the time step used by the operator
+///    * `small h value` - the water height below which dry conditions are assumed
+///    * `gravity` - the acceleration due to gravity [m/s/s]
+///
 /// @param [in]  mesh   a mesh representing the domain
 /// @param [in]  tiny_h the water height below which dry conditions are assumed
 /// @param [out] op     the newly created CeedOperator
@@ -257,6 +262,11 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
 ///      with each boundary edge (to be summed to compute their divergence)
 ///    * `courant_number[num_interior_edges][1]` - an array associating the
 ///      Courant number (max wave speed) with each boundary edge
+///
+/// Q-function context field labels:
+///    * `time step` - the time step used by the operator
+///    * `small h value` - the water height below which dry conditions are assumed
+///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
 /// @param [in]  mesh               a mesh representing the domain
 /// @param [in]  boundary           the boundary through which fluxes are to be computed
@@ -445,6 +455,11 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 /// Active output fields:
 ///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
 ///      value with each (owned) cell in the domain
+///
+/// Q-function context field labels:
+///    * `time step` - the time step used by the operator
+///    * `small h value` - the water height below which dry conditions are assumed
+///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
 /// @param [in]  mesh            a mesh representing the domain
 /// @param [in]  tiny_h          the water height below which dry conditions are assumed

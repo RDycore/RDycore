@@ -214,7 +214,7 @@ typedef struct {
   OperatorDiagnostics *diagnostics;   // courant number, etc
 } InteriorFluxOperator;
 
-static PetscErrorCode ApplyInteriorFlux(void *context, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -370,7 +370,7 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnos
 //------------------------
 
 typedef struct {
-  RDyMesh             *mesh;                // domain mesh (FIXME: needed after construction?)
+  RDyMesh             *mesh;                // domain mesh
   RDyBoundary          boundary;            // boundary associated with this sub-operator
   RDyCondition         boundary_condition;  // boundary condition associated with this sub-operator
   Vec                  boundary_values;     // Dirichlet boundary values vector
@@ -448,7 +448,7 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDyMesh *mesh, RDyBoundary boundary
 }
 
 // application of boundary flux operator for its specific boundary
-static PetscErrorCode ApplyBoundaryFlux(void *context, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
@@ -606,16 +606,14 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
 //-----------------
 
 typedef struct {
-  RDyMesh  *mesh;              // domain mesh (FIXME: needed after construction?)
+  RDyMesh  *mesh;              // domain mesh
   Vec       external_sources;  // external source vector
   Vec       mannings;          // mannings coefficient vector
   PetscReal tiny_h;            // minimum water height for wet conditions
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
-// NOTE: we assume that previously-computed flux divergences can be extracted
-// NOTE: directly from f_global
-static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplySource(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
@@ -635,6 +633,13 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
   PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
   PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
 
+  // access previously-computed flux divergence data
+  Vec flux_div;
+  PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
+  PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
+  PetscScalar *flux_div_ptr;
+  PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
+
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(source_vec, &n_dof));
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
@@ -652,9 +657,8 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
     PetscReal bedx = dz_dx * GRAVITY * h;
     PetscReal bedy = dz_dy * GRAVITY * h;
 
-    // NOTE: we grab flux divergences directly from the RHS vector we've been passed
-    PetscReal Fsum_x = f_ptr[n_dof * owned_cell_id + 1];
-    PetscReal Fsum_y = f_ptr[n_dof * owned_cell_id + 2];
+    PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
+    PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
 
     PetscReal tbx = 0.0, tby = 0.0;
 
@@ -676,6 +680,7 @@ static PetscErrorCode ApplySource(void *context, PetscReal dt, Vec u_local, Vec 
       tby = (hv + dt * Fsum_y - dt * bedy) * factor;
     }
 
+    // NOTE: we accumulate everything into the RHS vector by convention.
     f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
     f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
     f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
