@@ -55,7 +55,7 @@ typedef struct {
 typedef struct {
   PetscInt            num_fields, capacity;
   PetscOperatorField *fields;
-} * PetscOperatorFields;
+} PetscOperatorFields;
 
 PETSC_INTERN PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields, const char *, Vec *);
 

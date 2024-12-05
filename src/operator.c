@@ -24,7 +24,7 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
   PetscCheck(mesh, comm, PETSC_ERR_USER, "Operator mesh must be non-NULL");
 
   op->dm   = dm;
@@ -122,6 +122,8 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
 
   // set up operators for the shallow water equations
 
+  op->num_components = 3;
+
   Ceed      ceed   = CeedContext();
   PetscReal tiny_h = op->config->physics.flow.tiny_h;
 
@@ -166,7 +168,11 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
 static PetscErrorCode PreparePetscOperator(Operator *op) {
   PetscFunctionBegin;
 
-  // set up suboperators for the shallow water equations
+  // set up sub-operators for the shallow water equations
+  // NOTE: unlike CEED operators, Petsc operators are not ref-counted, so we
+  // NOTE: don't need to "destroy" them after adding them to composite operators
+
+  op->num_components = 3;
 
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.flux));
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.source));
@@ -177,7 +183,6 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   PetscOperator interior_flux_op;
   PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->diagnostics, tiny_h, &interior_flux_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, interior_flux_op));
-  PetscCall(PetscOperatorDestroy(&interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
@@ -187,14 +192,12 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
     PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, condition, op->petsc.boundary_values[b], op->petsc.boundary_fluxes[b],
                                                  &op->diagnostics, tiny_h, &boundary_flux_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, boundary_flux_op));
-    PetscCall(PetscOperatorDestroy(&boundary_flux_op));
   }
 
   // domain-wide SWE source operator
   PetscOperator source_op;
   PetscCall(CreateSWEPetscSourceOperator(op->mesh, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS], tiny_h, &source_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.source, source_op));
-  PetscCall(PetscOperatorDestroy(&source_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -242,9 +245,6 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 // performs all work necessary to make the operator ready for use
 static PetscErrorCode PrepareOperator(Operator *op) {
   PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
   if (CeedEnabled()) {
     PetscCall(PrepareCeedOperator(op));
@@ -1052,8 +1052,8 @@ PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, O
 PetscErrorCode PetscOperatorCreate(void *context, PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec),
                                    PetscErrorCode (*destroy)(void *), PetscOperator *op) {
   PetscFunctionBegin;
-  PetscCall(PetscCalloc1(1, &op));  // NOLINT(bugprone-sizeof-expression)
-  PetscCall(PetscCalloc1(1, &(*op)->fields));
+  PetscCall(PetscCalloc1(1, op));
+  (*op)->fields       = (PetscOperatorFields){0};
   (*op)->is_composite = PETSC_FALSE;
   (*op)->context      = context;
   (*op)->apply        = apply;
@@ -1065,8 +1065,7 @@ PetscErrorCode PetscOperatorCreate(void *context, PetscErrorCode (*apply)(void *
 /// @param [inout] op the PetscOperator to be destroyed
 PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
   PetscFunctionBegin;
-  PetscFree((*op)->fields->fields);
-  PetscFree((*op)->fields);
+  PetscFree((*op)->fields.fields);
   PetscCall((*op)->destroy((*op)->context));
   PetscFree(*op);
   *op = NULL;
@@ -1144,9 +1143,9 @@ PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_
 PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields fields, const char *name, Vec *vec) {
   PetscFunctionBegin;
 
-  for (PetscInt f = 0; f < fields->num_fields; ++f) {
-    if (!strcmp(name, fields->fields[f].name)) {  // found it!
-      *vec = fields->fields[f].vec;
+  for (PetscInt f = 0; f < fields.num_fields; ++f) {
+    if (!strcmp(name, fields.fields[f].name)) {  // found it!
+      *vec = fields.fields[f].vec;
       PetscFunctionReturn(PETSC_SUCCESS);
     }
   }
@@ -1156,11 +1155,11 @@ PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields fields, const char *na
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PetscOperatorFieldsAppend(PetscOperatorFields fields, PetscOperatorField field) {
+static PetscErrorCode AppendOperatorField(PetscOperatorFields *fields, PetscOperatorField field) {
   PetscFunctionBegin;
 
   if (fields->num_fields + 1 > fields->capacity) {
-    fields->capacity *= 2;
+    fields->capacity = (fields->capacity > 0) ? 2 * fields->capacity : 8;
     PetscCall(PetscRealloc(fields->capacity, &fields->fields));
   }
   fields->fields[fields->num_fields] = field;
@@ -1182,19 +1181,21 @@ PetscErrorCode PetscOperatorSetField(PetscOperator op, const char *name, Vec vec
       .vec  = vec,
   };
 
-  // look for the existing field
+  // look for an existing field of this name
   PetscInt index = -1;
-  for (PetscInt f = 0; f < op->fields->num_fields; ++f) {
-    if (!strcmp(name, op->fields->fields[f].name)) {
-      index = f;
+  if (op->fields.num_fields > 0) {
+    for (PetscInt f = 0; f < op->fields.num_fields; ++f) {
+      if (!strcmp(name, op->fields.fields[f].name)) {
+        index = f;
+      }
     }
   }
 
   // replace the existing field or append a new one
   if (index != -1) {
-    op->fields->fields[index] = field;
+    op->fields.fields[index] = field;
   } else {
-    PetscCall(PetscOperatorFieldsAppend(op->fields, field));
+    PetscCall(AppendOperatorField(&op->fields, field));
   }
 
   if (op->is_composite) {
