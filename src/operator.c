@@ -1112,9 +1112,11 @@ PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite;
   PetscCall(PetscCalloc1(1, &composite));
-  static const PetscInt initial_capacity = 16;
-  composite->capacity                    = initial_capacity;
-  PetscCall(PetscCalloc1(initial_capacity, &composite->suboperators));  // NOLINT(bugprone-sizeof-expression)
+  *composite = (PetscCompositeOperator){
+      .num_suboperators = 0,
+      .capacity         = 8,
+  };
+  PetscCall(PetscCalloc1(composite->capacity, &composite->suboperators));  // NOLINT(bugprone-sizeof-expression)
   PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
   (*op)->is_composite = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1142,16 +1144,13 @@ PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_
 /// @param [out] vec    points to the field with the desired name (or to NULL if no such field exists)
 PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields fields, const char *name, Vec *vec) {
   PetscFunctionBegin;
-
   for (PetscInt f = 0; f < fields.num_fields; ++f) {
     if (!strcmp(name, fields.fields[f].name)) {  // found it!
       *vec = fields.fields[f].vec;
       PetscFunctionReturn(PETSC_SUCCESS);
     }
   }
-
   *vec = NULL;
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
