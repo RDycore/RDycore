@@ -34,7 +34,7 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
 }
 
 // creates a sequential vector appropriate for our chosen architecture
-static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt block_size, PetscInt size, Vec *vec) {
+static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt size, Vec *vec) {
   PetscFunctionBegin;
 
   VecType seq_vec_type;
@@ -56,6 +56,7 @@ static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt block_size,
   PetscCall(VecCreate(PETSC_COMM_SELF, vec));
   PetscCall(VecSetSizes(*vec, size, size));
   PetscCall(VecSetType(*vec, seq_vec_type));
+  PetscCall(VecSetUp(*vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -76,11 +77,11 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
 
   // allocate sequential vectors for each region
   if (!CeedEnabled()) {
-    PetscCall(CreateSequentialVector(comm, op->num_components, op->mesh->num_owned_cells, &op->petsc.external_sources));
+    PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, &op->petsc.external_sources));
 
     PetscCall(PetscCalloc1(OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));  // NOLINT(bugprone-sizeof-expression)
     for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
-      PetscCall(CreateSequentialVector(comm, op->num_components, op->mesh->num_owned_cells, &op->petsc.material_properties[p]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, &op->petsc.material_properties[p]));
     }
   }
 
@@ -109,8 +110,8 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
 
     for (PetscInt b = 0; b < num_boundaries; ++b) {
       PetscInt num_edges = boundaries[b].num_edges;
-      PetscCall(CreateSequentialVector(comm, op->num_components, num_edges, &op->petsc.boundary_values[b]));
-      PetscCall(CreateSequentialVector(comm, op->num_components, num_edges, &op->petsc.boundary_fluxes[b]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, &op->petsc.boundary_values[b]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, &op->petsc.boundary_fluxes[b]));
     }
   }
 
@@ -121,8 +122,6 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
   PetscFunctionBegin;
 
   // set up operators for the shallow water equations
-
-  op->num_components = 3;
 
   Ceed      ceed   = CeedContext();
   PetscReal tiny_h = op->config->physics.flow.tiny_h;
@@ -171,8 +170,6 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   // set up sub-operators for the shallow water equations
   // NOTE: unlike CEED operators, Petsc operators are not ref-counted, so we
   // NOTE: don't need to "destroy" them after adding them to composite operators
-
-  op->num_components = 3;
 
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.flux));
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.source));
@@ -292,7 +289,8 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   }
 
   PetscCall(PetscCalloc1(1, operator));
-  (*operator)->config = config;
+  (*operator)->config         = config;
+  (*operator)->num_components = 3;
 
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
   PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
