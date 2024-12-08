@@ -21,8 +21,8 @@ PetscErrorCode ConfigureEnsembleMember(RDy rdy) {
     char fmt[16]    = {0};
     snprintf(fmt, 15, "%%0%dd", num_digits);
     char suffix[16];
-    sprintf(suffix, fmt, color);
-    sprintf(rdy->config.ensemble.members[color].name, "ensemble_%s", suffix);
+    snprintf(suffix, 15, fmt, color);
+    snprintf(rdy->config.ensemble.members[color].name, MAX_NAME_LEN, "ensemble_%s", suffix);
   }
 
   // override ensemble member parameters by copying them into place

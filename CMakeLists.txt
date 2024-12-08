@@ -5,7 +5,6 @@ option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
-option(DISABLE_FORTRAN "Disable Fortran libraries and programs" OFF)
 
 set(MAX_NAME_LEN 128 CACHE STRING "Maximum allowable length of field/variable names")
 
@@ -17,11 +16,7 @@ set(CLANG_FORMAT_VERSION 14)
 
 project(rdycore)
 enable_language(C)
-if (DISABLE_FORTRAN)
-  message(STATUS "Disabling Fortran libraries and programs.")
-else()
-  enable_language(Fortran)
-endif()
+enable_language(Fortran)
 
 # Make sure PETSc can be found with pkgconfig
 set(PETSC_DIR $ENV{PETSC_DIR})
@@ -94,36 +89,29 @@ if (APPLE)
 endif()
 
 if (ENABLE_ASAN)
-  if (NOT DISABLE_FORTRAN)
-    message(FATAL_ERROR "Enabling Address Sanitizer requires disabling Fortran!")
-  endif()
   message(STATUS "Enabling Address Sanitizer...")
-  add_compile_options(-fsanitize=address)
-  add_link_options(-fsanitize=address)
 endif()
 
-if (NOT DISABLE_FORTRAN)
-  # Fortran settings
-  include(CheckFortranCompilerFlag)
-  set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
-  if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-    list(APPEND fflags "-fallow-argument-mismatch")
-    list(APPEND fflags "-Wno-allow-argument-mismatch")
-    list(APPEND fflags "-ffree-line-length-none")
-    foreach(fflag ${fflags})
-      check_fortran_compiler_flag(${fflag} result)
-      if (result)
-        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${fflag}")
-      endif()
-    endforeach()
+# Fortran settings
+include(CheckFortranCompilerFlag)
+set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  list(APPEND fflags "-fallow-argument-mismatch")
+  list(APPEND fflags "-Wno-allow-argument-mismatch")
+  list(APPEND fflags "-ffree-line-length-none")
+  foreach(fflag ${fflags})
+    check_fortran_compiler_flag(${fflag} result)
+    if (result)
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${fflag}")
+    endif()
+  endforeach()
 
-    # make sure libgfortran appears in our rpath
-    execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
-                    OUTPUT_VARIABLE gfortran_library_location)
-    get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
-    list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
-    list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
-  endif()
+  # make sure libgfortran appears in our rpath
+  execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
+                  OUTPUT_VARIABLE gfortran_library_location)
+  get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
+  list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
+  list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
 endif()
 
 # By default, we build a Debug configuration.
@@ -135,9 +123,7 @@ endif()
 message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")
 message(STATUS "Generating project files in build directory: ${PROJECT_BINARY_DIR}")
 message(STATUS "C compiler is ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION})")
-if (NOT DISABLE_FORTRAN)
-  message(STATUS "Fortran compiler is ${CMAKE_Fortran_COMPILER} (${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION})")
-endif()
+message(STATUS "Fortran compiler is ${CMAKE_Fortran_COMPILER} (${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION})")
 
 # Version numbers (written to rdycore.h).
 set(RDYCORE_MAJOR_VERSION 0)
@@ -170,9 +156,9 @@ configure_file(
 # Inherit libraries from PETSc for shared or static libs.
 extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)
 if (petsc_shared STREQUAL "yes")
-  set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)           # adds stdc++ for Frontier
+  set(SYSTEM_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)
 else()
-    set(RDYCORE_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)  # adds stdc++ for Frontier
+  set(SYSTEM_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)
 endif()
 
 if (ENABLE_TESTS)
@@ -189,9 +175,7 @@ if (ENABLE_COVERAGE)
 
   # Add code coverage compiler flags
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
-  if (NOT DISABLE_FORTRAN)
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} --coverage")
-  endif()
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} --coverage")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 
   # Add a "make coverage" target.

@@ -669,7 +669,7 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, Unstruc
   }
 
   if (data->write_map_for_debugging) {
-    sprintf(debug_file, "map.source-sink.unstructured.rank_%d.bin", rank);
+    snprintf(debug_file, PETSC_MAX_PATH_LEN, "map.source-sink.unstructured.rank_%d.bin", rank);
     PetscCall(
         WriteMappingForDebugging(debug_file, data->mesh_nelements, data->data2mesh_idx, data->data_xc, data->data_yc, data->mesh_xc, data->mesh_yc));
   }
@@ -725,7 +725,7 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
       PetscMPIInt rank;
       MPI_Comm_rank(comm, &rank);
       static char debug_file[PETSC_MAX_PATH_LEN] = {0};
-      sprintf(debug_file, "map.bc.unstructured.rank_%d.bin", rank);
+      snprintf(debug_file, PETSC_MAX_PATH_LEN, "map.bc.unstructured.rank_%d.bin", rank);
 
       PetscCall(WriteMappingForDebugging(debug_file, bc_dataset->unstructured.mesh_nelements, bc_dataset->unstructured.data2mesh_idx,
                                          bc_dataset->unstructured.data_xc, bc_dataset->unstructured.data_yc, bc_dataset->unstructured.mesh_xc,
@@ -996,7 +996,7 @@ static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RasterDataset
   }
 
   if (data->write_map_for_debugging) {
-    sprintf(debug_file, "map.source-sink.raster.rank_%d.bin", rank);
+    snprintf(debug_file, PETSC_MAX_PATH_LEN, "map.source-sink.raster.rank_%d.bin", rank);
     PetscCall(WriteMappingForDebugging(debug_file, data->mesh_ncells_local, data->data2mesh_idx, data->data_xc, data->data_yc, data->mesh_xc,
                                        data->mesh_yc));
   }

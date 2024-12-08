@@ -863,7 +863,7 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
 
     const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
     char        file[PETSC_MAX_PATH_LEN];
-    sprintf(file, "F_%s_nstep%" PetscInt_FMT "_N%d.bin", backend, nstep, rdy->nproc);
+    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.bin", backend, nstep, rdy->nproc);
 
     PetscViewer viewer;
     PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));

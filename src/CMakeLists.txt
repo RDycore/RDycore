@@ -1,5 +1,4 @@
-# Main library -- we list all source files here (incl. those in subdirectories)
-add_library(rdycore
+set(RDYCORE_C_SOURCE_FILES
   ceed.c
   checkpoint.c
   ensemble.c
@@ -18,23 +17,23 @@ add_library(rdycore
   xdmf_output.c
   yaml_input.c
 )
-target_link_libraries(rdycore cyaml yaml hdf5 petsc)
+
+add_library(rdycore ${RDYCORE_C_SOURCE_FILES})
+target_link_libraries(rdycore cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
 add_dependencies(rdycore cyaml yaml)
 
 install(
   TARGETS rdycore
   DESTINATION lib
 )
-set(RDYCORE_LIBRARIES rdycore;cyaml;yaml;muparser;hdf5;${RDYCORE_LIBRARIES})
+if (ENABLE_ASAN)
+  target_compile_options(rdycore PUBLIC -fsanitize=address)
+  target_link_options(rdycore PUBLIC -fsanitize=address)
+endif()
 
 # Unit tests for the main library
 if (ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-if (NOT DISABLE_FORTRAN)
-  add_subdirectory(f90-mod)
-endif()
-
-# Pass RDYCORE_LIBRARIES to the parent directory.
-set(RDYCORE_LIBRARIES ${RDYCORE_LIBRARIES} PARENT_SCOPE)
+add_subdirectory(f90-mod)
