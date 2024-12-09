@@ -3,7 +3,7 @@ if (ENABLE_ASAN)
   # we rebuild the C source files without Address Sanitizer so the Fortran
   # compiler can link the driver
   foreach(source_file ${RDYCORE_C_SOURCE_FILES})
-    list(APPEND RDYCORE_F90_SOURCE_FILES ${PROJECT_SOURCE_DIR}/src/${source_file})
+    list(APPEND RDYCORE_F90_SOURCE_FILES ../${source_file})
   endforeach()
   add_library(rdycore_f90
     ${RDYCORE_F90_SOURCE_FILES}

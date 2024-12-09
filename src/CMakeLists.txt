@@ -27,8 +27,9 @@ install(
   DESTINATION lib
 )
 if (ENABLE_ASAN)
-  target_compile_options(rdycore PUBLIC -fsanitize=address)
-  target_link_options(rdycore PUBLIC -fsanitize=address)
+  set(SANITIZER_OPTIONS address,undefined)
+  target_compile_options(rdycore PUBLIC -fsanitize=${SANITIZER_OPTIONS})
+  target_link_options(rdycore PUBLIC -fsanitize=${SANITIZER_OPTIONS})
 endif()
 
 # Unit tests for the main library

@@ -1100,6 +1100,9 @@ static PetscErrorCode PetscCompositeOperatorDestroy(void *context) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite = context;
   PetscFree(composite->suboperators);
+  for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
+    PetscCall(composite->suboperators[i]->destroy(composite->suboperators[i]->context));
+  }
   PetscFree(composite);
   PetscFunctionReturn(PETSC_SUCCESS);
 }

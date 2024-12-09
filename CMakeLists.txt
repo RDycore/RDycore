@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 3.14.0)
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
-option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
+option(ENABLE_ASAN     "Enable Address and Undefined Behavior Sanitizers (if available)" OFF)
 
 set(MAX_NAME_LEN 128 CACHE STRING "Maximum allowable length of field/variable names")
 
