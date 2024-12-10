@@ -1664,7 +1664,7 @@ int main(int argc, char *argv[]) {
   // print usage info if no arguments given
   if (argc < 2) {
     usage(argv[0]);
-    exit(-1);
+    exit(0);
   }
 
   // initialize subsystems

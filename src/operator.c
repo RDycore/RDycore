@@ -154,6 +154,8 @@ static PetscErrorCode AddCeedSuboperators(Operator *op) {
   // Source Operator
   //-----------------
 
+  PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.source));
+
   CeedOperator source_op;
   PetscCall(CreateSWECeedSourceOperator(op->mesh, tiny_h, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
@@ -359,6 +361,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     CeedContextFieldLabel label;
     PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.flux, "time step", &label));
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.flux, label, &op->ceed.dt));
+    PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.source, "time step", &label));
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.source, label, &op->ceed.dt));
   }
 
