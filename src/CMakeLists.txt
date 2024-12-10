@@ -26,10 +26,9 @@ install(
   TARGETS rdycore
   DESTINATION lib
 )
-if (ENABLE_ASAN)
-  set(SANITIZER_OPTIONS address,undefined)
-  target_compile_options(rdycore PUBLIC -fsanitize=${SANITIZER_OPTIONS})
-  target_link_options(rdycore PUBLIC -fsanitize=${SANITIZER_OPTIONS})
+if (ENABLE_SANITIZERS)
+  target_compile_options(rdycore PUBLIC -fsanitize=${SANITIZERS})
+  target_link_options(rdycore PUBLIC -fsanitize=${SANITIZERS})
 endif()
 
 # Unit tests for the main library

@@ -1,5 +1,5 @@
 set(RDYCORE_F90_SOURCE_FILES rdycore.F90)
-if (ENABLE_ASAN)
+if (ENABLE_SANITIZERS)
   # we rebuild the C source files without Address Sanitizer so the Fortran
   # compiler can link the driver
   foreach(source_file ${RDYCORE_C_SOURCE_FILES})
@@ -14,7 +14,7 @@ else()
   add_library(rdycore_f90
     ${RDYCORE_F90_SOURCE_FILES}
   )
-  target_link_libraries(rdycore_f90 rdycore cyaml yaml petsc)
+  target_link_libraries(rdycore_f90 rdycore cyaml yaml ceed ${SYSTEM_LIBRARIES})
 endif()
 
 install(

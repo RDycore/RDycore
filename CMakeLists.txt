@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 3.14.0)
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
-option(ENABLE_ASAN     "Enable Address and Undefined Behavior Sanitizers (if available)" OFF)
+option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
 
 set(MAX_NAME_LEN 128 CACHE STRING "Maximum allowable length of field/variable names")
 
@@ -88,8 +88,13 @@ if (APPLE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_compact_unwind")
 endif()
 
-if (ENABLE_ASAN)
-  message(STATUS "Enabling Address Sanitizer...")
+if (ENABLE_SANITIZERS)
+  if (APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64") # no memory sanitizer!
+    set(SANITIZERS address,undefined)
+  else()
+    set(SANITIZERS address,memory,undefined)
+  endif()
+  message(STATUS "Enabling sanitizers (${SANITIZERS})...")
 endif()
 
 # Fortran settings
