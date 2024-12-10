@@ -8,6 +8,7 @@
 #include <private/rdyconfigimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyregionimpl.h>
+#include <rdycore.h>  // for MAX_NAME_LEN
 
 //--------------------------------
 // Maximum Wave Speed Diagnostics
@@ -45,10 +46,10 @@ typedef struct {
 // PETSc (CEED-like) "operator"
 //------------------------------
 
-// a "field" associating a symbolic name (e. g. "flux divergence") with a PETSc Vec
+// a "field" associating a symbolic name (e. g. "riemannf") with a PETSc Vec
 typedef struct {
-  const char *name;
-  Vec         vec;
+  char name[MAX_NAME_LEN + 1];
+  Vec  vec;
 } PetscOperatorField;
 
 // a collection of operator fields
@@ -156,10 +157,10 @@ typedef struct Operator {
       // array of domain-wide material property data Vecs, indexed by property_id
       Vec *material_properties;
     } petsc;
-
-    // domain-wide flux divergence data
-    Vec flux_divergence;
   };
+
+  // domain-wide flux divergence data
+  Vec flux_divergence;
 
   //-------------------------------------------
   // diagnostics (used by both PETSc and CEED)

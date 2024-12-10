@@ -640,8 +640,9 @@ static PetscErrorCode ApplySource(void *context, PetscOperatorFields fields, Pet
   PetscScalar *flux_div_ptr;
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
-  PetscInt n_dof;
-  PetscCall(VecGetBlockSize(source_vec, &n_dof));
+  PetscInt size;
+  PetscCall(VecGetSize(source_vec, &size));
+  PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
   for (PetscInt c = 0; c < mesh->num_owned_cells; ++c) {

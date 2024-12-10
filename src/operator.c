@@ -118,7 +118,7 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PrepareCeedOperator(Operator *op) {
+static PetscErrorCode AddCeedSuboperators(Operator *op) {
   PetscFunctionBegin;
 
   // set up operators for the shallow water equations
@@ -164,7 +164,7 @@ static PetscErrorCode PrepareCeedOperator(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PreparePetscOperator(Operator *op) {
+static PetscErrorCode AddPetscSuboperators(Operator *op) {
   PetscFunctionBegin;
 
   // set up sub-operators for the shallow water equations
@@ -199,8 +199,8 @@ static PetscErrorCode PreparePetscOperator(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// sets up a field named "riemannf" for each source sub-operator, associating
-// it with a vector that stores flux divergences computed by flux sub-operators
+// sets up a field named "riemannf" for the source operator, associating
+// it with a vector that stores flux divergences computed by the flux operator
 static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
   PetscFunctionBegin;
 
@@ -240,13 +240,13 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 }
 
 // performs all work necessary to make the operator ready for use
-static PetscErrorCode PrepareOperator(Operator *op) {
+static PetscErrorCode AddSuboperators(Operator *op) {
   PetscFunctionBegin;
 
   if (CeedEnabled()) {
-    PetscCall(PrepareCeedOperator(op));
+    PetscCall(AddCeedSuboperators(op));
   } else {
-    PetscCall(PreparePetscOperator(op));
+    PetscCall(AddPetscSuboperators(op));
   }
 
   // set up our flux divergence vector(s)
@@ -295,7 +295,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
   PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
   PetscCall(SetOperatorRegions(*operator, num_regions, regions));
-  PetscCall(PrepareOperator(*operator));
+  PetscCall(AddSuboperators(*operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1063,7 +1063,9 @@ PetscErrorCode PetscOperatorCreate(void *context, PetscErrorCode (*apply)(void *
 /// @param [inout] op the PetscOperator to be destroyed
 PetscErrorCode PetscOperatorDestroy(PetscOperator *op) {
   PetscFunctionBegin;
-  PetscFree((*op)->fields.fields);
+  if ((*op)->fields.fields) {
+    PetscFree((*op)->fields.fields);
+  }
   PetscCall((*op)->destroy((*op)->context));
   PetscFree(*op);
   *op = NULL;
@@ -1091,7 +1093,7 @@ static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscOperatorFi
   PetscFunctionBegin;
   PetscCompositeOperator *composite = context;
   for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
-    PetscOperatorApply(composite->suboperators[i], dt, u_local, f_global);
+    PetscCall(PetscOperatorApply(composite->suboperators[i], dt, u_local, f_global));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1099,10 +1101,10 @@ static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscOperatorFi
 static PetscErrorCode PetscCompositeOperatorDestroy(void *context) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite = context;
-  PetscFree(composite->suboperators);
   for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
-    PetscCall(composite->suboperators[i]->destroy(composite->suboperators[i]->context));
+    PetscCall(PetscOperatorDestroy(&composite->suboperators[i]));
   }
+  PetscFree(composite->suboperators);
   PetscFree(composite);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1113,25 +1115,21 @@ PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite;
   PetscCall(PetscCalloc1(1, &composite));
-  *composite = (PetscCompositeOperator){
-      .num_suboperators = 0,
-      .capacity         = 8,
-  };
-  PetscCall(PetscCalloc1(composite->capacity, &composite->suboperators));  // NOLINT(bugprone-sizeof-expression)
+  *composite = (PetscCompositeOperator){0};
   PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
   (*op)->is_composite = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Appends a sub-operator to the given composite PetscOperator.
+/// Appends a sub-operator to the given composite PetscOperator (which takes ownership).
 /// @param [inout] op     the composite operator to which a sub-operator is appended
 /// @param [in]    sub_op the suboperator to be appended to the composite operator
 PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_op) {
   PetscFunctionBegin;
   PetscCompositeOperator *composite = op->context;
   if (composite->num_suboperators + 1 > composite->capacity) {
-    composite->capacity *= 2;
-    PetscCall(PetscRealloc(composite->capacity, &composite->suboperators));
+    composite->capacity = (composite->capacity > 0) ? 2 * composite->capacity : 8;
+    PetscCall(PetscRealloc(sizeof(PetscOperator) * composite->capacity, &composite->suboperators));
   }
   composite->suboperators[composite->num_suboperators] = sub_op;
   ++composite->num_suboperators;
@@ -1142,11 +1140,11 @@ PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_
 /// This is useful for extracting PETSc Vecs for use within operator apply() functions.
 /// @param [in]  fields the set of available fields
 /// @param [in]  name   the name of the desired field
-/// @param [out] vec    points to the field with the desired name (or to NULL if no such field exists)
+/// @param [out] vec    points to the field with the desired name, or to NULL if no such field exists
 PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields fields, const char *name, Vec *vec) {
   PetscFunctionBegin;
   for (PetscInt f = 0; f < fields.num_fields; ++f) {
-    if (!strcmp(name, fields.fields[f].name)) {  // found it!
+    if (!strncmp(name, fields.fields[f].name, MAX_NAME_LEN)) {  // found it!
       *vec = fields.fields[f].vec;
       PetscFunctionReturn(PETSC_SUCCESS);
     }
@@ -1160,7 +1158,7 @@ static PetscErrorCode AppendOperatorField(PetscOperatorFields *fields, PetscOper
 
   if (fields->num_fields + 1 > fields->capacity) {
     fields->capacity = (fields->capacity > 0) ? 2 * fields->capacity : 8;
-    PetscCall(PetscRealloc(fields->capacity, &fields->fields));
+    PetscCall(PetscRealloc(sizeof(PetscOperatorField) * fields->capacity, &fields->fields));
   }
   fields->fields[fields->num_fields] = field;
   ++fields->num_fields;
@@ -1169,29 +1167,28 @@ static PetscErrorCode AppendOperatorField(PetscOperatorFields *fields, PetscOper
 }
 
 /// Adds a field with the given name and Vec to the given PETSc operator. If
-/// this is a composite operator, the field is added to all sub-operators. The
+/// this is a composite operator, the field is set on all sub-operators. The
 /// operator does NOT manage memory for the PETSc Vec.
-/// @param [inout] op   the operator to which a sub-operator is appended
+/// @param [inout] op   the operator for which a field is set
 /// @param [in]    name the name of the field
 /// @param [in]    vec  the PETSc Vec storing the field's data (NOT managed by the operator)
 PetscErrorCode PetscOperatorSetField(PetscOperator op, const char *name, Vec vec) {
   PetscFunctionBegin;
-  PetscOperatorField field = {
-      .name = name,
-      .vec  = vec,
-  };
-
   // look for an existing field of this name
   PetscInt index = -1;
   if (op->fields.num_fields > 0) {
     for (PetscInt f = 0; f < op->fields.num_fields; ++f) {
-      if (!strcmp(name, op->fields.fields[f].name)) {
+      if (!strncmp(name, op->fields.fields[f].name, MAX_NAME_LEN)) {
         index = f;
       }
     }
   }
 
   // replace the existing field or append a new one
+  PetscOperatorField field = {
+      .vec = vec,
+  };
+  strncpy(field.name, name, MAX_NAME_LEN);
   if (index != -1) {
     op->fields.fields[index] = field;
   } else {
@@ -1199,11 +1196,9 @@ PetscErrorCode PetscOperatorSetField(PetscOperator op, const char *name, Vec vec
   }
 
   if (op->is_composite) {
-    // for simplicity, sub-operators borrow a reference to their parent
-    // operator's set of fields
     PetscCompositeOperator *composite = op->context;
     for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
-      composite->suboperators[i]->fields = op->fields;
+      PetscCall(PetscOperatorSetField(composite->suboperators[i], name, vec));
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
