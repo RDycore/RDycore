@@ -326,6 +326,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.source)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
+    PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }

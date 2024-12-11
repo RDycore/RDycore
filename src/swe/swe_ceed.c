@@ -231,6 +231,7 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
@@ -427,6 +428,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
@@ -562,11 +564,15 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
   PetscCallCEED(CeedOperatorSetField(*op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 
   // clean up
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_swe));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_mannings_n));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_c));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_q));
   PetscCallCEED(CeedVectorDestroy(&geom));
+  PetscCallCEED(CeedVectorDestroy(&swe_src));
+  PetscCallCEED(CeedVectorDestroy(&mannings_n));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
