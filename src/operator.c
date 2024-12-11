@@ -30,6 +30,15 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
   op->dm   = dm;
   op->mesh = mesh;
 
+  // create vectors
+  if (CeedEnabled()) {
+    Ceed     ceed     = CeedContext();
+    PetscInt num_comp = op->num_components;
+    PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.u_local));
+    PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.rhs));
+    PetscCallCEED(CeedVectorCreate(ceed, mesh->num_owned_cells * num_comp, &op->ceed.sources));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
