@@ -238,6 +238,9 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   // (this works whether or not the CEED resource has been set previously)
   PetscCall(SetCeedResource(NULL));
 
+  // destroy config data
+  PetscCall(DestroyConfig((*rdy)));
+
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
