@@ -543,7 +543,7 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
       offset_c[owned_cell] = cells->local_to_owned[c] * num_comp;
       ++owned_cell;
     }
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_local_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             offset_q, &restrict_q));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_cells, 1, num_comp, 1, num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             offset_c, &restrict_c));
