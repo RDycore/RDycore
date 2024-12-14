@@ -183,7 +183,7 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 typedef struct {
   PetscInt    num_components;  // number of data components
   PetscReal **values;          // array of values ([component][index])
-  void       *array_pointer;   // pointer to CEED/PETSc array owning data (used internally)
+  PetscReal  *array_pointer;   // pointer to CEED/PETSc array owning data (used internally)
 } OperatorData;
 
 // operator material property identifiers
