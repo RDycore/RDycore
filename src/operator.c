@@ -1040,6 +1040,7 @@ PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *op, RDyRegion regio
       } else {
         PetscCall(GetPetscSourceOperatorRegionData(op, region, op->petsc.material_properties[property_id], property_data));
       }
+      break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
@@ -1069,6 +1070,7 @@ PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *op, RDyRegion r
       } else {
         PetscCall(RestorePetscSourceOperatorRegionData(op, region, op->petsc.material_properties[property_id], property_data));
       }
+      break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
@@ -1240,6 +1242,7 @@ PetscErrorCode GetOperatorDomainMaterialProperty(Operator *op, OperatorMaterialP
       } else {
         PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.material_properties[property_id], property_data));
       }
+      break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
@@ -1267,6 +1270,7 @@ PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *op, OperatorMater
       } else {
         PetscCall(RestorePetscSourceOperatorDomainData(op, op->petsc.material_properties[property_id], property_data));
       }
+      break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }

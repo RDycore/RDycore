@@ -830,13 +830,12 @@ PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// This is the right-hand-side function used by our timestepping solver.
-// Parameters:
-//  ts  - the solver
-//  t   - the simulation time [seconds]
-//  U   - the global solution vector at time t
-//  F   - the global right hand side vector to be evaluated at time t
-//  ctx - a generic pointer to our RDy object
+/// This is the right-hand-side function used by our timestepping solver.
+/// @param [in]    ts  the solver
+/// @param [in]    t   the simulation time [seconds]
+/// @param [in]    U   the global solution vector at time t
+/// @param [out]   F   the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx a pointer to the operator representing the system being solved
 static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
   PetscFunctionBegin;
 
@@ -890,7 +889,8 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-static PetscErrorCode InitSolver(RDy rdy) {
+
+PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
 
   PetscInt n_dof;
