@@ -897,7 +897,7 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
 
   CeedOperator *sub_ops;
   PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
-  CeedOperator source_op = sub_ops[1 + op->num_boundaries + region.index];
+  CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
   PetscInt num_components = op->num_components;
@@ -967,7 +967,7 @@ static PetscErrorCode RestorePetscSourceOperatorRegionData(Operator *op, RDyRegi
 /// @param [in]  op the operator for which data access is provided
 /// @param [in]  region the region for which access to source data is provided
 /// @param [out] source_data the array data to which access is provided
-PetscErrorCode GetOperatorExternalSource(Operator *op, RDyRegion region, OperatorData *source_data) {
+PetscErrorCode GetOperatorRegionalExternalSource(Operator *op, RDyRegion region, OperatorData *source_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -986,12 +986,12 @@ PetscErrorCode GetOperatorExternalSource(Operator *op, RDyRegion region, Operato
 }
 
 /// Releases access to the operator's external source array data for a region
-/// for which access was provided via @ref GetOperatorExternalSource. This
+/// for which access was provided via @ref GetOperatorRegionalExternalSource. This
 /// operation can cause data to be copied between memory spaces.
 /// @param [in]  op the operator for which data access is released
 /// @param [in]  region the region for which access to source data is released
 /// @param [out] source_data the array data for which access is released
-PetscErrorCode RestoreOperatorExternalSource(Operator *op, RDyRegion region, OperatorData *source_data) {
+PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *op, RDyRegion region, OperatorData *source_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -1021,7 +1021,8 @@ const char *material_property_names[] = {
 /// @param [in]  region the region for which access to material propety data is provided
 /// @param [in]  property_id the ID for the desired material property
 /// @param [out] property_data the array data to which access is provided
-PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
+PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id,
+                                                   OperatorData *property_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -1047,13 +1048,14 @@ PetscErrorCode GetOperatorMaterialProperty(Operator *op, RDyRegion region, Opera
 }
 
 /// Releases access to the operator's material property array data for a region
-/// and property for which access was provided via @ref GetOperatorMaterialProperty.
+/// and property for which access was provided via @ref GetOperatorRegionalMaterialProperty.
 /// This operation can cause data to be copied between memory spaces.
 /// @param [in]  op the operator for which data access is released
 /// @param [in]  region the region for which access to material propety data is released
 /// @param [in]  property_id the ID for the desired material property
 /// @param [out] property_data the array data for which access is released
-PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
+PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id,
+                                                       OperatorData *property_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -1066,6 +1068,204 @@ PetscErrorCode RestoreOperatorMaterialProperty(Operator *op, RDyRegion region, O
         PetscCall(RestoreCeedSourceOperatorRegionData(op, region, material_property_names[property_id], property_data));
       } else {
         PetscCall(RestorePetscSourceOperatorRegionData(op, region, op->petsc.material_properties[property_id], property_data));
+      }
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//--------------------------------------
+// Domain (Cell-Centered) Operator Data
+//--------------------------------------
+
+static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *field_name, OperatorData *domain_data) {
+  PetscFunctionBegin;
+
+  CeedOperator *sub_ops;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  CeedOperator source_op = sub_ops[0];
+
+  // fetch the relevant vector
+  CeedOperatorField field;
+  PetscCallCEED(CeedOperatorGetFieldByName(source_op, field_name, &field));
+  CeedVector vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+
+  // copy out operator data
+  *domain_data = (OperatorData){
+      .num_components = op->num_components,
+  };
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &domain_data->array_pointer));
+  CeedScalar(*values)[op->num_components];
+  *((CeedScalar **)&values) = domain_data->array_pointer;
+  PetscCall(PetscCalloc1(op->num_components, &domain_data->values));
+  for (PetscInt c = 0; c < op->num_components; ++c) {
+    PetscCall(PetscCalloc1(op->mesh->num_owned_cells, &domain_data->values[c]));
+    for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
+      domain_data->values[c][i] = values[i][c];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const char *field_name, OperatorData *domain_data) {
+  PetscFunctionBegin;
+
+  CeedOperator *sub_ops;
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  CeedOperator source_op = sub_ops[0];
+
+  // copy the data into place
+  PetscInt num_components = op->num_components;
+  CeedScalar(*values)[num_components];
+  *((CeedScalar **)&values) = domain_data->array_pointer;
+  for (PetscInt c = 0; c < num_components; ++c) {
+    for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
+      values[i][c] = domain_data->values[c][i];
+    }
+    PetscCall(PetscFree(domain_data->values[c]));
+  }
+  PetscCall(PetscFree(domain_data->values));
+
+  // release the array
+  CeedOperatorField field;
+  PetscCallCEED(CeedOperatorGetFieldByName(source_op, field_name, &field));
+  CeedVector vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+  PetscCallCEED(CeedVectorRestoreArray(vec, &domain_data->array_pointer));
+
+  *domain_data = (OperatorData){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode GetPetscSourceOperatorDomainData(Operator *op, Vec vec, OperatorData *domain_data) {
+  PetscFunctionBegin;
+
+  PetscReal *data;
+  PetscCall(VecGetArray(vec, &data));
+  *domain_data = (OperatorData){
+      .num_components = op->num_components,
+  };
+  PetscCall(PetscCalloc1(op->num_components, &domain_data->values));
+  for (PetscInt c = 0; c < op->num_components; ++c) {
+    PetscCall(PetscCalloc1(op->mesh->num_owned_cells, &domain_data->values[c]));
+    for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
+      domain_data->values[c][i] = data[op->num_components * i + c];
+    }
+  }
+  domain_data->array_pointer = data;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RestorePetscSourceOperatorDomainData(Operator *op, Vec vec, OperatorData *domain_data) {
+  PetscFunctionBegin;
+
+  PetscReal *data = domain_data->array_pointer;
+  for (PetscInt c = 0; c < op->num_components; ++c) {
+    for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
+      data[op->num_components * i + c] = domain_data->values[c][i];
+    }
+    PetscCall(PetscFree(domain_data->values[c]));
+  }
+  PetscCall(PetscFree(domain_data->values));
+  PetscCall(VecRestoreArray(vec, &data));
+  *domain_data = (OperatorData){0};
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Provides read-write access to the operator's external source array data for
+/// the entire domain.
+/// @param [in]  op the operator for which data access is provided
+/// @param [out] source_data the array data to which access is provided
+PetscErrorCode GetOperatorDomainExternalSource(Operator *op, OperatorData *source_data) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  source_data->num_components = op->num_components;
+  PetscCall(PetscCalloc1(op->num_components, &source_data->values));
+  if (CeedEnabled()) {
+    PetscCall(GetCeedSourceOperatorDomainData(op, "swe_src", source_data));
+  } else {  // petsc
+    PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Releases access to the operator's external source array data for the entire
+/// domain for which access was provided via @ref GetOperatorDomainExternalSource.
+/// This operation can cause data to be copied between memory spaces.
+/// @param [in]  op the operator for which data access is released
+/// @param [out] source_data the array data for which access is released
+PetscErrorCode RestoreOperatorDomainExternalSource(Operator *op, OperatorData *source_data) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  if (CeedEnabled()) {
+    PetscCallCEED(RestoreCeedSourceOperatorDomainData(op, "swe_src", source_data));
+  } else {
+    PetscCallCEED(RestorePetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Provides read-write access to the operator's material property array data
+/// for the given material property on the entire domain.
+/// @param [in]  op the operator for which data access is provided
+/// @param [in]  property_id the ID for the desired material property
+/// @param [out] property_data the array data to which access is provided
+PetscErrorCode GetOperatorDomainMaterialProperty(Operator *op, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  // NOTE: only single-component material property data currently supported!
+  property_data->num_components = 1;
+  PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
+
+  switch (property_id) {
+    case OPERATOR_MANNINGS:
+      if (CeedEnabled()) {
+        PetscCall(GetCeedSourceOperatorDomainData(op, material_property_names[property_id], property_data));
+      } else {
+        PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.material_properties[property_id], property_data));
+      }
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Releases access to the operator's material property array data for the given
+/// property on the entire domain for which access was provided via
+/// @ref GetOperatorDomainMaterialProperty. This operation can cause data to be
+/// copied between memory spaces.
+/// @param [in]  op the operator for which data access is released
+/// @param [in]  property_id the ID for the desired material property
+/// @param [out] property_data the array data for which access is released
+PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *op, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  switch (property_id) {
+    case OPERATOR_MANNINGS:
+      if (CeedEnabled()) {
+        PetscCall(RestoreCeedSourceOperatorDomainData(op, material_property_names[property_id], property_data));
+      } else {
+        PetscCall(RestorePetscSourceOperatorDomainData(op, op->petsc.material_properties[property_id], property_data));
       }
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);

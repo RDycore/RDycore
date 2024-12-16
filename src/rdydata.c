@@ -155,11 +155,11 @@ static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_
 
   if (region.num_owned_cells) {
     OperatorData source_data;
-    PetscCall(GetOperatorExternalSource(rdy->operator, region, &source_data));
+    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
     for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
       source_data.values[component][c] = values[c];
     }
-    PetscCall(RestoreOperatorExternalSource(rdy->operator, region, &source_data));
+    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -199,11 +199,11 @@ static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const Petsc
   RDyRegion region = rdy->regions[region_idx];
   if (region.num_owned_cells) {
     OperatorData source_data;
-    PetscCall(GetOperatorExternalSource(rdy->operator, region, &source_data));
+    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
     for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
       source_data.values[component][c] = value;
     }
-    PetscCall(RestoreOperatorExternalSource(rdy->operator, region, &source_data));
+    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -230,6 +230,47 @@ PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_i
 PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value) {
   PetscFunctionBegin;
   PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_idx, 2, value));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode SetDomainSourceComponent(RDy rdy, PetscInt component, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
+  OperatorData source_data;
+  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & source_data));
+  for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
+    source_data.values[component][c] = values[c];
+  }
+  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & source_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets the external water source term on the entire domain to the values in
+/// the given array (whose length is equal to the number of owned cells in the
+/// domain).
+PetscErrorCode RDySetDomainWaterSource(RDy rdy, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetDomainSourceComponent(rdy, 0, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets the external x-momentum term on the entire domain to the values in the
+/// given array (whose length is equal to the number of owned cells in the
+/// domain).
+PetscErrorCode RDySetDomainXMomentumSource(RDy rdy, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetDomainSourceComponent(rdy, 1, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets the external y-momentum term on the entire domain to the values in the
+/// given array (whose length is equal to the number of owned cells in the
+/// domain).
+PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetDomainSourceComponent(rdy, 2, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -409,11 +450,27 @@ PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, con
              region.num_owned_cells);
 
   OperatorData mannings_data;
-  PetscCall(GetOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+  PetscCall(GetOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
   for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
     mannings_data.values[0][c] = n_values[c];
   }
-  PetscCall(RestoreOperatorMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+  PetscCall(RestoreOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal *n_values) {
+  PetscFunctionBegin;
+
+  PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
+
+  OperatorData mannings_data;
+  PetscCall(GetOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &mannings_data));
+  for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
+    mannings_data.values[0][c] = n_values[c];
+  }
+  PetscCall(RestoreOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &mannings_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

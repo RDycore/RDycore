@@ -198,11 +198,15 @@ PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryValues(Operator *, RDyBoundar
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
 
-PETSC_INTERN PetscErrorCode GetOperatorExternalSource(Operator *, RDyRegion, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorExternalSource(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorRegionalExternalSource(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorDomainExternalSource(Operator *, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorDomainExternalSource(Operator *, OperatorData *);
 
-PETSC_INTERN PetscErrorCode GetOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorDomainMaterialProperty(Operator *, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *, OperatorMaterialPropertyId, OperatorData *);
 
 // diagnostics
 PETSC_INTERN PetscErrorCode ResetOperatorDiagnostics(Operator *);

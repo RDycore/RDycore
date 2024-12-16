@@ -83,7 +83,6 @@ contains
     PetscInt             :: t
     integer(RDyTimeUnit) :: time_unit
     PetscReal            :: time_dn, time_up, cur_time, cur_rain
-    PetscInt             :: region_id
     PetscErrorCode       :: ierr
 
     cur_time = (nstep-1)*dtime
@@ -91,8 +90,7 @@ contains
     ! Set spatially homogeneous rainfall for all grid cells
     ! (the domain is region 0)
     rain_data(:) = 0.d0
-    region_id = 0
-    PetscCallA(RDySetRegionalWaterSource(rdy_, region_id, num_cells_owned, rain_data, ierr))
+    PetscCallA(RDySetDomainWaterSource(rdy_, num_cells_owned, rain_data, ierr))
 
     ! Set the coupling time step
     PetscCallA(RDyGetTimeUnit(rdy_, time_unit, ierr))
