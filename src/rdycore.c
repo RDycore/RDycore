@@ -180,17 +180,6 @@ PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Destroy data structures for materials
-/// @param rdy A RDy struct
-/// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyDestroyMaterials(RDy *rdy) {
-  PetscFunctionBegin;
-
-  if ((*rdy)->materials_by_cell) PetscFree((*rdy)->materials_by_cell);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// Destroys the given RDy object, freeing any allocated resources.
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
@@ -205,9 +194,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->initial_conditions) PetscFree((*rdy)->initial_conditions);
   if ((*rdy)->sources) PetscFree((*rdy)->sources);
   if ((*rdy)->boundary_conditions) PetscFree((*rdy)->boundary_conditions);
-
-  // destroy materials
-  PetscCall(RDyDestroyMaterials(rdy));
 
   // destroy regions
   for (PetscInt r = 0; r < (*rdy)->num_regions; ++r) {

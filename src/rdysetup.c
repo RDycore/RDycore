@@ -480,7 +480,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define READ_MATERIAL_PROPERTY(property, mat_props_spec, materials_by_cell)                            \
+#define READ_MATERIAL_PROPERTY(property, mat_props_spec, values)                                       \
   {                                                                                                    \
     Vec mat_prop_vec = NULL;                                                                           \
     if (mat_props_spec.property.file[0]) {                                                             \
@@ -495,15 +495,15 @@ PetscErrorCode InitBoundaries(RDy rdy) {
             PetscScalar *prop_ptr;                                                                     \
             PetscCall(VecGetArray(mat_prop_vec, &prop_ptr));                                           \
             for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
-              PetscInt cell                    = region.cell_local_ids[c];                             \
-              materials_by_cell[cell].property = prop_ptr[c];                                          \
+              PetscInt cell = region.cell_local_ids[c];                                                \
+              values[cell]  = prop_ptr[c];                                                             \
             }                                                                                          \
             PetscCall(VecRestoreArray(mat_prop_vec, &prop_ptr));                                       \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
-              PetscInt cell                    = region.cell_local_ids[c];                             \
-              materials_by_cell[cell].property = mupEval(mat_props_spec.property.value);               \
+              PetscInt cell = region.cell_local_ids[c];                                                \
+              values[cell]  = mupEval(mat_props_spec.property.value);                                  \
             }                                                                                          \
           }                                                                                            \
         }                                                                                              \
@@ -516,7 +516,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
 
 // sets up materials
 //   unsafe for refinement if file is given for surface composition
-static PetscErrorCode InitMaterials(RDy rdy) {
+static PetscErrorCode InitMaterialProperties(RDy rdy) {
   PetscFunctionBegin;
 
   // check that each region has a material assigned to it
@@ -538,13 +538,28 @@ static PetscErrorCode InitMaterials(RDy rdy) {
     PetscCheck(region_mat_index != -1, rdy->comm, PETSC_ERR_USER, "Region '%s' has no assigned material!", region.name);
   }
 
-  // allocate storage for materials
-  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
-
-  // read material properties in from files as needed
+  // read material properties in from regional specifications and/or files
+  PetscReal *material_property_values[OPERATOR_NUM_MATERIAL_PROPERTIES];
+  for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+    PetscCall(PetscCalloc1(rdy->mesh.num_cells, &material_property_values[p]));
+  }
   for (PetscInt imat = 0; imat < rdy->config.num_materials; ++imat) {
     RDyMaterialPropertiesSpec mat_props_spec = rdy->config.materials[imat].properties;
-    READ_MATERIAL_PROPERTY(manning, mat_props_spec, rdy->materials_by_cell);
+    READ_MATERIAL_PROPERTY(manning, mat_props_spec, material_property_values[OPERATOR_MANNINGS]);
+  }
+
+  // set the properties on the operator
+  OperatorData material_property;
+  for (PetscInt property = 0; property < OPERATOR_NUM_MATERIAL_PROPERTIES; ++property) {
+    PetscCall(GetOperatorDomainMaterialProperty(rdy->operator, property, &material_property));
+    for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
+      if (rdy->mesh.cells.is_owned[i]) {
+        PetscInt owned_cell                     = rdy->mesh.cells.local_to_owned[i];
+        material_property.values[0][owned_cell] = material_property_values[property][i];
+      }
+    }
+    PetscCall(RestoreOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &material_property));
+    PetscCall(PetscFree(material_property_values[property]));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -862,10 +877,10 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
 
     const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
     char        file[PETSC_MAX_PATH_LEN];
-    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.bin", backend, nstep, rdy->nproc);
+    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
 
     PetscViewer viewer;
-    PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD, file, FILE_MODE_WRITE, &viewer));
+    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
     PetscCall(VecView(F, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   }
@@ -1096,14 +1111,14 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
   PetscCall(InitBoundaryConditions(rdy));
 
-  RDyLogDebug(rdy, "Initializing materials...");
-  PetscCall(InitMaterials(rdy));
-
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
+
+  RDyLogDebug(rdy, "Initializing material properties...");
+  PetscCall(InitMaterialProperties(rdy));
 
   RDyLogDebug(rdy, "Initializing solver...");
   PetscCall(InitSolver(rdy));

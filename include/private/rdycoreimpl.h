@@ -18,13 +18,6 @@ PETSC_INTERN PetscBool      CeedEnabled(void);
 PETSC_INTERN Ceed           CeedContext(void);
 PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
 
-// This type defines a material with specific properties.
-// (undefined properties are set to INVALID_INT/INVALID_REAL)
-typedef struct {
-  char      name[MAX_NAME_LEN + 1];
-  PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
-} RDyMaterial;
-
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {
@@ -110,9 +103,6 @@ struct _p_RDy {
   PetscInt     num_boundaries;
   RDyBoundary *boundaries;
 
-  // materials associated with individual (local) cells
-  RDyMaterial *materials_by_cell;
-
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;
 
@@ -165,7 +155,6 @@ PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 PETSC_INTERN PetscErrorCode DestroyConfig(RDy);
 
 PETSC_INTERN PetscErrorCode RDyDestroyVectors(RDy *);
-PETSC_INTERN PetscErrorCode RDyDestroyMaterials(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyBoundaries(RDy *);
 
 // output functions

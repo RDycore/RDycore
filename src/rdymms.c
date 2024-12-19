@@ -191,7 +191,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
-  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
   PetscCall(RDyMMSUpdateMaterialProperties(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
