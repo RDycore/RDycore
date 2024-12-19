@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <petscviewerhdf5.h>  // note: includes hdf5.h
 #include <private/rdycoreimpl.h>
 #include <rdycore.h>
