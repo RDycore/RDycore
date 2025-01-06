@@ -3,68 +3,56 @@
 #include <rdycore.h>
 #include <string.h>
 
-// Writes a XDMF "heavy data" to an HDF5 file. The time is expressed in the
-// units given in the configuration file.
-static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
+static PetscErrorCode WriteFieldData(MPI_Comm comm, DM dm, Vec global_vec, char file_name[PETSC_MAX_PATH_LEN], char group_name[PETSC_MAX_PATH_LEN],
+                                     PetscFileMode file_mode) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
-
-  // Determine the output file name.
-  char fname[PETSC_MAX_PATH_LEN];
-  PetscCall(DetermineOutputFile(rdy, step, time, "h5", fname));
-  const char *units = TimeUnitAsString(rdy->config.time.unit);
-  RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 output at t = %g %s to %s", step, time, units, fname);
-
-  // write the grid if we're the first step in a batch.
-  PetscInt dataset = step / rdy->config.output.step_interval;
-  if (dataset % rdy->config.output.batch_size == 0) {
-    PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_WRITE, &viewer));
-    PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
-  } else {
-    PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_APPEND, &viewer));
-    PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
-  }
-  // turn on collective MPI-IO transfers
-  PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));
-
-  // write solution data to a new GROUP with components in separate datasets
-  char group_name[1025];
-  snprintf(group_name, 1024, "%" PetscInt_FMT " %E %s", step, time, units);
+  PetscCall(PetscViewerHDF5Open(comm, file_name, file_mode, &viewer));
+  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
+  PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
 
-  // create and populate a multi-component natural vector
-  Vec       natural;
+  // create and populate a multi-component vector
+  Vec       data_vec;
   PetscBool use_natural;
-  PetscCall(DMGetUseNatural(rdy->dm, &use_natural));
+  PetscCall(DMGetUseNatural(dm, &use_natural));
   if (use_natural) {
-    PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-    PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm, rdy->u_global, natural));
-    PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm, rdy->u_global, natural));
+    PetscCall(DMPlexCreateNaturalVector(dm, &data_vec));
+    PetscCall(DMPlexGlobalToNaturalBegin(dm, global_vec, data_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(dm, global_vec, data_vec));
   } else {
-    natural = rdy->u_global;
-    PetscCall(PetscObjectReference((PetscObject)natural));
+    data_vec = global_vec;
+    PetscCall(PetscObjectReference((PetscObject)data_vec));
   }
 
+  // fetch our section to extract names of components
+  PetscSection section;
+  PetscCall(DMGetLocalSection(dm, &section));
+
+  // the section should contain a single field with a number of components
+  // equal to the block size of the data vector
+  PetscInt num_fields, num_comp, bs;
+  PetscCall(PetscSectionGetNumFields(section, &num_fields));
+  PetscCheck(num_fields == 1, comm, PETSC_ERR_USER, "Primary DM section has %" PetscInt_FMT " fields (should contain 1)", num_fields);
+  PetscCall(PetscSectionGetFieldComponents(section, 0, &num_comp));
+  PetscCall(VecGetBlockSize(data_vec, &bs));
+  PetscCheck(num_comp == bs, comm, PETSC_ERR_USER,
+             "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, num_comp);
+
   // extract each component into a separate vector and write it to the group
-  // FIXME: This setup is specific to the shallow water equations. We can
-  // FIXME: generalize it later.
-  const char *comp_names[3] = {
-      "Height",
-      "MomentumX",
-      "MomentumY",
-  };
-  Vec     *comp;  // single-component natural vector
-  PetscInt n, N, bs;
-  PetscCall(VecGetLocalSize(natural, &n));
-  PetscCall(VecGetSize(natural, &N));
-  PetscCall(VecGetBlockSize(natural, &bs));
+  Vec     *comp;  // array of single-component vectors
+  PetscInt n, N;
+  PetscCall(VecGetLocalSize(data_vec, &n));
+  PetscCall(VecGetSize(data_vec, &N));
   PetscCall(PetscMalloc1(bs, &comp));
   for (PetscInt c = 0; c < bs; ++c) {
-    PetscCall(VecCreateMPI(rdy->comm, n / bs, N / bs, &comp[c]));
-    PetscCall(PetscObjectSetName((PetscObject)comp[c], comp_names[c]));
+    PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp[c]));
+    const char *comp_name;
+    PetscCall(PetscSectionGetComponentName(section, 0, c, &comp_name));
+    PetscCall(PetscObjectSetName((PetscObject)comp[c], comp_name));
   }
-  PetscCall(VecStrideGatherAll(natural, comp, INSERT_VALUES));
+  PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
   for (PetscInt c = 0; c < bs; ++c) {
     PetscCall(VecView(comp[c], viewer));
     PetscCall(VecDestroy(&comp[c]));
@@ -72,28 +60,63 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscFree(comp));
 
   // clean up
-  if (use_natural) PetscCall(VecDestroy(&natural));
+  if (use_natural) PetscCall(VecDestroy(&data_vec));  // FIXME: does this leave an extra ref in non-natural case?
   PetscCall(PetscViewerHDF5PopGroup(viewer));
   PetscCall(PetscViewerPopFormat(viewer));
   PetscCall(PetscViewerDestroy(&viewer));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, char file_name[PETSC_MAX_PATH_LEN]) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  char        group_name[1025];
+  snprintf(group_name, 1024, "Domain");
+  PetscCall(PetscViewerHDF5Open(comm, file_name, FILE_MODE_APPEND, &viewer));
+  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
+  PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
+
+  PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
+  PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
+  PetscCall(VecView(mesh->output.xc, viewer));
+  PetscCall(VecView(mesh->output.yc, viewer));
+  PetscCall(VecView(mesh->output.zc, viewer));
+
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscCall(PetscViewerPopFormat(viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Writes a XDMF "heavy data" to an HDF5 file. The time is expressed in the
+// units given in the configuration file.
+static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
+  PetscFunctionBegin;
+
+  // Determine the output file name.
+  char file_name[PETSC_MAX_PATH_LEN];
+  PetscCall(DetermineOutputFile(rdy, step, time, "h5", file_name));
+  const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+  // construct a group name that encodes the step, time, units
+  char group_name[PETSC_MAX_PATH_LEN];
+  snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
+
+  // create or append to a file depending on whether this step is the first in a dataset
+  PetscInt      dataset   = step / rdy->config.output.step_interval;
+  PetscFileMode file_mode = (dataset % rdy->config.output.batch_size == 0) ? FILE_MODE_WRITE : FILE_MODE_APPEND;
+
+  RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 output at t = %g %s to %s", step, time, units, file_name);
+
+  // write solution data for the primary DM
+  PetscCall(WriteFieldData(rdy->comm, rdy->dm, rdy->u_global, file_name, group_name, file_mode));
+
+  // write the grid if we're the first step in a batch.
   if (dataset % rdy->config.output.batch_size == 0) {
-    char group_name[1025];
-    snprintf(group_name, 1024, "Domain");
-    PetscCall(PetscViewerHDF5Open(rdy->comm, fname, FILE_MODE_APPEND, &viewer));
-    PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
-    PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-
-    RDyMesh *mesh = &rdy->mesh;
-    PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
-    PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
-    PetscCall(VecView(mesh->output.xc, viewer));
-    PetscCall(VecView(mesh->output.yc, viewer));
-    PetscCall(VecView(mesh->output.zc, viewer));
-
-    PetscCall(PetscViewerHDF5PopGroup(viewer));
-    PetscCall(PetscViewerPopFormat(viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
+    PetscCall(WriteGrid(rdy->comm, &rdy->mesh, file_name));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -174,15 +197,20 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   }
 
   // write cell field metadata
-  const char *cell_field_names[3] = {"Height", "MomentumX", "MomentumY"};
+  PetscSection section;
+  PetscInt     num_comp;
+  PetscCall(DMGetLocalSection(rdy->dm, &section));
+  PetscCall(PetscSectionGetFieldComponents(section, 0, &num_comp));
   for (int f = 0; f < 3; ++f) {
+    const char *comp_name;
+    PetscCall(PetscSectionGetComponentName(section, 0, f, &comp_name));
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
                            "          %s:/%s/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
-                           cell_field_names[f], mesh->num_cells_global, h5_basename, time_group, cell_field_names[f]));
+                           comp_name, mesh->num_cells_global, h5_basename, time_group, comp_name));
   }
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
