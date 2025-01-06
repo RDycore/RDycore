@@ -666,6 +666,26 @@ static PetscErrorCode CheckOperatorBoundary(Operator *op, RDyBoundary boundary, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateOperatorBoundaryData(Operator *op, RDyBoundary boundary, OperatorData *data) {
+  PetscFunctionBegin;
+  data->num_components = op->num_components;
+  PetscCall(PetscCalloc1(op->num_components, &data->values));
+  for (PetscInt c = 0; c < op->num_components; ++c) {
+    PetscCall(PetscCalloc1(boundary.num_edges, &data->values[c]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroyOperatorData(OperatorData *data) {
+  PetscFunctionBegin;
+  for (PetscInt c = 0; c < data->num_components; ++c) {
+    PetscCall(PetscFree(data->values[c]));
+  }
+  PetscCall(PetscFree(data->values));
+  *data = (OperatorData){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
@@ -681,15 +701,11 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
   // copy out operator data
-  *boundary_data = (OperatorData){
-      .num_components = op->num_components,
-  };
+  PetscInt num_comp = boundary_data->num_components;
   PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &boundary_data->array_pointer));
-  CeedScalar(*values)[op->num_components];
+  CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = boundary_data->array_pointer;
-  PetscCall(PetscCalloc1(op->num_components, &boundary_data->values));
-  for (PetscInt c = 0; c < op->num_components; ++c) {
-    PetscCall(PetscCalloc1(boundary.num_edges, &boundary_data->values[c]));
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       boundary_data->values[c][e] = values[e][c];
     }
@@ -706,16 +722,14 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
   CeedOperator sub_op = sub_ops[1 + boundary.index];
 
   // copy the data in
-  PetscInt num_components = op->num_components;
-  CeedScalar(*values)[num_components];
+  PetscInt num_comp = boundary_data->num_components;
+  CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = boundary_data->array_pointer;
-  for (PetscInt c = 0; c < num_components; ++c) {
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       values[e][c] = boundary_data->values[c][e];
     }
-    PetscCall(PetscFree(boundary_data->values[c]));
   }
-  PetscCall(PetscFree(boundary_data->values));
 
   // release the array
   CeedOperatorField field;
@@ -724,7 +738,6 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
   PetscCallCEED(CeedVectorRestoreArray(vec, &boundary_data->array_pointer));
 
-  *boundary_data = (OperatorData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -733,14 +746,10 @@ static PetscErrorCode GetPetscOperatorBoundaryData(Operator *op, RDyBoundary bou
 
   PetscReal *data;
   PetscCall(VecGetArray(vec, &data));
-  *boundary_data = (OperatorData){
-      .num_components = op->num_components,
-  };
-  PetscCall(PetscCalloc1(op->num_components, &boundary_data->values));
-  for (PetscInt c = 0; c < op->num_components; ++c) {
-    PetscCall(PetscCalloc1(boundary.num_edges, &boundary_data->values[c]));
+  PetscInt num_comp = boundary_data->num_components;
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      boundary_data->values[c][e] = data[op->num_components * e + c];
+      boundary_data->values[c][e] = data[num_comp * e + c];
     }
   }
   boundary_data->array_pointer = data;
@@ -751,17 +760,15 @@ static PetscErrorCode GetPetscOperatorBoundaryData(Operator *op, RDyBoundary bou
 static PetscErrorCode RestorePetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
-  PetscReal *data = boundary_data->array_pointer;
-  for (PetscInt c = 0; c < op->num_components; ++c) {
+  PetscReal *data     = boundary_data->array_pointer;
+  PetscInt   num_comp = boundary_data->num_components;
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      data[op->num_components * e + c] = boundary_data->values[c][e];
+      data[num_comp * e + c] = boundary_data->values[c][e];
     }
-    PetscCall(PetscFree(boundary_data->values[c]));
   }
-  PetscCall(PetscFree(boundary_data->values));
   PetscCall(VecRestoreArray(vec, &data));
 
-  *boundary_data = (OperatorData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -777,8 +784,7 @@ PetscErrorCode GetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, Ope
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
-  boundary_value_data->num_components = op->num_components;
-  PetscCall(PetscCalloc1(op->num_components, &boundary_value_data->values));
+  PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_value_data));
   if (CeedEnabled()) {
     PetscCall(GetCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
   } else {  // petsc
@@ -800,6 +806,7 @@ PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary,
   } else {
     PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
   }
+  DestroyOperatorData(boundary_value_data);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -816,8 +823,8 @@ PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Ope
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
+  PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
-  PetscCall(PetscCalloc1(op->num_components, &boundary_flux_data->values));
   if (CeedEnabled()) {
     PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
   } else {  // petsc
@@ -845,6 +852,7 @@ PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary,
   } else {
     PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_flux_data));
   }
+  DestroyOperatorData(boundary_flux_data);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -858,6 +866,16 @@ static PetscErrorCode CheckOperatorRegion(Operator *op, RDyRegion region, MPI_Co
 
   PetscCheck(region.index >= 0 && region.index < op->num_regions, comm, PETSC_ERR_USER, "Invalid region for source data (index: %" PetscInt_FMT ")",
              region.index);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode CreateOperatorRegionData(Operator *op, RDyRegion region, PetscInt num_comp, OperatorData *data) {
+  PetscFunctionBegin;
+  data->num_components = num_comp;
+  PetscCall(PetscCalloc1(num_comp, &data->values));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    PetscCall(PetscCalloc1(region.num_owned_cells, &data->values[c]));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -875,15 +893,11 @@ static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion re
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
   // copy out operator data
-  *region_data = (OperatorData){
-      .num_components = op->num_components,
-  };
+  PetscInt num_comp = region_data->num_components;
   PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &region_data->array_pointer));
-  CeedScalar(*values)[op->num_components];
+  CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = region_data->array_pointer;
-  PetscCall(PetscCalloc1(op->num_components, &region_data->values));
-  for (PetscInt c = 0; c < op->num_components; ++c) {
-    PetscCall(PetscCalloc1(region.num_owned_cells, &region_data->values[c]));
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt i = 0; i < region.num_owned_cells; ++i) {
       PetscInt owned_cell_id    = region.owned_cell_global_ids[i];
       region_data->values[c][i] = values[owned_cell_id][c];
@@ -900,17 +914,15 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
-  PetscInt num_components = op->num_components;
-  CeedScalar(*values)[num_components];
+  PetscInt num_comp = region_data->num_components;
+  CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = region_data->array_pointer;
-  for (PetscInt c = 0; c < num_components; ++c) {
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt i = 0; i < region.num_owned_cells; ++i) {
       PetscInt owned_cell_id   = region.owned_cell_global_ids[i];
       values[owned_cell_id][c] = region_data->values[c][i];
     }
-    PetscCall(PetscFree(region_data->values[c]));
   }
-  PetscCall(PetscFree(region_data->values));
 
   // release the array
   CeedOperatorField field;
@@ -919,7 +931,6 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
   PetscCallCEED(CeedVectorRestoreArray(vec, &region_data->array_pointer));
 
-  *region_data = (OperatorData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -928,15 +939,11 @@ static PetscErrorCode GetPetscSourceOperatorRegionData(Operator *op, RDyRegion r
 
   PetscReal *data;
   PetscCall(VecGetArray(vec, &data));
-  *region_data = (OperatorData){
-      .num_components = op->num_components,
-  };
-  PetscCall(PetscCalloc1(op->num_components, &region_data->values));
-  for (PetscInt c = 0; c < op->num_components; ++c) {
-    PetscCall(PetscCalloc1(region.num_owned_cells, &region_data->values[c]));
+  PetscInt num_comp = region_data->num_components;
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt ce = 0; ce < region.num_owned_cells; ++ce) {
       PetscInt owned_cell_id     = region.owned_cell_global_ids[ce];
-      region_data->values[c][ce] = data[op->num_components * owned_cell_id + c];
+      region_data->values[c][ce] = data[num_comp * owned_cell_id + c];
     }
   }
   region_data->array_pointer = data;
@@ -947,17 +954,15 @@ static PetscErrorCode GetPetscSourceOperatorRegionData(Operator *op, RDyRegion r
 static PetscErrorCode RestorePetscSourceOperatorRegionData(Operator *op, RDyRegion region, Vec vec, OperatorData *region_data) {
   PetscFunctionBegin;
 
-  PetscReal *data = region_data->array_pointer;
-  for (PetscInt c = 0; c < op->num_components; ++c) {
+  PetscInt   num_comp = region_data->num_components;
+  PetscReal *data     = region_data->array_pointer;
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt ce = 0; ce < region.num_owned_cells; ++ce) {
-      PetscInt owned_cell_id                       = region.owned_cell_global_ids[ce];
-      data[op->num_components * owned_cell_id + c] = region_data->values[c][ce];
+      PetscInt owned_cell_id             = region.owned_cell_global_ids[ce];
+      data[num_comp * owned_cell_id + c] = region_data->values[c][ce];
     }
-    PetscCall(PetscFree(region_data->values[c]));
   }
-  PetscCall(PetscFree(region_data->values));
   PetscCall(VecRestoreArray(vec, &data));
-  *region_data = (OperatorData){0};
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -974,8 +979,7 @@ PetscErrorCode GetOperatorRegionalExternalSource(Operator *op, RDyRegion region,
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorRegion(op, region, comm));
 
-  source_data->num_components = op->num_components;
-  PetscCall(PetscCalloc1(op->num_components, &source_data->values));
+  PetscCall(CreateOperatorRegionData(op, region, op->num_components, source_data));
   if (CeedEnabled()) {
     PetscCall(GetCeedSourceOperatorRegionData(op, region, "swe_src", source_data));
   } else {  // petsc
@@ -1003,6 +1007,7 @@ PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *op, RDyRegion reg
   } else {
     PetscCallCEED(RestorePetscSourceOperatorRegionData(op, region, op->petsc.external_sources, source_data));
   }
+  PetscCall(DestroyOperatorData(source_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1012,7 +1017,7 @@ PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *op, RDyRegion reg
 //------------------------------------------
 
 const char *material_property_names[] = {
-    "manning",
+    "mannings_n",
 };
 
 /// Provides read-write access to the operator's material property array data
@@ -1030,9 +1035,7 @@ PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *op, RDyRegion regio
   PetscCall(CheckOperatorRegion(op, region, comm));
 
   // NOTE: only single-component material property data currently supported!
-  property_data->num_components = 1;
-  PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
-
+  PetscCall(CreateOperatorRegionData(op, region, 1, property_data));
   switch (property_id) {
     case OPERATOR_MANNINGS:
       if (CeedEnabled()) {
@@ -1074,6 +1077,7 @@ PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *op, RDyRegion r
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
+  PetscCall(DestroyOperatorData(property_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1081,6 +1085,16 @@ PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *op, RDyRegion r
 //--------------------------------------
 // Domain (Cell-Centered) Operator Data
 //--------------------------------------
+
+static PetscErrorCode CreateOperatorDomainData(Operator *op, PetscInt num_comp, OperatorData *data) {
+  PetscFunctionBegin;
+  data->num_components = num_comp;
+  PetscCall(PetscCalloc1(num_comp, &data->values));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    PetscCall(PetscCalloc1(op->mesh->num_owned_cells, &data->values[c]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *field_name, OperatorData *domain_data) {
   PetscFunctionBegin;
@@ -1096,15 +1110,11 @@ static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
   // copy out operator data
-  *domain_data = (OperatorData){
-      .num_components = op->num_components,
-  };
+  PetscInt num_comp = domain_data->num_components;
   PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &domain_data->array_pointer));
-  CeedScalar(*values)[op->num_components];
+  CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = domain_data->array_pointer;
-  PetscCall(PetscCalloc1(op->num_components, &domain_data->values));
-  for (PetscInt c = 0; c < op->num_components; ++c) {
-    PetscCall(PetscCalloc1(op->mesh->num_owned_cells, &domain_data->values[c]));
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
       domain_data->values[c][i] = values[i][c];
     }
@@ -1120,16 +1130,14 @@ static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const ch
   CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
-  PetscInt num_components = op->num_components;
-  CeedScalar(*values)[num_components];
+  PetscInt num_comp = domain_data->num_components;
+  CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = domain_data->array_pointer;
-  for (PetscInt c = 0; c < num_components; ++c) {
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
       values[i][c] = domain_data->values[c][i];
     }
-    PetscCall(PetscFree(domain_data->values[c]));
   }
-  PetscCall(PetscFree(domain_data->values));
 
   // release the array
   CeedOperatorField field;
@@ -1147,14 +1155,10 @@ static PetscErrorCode GetPetscSourceOperatorDomainData(Operator *op, Vec vec, Op
 
   PetscReal *data;
   PetscCall(VecGetArray(vec, &data));
-  *domain_data = (OperatorData){
-      .num_components = op->num_components,
-  };
-  PetscCall(PetscCalloc1(op->num_components, &domain_data->values));
-  for (PetscInt c = 0; c < op->num_components; ++c) {
-    PetscCall(PetscCalloc1(op->mesh->num_owned_cells, &domain_data->values[c]));
+  PetscInt num_comp = domain_data->num_components;
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
-      domain_data->values[c][i] = data[op->num_components * i + c];
+      domain_data->values[c][i] = data[num_comp * i + c];
     }
   }
   domain_data->array_pointer = data;
@@ -1165,14 +1169,13 @@ static PetscErrorCode GetPetscSourceOperatorDomainData(Operator *op, Vec vec, Op
 static PetscErrorCode RestorePetscSourceOperatorDomainData(Operator *op, Vec vec, OperatorData *domain_data) {
   PetscFunctionBegin;
 
-  PetscReal *data = domain_data->array_pointer;
-  for (PetscInt c = 0; c < op->num_components; ++c) {
+  PetscInt   num_comp = domain_data->num_components;
+  PetscReal *data     = domain_data->array_pointer;
+  for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt i = 0; i < op->mesh->num_owned_cells; ++i) {
-      data[op->num_components * i + c] = domain_data->values[c][i];
+      data[num_comp * i + c] = domain_data->values[c][i];
     }
-    PetscCall(PetscFree(domain_data->values[c]));
   }
-  PetscCall(PetscFree(domain_data->values));
   PetscCall(VecRestoreArray(vec, &data));
   *domain_data = (OperatorData){0};
 
@@ -1189,8 +1192,7 @@ PetscErrorCode GetOperatorDomainExternalSource(Operator *op, OperatorData *sourc
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
-  source_data->num_components = op->num_components;
-  PetscCall(PetscCalloc1(op->num_components, &source_data->values));
+  PetscCall(CreateOperatorDomainData(op, op->num_components, source_data));
   if (CeedEnabled()) {
     PetscCall(GetCeedSourceOperatorDomainData(op, "swe_src", source_data));
   } else {  // petsc
@@ -1216,6 +1218,7 @@ PetscErrorCode RestoreOperatorDomainExternalSource(Operator *op, OperatorData *s
   } else {
     PetscCallCEED(RestorePetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
   }
+  PetscCall(DestroyOperatorData(source_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1232,9 +1235,7 @@ PetscErrorCode GetOperatorDomainMaterialProperty(Operator *op, OperatorMaterialP
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
   // NOTE: only single-component material property data currently supported!
-  property_data->num_components = 1;
-  PetscCall(PetscCalloc1(property_data->num_components, &property_data->values));
-
+  PetscCall(CreateOperatorDomainData(op, 1, property_data));
   switch (property_id) {
     case OPERATOR_MANNINGS:
       if (CeedEnabled()) {
@@ -1274,6 +1275,7 @@ PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *op, OperatorMater
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
   }
+  PetscCall(DestroyOperatorData(property_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
