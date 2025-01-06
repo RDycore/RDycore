@@ -142,10 +142,10 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
-  /* FIXME: we need to figure out how the operator fits into this
-  if ((*rdy)->ceed.host_fluxes) PetscCall(VecDestroy(&(*rdy)->ceed.host_fluxes));
-  if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
-  */
+
+  for (PetscInt i = 0; i < (*rdy)->diag_fields.num_fields; ++i) {
+    if ((*rdy)->diag_vecs[i]) PetscCall(VecDestroy(&(*rdy)->diag_vecs[i]));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

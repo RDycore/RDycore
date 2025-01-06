@@ -5,6 +5,7 @@
 #include <petsc/private/petscimpl.h>
 #include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
+#include <private/rdydmimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -89,8 +90,10 @@ struct _p_RDy {
   DM        dm;
   PetscBool refine;
 
-  // Auxiliary DM for diagnostics
-  DM aux_dm;
+  // auxiliary DM for diagnostics (stored as components in a single field)
+  DM               aux_dm;
+  SectionFieldSpec diag_fields;
+  Vec              diag_vecs[MAX_NUM_SECTION_FIELDS];
 
   // mesh representing simulation domain
   RDyMesh mesh;

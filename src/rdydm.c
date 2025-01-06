@@ -217,12 +217,7 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
   // create an auxiliary section with a diagnostic parameter.
-  SectionFieldSpec cc_spec = {
-      .num_fields    = 1,
-      .num_field_dof = {1},
-      .field_names   = {"Parameter"},
-  };
-  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, cc_spec, &rdy->aux_dm));
+  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, rdy->diag_fields, &rdy->aux_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -235,6 +230,12 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecDuplicate(rdy->u_global, &rdy->rhs));
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
+
+  // diagnostics are stored in single-component vectors
+  for (PetscInt i = 0; i < rdy->diag_fields.num_fields; ++i) {
+    PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diag_vecs[i]));
+    PetscCall(VecZeroEntries(rdy->diag_vecs[i]));
+  }
 
   /* FIXME: Figure out where we do this in the operator)
   if (CeedEnabled()) {

@@ -1093,9 +1093,20 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(PrintConfig(rdy));
 
   RDyLogDebug(rdy, "Creating DMs...");
-  PetscCall(CreateDM(rdy));           // for mesh and solution vector
-  PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
-  PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
+
+  // create the primary DM that stores the mesh and solution vector
+  PetscCall(CreateDM(rdy));
+
+  // create the auxiliary DM, which handles diagnostics and I/O
+  rdy->diag_fields = (SectionFieldSpec){
+      .num_fields    = 1,
+      .num_field_dof = {1},
+      .field_names   = {"Parameter"},
+  };
+  PetscCall(CreateAuxiliaryDM(rdy));
+
+  // create global and local vectors
+  PetscCall(CreateVectors(rdy));
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));

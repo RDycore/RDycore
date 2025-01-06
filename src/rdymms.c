@@ -162,9 +162,20 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   }
 
   RDyLogDebug(rdy, "Creating DMs...");
-  PetscCall(CreateDM(rdy));           // for mesh and solution vector
-  PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
-  PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
+
+  // create the primary DM that stores the mesh and solution vector
+  PetscCall(CreateDM(rdy));
+
+  // create the auxiliary DM, which handles diagnostics and I/O
+  rdy->diag_fields = (SectionFieldSpec){
+      .num_fields    = 3,
+      .num_field_dof = {1                   },
+      .field_names   = { "Error(height)", "Error(MomentumX)", "Errory(MomentumY)"},
+  };
+  PetscCall(CreateAuxiliaryDM(rdy));
+
+  // create global and local vectors
+  PetscCall(CreateVectors(rdy));
 
   // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
   PetscCall(SnapVerticesToBathymetry(rdy));

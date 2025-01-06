@@ -3,15 +3,11 @@
 #include <rdycore.h>
 #include <string.h>
 
-static PetscErrorCode WriteFieldData(MPI_Comm comm, DM dm, Vec global_vec, char file_name[PETSC_MAX_PATH_LEN], char group_name[PETSC_MAX_PATH_LEN],
-                                     PetscFileMode file_mode) {
+static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) {
   PetscFunctionBegin;
 
-  PetscViewer viewer;
-  PetscCall(PetscViewerHDF5Open(comm, file_name, file_mode, &viewer));
-  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
-  PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
-  PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
   // create and populate a multi-component vector
   Vec       data_vec;
@@ -30,45 +26,48 @@ static PetscErrorCode WriteFieldData(MPI_Comm comm, DM dm, Vec global_vec, char 
   PetscSection section;
   PetscCall(DMGetLocalSection(dm, &section));
 
-  // the section should contain a single field with a number of components
-  // equal to the block size of the data vector
+  // each field has a number of components equal to the block size of its vector
+  // NOTE: at the moment, we assume every field in a section has the same number
+  // NOTE: of components!
   PetscInt num_fields, num_comp, bs;
   PetscCall(PetscSectionGetNumFields(section, &num_fields));
-  PetscCheck(num_fields == 1, comm, PETSC_ERR_USER, "Primary DM section has %" PetscInt_FMT " fields (should contain 1)", num_fields);
-  PetscCall(PetscSectionGetFieldComponents(section, 0, &num_comp));
-  PetscCall(VecGetBlockSize(data_vec, &bs));
-  PetscCheck(num_comp == bs, comm, PETSC_ERR_USER,
-             "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, num_comp);
+  for (PetscInt f = 0; f < num_fields; ++f) {
+    PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
+    PetscCall(VecGetBlockSize(data_vec, &bs));
+    PetscCheck(num_comp == bs, comm, PETSC_ERR_USER,
+               "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, num_comp);
 
-  // extract each component into a separate vector and write it to the group
-  Vec     *comp;  // array of single-component vectors
-  PetscInt n, N;
-  PetscCall(VecGetLocalSize(data_vec, &n));
-  PetscCall(VecGetSize(data_vec, &N));
-  PetscCall(PetscMalloc1(bs, &comp));
-  for (PetscInt c = 0; c < bs; ++c) {
-    PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp[c]));
-    const char *comp_name;
-    PetscCall(PetscSectionGetComponentName(section, 0, c, &comp_name));
-    PetscCall(PetscObjectSetName((PetscObject)comp[c], comp_name));
+    // extract each component into a separate vector and write it to the group
+    Vec     *comp;  // array of single-component vectors
+    PetscInt n, N;
+    PetscCall(VecGetLocalSize(data_vec, &n));
+    PetscCall(VecGetSize(data_vec, &N));
+    PetscCall(PetscMalloc1(bs, &comp));
+    for (PetscInt c = 0; c < bs; ++c) {
+      PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp[c]));
+      const char *name;
+      if (num_comp == 1) {
+        // for single-component fields, use the field name
+        PetscCall(PetscSectionGetFieldName(section, f, &name));
+      } else {
+        PetscCall(PetscSectionGetComponentName(section, f, c, &name));
+      }
+      PetscCall(PetscObjectSetName((PetscObject)comp[c], name));
+    }
+    PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
+    for (PetscInt c = 0; c < bs; ++c) {
+      PetscCall(VecView(comp[c], viewer));
+      PetscCall(VecDestroy(&comp[c]));
+    }
+    PetscCall(PetscFree(comp));
   }
-  PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
-  for (PetscInt c = 0; c < bs; ++c) {
-    PetscCall(VecView(comp[c], viewer));
-    PetscCall(VecDestroy(&comp[c]));
-  }
-  PetscCall(PetscFree(comp));
 
-  // clean up
   if (use_natural) PetscCall(VecDestroy(&data_vec));  // FIXME: does this leave an extra ref in non-natural case?
-  PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerPopFormat(viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, char file_name[PETSC_MAX_PATH_LEN]) {
+static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, const char *file_name) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -111,14 +110,54 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
 
   RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 output at t = %g %s to %s", step, time, units, file_name);
 
-  // write solution data for the primary DM
-  PetscCall(WriteFieldData(rdy->comm, rdy->dm, rdy->u_global, file_name, group_name, file_mode));
+  // write solution data for the primary and auxiliary DMs
+  PetscViewer viewer;
+  PetscCall(PetscViewerHDF5Open(rdy->comm, file_name, file_mode, &viewer));
+  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
+  PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
+  PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
+  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, viewer));
+  for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
+    PetscCall(WriteFieldData(rdy->aux_dm, rdy->diag_vecs[f], viewer));
+  }
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscCall(PetscViewerPopFormat(viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
 
   // write the grid if we're the first step in a batch.
   if (dataset % rdy->config.output.batch_size == 0) {
     PetscCall(WriteGrid(rdy->comm, &rdy->mesh, file_name));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode WriteFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5_basename, const char *group_name, DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  // write cell field metadata
+  PetscSection section;
+  PetscInt     num_fields, num_comp;
+  PetscCall(DMGetLocalSection(dm, &section));
+  PetscCall(PetscSectionGetNumFields(section, &num_fields));
+  for (PetscInt f = 0; f < num_fields; ++f) {
+    PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
+    for (PetscInt c = 0; c < num_comp; ++c) {
+      const char *name;
+      if (num_comp == 1) {
+        PetscCall(PetscSectionGetFieldName(section, f, &name));
+      } else {
+        PetscCall(PetscSectionGetComponentName(section, f, c, &name));
+      }
+      PetscCall(PetscFPrintf(comm, fp,
+                             "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
+                             "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
+                             "          %s:/%s/%s\n"
+                             "        </DataItem>\n"
+                             "      </Attribute>\n",
+                             name, mesh->num_cells_global, h5_basename, group_name, name));
+    }
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -196,22 +235,8 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                            geometric_cell_field_names[f], mesh->num_cells_global, h5_basename, geometric_cell_field_names[f]));
   }
 
-  // write cell field metadata
-  PetscSection section;
-  PetscInt     num_comp;
-  PetscCall(DMGetLocalSection(rdy->dm, &section));
-  PetscCall(PetscSectionGetFieldComponents(section, 0, &num_comp));
-  for (int f = 0; f < 3; ++f) {
-    const char *comp_name;
-    PetscCall(PetscSectionGetComponentName(section, 0, f, &comp_name));
-    PetscCall(PetscFPrintf(rdy->comm, fp,
-                           "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
-                           "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                           "          %s:/%s/%s\n"
-                           "        </DataItem>\n"
-                           "      </Attribute>\n",
-                           comp_name, mesh->num_cells_global, h5_basename, time_group, comp_name));
-  }
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, rdy->aux_dm, &rdy->mesh));
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
 
