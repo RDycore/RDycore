@@ -37,8 +37,8 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) 
     PetscCheck(num_comp == bs, comm, PETSC_ERR_USER,
                "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, num_comp);
 
-    // extract each component into a separate vector and write it to the group
-    Vec     *comp;  // array of single-component vectors
+    // extract each component into a separate vector and write it
+    Vec     *comp;
     PetscInt n, N;
     PetscCall(VecGetLocalSize(data_vec, &n));
     PetscCall(VecGetSize(data_vec, &N));
@@ -67,25 +67,20 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, const char *file_name) {
+static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer) {
   PetscFunctionBegin;
 
-  PetscViewer viewer;
-  char        group_name[1025];
-  snprintf(group_name, 1024, "Domain");
-  PetscCall(PetscViewerHDF5Open(comm, file_name, FILE_MODE_APPEND, &viewer));
-  PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
-  PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "Domain"));
 
   PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
   PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
+
+  // NOTE: for some reason, these get deposited into the "fields" group(!)
   PetscCall(VecView(mesh->output.xc, viewer));
   PetscCall(VecView(mesh->output.yc, viewer));
   PetscCall(VecView(mesh->output.zc, viewer));
 
   PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerPopFormat(viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -100,10 +95,6 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(DetermineOutputFile(rdy, step, time, "h5", file_name));
   const char *units = TimeUnitAsString(rdy->config.time.unit);
 
-  // construct a group name that encodes the step, time, units
-  char group_name[PETSC_MAX_PATH_LEN];
-  snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
-
   // create or append to a file depending on whether this step is the first in a dataset
   PetscInt      dataset   = step / rdy->config.output.step_interval;
   PetscFileMode file_mode = (dataset % rdy->config.output.batch_size == 0) ? FILE_MODE_WRITE : FILE_MODE_APPEND;
@@ -115,19 +106,24 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerHDF5Open(rdy->comm, file_name, file_mode, &viewer));
   PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
   PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
+
+  // write time-dependent solution and diagnostic fields
+  char group_name[PETSC_MAX_PATH_LEN];
+  snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
   PetscCall(WriteFieldData(rdy->dm, rdy->u_global, viewer));
   for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
     PetscCall(WriteFieldData(rdy->aux_dm, rdy->diag_vecs[f], viewer));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
-  PetscCall(PetscViewerPopFormat(viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
 
   // write the grid if we're the first step in a batch.
   if (dataset % rdy->config.output.batch_size == 0) {
-    PetscCall(WriteGrid(rdy->comm, &rdy->mesh, file_name));
+    PetscCall(WriteGrid(rdy->comm, &rdy->mesh, viewer));
   }
+
+  PetscCall(PetscViewerPopFormat(viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -224,15 +220,16 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                          "      </Geometry>\n",
                          num_vertices, h5_basename));
 
-  const char *geometric_cell_field_names[3] = {"XC", "YC", "ZC"};
+  // write out mesh coordinates (data placed in "fields" group for some reason)
+  const char *grid_coord_names[3] = {"XC", "YC", "ZC"};
   for (int f = 0; f < 3; ++f) {
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                           "          %s:/Domain/%s\n"
+                           "          %s:/fields/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
-                           geometric_cell_field_names[f], mesh->num_cells_global, h5_basename, geometric_cell_field_names[f]));
+                           grid_coord_names[f], mesh->num_cells_global, h5_basename, grid_coord_names[f]));
   }
 
   PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));

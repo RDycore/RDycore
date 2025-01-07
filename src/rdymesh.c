@@ -1120,10 +1120,9 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   // create a local DM
   DM               local_dm;
   SectionFieldSpec local_spec = {
-      .num_fields            = 1,
-      .num_field_components  = {1},
-      .field_names           = {"Cell Coordinates"},
-      .field_component_names = {{"XC", "YC", "ZC"}},
+      .num_fields           = 1,
+      .num_field_components = {1},
+      .field_names          = {"Cell Coordinates"},
   };
 
   PetscCall(CreateCellCenteredDMFromDM(dm, local_spec, &local_dm));
@@ -1153,7 +1152,7 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
       PetscInt icell = cells->owned_to_local[c];
       vec_ptr[c]     = cells->centroids[icell].X[idim];
     }
-    PetscCall(VecGetArray(global_vec, &vec_ptr));
+    PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
     // scatter the data from global to natural order
     PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));

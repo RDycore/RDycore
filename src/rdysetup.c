@@ -1098,7 +1098,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   rdy->soln_fields = (SectionFieldSpec){
       .num_fields            = 1,
       .num_field_components  = {3},
-      .field_names           = {"solution"},
+      .field_names           = {"Solution"},
       .field_component_names = {{
           "Height",
           "MomentumX",
