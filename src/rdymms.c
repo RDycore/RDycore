@@ -164,14 +164,26 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   RDyLogDebug(rdy, "Creating DMs...");
 
   // create the primary DM that stores the mesh and solution vector
+  rdy->soln_fields = (SectionFieldSpec){
+      .num_fields            = 1,
+      .num_field_components  = {3},
+      .field_names           = {"solution"},
+      .field_component_names = {{
+          "Height",
+          "MomentumX",
+          "MomentumY",
+      }},
+  };
   PetscCall(CreateDM(rdy));
 
-  // create the auxiliary DM, which handles diagnostics and I/O
+  // create the auxiliary DM, which contains error fields for each of the solution fields
   rdy->diag_fields = (SectionFieldSpec){
-      .num_fields    = 3,
-      .num_field_dof = {1                   },
-      .field_names   = { "Error(height)", "Error(MomentumX)", "Errory(MomentumY)"},
+      .num_fields           = rdy->soln_fields.num_fields,
+      .num_field_components = {1, 1, 1},
   };
+  for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
+    sprintf(rdy->diag_fields.field_names[f], "Error(%s)", rdy->soln_fields.field_names[f]);
+  }
   PetscCall(CreateAuxiliaryDM(rdy));
 
   // create global and local vectors

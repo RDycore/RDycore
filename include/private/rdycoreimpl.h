@@ -61,13 +61,6 @@ extern PetscClassId RDY_CLASSID;
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);
 
-  // Implementation-specific context pointer
-  void *context;
-
-  //------------------------------------------------------------------
-  // TODO: The fields below are subject to change as we find our way!
-  //------------------------------------------------------------------
-
   // MPI communicator used for the simulation
   MPI_Comm comm;
   // global MPI communicator, used for ensemble analysis (equivalent to comm for
@@ -87,8 +80,9 @@ struct _p_RDy {
   RDyConfig config;
 
   // PETSc (DMPlex) grid
-  DM        dm;
-  PetscBool refine;
+  DM               dm;
+  SectionFieldSpec soln_fields;
+  PetscBool        refine;
 
   // auxiliary DM for diagnostics (stored as components in a single field)
   DM               aux_dm;

@@ -4,101 +4,63 @@
 #include <private/rdydmimpl.h>
 #include <rdycore.h>
 
-// Maximum length of the name of a prognostic or diagnostic field component
-#define MAX_COMP_NAME_LENGTH 20
-
-/// Create a new cell-centered DM (cc_dm) from a given DM and adds a number of given
-/// cell-centered fields as Sections in the new DM.
-PetscErrorCode CloneAndCreateCellCenteredDM(DM dm, const SectionFieldSpec cc_spec, DM *cc_dm) {
-  PetscFunctionBegin;
-
-  PetscCall(DMClone(dm, cc_dm));
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-
-  PetscSection cc_section;
-  PetscCall(PetscSectionCreate(comm, &cc_section));
-  PetscCall(PetscSectionSetNumFields(cc_section, cc_spec.num_fields));
-  PetscInt n_cc_field_dof_tot = 0;
-  for (PetscInt f = 0; f < cc_spec.num_fields; ++f) {
-    PetscInt num_field_dof = cc_spec.num_field_dof[f];
-    PetscCall(PetscSectionSetFieldName(cc_section, f, cc_spec.field_names[f]));
-    PetscCall(PetscSectionSetFieldComponents(cc_section, f, num_field_dof));
-    n_cc_field_dof_tot += num_field_dof;
-  }
-
-  // set the number of cell-centered degrees of freedom in each field
-  PetscInt c_start, c_end;  // starting and ending cell points
-  DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
-  PetscCall(PetscSectionSetChart(cc_section, c_start, c_end));
-  for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < cc_spec.num_fields; ++f) {
-      PetscCall(PetscSectionSetFieldDof(cc_section, c, f, cc_spec.num_field_dof[f]));
-    }
-    PetscCall(PetscSectionSetDof(cc_section, c, n_cc_field_dof_tot));
-  }
-
-  // embed the section's data in the cell-centered DM
-  PetscCall(PetscSectionSetUp(cc_section));
-  PetscCall(DMSetLocalSection(*cc_dm, cc_section));
-  PetscCall(PetscSectionViewFromOptions(cc_section, NULL, "-aux_layout_view"));
-  PetscCall(PetscSectionDestroy(&cc_section));
-
-  PetscInt refine_level;
-  DMGetRefineLevel(dm, &refine_level);
-
-  if (!refine_level) {
-    // copy adjacency info from the primary DM
-    PetscSF sf_migration, sf_natural;
-    PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));
-    PetscCall(DMPlexCreateGlobalToNaturalSF(*cc_dm, cc_section, sf_migration, &sf_natural));
-    PetscCall(DMPlexSetGlobalToNaturalSF(*cc_dm, sf_natural));
-    PetscCall(PetscSFDestroy(&sf_natural));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// This function creates a Section appropriate for use by the given (primary) DM.
-static PetscErrorCode CreateDMSection(RDyPhysicsSection physics_config, DM dm, PetscSection *sec) {
+static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields, PetscSection *sec) {
   PetscFunctionBeginUser;
-
-  // set up fields for the shallow water equations
-  // FIXME: generalize using physics_config
-  PetscInt    num_fields             = 1;
-  PetscInt    num_field_components[] = {3};
-  const char *component_names[3]     = {
-          "Height",
-          "MomentumX",
-          "MomentumY",
-  };
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
   PetscCall(PetscSectionCreate(comm, sec));
-  PetscCall(PetscSectionSetNumFields(*sec, num_fields));
-
-  PetscInt num_total_dofs = 0;
-  for (PetscInt f = 0; f < num_fields; ++f) {
-    PetscCall(PetscSectionSetFieldComponents(*sec, f, num_field_components[f]));
-    for (PetscInt c = 0; c < num_field_components[f]; ++c, ++num_total_dofs) {
-      PetscCall(PetscSectionSetComponentName(*sec, f, c, component_names[c]));
+  PetscCall(PetscSectionSetNumFields(*sec, fields.num_fields));
+  PetscInt dof_per_cell = 0;
+  for (PetscInt f = 0; f < fields.num_fields; ++f) {
+    PetscCall(PetscSectionSetFieldName(*sec, f, fields.field_names[f]));
+    PetscCall(PetscSectionSetFieldComponents(*sec, f, fields.num_field_components[f]));
+    dof_per_cell += fields.num_field_components[f];
+    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
+      if (fields.field_component_names[f][c][0]) {
+        PetscCall(PetscSectionSetComponentName(*sec, f, c, fields.field_component_names[f][c]));
+      }
     }
   }
 
-  // set the number of degrees of freedom in each cell
-  PetscInt c_start, c_end;  // starting and ending cell points
+  // set the number of degrees of freedom for each field in each cell
+  PetscInt c_start, c_end;
   PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
   PetscCall(PetscSectionSetChart(*sec, c_start, c_end));
   for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < num_fields; ++f) {
-      PetscCall(PetscSectionSetFieldDof(*sec, c, f, num_field_components[f]));
+    for (PetscInt f = 0; f < fields.num_fields; ++f) {
+      PetscCall(PetscSectionSetFieldDof(*sec, c, f, fields.num_field_components[f]));
     }
-    PetscCall(PetscSectionSetDof(*sec, c, num_total_dofs));
+    PetscCall(PetscSectionSetDof(*sec, c, dof_per_cell));
   }
   PetscCall(PetscSectionSetUp(*sec));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode CreateCellCenteredDMFromDM(DM dm, const SectionFieldSpec fields, DM *cc_dm) {
+  PetscFunctionBegin;
+
+  PetscCall(DMClone(dm, cc_dm));
+
+  PetscSection section;
+  PetscCall(CreateDMSection(*cc_dm, fields, &section));
+  PetscCall(DMSetLocalSection(*cc_dm, section));
+  PetscCall(PetscSectionViewFromOptions(section, NULL, "-aux_layout_view"));
+  PetscCall(PetscSectionDestroy(&section));  // NOTE: yes, here and not below!
+
+  PetscInt refine_level;
+  DMGetRefineLevel(dm, &refine_level);
+  if (!refine_level) {
+    // copy adjacency info from the original DM
+    PetscSF sf_migration, sf_natural;
+    PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));
+    PetscCall(DMPlexCreateGlobalToNaturalSF(*cc_dm, section, sf_migration, &sf_natural));
+    PetscCall(DMPlexSetGlobalToNaturalSF(*cc_dm, sf_natural));
+    PetscCall(PetscSFDestroy(&sf_natural));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -138,7 +100,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   // NOTE Need to create section before distribution, so that natural map can be created
   // create a section with (h, hu, hv) as degrees of freedom
   if (!rdy->refine) {
-    PetscCall(CreateDMSection(rdy->config.physics, rdy->dm, &sec));
+    PetscCall(CreateDMSection(rdy->dm, rdy->soln_fields, &sec));
     // embed the section's data in our grid and toss the section
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   }
@@ -182,7 +144,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // create parallel section and global-to-natural mapping
   if (rdy->refine) {
-    PetscCall(CreateDMSection(rdy->config.physics, rdy->dm, &sec));
+    PetscCall(CreateDMSection(rdy->dm, rdy->soln_fields, &sec));
     PetscCall(DMSetLocalSection(rdy->dm, sec));
   } else if (size > 1) {
     PetscSF      sfMigration, sfNatural;
@@ -216,9 +178,14 @@ PetscErrorCode CreateDM(RDy rdy) {
 PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
-  // create an auxiliary section with a diagnostic parameter.
-  PetscCall(CloneAndCreateCellCenteredDM(rdy->dm, rdy->diag_fields, &rdy->aux_dm));
+  // diagnostic fields must all have one component
+  for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
+    PetscCheck(rdy->diag_fields.num_field_components[f] == 1, rdy->comm, PETSC_ERR_USER,
+               "Diagnostic field '%s' has %" PetscInt_FMT " components (must have 1)", rdy->diag_fields.field_names[f],
+               rdy->diag_fields.num_field_components[f]);
+  }
 
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->diag_fields, &rdy->aux_dm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

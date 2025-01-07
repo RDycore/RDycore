@@ -1095,13 +1095,23 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Creating DMs...");
 
   // create the primary DM that stores the mesh and solution vector
+  rdy->soln_fields = (SectionFieldSpec){
+      .num_fields            = 1,
+      .num_field_components  = {3},
+      .field_names           = {"solution"},
+      .field_component_names = {{
+          "Height",
+          "MomentumX",
+          "MomentumY",
+      }},
+  };
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which handles diagnostics and I/O
   rdy->diag_fields = (SectionFieldSpec){
-      .num_fields    = 1,
-      .num_field_dof = {1},
-      .field_names   = {"Parameter"},
+      .num_fields           = 1,
+      .num_field_components = {1},
+      .field_names          = {"Parameter"},
   };
   PetscCall(CreateAuxiliaryDM(rdy));
 

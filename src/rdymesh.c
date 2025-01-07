@@ -843,7 +843,7 @@ static PetscErrorCode SaveNaturalCellIDs(DM dm, PetscInt num_cells, RDyCells *ce
     PetscCall(VecGetArray(natural, &entries));
     for (PetscInt i = 0; i < natural_size; ++i) {
       if (i % num_fields == 0) {
-        entries[i] = (natural_start + i) / num_fields;
+        entries[i] = 1.0 * (natural_start + i) / num_fields;
       } else {
         entries[i] = -(rank + 1);
       }
@@ -1002,12 +1002,12 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   // create a local DM
   DM               local_dm;
   PetscInt         max_num_vertices = 4;
-  SectionFieldSpec aux_spec         = {
-              .num_fields    = 1,
-              .num_field_dof = {max_num_vertices},
-              .field_names   = {"Cell Connections"},
+  SectionFieldSpec field_spec       = {
+            .num_fields           = 1,
+            .num_field_components = {max_num_vertices},
+            .field_names          = {"Cell Connections"},
   };
-  PetscCall(CloneAndCreateCellCenteredDM(dm, aux_spec, &local_dm));
+  PetscCall(CreateCellCenteredDMFromDM(dm, field_spec, &local_dm));
 
   Vec          global_vec, natural_vec;
   PetscScalar *vec_ptr;
@@ -1120,12 +1120,13 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   // create a local DM
   DM               local_dm;
   SectionFieldSpec local_spec = {
-      .num_fields    = 1,
-      .num_field_dof = {1},
-      .field_names   = {"Cell Coordinates"},
+      .num_fields            = 1,
+      .num_field_components  = {1},
+      .field_names           = {"Cell Coordinates"},
+      .field_component_names = {{"XC", "YC", "ZC"}},
   };
 
-  PetscCall(CloneAndCreateCellCenteredDM(dm, local_spec, &local_dm));
+  PetscCall(CreateCellCenteredDMFromDM(dm, local_spec, &local_dm));
 
   Vec global_vec, natural_vec;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
