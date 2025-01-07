@@ -645,46 +645,48 @@ static PetscErrorCode ApplySource(void *context, PetscOperatorFields fields, Pet
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  for (PetscInt c = 0; c < mesh->num_owned_cells; ++c) {
-    PetscInt owned_cell_id = cells->local_to_owned[c];
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) {
+      PetscInt owned_cell_id = cells->local_to_owned[c];
 
-    PetscReal h  = u_ptr[n_dof * c + 0];
-    PetscReal hu = u_ptr[n_dof * c + 1];
-    PetscReal hv = u_ptr[n_dof * c + 2];
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal hu = u_ptr[n_dof * c + 1];
+      PetscReal hv = u_ptr[n_dof * c + 2];
 
-    PetscReal dz_dx = cells->dz_dx[c];
-    PetscReal dz_dy = cells->dz_dy[c];
+      PetscReal dz_dx = cells->dz_dx[c];
+      PetscReal dz_dy = cells->dz_dy[c];
 
-    PetscReal bedx = dz_dx * GRAVITY * h;
-    PetscReal bedy = dz_dy * GRAVITY * h;
+      PetscReal bedx = dz_dx * GRAVITY * h;
+      PetscReal bedy = dz_dy * GRAVITY * h;
 
-    PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
-    PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
+      PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
+      PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
 
-    PetscReal tbx = 0.0, tby = 0.0;
+      PetscReal tbx = 0.0, tby = 0.0;
 
-    if (h >= tiny_h) {  // wet conditions
-      PetscReal u = hu / h;
-      PetscReal v = hv / h;
+      if (h >= tiny_h) {  // wet conditions
+        PetscReal u = hu / h;
+        PetscReal v = hv / h;
 
-      // Manning's coefficient
-      PetscReal N_mannings = mannings_ptr[c];
+        // Manning's coefficient
+        PetscReal N_mannings = mannings_ptr[c];
 
-      // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
-      PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
+        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
 
-      PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
-      PetscReal tb       = Cd * velocity / h;
-      PetscReal factor   = tb / (1.0 + dt * tb);
+        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+        PetscReal tb       = Cd * velocity / h;
+        PetscReal factor   = tb / (1.0 + dt * tb);
 
-      tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
-      tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+        tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
+        tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+      }
+
+      // NOTE: we accumulate everything into the RHS vector by convention.
+      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+      f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
+      f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
     }
-
-    // NOTE: we accumulate everything into the RHS vector by convention.
-    f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
-    f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
-    f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
   }
 
   // restore vectors

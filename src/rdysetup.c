@@ -818,6 +818,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
           PetscCall(VecRestoreArray(local, &local_ptr));
           PetscCall(VecDestroy(&local));
         } else {
+          // FIXME: this assumes the shallow water equations!
           for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
             PetscInt owned_cell_id          = region.owned_cell_global_ids[c];
             u_ptr[ndof * owned_cell_id]     = mupEval(flow_ic.height);
