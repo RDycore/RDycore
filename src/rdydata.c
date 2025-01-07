@@ -111,8 +111,7 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
   PetscReal *u;
   PetscCall(VecGetArray(rdy->u_global, &u));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    PetscInt cell_id = rdy->mesh.cells.owned_to_local[i];
-    values[i]        = u[3 * cell_id + idof];
+    values[i] = u[3 * i + idof];
   }
   PetscCall(VecRestoreArray(rdy->u_global, &u));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -124,24 +123,21 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
 PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
-  PetscInt idof = 0;
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 0, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellXMomentums(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
-  PetscInt idof = 1;
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 1, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
-  PetscInt idof = 2;
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 2, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

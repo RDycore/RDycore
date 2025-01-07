@@ -254,8 +254,8 @@ program rdycore_f90
         end if
 
         PetscCallA(RDyGetLocalCellHeights(rdy_, n, h, ierr))
-        PetscCallA(RDyGetLocalCellXMomentums(rdy_, n, hu, ierr))
-        PetscCallA(RDyGetLocalCellYMomentums(rdy_, n, hv, ierr))
+        PetscCallA(RDyGetLocalCellXMomenta(rdy_, n, hu, ierr))
+        PetscCallA(RDyGetLocalCellYMomenta(rdy_, n, hv, ierr))
       end do
 
       deallocate(h, hu, hv, rain, bc_values, values, nat_id)

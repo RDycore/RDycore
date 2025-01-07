@@ -19,7 +19,7 @@ module rdycore
             RDySetDirichletBoundaryValues, &
             RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
             RDyGetStep, RDyGetCouplingInterval, RDySetCouplingInterval, &
-            RDyGetLocalCellHeights, RDyGetLocalCellXMomentums, RDyGetLocalCellYMomentums, &
+            RDyGetLocalCellHeights, RDyGetLocalCellXMomenta, RDyGetLocalCellYMomenta, &
             RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
             RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
@@ -226,14 +226,14 @@ module rdycore
       type(c_ptr), value, intent(in) :: h
     end function
 
-    integer(c_int) function rdygetlocaclellxmomentums_(rdy, size, hu) bind(c, name="RDyGetLocalCellXMomentums")
+    integer(c_int) function rdygetlocaclellxmomenta_(rdy, size, hu) bind(c, name="RDyGetLocalCellXMomenta")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hu
     end function
 
-    integer(c_int) function rdygetlocaclellymomentums_(rdy, size, hv) bind(c, name="RDyGetLocalCellYMomentums")
+    integer(c_int) function rdygetlocaclellymomenta_(rdy, size, hv) bind(c, name="RDyGetLocalCellYMomenta")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
@@ -644,20 +644,20 @@ contains
     ierr = rdygetlocalcellheights_(rdy_%c_rdy, size, c_loc(h))
   end subroutine
 
-  subroutine RDyGetLocalCellXMomentums(rdy_, size, hu, ierr)
+  subroutine RDyGetLocalCellXMomenta(rdy_, size, hu, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hu(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetlocaclellxmomentums_(rdy_%c_rdy, size, c_loc(hu))
+    ierr = rdygetlocaclellxmomenta_(rdy_%c_rdy, size, c_loc(hu))
   end subroutine
 
-  subroutine RDyGetLocalCellYMomentums(rdy_, size, hv, ierr)
+  subroutine RDyGetLocalCellYMomenta(rdy_, size, hv, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hv(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetlocaclellymomentums_(rdy_%c_rdy, size, c_loc(hv))
+    ierr = rdygetlocaclellymomenta_(rdy_%c_rdy, size, c_loc(hv))
   end subroutine
 
   subroutine RDyGetLocalCellXCentroids(rdy_, size, values, ierr)

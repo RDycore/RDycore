@@ -80,8 +80,8 @@ PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, const PetscInt, PetscInt*);
 
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDyGetLocalCellXMomentums(RDy rdy, const PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values);
