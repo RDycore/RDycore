@@ -218,7 +218,7 @@ file(COPY
 foreach(np 1) # test on 1 processes
   foreach(config basic ceed preload)
     foreach(lang c f90)
-      add_test(swe_roe_mixed_elements_ic_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} quad_tri_mesh.yaml -homogeneous_rain_files Houston1km.rain.${PETSC_ID_TYPE}.bin,Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_rain_region_ids 1,3 -homogeneous_bc_files Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin -homogeneous_bc_region_ids   1,2,4 ${${config}_args})
+      add_test(swe_roe_quad_tri_mesh_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} quad_tri_mesh.yaml -homogeneous_rain_files Houston1km.rain.${PETSC_ID_TYPE}.bin,Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_rain_region_ids 1,3 -homogeneous_bc_files Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin -homogeneous_bc_region_ids   1,2,4 ${${config}_args})
     endforeach()
   endforeach()
 endforeach()
