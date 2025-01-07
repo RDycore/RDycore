@@ -204,15 +204,5 @@ PetscErrorCode CreateVectors(RDy rdy) {
     PetscCall(VecZeroEntries(rdy->diag_vecs[i]));
   }
 
-  /* FIXME: Figure out where we do this in the operator)
-  if (CeedEnabled()) {
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->ceed.host_fluxes));
-  } else {
-    // initialize the sources vector
-    PetscCall(VecDuplicate(rdy->u_global, &rdy->petsc.sources));
-    PetscCall(VecZeroEntries(rdy->petsc.sources));
-  }
-  */
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }

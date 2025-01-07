@@ -109,7 +109,7 @@ static PetscErrorCode SnapVerticesToBathymetry(RDy rdy) {
 }
 
 // this function gets called at the beginning of each time step, updating
-// source terms and boundary conditions at a properly centered time
+// source terms and  boundary conditions at a properly centered time
 static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionBegin;
 
@@ -122,6 +122,38 @@ static PetscErrorCode MMSPreStep(TS ts) {
 
   PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t + 0.5 * dt));
   PetscCall(RDyMMSComputeSourceTerms(rdy, t + 0.5 * dt));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode MMSPostStep(TS ts) {
+  PetscFunctionBegin;
+
+  RDy rdy;
+  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
+
+  PetscReal t;
+  PetscCall(TSGetTime(ts, &t));
+
+  // compute the error vector and stuff its components into diagnostic fields
+  Vec error;
+  PetscCall(RDyCreatePrognosticVec(rdy, &error));
+  PetscCall(RDyMMSComputeSolution(rdy, t, error));
+  PetscCall(VecAYPX(error, -1.0, rdy->u_global));
+
+  PetscInt         num_comp = rdy->soln_fields.num_field_components[0];
+  const PetscReal *error_ptr;
+  PetscCall(VecGetArrayRead(error, &error_ptr));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    PetscReal *comp_ptr;
+    PetscCall(VecGetArray(rdy->diag_vecs[c], &comp_ptr));
+    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
+      comp_ptr[i] = error_ptr[num_comp * i + c];
+    }
+    PetscCall(VecRestoreArray(rdy->diag_vecs[c], &comp_ptr));
+  }
+  PetscCall(VecRestoreArrayRead(error, &error_ptr));
+  PetscCall(VecDestroy(&error));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -178,11 +210,11 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   // create the auxiliary DM, which contains error fields for each of the solution fields
   rdy->diag_fields = (SectionFieldSpec){
-      .num_fields           = rdy->soln_fields.num_fields,
+      .num_fields           = rdy->soln_fields.num_field_components[0],
       .num_field_components = {1, 1, 1},
   };
   for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
-    sprintf(rdy->diag_fields.field_names[f], "Error(%s)", rdy->soln_fields.field_names[f]);
+    sprintf(rdy->diag_fields.field_names[f], "Error(%s)", rdy->soln_fields.field_component_names[0][f]);
   }
   PetscCall(CreateAuxiliaryDM(rdy));
 
@@ -211,6 +243,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
+  PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
