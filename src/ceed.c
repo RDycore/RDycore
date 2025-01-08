@@ -1,7 +1,8 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 
-// global CEED context
+// global CEED resource and context
+static char ceed_resource[PETSC_MAX_PATH_LEN] = {0};
 static Ceed ceed_context;
 
 /// returns true iff CEED is enabled
@@ -33,6 +34,9 @@ PetscErrorCode GetCeedVecType(VecType *vec_type) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// this get called on process exit to clear the CEED resource
+static void ClearCeedResource(void) { SetCeedResource(NULL); }
+
 /// Sets the CEED resource string to the given string, initializing the global
 /// CEED context if the argument is specified. If CEED has already been enabled
 /// with a different resource, a call to this function deletes the global
@@ -41,12 +45,24 @@ PetscErrorCode GetCeedVecType(VecType *vec_type) {
 /// @param resource a CEED resource string, possibly empty or NULL
 PetscErrorCode SetCeedResource(char *resource) {
   PetscFunctionBegin;
+
   if (ceed_context) {  // we already have a context
+    // if it's the same as we're already using, do nothing
+    if (resource && !strcmp(resource, ceed_resource)) PetscFunctionReturn(PETSC_SUCCESS);
+
+    // otherwise clear the context before we reset it
     CeedDestroy(&ceed_context);
     ceed_context = NULL;
   }
   if (resource && resource[0]) {
     PetscCallCEED(CeedInit(resource, &ceed_context));
+    strncpy(ceed_resource, resource, PETSC_MAX_PATH_LEN);
+
+    static bool firstTime = true;
+    if (firstTime) {
+      PetscCall(RDyOnFinalize(ClearCeedResource));
+      firstTime = false;
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
