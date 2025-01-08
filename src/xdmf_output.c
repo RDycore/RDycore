@@ -26,23 +26,25 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) 
   PetscSection section;
   PetscCall(DMGetLocalSection(dm, &section));
 
-  // each field has a number of components equal to the block size of its vector
-  // NOTE: at the moment, we assume every field in a section has the same number
-  // NOTE: of components!
-  PetscInt num_fields, num_comp, bs;
+  // the block size of a vector is total number of components in all its fields
+  PetscInt num_fields, num_comp, bs, tot_num_comp = 0;
   PetscCall(PetscSectionGetNumFields(section, &num_fields));
   for (PetscInt f = 0; f < num_fields; ++f) {
     PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
-    PetscCall(VecGetBlockSize(data_vec, &bs));
-    PetscCheck(num_comp == bs, comm, PETSC_ERR_USER,
-               "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, num_comp);
+    tot_num_comp += num_comp;
+  }
+  PetscCall(VecGetBlockSize(data_vec, &bs));
+  PetscCheck(tot_num_comp == bs, comm, PETSC_ERR_USER,
+             "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, tot_num_comp);
+  for (PetscInt f = 0; f < num_fields; ++f) {
+    PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
 
     // extract each component into a separate vector and write it
     Vec     *comp;
     PetscInt n, N;
     PetscCall(VecGetLocalSize(data_vec, &n));
     PetscCall(VecGetSize(data_vec, &N));
-    PetscCall(PetscMalloc1(bs, &comp));
+    PetscCall(PetscMalloc1(bs, &comp));  // NOLINT
     for (PetscInt c = 0; c < bs; ++c) {
       PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp[c]));
       const char *name;
@@ -112,9 +114,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
   PetscCall(WriteFieldData(rdy->dm, rdy->u_global, viewer));
-  for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
-    PetscCall(WriteFieldData(rdy->aux_dm, rdy->diag_vecs[f], viewer));
-  }
+  PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, viewer));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // write the grid if we're the first step in a batch.

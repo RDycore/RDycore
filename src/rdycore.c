@@ -148,10 +148,7 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
-
-  for (PetscInt i = 0; i < (*rdy)->diag_fields.num_fields; ++i) {
-    if ((*rdy)->diag_vecs[i]) PetscCall(VecDestroy(&(*rdy)->diag_vecs[i]));
-  }
+  if ((*rdy)->diags_vec) PetscCall(VecDestroy(&(*rdy)->diags_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

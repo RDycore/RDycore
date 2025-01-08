@@ -143,15 +143,15 @@ static PetscErrorCode MMSPostStep(TS ts) {
 
   PetscInt         num_comp = rdy->soln_fields.num_field_components[0];
   const PetscReal *error_ptr;
+  PetscReal       *diags_ptr;
   PetscCall(VecGetArrayRead(error, &error_ptr));
+  PetscCall(VecGetArray(rdy->diags_vec, &diags_ptr));
   for (PetscInt c = 0; c < num_comp; ++c) {
-    PetscReal *comp_ptr;
-    PetscCall(VecGetArray(rdy->diag_vecs[c], &comp_ptr));
     for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-      comp_ptr[i] = error_ptr[num_comp * i + c];
+      diags_ptr[num_comp * i + c] = error_ptr[num_comp * i + c];
     }
-    PetscCall(VecRestoreArray(rdy->diag_vecs[c], &comp_ptr));
   }
+  PetscCall(VecRestoreArray(rdy->diags_vec, &diags_ptr));
   PetscCall(VecRestoreArrayRead(error, &error_ptr));
   PetscCall(VecDestroy(&error));
 
@@ -210,11 +210,12 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   // create the auxiliary DM, which contains error fields for each of the solution fields
   rdy->diag_fields = (SectionFieldSpec){
-      .num_fields           = rdy->soln_fields.num_field_components[0],
-      .num_field_components = {1, 1, 1},
+      .num_fields           = 1,
+      .num_field_components = {rdy->soln_fields.num_field_components[0]},
+      .field_names          = {"Error"},
   };
-  for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
-    sprintf(rdy->diag_fields.field_names[f], "Error(%s)", rdy->soln_fields.field_component_names[0][f]);
+  for (PetscInt c = 0; c < rdy->diag_fields.num_field_components[0]; ++c) {
+    sprintf(rdy->diag_fields.field_component_names[0][c], "%s error", rdy->soln_fields.field_component_names[0][c]);
   }
   PetscCall(CreateAuxiliaryDM(rdy));
 

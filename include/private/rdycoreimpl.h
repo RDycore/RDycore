@@ -84,10 +84,10 @@ struct _p_RDy {
   SectionFieldSpec soln_fields;
   PetscBool        refine;
 
-  // auxiliary DM for diagnostics (stored as components in a single field)
+  // auxiliary DM for diagnostics
   DM               aux_dm;
   SectionFieldSpec diag_fields;
-  Vec              diag_vecs[MAX_NUM_SECTION_FIELDS];
+  Vec              diags_vec;
 
   // mesh representing simulation domain
   RDyMesh mesh;

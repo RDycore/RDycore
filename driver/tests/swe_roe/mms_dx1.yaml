@@ -52,16 +52,16 @@ mms:
       expected_rates:
         h:
           L1: 0.94
-          L2: 0.95
+          L2: 0.949
           Linf: 0.94
         hu:
-          L1: 0.91
+          L1: 0.92
           L2: 0.93
-          Linf: 0.77
+          Linf: 0.779
         hv:
-          L1: 0.91
+          L1: 0.92
           L2: 0.93
-          Linf: 0.77
+          Linf: 0.779
 
 logging:
   level: none

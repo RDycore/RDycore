@@ -178,13 +178,6 @@ PetscErrorCode CreateDM(RDy rdy) {
 PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
-  // diagnostic fields must all have one component
-  for (PetscInt f = 0; f < rdy->diag_fields.num_fields; ++f) {
-    PetscCheck(rdy->diag_fields.num_field_components[f] == 1, rdy->comm, PETSC_ERR_USER,
-               "Diagnostic field '%s' has %" PetscInt_FMT " components (must have 1)", rdy->diag_fields.field_names[f],
-               rdy->diag_fields.num_field_components[f]);
-  }
-
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->diag_fields, &rdy->aux_dm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -198,11 +191,9 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
-  // diagnostics are stored in single-component vectors
-  for (PetscInt i = 0; i < rdy->diag_fields.num_fields; ++i) {
-    PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diag_vecs[i]));
-    PetscCall(VecZeroEntries(rdy->diag_vecs[i]));
-  }
+  // diagnostics are all piled into a single vector whose block size is the
+  // total number of field components
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diags_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
