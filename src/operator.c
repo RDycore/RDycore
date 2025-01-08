@@ -464,10 +464,8 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
   // apply the composite PETSc flux operators
   PetscCall(PetscOperatorApply(op->petsc.flux, dt, u_local, f_global));
 
-  // NOTE: we don't need a separate flux divergence vector currently, but if/when
-  // NOTE: we do, we'd do this vvv
-  //// copy the flux divergences out of f_global for use with the source operator
-  // PetscCall(VecCopy(f_global, op->flux_divergence));
+  // copy the flux divergences out of f_global for use with the source operator
+  PetscCall(VecCopy(f_global, op->flux_divergence));
 
   // apply the composite PETSc source operators
   PetscCall(PetscOperatorApply(op->petsc.source, dt, u_local, f_global));
