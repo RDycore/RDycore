@@ -348,7 +348,7 @@ PetscBool RDyFinished(RDy rdy) {
   PetscReal time_in_unit = ConvertTimeFromSeconds(time, rdy->config.time.unit);
   PetscInt  step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
-  if ((time_in_unit >= rdy->config.time.final_time)) {
+  if (rdy->config.time.final_time - time_in_unit < 1e-13) {  // FIXME: can we do better than this?
     finished = PETSC_TRUE;
   }
   PetscFunctionReturn(finished);

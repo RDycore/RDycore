@@ -709,10 +709,9 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
 #define MAX_NUM_COMPONENTS 3  // FIXME: SWE only!
-  PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS], L1_norms[MAX_NUM_COMPONENTS],
-      L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
   const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
+    PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
     // run a convergence study
     PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
@@ -734,6 +733,8 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, Linf);
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
+    PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
+
     // run the problem to completion and print error norms
     while (!RDyFinished(rdy)) {
       PetscCall(RDyAdvance(rdy));
