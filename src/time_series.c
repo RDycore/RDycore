@@ -229,7 +229,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
       PetscReal y_momentum = global_flux_data[num_data * e + 2];
       PetscReal x_normal   = global_flux_data[num_data * e + 3];
       PetscReal y_normal   = global_flux_data[num_data * e + 4];
-      PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%f\t%f\t%" PetscInt_FMT "\t%e\t%e\t%e\t%e\t%e\n", time, edge_xc, edge_yc, bc_type, water_mass,
+      PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%f\t%f\t%" PetscInt_FMT "\t%18.16f\t%18.16f\t%18.16f\t%e\t%e\n", time, edge_xc, edge_yc, bc_type, water_mass,
                              x_momentum, y_momentum, x_normal, y_normal));
     }
     PetscCall(PetscFree(global_flux_data));
