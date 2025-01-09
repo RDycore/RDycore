@@ -480,7 +480,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define READ_MATERIAL_PROPERTY(property, mat_props_spec, materials_by_cell)                            \
+#define READ_MATERIAL_PROPERTY(property, mat_props_spec, values)                                       \
   {                                                                                                    \
     Vec mat_prop_vec = NULL;                                                                           \
     if (mat_props_spec.property.file[0]) {                                                             \
@@ -495,15 +495,15 @@ PetscErrorCode InitBoundaries(RDy rdy) {
             PetscScalar *prop_ptr;                                                                     \
             PetscCall(VecGetArray(mat_prop_vec, &prop_ptr));                                           \
             for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
-              PetscInt cell                    = region.cell_local_ids[c];                             \
-              materials_by_cell[cell].property = prop_ptr[c];                                          \
+              PetscInt cell = region.cell_local_ids[c];                                                \
+              values[cell]  = prop_ptr[c];                                                             \
             }                                                                                          \
             PetscCall(VecRestoreArray(mat_prop_vec, &prop_ptr));                                       \
           } else {                                                                                     \
             /* set this material property for all cells in each matching region */                     \
             for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
-              PetscInt cell                    = region.cell_local_ids[c];                             \
-              materials_by_cell[cell].property = mupEval(mat_props_spec.property.value);               \
+              PetscInt cell = region.cell_local_ids[c];                                                \
+              values[cell]  = mupEval(mat_props_spec.property.value);                                  \
             }                                                                                          \
           }                                                                                            \
         }                                                                                              \
@@ -516,7 +516,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
 
 // sets up materials
 //   unsafe for refinement if file is given for surface composition
-static PetscErrorCode InitMaterials(RDy rdy) {
+static PetscErrorCode InitMaterialProperties(RDy rdy) {
   PetscFunctionBegin;
 
   // check that each region has a material assigned to it
@@ -538,13 +538,28 @@ static PetscErrorCode InitMaterials(RDy rdy) {
     PetscCheck(region_mat_index != -1, rdy->comm, PETSC_ERR_USER, "Region '%s' has no assigned material!", region.name);
   }
 
-  // allocate storage for materials
-  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
-
-  // read material properties in from files as needed
+  // read material properties in from regional specifications and/or files
+  PetscReal *material_property_values[OPERATOR_NUM_MATERIAL_PROPERTIES];
+  for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+    PetscCall(PetscCalloc1(rdy->mesh.num_cells, &material_property_values[p]));
+  }
   for (PetscInt imat = 0; imat < rdy->config.num_materials; ++imat) {
     RDyMaterialPropertiesSpec mat_props_spec = rdy->config.materials[imat].properties;
-    READ_MATERIAL_PROPERTY(manning, mat_props_spec, rdy->materials_by_cell);
+    READ_MATERIAL_PROPERTY(manning, mat_props_spec, material_property_values[OPERATOR_MANNINGS]);
+  }
+
+  // set the properties on the operator
+  OperatorData material_property;
+  for (PetscInt property = 0; property < OPERATOR_NUM_MATERIAL_PROPERTIES; ++property) {
+    PetscCall(GetOperatorDomainMaterialProperty(rdy->operator, property, &material_property));
+    for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
+      if (rdy->mesh.cells.is_owned[i]) {
+        PetscInt owned_cell                     = rdy->mesh.cells.local_to_owned[i];
+        material_property.values[0][owned_cell] = material_property_values[property][i];
+      }
+    }
+    PetscCall(RestoreOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &material_property));
+    PetscCall(PetscFree(material_property_values[property]));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -803,6 +818,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
           PetscCall(VecRestoreArray(local, &local_ptr));
           PetscCall(VecDestroy(&local));
         } else {
+          // FIXME: this assumes the shallow water equations!
           for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
             PetscInt owned_cell_id          = region.owned_cell_global_ids[c];
             u_ptr[ndof * owned_cell_id]     = mupEval(flow_ic.height);
@@ -817,6 +833,118 @@ static PetscErrorCode InitSolution(RDy rdy) {
   // TODO: salinity and sediment initial conditions go here.
 
   PetscCall(VecRestoreArray(rdy->u_global, &u_ptr));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// initializes the operator given the information in rdy
+PetscErrorCode InitOperator(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(CreateOperator(&rdy->config, rdy->dm, &rdy->mesh, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries,
+                           rdy->boundary_conditions, &rdy->operator));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// This is the right-hand-side function used by our timestepping solver.
+/// @param [in]    ts  the solver
+/// @param [in]    t   the simulation time [seconds]
+/// @param [in]    U   the global solution vector at time t
+/// @param [out]   F   the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx a pointer to the operator representing the system being solved
+static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy       rdy = ctx;
+  DM        dm  = rdy->dm;
+  Operator *op  = rdy->operator;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(VecZeroEntries(F));
+
+  // populate the local U vector
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+
+  PetscCall(ResetOperatorDiagnostics(op));
+
+  // compute the right hand side
+  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
+  if (0) {
+    PetscInt nstep;
+    PetscCall(TSGetStepNumber(ts, &nstep));
+
+    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
+    char        file[PETSC_MAX_PATH_LEN];
+    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
+    PetscCall(VecView(F, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
+
+  // if debug-level logging is enabled, find the latest global maximum Courant number
+  // and log it.
+  if (rdy->config.logging.level >= LOG_DEBUG) {
+    PetscCall(UpdateOperatorDiagnostics(op));
+    OperatorDiagnostics diagnostics;
+    PetscCall(GetOperatorDiagnostics(op, &diagnostics));
+
+    PetscReal time;
+    PetscInt  stepnum;
+    PetscCall(TSGetTime(ts, &time));
+    PetscCall(TSGetStepNumber(ts, &stepnum));
+    const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
+                diagnostics.courant_number.max_courant_num);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode InitSolver(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt n_dof;
+  PetscCall(VecGetSize(rdy->u_global, &n_dof));
+
+  // set up a TS solver
+  PetscCall(TSCreate(rdy->comm, &rdy->ts));
+  PetscCall(TSSetProblemType(rdy->ts, TS_NONLINEAR));
+  switch (rdy->config.numerics.temporal) {
+    case TEMPORAL_EULER:
+      PetscCall(TSSetType(rdy->ts, TSEULER));
+      break;
+    case TEMPORAL_RK4:
+      PetscCall(TSSetType(rdy->ts, TSRK));
+      PetscCall(TSRKSetType(rdy->ts, TSRK4));
+      break;
+    case TEMPORAL_BEULER:
+      PetscCall(TSSetType(rdy->ts, TSBEULER));
+      break;
+  }
+  PetscCall(TSSetDM(rdy->ts, rdy->dm));
+  PetscCall(TSSetApplicationContext(rdy->ts, rdy));
+
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
+
+  if (!rdy->config.time.adaptive.enable) {
+    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
+  }
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+
+  // apply any solver-related options supplied on the command line
+  PetscCall(TSSetFromOptions(rdy->ts));
+  PetscCall(TSGetTimeStep(rdy->ts, &rdy->dt));  // just in case!
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -856,7 +984,7 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Initializes the source term for the SWE solver
+/// @brief Initializes a homogeneous water source term.
 /// @param rdy A RDy struct
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode InitSourceConditions(RDy rdy) {
@@ -882,7 +1010,8 @@ static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 /// Sets the name of the log file for RDycore. If this function is called
 /// before RDySetup, the name passed to it overrides any log filename set in
 /// the YAML config file.
-/// @param log_file [in] the name of the log file written by RDycore
+/// @param [inout] rdy      the RDycore simulator
+/// @param [in]    log_file the name of the log file written by RDycore
 PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionBegin;
   strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
@@ -890,8 +1019,9 @@ PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// checks for the -pause option, which pauses RDycore and prints out the PIDs
-// of the MPI processes so that a debugger may be attached
+/// Checks for the -pause option, which pauses RDycore and prints out the PIDs
+/// of the MPI processes so that a debugger may be attached.
+/// @param [in] rdy the RDycore simulator
 PetscErrorCode PauseIfRequested(RDy rdy) {
   PetscFunctionBegin;
 
@@ -935,7 +1065,8 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
 }
 
 /// Performs any setup needed by RDy, reading from the specified configuration
-/// file.
+/// file and overwriting options with command-line arguments.
+/// @param [inout] rdy the RDycore simulator
 PetscErrorCode RDySetup(RDy rdy) {
   PetscFunctionBegin;
 
@@ -963,9 +1094,30 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(PrintConfig(rdy));
 
   RDyLogDebug(rdy, "Creating DMs...");
-  PetscCall(CreateDM(rdy));           // for mesh and solution vector
-  PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
-  PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
+
+  // create the primary DM that stores the mesh and solution vector
+  rdy->soln_fields = (SectionFieldSpec){
+      .num_fields            = 1,
+      .num_field_components  = {3},
+      .field_names           = {"Solution"},
+      .field_component_names = {{
+          "Height",
+          "MomentumX",
+          "MomentumY",
+      }},
+  };
+  PetscCall(CreateDM(rdy));
+
+  // create the auxiliary DM, which handles diagnostics and I/O
+  rdy->diag_fields = (SectionFieldSpec){
+      .num_fields           = 1,
+      .num_field_components = {1},
+      .field_names          = {"Parameter"},
+  };
+  PetscCall(CreateAuxiliaryDM(rdy));
+
+  // create global and local vectors
+  PetscCall(CreateVectors(rdy));
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
@@ -981,14 +1133,17 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
   PetscCall(InitBoundaryConditions(rdy));
 
-  RDyLogDebug(rdy, "Initializing materials...");
-  PetscCall(InitMaterials(rdy));
-
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing operators...");
-  PetscCall(InitOperators(rdy));
+  RDyLogDebug(rdy, "Initializing operator...");
+  PetscCall(InitOperator(rdy));
+
+  RDyLogDebug(rdy, "Initializing material properties...");
+  PetscCall(InitMaterialProperties(rdy));
+
+  RDyLogDebug(rdy, "Initializing solver...");
+  PetscCall(InitSolver(rdy));
 
   // make sure any Dirichlet boundary conditions are properly specified
   PetscCall(InitDirichletBoundaryConditions(rdy));
@@ -998,13 +1153,6 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
-
-  RDyLogDebug(rdy, "Initializing courant number diagnostics...");
-  CourantNumberDiagnostics *courant_num_diags = &rdy->courant_num_diags;
-  courant_num_diags->max_courant_num          = 0.0;
-  courant_num_diags->global_edge_id           = -1;
-  courant_num_diags->global_cell_id           = -1;
-  courant_num_diags->is_set                   = PETSC_FALSE;
 
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data

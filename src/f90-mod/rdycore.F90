@@ -19,13 +19,13 @@ module rdycore
             RDySetDirichletBoundaryValues, &
             RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
             RDyGetStep, RDyGetCouplingInterval, RDySetCouplingInterval, &
-            RDyGetLocalCellHeights, RDyGetLocalCellXMomentums, RDyGetLocalCellYMomentums, &
+            RDyGetLocalCellHeights, RDyGetLocalCellXMomenta, RDyGetLocalCellYMomenta, &
             RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
             RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
-            RDySetRegionalWaterSource, RDySetRegionalXMomentumSource, RDySetRegionalYMomentumSource, &
-            RDySetManningsNForLocalCells, RDySetInitialConditions, &
+            RDySetDomainWaterSource, RDySetDomainXMomentumSource, RDySetDomainYMomentumSource, &
+            RDySetDomainManningsN, RDySetInitialConditions, &
             RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile
 
   ! RDycore uses double-precision floating point numbers
@@ -226,14 +226,14 @@ module rdycore
       type(c_ptr), value, intent(in) :: h
     end function
 
-    integer(c_int) function rdygetlocaclellxmomentums_(rdy, size, hu) bind(c, name="RDyGetLocalCellXMomentums")
+    integer(c_int) function rdygetlocaclellxmomenta_(rdy, size, hu) bind(c, name="RDyGetLocalCellXMomenta")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hu
     end function
 
-    integer(c_int) function rdygetlocaclellymomentums_(rdy, size, hv) bind(c, name="RDyGetLocalCellYMomentums")
+    integer(c_int) function rdygetlocaclellymomenta_(rdy, size, hv) bind(c, name="RDyGetLocalCellYMomenta")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
@@ -331,34 +331,31 @@ module rdycore
       type(c_ptr), value, intent(in) :: values
     end function
 
-    integer(c_int) function rdysetregionalwatersource_(rdy, region_idx, size, watsrc) bind(c, name="RDySetRegionalWaterSource")
+    integer(c_int) function rdysetdomainwatersource_(rdy, size, watsrc) bind(c, name="RDySetDomainWaterSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt   , value, intent(in) :: region_idx
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
-    integer(c_int) function rdysetregionalxmomentumsource_(rdy, region_idx, size, xmomsrc) bind(c, name="RDySetRegionalXMomentumSource")
+    integer(c_int) function rdysetdomainxmomentumsource_(rdy, size, xmomsrc) bind(c, name="RDySetDomainXMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt   , value, intent(in) :: region_idx
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: xmomsrc
     end function
 
-    integer(c_int) function rdysetregionalymomentumsource_(rdy, region_idx, size, ymomsrc) bind(c, name="RDySetRegionalYMomentumSource")
+    integer(c_int) function rdysetdomainymomentumsource_(rdy, size, ymomsrc) bind(c, name="RDySetDomainYMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt   , value, intent(in) :: region_idx
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
-    integer(c_int) function rdysetmanningsnforlocalcells_(rdy, size, n) bind(c, name="RDySetManningsNForLocalCells")
+    integer(c_int) function rdysetdomainmanningsn_(rdy, size, n) bind(c, name="RDySetDomainManningsN")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
-      PetscInt, value, intent(in)    :: size
+      PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: n
     end function
 
@@ -647,20 +644,20 @@ contains
     ierr = rdygetlocalcellheights_(rdy_%c_rdy, size, c_loc(h))
   end subroutine
 
-  subroutine RDyGetLocalCellXMomentums(rdy_, size, hu, ierr)
+  subroutine RDyGetLocalCellXMomenta(rdy_, size, hu, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hu(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetlocaclellxmomentums_(rdy_%c_rdy, size, c_loc(hu))
+    ierr = rdygetlocaclellxmomenta_(rdy_%c_rdy, size, c_loc(hu))
   end subroutine
 
-  subroutine RDyGetLocalCellYMomentums(rdy_, size, hv, ierr)
+  subroutine RDyGetLocalCellYMomenta(rdy_, size, hv, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hv(:)
     integer,         intent(out)            :: ierr
-    ierr = rdygetlocaclellymomentums_(rdy_%c_rdy, size, c_loc(hv))
+    ierr = rdygetlocaclellymomenta_(rdy_%c_rdy, size, c_loc(hv))
   end subroutine
 
   subroutine RDyGetLocalCellXCentroids(rdy_, size, values, ierr)
@@ -766,39 +763,36 @@ contains
     ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
-  subroutine RDySetRegionalWaterSource(rdy_, region_idx, size, watsrc, ierr)
+  subroutine RDySetDomainWaterSource(rdy_, size, watsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetregionalwatersource_(rdy_%c_rdy, region_idx, size, c_loc(watsrc))
+    ierr = rdysetdomainwatersource_(rdy_%c_rdy, size, c_loc(watsrc))
   end subroutine
 
-  subroutine RDySetRegionalXMomentumSource(rdy_, region_idx, size, xmomsrc, ierr)
+  subroutine RDySetDomainXMomentumSource(rdy_, size, xmomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: xmomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetregionalxmomentumsource_(rdy_%c_rdy, region_idx, size, c_loc(xmomsrc))
+    ierr = rdysetdomainxmomentumsource_(rdy_%c_rdy, size, c_loc(xmomsrc))
   end subroutine
 
-  subroutine RDySetRegionalYMomentumSource(rdy_, region_idx, size, ymomsrc, ierr)
+  subroutine RDySetDomainYMomentumSource(rdy_, size, ymomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
-    PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: ymomsrc(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetregionalymomentumsource_(rdy_%c_rdy, region_idx, size, c_loc(ymomsrc))
+    ierr = rdysetdomainymomentumsource_(rdy_%c_rdy, size, c_loc(ymomsrc))
   end subroutine
 
-  subroutine RDySetManningsNForLocalCells(rdy_, size, n, ierr)
+  subroutine RDySetDomainManningsN(rdy_, size, n, ierr)
     type(RDy),       intent(inout)       :: rdy_
     PetscInt,        intent(in)          :: size
     real(RDyDouble), pointer, intent(in) :: n(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetmanningsnforlocalcells_(rdy_%c_rdy, size, c_loc(n))
+    ierr = rdysetdomainmanningsn_(rdy_%c_rdy, size, c_loc(n))
   end subroutine
 
   subroutine RDySetInitialConditions(rdy_, ic, ierr)

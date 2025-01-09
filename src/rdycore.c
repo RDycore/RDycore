@@ -5,6 +5,7 @@
 #include <rdycore.h>
 
 static PetscBool initialized_ = PETSC_FALSE;
+PetscClassId     RDY_CLASSID;
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
@@ -16,6 +17,12 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
     if (!petsc_initialized) {
       PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
     }
+
+    // some exit statuses don't get propagated without this vvv
+    PetscCall(PetscPushErrorHandler(PetscMPIAbortErrorHandler, NULL));
+
+    // set up our logging class ID
+    PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
 
     // initialize our Courant number diagnostics MPI datatype / operator
     PetscCall(InitCourantNumberDiagnostics());
@@ -38,6 +45,12 @@ PetscErrorCode RDyInitFortran(void) {
       // no need for PetscInitializeFortran because PetscInitialize is
       // called before this function in the rdycore Fortran module.
     }
+
+    // some exit statuses don't get propagated without this vvv
+    PetscCall(PetscPushErrorHandler(PetscMPIAbortErrorHandler, NULL));
+
+    // set up our logging class ID
+    PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
 
     // initialize our Courant number diagnostics MPI datatype / operator
     PetscCall(InitCourantNumberDiagnostics());
@@ -135,8 +148,7 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
-  if ((*rdy)->ceed.host_fluxes) PetscCall(VecDestroy(&(*rdy)->ceed.host_fluxes));
-  if ((*rdy)->petsc.sources) PetscCall(VecDestroy(&((*rdy)->petsc.sources)));
+  if ((*rdy)->diags_vec) PetscCall(VecDestroy(&(*rdy)->diags_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -171,17 +183,6 @@ PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Destroy data structures for materials
-/// @param rdy A RDy struct
-/// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyDestroyMaterials(RDy *rdy) {
-  PetscFunctionBegin;
-
-  if ((*rdy)->materials_by_cell) PetscFree((*rdy)->materials_by_cell);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// Destroys the given RDy object, freeing any allocated resources.
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
@@ -197,9 +198,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->sources) PetscFree((*rdy)->sources);
   if ((*rdy)->boundary_conditions) PetscFree((*rdy)->boundary_conditions);
 
-  // destroy materials
-  PetscCall(RDyDestroyMaterials(rdy));
-
   // destroy regions
   for (PetscInt r = 0; r < (*rdy)->num_regions; ++r) {
     PetscCall(DestroyRegion(&((*rdy)->regions[r])));
@@ -214,7 +212,9 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   PetscCall(RDyDestroyVectors(rdy));
 
-  PetscCall(DestroyOperators(*rdy));
+  if ((*rdy)->operator) {
+    PetscCall(DestroyOperator(&(*rdy)->operator));
+  }
 
   // destroy time series
   PetscCall(DestroyTimeSeries(*rdy));
@@ -223,9 +223,8 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
-  // destroy our CEED context if needed by setting its resource to NULL
-  // (this works whether or not the CEED resource has been set previously)
-  PetscCall(SetCeedResource(NULL));
+  // destroy config data
+  PetscCall(DestroyConfig((*rdy)));
 
   // close the log file if needed
   if (((*rdy)->log) && ((*rdy)->log != stdout)) {

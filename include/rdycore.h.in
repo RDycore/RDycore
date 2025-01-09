@@ -80,8 +80,8 @@ PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, const PetscInt, PetscInt*);
 
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDyGetLocalCellXMomentums(RDy rdy, const PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values);
@@ -110,7 +110,12 @@ PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const 
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);
 
-PETSC_EXTERN PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetDomainWaterSource(RDy rdy, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetDomainXMomentumSource(RDy rdy, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *values);
+
+PETSC_EXTERN PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_idx, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic);
 
 PETSC_EXTERN PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec);

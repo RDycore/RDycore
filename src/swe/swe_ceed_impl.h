@@ -6,6 +6,15 @@
 #define Square(x) ((x) * (x))
 #define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
 
+// we disable compiler warnings for implicitly-declared math functions known to
+// the JIT compiler
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-function-declaration"
+
+// Q-function context with data attached
 typedef struct SWEContext_ *SWEContext;
 struct SWEContext_ {
   CeedScalar dtime;
@@ -18,6 +27,7 @@ struct SWEState_ {
 };
 typedef struct SWEState_ SWEState;
 
+// riemann solver -- called by other Q-functions
 CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SWEState qL, SWEState qR, CeedScalar sn,
                                               CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar sqrt_gravity = sqrt(gravity);
@@ -109,6 +119,7 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
+// SWE interior flux operator Q-function
 CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -141,6 +152,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   return 0;
 }
 
+// SWE boundary flux operator Q-function (Dirichlet condition)
 CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -170,6 +182,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   return 0;
 }
 
+// SWE boundary flux operator Q-function (reflecting condition)
 CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -199,6 +212,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
   return 0;
 }
 
+// SWE boundary flux operator Q-function (outflow condition)
 CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -231,9 +245,10 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   return 0;
 }
 
+// SWE regional source operator Q-function
 CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
-  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // rain rate
+  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
   const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
   const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
@@ -284,6 +299,8 @@ CEED_QFUNCTION(SWESourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[]
 }
 
 #pragma GCC diagnostic   pop
+#pragma GCC diagnostic   pop
+#pragma clang diagnostic pop
 #pragma clang diagnostic pop
 
 #endif

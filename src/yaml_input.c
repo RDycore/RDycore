@@ -1452,3 +1452,76 @@ PetscErrorCode PrintConfig(RDy rdy) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+//--------------
+// Finalization
+//--------------
+
+/*
+static PetscErrorCode DestroyMMSConstants(RDyMMSConstants *mms_constants) {
+  PetscFunctionBegin;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+*/
+
+static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions *swe_mms) {
+  PetscFunctionBegin;
+  mupRelease(swe_mms->solutions.h);
+  mupRelease(swe_mms->solutions.dhdx);
+  mupRelease(swe_mms->solutions.dhdy);
+  mupRelease(swe_mms->solutions.dhdt);
+  mupRelease(swe_mms->solutions.u);
+  mupRelease(swe_mms->solutions.dudx);
+  mupRelease(swe_mms->solutions.dudy);
+  mupRelease(swe_mms->solutions.dudt);
+  mupRelease(swe_mms->solutions.v);
+  mupRelease(swe_mms->solutions.dvdx);
+  mupRelease(swe_mms->solutions.dvdy);
+  mupRelease(swe_mms->solutions.dvdt);
+  mupRelease(swe_mms->solutions.n);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroyManufacturedSolutions(RDyMMSSection *mms) {
+  PetscFunctionBegin;
+
+  if (mms->swe.expressions.h[0]) {
+    PetscCall(DestroySWEManufacturedSolutions(&mms->swe));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Destroys configuration data.
+PetscErrorCode DestroyConfig(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(DestroyManufacturedSolutions(&rdy->config.mms));
+
+  for (PetscInt m = 0; m < rdy->config.num_materials; ++m) {
+    RDyMaterialPropertiesSpec *properties = &rdy->config.materials[m].properties;
+    if (properties->manning.expression[0]) {
+      mupRelease(properties->manning.value);
+    }
+  }
+
+  for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
+    RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[f];
+    mupRelease(flow_cond->height);
+    mupRelease(flow_cond->x_momentum);
+    mupRelease(flow_cond->y_momentum);
+    mupRelease(flow_cond->value);
+  }
+
+  for (PetscInt s = 0; s < rdy->config.num_sediment_conditions; ++s) {
+    RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[s];
+    mupRelease(sed_cond->concentration);
+  }
+
+  for (PetscInt s = 0; s < rdy->config.num_salinity_conditions; ++s) {
+    RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[s];
+    mupRelease(sal_cond->concentration);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

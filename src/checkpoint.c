@@ -15,7 +15,7 @@ static PetscErrorCode GetCheckpointDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LE
   static char checkpoint_dir[PETSC_MAX_PATH_LEN] = {0};
   if (!checkpoint_dir[0]) {
     if (rdy->config.ensemble.size > 1) {
-      sprintf(checkpoint_dir, "checkpoints/%s", rdy->config.ensemble.members[rdy->ensemble_member_index].name);
+      snprintf(checkpoint_dir, PETSC_MAX_PATH_LEN, "checkpoints/%s", rdy->config.ensemble.members[rdy->ensemble_member_index].name);
     } else {
       strcpy(checkpoint_dir, "checkpoints");
     }

@@ -109,7 +109,7 @@ static PetscErrorCode SnapVerticesToBathymetry(RDy rdy) {
 }
 
 // this function gets called at the beginning of each time step, updating
-// source terms and boundary conditions at a properly centered time
+// source terms and  boundary conditions at a properly centered time
 static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionBegin;
 
@@ -126,7 +126,41 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode MMSPostStep(TS ts) {
+  PetscFunctionBegin;
+
+  RDy rdy;
+  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
+
+  PetscReal t;
+  PetscCall(TSGetTime(ts, &t));
+
+  // compute the error vector and stuff its components into diagnostic fields
+  Vec error;
+  PetscCall(RDyCreatePrognosticVec(rdy, &error));
+  PetscCall(RDyMMSComputeSolution(rdy, t, error));
+  PetscCall(VecAYPX(error, -1.0, rdy->u_global));
+
+  PetscInt         num_comp = rdy->soln_fields.num_field_components[0];
+  const PetscReal *error_ptr;
+  PetscReal       *diags_ptr;
+  PetscCall(VecGetArrayRead(error, &error_ptr));
+  PetscCall(VecGetArray(rdy->diags_vec, &diags_ptr));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
+      diags_ptr[num_comp * i + c] = error_ptr[num_comp * i + c];
+    }
+  }
+  PetscCall(VecRestoreArray(rdy->diags_vec, &diags_ptr));
+  PetscCall(VecRestoreArrayRead(error, &error_ptr));
+  PetscCall(VecDestroy(&error));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
+extern PetscErrorCode InitOperator(RDy rdy);
+extern PetscErrorCode InitSolver(RDy rdy);
 
 // this can be used in place of RDySetup for the MMS driver, which uses a
 // modified YAML input schema (see ReadMMSConfigFile in yaml_input.c)
@@ -160,9 +194,33 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   }
 
   RDyLogDebug(rdy, "Creating DMs...");
-  PetscCall(CreateDM(rdy));           // for mesh and solution vector
-  PetscCall(CreateAuxiliaryDM(rdy));  // for diagnostics
-  PetscCall(CreateVectors(rdy));      // global and local vectors, residuals
+
+  // create the primary DM that stores the mesh and solution vector
+  rdy->soln_fields = (SectionFieldSpec){
+      .num_fields            = 1,
+      .num_field_components  = {3},
+      .field_names           = {"solution"},
+      .field_component_names = {{
+          "Height",
+          "MomentumX",
+          "MomentumY",
+      }},
+  };
+  PetscCall(CreateDM(rdy));
+
+  // create the auxiliary DM, which contains error fields for each of the solution fields
+  rdy->diag_fields = (SectionFieldSpec){
+      .num_fields           = 1,
+      .num_field_components = {rdy->soln_fields.num_field_components[0]},
+      .field_names          = {"Error"},
+  };
+  for (PetscInt c = 0; c < rdy->diag_fields.num_field_components[0]; ++c) {
+    sprintf(rdy->diag_fields.field_component_names[0][c], "%s error", rdy->soln_fields.field_component_names[0][c]);
+  }
+  PetscCall(CreateAuxiliaryDM(rdy));
+
+  // create global and local vectors
+  PetscCall(CreateVectors(rdy));
 
   // adjust the vertices of a refined mesh to conform to our analytical z(x, y)
   PetscCall(SnapVerticesToBathymetry(rdy));
@@ -179,13 +237,17 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitBoundaries(rdy));
   PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
 
-  RDyLogDebug(rdy, "Initializing operators...");
-  PetscCall(InitOperators(rdy));
+  RDyLogDebug(rdy, "Initializing operator...");
+  PetscCall(InitOperator(rdy));
+
+  RDyLogDebug(rdy, "Initializing solver...");
+  PetscCall(InitSolver(rdy));
+
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
+  PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
-  PetscCall(PetscCalloc1(rdy->mesh.num_cells, &rdy->materials_by_cell));
   PetscCall(RDyMMSUpdateMaterialProperties(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -463,11 +525,10 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
     // evaluate and set material properties
     if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      PetscReal *manning;
-      PetscCall(PetscCalloc1(N, &manning));
-      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, manning));
-      PetscCall(RDySetManningsNForLocalCells(rdy, N, manning));
-      PetscCall(PetscFree(manning));
+      OperatorData mannings;
+      PetscCall(GetOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings));
+      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, mannings.values[0]));
+      PetscCall(RestoreOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings));
     }
     PetscCall(PetscFree(cell_x));
     PetscCall(PetscFree(cell_y));
@@ -648,10 +709,9 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
 #define MAX_NUM_COMPONENTS 3  // FIXME: SWE only!
-  PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS], L1_norms[MAX_NUM_COMPONENTS],
-      L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
   const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
+    PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
     // run a convergence study
     PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
@@ -673,6 +733,8 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, Linf);
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
+    PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
+
     // run the problem to completion and print error norms
     while (!RDyFinished(rdy)) {
       PetscCall(RDyAdvance(rdy));

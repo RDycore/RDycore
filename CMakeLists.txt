@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 3.14.0)
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
-option(ENABLE_ASAN     "Enable Address Sanitizer (if available)" OFF)
+option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
 
 set(MAX_NAME_LEN 128 CACHE STRING "Maximum allowable length of field/variable names")
 
@@ -88,10 +88,18 @@ if (APPLE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_compact_unwind")
 endif()
 
-if (ENABLE_ASAN)
-  message(STATUS "Enabling Address Sanitizer...")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+if (ENABLE_SANITIZERS)
+  if (APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64") # no memory sanitizer!
+    set(SANITIZERS address,undefined)
+  elseif (CMAKE_C_COMPILER_ID MATCHES "Clang")
+    # clang should provide MemorySanitizer
+    set(SANITIZERS address,memory,undefined)
+  elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    set(SANITIZERS address,undefined)
+  else() # probably no sanitizers available for this compiler(?)
+    message(FATAL_ERROR "The selected C compiler (${CMAKE_C_COMPILER_ID}) doesn't support sanitizers.")
+  endif()
+  message(STATUS "Enabling sanitizers (${SANITIZERS})...")
 endif()
 
 # Fortran settings
@@ -158,9 +166,9 @@ configure_file(
 # Inherit libraries from PETSc for shared or static libs.
 extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)
 if (petsc_shared STREQUAL "yes")
-  set(RDYCORE_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)           # adds stdc++ for Frontier
+  set(SYSTEM_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)
 else()
-    set(RDYCORE_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)  # adds stdc++ for Frontier
+  set(SYSTEM_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)
 endif()
 
 if (ENABLE_TESTS)

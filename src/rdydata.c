@@ -93,60 +93,15 @@ PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_in
              "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.flow->type);
 
-  // dispatch this call to CEED or PETSc
-  PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
-  if (CeedEnabled()) {
-    // FIXME: we'd like to do this for both CEED and PETSc
-    // FIXME: also, I don't think we should be setting boundary values with a
-    // FIXME: strided array, since it makes non-SWE situations more complicated
-
-    // shuffle DOF into component arrays
-    // FIXME: we fix ndof at 3 for now; we'll fix this later
-    PetscReal *bvalues[3];
-    PetscCalloc1(num_edges, &bvalues[0]);
-    PetscCalloc1(num_edges, &bvalues[1]);
-    PetscCalloc1(num_edges, &bvalues[2]);
-    for (PetscInt i = 0; i < num_edges; ++i) {
-      bvalues[0][i] = values[3 * i + 0];
-      bvalues[1][i] = values[3 * i + 1];
-      bvalues[2][i] = values[3 * i + 2];
-    }
-
-    OperatorBoundaryData boundary_data;
-    PetscCall(GetOperatorBoundaryData(rdy, boundary, &boundary_data));
-    for (PetscInt c = 0; c < ndof; ++c) {
-      PetscCall(SetOperatorBoundaryValues(&boundary_data, c, bvalues[c]));
-    }
-    PetscCall(RestoreOperatorBoundaryData(rdy, boundary, &boundary_data));
-    PetscFree(bvalues[0]);
-    PetscFree(bvalues[1]);
-    PetscFree(bvalues[2]);
-  } else {  // petsc
-    // fetch the boundary data
-    RiemannDataSWE bdata;
-    PetscCall(GetPetscSWEDirichletBoundaryValues(rdy->petsc.context, boundary_index, &bdata));
-
-    // set the boundary values
-    RDyCells *cells = &rdy->mesh.cells;
-    RDyEdges *edges = &rdy->mesh.edges;
+  OperatorData dirichlet;
+  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+  for (PetscInt comp = 0; comp < dirichlet.num_components; ++comp) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      PetscInt iedge = boundary.edge_ids[e];
-      PetscInt icell = edges->cell_ids[2 * iedge];
-      if (cells->is_owned[icell]) {
-        bdata.h[e]  = values[3 * e];
-        bdata.hu[e] = values[3 * e + 1];
-        bdata.hv[e] = values[3 * e + 2];
-
-        if (bdata.h[e] > tiny_h) {
-          bdata.u[e] = values[3 * e + 1] / bdata.h[e];
-          bdata.v[e] = values[3 * e + 2] / bdata.h[e];
-        } else {
-          bdata.u[e] = 0.0;
-          bdata.v[e] = 0.0;
-        }
-      }
+      dirichlet.values[comp][e] = values[dirichlet.num_components * e + comp];
     }
   }
+  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -156,8 +111,7 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
   PetscReal *u;
   PetscCall(VecGetArray(rdy->u_global, &u));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-    PetscInt cell_id = rdy->mesh.cells.owned_to_local[i];
-    values[i]        = u[3 * cell_id + idof];
+    values[i] = u[3 * i + idof];
   }
   PetscCall(VecRestoreArray(rdy->u_global, &u));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -169,38 +123,39 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
 PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
-  PetscInt idof = 0;
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 0, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellXMomentums(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
-  PetscInt idof = 1;
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 1, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellYMomentums(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckNumLocalCells(rdy, size));
-  PetscInt idof = 2;
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, idof, values));
+  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 2, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(CheckRegionIndex(rdy, region_idx));
-  PetscCall(CheckNumLocalCells(rdy, size));
-
   RDyRegion region = rdy->regions[region_idx];
+  PetscCheck(size == region.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_idx,
+             region.num_owned_cells);
+
   if (region.num_owned_cells) {
-    OperatorSourceData source_data;
-    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
-    PetscCall(SetOperatorSourceValues(&source_data, component, values));
-    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
+    OperatorData source_data;
+    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+      source_data.values[component][c] = values[c];
+    }
+    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -237,21 +192,16 @@ static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const Petsc
   PetscFunctionBegin;
   PetscCall(CheckRegionIndex(rdy, region_idx));
 
-  RDyRegion  region = rdy->regions[region_idx];
-  PetscReal *values;
-  PetscCall(PetscCalloc1(region.num_owned_cells, &values));
-  for (PetscInt i = 0; i < region.num_owned_cells; ++i) {
-    values[i] = value;
-  }
-
+  RDyRegion region = rdy->regions[region_idx];
   if (region.num_owned_cells) {
-    OperatorSourceData source_data;
-    PetscCall(GetOperatorSourceData(rdy, region, &source_data));
-    PetscCall(SetOperatorSourceValues(&source_data, component, values));
-    PetscCall(RestoreOperatorSourceData(rdy, region, &source_data));
+    OperatorData source_data;
+    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+      source_data.values[component][c] = value;
+    }
+    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
   }
 
-  PetscFree(values);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -276,6 +226,47 @@ PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_i
 PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value) {
   PetscFunctionBegin;
   PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_idx, 2, value));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode SetDomainSourceComponent(RDy rdy, PetscInt component, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
+  OperatorData source_data;
+  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & source_data));
+  for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
+    source_data.values[component][c] = values[c];
+  }
+  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & source_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets the external water source term on the entire domain to the values in
+/// the given array (whose length is equal to the number of owned cells in the
+/// domain).
+PetscErrorCode RDySetDomainWaterSource(RDy rdy, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetDomainSourceComponent(rdy, 0, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets the external x-momentum term on the entire domain to the values in the
+/// given array (whose length is equal to the number of owned cells in the
+/// domain).
+PetscErrorCode RDySetDomainXMomentumSource(RDy rdy, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetDomainSourceComponent(rdy, 1, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets the external y-momentum term on the entire domain to the values in the
+/// given array (whose length is equal to the number of owned cells in the
+/// domain).
+PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetDomainSourceComponent(rdy, 2, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -445,23 +436,37 @@ PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetManningsNForLocalCells(RDy rdy, const PetscInt size, PetscReal *n_values) {
+PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, const PetscInt size, PetscReal *n_values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckRegionIndex(rdy, region_index));
+  RDyRegion region = rdy->regions[region_index];
+  PetscCheck(size == region.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_index,
+             region.num_owned_cells);
 
-  if (CeedEnabled()) {
-    // FIXME: we'd like to do this for both CEED and PETSc
-    OperatorMaterialData material_data;
-    PetscCall(GetOperatorMaterialData(rdy, &material_data));
-    PetscCall(SetOperatorMaterialValues(&material_data, OPERATOR_MANNINGS, n_values));
-    PetscCall(RestoreOperatorMaterialData(rdy, &material_data));
-  } else {  // petsc
-    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-      PetscInt cell_id                        = rdy->mesh.cells.owned_to_local[i];
-      rdy->materials_by_cell[cell_id].manning = n_values[i];
-    }
+  OperatorData mannings_data;
+  PetscCall(GetOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+  for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+    mannings_data.values[0][c] = n_values[c];
   }
+  PetscCall(RestoreOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings_data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal *n_values) {
+  PetscFunctionBegin;
+
+  PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
+
+  OperatorData mannings_data;
+  PetscCall(GetOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &mannings_data));
+  for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
+    mannings_data.values[0][c] = n_values[c];
+  }
+  PetscCall(RestoreOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &mannings_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

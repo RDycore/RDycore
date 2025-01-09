@@ -5,8 +5,10 @@
 #include <petsc/private/petscimpl.h>
 #include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
+#include <private/rdydmimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
+#include <private/rdyoperatorimpl.h>
 #include <private/rdyregionimpl.h>
 #include <rdycore.h>
 
@@ -16,46 +18,6 @@ PETSC_INTERN PetscErrorCode SetCeedResource(char *);
 PETSC_INTERN PetscBool      CeedEnabled(void);
 PETSC_INTERN Ceed           CeedContext(void);
 PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
-
-// Diagnostic structure that captures information about the conditions under
-// which the maximum courant number is encountered. If you change this struct,
-// update the call to MPI_Type_create_struct in InitMPITypesAndOps below.
-typedef struct {
-  PetscReal max_courant_num;  // maximum courant number
-  PetscInt  global_edge_id;   // edge at which the max courant number was encountered
-  PetscInt  global_cell_id;   // cell in which the max courant number was encountered
-  PetscBool is_set;           // true if max_courant_num is set, otherwise false
-} CourantNumberDiagnostics;
-
-// MPI datatype and operator for reducing CourantNumberDiagnostics with MPI_AllReduce,
-// and related initialization function
-extern MPI_Datatype         MPI_COURANT_NUMBER_DIAGNOSTICS;
-extern MPI_Op               MPI_MAX_COURANT_NUMBER;
-PETSC_INTERN PetscErrorCode InitCourantNumberDiagnostics(void);
-
-// This type defines a material with specific properties.
-// (undefined properties are set to INVALID_INT/INVALID_REAL)
-typedef struct {
-  char      name[MAX_NAME_LEN + 1];
-  PetscReal manning;  // Manning's coefficient [s/m**(1/3)]
-} RDyMaterial;
-
-// This type defines a "condition" representing
-// * an initial condition or source/sink associated with a region
-// * a boundary condition associated with a boundary
-typedef struct {
-  // flow, sediment, salinity conditions (NULL for none)
-  RDyFlowCondition     *flow;
-  RDySedimentCondition *sediment;
-  RDySalinityCondition *salinity;
-
-  // value(s) associated with the condition
-  PetscReal value;
-
-  // was this boundary condition automatically generated and not explicitly
-  // requested in the config file?
-  PetscBool auto_generated;
-} RDyCondition;
 
 // This type keeps track of accumulated time series data appended periodically
 // to files.
@@ -92,16 +54,12 @@ struct _RDyOps {
   PetscErrorCode (*destroy)(void *);
 };
 
+// class ID for PETSc logging events
+extern PetscClassId RDY_CLASSID;
+
 // an application context that stores data relevant to a simulation
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);
-
-  // Implementation-specific context pointer
-  void *context;
-
-  //------------------------------------------------------------------
-  // TODO: The fields below are subject to change as we find our way!
-  //------------------------------------------------------------------
 
   // MPI communicator used for the simulation
   MPI_Comm comm;
@@ -122,11 +80,14 @@ struct _p_RDy {
   RDyConfig config;
 
   // PETSc (DMPlex) grid
-  DM        dm;
-  PetscBool refine;
+  DM               dm;
+  SectionFieldSpec soln_fields;
+  PetscBool        refine;
 
-  // Auxiliary DM for diagnostics
-  DM aux_dm;
+  // auxiliary DM for diagnostics
+  DM               aux_dm;
+  SectionFieldSpec diag_fields;
+  Vec              diags_vec;
 
   // mesh representing simulation domain
   RDyMesh mesh;
@@ -138,9 +99,6 @@ struct _p_RDy {
   // mesh boundaries
   PetscInt     num_boundaries;
   RDyBoundary *boundaries;
-
-  // materials associated with individual (local) cells
-  RDyMaterial *materials_by_cell;
 
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;
@@ -170,40 +128,11 @@ struct _p_RDy {
   // host right-hand-side (residual) vector
   Vec rhs;
 
-  // CEED (device) solver data
-  struct {
-    CeedOperator flux_operator;
-    CeedOperator source_operator;
-
-    CeedVector u_local;
-    CeedVector rhs, sources;
-
-    CeedScalar dt;
-
-    Vec host_fluxes;  // edge fluxes copied to host for diagnostics
-  } ceed;
-
-  // PETSc (host) solver data
-  struct {
-    // context pointer -- must be cast to e.g. PetscRiemannDataSWE*
-    void *context;
-
-    // source-sink vector for domain
-    Vec sources;
-  } petsc;
-
-  // locks on operator data for exclusive access (see rdyoperatorimpl.h)
-  struct {
-    void **boundary_data;  // per-boundary operator boundary data
-    void  *source_data;    // domain operator source data
-    void  *material_data;  // operator material data for the domain
-    void  *flux_div_data;  // operator flux divergence data for the domain
-  } lock;
+  // operator representing the system of equations
+  Operator *operator;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;
-
-  CourantNumberDiagnostics courant_num_diags;
 
   //-------------------
   // Simulatіon output
@@ -220,9 +149,9 @@ PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
+PETSC_INTERN PetscErrorCode DestroyConfig(RDy);
 
 PETSC_INTERN PetscErrorCode RDyDestroyVectors(RDy *);
-PETSC_INTERN PetscErrorCode RDyDestroyMaterials(RDy *);
 PETSC_INTERN PetscErrorCode RDyDestroyBoundaries(RDy *);
 
 // output functions
@@ -237,7 +166,6 @@ PETSC_INTERN PetscErrorCode ReadCheckpointFile(RDy, const char *);
 
 // time series
 PETSC_INTERN PetscErrorCode InitTimeSeries(RDy);
-PETSC_INTERN PetscErrorCode AccumulateBoundaryFluxes(RDy, RDyBoundary boundary, PetscInt size, PetscInt ndof, PetscReal *);
 PETSC_INTERN PetscErrorCode WriteTimeSeries(TS, PetscInt, PetscReal, Vec, void *);
 PETSC_INTERN PetscErrorCode DestroyTimeSeries(RDy);
 
