@@ -106,10 +106,10 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
 ///    * `small h value` - the water height below which dry conditions are assumed
 ///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
-/// @param [in]  mesh   a mesh representing the domain
-/// @param [in]  tiny_h the water height below which dry conditions are assumed
-/// @param [out] op     the newly created CeedOperator
-PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *op) {
+/// @param [in]  mesh    a mesh representing the domain
+/// @param [in]  tiny_h  the water height below which dry conditions are assumed
+/// @param [out] ceed_op the newly created CeedOperator
+PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -211,14 +211,14 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
-  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
-  PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*op, "q_right", q_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*op, "cell_right", c_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
-  PetscCallCEED(CeedOperatorSetField(*op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_right", q_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_right", c_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
@@ -273,9 +273,9 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
 /// @param [in]  boundary           the boundary through which fluxes are to be computed
 /// @param [in]  boundary_condition the boundary condition associated with the boundary of interest
 /// @param [in]  tiny_h             the water height below which dry conditions are assumed
-/// @param [out] op                 the newly created CeedOperator
+/// @param [out] ceed_op            the newly created CeedOperator
 PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
-                                                 CeedOperator *op) {
+                                                 CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -409,15 +409,15 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
-  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
-  PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
-    PetscCallCEED(CeedOperatorSetField(*op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_COLLOCATED, dirichlet));
+    PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_COLLOCATED, dirichlet));
   }
-  PetscCallCEED(CeedOperatorSetField(*op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
-  PetscCallCEED(CeedOperatorSetField(*op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
@@ -465,8 +465,8 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 ///
 /// @param [in]  mesh            a mesh representing the domain
 /// @param [in]  tiny_h          the water height below which dry conditions are assumed
-/// @param [out] op              the newly created PetscOperator
-PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *op) {
+/// @param [out] ceed_op         the newly created CeedOperator
+PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -556,12 +556,12 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
-  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
-  PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
-  PetscCallCEED(CeedOperatorSetField(*op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n));
-  PetscCallCEED(CeedOperatorSetField(*op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_swe));

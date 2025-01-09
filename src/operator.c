@@ -127,7 +127,7 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode AddCeedSuboperators(Operator *op) {
+static PetscErrorCode AddCeedOperators(Operator *op) {
   PetscFunctionBegin;
 
   // set up operators for the shallow water equations
@@ -175,7 +175,7 @@ static PetscErrorCode AddCeedSuboperators(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode AddPetscSuboperators(Operator *op) {
+static PetscErrorCode AddPetscOperators(Operator *op) {
   PetscFunctionBegin;
 
   // set up sub-operators for the shallow water equations
@@ -255,9 +255,9 @@ static PetscErrorCode AddSuboperators(Operator *op) {
   PetscFunctionBegin;
 
   if (CeedEnabled()) {
-    PetscCall(AddCeedSuboperators(op));
+    PetscCall(AddCeedOperators(op));
   } else {
-    PetscCall(AddPetscSuboperators(op));
+    PetscCall(AddPetscOperators(op));
   }
 
   // set up our flux divergence vector(s)

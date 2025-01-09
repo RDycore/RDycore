@@ -329,8 +329,8 @@ static PetscErrorCode DestroyInteriorFlux(void *context) {
 /// @param [in]    mesh        a mesh representing the domain
 /// @param [inout] diagnostics a set of diagnostics that can be updated by the PetscOperator
 /// @param [in]    tiny_h      the water height below which dry conditions are assumed
-/// @param [out]   op          the newly created PetscOperator
-PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *op) {
+/// @param [out]   petsc_op    the newly created PetscOperator
+PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   const PetscInt num_comp = 3;
@@ -360,7 +360,7 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnos
     }
   }
 
-  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyInteriorFlux, DestroyInteriorFlux, op));
+  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyInteriorFlux, DestroyInteriorFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -568,9 +568,9 @@ static PetscErrorCode DestroyBoundaryFlux(void *context) {
 /// @param [inout] boundary_fluxes    a Vec storing fluxes for this boundary
 /// @param [inout] diagnostics        a set of diagnostics that can be updated by the PetscOperator
 /// @param [in]    tiny_h             the water height below which dry conditions are assumed
-/// @param [out]   op                 the newly created PetscOperator
+/// @param [out]   petsc_op           the newly created PetscOperator
 PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, Vec boundary_values,
-                                                  Vec boundary_fluxes, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *op) {
+                                                  Vec boundary_fluxes, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
   PetscFunctionBegin;
   BoundaryFluxOperator *boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
@@ -596,7 +596,7 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
     boundary_flux_op->edges.cn[e] = edges->cn[edge_id];
     boundary_flux_op->edges.sn[e] = edges->sn[edge_id];
   }
-  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplyBoundaryFlux, DestroyBoundaryFlux, op));
+  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplyBoundaryFlux, DestroyBoundaryFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -711,8 +711,8 @@ static PetscErrorCode DestroySource(void *context) {
 /// @param [in]    external_sources a Vec storing external source values (if any) for the domain
 /// @param [in]    mannings         a Vec storing Mannings coefficient values for the domain
 /// @param [in]    tiny_h           the water height below which dry conditions are assumed
-/// @param [out]   op               the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, PetscReal tiny_h, PetscOperator *op) {
+/// @param [out]   petsc_op         the newly created PetscOperator
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, PetscReal tiny_h, PetscOperator *petsc_op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
@@ -722,7 +722,7 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources,
       .mannings         = mannings,
       .tiny_h           = tiny_h,
   };
-  PetscCall(PetscOperatorCreate(source_op, ApplySource, DestroySource, op));
+  PetscCall(PetscOperatorCreate(source_op, ApplySource, DestroySource, petsc_op));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
