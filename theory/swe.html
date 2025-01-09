@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.46">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
     
     
       
@@ -1488,7 +1488,7 @@ critical flow.</p>
   |\hat{\lambda}|_3 &amp;=&amp; \frac{\hat{\lambda}^2_2}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_3 &lt; \Delta \lambda/2$}
 \end{eqnarray}\]</div>
 <h3 id="source-terms">Source terms</h3>
-<p>Recall that there are three source terms $\mathbf{S}_r, <span class="arithmatex">\(\mathbf{S}_b\)</span>, and
+<p>Recall that there are three source terms <span class="arithmatex">\(\mathbf{S}_r\)</span>, <span class="arithmatex">\(\mathbf{S}_b\)</span>, and
 <span class="arithmatex">\(\mathbf{S}_f\)</span>. In this section, we write the source terms for the momentum
 vector as <span class="arithmatex">\(\mathbf{S}_b = [0, \mathbf{\vec{S}}_b]^T\)</span> and <span class="arithmatex">\(\mathbf{S}_f = [0, \mathbf{\vec{S}}_f]^T\)</span>
 because their second and third components correspond to the spatial components
@@ -1525,11 +1525,12 @@ gradient of the bed elevation function <span class="arithmatex">\(z\)</span>.</p
 <p>Like the runoff term, this term involves only quantities within a single cell
 and can be approximated by the mean value theorem:</p>
 <div class="arithmatex">\[\begin{equation}
-\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u} \sqrt{u^2 + v^2} A_i
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u}_i \sqrt{u_i^2 + v_i^2} A_i
 \end{equation}\]</div>
-<p>where <span class="arithmatex">\(\vec{u} = (u, v)\)</span> is the flow velocity vector. The <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial
-components contribute to the second and third vector components of the integral
-of <span class="arithmatex">\(\mathbf{S}_r\)</span>, respectively.</p>
+<p>where <span class="arithmatex">\(C_D = g n_i^2 h_i^{-1/3}\)</span> and <span class="arithmatex">\(\vec{u}_i = (u, v)\)</span>
+are, respectively, the drag coefficient and the flow velocity vector in cell <span class="arithmatex">\(i\)</span>.
+The <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial components of <span class="arithmatex">\(\mathbf{\vec{S}}_f\)</span> contribute to the
+second and third components of the source term.</p>
 <h2 id="temporal-discretization">Temporal Discretization</h2>
 <p>The above spatial discretization produces a "semi-discrete" system of equations
 that can be integrated using various methods for solving systems of ordinary
@@ -1604,7 +1605,7 @@ overland and channel flow. Advances in water resources, 37, 104-126.</a></p>
     <script id="__config" type="application/json">{"base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
       
         <script src="../javascript/mathjax.js"></script>
       
