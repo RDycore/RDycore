@@ -613,7 +613,7 @@ typedef struct {
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
-static PetscErrorCode ApplySource(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
@@ -833,7 +833,7 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources,
       .mannings         = mannings,
       .tiny_h           = tiny_h,
   };
-  PetscCall(PetscOperatorCreate(source_op, ApplySource, DestroySource, petsc_op));
+  PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
