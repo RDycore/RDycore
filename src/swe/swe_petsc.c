@@ -783,8 +783,8 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
           qx_nplus1 = mx;
           qy_nplus1 = my;
         } else {
-          qx_nplus1 = (mx - mx * PetscPowReal(1 + 4 * dt * lambda, 0.5)) / (-2 * dt * lambda);
-          qy_nplus1 = (my - my * PetscPowReal(1 + 4 * dt * lambda, 0.5)) / (-2 * dt * lambda);
+          qx_nplus1 = (mx - mx * PetscPowReal(1.0 + 4.0 * dt * lambda, 0.5)) / (-2.0 * dt * lambda);
+          qy_nplus1 = (my - my * PetscPowReal(1.0 + 4.0 * dt * lambda, 0.5)) / (-2.0 * dt * lambda);
         }
 
         PetscReal q_magnitude = PetscPowReal(Square(qx_nplus1) + Square(qy_nplus1), 0.5);
