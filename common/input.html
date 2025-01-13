@@ -1799,6 +1799,7 @@ RDycore. The parameters that define these discretizations are</p>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
 <p>The <code>output</code> section control simulation output, including visualization and
 time series data (and excluding checkpoint data). Relevant parameters are</p>
@@ -1824,6 +1825,9 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
   flux data is appended to a tab-delimited text file</li>
 </ul>
 </li>
+<li><code>separate_grid_file</code>: this optional parameter specifies whether the grid is
+  written to its own file, which saves space in very large simulations. Currently,
+  this option is only supported for <code>xdmf</code> output.</li>
 </ul>
 <h2 id="physics"><code>physics</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">physics</span><span class="p">:</span>
