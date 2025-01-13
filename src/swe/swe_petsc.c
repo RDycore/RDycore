@@ -698,6 +698,117 @@ static PetscErrorCode ApplySource(void *context, PetscOperatorFields fields, Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Adds contribution of the source-term using implicit time integration approach of:
+///        Xia, Xilin, and Qiuhua Liang. "A new efficient implicit scheme for discretising the stiff
+///        friction terms in the shallow water equations." Advances in water resources 117 (2018): 87-97.
+///        https://www.sciencedirect.com/science/article/pii/S0309170818302124?ref=cra_js_challenge&fr=RR-1
+/// @param context
+/// @param fields
+/// @param dt
+/// @param u_local
+/// @param f_global
+/// @return
+static PetscErrorCode ApplySourceXL2018(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBeginUser;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
+
+  SourceOperator *source_op        = context;
+  Vec             source_vec       = source_op->external_sources;
+  Vec             mannings_vec     = source_op->mannings;
+  RDyMesh        *mesh             = source_op->mesh;
+  RDyCells       *cells            = &mesh->cells;
+  PetscReal       tiny_h           = source_op->tiny_h;
+  PetscReal       xl2018_threshold = 10e-10;
+
+  // access Vec data
+  PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));      // sequential vector
+  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
+
+  // access previously-computed flux divergence data
+  Vec flux_div;
+  PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
+  PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
+  PetscScalar *flux_div_ptr;
+  PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
+
+  PetscInt size;
+  PetscCall(VecGetSize(source_vec, &size));
+  PetscInt n_dof = size / mesh->num_owned_cells;
+  PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) {
+      PetscInt owned_cell_id = cells->local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal hu = u_ptr[n_dof * c + 1];
+      PetscReal hv = u_ptr[n_dof * c + 2];
+
+      PetscReal dz_dx = cells->dz_dx[c];
+      PetscReal dz_dy = cells->dz_dy[c];
+
+      PetscReal bedx = dz_dx * GRAVITY * h;
+      PetscReal bedy = dz_dy * GRAVITY * h;
+
+      PetscReal tbx = 0.0, tby = 0.0;
+
+      if (h >= tiny_h) {  // wet conditions
+
+        // Manning's coefficient
+        PetscReal N_mannings = mannings_ptr[c];
+
+        PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
+        PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
+
+        // defined in the text below equation 22 of XL2018
+        PetscReal Ax = Fsum_x - bedx;
+        PetscReal Ay = Fsum_y - bedy;
+
+        // equation 27 of XL2018
+        PetscReal mx = hu + Ax * dt;
+        PetscReal my = hv + Ay * dt;
+
+        PetscReal lambda = GRAVITY * Square(N_mannings) * PetscPowReal(h, -4.0 / 3.0) * PetscPowReal(Square(mx / h) + Square(my / h), 0.5);
+
+        PetscReal qx_nplus1, qy_nplus1;
+
+        // equation 36 and 37 of XL2018
+        if (dt * lambda < xl2018_threshold) {
+          qx_nplus1 = mx;
+          qy_nplus1 = my;
+        } else {
+          qx_nplus1 = (mx - mx * PetscPowReal(1 + 4 * dt * lambda, 0.5)) / (-2 * dt * lambda);
+          qy_nplus1 = (my - my * PetscPowReal(1 + 4 * dt * lambda, 0.5)) / (-2 * dt * lambda);
+        }
+
+        PetscReal q_magnitude = PetscPowReal(Square(qx_nplus1) + Square(qy_nplus1), 0.5);
+
+        // equation 21 and 22 of XL2018
+        tbx = dt * GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
+        tby = dt * GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
+      }
+
+      // NOTE: we accumulate everything into the RHS vector by convention.
+      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+      f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
+      f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+    }
+  }
+
+  // restore vectors
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+  PetscCall(VecRestoreArray(source_vec, &source_ptr));
+  PetscCall(VecRestoreArray(mannings_vec, &mannings_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DestroySource(void *context) {
   PetscFunctionBegin;
   SourceOperator *source_op = context;
