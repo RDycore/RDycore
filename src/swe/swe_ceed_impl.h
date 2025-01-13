@@ -20,6 +20,7 @@ struct SWEContext_ {
   CeedScalar dtime;
   CeedScalar tiny_h;
   CeedScalar gravity;
+  CeedScalar xq2018_threshold;
 };
 
 struct SWEState_ {
@@ -289,6 +290,76 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
 
       tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
       tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+    }
+
+    cell[0][i] = riemannf[0][i] + swe_src[0][i];
+    cell[1][i] = riemannf[1][i] - bedx - tbx + swe_src[1][i];
+    cell[2][i] = riemannf[2][i] - bedy - tby + swe_src[2][i];
+  }
+  return 0;
+}
+
+/// @brief Adds contribution of the source-term using implicit time integration approach of:
+///        Xia, Xilin, and Qiuhua Liang. "A new efficient implicit scheme for discretising the stiff
+///        friction terms in the shallow water equations." Advances in water resources 117 (2018): 87-97.
+///        https://www.sciencedirect.com/science/article/pii/S0309170818302124?ref=cra_js_challenge&fr=RR-1
+CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
+  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
+  const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
+  const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SWEContext context                  = (SWEContext)ctx;
+
+  const CeedScalar dt               = context->dtime;
+  const CeedScalar tiny_h           = context->tiny_h;
+  const CeedScalar gravity          = context->gravity;
+  const CeedScalar xq2018_threshold = context->xq2018_threshold;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    const CeedScalar h     = state.h;
+    const CeedScalar hu    = state.hu;
+    const CeedScalar hv    = state.hv;
+
+    const CeedScalar dz_dx = geom[0][i];
+    const CeedScalar dz_dy = geom[1][i];
+
+    const CeedScalar bedx = dz_dx * gravity * h;
+    const CeedScalar bedy = dz_dy * gravity * h;
+
+    const CeedScalar Fsum_x = riemannf[1][i];
+    const CeedScalar Fsum_y = riemannf[2][i];
+
+    CeedScalar tbx = 0.0, tby = 0.0;
+    if (h > tiny_h) {
+      // defined in the text below equation 22 of XQ2018
+      const CeedScalar Ax = Fsum_x - bedx;
+      const CeedScalar Ay = Fsum_y - bedy;
+
+      // equation 27 of XQ2018
+      const CeedScalar mx = hu + Ax * dt;
+      const CeedScalar my = hv + Ay * dt;
+
+      const CeedScalar lambda = gravity * Square(mannings_n[0][i]) * pow(h, -4.0 / 3.0) * pow(Square(mx / h) + Square(my / h), 0.5);
+
+      CeedScalar qx_nplus1 = 0.0, qy_nplus1 = 0.0;
+
+      // equation 36 and 37 of XQ2018
+      if (dt * lambda < xq2018_threshold) {
+        qx_nplus1 = mx;
+        qy_nplus1 = my;
+      } else {
+        qx_nplus1 = (mx - mx * pow(1.0 + 4.0 * dt * lambda, 0.5)) / (-2.0 * dt * lambda);
+        qy_nplus1 = (my - my * pow(1.0 + 4.0 * dt * lambda, 0.5)) / (-2.0 * dt * lambda);
+      }
+
+      const CeedScalar q_magnitude = pow(Square(qx_nplus1) + Square(qy_nplus1), 0.5);
+
+      // equation 21 and 22 of XQ2018
+      tbx = dt * gravity * Square(mannings_n[0][i]) * pow(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
+      tby = dt * gravity * Square(mannings_n[0][i]) * pow(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
     }
 
     cell[0][i] = riemannf[0][i] + swe_src[0][i];

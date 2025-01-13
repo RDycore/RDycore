@@ -8,7 +8,7 @@
 
 PETSC_INTERN PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *, PetscReal, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *, RDyBoundary, RDyCondition, PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *, PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *, RDySourceTimeMethod, PetscReal, PetscReal, CeedOperator *);
 
 PETSC_INTERN PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *, OperatorDiagnostics *, PetscReal, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *, RDyBoundary, RDyCondition, Vec, Vec, OperatorDiagnostics *, PetscReal,
