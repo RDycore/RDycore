@@ -406,6 +406,7 @@ output:
   batch_size: 1
   time_series:
     boundary_fluxes: 10
+  separate_grid_file: false
 ```
 
 The `output` section control simulation output, including visualization and
@@ -428,6 +429,9 @@ time series data (and excluding checkpoint data). Relevant parameters are
   has only one parameter:
     * `boundary_fluxes`: the interval (number of timesteps) at which boundary
       flux data is appended to a tab-delimited text file
+* `separate_grid_file`: this optional parameter specifies whether the grid is
+  written to its own file, which saves space in very large simulations. Currently,
+  this option is only supported for `xdmf` output.
 
 ## `physics`
 

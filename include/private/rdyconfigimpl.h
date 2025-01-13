@@ -165,6 +165,7 @@ typedef struct {
   PetscInt        batch_size;                     // number of timesteps per output file (if available)
   RDyTimeSeries   time_series;                    // time series appended to text (.dat) files
   PetscReal       prev_output_time;               // previous time at which output was written
+  PetscBool       separate_grid_file;             // whether grid is written to a separate file
 } RDyOutputSection;
 
 // ------------

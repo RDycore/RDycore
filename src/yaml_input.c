@@ -234,6 +234,7 @@ static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
     CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
+    CYAML_FIELD_BOOL("separate_grid_file", CYAML_FLAG_OPTIONAL, RDyOutputSection, separate_grid_file),
     CYAML_FIELD_END
 };
 
