@@ -708,7 +708,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
 /// @param u_local
 /// @param f_global
 /// @return
-static PetscErrorCode ApplySourceXL2018(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplySourceXQ2018(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
@@ -720,7 +720,7 @@ static PetscErrorCode ApplySourceXL2018(void *context, PetscOperatorFields field
   RDyMesh        *mesh             = source_op->mesh;
   RDyCells       *cells            = &mesh->cells;
   PetscReal       tiny_h           = source_op->tiny_h;
-  PetscReal       xl2018_threshold = 10e-10;
+  PetscReal       xq2018_threshold = 10e-10;
 
   // access Vec data
   PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
@@ -765,11 +765,11 @@ static PetscErrorCode ApplySourceXL2018(void *context, PetscOperatorFields field
         PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
         PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
 
-        // defined in the text below equation 22 of XL2018
+        // defined in the text below equation 22 of XQ2018
         PetscReal Ax = Fsum_x - bedx;
         PetscReal Ay = Fsum_y - bedy;
 
-        // equation 27 of XL2018
+        // equation 27 of XQ2018
         PetscReal mx = hu + Ax * dt;
         PetscReal my = hv + Ay * dt;
 
@@ -777,8 +777,8 @@ static PetscErrorCode ApplySourceXL2018(void *context, PetscOperatorFields field
 
         PetscReal qx_nplus1, qy_nplus1;
 
-        // equation 36 and 37 of XL2018
-        if (dt * lambda < xl2018_threshold) {
+        // equation 36 and 37 of XQ2018
+        if (dt * lambda < xq2018_threshold) {
           qx_nplus1 = mx;
           qy_nplus1 = my;
         } else {
@@ -788,7 +788,7 @@ static PetscErrorCode ApplySourceXL2018(void *context, PetscOperatorFields field
 
         PetscReal q_magnitude = PetscPowReal(Square(qx_nplus1) + Square(qy_nplus1), 0.5);
 
-        // equation 21 and 22 of XL2018
+        // equation 21 and 22 of XQ2018
         tbx = dt * GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
         tby = dt * GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
       }
