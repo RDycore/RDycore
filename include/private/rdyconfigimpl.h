@@ -47,10 +47,17 @@ typedef enum {
   FLOW_DIFFUSION  // diffusion equation
 } RDyPhysicsFlowMode;
 
+typedef enum {
+  SOURCE_SEMI_IMPLICIT = 0,  // semi-implicit treatment
+  SOURCE_IMPLIICT_XQ2018     // implicit treatment using Xilin and Qiuhua (2018)
+} RDySourceTimeMethod;
+
 // physics flow parameters
 typedef struct {
-  RDyPhysicsFlowMode mode;    // flow mode
-  PetscReal          tiny_h;  // depth below which no flow occurs
+  RDyPhysicsFlowMode  mode;                // flow mode
+  PetscReal           tiny_h;              // depth below which no flow occurs
+  RDySourceTimeMethod source_time_method;  // temporal discretization method for source term
+  PetscReal           xq2018_threshold;    // threshold for the XQ2018's implicit time integration of source term
 } RDyPhysicsFlow;
 
 // all physics parameters

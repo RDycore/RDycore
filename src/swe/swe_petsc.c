@@ -610,6 +610,7 @@ typedef struct {
   Vec       external_sources;  // external source vector
   Vec       mannings;          // mannings coefficient vector
   PetscReal tiny_h;            // minimum water height for wet conditions
+  PetscReal xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
@@ -708,7 +709,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
 /// @param u_local
 /// @param f_global
 /// @return
-static PetscErrorCode ApplySourceXQ2018(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
@@ -823,7 +824,8 @@ static PetscErrorCode DestroySource(void *context) {
 /// @param [in]    mannings         a Vec storing Mannings coefficient values for the domain
 /// @param [in]    tiny_h           the water height below which dry conditions are assumed
 /// @param [out]   petsc_op         the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, PetscReal tiny_h, PetscOperator *petsc_op) {
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, RDySourceTimeMethod method, PetscReal tiny_h,
+                                            PetscReal xq2018_threshold, PetscOperator *petsc_op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
@@ -832,8 +834,23 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources,
       .external_sources = external_sources,
       .mannings         = mannings,
       .tiny_h           = tiny_h,
+      .xq2018_threshold = xq2018_threshold,
   };
-  PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)external_sources, &comm));
+
+  switch (method) {
+    case SOURCE_SEMI_IMPLICIT:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
+      break;
+    case SOURCE_IMPLIICT_XQ2018:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
+      break;
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

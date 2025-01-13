@@ -185,7 +185,9 @@ static PetscErrorCode AddPetscOperators(Operator *op) {
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.flux));
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.source));
 
-  PetscReal tiny_h = op->config->physics.flow.tiny_h;
+  RDySourceTimeMethod time_method      = op->config->physics.flow.source_time_method;
+  PetscReal           tiny_h           = op->config->physics.flow.tiny_h;
+  PetscReal           xq2018_threshold = op->config->physics.flow.xq2018_threshold;
 
   // flux suboperator 0: fluxes between interior cells
   PetscOperator interior_flux_op;
@@ -204,7 +206,8 @@ static PetscErrorCode AddPetscOperators(Operator *op) {
 
   // domain-wide SWE source operator
   PetscOperator source_op;
-  PetscCall(CreateSWEPetscSourceOperator(op->mesh, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS], tiny_h, &source_op));
+  PetscCall(CreateSWEPetscSourceOperator(op->mesh, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS], time_method, tiny_h,
+                                         xq2018_threshold, &source_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.source, source_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);

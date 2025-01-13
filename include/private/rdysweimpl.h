@@ -13,6 +13,6 @@ PETSC_INTERN PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *, PetscReal, Ce
 PETSC_INTERN PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *, OperatorDiagnostics *, PetscReal, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *, RDyBoundary, RDyCondition, Vec, Vec, OperatorDiagnostics *, PetscReal,
                                                                PetscOperator *);
-PETSC_INTERN PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *, Vec, Vec, PetscReal, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *, Vec, Vec, RDySourceTimeMethod, PetscReal, PetscReal, PetscOperator *);
 
 #endif
