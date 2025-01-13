@@ -69,6 +69,22 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode DetermineGridFile(RDy rdy, PetscInt step, PetscReal time, char *filename) {
+  PetscFunctionBegin;
+
+  if (rdy->config.output.separate_grid_file) {
+    // the grid is stored in its own file
+    char prefix[PETSC_MAX_PATH_LEN], output_dir[PETSC_MAX_PATH_LEN];
+    PetscCall(DetermineConfigPrefix(rdy, prefix));
+    PetscCall(GetOutputDirectory(rdy, output_dir));
+    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
+  } else {
+    // the grid is stored in the base HDF5 file
+    DetermineOutputFile(rdy, step, time, "h5", filename);
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer) {
   PetscFunctionBegin;
 
@@ -117,9 +133,27 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, viewer));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
-  // write the grid if we're the first step in a batch.
-  if (dataset % rdy->config.output.batch_size == 0) {
-    PetscCall(WriteGrid(rdy->comm, &rdy->mesh, viewer));
+  // write the grid
+  if (rdy->config.output.separate_grid_file) {
+    // on the first step ONLY, write the grid to its own file
+    if (step == 0) {
+      char h5_gridname[PETSC_MAX_PATH_LEN];
+      PetscCall(DetermineGridFile(rdy, step, time, h5_gridname));
+      RDyLogDetail(rdy, "Step 0: writing XDMF HDF5 grid to %s", h5_gridname);
+
+      PetscViewer grid_viewer;
+      PetscCall(PetscViewerHDF5Open(rdy->comm, h5_gridname, FILE_MODE_WRITE, &grid_viewer));
+      PetscCall(PetscViewerPushFormat(grid_viewer, PETSC_VIEWER_HDF5_XDMF));
+      PetscCall(PetscViewerHDF5SetCollective(grid_viewer, PETSC_TRUE));
+      PetscCall(WriteGrid(rdy->comm, &rdy->mesh, grid_viewer));
+      PetscCall(PetscViewerPopFormat(grid_viewer));
+      PetscCall(PetscViewerDestroy(&grid_viewer));
+    }
+  } else {
+    // write the grid with the rest of the HDF5 data if we're the first step in a batch.
+    if (dataset % rdy->config.output.batch_size == 0) {
+      PetscCall(WriteGrid(rdy->comm, &rdy->mesh, viewer));
+    }
   }
 
   PetscCall(PetscViewerPopFormat(viewer));
@@ -187,6 +221,11 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   char       *last_slash  = strrchr(h5_name, '/');
   const char *h5_basename = last_slash ? &last_slash[1] : h5_name;
 
+  char gridname[PETSC_MAX_PATH_LEN];
+  PetscCall(DetermineGridFile(rdy, step, time, gridname));
+  last_slash              = strrchr(gridname, '/');
+  const char *h5_gridname = last_slash ? &last_slash[1] : gridname;
+
   // write the header
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "<?xml version=\"1.0\" ?>\n"
@@ -211,14 +250,14 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                          "          %s:/Domain/Cells\n"
                          "        </DataItem>\n"
                          "      </Topology>\n",
-                         mesh->num_cells_global, size, h5_basename));
+                         mesh->num_cells_global, size, h5_gridname));
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Geometry GeometryType=\"XYZ\">\n"
                          "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " 3\">\n"
-                         "          %s:Domain/Vertices\n"
+                         "          %s:/Domain/Vertices\n"
                          "        </DataItem>\n"
                          "      </Geometry>\n",
-                         num_vertices, h5_basename));
+                         num_vertices, h5_gridname));
 
   // write out mesh coordinates (data placed in "fields" group for some reason)
   const char *grid_coord_names[3] = {"XC", "YC", "ZC"};
@@ -229,7 +268,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
                            "          %s:/fields/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
-                           grid_coord_names[f], mesh->num_cells_global, h5_basename, grid_coord_names[f]));
+                           grid_coord_names[f], mesh->num_cells_global, h5_gridname, grid_coord_names[f]));
   }
 
   PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
