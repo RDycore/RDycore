@@ -52,7 +52,7 @@ static const cyaml_strval_t physics_flow_modes[] = {
 
 static const cyaml_strval_t source_time_methods[] = {
     {"semi_implicit",   SOURCE_SEMI_IMPLICIT  },
-    {"implicit_xq2018", SOURCE_IMPLIICT_XQ2018},
+    {"implicit_xq2018", SOURCE_IMPLICIT_XQ2018},
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow

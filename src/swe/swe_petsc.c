@@ -846,7 +846,7 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources,
     case SOURCE_SEMI_IMPLICIT:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
       break;
-    case SOURCE_IMPLIICT_XQ2018:
+    case SOURCE_IMPLICIT_XQ2018:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
       break;
     default:

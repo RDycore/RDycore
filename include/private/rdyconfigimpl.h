@@ -49,7 +49,7 @@ typedef enum {
 
 typedef enum {
   SOURCE_SEMI_IMPLICIT = 0,  // semi-implicit treatment
-  SOURCE_IMPLIICT_XQ2018     // implicit treatment using Xilin and Qiuhua (2018)
+  SOURCE_IMPLICIT_XQ2018     // implicit treatment using Xilin and Qiuhua (2018)
 } RDySourceTimeMethod;
 
 // physics flow parameters

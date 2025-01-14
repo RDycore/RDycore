@@ -491,7 +491,7 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDySourceTimeMethod me
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermSemiImplicit, SWESourceTermSemiImplicit_loc, &qf));
       break;
-    case SOURCE_IMPLIICT_XQ2018:
+    case SOURCE_IMPLICIT_XQ2018:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermImplicitXQ2018, SWESourceTermImplicitXQ2018_loc, &qf));
       break;
     default:
