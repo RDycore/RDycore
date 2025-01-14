@@ -1799,7 +1799,7 @@ RDycore. The parameters that define these discretizations are</p>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>The <code>output</code> section control simulation output, including visualization and
 time series data (and excluding checkpoint data). Relevant parameters are</p>
@@ -1833,7 +1833,10 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
 <div class="highlight"><pre><span></span><code><span class="nt">physics</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">flow</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swe</span>
-<span class="w">    </span><span class="nt">tiny</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
+<span class="w">    </span><span class="nt">tiny_h</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
+<span class="w">    </span><span class="nt">source</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implicit_xq2018</span>
+<span class="w">      </span><span class="nt">xq2018_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-10</span>
 <span class="w">  </span><span class="nt">sediment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <span class="w">  </span><span class="nt">salinity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
@@ -1849,6 +1852,15 @@ parameters in this subsection are:</p>
    not yet supported). This parameter is required and has no default value.</li>
 <li><code>tiny_h</code>, which is the water height below which a given point is assumed to
   be dry. Default value: <code>1e-7</code></li>
+<li><code>source</code>: this subsection controls parameters governing how the flow source
+  term is integrated in time. Parameters are:</li>
+<li><code>method</code>: the method for integrating the flow source term. Options are<ul>
+<li><code>semi_implicit</code>: a semi-implicit source treatment (default value)</li>
+<li><code>implicit_xq2018</code>: a fully implicit source treatment based on Xilin and Qiuhua (2018)</li>
+</ul>
+</li>
+<li><code>xq2018_threshold</code>: threshold for the implicit integration of the source
+    (valid only for the <code>implicit_xq2018</code> method; default value: <code>1e-10</code>)</li>
 </ul>
 <p>The second physical model is the sediment model. You can enable or disable this
 by setting the <code>sediment</code> parameter to <code>true</code> or <code>false</code>.</p>
