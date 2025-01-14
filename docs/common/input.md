@@ -406,7 +406,7 @@ output:
   batch_size: 1
   time_series:
     boundary_fluxes: 10
-  separate_grid_file: false
+  separate_grid_file: true
 ```
 
 The `output` section control simulation output, including visualization and
@@ -439,7 +439,10 @@ time series data (and excluding checkpoint data). Relevant parameters are
 physics:
   flow:
     mode: swe
-    tiny: 1e-7
+    tiny_h: 1e-7
+    source:
+      method: implicit_xq2018
+      xq2018_threshold: 1e-10
   sediment: false
   salinity: false
 ```
@@ -457,6 +460,13 @@ parameters in this subsection are:
    not yet supported). This parameter is required and has no default value.
 * `tiny_h`, which is the water height below which a given point is assumed to
   be dry. Default value: `1e-7`
+* `source`: this subsection controls parameters governing how the flow source
+  term is integrated in time. Parameters are:
+  * `method`: the method for integrating the flow source term. Options are
+    * `semi_implicit`: a semi-implicit source treatment (default value)
+    * `implicit_xq2018`: a fully implicit source treatment based on Xilin and Qiuhua (2018)
+  * `xq2018_threshold`: threshold for the implicit integration of the source
+    (valid only for the `implicit_xq2018` method; default value: `1e-10`)
 
 The second physical model is the sediment model. You can enable or disable this
 by setting the `sediment` parameter to `true` or `false`.

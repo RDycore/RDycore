@@ -61,6 +61,7 @@ static const cyaml_strval_t source_time_methods[] = {
 static const cyaml_schema_field_t source_fields_schema[] = {
     CYAML_FIELD_ENUM("method", CYAML_FLAG_OPTIONAL, RDyFlowSource, method, source_time_methods, CYAML_ARRAY_LEN(source_time_methods)),
     CYAML_FIELD_FLOAT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDyFlowSource, xq2018_threshold),
+    CYAML_FIELD_END
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow
@@ -751,7 +752,9 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
 
   SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
   SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_SEMI_IMPLICIT);
-  SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
+  if (config->physics.flow.source.method == SOURCE_IMPLICIT_XQ2018) {
+    SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
+  }
 
   SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
@@ -779,6 +782,10 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     MPI_Comm_size(comm, &nproc);
     PetscCheck((nproc % config->ensemble.size) == 0, comm, PETSC_ERR_USER,
                "In ensemble mode, the ensemble size must evenly divide the number of processes.");
+  }
+
+  // check flow settings
+  if ((config->physics.flow.source.xq2018_threshold > 0.0) && (config->physics.flow.source.method != SOURCE_IMPLICIT_XQ2018)) {
   }
 
   // check numerics settings
@@ -932,6 +939,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
       config->output.batch_size = 1;
     }
+    PetscCheck(!config->output.separate_grid_file || (config->output.format == OUTPUT_XDMF), comm, PETSC_ERR_USER,
+               "separate_grid_file option is only supported for XDMF output");
 
     if (config->output.time_interval) {
       if (!coupling_interval_was_specified) config->time.coupling_interval = config->output.time_interval * 1.0;

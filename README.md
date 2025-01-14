@@ -9,7 +9,7 @@
 
 To build RDycore, you need:
 
-* [CMake v3.12+](https://cmake.org/)
+* [CMake v3.14+](https://cmake.org/)
 * GNU Make
 * reliable C and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
