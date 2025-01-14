@@ -3,6 +3,8 @@
 physics:
   flow:
     mode: swe
+    source:
+      method: implicit_xq2018
 
 numerics:
   spatial: fv

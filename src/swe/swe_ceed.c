@@ -50,15 +50,16 @@ static int FreeContextPetsc(void *data) {
 
 // creates a QFunction context for a flux or source operator with the given
 // minimum water height threshold
-static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQFunctionContext *qf_context) {
+static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, PetscReal xq2018_threshold, CeedQFunctionContext *qf_context) {
   PetscFunctionBeginUser;
 
   SWEContext swe_ctx;
   PetscCall(PetscCalloc1(1, &swe_ctx));
 
-  swe_ctx->dtime   = 0.0;
-  swe_ctx->tiny_h  = tiny_h;
-  swe_ctx->gravity = 9.806;
+  swe_ctx->dtime            = 0.0;
+  swe_ctx->tiny_h           = tiny_h;
+  swe_ctx->gravity          = 9.806;
+  swe_ctx->xq2018_threshold = xq2018_threshold;
 
   PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
   PetscCallCEED(CeedQFunctionContextSetData(*qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx));
@@ -67,6 +68,8 @@ static PetscErrorCode CreateQFunctionContext(Ceed ceed, PetscReal tiny_h, CeedQF
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "small h value", offsetof(struct SWEContext_, tiny_h), 1,
                                                    "Height threshold below which dry condition is assumed"));
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SWEContext_, gravity), 1, "Accelaration due to gravity"));
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "xq2018_threshold", offsetof(struct SWEContext_, xq2018_threshold), 1,
+                                                   "Threshold for the treatment of Implicit XQ2018 method"));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
@@ -134,7 +137,8 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, PetscReal tiny_h
 
   // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCall(CreateQFunctionContext(ceed, tiny_h, &qf_context));
+  PetscReal            xq2018_threshold_dummy = 0.0;
+  PetscCall(CreateQFunctionContext(ceed, tiny_h, xq2018_threshold_dummy, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
@@ -320,7 +324,8 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 
   // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCall(CreateQFunctionContext(ceed, tiny_h, &qf_context));
+  PetscReal            xq2018_threshold_dummy = 0.0;
+  PetscCall(CreateQFunctionContext(ceed, tiny_h, xq2018_threshold_dummy, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
@@ -463,10 +468,13 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 ///    * `small h value` - the water height below which dry conditions are assumed
 ///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
-/// @param [in]  mesh            a mesh representing the domain
-/// @param [in]  tiny_h          the water height below which dry conditions are assumed
-/// @param [out] ceed_op         the newly created CeedOperator
-PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, CeedOperator *ceed_op) {
+/// @param [in]  mesh             a mesh representing the domain
+/// @param [in]  method           type of temporal method used for discretizing the friction source term
+/// @param [in]  tiny_h           the water height below which dry conditions are assumed
+/// @param [in]  xq2018_threshold the threshold use of the XL2018 implicit temporal method
+/// @param [out] ceed_op          the newly created CeedOperator
+PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDyFlowSourceMethod method, PetscReal tiny_h, PetscReal xq2018_threshold,
+                                           CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -479,7 +487,18 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
   // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
   CeedInt       num_comp_geom = 2, num_comp_swe_src = 3, num_comp_mannings_n = 1;
-  PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTerm, SWESourceTerm_loc, &qf));
+  switch (method) {
+    case SOURCE_SEMI_IMPLICIT:
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermSemiImplicit, SWESourceTermSemiImplicit_loc, &qf));
+      break;
+    case SOURCE_IMPLICIT_XQ2018:
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermImplicitXQ2018, SWESourceTermImplicitXQ2018_loc, &qf));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only semi_implicit source-term is supported in the CEED version");
+      break;
+  }
+
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "swe_src", num_comp_swe_src, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "mannings_n", num_comp_mannings_n, CEED_EVAL_NONE));
@@ -489,7 +508,7 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, PetscReal tiny_h, Ceed
 
   // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCall(CreateQFunctionContext(ceed, tiny_h, &qf_context));
+  PetscCall(CreateQFunctionContext(ceed, tiny_h, xq2018_threshold, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
