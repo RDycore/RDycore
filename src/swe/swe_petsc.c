@@ -703,11 +703,11 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
 ///        Xia, Xilin, and Qiuhua Liang. "A new efficient implicit scheme for discretising the stiff
 ///        friction terms in the shallow water equations." Advances in water resources 117 (2018): 87-97.
 ///        https://www.sciencedirect.com/science/article/pii/S0309170818302124?ref=cra_js_challenge&fr=RR-1
-/// @param context
-/// @param fields
-/// @param dt
-/// @param u_local
-/// @param f_global
+/// @param [in] context   a context for the SourceOperator
+/// @param [in] fields    a PetscOperatorFields from which includes the "rimeannf" field
+/// @param [in] dt        time step
+/// @param [in] u_local   a Vec that contain unknowns for locally-present and ghost cells
+/// @param [out] f_global a Vec that stores the fluxes for only locally-present cells
 /// @return
 static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
@@ -822,7 +822,9 @@ static PetscErrorCode DestroySource(void *context) {
 /// @param [in]    mesh             a mesh representing the domain
 /// @param [in]    external_sources a Vec storing external source values (if any) for the domain
 /// @param [in]    mannings         a Vec storing Mannings coefficient values for the domain
+/// @param [in]    method           type of temporal method used for discretizing the friction source term
 /// @param [in]    tiny_h           the water height below which dry conditions are assumed
+/// @param [in]    xq2018_threshold the threshold use of the XL2018 implicit temporal method
 /// @param [out]   petsc_op         the newly created PetscOperator
 PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, RDySourceTimeMethod method, PetscReal tiny_h,
                                             PetscReal xq2018_threshold, PetscOperator *petsc_op) {
