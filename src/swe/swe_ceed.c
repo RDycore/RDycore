@@ -473,7 +473,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boun
 /// @param [in]  tiny_h           the water height below which dry conditions are assumed
 /// @param [in]  xq2018_threshold the threshold use of the XL2018 implicit temporal method
 /// @param [out] ceed_op          the newly created CeedOperator
-PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDySourceTimeMethod method, PetscReal tiny_h, PetscReal xq2018_threshold,
+PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, RDyFlowSourceMethod method, PetscReal tiny_h, PetscReal xq2018_threshold,
                                            CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 

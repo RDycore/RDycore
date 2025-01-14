@@ -826,7 +826,7 @@ static PetscErrorCode DestroySource(void *context) {
 /// @param [in]    tiny_h           the water height below which dry conditions are assumed
 /// @param [in]    xq2018_threshold the threshold use of the XL2018 implicit temporal method
 /// @param [out]   petsc_op         the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, RDySourceTimeMethod method, PetscReal tiny_h,
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, RDyFlowSourceMethod method, PetscReal tiny_h,
                                             PetscReal xq2018_threshold, PetscOperator *petsc_op) {
   PetscFunctionBegin;
   SourceOperator *source_op;

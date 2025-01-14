@@ -57,8 +57,8 @@ static const cyaml_strval_t source_time_methods[] = {
 
 // mapping of treatment of "source" fields to members
 static const cyaml_schema_field_t output_source_fields_schema[] = {
-    CYAML_FIELD_ENUM("method", CYAML_FLAG_OPTIONAL, RDySource, method, source_time_methods, CYAML_ARRAY_LEN(source_time_methods)),
-    CYAML_FIELD_INT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDySource, xq2018_threshold),
+    CYAML_FIELD_ENUM("method", CYAML_FLAG_OPTIONAL, RDyFlowSource, method, source_time_methods, CYAML_ARRAY_LEN(source_time_methods)),
+    CYAML_FIELD_INT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDyFlowSource, xq2018_threshold),
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow

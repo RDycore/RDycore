@@ -133,7 +133,7 @@ static PetscErrorCode AddCeedOperators(Operator *op) {
   // set up operators for the shallow water equations
 
   Ceed                ceed             = CeedContext();
-  RDySourceTimeMethod time_method      = op->config->physics.flow.source.method;
+  RDyFlowSourceMethod time_method      = op->config->physics.flow.source.method;
   PetscReal           tiny_h           = op->config->physics.flow.tiny_h;
   PetscReal           xq2018_threshold = op->config->physics.flow.source.xq2018_threshold;
 
@@ -187,7 +187,7 @@ static PetscErrorCode AddPetscOperators(Operator *op) {
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.flux));
   PetscCall(PetscCompositeOperatorCreate(&op->petsc.source));
 
-  RDySourceTimeMethod time_method      = op->config->physics.flow.source.method;
+  RDyFlowSourceMethod time_method      = op->config->physics.flow.source.method;
   PetscReal           tiny_h           = op->config->physics.flow.tiny_h;
   PetscReal           xq2018_threshold = op->config->physics.flow.source.xq2018_threshold;
 
