@@ -56,16 +56,16 @@ static const cyaml_strval_t source_time_methods[] = {
 };
 
 // mapping of treatment of "source" fields to members
-static const cyaml_schema_field_t output_source_fields_schema[] = {
+static const cyaml_schema_field_t source_fields_schema[] = {
     CYAML_FIELD_ENUM("method", CYAML_FLAG_OPTIONAL, RDyFlowSource, method, source_time_methods, CYAML_ARRAY_LEN(source_time_methods)),
-    CYAML_FIELD_INT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDyFlowSource, xq2018_threshold),
+    CYAML_FIELD_FLOAT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDyFlowSource, xq2018_threshold),
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
     CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
-    CYAML_FIELD_MAPPING("source", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source, output_source_fields_schema),
+    CYAML_FIELD_MAPPING("source", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source, source_fields_schema),
     CYAML_FIELD_END
 };
 
