@@ -20,7 +20,7 @@ different aspect of the desired simulation. These sections fall into several
 broad categories:
 
 * **Model equations and discretizations**
-    * [physics](input.md#physіcs): configures the different physical models
+    * [physics](input.md#physics): configures the different physical models
       represented within RDycore
     * [numerics](input.md#numerics): specifies the numerical methods used
       to solve the model equations
