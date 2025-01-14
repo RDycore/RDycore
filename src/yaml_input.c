@@ -40,7 +40,9 @@
 //   flow:
 //     mode: <swe|diffusion> # swe by default
 //     tiny_h: <value> # 1e-7 by default
-//     xq2018_threshold: <value> # 1e-10 by default
+//     source:
+//       method: <semi_implicit|implicit_xq2018> # semi_implicit by default
+//       xq2018_threshold: <value> # 1e-10 by default
 //   sediment: <true|false> # off by default
 //   salinity: <true|false> # off by default
 
