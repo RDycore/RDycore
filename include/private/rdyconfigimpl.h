@@ -52,12 +52,16 @@ typedef enum {
   SOURCE_IMPLICIT_XQ2018     // implicit treatment using Xilin and Qiuhua (2018)
 } RDySourceTimeMethod;
 
+typedef struct {
+  RDySourceTimeMethod method;            // temporal discretization method for source term
+  PetscReal           xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
+} RDySource;
+
 // physics flow parameters
 typedef struct {
-  RDyPhysicsFlowMode  mode;                // flow mode
-  PetscReal           tiny_h;              // depth below which no flow occurs
-  RDySourceTimeMethod source_time_method;  // temporal discretization method for source term
-  PetscReal           xq2018_threshold;    // threshold for the XQ2018's implicit time integration of source term
+  RDyPhysicsFlowMode mode;    // flow mode
+  PetscReal          tiny_h;  // depth below which no flow occurs
+  RDySource          source;
 } RDyPhysicsFlow;
 
 // all physics parameters

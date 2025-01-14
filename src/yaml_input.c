@@ -55,12 +55,17 @@ static const cyaml_strval_t source_time_methods[] = {
     {"implicit_xq2018", SOURCE_IMPLICIT_XQ2018},
 };
 
+// mapping of treatment of "source" fields to members
+static const cyaml_schema_field_t output_source_fields_schema[] = {
+    CYAML_FIELD_ENUM("method", CYAML_FLAG_OPTIONAL, RDySource, method, source_time_methods, CYAML_ARRAY_LEN(source_time_methods)),
+    CYAML_FIELD_INT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDySource, xq2018_threshold),
+};
+
 // mapping of physics.flow fields to members of RDyPhysicsFlow
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
     CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
-    CYAML_FIELD_ENUM("source_time_method", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source_time_method, source_time_methods, CYAML_ARRAY_LEN(source_time_methods)),
-    CYAML_FIELD_FLOAT("xq2018_threshold", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, xq2018_threshold),
+    CYAML_FIELD_MAPPING("source", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source, output_source_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -743,8 +748,8 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   PetscFunctionBegin;
 
   SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
-  SET_MISSING_PARAMETER(config->physics.flow.source_time_method, SOURCE_SEMI_IMPLICIT);
-  SET_MISSING_PARAMETER(config->physics.flow.xq2018_threshold, 1e-10);
+  SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_SEMI_IMPLICIT);
+  SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
 
   SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
