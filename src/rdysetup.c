@@ -841,7 +841,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
 static PetscErrorCode InitSedimentSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->flow_u_global));
+  PetscCall(VecZeroEntries(rdy->sd_u_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -934,12 +934,41 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt flow_ndof, sediment_ndof, soln_ndof, diags_ndof;
+
+  PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
+  PetscCall(VecGetBlockSize(rdy->sd_u_global, &sediment_ndof));
+  PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
+  PetscCall(VecGetBlockSize(rdy->diags_vec, &diags_ndof));
+
+  PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
+             "Blocksize of flow (=%d) and sediment (=%d) Vec do not sum to blocksize of solution (=%d) Vec", flow_ndof, sediment_ndof, soln_ndof);
+
+  // first, copy flow Vec into solution Vec
+  for (PetscInt i = 0; i < flow_ndof; i++) {
+    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->diags_vec, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->diags_vec, i, rdy->u_global, INSERT_VALUES));
+  }
+
+  // next, copy sediment Vec into solution Vec
+  for (PetscInt i = 0; i < sediment_ndof; i++) {
+    PetscCall(VecStrideGather(rdy->sd_u_global, i, rdy->diags_vec, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->diags_vec, flow_ndof + i, rdy->u_global, INSERT_VALUES));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
   PetscCall(InitFlowSolution(rdy));
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(InitSedimentSolution(rdy));
+    PetscCall(InitFlowAndSedimentSolution(rdy));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
