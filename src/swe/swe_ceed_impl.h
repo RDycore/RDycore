@@ -358,8 +358,8 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
       const CeedScalar q_magnitude = pow(Square(qx_nplus1) + Square(qy_nplus1), 0.5);
 
       // equation 21 and 22 of XQ2018
-      tbx = dt * gravity * Square(mannings_n[0][i]) * pow(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
-      tby = dt * gravity * Square(mannings_n[0][i]) * pow(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
+      tbx = gravity * Square(mannings_n[0][i]) * pow(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
+      tby = gravity * Square(mannings_n[0][i]) * pow(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
     }
 
     cell[0][i] = riemannf[0][i] + swe_src[0][i];

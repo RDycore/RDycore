@@ -790,8 +790,8 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
         PetscReal q_magnitude = PetscPowReal(Square(qx_nplus1) + Square(qy_nplus1), 0.5);
 
         // equation 21 and 22 of XQ2018
-        tbx = dt * GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
-        tby = dt * GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
+        tbx = GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qx_nplus1 * q_magnitude;
+        tby = GRAVITY * Square(N_mannings) * PetscPowReal(h, -7.0 / 3.0) * qy_nplus1 * q_magnitude;
       }
 
       // NOTE: we accumulate everything into the RHS vector by convention.
