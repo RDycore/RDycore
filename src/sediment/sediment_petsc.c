@@ -450,13 +450,140 @@ typedef struct {
   PetscReal               *a_max;            // maximum courant number
 } SedimentBoundaryFluxOperator;
 
+static PetscErrorCode ApplySedimentReflectingBC(RDyMesh *mesh, RDyBoundary boundary, SedimentRiemannStateData *datal, SedimentRiemannStateData *datar,
+                                                SedimentRiemannEdgeData *data_edge) {
+  PetscFunctionBeginUser;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscReal *sn_vec_bnd = data_edge->sn;
+  PetscReal *cn_vec_bnd = data_edge->cn;
+
+  PetscInt num_sediment_comp = datal->num_sediment_comp;
+
+  // compute h/u/v for right cells
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt edge_id            = boundary.edge_ids[e];
+    PetscInt left_local_cell_id = edges->cell_ids[2 * edge_id];
+
+    if (cells->is_owned[left_local_cell_id]) {
+      datar->h[e] = datal->h[e];
+
+      PetscReal dum1 = Square(sn_vec_bnd[e]) - Square(cn_vec_bnd[e]);
+      PetscReal dum2 = 2.0 * sn_vec_bnd[e] * cn_vec_bnd[e];
+
+      datar->u[e] = datal->u[e] * dum1 - datal->v[e] * dum2;
+      datar->v[e] = -datal->u[e] * dum2 - datal->v[e] * dum1;
+
+      for (PetscInt s = 0; s < num_sediment_comp; s++) {
+        datar->c[e * num_sediment_comp] = datal->c[e * num_sediment_comp];
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Add code in ApplySedimentBoundaryFlux");
+  SedimentBoundaryFluxOperator *boundary_flux_op = context;
+
+  RDyBoundary  boundary           = boundary_flux_op->boundary;
+  RDyCondition boundary_condition = boundary_flux_op->boundary_condition;
+  Vec          boundary_values    = boundary_flux_op->boundary_values;
+  Vec          boundary_fluxes    = boundary_flux_op->boundary_fluxes;
+
+  // get pointers to vector data
+  PetscScalar *u_ptr, *f_ptr, *boundary_values_ptr, *boundary_fluxes_ptr;
+  PetscCall(VecGetArray(u_local, &u_ptr));
+  PetscCall(VecGetArray(f_global, &f_ptr));
+  PetscCall(VecGetArray(boundary_values, &boundary_values_ptr));
+  PetscCall(VecGetArray(boundary_fluxes, &boundary_fluxes_ptr));
+
+  // apply boundary conditions
+  SedimentRiemannStateData *datal     = &boundary_flux_op->left_states;
+  SedimentRiemannStateData *datar     = &boundary_flux_op->right_states;
+  SedimentRiemannEdgeData  *data_edge = &boundary_flux_op->edges;
+
+  PetscInt num_flow_comp     = datal->num_flow_comp;
+  PetscInt num_sediment_comp = datal->num_sediment_comp;
+
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER, "Number of dof in local vector do not match flow and sediment dof!");
+
+  // copy the "left cell" values into the "left states"
+  RDyEdges *edges = &boundary_flux_op->mesh->edges;
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt edge_id            = boundary.edge_ids[e];
+    PetscInt left_local_cell_id = edges->cell_ids[2 * edge_id];
+    datal->h[e]                 = u_ptr[n_dof * left_local_cell_id + 0];
+    datal->hu[e]                = u_ptr[n_dof * left_local_cell_id + 1];
+    datal->hv[e]                = u_ptr[n_dof * left_local_cell_id + 2];
+
+    for (PetscInt s = 0; s < num_sediment_comp; s++) {
+      datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 2 + s];
+    }
+  }
+
+  const PetscReal tiny_h = boundary_flux_op->tiny_h;
+  PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datal));
+
+  // compute the "right" Riemann cell values using the boundary condition
+  switch (boundary_condition.flow->type) {
+    case CONDITION_DIRICHLET:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_DIRICHLET not supported for sediment");
+      break;
+    case CONDITION_REFLECTING:
+      PetscCall(ApplySedimentReflectingBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
+      break;
+    case CONDITION_CRITICAL_OUTFLOW:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not supported for sediment");
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);
+  }
+
+  // call Riemann solver (only Roe currently supported)
+  PetscCall(ComputeSedimentRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+
+  // accumulate the flux values in f_global
+  RDyCells                 *cells             = &boundary_flux_op->mesh->cells;
+  CourantNumberDiagnostics *courant_num_diags = &boundary_flux_op->diagnostics->courant_number;
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt  edge_id       = boundary.edge_ids[e];
+    PetscReal edge_len      = edges->lengths[edge_id];
+    PetscInt  local_cell_id = edges->cell_ids[2 * edge_id];
+
+    if (cells->is_owned[local_cell_id]) {
+      PetscReal cell_area = cells->areas[local_cell_id];
+      PetscReal hl        = datal->h[e];
+      PetscReal hr        = datar->h[e];
+
+      if (!(hl < tiny_h && hr < tiny_h)) {
+        PetscReal cnum = data_edge->amax[e] * edge_len / cell_area * dt;
+        if (cnum > courant_num_diags->max_courant_num) {
+          courant_num_diags->max_courant_num = cnum;
+          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_cell_id  = cells->global_ids[local_cell_id];
+        }
+
+        PetscInt owned_cell_id = cells->local_to_owned[local_cell_id];
+        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+          f_ptr[n_dof * owned_cell_id + i_dof] += boundary_fluxes_ptr[n_dof * e + i_dof] * (-edge_len / cell_area);
+        }
+      }
+    }
+  }
+
+  // restore vectors
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
