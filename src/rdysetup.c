@@ -596,7 +596,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
                "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
     ic->flow = flow_cond;
 
-    if (rdy->config.physics.sediment) {
+    if (rdy->config.physics.sediment.num_classes) {
       PetscCheck(strlen(ic_spec.sediment), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial sediment condition!", region.name);
       PetscInt sed_index;
       PetscCall(FindSedimentCondition(rdy, ic_spec.sediment, &sed_index));
@@ -653,7 +653,7 @@ static PetscErrorCode InitSources(RDy rdy) {
           src->flow = flow_cond;
         }
 
-        if (rdy->config.physics.sediment && strlen(src_spec.sediment)) {
+        if (rdy->config.physics.sediment.num_classes && strlen(src_spec.sediment)) {
           PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for sediments.");
         }
         if (rdy->config.physics.salinity && strlen(src_spec.salinity)) {
@@ -716,7 +716,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
         bc->flow = &rdy->config.flow_conditions[flow_index];
       }
 
-      if (rdy->config.physics.sediment) {
+      if (rdy->config.physics.sediment.num_classes) {
         PetscCheck(strlen(bc_spec.sediment), rdy->comm, PETSC_ERR_USER, "Boundary '%s' has no sediment boundary condition!", boundary.name);
         PetscInt sed_index;
         PetscCall(FindSedimentCondition(rdy, bc_spec.sediment, &sed_index));

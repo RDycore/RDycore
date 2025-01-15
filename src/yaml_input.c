@@ -72,10 +72,16 @@ static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+// mapping of physics.flow fields to members of RDyPhysicsFlow
+static const cyaml_schema_field_t physics_sd_fields_schema[] = {
+    CYAML_FIELD_INT("num_classes", CYAML_FLAG_DEFAULT, RDyPhysicsSD, num_classes),
+    CYAML_FIELD_END
+};
+
 // mapping of physics fields to members of RDyPhysicsSection
 static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
-    CYAML_FIELD_BOOL("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment),
+    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, physics_sd_fields_schema),
     CYAML_FIELD_BOOL("salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity),
     CYAML_FIELD_END
 };
@@ -756,6 +762,7 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
     SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
   }
 
+  SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
   SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
   SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
@@ -1377,7 +1384,7 @@ static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Physics:");
   RDyLogDetail(rdy, "  Flow:");
-  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment));
+  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment.num_classes > 0));
   RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

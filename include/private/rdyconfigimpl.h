@@ -64,10 +64,14 @@ typedef struct {
   RDyFlowSource      source;
 } RDyPhysicsFlow;
 
+typedef struct{
+  PetscInt num_classes; // number of sediment classes
+} RDyPhysicsSD;
+
 // all physics parameters
 typedef struct {
   RDyPhysicsFlow flow;      // flow parameters
-  PetscBool      sediment;  // sediment effects enabled?
+  RDyPhysicsSD   sediment;  // sediment effects enabled?
   PetscBool      salinity;  // salinity effects enabled?
 } RDyPhysicsSection;
 
