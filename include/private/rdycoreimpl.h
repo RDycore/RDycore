@@ -92,7 +92,12 @@ struct _p_RDy {
   // DM for sediment dynamics
   DM               sd_dm;
   SectionFieldSpec sd_fields;
-  Vec              sd_vec;
+  Vec              sd_u_global, sd_u_local;
+
+  // DM for flow
+  DM               flow_dm;
+  SectionFieldSpec flow_fields;
+  Vec              flow_u_global, flow_u_local;
 
   // mesh representing simulation domain
   RDyMesh mesh;

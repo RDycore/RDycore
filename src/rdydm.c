@@ -168,6 +168,14 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// This function creates an auxiliary (secondary) DM
+PetscErrorCode CreateFlowDM(RDy rdy) {
+  PetscFunctionBegin;
+  rdy->flow_fields = rdy->soln_fields;
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->flow_fields, &rdy->flow_dm));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief  This function creates a DM for sediments
 /// @param rdy 
 /// @return PETSC_SUCESS on success
@@ -188,6 +196,33 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode CreateCombinedDM(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
+
+  rdy->soln_fields.num_fields = 1;
+  rdy->soln_fields.num_field_components[0] = 3 + num_sediment_class;
+
+  sprintf(rdy->soln_fields.field_names[0],"Solution");
+
+  sprintf(rdy->soln_fields.field_component_names[0][0],"Height");
+  sprintf(rdy->soln_fields.field_component_names[0][1],"MomentumX");
+  sprintf(rdy->soln_fields.field_component_names[0][2],"MomentumY");
+
+  for (PetscInt i = 0; i < num_sediment_class; i++) {
+    sprintf(rdy->soln_fields.field_component_names[0][i + 3],"Class_%d",i);
+  }
+
+  DM combined_dm;
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->soln_fields, &combined_dm));
+
+  PetscCall(DMDestroy(&rdy->dm));
+  rdy->dm = combined_dm;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Creates global and local solution vectors and residuals
 PetscErrorCode CreateVectors(RDy rdy) {
   PetscFunctionBegin;
@@ -200,6 +235,22 @@ PetscErrorCode CreateVectors(RDy rdy) {
   // diagnostics are all piled into a single vector whose block size is the
   // total number of field components
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diags_vec));
+
+  if (rdy->config.physics.sediment.num_classes) {
+
+    // Vecs for flow 
+    PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_u_global));
+    PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_u_local));
+
+    // Vecs for sediment
+    PetscCall(DMCreateGlobalVector(rdy->sd_dm, &rdy->sd_u_global));
+    PetscCall(DMCreateLocalVector(rdy->sd_dm, &rdy->sd_u_local));
+
+  } else {
+    // Point the flow Vecs to soln Vecs
+    rdy->flow_u_global = rdy->u_global;
+    rdy->flow_u_local  = rdy->u_local;
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
