@@ -128,7 +128,7 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode AddCeedOperators(Operator *op) {
+static PetscErrorCode AddCeedFlowOperators(Operator *op) {
   PetscFunctionBegin;
 
   // set up operators for the shallow water equations
@@ -178,7 +178,25 @@ static PetscErrorCode AddCeedOperators(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode AddPetscOperators(Operator *op) {
+static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
+  PetscFunctionBegin;
+  PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend code to add CEED version of sediment operators");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode AddCeedOperators(Operator *op) {
+  PetscFunctionBegin;
+
+  if (!op->config->physics.sediment.num_classes) {
+    PetscCall(AddCeedFlowOperators(op));
+  } else {
+    PetscCall(AddCeedSedimentOperators(op));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode AddPetscFlowOperators(Operator *op) {
   PetscFunctionBegin;
 
   // set up sub-operators for the shallow water equations
@@ -213,6 +231,23 @@ static PetscErrorCode AddPetscOperators(Operator *op) {
                                          xq2018_threshold, &source_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.source, source_op));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
+  PetscFunctionBegin;
+  PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend code to add PETSc version of sediment operators");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode AddPetscOperators(Operator *op) {
+  PetscFunctionBegin;
+
+  if (!op->config->physics.sediment.num_classes) {
+    PetscCall(AddPetscFlowOperators(op));
+  } else {
+    PetscCall(AddPetscSedimentOperators(op));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
