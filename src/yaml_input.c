@@ -917,7 +917,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   for (PetscInt i = 0; i < config->num_sediment_conditions; ++i) {
     const RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
     PetscCheck(sed_cond->type >= 0, comm, PETSC_ERR_USER, "Sediment condition type not set in sediment_conditions.%s", sed_cond->name);
-    PetscCheck(sed_cond->expression[0], comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s", sed_cond->name);
+    PetscCheck(sed_cond->expression[0] || sed_cond->file[0], comm, PETSC_ERR_USER, "Missing sediment specification for sediment_conditions.%s", sed_cond->name);
   }
 
   // validate salinity conditions
