@@ -741,10 +741,10 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 
 // initializes solution vector data
 //   unsafe for refinement if file is given with initial conditions
-static PetscErrorCode InitSolution(RDy rdy) {
+static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->u_global));
+  PetscCall(VecZeroEntries(rdy->flow_u_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -755,10 +755,10 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
+  PetscCall(VecGetLocalSize(rdy->flow_u_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->flow_u_global, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->u_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->flow_u_global, &u_ptr));
 
   // initialize flow conditions
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
@@ -769,9 +769,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscCall(PetscViewerBinaryOpen(rdy->comm, flow_ic.file, FILE_MODE_READ, &viewer));
 
       Vec natural, global;
-      PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-      PetscCall(DMCreateGlobalVector(rdy->dm, &global));
-      PetscCall(DMCreateLocalVector(rdy->dm, &local));
+      PetscCall(DMPlexCreateNaturalVector(rdy->flow_dm, &natural));
+      PetscCall(DMCreateGlobalVector(rdy->flow_dm, &global));
+      PetscCall(DMCreateLocalVector(rdy->flow_dm, &local));
 
       PetscCall(VecLoad(natural, viewer));
       PetscCall(PetscViewerDestroy(&viewer));
@@ -786,12 +786,12 @@ static PetscErrorCode InitSolution(RDy rdy) {
                  nblocks_nat, ndof);
 
       // scatter natural-to-global
-      PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
-      PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalBegin(rdy->flow_dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalEnd(rdy->flow_dm, natural, global));
 
       // scatter global-to-local
-      PetscCall(DMGlobalToLocalBegin(rdy->dm, global, INSERT_VALUES, local));
-      PetscCall(DMGlobalToLocalEnd(rdy->dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalBegin(rdy->flow_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalEnd(rdy->flow_dm, global, INSERT_VALUES, local));
 
       // free up memory
       PetscCall(VecDestroy(&natural));
@@ -832,7 +832,13 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // TODO: salinity and sediment initial conditions go here.
 
-  PetscCall(VecRestoreArray(rdy->u_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->flow_u_global, &u_ptr));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode InitSolution(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(InitFlowSolution(rdy));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
