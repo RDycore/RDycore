@@ -177,18 +177,18 @@ PetscErrorCode CreateFlowDM(RDy rdy) {
 }
 
 /// @brief  This function creates a DM for sediments
-/// @param rdy 
+/// @param rdy
 /// @return PETSC_SUCESS on success
 PetscErrorCode CreateSedimentDM(RDy rdy) {
   PetscFunctionBegin;
   PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
 
-  rdy->sd_fields.num_fields = 1;
+  rdy->sd_fields.num_fields              = 1;
   rdy->sd_fields.num_field_components[0] = num_sediment_class;
 
-  sprintf(rdy->sd_fields.field_names[0],"Sediments");
+  sprintf(rdy->sd_fields.field_names[0], "Sediments");
   for (PetscInt i = 0; i < num_sediment_class; i++) {
-    sprintf(rdy->sd_fields.field_component_names[0][i],"Class_%d",i);
+    sprintf(rdy->sd_fields.field_component_names[0][i], "Class_%d", i);
   }
 
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sd_fields, &rdy->sd_dm));
@@ -201,17 +201,17 @@ PetscErrorCode CreateCombinedDM(RDy rdy) {
 
   PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
 
-  rdy->soln_fields.num_fields = 1;
+  rdy->soln_fields.num_fields              = 1;
   rdy->soln_fields.num_field_components[0] = 3 + num_sediment_class;
 
-  sprintf(rdy->soln_fields.field_names[0],"Solution");
+  sprintf(rdy->soln_fields.field_names[0], "Solution");
 
-  sprintf(rdy->soln_fields.field_component_names[0][0],"Height");
-  sprintf(rdy->soln_fields.field_component_names[0][1],"MomentumX");
-  sprintf(rdy->soln_fields.field_component_names[0][2],"MomentumY");
+  sprintf(rdy->soln_fields.field_component_names[0][0], "Height");
+  sprintf(rdy->soln_fields.field_component_names[0][1], "MomentumX");
+  sprintf(rdy->soln_fields.field_component_names[0][2], "MomentumY");
 
   for (PetscInt i = 0; i < num_sediment_class; i++) {
-    sprintf(rdy->soln_fields.field_component_names[0][i + 3],"Class_%d",i);
+    sprintf(rdy->soln_fields.field_component_names[0][i + 3], "Class_%d", i);
   }
 
   DM combined_dm;
@@ -237,8 +237,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diags_vec));
 
   if (rdy->config.physics.sediment.num_classes) {
-
-    // Vecs for flow 
+    // Vecs for flow
     PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_u_global));
     PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_u_local));
 

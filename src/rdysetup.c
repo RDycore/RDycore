@@ -860,7 +860,7 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
   // initialize sediment conditions
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
     RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
-    Vec                  local   = NULL;
+    Vec                  local       = NULL;
     if (sediment_ic.file[0]) {  // read sediment data from file
       PetscViewer viewer;
       PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.file, FILE_MODE_READ, &viewer));
@@ -915,7 +915,7 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
           PetscCall(VecRestoreArray(local, &local_ptr));
           PetscCall(VecDestroy(&local));
         } else {
-          PetscCheck(PETSC_FALSE,rdy->comm, PETSC_ERR_USER, "mupEval is unsupported for Sediments.");
+          PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "mupEval is unsupported for Sediments.");
           // FIXME: this assumes the shallow water equations!
           /*
           for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
