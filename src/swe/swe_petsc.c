@@ -721,7 +721,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   RDyMesh        *mesh             = source_op->mesh;
   RDyCells       *cells            = &mesh->cells;
   PetscReal       tiny_h           = source_op->tiny_h;
-  PetscReal       xq2018_threshold = 10e-10;
+  PetscReal       xq2018_threshold = source_op->xq2018_threshold;
 
   // access Vec data
   PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
