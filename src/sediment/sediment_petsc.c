@@ -5,6 +5,9 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
+// gravitational acceleration [m/s/s]
+static const PetscReal GRAVITY = 9.806;
+
 // riemann left and right states
 typedef struct {
   PetscInt   num_states;         // number of states
@@ -117,6 +120,148 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(PetscReal tiny_h,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+#define MAX_NUM_SECTION_FIELD_COMPONENTS 10
+
+static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, SedimentRiemannStateData *datar, const PetscReal *sn,
+                                             const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
+  PetscFunctionBeginUser;
+
+  PetscReal *hl  = datal->h;
+  PetscReal *ul  = datal->u;
+  PetscReal *vl  = datal->v;
+  PetscReal *cil = datal->c;
+
+  PetscReal *hr  = datar->h;
+  PetscReal *ur  = datar->u;
+  PetscReal *vr  = datar->v;
+  PetscReal *cir = datar->c;
+
+  PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
+
+  PetscInt num_states = datal->num_states;
+  PetscInt flow_ncomp = datal->num_flow_comp;
+  PetscInt sed_ncomp  = datal->num_sediment_comp;
+  PetscInt soln_ncomp = flow_ncomp + sed_ncomp;
+
+  PetscInt ci_index_offset;
+
+  PetscReal cihat[MAX_NUM_SECTION_FIELD_COMPONENTS];
+  PetscReal dch[MAX_NUM_SECTION_FIELD_COMPONENTS];
+  PetscReal R[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS];
+  PetscReal A[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS];
+  PetscReal dW[MAX_NUM_SECTION_FIELD_COMPONENTS];
+  PetscReal FL[MAX_NUM_SECTION_FIELD_COMPONENTS], FR[MAX_NUM_SECTION_FIELD_COMPONENTS];
+
+  for (PetscInt i = 0; i < num_states; ++i) {
+    // compute Roe averages
+    PetscReal duml  = pow(hl[i], 0.5);
+    PetscReal dumr  = pow(hr[i], 0.5);
+    PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
+    PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
+    PetscReal hhat  = duml * dumr;
+    PetscReal uhat  = (duml * ul[i] + dumr * ur[i]) / (duml + dumr);
+    PetscReal vhat  = (duml * vl[i] + dumr * vr[i]) / (duml + dumr);
+    PetscReal chat  = pow(0.5 * GRAVITY * (hl[i] + hr[i]), 0.5);
+    PetscReal uperp = uhat * cn[i] + vhat * sn[i];
+
+    PetscReal dh     = hr[i] - hl[i];
+    PetscReal du     = ur[i] - ul[i];
+    PetscReal dv     = vr[i] - vl[i];
+    PetscReal dupar  = -du * sn[i] + dv * cn[i];
+    PetscReal duperp = du * cn[i] + dv * sn[i];
+
+    ci_index_offset = i * sed_ncomp;
+    for (PetscInt j = 0; j < sed_ncomp; j++) {
+      cihat[j] = (duml * cil[ci_index_offset + j] + dumr * cir[ci_index_offset + j]) / (duml + dumr);
+      dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
+    }
+
+    dW[0] = 0.5 * (dh - hhat * duperp / chat);
+    dW[1] = hhat * dupar;
+    dW[2] = 0.5 * (dh + hhat * duperp / chat);
+    for (PetscInt j = 0; j < sed_ncomp; j++) {
+      dW[j + 3] = dch[j] - cihat[j] * dh;
+    }
+
+    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
+    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
+    PetscReal al1    = uperpl - cl;
+    PetscReal al3    = uperpl + cl;
+    PetscReal ar1    = uperpr - cr;
+    PetscReal ar3    = uperpr + cr;
+
+    R[0][0] = 1.0;
+    R[0][1] = 0.0;
+    R[0][2] = 1.0;
+    R[1][0] = uhat - chat * cn[i];
+    R[1][1] = -sn[i];
+    R[1][2] = uhat + chat * cn[i];
+    R[2][0] = vhat - chat * sn[i];
+    R[2][1] = cn[i];
+    R[2][2] = vhat + chat * sn[i];
+    for (PetscInt j = 0; j < sed_ncomp; j++) {
+      R[j + 3][0]     = cihat[j];
+      R[j + 3][2]     = cihat[j];
+      R[j + 3][j + 3] = 1.0;
+    }
+
+    PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
+    PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
+    PetscReal a1  = fabs(uperp - chat);
+    PetscReal a2  = fabs(uperp);
+    PetscReal a3  = fabs(uperp + chat);
+
+    // Critical flow fix
+    if (a1 < da1) {
+      a1 = 0.5 * (a1 * a1 / da1 + da1);
+    }
+    if (a3 < da3) {
+      a3 = 0.5 * (a3 * a3 / da3 + da3);
+    }
+
+    // Compute interface flux
+    for (PetscInt i = 0; i < 3; i++) {
+      for (PetscInt j = 0; j < 3; j++) {
+        A[i][j] = 0.0;
+      }
+    }
+    A[0][0] = a1;
+    A[1][1] = a2;
+    A[2][2] = a3;
+    for (PetscInt j = 0; j < sed_ncomp; j++) {
+      A[j + 3][j + 3] = a2;
+    }
+
+    FL[0] = uperpl * hl[i];
+    FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
+    FL[2] = vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i];
+
+    FR[0] = uperpr * hr[i];
+    FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
+    FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
+
+    ci_index_offset = i * sed_ncomp;
+    for (PetscInt j = 0; j < sed_ncomp; j++) {
+      FL[j + 3] = hl[i] * uperpl * cil[ci_index_offset + j];
+      FR[j + 3] = hr[i] * uperpr * cir[ci_index_offset + j];
+    }
+
+    // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
+    for (PetscInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
+      for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
+        if (dof2 == 0) {
+          fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
+        }
+        fij[soln_ncomp * i + dof1] = fij[soln_ncomp * i + dof1] - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
+      }
+    }
+
+    amax[i] = chat + fabs(uperp);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 //------------------------
 // Interior Flux Operator
 //------------------------
@@ -136,7 +281,104 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Add code in ApplySedimentInteriorFlux");
+  SedimentInteriorFluxOperator *interior_flux_op = context;
+
+  RDyMesh  *mesh  = interior_flux_op->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  // get pointers to vector data
+  PetscScalar *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(u_local, &u_ptr));
+  PetscCall(VecGetArray(f_global, &f_ptr));
+
+  SedimentRiemannStateData *datal        = &interior_flux_op->left_states;
+  SedimentRiemannStateData *datar        = &interior_flux_op->right_states;
+  SedimentRiemannEdgeData  *data_edge    = &interior_flux_op->edges;
+  PetscReal                *sn_vec_int   = data_edge->sn;
+  PetscReal                *cn_vec_int   = data_edge->cn;
+  PetscReal                *amax_vec_int = data_edge->amax;
+  PetscReal                *flux_vec_int = data_edge->fluxes;
+
+  PetscInt num_flow_comp     = datal->num_flow_comp;
+  PetscInt num_sediment_comp = datal->num_sediment_comp;
+
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER, "Number of dof in local vector do not match flow and sediment dof!");
+
+  // Collect the h/hu/hv for left and right cells to compute u/v
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id             = edges->internal_edge_ids[e];
+    PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
+    PetscInt right_local_cell_id = edges->cell_ids[2 * edge_id + 1];
+
+    if (right_local_cell_id != -1) {
+      datal->h[e]  = u_ptr[n_dof * left_local_cell_id + 0];
+      datal->hu[e] = u_ptr[n_dof * left_local_cell_id + 1];
+      datal->hv[e] = u_ptr[n_dof * left_local_cell_id + 2];
+
+      datar->h[e]  = u_ptr[n_dof * right_local_cell_id + 0];
+      datar->hu[e] = u_ptr[n_dof * right_local_cell_id + 1];
+      datar->hv[e] = u_ptr[n_dof * right_local_cell_id + 2];
+
+      for (PetscInt s = 0; s < num_sediment_comp; s++) {
+        datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 2 + s];
+        datar->hc[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + 2 + s];
+      }
+    }
+  }
+
+  const PetscReal tiny_h = interior_flux_op->tiny_h;
+  PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datal));
+  PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));
+
+  // call Riemann solver (only Roe currently supported)
+  PetscCall(ComputeSedimentRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+
+  // accummulate the flux values in the global flux vector
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id             = edges->internal_edge_ids[e];
+    PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
+    PetscInt right_local_cell_id = edges->cell_ids[2 * edge_id + 1];
+
+    if (right_local_cell_id != -1) {  // internal edge
+      PetscReal edge_len = edges->lengths[edge_id];
+
+      PetscReal hl = u_ptr[n_dof * left_local_cell_id + 0];
+      PetscReal hr = u_ptr[n_dof * right_local_cell_id + 0];
+
+      if (!(hr < tiny_h && hl < tiny_h)) {  // either cell is "wet"
+        PetscReal areal = cells->areas[left_local_cell_id];
+        PetscReal arear = cells->areas[right_local_cell_id];
+
+        PetscReal                 cnum              = amax_vec_int[e] * edge_len / fmin(areal, arear) * dt;
+        CourantNumberDiagnostics *courant_num_diags = &interior_flux_op->diagnostics->courant_number;
+        if (cnum > courant_num_diags->max_courant_num) {
+          courant_num_diags->max_courant_num = cnum;
+          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[left_local_cell_id];
+          else courant_num_diags->global_cell_id = cells->global_ids[right_local_cell_id];
+        }
+
+        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+          if (cells->is_owned[left_local_cell_id]) {
+            PetscInt left_owned_cell_id = cells->local_to_owned[left_local_cell_id];
+            f_ptr[n_dof * left_owned_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (-edge_len / areal);
+          }
+
+          if (cells->is_owned[right_local_cell_id]) {
+            PetscInt right_owned_cell_id = cells->local_to_owned[right_local_cell_id];
+            f_ptr[n_dof * right_owned_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (edge_len / arear);
+          }
+        }
+      }
+    }
+  }
+
+  // Restore vectors
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
