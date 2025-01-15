@@ -168,6 +168,26 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief  This function creates a DM for sediments
+/// @param rdy 
+/// @return PETSC_SUCESS on success
+PetscErrorCode CreateSedimentDM(RDy rdy) {
+  PetscFunctionBegin;
+  PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
+
+  rdy->sd_fields.num_fields = 1;
+  rdy->sd_fields.num_field_components[0] = num_sediment_class;
+
+  sprintf(rdy->sd_fields.field_names[0],"Sediments");
+  for (PetscInt i = 0; i < num_sediment_class; i++) {
+    sprintf(rdy->sd_fields.field_component_names[0][i],"Class_%d",i);
+  }
+
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sd_fields, &rdy->sd_dm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Creates global and local solution vectors and residuals
 PetscErrorCode CreateVectors(RDy rdy) {
   PetscFunctionBegin;

@@ -1116,6 +1116,10 @@ PetscErrorCode RDySetup(RDy rdy) {
   };
   PetscCall(CreateAuxiliaryDM(rdy));
 
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(CreateSedimentDM(rdy));
+  }
+
   // create global and local vectors
   PetscCall(CreateVectors(rdy));
 
