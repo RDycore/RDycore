@@ -34,6 +34,15 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
       .flow = &analytic_flow,
   };
 
+  if (rdy->config.physics.sediment.num_classes) {
+    static RDySedimentCondition analytic_sediment = {
+        .name = "analytic_sediment_bc",
+        .type = CONDITION_DIRICHLET,
+    };
+    analytic_sediment.concentration = rdy->config.mms.sediment.solutions.ci;
+    analytic_bc.sediment            = &analytic_sediment;
+  }
+
   // Assign the boundary condition to each boundary.
   PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundary_conditions));
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -520,6 +529,25 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       boundary_values[3 * e + 2] = h[e] * v[e];
     }
     PetscCall(RDySetFlowDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+
+    if (rdy->config.physics.sediment.num_classes) {
+      RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment;
+
+      PetscReal *ci;
+      PetscCall(PetscCalloc1(num_edges, &ci));
+      PetscCall(EvaluateTemporalSolution(sediment_bc->concentration, num_edges, x, y, time, ci));
+
+      PetscReal *sediment_boundary_values;
+      PetscCall(PetscCalloc1(1 * num_edges, &boundary_values));
+      for (PetscInt e = 0; e < num_edges; ++e) {
+        sediment_boundary_values[e] = h[e] * ci[e];
+      }
+
+      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, 1, boundary_values));
+
+      PetscCall(PetscFree(ci));
+      PetscCall(PetscFree(sediment_boundary_values));
+    }
 
     PetscCall(PetscFree(x));
     PetscCall(PetscFree(y));

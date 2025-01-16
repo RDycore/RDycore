@@ -76,7 +76,7 @@ PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, const PetscInt boundary_
 // sets Dirichlet boundary values using the data in the strided array
 // values[num_edges * ndof]
 PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
-                                             PetscReal *values) {
+                                                 PetscReal *values) {
   PetscFunctionBegin;
 
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
@@ -95,9 +95,43 @@ PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundar
 
   OperatorData dirichlet;
   PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
-  for (PetscInt comp = 0; comp < dirichlet.num_components; ++comp) {
+  for (PetscInt comp = 0; comp < ndof; ++comp) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      dirichlet.values[comp][e] = values[dirichlet.num_components * e + comp];
+      dirichlet.values[comp][e] = values[ndof * e + comp];
+    }
+  }
+  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
+                                                     PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+
+  PetscCheck(ndof == 1, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%" PetscInt_FMT ") for the boundary condition need to be one.", ndof);
+
+  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
+             "The given number of edges (%" PetscInt_FMT ") for boundary with index %" PetscInt_FMT " is incorrect (should be %" PetscInt_FMT ")",
+             num_edges, boundary_index, boundary.num_edges);
+
+  RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
+  PetscCheck(boundary_cond.sediment->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
+             boundary_cond.sediment->type);
+
+  OperatorData dirichlet;
+  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+
+  PetscInt comp_offset = 3;
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend the code to set offset correctly");
+
+  for (PetscInt comp = 0; comp < ndof; ++comp) {
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      dirichlet.values[comp + comp_offset][e] = values[ndof * e + comp];
     }
   }
   PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
