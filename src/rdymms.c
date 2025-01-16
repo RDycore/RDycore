@@ -262,7 +262,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
-  PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
+  //PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
