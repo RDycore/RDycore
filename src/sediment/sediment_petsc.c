@@ -323,8 +323,8 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
       datar->hv[e] = u_ptr[n_dof * right_local_cell_id + 2];
 
       for (PetscInt s = 0; s < num_sediment_comp; s++) {
-        datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 2 + s];
-        datar->hc[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + 2 + s];
+        datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
+        datar->hc[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + 3 + s];
       }
     }
   }
@@ -477,7 +477,7 @@ static PetscErrorCode ApplySedimentReflectingBC(RDyMesh *mesh, RDyBoundary bound
       datar->v[e] = -datal->u[e] * dum2 - datal->v[e] * dum1;
 
       for (PetscInt s = 0; s < num_sediment_comp; s++) {
-        datar->c[e * num_sediment_comp] = datal->c[e * num_sediment_comp];
+        datar->c[e * num_sediment_comp + s] = datal->c[e * num_sediment_comp + s];
       }
     }
   }
@@ -527,7 +527,7 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
     datal->hv[e]                = u_ptr[n_dof * left_local_cell_id + 2];
 
     for (PetscInt s = 0; s < num_sediment_comp; s++) {
-      datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 2 + s];
+      datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
     }
   }
 
@@ -655,7 +655,94 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Add code in ApplySedimentSourceSemiImplicit");
+  SedimentSourceOperator *source_op         = context;
+  Vec                     source_vec        = source_op->external_sources;
+  Vec                     mannings_vec      = source_op->mannings;
+  RDyMesh                *mesh              = source_op->mesh;
+  RDyCells               *cells             = &mesh->cells;
+  PetscReal               tiny_h            = source_op->tiny_h;
+  PetscInt                num_sediment_comp = source_op->num_sediment_comp;
+
+  const PetscReal kp_constant             = 0.001;
+  const PetscReal settling_velocity       = 0.01;
+  const PetscReal tau_critical_erosion    = 0.1;
+  const PetscReal tau_critical_deposition = 1000.0;
+  const PetscReal rhow                    = 1000.0;
+
+  // access Vec data
+  PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));      // sequential vector
+  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
+
+  // access previously-computed flux divergence data
+  Vec flux_div;
+  PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
+  PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
+  PetscScalar *flux_div_ptr;
+  PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
+
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(source_vec, &n_dof));
+
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) {
+      PetscInt owned_cell_id = cells->local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal hu = u_ptr[n_dof * c + 1];
+      PetscReal hv = u_ptr[n_dof * c + 2];
+
+      PetscReal dz_dx = cells->dz_dx[c];
+      PetscReal dz_dy = cells->dz_dy[c];
+
+      PetscReal bedx = dz_dx * GRAVITY * h;
+      PetscReal bedy = dz_dy * GRAVITY * h;
+
+      PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
+      PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
+
+      PetscReal tbx = 0.0, tby = 0.0;
+
+      if (h >= tiny_h) {  // wet conditions
+        PetscReal u = hu / h;
+        PetscReal v = hv / h;
+
+        // Manning's coefficient
+        PetscReal N_mannings = mannings_ptr[c];
+
+        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
+
+        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+        PetscReal tb       = Cd * velocity / h;
+        PetscReal factor   = tb / (1.0 + dt * tb);
+
+        tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
+        tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+
+        for (PetscInt s = 0; s < num_sediment_comp; s++) {
+          PetscReal ci    = u_ptr[n_dof * c + 3 + s] / h;
+          PetscReal tau_b = rhow * Cd * (Square(u) + Square(v));
+          PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
+          PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
+          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di);
+        }
+      }
+
+      // NOTE: we accumulate everything into the RHS vector by convention.
+      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+      f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
+      f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+    }
+  }
+
+  // restore vectors
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+  PetscCall(VecRestoreArray(source_vec, &source_ptr));
+  PetscCall(VecRestoreArray(mannings_vec, &mannings_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
