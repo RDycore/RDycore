@@ -287,7 +287,7 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
   }
 
   PetscInt sediment_ndof = rdy->config.physics.sediment.num_classes;
-  PetscCheck(sediment_ndof == 1, rdy->comm, PETSC_ERR_USER, "MMS with sediments included only supported for when num_classes is 1");
+  PetscCheck(sediment_ndof <= 1, rdy->comm, PETSC_ERR_USER, "MMS with sediments included only supported for when num_classes is 1");
 
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
