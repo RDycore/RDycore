@@ -6,6 +6,7 @@
 module rdycore
 
   use iso_c_binding, only: c_ptr, c_int, c_int64_t, c_loc
+  use petscsys
 
   implicit none
 
@@ -468,7 +469,7 @@ contains
   subroutine RDySetup(rdy_, ierr)
     type(RDy), intent(inout) :: rdy_
     integer,   intent(out)   :: ierr
-    ierr = rdysetup_(rdy_%c_rdy)
+    ierr = rdysetup_(rdy_%c_rdy);CHKERRA(ierr)
   end subroutine
 
   subroutine RDyMMSSetup(rdy_, ierr)
