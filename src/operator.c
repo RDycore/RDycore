@@ -262,7 +262,6 @@ static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
 
   PetscCall(CreateSedimentPetscInteriorFluxOperator(op->mesh, num_flow_comp, num_sediment_comp, &op->diagnostics, tiny_h, &interior_flux_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, interior_flux_op));
-  PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
