@@ -39,7 +39,7 @@ typedef struct {
       PetscReal water_mass;
       PetscReal x_momentum;
       PetscReal y_momentum;
-    } * fluxes;
+    } *fluxes;
   } boundary_fluxes;
 } RDyTimeSeriesData;
 

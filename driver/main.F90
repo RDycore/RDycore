@@ -222,7 +222,7 @@ program rdycore_f90
             enddo
           endif
           if (num_edges_dirc_bc > 0) then
-            PetscCallA(RDySetDirichletBoundaryValues(rdy_, dirc_bc_idx, num_edges_dirc_bc, ndof, bc_values, ierr))
+            PetscCallA(RDySetFlowDirichletBoundaryValues(rdy_, dirc_bc_idx, num_edges_dirc_bc, ndof, bc_values, ierr))
           endif
         endif
 

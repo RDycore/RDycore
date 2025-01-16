@@ -519,7 +519,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       boundary_values[3 * e + 1] = h[e] * u[e];
       boundary_values[3 * e + 2] = h[e] * v[e];
     }
-    PetscCall(RDySetDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+    PetscCall(RDySetFlowDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
 
     PetscCall(PetscFree(x));
     PetscCall(PetscFree(y));

@@ -1109,7 +1109,7 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
           boundary_values[3 * e + 1] = mupEval(flow_bc->x_momentum);
           boundary_values[3 * e + 2] = mupEval(flow_bc->y_momentum);
         }
-        PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
+        PetscCall(RDySetFlowDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
         break;
       case CONDITION_REFLECTING:
         break;

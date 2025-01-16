@@ -75,7 +75,7 @@ PetscErrorCode RDyGetBoundaryConditionFlowType(RDy rdy, const PetscInt boundary_
 
 // sets Dirichlet boundary values using the data in the strided array
 // values[num_edges * ndof]
-PetscErrorCode RDySetDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
+PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
                                              PetscReal *values) {
   PetscFunctionBegin;
 
