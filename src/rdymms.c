@@ -538,7 +538,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       PetscCall(EvaluateTemporalSolution(sediment_bc->concentration, num_edges, x, y, time, ci));
 
       PetscReal *sediment_boundary_values;
-      PetscCall(PetscCalloc1(1 * num_edges, &boundary_values));
+      PetscCall(PetscCalloc1(1 * num_edges, &sediment_boundary_values));
       for (PetscInt e = 0; e < num_edges; ++e) {
         sediment_boundary_values[e] = h[e] * ci[e];
       }
