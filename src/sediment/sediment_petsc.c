@@ -544,7 +544,16 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
   // compute the "right" Riemann cell values using the boundary condition
   switch (boundary_condition.flow->type) {
     case CONDITION_DIRICHLET:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_DIRICHLET not supported for sediment");
+      // copy Dirichlet boundary values into the "right states"
+      for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+        datar->h[e]  = boundary_values_ptr[n_dof * e + 0];
+        datar->hu[e] = boundary_values_ptr[n_dof * e + 1];
+        datar->hv[e] = boundary_values_ptr[n_dof * e + 2];
+        for (PetscInt s = 0; s < num_sediment_comp; s++) {
+          datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * e + 3 + s];
+        }
+      }
+      PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));
       break;
     case CONDITION_REFLECTING:
       PetscCall(ApplySedimentReflectingBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
