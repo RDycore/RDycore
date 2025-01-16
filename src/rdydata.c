@@ -222,6 +222,12 @@ PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscReal value) {
   PetscFunctionBegin;
   PetscCall(CheckRegionIndex(rdy, region_idx));

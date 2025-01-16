@@ -262,7 +262,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
-  //PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
+  // PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
@@ -463,6 +463,43 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
     PetscCall(RDySetRegionalWaterSource(rdy, 0, N, h_source));
     PetscCall(RDySetRegionalXMomentumSource(rdy, 0, N, hu_source));
     PetscCall(RDySetRegionalYMomentumSource(rdy, 0, N, hv_source));
+
+    if (rdy->config.physics.sediment.num_classes) {
+      PetscCheck(rdy->config.physics.sediment.num_classes == 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Setting of source term only supported when num. of sediment class is one.");
+
+      PetscReal *ci, *dcidx, *dcidy, *dcidt;
+      PetscReal *hci_source;
+
+      PetscCall(PetscCalloc1(N, &ci));
+      PetscCall(PetscCalloc1(N, &dcidx));
+      PetscCall(PetscCalloc1(N, &dcidy));
+      PetscCall(PetscCalloc1(N, &dcidt));
+      PetscCall(PetscCalloc1(N, &hci_source));
+
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.ci, N, cell_x, cell_y, time, ci));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidx, N, cell_x, cell_y, time, dcidx));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidy, N, cell_x, cell_y, time, dcidy));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidt, N, cell_x, cell_y, time, dcidt));
+
+      l = 0;
+      for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+        if (cells->is_owned[icell]) {
+          hci_source[l] = ci[l] * dhdt[l] + h[l] * dcidt[l];
+          hci_source[l] += u[l] * ci[l] * dhdx[l] + h[l] * ci[l] * dudx[l] + u[l] * h[l] * dcidx[l];
+          hci_source[l] += v[l] * ci[l] * dhdy[l] + h[l] * ci[l] * dvdy[l] + v[l] * h[l] * dcidy[l];
+          ++l;
+        }
+      }
+
+      PetscCall(RDySetRegionalSedimentSource(rdy, 0, N, hci_source));
+
+      PetscCall(PetscFree(ci));
+      PetscCall(PetscFree(dcidx));
+      PetscCall(PetscFree(dcidy));
+      PetscCall(PetscFree(dcidt));
+      PetscCall(PetscFree(hci_source));
+    }
 
     PetscCall(PetscFree(h));
     PetscCall(PetscFree(u));
