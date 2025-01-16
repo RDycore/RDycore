@@ -183,15 +183,15 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
   PetscFunctionBegin;
   PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
 
-  rdy->sd_fields.num_fields              = 1;
-  rdy->sd_fields.num_field_components[0] = num_sediment_class;
+  rdy->sediment_fields.num_fields              = 1;
+  rdy->sediment_fields.num_field_components[0] = num_sediment_class;
 
-  sprintf(rdy->sd_fields.field_names[0], "Sediments");
+  sprintf(rdy->sediment_fields.field_names[0], "Sediments");
   for (PetscInt i = 0; i < num_sediment_class; i++) {
-    sprintf(rdy->sd_fields.field_component_names[0][i], "Class_%d", i);
+    sprintf(rdy->sediment_fields.field_component_names[0][i], "Class_%d", i);
   }
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sd_fields, &rdy->sd_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sediment_fields, &rdy->sediment_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -242,8 +242,8 @@ PetscErrorCode CreateVectors(RDy rdy) {
     PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_u_local));
 
     // Vecs for sediment
-    PetscCall(DMCreateGlobalVector(rdy->sd_dm, &rdy->sd_u_global));
-    PetscCall(DMCreateLocalVector(rdy->sd_dm, &rdy->sd_u_local));
+    PetscCall(DMCreateGlobalVector(rdy->sediment_dm, &rdy->sediment_u_global));
+    PetscCall(DMCreateLocalVector(rdy->sediment_dm, &rdy->sediment_u_local));
 
   } else {
     // Point the flow Vecs to soln Vecs

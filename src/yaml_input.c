@@ -73,7 +73,7 @@ static const cyaml_schema_field_t physics_flow_fields_schema[] = {
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow
-static const cyaml_schema_field_t physics_sd_fields_schema[] = {
+static const cyaml_schema_field_t physics_sediment_fields_schema[] = {
     CYAML_FIELD_INT("num_classes", CYAML_FLAG_DEFAULT, RDyPhysicsSD, num_classes),
     CYAML_FIELD_END
 };
@@ -81,7 +81,7 @@ static const cyaml_schema_field_t physics_sd_fields_schema[] = {
 // mapping of physics fields to members of RDyPhysicsSection
 static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
-    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, physics_sd_fields_schema),
+    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, physics_sediment_fields_schema),
     CYAML_FIELD_BOOL("salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity),
     CYAML_FIELD_END
 };

@@ -90,9 +90,9 @@ struct _p_RDy {
   Vec              diags_vec;
 
   // DM for sediment dynamics
-  DM               sd_dm;
-  SectionFieldSpec sd_fields;
-  Vec              sd_u_global, sd_u_local;
+  DM               sediment_dm;
+  SectionFieldSpec sediment_fields;
+  Vec              sediment_u_global, sediment_u_local;
 
   // DM for flow
   DM               flow_dm;

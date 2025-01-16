@@ -841,7 +841,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
 static PetscErrorCode InitSedimentSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->sd_u_global));
+  PetscCall(VecZeroEntries(rdy->sediment_u_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -852,10 +852,10 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->sd_u_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->sd_u_global, &ndof));
+  PetscCall(VecGetLocalSize(rdy->sediment_u_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->sediment_u_global, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->sd_u_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->sediment_u_global, &u_ptr));
 
   // initialize sediment conditions
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
@@ -866,9 +866,9 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
       PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.file, FILE_MODE_READ, &viewer));
 
       Vec natural, global;
-      PetscCall(DMPlexCreateNaturalVector(rdy->sd_dm, &natural));
-      PetscCall(DMCreateGlobalVector(rdy->sd_dm, &global));
-      PetscCall(DMCreateLocalVector(rdy->sd_dm, &local));
+      PetscCall(DMPlexCreateNaturalVector(rdy->sediment_dm, &natural));
+      PetscCall(DMCreateGlobalVector(rdy->sediment_dm, &global));
+      PetscCall(DMCreateLocalVector(rdy->sediment_dm, &local));
 
       PetscCall(VecLoad(natural, viewer));
       PetscCall(PetscViewerDestroy(&viewer));
@@ -883,12 +883,12 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
                  nblocks_nat, ndof);
 
       // scatter natural-to-global
-      PetscCall(DMPlexNaturalToGlobalBegin(rdy->sd_dm, natural, global));
-      PetscCall(DMPlexNaturalToGlobalEnd(rdy->sd_dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalBegin(rdy->sediment_dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalEnd(rdy->sediment_dm, natural, global));
 
       // scatter global-to-local
-      PetscCall(DMGlobalToLocalBegin(rdy->sd_dm, global, INSERT_VALUES, local));
-      PetscCall(DMGlobalToLocalEnd(rdy->sd_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalBegin(rdy->sediment_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalEnd(rdy->sediment_dm, global, INSERT_VALUES, local));
 
       // free up memory
       PetscCall(VecDestroy(&natural));
@@ -930,7 +930,7 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
     }
   }
 
-  PetscCall(VecRestoreArray(rdy->sd_u_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->sediment_u_global, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -940,7 +940,7 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
   PetscInt flow_ndof, sediment_ndof, soln_ndof, diags_ndof;
 
   PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
-  PetscCall(VecGetBlockSize(rdy->sd_u_global, &sediment_ndof));
+  PetscCall(VecGetBlockSize(rdy->sediment_u_global, &sediment_ndof));
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
   PetscCall(VecGetBlockSize(rdy->diags_vec, &diags_ndof));
 
@@ -955,7 +955,7 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
 
   // next, copy sediment Vec into solution Vec
   for (PetscInt i = 0; i < sediment_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->sd_u_global, i, rdy->diags_vec, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->diags_vec, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->diags_vec, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
 
