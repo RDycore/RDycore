@@ -13,8 +13,8 @@ typedef struct {
   PetscInt   num_states;         // number of states
   PetscInt   num_flow_comp;      // number of flow components
   PetscInt   num_sediment_comp;  // number of sediment components
-  PetscReal *h, *hu, *hv, *hc;   // prognostic variables
-  PetscReal *u, *v, *c;          // diagnostic variables
+  PetscReal *h, *hu, *hv, *hci;  // prognostic variables
+  PetscReal *u, *v, *ci;         // diagnostic variables
 } SedimentRiemannStateData;
 
 typedef struct {
@@ -40,8 +40,8 @@ static PetscErrorCode CreateSedimentRiemannStateData(PetscInt num_states, PetscI
   PetscCall(PetscCalloc1(num_states, &data->u));
   PetscCall(PetscCalloc1(num_states, &data->v));
 
-  PetscCall(PetscCalloc1(num_states * num_sediment_comp, &data->hc));
-  PetscCall(PetscCalloc1(num_states * num_sediment_comp, &data->c));
+  PetscCall(PetscCalloc1(num_states * num_sediment_comp, &data->hci));
+  PetscCall(PetscCalloc1(num_states * num_sediment_comp, &data->ci));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -55,10 +55,10 @@ static PetscErrorCode DestroySedimentRiemannStateData(SedimentRiemannStateData d
   PetscCall(PetscFree(data.h));
   PetscCall(PetscFree(data.hu));
   PetscCall(PetscFree(data.hv));
-  PetscCall(PetscFree(data.hc));
+  PetscCall(PetscFree(data.hci));
   PetscCall(PetscFree(data.u));
   PetscCall(PetscFree(data.v));
-  PetscCall(PetscFree(data.c));
+  PetscCall(PetscFree(data.ci));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -104,15 +104,15 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(PetscReal tiny_h,
       data->u[n] = 0.0;
       data->v[n] = 0.0;
       for (PetscInt s = 0; s < data->num_sediment_comp; s++) {
-        index          = n * data->num_sediment_comp + s;
-        data->c[index] = 0.0;
+        index           = n * data->num_sediment_comp + s;
+        data->ci[index] = 0.0;
       }
     } else {
       data->u[n] = data->hu[n] / data->h[n];
       data->v[n] = data->hv[n] / data->h[n];
       for (PetscInt s = 0; s < data->num_sediment_comp; s++) {
-        index          = n * data->num_sediment_comp + s;
-        data->c[index] = data->hc[index] / data->h[n];
+        index           = n * data->num_sediment_comp + s;
+        data->ci[index] = data->hci[index] / data->h[n];
       }
     }
   }
@@ -129,12 +129,12 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
   PetscReal *hl  = datal->h;
   PetscReal *ul  = datal->u;
   PetscReal *vl  = datal->v;
-  PetscReal *cil = datal->c;
+  PetscReal *cil = datal->ci;
 
   PetscReal *hr  = datar->h;
   PetscReal *ur  = datar->u;
   PetscReal *vr  = datar->v;
-  PetscReal *cir = datar->c;
+  PetscReal *cir = datar->ci;
 
   PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
 
@@ -330,8 +330,8 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
       datar->hv[e] = u_ptr[n_dof * right_local_cell_id + 2];
 
       for (PetscInt s = 0; s < num_sediment_comp; s++) {
-        datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
-        datar->hc[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + 3 + s];
+        datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
+        datar->hci[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + 3 + s];
       }
     }
   }
@@ -484,7 +484,7 @@ static PetscErrorCode ApplySedimentReflectingBC(RDyMesh *mesh, RDyBoundary bound
       datar->v[e] = -datal->u[e] * dum2 - datal->v[e] * dum1;
 
       for (PetscInt s = 0; s < num_sediment_comp; s++) {
-        datar->c[e * num_sediment_comp + s] = datal->c[e * num_sediment_comp + s];
+        datar->ci[e * num_sediment_comp + s] = datal->ci[e * num_sediment_comp + s];
       }
     }
   }
@@ -534,7 +534,7 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
     datal->hv[e]                = u_ptr[n_dof * left_local_cell_id + 2];
 
     for (PetscInt s = 0; s < num_sediment_comp; s++) {
-      datal->hc[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
+      datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
     }
   }
 
