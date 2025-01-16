@@ -666,7 +666,7 @@ static const cyaml_schema_field_t mms_sediement_fields_schema[] = {
 static const cyaml_schema_field_t mms_fields_schema[] = {
     CYAML_FIELD_MAPPING("constants", CYAML_FLAG_OPTIONAL, RDyMMSSection, constants, mms_constants_fields_schema),
     CYAML_FIELD_MAPPING("swe", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_swe_fields_schema),
-    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_sediement_fields_schema),
+    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyMMSSection, sediment, mms_sediement_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -922,6 +922,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
       PetscCheck(config->mms.swe.expressions.dvdt[0], comm, PETSC_ERR_USER, "No expression for dv/dt was specified!");
       PetscCheck(config->mms.swe.expressions.n[0], comm, PETSC_ERR_USER, "No expression for n was specified!");
     }
+    if (config->physics.sediment.num_classes) {
+      PetscCheck(config->mms.sediment.expressions.ci[0], comm, PETSC_ERR_USER, "No expression for ci was specified!");
+      PetscCheck(config->mms.sediment.expressions.dcidx[0], comm, PETSC_ERR_USER, "No expression for dci/dx was specified!");
+      PetscCheck(config->mms.sediment.expressions.dcidy[0], comm, PETSC_ERR_USER, "No expression for dci/dy was specified!");
+      PetscCheck(config->mms.sediment.expressions.dcidt[0], comm, PETSC_ERR_USER, "No expression for dci/dt was specified!");
+    }
   }
 
   // validate our flow conditions
@@ -1054,6 +1060,20 @@ static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstan
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSedimentSolutions *sediment) {
+  PetscFunctionBegin;
+
+  // NOTE: you must define the relavent variables (e.g. x, y or x, y, t)
+  // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
+
+  DEFINE_FUNCTION(sediment, constants, ci);
+  DEFINE_FUNCTION(sediment, constants, dcidx);
+  DEFINE_FUNCTION(sediment, constants, dcidy);
+  DEFINE_FUNCTION(sediment, constants, dcidt);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // parses mathematical expressions given for manufactured solutions, material
 // properties, initial/boundary conditions, etc
 static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
@@ -1061,6 +1081,10 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
 
   if (config->mms.swe.expressions.h[0]) {
     PetscCall(ParseSWEManufacturedSolutions(comm, &config->mms.constants, &config->mms.swe));
+  }
+
+  if (config->mms.sediment.expressions.ci[0]) {
+    PetscCall(ParseSedimentManufacturedSolutions(comm, &config->mms.constants, &config->mms.sediment));
   }
 
   // material properties

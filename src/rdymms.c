@@ -219,6 +219,15 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   }
   PetscCall(CreateAuxiliaryDM(rdy));
 
+  PetscCall(CreateFlowDM(rdy));
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(CreateSedimentDM(rdy));
+    PetscCall(CreateCombinedDM(rdy));
+  } else {
+    rdy->flow_dm = rdy->dm;
+  }
+
   // create global and local vectors
   PetscCall(CreateVectors(rdy));
 
@@ -267,6 +276,19 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
   PetscScalar *x_ptr;
   PetscCall(VecGetArray(solution, &x_ptr));
 
+  PetscInt flow_ndof;
+  switch (rdy->config.physics.flow.mode) {
+    case FLOW_SWE:
+      flow_ndof = 3;
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend code to support flow mode other than SWE");
+      break;
+  }
+
+  PetscInt sediment_ndof = rdy->config.physics.sediment.num_classes;
+  PetscCheck(sediment_ndof == 1, rdy->comm, PETSC_ERR_USER, "MMS with sediments included only supported for when num_classes is 1");
+
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
 
@@ -286,7 +308,10 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
     }
 
     if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "SWE solution vector has %" PetscInt_FMT " DOF (should have 3)", ndof);
+      PetscCheck(ndof == flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
+                 "SWE solution vector has %" PetscInt_FMT " DOF that does not match the sum of flow_dof (%" PetscInt_FMT
+                 ") and sediment_dof (%" PetscInt_FMT ")",
+                 ndof, flow_ndof, sediment_ndof);
 
       // evaluate the manufactured ѕolutions at all (x, y, t)
       PetscReal *h, *u, *v;
@@ -296,22 +321,33 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
+      PetscReal *ci;
+      if (sediment_ndof == 1) {
+        PetscCall(PetscCalloc1(region.num_local_cells, &ci));
+        PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.ci, N, cell_x, cell_y, time, ci));
+      }
 
       // TODO: salinity and sediment initial conditions go here.
 
       PetscInt l = 0;
       for (PetscInt c = 0; c < region.num_local_cells; ++c) {
         PetscInt cell_id = region.cell_local_ids[c];
-        if (3 * cell_id < n_local) {  // skip ghost cells
-          x_ptr[3 * cell_id]     = h[l];
-          x_ptr[3 * cell_id + 1] = h[l] * u[l];
-          x_ptr[3 * cell_id + 2] = h[l] * v[l];
+        if (ndof * cell_id < n_local) {  // skip ghost cells
+          x_ptr[ndof * cell_id]     = h[l];
+          x_ptr[ndof * cell_id + 1] = h[l] * u[l];
+          x_ptr[ndof * cell_id + 2] = h[l] * v[l];
+          if (sediment_ndof == 1) {
+            x_ptr[ndof * cell_id + 3] = h[l] * ci[l];
+          }
           ++l;
         }
       }
       PetscCall(PetscFree(h));
       PetscCall(PetscFree(u));
       PetscCall(PetscFree(v));
+      if (sediment_ndof == 1) {
+        PetscCall(PetscFree(ci));
+      }
     }
     PetscCall(PetscFree(cell_x));
     PetscCall(PetscFree(cell_y));
