@@ -152,6 +152,13 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
   PetscReal dW[MAX_NUM_SECTION_FIELD_COMPONENTS];
   PetscReal FL[MAX_NUM_SECTION_FIELD_COMPONENTS], FR[MAX_NUM_SECTION_FIELD_COMPONENTS];
 
+  // initialize
+  for (PetscInt i = 0; i < MAX_NUM_SECTION_FIELD_COMPONENTS; i++) {
+    for (PetscInt j = 0; j < MAX_NUM_SECTION_FIELD_COMPONENTS; j++) {
+      R[i][j] = 0.0;
+    }
+  }
+
   for (PetscInt i = 0; i < num_states; ++i) {
     // compute Roe averages
     PetscReal duml  = pow(hl[i], 0.5);
@@ -727,7 +734,8 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
           PetscReal tau_b = rhow * Cd * (Square(u) + Square(v));
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
-          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di);
+
+          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + 3 + s];
         }
       }
 
