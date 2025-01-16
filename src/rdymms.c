@@ -482,12 +482,24 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidy, N, cell_x, cell_y, time, dcidy));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidt, N, cell_x, cell_y, time, dcidt));
 
+      const PetscReal kp_constant             = 0.001;
+      const PetscReal settling_velocity       = 0.01;
+      const PetscReal tau_critical_erosion    = 0.1;
+      const PetscReal tau_critical_deposition = 1000.0;
+      const PetscReal rhow                    = 1000.0;
+
       l = 0;
       for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
         if (cells->is_owned[icell]) {
           hci_source[l] = ci[l] * dhdt[l] + h[l] * dcidt[l];
           hci_source[l] += u[l] * ci[l] * dhdx[l] + h[l] * ci[l] * dudx[l] + u[l] * h[l] * dcidx[l];
           hci_source[l] += v[l] * ci[l] * dhdy[l] + h[l] * ci[l] * dvdy[l] + v[l] * h[l] * dcidy[l];
+
+          PetscReal Cd    = GRAVITY * Square(n[l]) * PetscPowReal(h[l], -1.0 / 3.0);
+          PetscReal tau_b = 0.5 * rhow * Cd * (Square(u[l]) + Square(v[l]));
+          PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
+          PetscReal di    = settling_velocity * ci[l] * (1.0 - tau_b / tau_critical_deposition);
+          hci_source[l] += -(ei - di);
           ++l;
         }
       }
@@ -730,11 +742,17 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
              MAX_NUM_REFINEMENTS);
 
   // error norm storage
-#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only
+#define MAX_NUM_COMPONENTS 4  // FIXME: SWE only
   int       num_comps = MAX_NUM_COMPONENTS;
   PetscReal L1_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS],
       Linf_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS];
-  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
+  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv", "ci"};
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCheck(rdy->config.physics.sediment.num_classes == 1, rdy->comm, PETSC_ERR_USER,
+               "MMS with sediments is only supported for when num_classes is 1");
+    num_comps = 4;
+  }
 
   // create refined RDy objects and set them up (dumb, but easy)
   RDy rdys[MAX_NUM_REFINEMENTS + 1];
@@ -809,8 +827,8 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
-#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only!
-  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
+#define MAX_NUM_COMPONENTS 4  // FIXME: SWE only!
+  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv", "ci"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
     PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
     // run a convergence study
