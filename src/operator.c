@@ -364,7 +364,7 @@ static PetscErrorCode AddSuboperators(Operator *op) {
 /// @param [in]  boundaries          an array of distinct boundaries bounding the computational domain
 /// @param [in]  boundary_conditions an array of boundary conditions corresponding to the domain boundaries
 /// @param [out] op                  the newly created operator
-PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_regions, RDyRegion *regions,
+PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_comp, PetscInt num_regions, RDyRegion *regions,
                               PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions, Operator **operator) {
   PetscFunctionBegin;
 
@@ -385,7 +385,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscCall(PetscCalloc1(1, operator));
   (*operator)->config         = config;
-  (*operator)->num_components = 3;
+  (*operator)->num_components = num_comp;
 
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
   if (num_boundaries > 0) {
