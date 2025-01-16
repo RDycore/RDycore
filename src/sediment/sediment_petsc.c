@@ -691,7 +691,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
   PetscInt n_dof;
-  PetscCall(VecGetBlockSize(source_vec, &n_dof));
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
 
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
@@ -731,7 +731,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
 
         for (PetscInt s = 0; s < num_sediment_comp; s++) {
           PetscReal ci    = u_ptr[n_dof * c + 3 + s] / h;
-          PetscReal tau_b = rhow * Cd * (Square(u) + Square(v));
+          PetscReal tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
