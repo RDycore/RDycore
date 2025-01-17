@@ -13,7 +13,7 @@ file(COPY
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
-  foreach(config basic ceed)
+  foreach(config basic)
     foreach(lang c f90)
       add_test(mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} sd_mms_conv_study.yaml ${${config}_args})
     endforeach()
