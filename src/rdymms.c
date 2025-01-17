@@ -204,17 +204,27 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating DMs...");
 
-  // create the primary DM that stores the mesh and solution vector
-  rdy->soln_fields = (SectionFieldSpec){
-      .num_fields            = 1,
-      .num_field_components  = {3},
-      .field_names           = {"solution"},
-      .field_component_names = {{
-          "Height",
-          "MomentumX",
-          "MomentumY",
-      }},
-  };
+  if (rdy->config.physics.sediment.num_classes == 0) {
+    rdy->soln_fields = (SectionFieldSpec){
+        .num_fields            = 1,
+        .num_field_components  = {3},
+        .field_names           = {"Solution"},
+        .field_component_names = {{
+            "Height",
+            "MomentumX",
+            "MomentumY",
+        }},
+    };
+  } else {
+    PetscCheck(rdy->config.physics.sediment.num_classes == 1, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only one sediment class is allowed.");
+    rdy->soln_fields = (SectionFieldSpec){
+        .num_fields            = 1,
+        .num_field_components  = {4},
+        .field_names           = {"Solution"},
+        .field_component_names = {{"Height", "MomentumX", "MomentumY", "Concentration"}},
+    };
+  }
+
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which contains error fields for each of the solution fields
@@ -228,13 +238,12 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   }
   PetscCall(CreateAuxiliaryDM(rdy));
 
-  PetscCall(CreateFlowDM(rdy));
-
   if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(CreateFlowDM(rdy));
     PetscCall(CreateSedimentDM(rdy));
-    PetscCall(CreateCombinedDM(rdy));
   } else {
-    rdy->flow_dm = rdy->dm;
+    rdy->flow_fields = rdy->soln_fields;
+    rdy->flow_dm     = rdy->dm;
   }
 
   // create global and local vectors

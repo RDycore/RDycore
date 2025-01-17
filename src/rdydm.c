@@ -168,14 +168,6 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This function creates an auxiliary (secondary) DM
-PetscErrorCode CreateFlowDM(RDy rdy) {
-  PetscFunctionBegin;
-  rdy->flow_fields = rdy->soln_fields;
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->flow_fields, &rdy->flow_dm));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// @brief  This function creates a DM for sediments
 /// @param rdy
 /// @return PETSC_SUCESS on success
@@ -196,29 +188,20 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateCombinedDM(RDy rdy) {
+PetscErrorCode CreateFlowDM(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
+  rdy->flow_fields.num_fields              = 1;
+  rdy->flow_fields.num_field_components[0] = 3;
 
-  rdy->soln_fields.num_fields              = 1;
-  rdy->soln_fields.num_field_components[0] = 3 + num_sediment_class;
+  sprintf(rdy->flow_fields.field_names[0], "Solution");
 
-  sprintf(rdy->soln_fields.field_names[0], "Solution");
-
-  sprintf(rdy->soln_fields.field_component_names[0][0], "Height");
-  sprintf(rdy->soln_fields.field_component_names[0][1], "MomentumX");
-  sprintf(rdy->soln_fields.field_component_names[0][2], "MomentumY");
-
-  for (PetscInt i = 0; i < num_sediment_class; i++) {
-    sprintf(rdy->soln_fields.field_component_names[0][i + 3], "Class_%d", i);
-  }
+  sprintf(rdy->flow_fields.field_component_names[0][0], "Height");
+  sprintf(rdy->flow_fields.field_component_names[0][1], "MomentumX");
+  sprintf(rdy->flow_fields.field_component_names[0][2], "MomentumY");
 
   DM combined_dm;
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->soln_fields, &combined_dm));
-
-  PetscCall(DMDestroy(&rdy->dm));
-  rdy->dm = combined_dm;
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->flow_fields, &rdy->flow_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
