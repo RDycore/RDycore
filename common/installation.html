@@ -1650,7 +1650,10 @@ at GitHub:</p>
 </div>
 </div>
 </div>
-<p>This places an <code>RDycore</code> folder into your current path.</p>
+<p>This places an <code>RDycore</code> folder into your current path. Then we need to update the submodules.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>RDycore
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
+</code></pre></div>
 <h2 id="configure-rdycore">Configure RDycore</h2>
 <p>RDycore uses CMake, and can be easily configured as long as
 <a href="https://petsc.org/release/install/">PETSc is installed</a> and <a href="https://petsc.org/release/install/multibuild/#environmental-variables-petsc-dir-and-petsc-arch">the <code>PETSC_DIR</code>
