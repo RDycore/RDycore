@@ -13,5 +13,8 @@ add_test(f90_driver_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_f90_drive
 # shallow water equations with roe riemann solver
 add_subdirectory(swe_roe)
 
+# sediment dynamics
+add_subdirectory(sd)
+
 # regression tests for bad input
 add_subdirectory(bad_input)
