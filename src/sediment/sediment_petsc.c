@@ -550,7 +550,7 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
         datar->hu[e] = boundary_values_ptr[n_dof * e + 1];
         datar->hv[e] = boundary_values_ptr[n_dof * e + 2];
         for (PetscInt s = 0; s < num_sediment_comp; s++) {
-          datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * e + 3 + s];
+          datar->hci[e * num_sediment_comp + s] = boundary_values_ptr[n_dof * e + 3 + s];
         }
       }
       PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));

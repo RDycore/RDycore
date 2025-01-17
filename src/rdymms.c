@@ -592,7 +592,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
         sediment_boundary_values[e] = h[e] * ci[e];
       }
 
-      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, 1, boundary_values));
+      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, 1, sediment_boundary_values));
 
       PetscCall(PetscFree(ci));
       PetscCall(PetscFree(sediment_boundary_values));
