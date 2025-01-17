@@ -824,6 +824,12 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
             rdy->config.mms.swe.convergence.expected_rates.comp.norm);                                                                      \
   }
 
+#define CheckSedimentConvergence(comp, comp_index, norm)                                                                                    \
+  if (norm##_conv_rates[comp_index] <= rdy->config.mms.sediment.convergence.expected_rates.comp.norm) {                                     \
+    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, #comp, norm##_conv_rates[comp_index], \
+            rdy->config.mms.sediment.convergence.expected_rates.comp.norm);                                                                 \
+  }
+
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
@@ -850,6 +856,13 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, L1);
     CheckConvergence(hv, 2, L2);
     CheckConvergence(hv, 2, Linf);
+
+    if (rdy->config.physics.sediment.num_classes) {
+      PetscCheck(rdy->config.physics.sediment.num_classes == 1, rdy->comm, PETSC_ERR_USER, "MMS CheckConvergence for sediments only supports num_classes is 1");
+      CheckSedimentConvergence(hci, 3, L1);
+      CheckSedimentConvergence(hci, 3, L2);
+      CheckSedimentConvergence(hci, 3, Linf);
+    }
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
     PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
