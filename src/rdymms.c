@@ -858,7 +858,8 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, Linf);
 
     if (rdy->config.physics.sediment.num_classes) {
-      PetscCheck(rdy->config.physics.sediment.num_classes == 1, rdy->comm, PETSC_ERR_USER, "MMS CheckConvergence for sediments only supports num_classes is 1");
+      PetscCheck(rdy->config.physics.sediment.num_classes == 1, rdy->comm, PETSC_ERR_USER,
+                 "MMS CheckConvergence for sediments only supports num_classes is 1");
       CheckSedimentConvergence(hci, 3, L1);
       CheckSedimentConvergence(hci, 3, L2);
       CheckSedimentConvergence(hci, 3, Linf);
