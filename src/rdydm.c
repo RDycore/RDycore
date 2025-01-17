@@ -5,37 +5,40 @@
 #include <rdycore.h>
 
 /// This function creates a Section appropriate for use by the given (primary) DM.
-static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields, PetscSection *sec) {
+static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
-  PetscCall(PetscSectionCreate(comm, sec));
-  PetscCall(PetscSectionSetNumFields(*sec, fields.num_fields));
-  PetscInt dof_per_cell = 0;
-  for (PetscInt f = 0; f < fields.num_fields; ++f) {
-    PetscCall(PetscSectionSetFieldName(*sec, f, fields.field_names[f]));
-    PetscCall(PetscSectionSetFieldComponents(*sec, f, fields.num_field_components[f]));
-    dof_per_cell += fields.num_field_components[f];
-    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
-      if (fields.field_component_names[f][c][0]) {
-        PetscCall(PetscSectionSetComponentName(*sec, f, c, fields.field_component_names[f][c]));
-      }
-    }
-  }
+  // Create a P0 discretization
+  DMPolytopeType ct;
+  PetscInt       dim, cStart, cEnd;
 
-  // set the number of degrees of freedom for each field in each cell
-  PetscInt c_start, c_end;
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
-  PetscCall(PetscSectionSetChart(*sec, c_start, c_end));
-  for (PetscInt c = c_start; c < c_end; ++c) {
-    for (PetscInt f = 0; f < fields.num_fields; ++f) {
-      PetscCall(PetscSectionSetFieldDof(*sec, c, f, fields.num_field_components[f]));
-    }
-    PetscCall(PetscSectionSetDof(*sec, c, dof_per_cell));
+  PetscCall(DMGetDimension(dm, &dim));
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+  if (cEnd > cStart) PetscCall(DMPlexGetCellType(dm, cStart, &ct));
+  else ct = DM_POLYTOPE_QUADRILATERAL;
+  for (PetscInt f = 0; f < fields.num_fields; ++f) {
+    PetscFE fe;
+
+    PetscCall(PetscFECreateLagrangeByCell(PETSC_COMM_SELF, dim, fields.num_field_components[f], ct, 0, PETSC_DETERMINE, &fe));
+    PetscCall(PetscObjectSetName((PetscObject)fe, fields.field_names[f]));
+    PetscCall(DMAddField(dm, NULL, (PetscObject)fe));
+    PetscCall(PetscFEDestroy(&fe));
   }
-  PetscCall(PetscSectionSetUp(*sec));
+  PetscCall(DMCreateDS(dm));
+
+  // Set field and component names
+  PetscSection sec;
+
+  PetscCall(DMGetLocalSection(dm, &sec));
+  for (PetscInt f = 0; f < fields.num_fields; ++f) {
+    PetscCall(PetscSectionSetFieldName(sec, f, fields.field_names[f]));
+    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
+      if (fields.field_component_names[f][c][0]) PetscCall(PetscSectionSetComponentName(sec, f, c, fields.field_component_names[f][c]));
+    }
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -44,22 +47,22 @@ PetscErrorCode CreateCellCenteredDMFromDM(DM dm, const SectionFieldSpec fields, 
 
   PetscCall(DMClone(dm, cc_dm));
 
-  PetscSection section;
-  PetscCall(CreateDMSection(*cc_dm, fields, &section));
-  PetscCall(DMSetLocalSection(*cc_dm, section));
-  PetscCall(PetscSectionViewFromOptions(section, NULL, "-aux_layout_view"));
-  PetscCall(PetscSectionDestroy(&section));  // NOTE: yes, here and not below!
+  PetscCall(CreateDMSection(*cc_dm, fields));
 
   PetscInt refine_level;
-  DMGetRefineLevel(dm, &refine_level);
+  PetscCall(DMGetRefineLevel(dm, &refine_level));
   if (!refine_level) {
     // copy adjacency info from the original DM
     PetscSF sf_migration, sf_natural;
     PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));
-    PetscCall(DMPlexCreateGlobalToNaturalSF(*cc_dm, section, sf_migration, &sf_natural));
-    PetscCall(DMPlexSetGlobalToNaturalSF(*cc_dm, sf_natural));
+    PetscCall(DMPlexCreateGlobalToNaturalSF(*cc_dm, NULL, sf_migration, &sf_natural));
+    PetscCall(DMSetNaturalSF(*cc_dm, sf_natural));
+    PetscCall(DMSetUseNatural(*cc_dm, PETSC_TRUE));
     PetscCall(PetscSFDestroy(&sf_natural));
   }
+  PetscSection section;
+  PetscCall(DMGetLocalSection(*cc_dm, &section));
+  PetscCall(PetscSectionViewFromOptions(section, NULL, "-aux_layout_view"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -68,8 +71,7 @@ PetscErrorCode CreateCellCenteredDMFromDM(DM dm, const SectionFieldSpec fields, 
 /// set for CPU or GPUs. Must be called after CreateOperator() so that an
 /// operator is available to create sections.
 PetscErrorCode CreateDM(RDy rdy) {
-  PetscSection sec;
-  PetscMPIInt  size;
+  PetscMPIInt size;
 
   PetscFunctionBegin;
   PetscCallMPI(MPI_Comm_size(rdy->comm, &size));
@@ -99,11 +101,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // NOTE Need to create section before distribution, so that natural map can be created
   // create a section with (h, hu, hv) as degrees of freedom
-  if (!rdy->refine) {
-    PetscCall(CreateDMSection(rdy->dm, rdy->soln_fields, &sec));
-    // embed the section's data in our grid and toss the section
-    PetscCall(DMSetLocalSection(rdy->dm, sec));
-  }
+  PetscCall(CreateDMSection(rdy->dm, rdy->soln_fields));
 
   // distribution phase
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "dist_"));
@@ -143,27 +141,15 @@ PetscErrorCode CreateDM(RDy rdy) {
   }
 
   // create parallel section and global-to-natural mapping
-  if (rdy->refine) {
-    PetscCall(CreateDMSection(rdy->dm, rdy->soln_fields, &sec));
-    PetscCall(DMSetLocalSection(rdy->dm, sec));
-  } else if (size > 1) {
-    PetscSF      sfMigration, sfNatural;
-    PetscSection psec;
-    PetscInt    *remoteOffsets;
+  if (size > 1) {
+    PetscSF sfMigration, sfNatural;
 
     PetscCall(DMPlexGetMigrationSF(rdy->dm, &sfMigration));
-    PetscCall(DMPlexCreateGlobalToNaturalSF(rdy->dm, sec, sfMigration, &sfNatural));
-    PetscCall(DMPlexSetGlobalToNaturalSF(rdy->dm, sfNatural));
+    PetscCall(DMPlexCreateGlobalToNaturalSF(rdy->dm, NULL, sfMigration, &sfNatural));
+    PetscCall(DMSetNaturalSF(rdy->dm, sfNatural));
+    PetscCall(DMSetUseNatural(rdy->dm, PETSC_TRUE));
     PetscCall(PetscSFDestroy(&sfNatural));
-
-    PetscCall(PetscSectionCreate(rdy->comm, &psec));
-    PetscCall(PetscSFDistributeSection(sfMigration, sec, &remoteOffsets, psec));
-    PetscCall(DMSetLocalSection(rdy->dm, psec));
-    PetscCall(PetscFree(remoteOffsets));
-    PetscCall(PetscSectionDestroy(&sec));
-    PetscCall(PetscSectionDestroy(&psec));
   }
-  PetscCall(PetscSectionDestroy(&sec));
 
   // set grid adacency
   PetscCall(DMSetBasicAdjacency(rdy->dm, PETSC_TRUE, PETSC_TRUE));

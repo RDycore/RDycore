@@ -71,7 +71,12 @@ at GitHub:
     git clone https://github.com/RDycore/RDycore.git
     ```
 
-This places an `RDycore` folder into your current path.
+This places an `RDycore` folder into your current path. Then we need to update the submodules.
+
+```bash
+cd RDycore
+git submodule update --init --recursive
+```
 
 ## Configure RDycore
 

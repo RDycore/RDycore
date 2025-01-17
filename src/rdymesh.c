@@ -1011,11 +1011,15 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   Vec          global_vec, natural_vec;
   PetscScalar *vec_ptr;
+  PetscInt     n;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
   PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
 
+  PetscCall(VecGetLocalSize(global_vec, &n));
+  PetscCheck(n == mesh->num_owned_cells * max_num_vertices, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
+             "Vector local size %" PetscInt_FMT " != %" PetscInt_FMT " * %" PetscInt_FMT "\n", n, mesh->num_owned_cells, max_num_vertices);
   PetscCall(VecSet(global_vec, -1));
-  PetscCall(VecGetArray(global_vec, &vec_ptr));
+  PetscCall(VecGetArrayWrite(global_vec, &vec_ptr));
 
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
@@ -1029,7 +1033,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
     }
   }
 
-  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+  PetscCall(VecRestoreArrayWrite(global_vec, &vec_ptr));
 
   PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
   PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));

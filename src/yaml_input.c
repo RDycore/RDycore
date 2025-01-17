@@ -1300,7 +1300,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
 
   // copy the config into place and dispose of the original
   rdy->config = *config;
-  PetscFree(config);
+  PetscCall(PetscFree(config));
 
   // if this is an ensemble run, split our communicator, assign ranks to
   // ensemble members, and override parameters
@@ -1317,7 +1317,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscCall(SetAdditionalOptions(rdy));
 
   // clean up
-  PetscFree(config_str);
+  PetscCall(PetscFree(config_str));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
