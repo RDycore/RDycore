@@ -1,0 +1,64 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses a file
+# to specify the initial conditions (and a corresponding Exodus mesh).
+
+physics:
+  flow:
+    mode: swe
+  sediment:
+    num_classes: 1
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  final_time: 1.00
+  time_step : 0.01
+  unit: seconds
+
+#output:
+#  format: xdmf
+#  step_interval: 100
+
+grid:
+  file: DamBreak_grid5x10.exo
+
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        file: manning_grid5x10.${PETSC_ID_TYPE}.bin
+        format: binary
+
+initial_conditions:
+  - region: domain
+    flow: domain_flow_ic
+    sediment: domain_sediment_ic
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    file: DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
+    format: binary
+
+sediment_conditions:
+  - name: domain_sediment_ic
+    type: dirichlet
+    file: DamBreak_grid5x10_wetdownstream.sediment_ic.${PETSC_ID_TYPE}.bin
+    format: binary
+
+# we don't specify boundaries or boundary conditions, so all boundaries are
+# reflecting

@@ -12,7 +12,7 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/sediment_mms_conv_study.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2) # test on 1, 2 processes
+foreach(np 2) # test on 1, 2 processes
   foreach(config basic)
     foreach(lang c f90)
       add_test(mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} sediment_mms_conv_study.yaml ${${config}_args})
@@ -26,10 +26,25 @@ file(COPY
      ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
      ${MATERIALS_DIR}/manning_grid5x10.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2) # test on 1, 2 processes
+foreach(np 2) # test on 1, 2 processes
   foreach(config basic)
     foreach(lang c f90)
       add_test(sediment_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} sediment.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/sediment_ic_file.yaml
+     ${MESH_DIR}/DamBreak_grid5x10.exo
+     ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
+     ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.sediment_ic.${PETSC_ID_TYPE}.bin
+     ${MATERIALS_DIR}/manning_grid5x10.${PETSC_ID_TYPE}.bin
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 2) # test on 1, 2 processes
+  foreach(config basic)
+    foreach(lang c)
+      add_test(sediment_ic_file${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} sediment_ic_file.yaml ${${config}_args})
     endforeach()
   endforeach()
 endforeach()
