@@ -296,7 +296,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   // check our arguments
   PetscCheck(domain_mesh, comm, PETSC_ERR_USER, "Cannot create an operator with no mesh");
   PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Cannot create an operator with no regions");
-  PetscCheck(num_boundaries > 0, comm, PETSC_ERR_USER, "Cannot create an operator with no boundaries");
+  // NOTE: num_boundaries can be zero in a subdomain in a parallel simulation
 
   static PetscBool first_time = PETSC_TRUE;
   if (first_time) {
@@ -310,7 +310,9 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   (*operator)->num_components = 3;
 
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
-  PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
+  if (num_boundaries > 0) {
+    PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
+  }
   PetscCall(SetOperatorRegions(*operator, num_regions, regions));
   PetscCall(AddSuboperators(*operator));
 
@@ -547,6 +549,7 @@ static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edge
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 /// @brief Loops over all boundary conditions and finds the local maximum Courant number.
 ///        If needed, the data is moved from device to host.
 /// @param [in] op_edges A CeedOperator object for edges
