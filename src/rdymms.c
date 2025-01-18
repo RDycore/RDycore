@@ -626,6 +626,8 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
   // initialize the material properties on each region
   PetscInt n_local;
   PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
 
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
@@ -638,7 +640,7 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
     PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_local_cells; ++c) {
       PetscInt cell_id = region.cell_local_ids[c];
-      if (3 * cell_id < n_local) {
+      if (ndof * cell_id < n_local) {
         cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
         cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
         ++N;
