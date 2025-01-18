@@ -915,16 +915,10 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
           PetscCall(VecRestoreArray(local, &local_ptr));
           PetscCall(VecDestroy(&local));
         } else {
-          PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "mupEval is unsupported for Sediments.");
-          // FIXME: this assumes the shallow water equations!
-          /*
           for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-            PetscInt owned_cell_id          = region.owned_cell_global_ids[c];
-            u_ptr[ndof * owned_cell_id]     = mupEval(flow_ic.height);
-            u_ptr[ndof * owned_cell_id + 1] = mupEval(flow_ic.x_momentum);
-            u_ptr[ndof * owned_cell_id + 2] = mupEval(flow_ic.y_momentum);
+            PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
+            u_ptr[ndof * owned_cell_id] = mupEval(sediment_ic.concentration);
           }
-          */
         }
       }
     }
