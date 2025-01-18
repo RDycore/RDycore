@@ -14,7 +14,7 @@ add_test(f90_driver_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_f90_drive
 add_subdirectory(swe_roe)
 
 # sediment dynamics
-add_subdirectory(sd)
+add_subdirectory(sediment)
 
 # regression tests for bad input
 add_subdirectory(bad_input)
