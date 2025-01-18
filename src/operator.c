@@ -43,7 +43,7 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
 }
 
 // creates a sequential vector appropriate for our chosen architecture
-static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt size, Vec *vec) {
+static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt size, PetscInt block_size, Vec *vec) {
   PetscFunctionBegin;
 
   VecType seq_vec_type;
@@ -64,6 +64,7 @@ static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt size, Vec *
   }
   PetscCall(VecCreate(PETSC_COMM_SELF, vec));
   PetscCall(VecSetSizes(*vec, size, size));
+  PetscCall(VecSetBlockSize(*vec, block_size));
   PetscCall(VecSetType(*vec, seq_vec_type));
   PetscCall(VecSetUp(*vec));
 
@@ -86,11 +87,11 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
 
   // allocate sequential vectors for each region
   if (!CeedEnabled()) {
-    PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, &op->petsc.external_sources));
+    PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, op->num_components, &op->petsc.external_sources));
 
     PetscCall(PetscCalloc1(OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));  // NOLINT(bugprone-sizeof-expression)
     for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
-      PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, &op->petsc.material_properties[p]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, op->num_components, &op->petsc.material_properties[p]));
     }
   }
 
@@ -119,8 +120,8 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
 
     for (PetscInt b = 0; b < num_boundaries; ++b) {
       PetscInt num_edges = boundaries[b].num_edges;
-      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, &op->petsc.boundary_values[b]));
-      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, &op->petsc.boundary_fluxes[b]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, op->num_components, &op->petsc.boundary_values[b]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, op->num_components, &op->petsc.boundary_fluxes[b]));
     }
   }
 
