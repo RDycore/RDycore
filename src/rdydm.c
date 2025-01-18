@@ -200,7 +200,6 @@ PetscErrorCode CreateFlowDM(RDy rdy) {
   sprintf(rdy->flow_fields.field_component_names[0][1], "MomentumX");
   sprintf(rdy->flow_fields.field_component_names[0][2], "MomentumY");
 
-  DM combined_dm;
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->flow_fields, &rdy->flow_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);

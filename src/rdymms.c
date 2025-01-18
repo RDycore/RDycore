@@ -135,38 +135,6 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode MMSPostStep(TS ts) {
-  PetscFunctionBegin;
-
-  RDy rdy;
-  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
-
-  PetscReal t;
-  PetscCall(TSGetTime(ts, &t));
-
-  // compute the error vector and stuff its components into diagnostic fields
-  Vec error;
-  PetscCall(RDyCreatePrognosticVec(rdy, &error));
-  PetscCall(RDyMMSComputeSolution(rdy, t, error));
-  PetscCall(VecAYPX(error, -1.0, rdy->u_global));
-
-  PetscInt         num_comp = rdy->soln_fields.num_field_components[0];
-  const PetscReal *error_ptr;
-  PetscReal       *diags_ptr;
-  PetscCall(VecGetArrayRead(error, &error_ptr));
-  PetscCall(VecGetArray(rdy->diags_vec, &diags_ptr));
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-      diags_ptr[num_comp * i + c] = error_ptr[num_comp * i + c];
-    }
-  }
-  PetscCall(VecRestoreArray(rdy->diags_vec, &diags_ptr));
-  PetscCall(VecRestoreArrayRead(error, &error_ptr));
-  PetscCall(VecDestroy(&error));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
 extern PetscErrorCode InitOperator(RDy rdy);
 extern PetscErrorCode InitSolver(RDy rdy);
@@ -271,7 +239,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
-  // PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
