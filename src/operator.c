@@ -334,7 +334,7 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 }
 
 // performs all work necessary to make the operator ready for use
-static PetscErrorCode AddSuboperators(Operator *op) {
+static PetscErrorCode AddPhysicsOperators(Operator *op) {
   PetscFunctionBegin;
 
   if (CeedEnabled()) {
@@ -391,7 +391,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
   }
   PetscCall(SetOperatorRegions(*operator, num_regions, regions));
-  PetscCall(AddSuboperators(*operator));
+  PetscCall(AddPhysicsOperators(*operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
