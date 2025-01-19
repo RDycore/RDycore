@@ -92,7 +92,7 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
 
     PetscCall(PetscCalloc1(OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));  // NOLINT(bugprone-sizeof-expression)
     for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
-      PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, op->num_components, &op->petsc.material_properties[p]));
+      PetscCall(CreateSequentialVector(comm, op->mesh->num_owned_cells, 1, &op->petsc.material_properties[p]));
     }
   }
 
