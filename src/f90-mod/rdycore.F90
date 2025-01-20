@@ -17,7 +17,7 @@ module rdycore
             RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, RDyMMSRun, &
             RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
-            RDySetDirichletBoundaryValues, &
+            RDySetFlowDirichletBoundaryValues, &
             RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
             RDyGetStep, RDyGetCouplingInterval, RDySetCouplingInterval, &
             RDyGetLocalCellHeights, RDyGetLocalCellXMomenta, RDyGetLocalCellYMomenta, &
@@ -156,7 +156,7 @@ module rdycore
       PetscInt,    intent(out)       :: num_edges
     end function
 
-    integer(c_int) function rdysetdirichletboundaryvalues_(rdy, boundary_id, num_edges, ndof, bc_values) bind(c, name="RDySetDirichletBoundaryValues")
+    integer(c_int) function RDySetFlowDirichletBoundaryValues_(rdy, boundary_id, num_edges, ndof, bc_values) bind(c, name="RDySetFlowDirichletBoundaryValues")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,    value, intent(in)  :: boundary_id
@@ -564,14 +564,14 @@ contains
     ierr = rdygetnumboundaryedges_(rdy_%c_rdy, boundary_id-1, num_edges)
   end subroutine
 
-  subroutine RDySetDirichletBoundaryValues(rdy_, boundary_id, num_edges, ndof, bc_values, ierr)
+  subroutine RDySetFlowDirichletBoundaryValues(rdy_, boundary_id, num_edges, ndof, bc_values, ierr)
     type(RDy),       intent(inout)       :: rdy_
     PetscInt,        intent(in)          :: boundary_id
     PetscInt,        intent(in)          :: num_edges
     PetscInt,        intent(in)          :: ndof
     real(RDyDouble), pointer, intent(in) :: bc_values(:)
     integer,         intent(out)         :: ierr
-    ierr = rdysetdirichletboundaryvalues_(rdy_%c_rdy, boundary_id-1, num_edges, ndof, c_loc(bc_values))
+    ierr = RDySetFlowDirichletBoundaryValues_(rdy_%c_rdy, boundary_id-1, num_edges, ndof, c_loc(bc_values))
   end subroutine
 
   subroutine RDyGetBoundaryConditionFlowType(rdy_, boundary_id, bnd_cond_type, ierr)

@@ -169,7 +169,8 @@ typedef struct Operator {
   OperatorDiagnostics diagnostics;
 } Operator;
 
-PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *, Operator **);
+PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt, PetscInt, RDyRegion *, PetscInt, RDyBoundary *, RDyCondition *,
+                                           Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
 // operator timestepping function

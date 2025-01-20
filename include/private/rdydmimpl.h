@@ -6,7 +6,7 @@
 
 // maximum numbers of supported fields/components in a DM section
 #define MAX_NUM_SECTION_FIELDS 5
-#define MAX_NUM_SECTION_FIELD_COMPONENTS 3
+#define MAX_NUM_SECTION_FIELD_COMPONENTS 10
 
 // this struct specifies the number, degrees of freedom, and names of fields in
 // a section within a DM
@@ -20,6 +20,8 @@ typedef struct {
 PETSC_INTERN PetscErrorCode CreateCellCenteredDMFromDM(DM, const SectionFieldSpec, DM *);
 PETSC_INTERN PetscErrorCode CreateDM(RDy);
 PETSC_INTERN PetscErrorCode CreateAuxiliaryDM(RDy);
+PETSC_INTERN PetscErrorCode CreateFlowDM(RDy);
+PETSC_INTERN PetscErrorCode CreateSedimentDM(RDy);
 PETSC_INTERN PetscErrorCode CreateVectors(RDy);
 PETSC_INTERN PetscErrorCode CreateSectionForSWE(RDy, PetscSection *);
 

@@ -13,6 +13,7 @@ set(RDYCORE_C_SOURCE_FILES
   operator_diagnostics.c
   swe/swe_petsc.c
   swe/swe_ceed.c
+  sediment/sediment_petsc.c
   time_series.c
   xdmf_output.c
   yaml_input.c

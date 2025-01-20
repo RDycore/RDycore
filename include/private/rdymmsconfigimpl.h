@@ -24,10 +24,10 @@ typedef struct {
 
 typedef struct {
   PetscReal L1, L2, Linf;
-} RDyMMSSWEErrorNorms;
+} RDyMMSErrorNorms;
 
 typedef struct {
-  RDyMMSSWEErrorNorms h, hu, hv;
+  RDyMMSErrorNorms h, hu, hv;
 } RDyMMSSWEConvergenceRates;
 
 typedef struct {
@@ -68,10 +68,35 @@ typedef struct {
   RDyMMSSWEConvergence convergence;
 } RDyMMSSWESolutions;
 
+typedef struct {
+  RDyMMSErrorNorms hci;
+} RDyMMSSedimentConvergenceRates;
+
+typedef struct {
+  PetscInt                       num_refinements;
+  PetscInt                       base_refinement;
+  RDyMMSSedimentConvergenceRates expected_rates;
+} RDyMMSSedimentConvergence;
+
+typedef struct {
+  struct {
+    // sediment concentration ci(x, y, t) and partial derivatives
+    MathExpression ci, dcidx, dcidy, dcidt;
+  } expressions;
+
+  struct {
+    // sediment concentration ci(x, y, t) and partial derivatives
+    void *ci, *dcidx, *dcidy, *dcidt;
+  } solutions;
+
+  RDyMMSSedimentConvergence convergence;
+} RDyMMSSedimentSolutions;
+
 // constants and expressions for manufactured solutions
 typedef struct {
-  RDyMMSConstants    constants;
-  RDyMMSSWESolutions swe;
+  RDyMMSConstants         constants;
+  RDyMMSSWESolutions      swe;
+  RDyMMSSedimentSolutions sediment;
 } RDyMMSSection;
 
 #endif
