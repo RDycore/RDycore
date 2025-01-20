@@ -181,7 +181,53 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
 
 static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
   PetscFunctionBegin;
-  PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend code to add CEED version of sediment operators");
+
+  // set up operators for the shallow water equations
+
+  Ceed                ceed             = CeedContext();
+  RDyFlowSourceMethod time_method      = op->config->physics.flow.source.method;
+  PetscReal           tiny_h           = op->config->physics.flow.tiny_h;
+  PetscReal           xq2018_threshold = op->config->physics.flow.source.xq2018_threshold;
+
+  //---------------
+  // Flux Operator
+  //---------------
+
+  PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.flux));
+
+  // suboperator 0: fluxes between interior cells
+  CeedOperator interior_flux_op;
+  PetscInt     num_flow_comp     = 3;
+  PetscInt     num_sediment_comp = op->config->physics.sediment.num_classes;
+  PetscCall(CreateSedimentCeedInteriorFluxOperator(op->mesh, num_flow_comp, num_sediment_comp, tiny_h, &interior_flux_op));
+  PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux, interior_flux_op));
+  PetscCallCEED(CeedOperatorDestroy(&interior_flux_op));
+
+  // suboperators 1 to num_boundaries: fluxes on boundary edges
+  for (CeedInt b = 0; b < op->num_boundaries; ++b) {
+    CeedOperator boundary_flux_op;
+    RDyBoundary  boundary  = op->boundaries[b];
+    RDyCondition condition = op->boundary_conditions[b];
+    PetscCall(CreateSedimentCeedBoundaryFluxOperator(op->mesh, num_flow_comp, num_sediment_comp, boundary, condition, tiny_h, &boundary_flux_op));
+    PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux, boundary_flux_op));
+    PetscCallCEED(CeedOperatorDestroy(&boundary_flux_op));
+  }
+
+  if (0) PetscCallCEED(CeedOperatorView(op->ceed.flux, stdout));
+
+  //-----------------
+  // Source Operator
+  //-----------------
+
+  PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.source));
+
+  CeedOperator source_op;
+  PetscCall(CreateSedimentCeedSourceOperator(op->mesh, num_flow_comp, num_sediment_comp, time_method, tiny_h, xq2018_threshold, &source_op));
+  PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
+  PetscCallCEED(CeedOperatorDestroy(&source_op));
+
+  if (0) PetscCallCEED(CeedOperatorView(op->ceed.source, stdout));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
