@@ -896,9 +896,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#shallow-water-equations-swe-operators" class="md-nav__link">
     <span class="md-ellipsis">
       Shallow Water Equations (SWE) operators
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sediment-dynamics-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sediment Dynamics operators
     </span>
   </a>
   
@@ -1285,9 +1303,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#shallow-water-equations-swe-operators" class="md-nav__link">
     <span class="md-ellipsis">
       Shallow Water Equations (SWE) operators
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sediment-dynamics-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sediment Dynamics operators
     </span>
   </a>
   
@@ -1478,6 +1514,9 @@ contents. In particular, the <code>src</code> folder has a few important subfold
   capabilities</li>
 <li><code>src/swe</code>: functions and data structures specific to the solution of the
   2D shallow water equations</li>
+<li><code>src/sediment</code>: functions and data structure specific to the solution of
+  the 2D shallow water equations coupled with diffusion-diffusion equation
+  for sediment dynamics</li>
 <li><code>src/tests</code>: unit tests for subsystems within RDycore</li>
 </ul>
 <p>The private headers in the <code>include</code> folder contain definitions of opaque types
@@ -1607,15 +1646,15 @@ implemented in the <code>InitBoundaries</code> function, which is called in <cod
 computing interior and boundary fluxes and source terms. Each operator is
 represented by a specific data structure associated with functions that
 implement its operations.</p>
-<p><em><strong>NOTE</strong>: at the time of writing, RDycore solves the shallow water equations
-exclusively, so everything here refers to operators pertaining only to these
-equations.</em></p>
-<h3 id="shallow-water-equations-swe-operators">Shallow Water Equations (SWE) operators</h3>
-<p>All shallow-water-equations-specific code lives within the <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/">swe source subfolder</a>
-and is initialized by the <code>InitSWE</code> function, which is called in <code>RDySetup</code>.
-The interface for the "SWE operator" is visible in the private header
-<a href="https://github.com/RDycore/RDycore/blob/main/include/private/rsdysweimpl.h">rdysweimpl.h</a>.</p>
-<p>All operator code has two parts:</p>
+<h3 id="overview">Overview</h3>
+<p>We have two types version in RDycore:</p>
+<ol>
+<li>A CPU-only version that uses PETSc. We refer to this version as the <em>PETSc version</em>.</li>
+<li>A CPU and GPU supported version that uses PETSc and CEED. We refer to this version as the <em>CEED version</em>.</li>
+</ol>
+<p>The PETSc version is mainly used to troubleshoot our CEED version. Both of the RDycore versions are
+in wrapped in a C struct called <code>Operator</code> defined in the <a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdyoperatorimpl.h">rdyoperatorimpl.h</a>.</p>
+<p>The CEED version of the operator code has two parts:</p>
 <ul>
 <li>"host" code that runs on the CPU and dispatches calls to the "device" (a CPU
   or GPU, depending on your runtime configuration) to create, update,
@@ -1624,29 +1663,52 @@ The interface for the "SWE operator" is visible in the private header
   operator using the <a href="https://ceed.exascaleproject.org/libceed/">libceed</a>
   exascale library.</li>
 </ul>
-<p>The SWE operators are created and configured in the <code>InitSWE</code> function, which
-lives in <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe.c"><code>swe/swe.c</code></a>.</p>
-<p>The <code>libceed</code>-based "device" code for these operators is defined within <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed.c"><code>swe/swe_ceed.c</code></a>
-and the header file <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed_impl.h"><code>swe/swe_ceed_impl.h</code></a>.
-The latter file defines inline <a href="https://libceed.org/en/latest/api/CeedQFunction/#ceedqfunction"><code>CeedQFunction</code></a>s
+<p>To make the PETSc version of the code be similar to the CEED version, the PETSc operator
+also has two parts that are similar to the CEED version. However, the PETSc version
+of the operator code only runs on a CPU.</p>
+<p>The <code>AddPhysicsOperators()</code> in <a href="https://github.com/RDycore/RDycore/blob/main/src/operator.c"><code>operator.c</code></a>
+sets up the operators for the PETSc or CEED version of the RDycore. Furthermore, each version of operators
+sets up physcis-specific (i.e., SWE or sediment dynamics) operators.</p>
+<p><em><strong>NOTE</strong>: at the time of writing, the physics in RDycore's operators supports the following configurations:</em>
+<em>(1) SWE: PETSc and CEED version and (2) Sediment Dynamics: PETSc version.</em></p>
+<h3 id="shallow-water-equations-swe-operators">Shallow Water Equations (SWE) operators</h3>
+<p>All shallow-water-equations-specific code lives within the <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/">swe source subfolder</a>.
+The SWE operators are created and configured by <code>AddPetscFlowOperators</code> and <code>AddCeedFlowOperators</code> functions for
+PETSc and CEED, respecitively. These two functions live in <a href="https://github.com/RDycore/RDycore/blob/main/src/operator.c"><code>operator.c</code></a>.
+The interface for the "SWE operator" is visible in the private header
+<a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdysweimpl.h">rdysweimpl.h</a>. Few details about the the PETSc and CEED
+version is as follows:</p>
+<ol>
+<li>
+<p>PETSc version: The creation of operators and the physics implementation lives in <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_petsc.c"><code>swe/swe_petsc.c</code></a></p>
+</li>
+<li>
+<p>CEED version: The creation of operators and the physics implementation lives in two separate files.
+The creation operators is defined within <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed.c"><code>swe/swe_ceed.c</code></a>, while
+the header file <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed_impl.h"><code>swe/swe_ceed_impl.h</code></a> defines the physics implementation.
+The header file defines inline <a href="https://libceed.org/en/latest/api/CeedQFunction/#ceedqfunction"><code>CeedQFunction</code></a>s
 that run on the device.</p>
-<p>We also implement a host-only version of the operators in <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_petsc.c"><code>swe/swe_petsc.c</code></a>,
-which we use mostly as a simple mechanism for troubleshoots our CEED
-implementation.</p>
-<p>We implement the following SWE operators:</p>
+</li>
+</ol>
+<p>For both PETSc and CEED version, we implement the following SWE operators:</p>
 <ul>
 <li>
 <p><strong>Riemann Flux operator</strong>: computes finite-volume fluxes between interior
-  cells and on the boundaries, according to specified boundary conditions</p>
+  cells and on the boundaries, according to specified boundary conditions.
+  In the CEED implementation, these two operators (for interior and boundary fluxes)
+  are combined into a <a href="https://libceed.org/en/latest/api/CeedOperator/#c.CeedCompositeOperatorCreate">composite operator</a>
+  that is called using in-place device data. In the PETSc version, these operators
+  are implemented by CPU code that is applied sequentially to relevant data.</p>
 </li>
 <li>
 <p><strong>Source operator</strong>: computes the source term for the shallow water equations</p>
 </li>
 </ul>
-<p>In the CEED implementation, these two operators are combined into a
-<a href="https://libceed.org/en/latest/api/CeedOperator/#c.CeedCompositeOperatorCreate">composite operator</a>
-that is called using in-place device data. In the PETSc version, these operators
-are implemented by CPU code that is applied sequentially to relevant data.</p>
+<h3 id="sediment-dynamics-operators">Sediment Dynamics operators</h3>
+<p>The sediment dynamics-specific code, which comparises of SWE coupled with advection-diffusion equation, lives within the
+<a href="https://github.com/RDycore/RDycore/blob/main/src/sediment/">sediment source subfolder</a>.
+Presently, only the PETSc version of the operator is implemented via <code>AddPetscSedimentOperators</code> that lives
+in <a href="https://github.com/RDycore/RDycore/blob/main/src/operator.c"><code>operator.c</code></a>.</p>
 <h2 id="input">Input</h2>
 <p>The parsing of input is dispatched from <a href="https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L244">RDySetup</a>
 and implemented in <a href="https://github.com/RDycore/RDycore/blob/main/src/yaml_input.c#L1173">ReadConfigFile</a>.
