@@ -10,8 +10,8 @@
 #include <private/rdymathimpl.h>
 #include <private/rdyoperatorimpl.h>
 
-// gravitational acceleration [m/s/s]
-static const PetscReal GRAVITY = 9.806;
+static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
+static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
 
 // NOTE: our boundary conditions are expressed in terms of momenta and not flow
 // velocities, so we have to chain together a few things to evaluate x and y
@@ -458,11 +458,13 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidy, N, cell_x, cell_y, time, dcidy));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidt, N, cell_x, cell_y, time, dcidt));
 
+      // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
+      // parameterization
       const PetscReal kp_constant             = 0.001;
       const PetscReal settling_velocity       = 0.01;
       const PetscReal tau_critical_erosion    = 0.1;
       const PetscReal tau_critical_deposition = 1000.0;
-      const PetscReal rhow                    = 1000.0;
+      const PetscReal rhow                    = DENSITY_OF_WATER;
 
       l = 0;
       for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {

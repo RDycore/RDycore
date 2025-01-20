@@ -5,8 +5,8 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
-// gravitational acceleration [m/s/s]
-static const PetscReal GRAVITY = 9.806;
+static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
+static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
 
 // riemann left and right states
 typedef struct {
@@ -26,7 +26,14 @@ typedef struct {
   PetscReal *amax;               // courant number on edges
 } SedimentRiemannEdgeData;
 
-static PetscErrorCode CreateSedimentRiemannStateData(PetscInt num_states, PetscInt num_flow_comp, PetscInt num_sediment_comp,
+/// @brief Allocates memory for prognostic (h/hu/hv/hci) and diagnostic (u/v/ci) variables stored at
+///        cell centers for sediment dynamics
+/// @param [in]  num_states        number of states
+/// @param [in]  num_flow_comp     number of components for the flow equation
+/// @param [in]  num_sediment_comp number of components for the sediment dynamics equation
+/// @param [out] *data             a SedimentRiemannStateData
+/// @return                        0 on success, or a non-zero error code on failure
+static PetscErrorCode CreateSedimentRiemannStateData(const PetscInt num_states, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
                                                      SedimentRiemannStateData *data) {
   PetscFunctionBegin;
 
@@ -46,6 +53,10 @@ static PetscErrorCode CreateSedimentRiemannStateData(PetscInt num_states, PetscI
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Deallocates memory for a struct that stores prognostic and diagnostic variables
+///        at cell centers
+/// @param [inout] data a SedimentRiemannStateData that deallocated
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode DestroySedimentRiemannStateData(SedimentRiemannStateData data) {
   PetscFunctionBegin;
 
@@ -63,6 +74,10 @@ static PetscErrorCode DestroySedimentRiemannStateData(SedimentRiemannStateData d
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Deallocates memory for a struct that stores diagnostic variables and geometric mesh
+///        attributes at cell edges
+/// @param [inout] data a SedimentRiemannEdgeData that deallocated
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode DestroySedimentRiemannEdgeData(SedimentRiemannEdgeData data) {
   PetscFunctionBegin;
 
@@ -78,6 +93,13 @@ static PetscErrorCode DestroySedimentRiemannEdgeData(SedimentRiemannEdgeData dat
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Allocates memory for diagnostic variables and geometric mesh attributes at cell edges
+///        cell centers for sediment dynamics
+/// @param [in]  num_edges         number of edges
+/// @param [in]  num_flow_comp     number of components for the flow equation
+/// @param [in]  num_sediment_comp number of components for the sediment dynamics equation
+/// @param [out] *data             a SedimentRiemannEdgeData
+/// @return                        0 on success, or a non-zero error code on failure
 static PetscErrorCode CreateSedimentRiemannEdgeData(PetscInt num_edges, PetscInt num_flow_comp, PetscInt num_sediment_comp,
                                                     SedimentRiemannEdgeData *data) {
   PetscFunctionBegin;
@@ -95,7 +117,11 @@ static PetscErrorCode CreateSedimentRiemannEdgeData(PetscInt num_edges, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(PetscReal tiny_h, SedimentRiemannStateData *data) {
+/// @brief Computes diagnostic variables (u/v/ci) from prognostic variables (h/hu/hv/hci)
+/// @param [in]  tiny_h  a height threshold for determining wet/dry cell
+/// @param [out] *data   a SedimentRiemannStateData
+/// @return              0 on success, or a non-zero error code on failure
+static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal tiny_h, SedimentRiemannStateData *data) {
   PetscFunctionBeginUser;
 
   PetscInt index;
@@ -122,6 +148,14 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(PetscReal tiny_h,
 
 #define MAX_NUM_SECTION_FIELD_COMPONENTS 10
 
+/// @brief Computes the flux for SWE and sediments across the edge using Roe's approximate Riemann solve
+/// @param [in] *datal A SedimentRiemannStateData for values left of the edges
+/// @param [in] *datar A SedimentRiemannStateData for values right of the edges
+/// @param [in] sn array containing sines of the angles between edges and y-axis
+/// @param [in] cn array containing cosines of the angles between edges and y-axis
+/// @param [out] fij array containing fluxes through edges
+/// @param [out] amax array storing maximum courant number on edges
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, SedimentRiemannStateData *datar, const PetscReal *sn,
                                              const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
@@ -282,6 +316,14 @@ typedef struct {
   OperatorDiagnostics     *diagnostics;   // courant number, etc
 } SedimentInteriorFluxOperator;
 
+/// @brief Computes the fluxes through the interior edges of mesh locally owned and
+///        adds contribution in f_global Vec.
+/// @param [in] context  a SedimentInteriorFluxOperator
+/// @param [in] fields   a PetscOperatorFields ! FIXME: Can possibly be deleted
+/// @param [in] dt       time step             ! FIXME: Can possibly be deleted
+/// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
+/// @param [in] f_global a Vec for storing RHS contrinution from interior edges
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
@@ -314,7 +356,7 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
   PetscCall(VecGetBlockSize(u_local, &n_dof));
   PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER, "Number of dof in local vector do not match flow and sediment dof!");
 
-  // Collect the h/hu/hv for left and right cells to compute u/v
+  // Collect the h/hu/hv/hci for left and right cells to compute u/v/ci
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
     PetscInt edge_id             = edges->internal_edge_ids[e];
     PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
@@ -336,6 +378,7 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
     }
   }
 
+  // compute diagnostic quantities
   const PetscReal tiny_h = interior_flux_op->tiny_h;
   PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datal));
   PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));
@@ -390,6 +433,9 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Deallocate memory
+/// @param context a SedimentInteriorFluxOperator struct
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode DestroySedimentInteriorFlux(void *context) {
   PetscFunctionBegin;
 
@@ -404,8 +450,16 @@ static PetscErrorCode DestroySedimentInteriorFlux(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, PetscInt num_flow_comp, PetscInt num_sediment_comp,
-                                                       OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
+/// @brief Creates an operator for computing fluxes through the interior edges.
+/// @param [in] mesh               a RDyMesh struct for the mesh
+/// @param [in] num_flow_comp      number of components in the flow equations
+/// @param [in] num_sediment_comp  number of components in the sediment dynamics equations
+/// @param [in] diagnostics        an OperatorDiagnostics struct
+/// @param [in] tiny_h             a height threshold for determining wet/dry cell
+/// @param [out] petsc_op          a PetscOperator struct that is created and returned
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
+                                                       OperatorDiagnostics *diagnostics, const PetscReal tiny_h, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   SedimentInteriorFluxOperator *interior_flux_op;
@@ -433,6 +487,7 @@ PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, PetscInt n
     }
   }
 
+  // create the interior operator
   PetscCall(PetscOperatorCreate(interior_flux_op, ApplySedimentInteriorFlux, DestroySedimentInteriorFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -457,6 +512,14 @@ typedef struct {
   PetscReal               *a_max;            // maximum courant number
 } SedimentBoundaryFluxOperator;
 
+/// @brief Sets values for the cells on the right of an edge, datar, based on values on the left of the
+///        edge, datal, and edge geometeric attributes for a reflective boundary condition.
+/// @param [in] mesh      a RDyMesh struct for the mesh
+/// @param [in] boundary  a RDyBoundary struct for the boundary
+/// @param [in] datal     a SedimentRiemannStateData that stores values for cells left of edges
+/// @param [out] datar    a SedimentRiemannStateData that stores values for cells right of edges
+/// @param [in] data_edge a SedimentRiemannEdgeData that has geometeric attributes about edges
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode ApplySedimentReflectingBC(RDyMesh *mesh, RDyBoundary boundary, SedimentRiemannStateData *datal, SedimentRiemannStateData *datar,
                                                 SedimentRiemannEdgeData *data_edge) {
   PetscFunctionBeginUser;
@@ -492,6 +555,14 @@ static PetscErrorCode ApplySedimentReflectingBC(RDyMesh *mesh, RDyBoundary bound
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Computes the fluxes through the boundary edges of mesh locally owned and
+///        adds contribution in f_global Vec.
+/// @param [in] context  a SedimentInteriorFluxOperator
+/// @param [in] fields   a PetscOperatorFields ! FIXME: Can possibly be deleted
+/// @param [in] dt       time step             ! FIXME: Can possibly be deleted
+/// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
+/// @param [in] f_global a Vec for storing RHS contrinution from interior edges
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
@@ -538,6 +609,7 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
     }
   }
 
+  // compute diagnostic quantities from prognostic variables
   const PetscReal tiny_h = boundary_flux_op->tiny_h;
   PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datal));
 
@@ -604,6 +676,9 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Deallocate memory
+/// @param context a DestroySedimentBoundaryFlux struct
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode DestroySedimentBoundaryFlux(void *context) {
   PetscFunctionBegin;
 
@@ -618,6 +693,18 @@ static PetscErrorCode DestroySedimentBoundaryFlux(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Creates an operator for computing fluxes through boundary edges.
+/// @param [in] mesh                a RDyMesh struct for the mesh
+/// @param [in] num_flow_comp       number of components in the flow equations
+/// @param [in] num_sediment_comp   number of components in the sediment dynamics equations
+/// @param [in] boundary            a RDyBoundary struct for the boundary edges
+/// @param [in] boundary_condition  a RDyCondition struct for all boundary conditions
+/// @param [in] boundary_values     a Vec containing values for the boundary conditions
+/// @param [in] boundary_fluxes     a Vec to accumulating boundary fluxes
+/// @param [in] diagnostics         an OperatorDiagnostics struct
+/// @param [in] tiny_h              a height threshold for determining wet/dry cell
+/// @param [out] petsc_op           a PetscOperator struct that is created and returned
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, PetscInt num_flow_comp, PetscInt num_sediment_comp, RDyBoundary boundary,
                                                        RDyCondition boundary_condition, Vec boundary_values, Vec boundary_fluxes,
                                                        OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
@@ -646,6 +733,8 @@ PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, PetscInt n
     boundary_flux_op->edges.cn[e] = edges->cn[edge_id];
     boundary_flux_op->edges.sn[e] = edges->sn[edge_id];
   }
+
+  // create the boundary operator
   PetscCall(PetscOperatorCreate(boundary_flux_op, ApplySedimentBoundaryFlux, DestroySedimentBoundaryFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -665,6 +754,14 @@ typedef struct {
   PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
 } SedimentSourceOperator;
 
+/// @brief Set the contribution of the source-term using the semi-implicit time integeration method
+///        for the friction term in SWE.
+/// @param [in] context  a SedimentInteriorFluxOperator
+/// @param [in] fields   a PetscOperatorFields
+/// @param [in] dt       time step
+/// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
+/// @param [in] f_global a Vec for storing RHS contrinution from interior edges
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
@@ -679,11 +776,13 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   PetscReal               tiny_h            = source_op->tiny_h;
   PetscInt                num_sediment_comp = source_op->num_sediment_comp;
 
+  // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
+  // parameterization
   const PetscReal kp_constant             = 0.001;
   const PetscReal settling_velocity       = 0.01;
   const PetscReal tau_critical_erosion    = 0.1;
   const PetscReal tau_critical_deposition = 1000.0;
-  const PetscReal rhow                    = 1000.0;
+  const PetscReal rhow                    = DENSITY_OF_WATER;
 
   // access Vec data
   PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
@@ -764,6 +863,9 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Deallocate memory
+/// @param context a SedimentSourceOperator struct
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode DestroySedimentSource(void *context) {
   PetscFunctionBegin;
   SedimentSourceOperator *source_op = context;
@@ -771,6 +873,17 @@ static PetscErrorCode DestroySedimentSource(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Creates an operator for computing source term contribution
+/// @param [in] mesh               a RDyMesh struct for the mesh
+/// @param [in] num_flow_comp      number of components in the flow equations
+/// @param [in] num_sediment_comp  number of components in the sediment dynamics equations
+/// @param [in] external_sources   a Vec containing source values for locally-owned cells
+/// @param [in] mannings           a Vec containing Manning roughness coefficient for SWE
+/// @param [in] method             an identifier for the type of time integration method
+/// @param [in] tiny_h             a height threshold for determining wet/dry cell
+/// @param [in] xq2018_threshold   threshold for the XQ2018 time integration method
+/// @param [out] petsc_op          a PetscOperator struct that is created and returned
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, PetscInt num_flow_comp, PetscInt num_sediment_comp, Vec external_sources,
                                                  Vec mannings, RDyFlowSourceMethod method, PetscReal tiny_h, PetscReal xq2018_threshold,
                                                  PetscOperator *petsc_op) {

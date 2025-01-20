@@ -235,6 +235,14 @@ static PetscErrorCode AddPetscFlowOperators(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Adds PETSc operator for solving sediment dynamic equations.
+///        - Two sub-operators are added to op->petsc.flux that compute
+///           1. Flux through interior edges, and
+///           2. Flux through boundary edges
+///        - One sub-operator to op->petsc.source for contribution the
+///          contribution of source terms.
+/// @param [inout] op  an Operator struct
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
   PetscFunctionBegin;
 
@@ -282,6 +290,9 @@ static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Adds physics-dependent PETSc operators
+/// @param [inout] op  an Operator struct
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode AddPetscOperators(Operator *op) {
   PetscFunctionBegin;
 
@@ -363,6 +374,7 @@ static PetscErrorCode AddPhysicsOperators(Operator *op) {
 /// @param [in]  boundaries          an array of distinct boundaries bounding the computational domain
 /// @param [in]  boundary_conditions an array of boundary conditions corresponding to the domain boundaries
 /// @param [out] op                  the newly created operator
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_comp, PetscInt num_regions, RDyRegion *regions,
                               PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions, Operator **operator) {
   PetscFunctionBegin;
@@ -543,6 +555,13 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief The two PETSc operators (flux and source) are applied to fill up the global
+///        right hand side of the discretized equation
+/// @param [in] op         an Operator struct
+/// @param [in] dt         the time step
+/// @param [in] u_local    the solution Vec containing locally-owned and ghost cells
+/// @param [out] f_global  the global right hand side Vec to be evaluated at time t
+/// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
