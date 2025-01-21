@@ -72,10 +72,16 @@ static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+// mapping of physics.flow fields to members of RDyPhysicsFlow
+static const cyaml_schema_field_t physics_sediment_fields_schema[] = {
+    CYAML_FIELD_INT("num_classes", CYAML_FLAG_DEFAULT, RDyPhysicsSD, num_classes),
+    CYAML_FIELD_END
+};
+
 // mapping of physics fields to members of RDyPhysicsSection
 static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
-    CYAML_FIELD_BOOL("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment),
+    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, physics_sediment_fields_schema),
     CYAML_FIELD_BOOL("salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity),
     CYAML_FIELD_END
 };
@@ -592,17 +598,17 @@ static const cyaml_schema_field_t mms_constants_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-static const cyaml_schema_field_t mms_swe_error_norms_fields_schema[] = {
-    CYAML_FIELD_FLOAT("L1", CYAML_FLAG_OPTIONAL, RDyMMSSWEErrorNorms, L1),
-    CYAML_FIELD_FLOAT("L2", CYAML_FLAG_OPTIONAL, RDyMMSSWEErrorNorms, L2),
-    CYAML_FIELD_FLOAT("Linf", CYAML_FLAG_OPTIONAL, RDyMMSSWEErrorNorms, Linf),
+static const cyaml_schema_field_t mms_error_norms_fields_schema[] = {
+    CYAML_FIELD_FLOAT("L1", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, L1),
+    CYAML_FIELD_FLOAT("L2", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, L2),
+    CYAML_FIELD_FLOAT("Linf", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, Linf),
     CYAML_FIELD_END
 };
 
 static const cyaml_schema_field_t mms_swe_convergence_rates_fields_schema[] = {
-    CYAML_FIELD_MAPPING("h", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, h, mms_swe_error_norms_fields_schema),
-    CYAML_FIELD_MAPPING("hu", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, hu, mms_swe_error_norms_fields_schema),
-    CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, hv, mms_swe_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("h", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, h, mms_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hu", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, hu, mms_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSSWEConvergenceRates, hv, mms_error_norms_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -635,9 +641,32 @@ static const cyaml_schema_field_t mms_swe_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_schema_field_t mms_sediment_convergence_rates_fields_schema[] = {
+    CYAML_FIELD_MAPPING("hci", CYAML_FLAG_OPTIONAL, RDyMMSSedimentConvergenceRates, hci, mms_error_norms_fields_schema),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t mms_sediment_convergence_fields_schema[] = {
+    CYAML_FIELD_INT("num_refinements", CYAML_FLAG_DEFAULT, RDyMMSSedimentConvergence, num_refinements),
+    CYAML_FIELD_INT("base_refinement", CYAML_FLAG_OPTIONAL, RDyMMSSedimentConvergence, base_refinement),
+    CYAML_FIELD_MAPPING("expected_rates", CYAML_FLAG_DEFAULT, RDyMMSSedimentConvergence,
+                        expected_rates, mms_sediment_convergence_rates_fields_schema),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_field_t mms_sediement_fields_schema[] = {
+    CYAML_FIELD_STRING("ci", CYAML_FLAG_DEFAULT, RDyMMSSedimentSolutions, expressions.ci, 1),
+    CYAML_FIELD_STRING("dcidx", CYAML_FLAG_DEFAULT, RDyMMSSedimentSolutions, expressions.dcidx, 1),
+    CYAML_FIELD_STRING("dcidy", CYAML_FLAG_DEFAULT, RDyMMSSedimentSolutions, expressions.dcidy, 1),
+    CYAML_FIELD_STRING("dcidt", CYAML_FLAG_DEFAULT, RDyMMSSedimentSolutions, expressions.dcidt, 1),
+    CYAML_FIELD_MAPPING("convergence", CYAML_FLAG_OPTIONAL, RDyMMSSedimentSolutions, convergence, mms_sediment_convergence_fields_schema),
+    CYAML_FIELD_END
+};
+
 static const cyaml_schema_field_t mms_fields_schema[] = {
     CYAML_FIELD_MAPPING("constants", CYAML_FLAG_OPTIONAL, RDyMMSSection, constants, mms_constants_fields_schema),
     CYAML_FIELD_MAPPING("swe", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_swe_fields_schema),
+    CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyMMSSection, sediment, mms_sediement_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -756,6 +785,7 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
     SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
   }
 
+  SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
   SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
   SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
@@ -892,6 +922,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
       PetscCheck(config->mms.swe.expressions.dvdt[0], comm, PETSC_ERR_USER, "No expression for dv/dt was specified!");
       PetscCheck(config->mms.swe.expressions.n[0], comm, PETSC_ERR_USER, "No expression for n was specified!");
     }
+    if (config->physics.sediment.num_classes) {
+      PetscCheck(config->mms.sediment.expressions.ci[0], comm, PETSC_ERR_USER, "No expression for ci was specified!");
+      PetscCheck(config->mms.sediment.expressions.dcidx[0], comm, PETSC_ERR_USER, "No expression for dci/dx was specified!");
+      PetscCheck(config->mms.sediment.expressions.dcidy[0], comm, PETSC_ERR_USER, "No expression for dci/dy was specified!");
+      PetscCheck(config->mms.sediment.expressions.dcidt[0], comm, PETSC_ERR_USER, "No expression for dci/dt was specified!");
+    }
   }
 
   // validate our flow conditions
@@ -910,7 +946,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   for (PetscInt i = 0; i < config->num_sediment_conditions; ++i) {
     const RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
     PetscCheck(sed_cond->type >= 0, comm, PETSC_ERR_USER, "Sediment condition type not set in sediment_conditions.%s", sed_cond->name);
-    PetscCheck(sed_cond->expression[0], comm, PETSC_ERR_USER, "Missing sediment concentration for sediment_conditions.%s", sed_cond->name);
+    PetscCheck(sed_cond->expression[0] || sed_cond->file[0], comm, PETSC_ERR_USER, "Missing sediment specification for sediment_conditions.%s",
+               sed_cond->name);
   }
 
   // validate salinity conditions
@@ -1023,6 +1060,20 @@ static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstan
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSedimentSolutions *sediment) {
+  PetscFunctionBegin;
+
+  // NOTE: you must define the relavent variables (e.g. x, y or x, y, t)
+  // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
+
+  DEFINE_FUNCTION(sediment, constants, ci);
+  DEFINE_FUNCTION(sediment, constants, dcidx);
+  DEFINE_FUNCTION(sediment, constants, dcidy);
+  DEFINE_FUNCTION(sediment, constants, dcidt);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // parses mathematical expressions given for manufactured solutions, material
 // properties, initial/boundary conditions, etc
 static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
@@ -1030,6 +1081,10 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
 
   if (config->mms.swe.expressions.h[0]) {
     PetscCall(ParseSWEManufacturedSolutions(comm, &config->mms.constants, &config->mms.swe));
+  }
+
+  if (config->mms.sediment.expressions.ci[0]) {
+    PetscCall(ParseSedimentManufacturedSolutions(comm, &config->mms.constants, &config->mms.sediment));
   }
 
   // material properties
@@ -1377,7 +1432,7 @@ static PetscErrorCode PrintPhysics(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Physics:");
   RDyLogDetail(rdy, "  Flow:");
-  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment));
+  RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment.num_classes > 0));
   RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

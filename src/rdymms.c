@@ -10,8 +10,8 @@
 #include <private/rdymathimpl.h>
 #include <private/rdyoperatorimpl.h>
 
-// gravitational acceleration [m/s/s]
-static const PetscReal GRAVITY = 9.806;
+static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
+static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
 
 // NOTE: our boundary conditions are expressed in terms of momenta and not flow
 // velocities, so we have to chain together a few things to evaluate x and y
@@ -33,6 +33,15 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
   RDyCondition analytic_bc = {
       .flow = &analytic_flow,
   };
+
+  if (rdy->config.physics.sediment.num_classes) {
+    static RDySedimentCondition analytic_sediment = {
+        .name = "analytic_sediment_bc",
+        .type = CONDITION_DIRICHLET,
+    };
+    analytic_sediment.concentration = rdy->config.mms.sediment.solutions.ci;
+    analytic_bc.sediment            = &analytic_sediment;
+  }
 
   // Assign the boundary condition to each boundary.
   PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundary_conditions));
@@ -126,38 +135,6 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode MMSPostStep(TS ts) {
-  PetscFunctionBegin;
-
-  RDy rdy;
-  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
-
-  PetscReal t;
-  PetscCall(TSGetTime(ts, &t));
-
-  // compute the error vector and stuff its components into diagnostic fields
-  Vec error;
-  PetscCall(RDyCreatePrognosticVec(rdy, &error));
-  PetscCall(RDyMMSComputeSolution(rdy, t, error));
-  PetscCall(VecAYPX(error, -1.0, rdy->u_global));
-
-  PetscInt         num_comp = rdy->soln_fields.num_field_components[0];
-  const PetscReal *error_ptr;
-  PetscReal       *diags_ptr;
-  PetscCall(VecGetArrayRead(error, &error_ptr));
-  PetscCall(VecGetArray(rdy->diags_vec, &diags_ptr));
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-      diags_ptr[num_comp * i + c] = error_ptr[num_comp * i + c];
-    }
-  }
-  PetscCall(VecRestoreArray(rdy->diags_vec, &diags_ptr));
-  PetscCall(VecRestoreArrayRead(error, &error_ptr));
-  PetscCall(VecDestroy(&error));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
 extern PetscErrorCode InitOperator(RDy rdy);
 extern PetscErrorCode InitSolver(RDy rdy);
@@ -195,17 +172,27 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating DMs...");
 
-  // create the primary DM that stores the mesh and solution vector
-  rdy->soln_fields = (SectionFieldSpec){
-      .num_fields            = 1,
-      .num_field_components  = {3},
-      .field_names           = {"solution"},
-      .field_component_names = {{
-          "Height",
-          "MomentumX",
-          "MomentumY",
-      }},
-  };
+  if (rdy->config.physics.sediment.num_classes == 0) {
+    rdy->soln_fields = (SectionFieldSpec){
+        .num_fields            = 1,
+        .num_field_components  = {3},
+        .field_names           = {"Solution"},
+        .field_component_names = {{
+            "Height",
+            "MomentumX",
+            "MomentumY",
+        }},
+    };
+  } else {
+    PetscCheck(rdy->config.physics.sediment.num_classes == 1, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only one sediment class is allowed.");
+    rdy->soln_fields = (SectionFieldSpec){
+        .num_fields            = 1,
+        .num_field_components  = {4},
+        .field_names           = {"Solution"},
+        .field_component_names = {{"Height", "MomentumX", "MomentumY", "Concentration"}},
+    };
+  }
+
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which contains error fields for each of the solution fields
@@ -218,6 +205,14 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
     sprintf(rdy->diag_fields.field_component_names[0][c], "%s error", rdy->soln_fields.field_component_names[0][c]);
   }
   PetscCall(CreateAuxiliaryDM(rdy));
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(CreateFlowDM(rdy));
+    PetscCall(CreateSedimentDM(rdy));
+  } else {
+    rdy->flow_fields = rdy->soln_fields;
+    rdy->flow_dm     = rdy->dm;
+  }
 
   // create global and local vectors
   PetscCall(CreateVectors(rdy));
@@ -244,7 +239,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
-  PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
@@ -267,6 +261,19 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
   PetscScalar *x_ptr;
   PetscCall(VecGetArray(solution, &x_ptr));
 
+  PetscInt flow_ndof;
+  switch (rdy->config.physics.flow.mode) {
+    case FLOW_SWE:
+      flow_ndof = 3;
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend code to support flow mode other than SWE");
+      break;
+  }
+
+  PetscInt sediment_ndof = rdy->config.physics.sediment.num_classes;
+  PetscCheck(sediment_ndof <= 1, rdy->comm, PETSC_ERR_USER, "MMS with sediments included only supported for when num_classes is 1");
+
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
 
@@ -286,7 +293,10 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
     }
 
     if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "SWE solution vector has %" PetscInt_FMT " DOF (should have 3)", ndof);
+      PetscCheck(ndof == flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
+                 "SWE solution vector has %" PetscInt_FMT " DOF that does not match the sum of flow_dof (%" PetscInt_FMT
+                 ") and sediment_dof (%" PetscInt_FMT ")",
+                 ndof, flow_ndof, sediment_ndof);
 
       // evaluate the manufactured ѕolutions at all (x, y, t)
       PetscReal *h, *u, *v;
@@ -296,22 +306,33 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
+      PetscReal *ci;
+      if (sediment_ndof == 1) {
+        PetscCall(PetscCalloc1(region.num_local_cells, &ci));
+        PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.ci, N, cell_x, cell_y, time, ci));
+      }
 
       // TODO: salinity and sediment initial conditions go here.
 
       PetscInt l = 0;
       for (PetscInt c = 0; c < region.num_local_cells; ++c) {
         PetscInt cell_id = region.cell_local_ids[c];
-        if (3 * cell_id < n_local) {  // skip ghost cells
-          x_ptr[3 * cell_id]     = h[l];
-          x_ptr[3 * cell_id + 1] = h[l] * u[l];
-          x_ptr[3 * cell_id + 2] = h[l] * v[l];
+        if (ndof * cell_id < n_local) {  // skip ghost cells
+          x_ptr[ndof * cell_id]     = h[l];
+          x_ptr[ndof * cell_id + 1] = h[l] * u[l];
+          x_ptr[ndof * cell_id + 2] = h[l] * v[l];
+          if (sediment_ndof == 1) {
+            x_ptr[ndof * cell_id + 3] = h[l] * ci[l];
+          }
           ++l;
         }
       }
       PetscCall(PetscFree(h));
       PetscCall(PetscFree(u));
       PetscCall(PetscFree(v));
+      if (sediment_ndof == 1) {
+        PetscCall(PetscFree(ci));
+      }
     }
     PetscCall(PetscFree(cell_x));
     PetscCall(PetscFree(cell_y));
@@ -419,6 +440,57 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
     PetscCall(RDySetRegionalXMomentumSource(rdy, 0, N, hu_source));
     PetscCall(RDySetRegionalYMomentumSource(rdy, 0, N, hv_source));
 
+    if (rdy->config.physics.sediment.num_classes) {
+      PetscCheck(rdy->config.physics.sediment.num_classes == 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
+                 "Setting of source term only supported when num. of sediment class is one.");
+
+      PetscReal *ci, *dcidx, *dcidy, *dcidt;
+      PetscReal *hci_source;
+
+      PetscCall(PetscCalloc1(N, &ci));
+      PetscCall(PetscCalloc1(N, &dcidx));
+      PetscCall(PetscCalloc1(N, &dcidy));
+      PetscCall(PetscCalloc1(N, &dcidt));
+      PetscCall(PetscCalloc1(N, &hci_source));
+
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.ci, N, cell_x, cell_y, time, ci));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidx, N, cell_x, cell_y, time, dcidx));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidy, N, cell_x, cell_y, time, dcidy));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.sediment.solutions.dcidt, N, cell_x, cell_y, time, dcidt));
+
+      // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
+      // parameterization
+      const PetscReal kp_constant             = 0.001;
+      const PetscReal settling_velocity       = 0.01;
+      const PetscReal tau_critical_erosion    = 0.1;
+      const PetscReal tau_critical_deposition = 1000.0;
+      const PetscReal rhow                    = DENSITY_OF_WATER;
+
+      l = 0;
+      for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+        if (cells->is_owned[icell]) {
+          hci_source[l] = ci[l] * dhdt[l] + h[l] * dcidt[l];
+          hci_source[l] += u[l] * ci[l] * dhdx[l] + h[l] * ci[l] * dudx[l] + u[l] * h[l] * dcidx[l];
+          hci_source[l] += v[l] * ci[l] * dhdy[l] + h[l] * ci[l] * dvdy[l] + v[l] * h[l] * dcidy[l];
+
+          PetscReal Cd    = GRAVITY * Square(n[l]) * PetscPowReal(h[l], -1.0 / 3.0);
+          PetscReal tau_b = 0.5 * rhow * Cd * (Square(u[l]) + Square(v[l]));
+          PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
+          PetscReal di    = settling_velocity * ci[l] * (1.0 - tau_b / tau_critical_deposition);
+          hci_source[l] += -(ei - di);
+          ++l;
+        }
+      }
+
+      PetscCall(RDySetRegionalSedimentSource(rdy, 0, N, hci_source));
+
+      PetscCall(PetscFree(ci));
+      PetscCall(PetscFree(dcidx));
+      PetscCall(PetscFree(dcidy));
+      PetscCall(PetscFree(dcidt));
+      PetscCall(PetscFree(hci_source));
+    }
+
     PetscCall(PetscFree(h));
     PetscCall(PetscFree(u));
     PetscCall(PetscFree(v));
@@ -483,7 +555,26 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       boundary_values[3 * e + 1] = h[e] * u[e];
       boundary_values[3 * e + 2] = h[e] * v[e];
     }
-    PetscCall(RDySetDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+    PetscCall(RDySetFlowDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
+
+    if (rdy->config.physics.sediment.num_classes) {
+      RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment;
+
+      PetscReal *ci;
+      PetscCall(PetscCalloc1(num_edges, &ci));
+      PetscCall(EvaluateTemporalSolution(sediment_bc->concentration, num_edges, x, y, time, ci));
+
+      PetscReal *sediment_boundary_values;
+      PetscCall(PetscCalloc1(1 * num_edges, &sediment_boundary_values));
+      for (PetscInt e = 0; e < num_edges; ++e) {
+        sediment_boundary_values[e] = h[e] * ci[e];
+      }
+
+      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, 1, sediment_boundary_values));
+
+      PetscCall(PetscFree(ci));
+      PetscCall(PetscFree(sediment_boundary_values));
+    }
 
     PetscCall(PetscFree(x));
     PetscCall(PetscFree(y));
@@ -504,6 +595,8 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
   // initialize the material properties on each region
   PetscInt n_local;
   PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
 
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion region = rdy->regions[r];
@@ -516,7 +609,7 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
     PetscInt N = 0;  // number of bulk evaluations
     for (PetscInt c = 0; c < region.num_local_cells; ++c) {
       PetscInt cell_id = region.cell_local_ids[c];
-      if (3 * cell_id < n_local) {
+      if (ndof * cell_id < n_local) {
         cell_x[N] = rdy->mesh.cells.centroids[cell_id].X[0];
         cell_y[N] = rdy->mesh.cells.centroids[cell_id].X[1];
         ++N;
@@ -629,11 +722,17 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
              MAX_NUM_REFINEMENTS);
 
   // error norm storage
-#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only
+#define MAX_NUM_COMPONENTS 4  // FIXME: SWE + 1 sediment class only
   int       num_comps = MAX_NUM_COMPONENTS;
   PetscReal L1_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS],
       Linf_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS];
-  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
+  const char *comp_names[MAX_NUM_COMPONENTS] = {" h ", "hu ", "hv ", "hci"};
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCheck(rdy->config.physics.sediment.num_classes == 1, rdy->comm, PETSC_ERR_USER,
+               "MMS with sediments is only supported for when num_classes is 1");
+    num_comps = 4;
+  }
 
   // create refined RDy objects and set them up (dumb, but easy)
   RDy rdys[MAX_NUM_REFINEMENTS + 1];
@@ -705,11 +804,17 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
             rdy->config.mms.swe.convergence.expected_rates.comp.norm);                                                                      \
   }
 
+#define CheckSedimentConvergence(comp, comp_index, norm)                                                                                    \
+  if (norm##_conv_rates[comp_index] <= rdy->config.mms.sediment.convergence.expected_rates.comp.norm) {                                     \
+    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, #comp, norm##_conv_rates[comp_index], \
+            rdy->config.mms.sediment.convergence.expected_rates.comp.norm);                                                                 \
+  }
+
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
-#define MAX_NUM_COMPONENTS 3  // FIXME: SWE only!
-  const char *comp_names[MAX_NUM_COMPONENTS] = {" h", "hu", "hv"};
+#define MAX_NUM_COMPONENTS 4  // FIXME: SWE + 1 sediment clanss only!
+  const char *comp_names[MAX_NUM_COMPONENTS] = {" h ", "hu ", "hv ", "hci"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
     PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
     // run a convergence study
@@ -731,6 +836,14 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, L1);
     CheckConvergence(hv, 2, L2);
     CheckConvergence(hv, 2, Linf);
+
+    if (rdy->config.physics.sediment.num_classes) {
+      PetscCheck(rdy->config.physics.sediment.num_classes == 1, rdy->comm, PETSC_ERR_USER,
+                 "MMS CheckConvergence for sediments only supports num_classes is 1");
+      CheckSedimentConvergence(hci, 3, L1);
+      CheckSedimentConvergence(hci, 3, L2);
+      CheckSedimentConvergence(hci, 3, Linf);
+    }
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
     PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];

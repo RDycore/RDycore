@@ -596,7 +596,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
                "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
     ic->flow = flow_cond;
 
-    if (rdy->config.physics.sediment) {
+    if (rdy->config.physics.sediment.num_classes) {
       PetscCheck(strlen(ic_spec.sediment), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial sediment condition!", region.name);
       PetscInt sed_index;
       PetscCall(FindSedimentCondition(rdy, ic_spec.sediment, &sed_index));
@@ -653,7 +653,7 @@ static PetscErrorCode InitSources(RDy rdy) {
           src->flow = flow_cond;
         }
 
-        if (rdy->config.physics.sediment && strlen(src_spec.sediment)) {
+        if (rdy->config.physics.sediment.num_classes && strlen(src_spec.sediment)) {
           PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for sediments.");
         }
         if (rdy->config.physics.salinity && strlen(src_spec.salinity)) {
@@ -716,7 +716,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
         bc->flow = &rdy->config.flow_conditions[flow_index];
       }
 
-      if (rdy->config.physics.sediment) {
+      if (rdy->config.physics.sediment.num_classes) {
         PetscCheck(strlen(bc_spec.sediment), rdy->comm, PETSC_ERR_USER, "Boundary '%s' has no sediment boundary condition!", boundary.name);
         PetscInt sed_index;
         PetscCall(FindSedimentCondition(rdy, bc_spec.sediment, &sed_index));
@@ -741,10 +741,10 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 
 // initializes solution vector data
 //   unsafe for refinement if file is given with initial conditions
-static PetscErrorCode InitSolution(RDy rdy) {
+static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->u_global));
+  PetscCall(VecZeroEntries(rdy->flow_u_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -755,10 +755,10 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
+  PetscCall(VecGetLocalSize(rdy->flow_u_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->flow_u_global, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->u_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->flow_u_global, &u_ptr));
 
   // initialize flow conditions
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
@@ -769,9 +769,9 @@ static PetscErrorCode InitSolution(RDy rdy) {
       PetscCall(PetscViewerBinaryOpen(rdy->comm, flow_ic.file, FILE_MODE_READ, &viewer));
 
       Vec natural, global;
-      PetscCall(DMPlexCreateNaturalVector(rdy->dm, &natural));
-      PetscCall(DMCreateGlobalVector(rdy->dm, &global));
-      PetscCall(DMCreateLocalVector(rdy->dm, &local));
+      PetscCall(DMPlexCreateNaturalVector(rdy->flow_dm, &natural));
+      PetscCall(DMCreateGlobalVector(rdy->flow_dm, &global));
+      PetscCall(DMCreateLocalVector(rdy->flow_dm, &local));
 
       PetscCall(VecLoad(natural, viewer));
       PetscCall(PetscViewerDestroy(&viewer));
@@ -786,12 +786,12 @@ static PetscErrorCode InitSolution(RDy rdy) {
                  nblocks_nat, ndof);
 
       // scatter natural-to-global
-      PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm, natural, global));
-      PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalBegin(rdy->flow_dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalEnd(rdy->flow_dm, natural, global));
 
       // scatter global-to-local
-      PetscCall(DMGlobalToLocalBegin(rdy->dm, global, INSERT_VALUES, local));
-      PetscCall(DMGlobalToLocalEnd(rdy->dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalBegin(rdy->flow_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalEnd(rdy->flow_dm, global, INSERT_VALUES, local));
 
       // free up memory
       PetscCall(VecDestroy(&natural));
@@ -832,7 +832,139 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
   // TODO: salinity and sediment initial conditions go here.
 
-  PetscCall(VecRestoreArray(rdy->u_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->flow_u_global, &u_ptr));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// initializes solution vector data
+//   unsafe for refinement if file is given with initial conditions
+static PetscErrorCode InitSedimentSolution(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(VecZeroEntries(rdy->sediment_u_global));
+
+  // check that each region has an initial condition
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion    region = rdy->regions[r];
+    RDyCondition ic     = rdy->initial_conditions[r];
+    PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER, "No initial condition specified for region '%s'", region.name);
+  }
+
+  // now initialize or override initial conditions for each region
+  PetscInt n_local, ndof;
+  PetscCall(VecGetLocalSize(rdy->sediment_u_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->sediment_u_global, &ndof));
+  PetscScalar *u_ptr;
+  PetscCall(VecGetArray(rdy->sediment_u_global, &u_ptr));
+
+  // initialize sediment conditions
+  for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
+    RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
+    Vec                  local       = NULL;
+    if (sediment_ic.file[0]) {  // read sediment data from file
+      PetscViewer viewer;
+      PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.file, FILE_MODE_READ, &viewer));
+
+      Vec natural, global;
+      PetscCall(DMPlexCreateNaturalVector(rdy->sediment_dm, &natural));
+      PetscCall(DMCreateGlobalVector(rdy->sediment_dm, &global));
+      PetscCall(DMCreateLocalVector(rdy->sediment_dm, &local));
+
+      PetscCall(VecLoad(natural, viewer));
+      PetscCall(PetscViewerDestroy(&viewer));
+
+      // check the block size of the initial condition vector agrees with the block size of rdy->u_global
+      PetscInt nblocks_nat;
+      PetscCall(VecGetBlockSize(natural, &nblocks_nat));
+      PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
+                 "The block size of the initial condition ('%" PetscInt_FMT
+                 "') "
+                 "does not match with the number of DOFs ('%" PetscInt_FMT "')",
+                 nblocks_nat, ndof);
+
+      // scatter natural-to-global
+      PetscCall(DMPlexNaturalToGlobalBegin(rdy->sediment_dm, natural, global));
+      PetscCall(DMPlexNaturalToGlobalEnd(rdy->sediment_dm, natural, global));
+
+      // scatter global-to-local
+      PetscCall(DMGlobalToLocalBegin(rdy->sediment_dm, global, INSERT_VALUES, local));
+      PetscCall(DMGlobalToLocalEnd(rdy->sediment_dm, global, INSERT_VALUES, local));
+
+      // free up memory
+      PetscCall(VecDestroy(&natural));
+      PetscCall(VecDestroy(&global));
+    }
+
+    // set regional sediment as needed
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyRegion    region = rdy->regions[r];
+      RDyCondition ic     = rdy->initial_conditions[r];
+      if (!strcmp(ic.sediment->name, sediment_ic.name)) {
+        if (local) {
+          PetscScalar *local_ptr;
+          PetscCall(VecGetArray(local, &local_ptr));
+          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+            PetscInt cell_local_id = region.cell_local_ids[c];
+            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+            if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
+              for (PetscInt idof = 0; idof < ndof; idof++) {
+                u_ptr[ndof * owned_cell_id + idof] = local_ptr[ndof * cell_local_id + idof];
+              }
+            }
+          }
+          PetscCall(VecRestoreArray(local, &local_ptr));
+          PetscCall(VecDestroy(&local));
+        } else {
+          for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+            PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
+            u_ptr[ndof * owned_cell_id] = mupEval(sediment_ic.concentration);
+          }
+        }
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(rdy->sediment_u_global, &u_ptr));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt flow_ndof, sediment_ndof, soln_ndof, diags_ndof;
+
+  PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
+  PetscCall(VecGetBlockSize(rdy->sediment_u_global, &sediment_ndof));
+  PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
+  PetscCall(VecGetBlockSize(rdy->diags_vec, &diags_ndof));
+
+  PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
+             "Blocksize of flow (=%d) and sediment (=%d) Vec do not sum to blocksize of solution (=%d) Vec", flow_ndof, sediment_ndof, soln_ndof);
+
+  // first, copy flow Vec into solution Vec
+  for (PetscInt i = 0; i < flow_ndof; i++) {
+    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->diags_vec, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->diags_vec, i, rdy->u_global, INSERT_VALUES));
+  }
+
+  // next, copy sediment Vec into solution Vec
+  for (PetscInt i = 0; i < sediment_ndof; i++) {
+    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->diags_vec, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->diags_vec, flow_ndof + i, rdy->u_global, INSERT_VALUES));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode InitSolution(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(InitFlowSolution(rdy));
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(InitSedimentSolution(rdy));
+    PetscCall(InitFlowAndSedimentSolution(rdy));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -840,7 +972,10 @@ static PetscErrorCode InitSolution(RDy rdy) {
 PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateOperator(&rdy->config, rdy->dm, &rdy->mesh, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries,
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
+
+  PetscCall(CreateOperator(&rdy->config, rdy->dm, &rdy->mesh, ndof, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries,
                            rdy->boundary_conditions, &rdy->operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -968,7 +1103,7 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
           boundary_values[3 * e + 1] = mupEval(flow_bc->x_momentum);
           boundary_values[3 * e + 2] = mupEval(flow_bc->y_momentum);
         }
-        PetscCall(RDySetDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
+        PetscCall(RDySetFlowDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
         break;
       case CONDITION_REFLECTING:
         break;
@@ -1096,16 +1231,27 @@ PetscErrorCode RDySetup(RDy rdy) {
   RDyLogDebug(rdy, "Creating DMs...");
 
   // create the primary DM that stores the mesh and solution vector
-  rdy->soln_fields = (SectionFieldSpec){
-      .num_fields            = 1,
-      .num_field_components  = {3},
-      .field_names           = {"Solution"},
-      .field_component_names = {{
-          "Height",
-          "MomentumX",
-          "MomentumY",
-      }},
-  };
+  if (rdy->config.physics.sediment.num_classes == 0) {
+    rdy->soln_fields = (SectionFieldSpec){
+        .num_fields            = 1,
+        .num_field_components  = {3},
+        .field_names           = {"Solution"},
+        .field_component_names = {{
+            "Height",
+            "MomentumX",
+            "MomentumY",
+        }},
+    };
+  } else {
+    PetscCheck(rdy->config.physics.sediment.num_classes == 1, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only one sediment class is allowed.");
+    rdy->soln_fields = (SectionFieldSpec){
+        .num_fields            = 1,
+        .num_field_components  = {4},
+        .field_names           = {"Solution"},
+        .field_component_names = {{"Height", "MomentumX", "MomentumY", "Concentration"}},
+    };
+  }
+
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which handles diagnostics and I/O
@@ -1115,6 +1261,16 @@ PetscErrorCode RDySetup(RDy rdy) {
       .field_names          = {"Parameter"},
   };
   PetscCall(CreateAuxiliaryDM(rdy));
+
+  PetscCall(CreateFlowDM(rdy));
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(CreateFlowDM(rdy));
+    PetscCall(CreateSedimentDM(rdy));
+  } else {
+    rdy->flow_fields = rdy->soln_fields;
+    rdy->flow_dm     = rdy->dm;
+  }
 
   // create global and local vectors
   PetscCall(CreateVectors(rdy));
