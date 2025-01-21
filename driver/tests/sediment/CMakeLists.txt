@@ -27,7 +27,7 @@ file(COPY
      ${MATERIALS_DIR}/manning_grid5x10.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 2) # test on 1, 2 processes
-  foreach(config basic)
+  foreach(config basic ceed)
     foreach(lang c f90)
       add_test(sediment_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} sediment.yaml ${${config}_args})
     endforeach()
@@ -42,7 +42,7 @@ file(COPY
      ${MATERIALS_DIR}/manning_grid5x10.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 2) # test on 1, 2 processes
-  foreach(config basic)
+  foreach(config basic ceed)
     foreach(lang c)
       add_test(sediment_ic_file${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} sediment_ic_file.yaml ${${config}_args})
     endforeach()
