@@ -239,7 +239,7 @@ implement its operations.
 
 ### Overview
 
-We have two types version in RDycore:
+RDycore uses two different but numerically equivalent technical approaches for solving its governing equations:
 
 1. A CPU-only version that uses PETSc. We refer to this version as the *PETSc version*.
 2. A CPU and GPU supported version that uses PETSc and CEED. We refer to this version as the *CEED version*.

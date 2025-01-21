@@ -722,7 +722,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
              MAX_NUM_REFINEMENTS);
 
   // error norm storage
-#define MAX_NUM_COMPONENTS 4  // FIXME: SWE only
+#define MAX_NUM_COMPONENTS 4  // FIXME: SWE + 1 sediment class only
   int       num_comps = MAX_NUM_COMPONENTS;
   PetscReal L1_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS],
       Linf_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS];
@@ -813,7 +813,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
-#define MAX_NUM_COMPONENTS 4  // FIXME: SWE only!
+#define MAX_NUM_COMPONENTS 4  // FIXME: SWE + 1 sediment clanss only!
   const char *comp_names[MAX_NUM_COMPONENTS] = {" h ", "hu ", "hv ", "hci"};
   if (rdy->config.mms.swe.convergence.num_refinements) {
     PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
