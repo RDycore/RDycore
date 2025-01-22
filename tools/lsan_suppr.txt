@@ -1,0 +1,9 @@
+# This file catalogs memory leaks identified by LeakSanitizer that we wish to
+# disregard.
+
+# we don't take responsibility for PETSc...
+leak:libpetsc.so
+# ... or hwloc...
+leak:hwloc_topology_load
+# ... or MPI...
+leak:libmpi.so

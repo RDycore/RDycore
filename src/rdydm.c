@@ -180,7 +180,7 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
 
   sprintf(rdy->sediment_fields.field_names[0], "Sediments");
   for (PetscInt i = 0; i < num_sediment_class; i++) {
-    sprintf(rdy->sediment_fields.field_component_names[0][i], "Class_%d", i);
+    sprintf(rdy->sediment_fields.field_component_names[0][i], "Class_%" PetscInt_FMT, i);
   }
 
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sediment_fields, &rdy->sediment_dm));
