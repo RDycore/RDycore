@@ -15,6 +15,8 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
+    env:
+      LSAN_OPTIONS: suppressions=tools/lsan_suppr.txt,exitcode=0
 
     # A build matrix storing all desired configurations.
     strategy:
@@ -38,6 +40,7 @@ jobs:
         cmake -S . -B build \
         -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
         -DENABLE_COVERAGE=ON \
+        -DENABLE_SANITIZERS=ON \
         -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Building RDycore (${{ matrix.build-type }})
