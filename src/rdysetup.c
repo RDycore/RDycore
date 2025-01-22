@@ -939,7 +939,7 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
   PetscCall(VecGetBlockSize(rdy->diags_vec, &diags_ndof));
 
   PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
-             "Blocksize of flow (=%d) and sediment (=%d) Vec do not sum to blocksize of solution (=%d) Vec", flow_ndof, sediment_ndof, soln_ndof);
+             "Blocksize of flow (=%" PetscInt_FMT ") and sediment (=%" PetscInt_FMT ") Vec do not sum to blocksize of solution (=%" PetscInt_FMT ") Vec", flow_ndof, sediment_ndof, soln_ndof);
 
   // first, copy flow Vec into solution Vec
   for (PetscInt i = 0; i < flow_ndof; i++) {
