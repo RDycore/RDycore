@@ -35,6 +35,8 @@ typedef struct SedimentState_ SedimentState;
 
 #define MAX_NUM_SECTION_FIELD_COMPONENTS 10
 
+/// computes the flux across an edge using Roe's approximate Riemann solver
+/// for flow and sediment transport
 CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SedimentState qL, SedimentState qR,
                                                    CeedScalar sn, CeedScalar cn, CeedInt sed_ncomp, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar sqrt_gravity = sqrt(gravity);
@@ -157,7 +159,7 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-// sediment interior flux operator Q-function
+// flow and sediment flux operator Q-function for interior edges
 CEED_QFUNCTION(SedimentFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -194,7 +196,7 @@ CEED_QFUNCTION(SedimentFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const i
   return 0;
 }
 
-// SWE boundary flux operator Q-function (Dirichlet condition)
+// flow and sediment flux operator Q-function for boundary edges on which dirichlet condition is applied
 CEED_QFUNCTION(SedimentBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -228,7 +230,7 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const C
   return 0;
 }
 
-// SWE boundary flux operator Q-function (reflecting condition)
+// flow and sediment flux operator Q-function for boundary edges on which reflecting wall condition is applied
 CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
@@ -262,7 +264,7 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const 
   return 0;
 }
 
-// SWE regional source operator Q-function
+// flow and sediment regional source operator Q-function
 CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
   const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)

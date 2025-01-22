@@ -72,6 +72,13 @@ static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const PetscReal 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
+/// @brief Creates a CEED operator for solving flow and sediment dynamics equation for interior edges
+/// @param [in] mesh               a RDymesh struct for the mesh
+/// @param [in] num_flow_comp      number of components for the flow problem
+/// @param [in] num_sediment_comp  number of components for the sediment dynamics problem. Currently only one component is supported.
+/// @param [in] tiny_h             the water height below which dry conditions are assumed
+/// @param [out] ceed_op           a CeedOperator that is created and returned
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
                                                       const PetscReal tiny_h, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
@@ -202,6 +209,15 @@ PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const Petsc
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
+/// @brief Creates a CEED operator for solving flow and sediment dynamics equation for a set of boundary edges
+/// @param [in] mesh               a RDymesh struct for the mesh
+/// @param [in] num_flow_comp      number of components for the flow problem
+/// @param [in] num_sediment_comp  number of components for the sediment dynamics problem. Currently only one component is supported.
+/// @param boundary                a RDyBoundary struct describing the boundary on which the boundary condition is applied
+/// @param boundary_condition      a RDyCondition describing the type of boundary condition
+/// @param [in] tiny_h             the water height below which dry conditions are assumed
+/// @param [out] ceed_op           a CeedOperator that is created and returned
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
                                                       RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
                                                       CeedOperator *ceed_op) {
@@ -363,6 +379,15 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const Petsc
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
+/// @brief Creates a CEED operator for solving flow and sediment dynamics equation for the source-sink term
+/// @param [in] mesh               a RDymesh struct for the mesh
+/// @param [in] num_flow_comp      number of components for the flow problem
+/// @param [in] num_sediment_comp  number of components for the sediment dynamics problem. Currently only one component is supported.
+/// @param [in]  method            type of temporal method used for discretizing the friction source term
+/// @param [in] tiny_h             the water height below which dry conditions are assumed
+/// @param xq2018_threshold        the threshold use of the XL2018 implicit temporal method
+/// @param [out] ceed_op           a CeedOperator that is created and returned
+/// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, PetscInt num_flow_comp, const PetscInt num_sediment_comp, RDyFlowSourceMethod method,
                                                 PetscReal tiny_h, PetscReal xq2018_threshold, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
