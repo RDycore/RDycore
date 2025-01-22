@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
     env:
-      LSAN_OPTIONS: suppressions=tools/lsan_suppr.txt,exitcode=0
+      ASAN_OPTIONS: detect_leaks=0
 
     # A build matrix storing all desired configurations.
     strategy:

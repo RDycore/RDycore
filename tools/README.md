@@ -10,5 +10,4 @@ development. Here's a brief rundown of the contents of this directory.
 * `Dockerfile.petsc` - a set of instructions for constructing the Docker image
   containing PETSc, used by `build-petsc-docker-image.sh
 * `lsan_suppr.txt` - A [LeakSanitizer suppression file](https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#suppressions)
-  that RDycore uses with its sanitizer-enabled tests in our GitHub Actions CI
-  environment.
+  that RDycore can use to detect memory leaks without extra noise
