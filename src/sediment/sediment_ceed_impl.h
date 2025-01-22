@@ -251,7 +251,7 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const 
       CeedScalar    dum1 = sn * sn - cn * cn;
       CeedScalar    dum2 = 2.0 * sn * cn;
       SedimentState qR   = {qL.h, qL.hu * dum1 - qL.hv * dum2, -qL.hu * dum2 - qL.hv * dum1, qL.hci};
-      CeedScalar    flux[3], amax;
+      CeedScalar    flux[ndof_total], amax;
       SedimentRiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, ndof_sediment, flux, &amax);
       for (CeedInt j = 0; j < ndof_total; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
