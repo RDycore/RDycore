@@ -14,6 +14,7 @@ set(RDYCORE_C_SOURCE_FILES
   swe/swe_petsc.c
   swe/swe_ceed.c
   sediment/sediment_petsc.c
+  sediment/sediment_ceed.c
   time_series.c
   xdmf_output.c
   yaml_input.c
