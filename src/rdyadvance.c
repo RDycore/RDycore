@@ -137,7 +137,7 @@ PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X
   PetscFunctionBegin;
   RDy rdy = ctx;
   if (step % rdy->config.output.step_interval == 0) {
-    static const char *formats[3] = {"binary", "XDMF", "CGNS"};
+    static const char *formats[4] = {"none", "binary", "XDMF", "CGNS"};
     const char        *format     = formats[rdy->config.output.format];
     const char        *units      = TimeUnitAsString(rdy->config.time.unit);
     RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing %s output at t = %g %s", step, format, time, units);
