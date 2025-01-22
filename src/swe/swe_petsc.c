@@ -670,7 +670,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
         PetscReal v = hv / h;
 
         // Manning's coefficient
-        PetscReal N_mannings = mannings_ptr[c];
+        PetscReal N_mannings = mannings_ptr[owned_cell_id];
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
