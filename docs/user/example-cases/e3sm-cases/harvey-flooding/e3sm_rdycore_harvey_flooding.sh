@@ -57,7 +57,7 @@ elif [ "$rainfall_dataset" = "imerg" ]; then
 elif [ "$rainfall_dataset" = "mrms" ]; then
     supported_dataset=1
 elif [ "$rainfall_dataset" = "mswep" ]; then
-    rainfall_dataset=1
+    supported_dataset=1
 elif [ "$rainfall_dataset" = "nldas" ]; then
     supported_dataset=1
 fi
