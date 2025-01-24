@@ -3,12 +3,16 @@
 # location of built driver executables
 set(rdycore_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore)
 set(mms_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_mms)
+set(amr_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_amr)
 
 set(rdycore_f90_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_f90)
 set(mms_f90_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_mms_f90)
 
 add_test(c_driver_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_driver})
 add_test(f90_driver_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_f90_driver})
+
+# sediment dynamics
+add_subdirectory(amr)
 
 # shallow water equations with roe riemann solver
 add_subdirectory(swe_roe)
