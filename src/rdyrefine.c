@@ -95,15 +95,14 @@ PetscErrorCode RDyRefine(RDy rdy) {
   DMLabel  label;
 
   PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &cStart, &cEnd));
-  PetscCall(DMCreateLabel(rdy->dm, "adapt"));
-  PetscCall(DMGetLabel(rdy->dm, "adapt", &label));
+  PetscCall(DMLabelCreate(PETSC_COMM_SELF, "adapt", &label));
   for (PetscInt c = cStart; c < cEnd; c++) {
     PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
   }
 
   // create a refined DM
   DM dm_fine;
-  PetscCall(DMRefine(rdy->dm, PETSC_COMM_WORLD, &dm_fine));
+  PetscCall(DMAdaptLabel(rdy->dm, label, &dm_fine));
   PetscCall(DMCopyDisc(rdy->dm, dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
 
