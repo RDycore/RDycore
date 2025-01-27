@@ -106,6 +106,47 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(DMCopyDisc(rdy->dm, dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
 
+  {
+    PetscSection sec;
+    PetscCall(DMGetLocalSection(rdy->dm, &sec));
+    PetscInt nfields;
+    PetscSectionGetNumFields(sec, &nfields);
+    printf("++++++++++++++++++++++++++++++++++++\n");
+    printf("About coarse DM: \n");
+    printf("nfields = %d\n", nfields);
+    for (PetscInt f = 0; f < nfields; f++) {
+      PetscInt ncomp;
+      PetscCall(PetscSectionGetFieldComponents(sec, f, &ncomp));
+      printf("  field = %d; num_component = %d\n", f, ncomp);
+      for (PetscInt c = 0; c < ncomp; c++) {
+        const char *comp_name;
+        PetscSectionGetComponentName(sec, f, c, &comp_name);
+        printf("    field = %d; component = %d; comp_name = %s\n", f, c, comp_name);
+      }
+    }
+  }
+
+  {
+    PetscSection sec;
+    PetscCall(DMGetLocalSection(dm_fine, &sec));
+    PetscInt nfields;
+    PetscSectionGetNumFields(sec, &nfields);
+    printf("++++++++++++++++++++++++++++++++++++\n");
+    printf("About refined DM: \n");
+    printf("nfields = %d\n", nfields);
+    for (PetscInt f = 0; f < nfields; f++) {
+      PetscInt ncomp;
+      PetscCall(PetscSectionGetFieldComponents(sec, f, &ncomp));
+      printf("  field = %d; num_component = %d\n", f, ncomp);
+      for (PetscInt c = 0; c < ncomp; c++) {
+        const char *comp_name;
+        PetscSectionGetComponentName(sec, f, c, &comp_name);
+        printf("    field = %d; component = %d; comp_name = %s\n", f, c, comp_name);
+      }
+    }
+    printf("++++++++++++++++++++++++++++++++++++\n");
+  }
+
   // Mat A;
   // Vec Ascale;
   // PetscCall(DMCreateInterpolation(rdy->dm, dm_fine, &A, &Ascale));
