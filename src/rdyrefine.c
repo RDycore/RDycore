@@ -159,8 +159,10 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // save time and timestep from TS
   PetscReal time, dt;
+  PetscInt  nstep;
   PetscCall(TSGetTime(rdy->ts, &time));
   PetscCall(TSGetTimeStep(rdy->ts, &dt));
+  PetscCall(TSGetStepNumber(rdy->ts, &nstep));
 
   // destroy the boundaries and reallocate memory
   PetscCall(RDyDestroyBoundaries(&rdy));
@@ -176,6 +178,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   // set the time and timstep in TS
+  PetscCall(TSSetStepNumber(rdy->ts, nstep));
   PetscCall(TSSetTime(rdy->ts, time));
   PetscCall(TSSetTimeStep(rdy->ts, dt));
 
@@ -184,6 +187,10 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // initialize the source terms
   PetscCall(InitSourceConditions(rdy));
+
+  // mark the mesh was refined
+  rdy->mesh_was_refined = PETSC_TRUE;
+  rdy->num_refinements++;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
