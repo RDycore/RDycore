@@ -147,6 +147,23 @@ PetscErrorCode RDyRefine(RDy rdy) {
     printf("++++++++++++++++++++++++++++++++++++\n");
   }
 
+  {
+    PetscSection coarse_sec, fine_sec;
+    PetscCall(DMGetLocalSection(rdy->dm, &coarse_sec));
+    PetscCall(DMGetLocalSection(dm_fine, &fine_sec));
+    PetscInt nfields;
+    PetscSectionGetNumFields(coarse_sec, &nfields);
+    for (PetscInt f = 0; f < nfields; f++) {
+      PetscInt ncomp;
+      PetscCall(PetscSectionGetFieldComponents(coarse_sec, f, &ncomp));
+      for (PetscInt c = 0; c < ncomp; c++) {
+        const char *comp_name;
+        PetscSectionGetComponentName(coarse_sec, f, c, &comp_name);
+        PetscSectionSetComponentName(fine_sec, f, c, comp_name);
+      }
+    }
+  }
+
   // Mat A;
   // Vec Ascale;
   // PetscCall(DMCreateInterpolation(rdy->dm, dm_fine, &A, &Ascale));
