@@ -1234,6 +1234,9 @@ PetscErrorCode RDySetup(RDy rdy) {
     rdy->log = stdout;
   }
 
+  rdy->mesh_was_refined = PETSC_FALSE;
+  rdy->num_refinements  = 0;
+
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
 
