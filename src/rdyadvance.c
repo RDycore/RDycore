@@ -248,6 +248,13 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     RDyLogDebug(rdy, "Running simulation...");
   }
 
+  if (rdy->mesh_was_refined) {
+    // create a viewer with the proper format for visualization output
+    PetscCall(CreateOutputViewer(rdy));
+
+    rdy->mesh_was_refined = PETSC_FALSE;
+  }
+
   PetscReal time;
   PetscCall(TSGetTime(rdy->ts, &time));
 
