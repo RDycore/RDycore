@@ -1,6 +1,7 @@
-# This CMake function generates a file named cyaml_sediment_fields.h in the src/ folder.
-# This file defines sediment size class fields for our YAML schema based on the build
-# parameter MAX_NUM_SEDIMENT_CLASSES.
+# This CMake function generates a file named cyaml_sediment_fields.h in the include/
+# folder within your build directory. The file defines sediment size class fields
+# for our YAML schema based on the build parameter MAX_NUM_SEDIMENT_CLASSES. See
+# related comments in src/yaml_input.c.
 
 function(generate_cyaml_sediment_fields)
   math(EXPR N "${MAX_NUM_SEDIMENT_CLASSES} - 1") # loop variable
