@@ -146,8 +146,6 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal t
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define MAX_NUM_SECTION_FIELD_COMPONENTS 10
-
 /// @brief Computes the flux for SWE and sediments across the edge using Roe's approximate Riemann solve
 /// @param [in] *datal A SedimentRiemannStateData for values left of the edges
 /// @param [in] *datar A SedimentRiemannStateData for values right of the edges

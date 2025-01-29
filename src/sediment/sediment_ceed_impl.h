@@ -33,7 +33,9 @@ struct SedimentState_ {
 };
 typedef struct SedimentState_ SedimentState;
 
+#ifndef MAX_NUM_SECTION_FIELD_COMPONENTS
 #define MAX_NUM_SECTION_FIELD_COMPONENTS 10
+#endif
 
 /// computes the flux across an edge using Roe's approximate Riemann solver
 /// for flow and sediment transport

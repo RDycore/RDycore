@@ -6,7 +6,7 @@
 
 // maximum numbers of supported fields/components in a DM section
 #define MAX_NUM_SECTION_FIELDS 5
-#define MAX_NUM_SECTION_FIELD_COMPONENTS 10
+#define MAX_NUM_SECTION_FIELD_COMPONENTS 3 + MAX_NUM_SEDIMENT_CLASSES
 
 // this struct specifies the number, degrees of freedom, and names of fields in
 // a section within a DM

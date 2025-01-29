@@ -367,7 +367,7 @@ static const cyaml_schema_value_t region_spec_entry = {
 static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
     CYAML_FIELD_STRING("region", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, region, 1),
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 1),
-    CYAML_REGION_CONDITION_SPEC_SEDIMENT_FIELDS // defined in build/src/cyaml_sediment_fields.h
+    CYAML_REGION_CONDITION_SPEC_SEDIMENT_FIELDS // defined in build/include/cyaml_sediment_fields.h
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
     CYAML_FIELD_END
 };
@@ -622,7 +622,7 @@ static const cyaml_schema_field_t mms_swe_fields_schema[] = {
 };
 
 static const cyaml_schema_field_t mms_sediment_fields_schema[] = {
-    CYAML_MMS_SEDIMENT_FIELDS
+    CYAML_MMS_SEDIMENT_FIELDS // defined in build/include/cyaml_sediment_fields.h
     CYAML_FIELD_END
 };
 
@@ -637,7 +637,7 @@ static const cyaml_schema_field_t mms_convergence_rates_fields_schema[] = {
     CYAML_FIELD_MAPPING("h", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, h, mms_error_norms_fields_schema),
     CYAML_FIELD_MAPPING("hu", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hu, mms_error_norms_fields_schema),
     CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hv, mms_error_norms_fields_schema),
-    CYAML_MMS_CONVERGENCE_RATES_SEDIMENT_FIELDS
+    CYAML_MMS_CONVERGENCE_RATES_SEDIMENT_FIELDS // defined in build/include/cyaml_sediment_fields.h
     CYAML_FIELD_END
 };
 
@@ -1088,10 +1088,8 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
     PetscCall(ParseSWEManufacturedSolutions(comm, &config->mms.constants, &config->mms.swe));
   }
 
-  for (PetscInt i = 0; i < config->physics.sediment.num_classes; ++i) {
-    if (config->mms.sediment.expressions.c[i][0]) {
-      PetscCall(ParseSedimentManufacturedSolutions(comm, config->physics.sediment.num_classes, &config->mms.constants, &config->mms.sediment));
-    }
+  if (config->physics.sediment.num_classes > 0) {
+    PetscCall(ParseSedimentManufacturedSolutions(comm, config->physics.sediment.num_classes, &config->mms.constants, &config->mms.sediment));
   }
 
   // material properties
