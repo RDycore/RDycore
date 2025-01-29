@@ -40,6 +40,7 @@
 //   flow:
 //     mode: <swe|diffusion> # swe by default
 //     tiny_h: <value> # 1e-7 by default
+//     h_anuga_reg_parameter: <value> # 0.0 by default
 //     source:
 //       method: <semi_implicit|implicit_xq2018> # semi_implicit by default
 //       xq2018_threshold: <value> # 1e-10 by default
@@ -68,6 +69,7 @@ static const cyaml_schema_field_t source_fields_schema[] = {
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
     CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
+    CYAML_FIELD_FLOAT("h_anuga_reg_parameter", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, h_anuga_regular),
     CYAML_FIELD_MAPPING("source", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source, source_fields_schema),
     CYAML_FIELD_END
 };
@@ -780,6 +782,7 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   PetscFunctionBegin;
 
   SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
+  SET_MISSING_PARAMETER(config->physics.flow.h_anuga_regular, 0.0);
   SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_SEMI_IMPLICIT);
   if (config->physics.flow.source.method == SOURCE_IMPLICIT_XQ2018) {
     SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);

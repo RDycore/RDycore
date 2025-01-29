@@ -440,6 +440,7 @@ physics:
   flow:
     mode: swe
     tiny_h: 1e-7
+    h_anuga_reg_parameter: 1.e-3
     source:
       method: implicit_xq2018
       xq2018_threshold: 1e-10
@@ -460,6 +461,10 @@ parameters in this subsection are:
    not yet supported). This parameter is required and has no default value.
 * `tiny_h`, which is the water height below which a given point is assumed to
   be dry. Default value: `1e-7`
+* `h_anuga_reg_parameter`: is the water height used in velocity regularization using the
+  approach implemented in the ANUGA hydrodynamic model. e.g., the velocity in x-dir from the
+  momentum in x-dir is computed as `u = (hu) * h / (h^2 + h_anuga_reg_parameter)`. The
+  default value is `0.0`.
 * `source`: this subsection controls parameters governing how the flow source
   term is integrated in time. Parameters are:
   * `method`: the method for integrating the flow source term. Options are

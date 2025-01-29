@@ -4,7 +4,7 @@
 #include <ceed/types.h>
 
 #define Square(x) ((x) * (x))
-#define SafeDiv(a, b, tiny) ((b) > (tiny) ? (a) / (b) : 0.0)
+#define SafeDiv(a, b, c, tiny) ((c) > (tiny) ? (a) / (b) : 0.0)
 
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
@@ -19,6 +19,7 @@ typedef struct SWEContext_ *SWEContext;
 struct SWEContext_ {
   CeedScalar dtime;
   CeedScalar tiny_h;
+  CeedScalar h_anuga_regular;
   CeedScalar gravity;
   CeedScalar xq2018_threshold;
 };
@@ -29,13 +30,16 @@ struct SWEState_ {
 typedef struct SWEState_ SWEState;
 
 // riemann solver -- called by other Q-functions
-CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SWEState qL, SWEState qR, CeedScalar sn,
-                                              CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
+CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL, SWEState qR,
+                                              CeedScalar sn, CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar sqrt_gravity = sqrt(gravity);
   const CeedScalar hl = qL.h, hr = qR.h;
 
-  const CeedScalar ul = SafeDiv(qL.hu, hl, tiny_h), vl = SafeDiv(qL.hv, hl, tiny_h);
-  const CeedScalar ur = SafeDiv(qR.hu, hr, tiny_h), vr = SafeDiv(qR.hv, hr, tiny_h);
+  const CeedScalar denom_l = Square(hl) + h_anuga;
+  const CeedScalar denom_r = Square(hr) + h_anuga;
+
+  const CeedScalar ul = SafeDiv(qL.hu * hl, denom_l, hl, tiny_h), vl = SafeDiv(qL.hv * hl, denom_l, hl, tiny_h);
+  const CeedScalar ur = SafeDiv(qR.hu * hr, denom_r, hr, tiny_h), vr = SafeDiv(qR.hv * hr, denom_r, hr, tiny_h);
   CeedScalar       duml  = sqrt(hl);
   CeedScalar       dumr  = sqrt(hr);
   CeedScalar       cl    = sqrt_gravity * duml;
@@ -133,6 +137,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
@@ -140,7 +145,7 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
     SWEState   qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
     CeedScalar flux[3], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
-      SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         cell_R[j][i]     = flux[j] * geom[3][i];
@@ -165,6 +170,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
@@ -172,7 +178,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
     SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar flux[3], amax;
-      SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         accum_flux[j][i] = flux[j];
@@ -193,6 +199,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
@@ -203,7 +210,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
       CeedScalar dum2 = 2.0 * sn * cn;
       SWEState   qR   = {qL.h, qL.hu * dum1 - qL.hv * dum2, -qL.hu * dum2 - qL.hv * dum1};
       CeedScalar flux[3], amax;
-      SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flux, &amax);
+      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
       }
@@ -224,6 +231,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
@@ -235,7 +243,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
     SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
-      SWERiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flux, &amax);
+      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         accum_flux[j][i] = flux[j];
@@ -258,6 +266,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
@@ -265,9 +274,10 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
     const CeedScalar h     = state.h;
     const CeedScalar hu    = state.hu;
     const CeedScalar hv    = state.hv;
+    const CeedScalar denom = Square(h) + h_anuga;
 
-    const CeedScalar u = SafeDiv(state.hu, h, tiny_h);
-    const CeedScalar v = SafeDiv(state.hv, h, tiny_h);
+    const CeedScalar u = SafeDiv(state.hu * h, denom, h, tiny_h);
+    const CeedScalar v = SafeDiv(state.hv * h, denom, h, tiny_h);
 
     const CeedScalar dz_dx = geom[0][i];
     const CeedScalar dz_dy = geom[1][i];
