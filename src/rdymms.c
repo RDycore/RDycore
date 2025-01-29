@@ -172,25 +172,18 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating DMs...");
 
-  if (rdy->config.physics.sediment.num_classes == 0) {
-    rdy->soln_fields = (SectionFieldSpec){
-        .num_fields            = 1,
-        .num_field_components  = {3},
-        .field_names           = {"Solution"},
-        .field_component_names = {{
-            "Height",
-            "MomentumX",
-            "MomentumY",
-        }},
-    };
-  } else {
-    PetscCheck(rdy->config.physics.sediment.num_classes == 1, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only one sediment class is allowed.");
-    rdy->soln_fields = (SectionFieldSpec){
-        .num_fields            = 1,
-        .num_field_components  = {4},
-        .field_names           = {"Solution"},
-        .field_component_names = {{"Height", "MomentumX", "MomentumY", "Concentration"}},
-    };
+  rdy->soln_fields = (SectionFieldSpec){
+      .num_fields            = 1,
+      .num_field_components  = {3 + rdy->num_sediment_classes},
+      .field_names           = {"Solution"},
+      .field_component_names = {{
+          "Height",
+          "MomentumX",
+          "MomentumY",
+      }},
+  };
+  for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
+    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration_%" PetscInt_FMT, i);
   }
 
   PetscCall(CreateDM(rdy));
