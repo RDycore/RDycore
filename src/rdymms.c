@@ -473,10 +473,10 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       const PetscReal tau_critical_deposition = 1000.0;
       const PetscReal rhow                    = DENSITY_OF_WATER;
 
-      l = 0;
-      for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-        if (cells->is_owned[icell]) {
-          for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
+      for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
+        l = 0;
+        for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+          if (cells->is_owned[icell]) {
             hci_source[l] = ci[i][l] * dhdt[l] + h[l] * dcidt[i][l];
             hci_source[l] += u[l] * ci[i][l] * dhdx[l] + h[l] * ci[i][l] * dudx[l] + u[l] * h[l] * dcidx[i][l];
             hci_source[l] += v[l] * ci[i][l] * dhdy[l] + h[l] * ci[i][l] * dvdy[l] + v[l] * h[l] * dcidy[i][l];
@@ -486,12 +486,11 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
             PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
             PetscReal di    = settling_velocity * ci[i][l] * (1.0 - tau_b / tau_critical_deposition);
             hci_source[l] += -(ei - di);
+            ++l;
           }
-          ++l;
         }
+        PetscCall(RDySetRegionalSedimentSource(rdy, 0, i, N, hci_source));
       }
-
-      PetscCall(RDySetRegionalSedimentSource(rdy, 0, N, hci_source));
 
       for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
         PetscCall(PetscFree(ci[i]));
@@ -568,23 +567,21 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     }
     PetscCall(RDySetFlowDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
 
-    for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
-      RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment[i];
-
-      PetscReal *ci;
+    if (rdy->num_sediment_classes) {
+      PetscInt   ndof = rdy->num_sediment_classes;
+      PetscReal *sediment_boundary_values, *ci;
+      PetscCall(PetscCalloc1(ndof * num_edges, &sediment_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &ci));
-      PetscCall(EvaluateTemporalSolution(sediment_bc->concentration, num_edges, x, y, time, ci));
-
-      PetscReal *sediment_boundary_values;
-      PetscCall(PetscCalloc1(1 * num_edges, &sediment_boundary_values));
-      for (PetscInt e = 0; e < num_edges; ++e) {
-        sediment_boundary_values[e] = h[e] * ci[e];
+      for (PetscInt i = 0; i < ndof; ++i) {
+        RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment[i];
+        PetscCall(EvaluateTemporalSolution(sediment_bc->concentration, num_edges, x, y, time, ci));
+        for (PetscInt e = 0; e < num_edges; ++e) {
+          sediment_boundary_values[ndof * e + i] = h[e] * ci[e];
+        }
       }
-
-      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, 1, sediment_boundary_values));
-
-      PetscCall(PetscFree(ci));
+      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, ndof, sediment_boundary_values));
       PetscCall(PetscFree(sediment_boundary_values));
+      PetscCall(PetscFree(ci));
     }
 
     PetscCall(PetscFree(x));

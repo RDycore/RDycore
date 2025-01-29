@@ -86,7 +86,8 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
   op->num_regions = num_regions;
   op->regions     = regions;
 
-  // allocate sequential vectors for each region
+  // allocate sequential vectors that store sources and material properties for
+  // the PETSc operator, similar to how restrictions are used in CEED
   if (!CeedEnabled()) {
     PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, op->num_components, &op->petsc.external_sources));
 
@@ -116,6 +117,8 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   op->boundary_conditions = conditions;
 
   if (!CeedEnabled()) {
+    // in the PETSc case, allocate sequential vectors for storing boundary values
+    // and fluxes, similar to how restrictions are used in CEED
     PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));  // NOLINT(bugprone-sizeof-expression)
     PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes));  // NOLINT(bugprone-sizeof-expression)
 
@@ -446,8 +449,13 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
   if (num_boundaries > 0) {
+    // set up boundaries for the operator, allocating any necessary storage
+    // (e.g. sequential vectors for PETSc operator)
     PetscCall(SetOperatorBoundaries(*operator, num_boundaries, boundaries, boundary_conditions));
   }
+
+  // set up regions for the operator, allocating any necessary storage
+  // (e.g. sequential vectors for PETSc operator)
   PetscCall(SetOperatorRegions(*operator, num_regions, regions));
   PetscCall(AddPhysicsOperators(*operator));
 

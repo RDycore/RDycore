@@ -111,8 +111,6 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
 
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
 
-  PetscCheck(ndof == 1, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%" PetscInt_FMT ") for the boundary condition need to be one.", ndof);
-
   RDyBoundary boundary = rdy->boundaries[boundary_index];
   PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
              "The given number of edges (%" PetscInt_FMT ") for boundary with index %" PetscInt_FMT " is incorrect (should be %" PetscInt_FMT ")",
@@ -224,9 +222,9 @@ PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt size_class, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3 + size_class, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
