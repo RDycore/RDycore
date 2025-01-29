@@ -46,7 +46,7 @@ materials:
 initial_conditions:
   - region: domain
     flow: domain_flow_ic
-    sediment: domain_sediment_ic
+    c0: domain_sediment_ic
 
 flow_conditions:
   - name: domain_flow_ic

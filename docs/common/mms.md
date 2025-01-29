@@ -64,22 +64,23 @@ mms:
     # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
 
-    # Convergence study parameters (optional)
-    convergence:
-      num_refinements: 3
-      expected_rates:
-        h:
-          L1: 1
-          L2: 1
-          Linf: 0.48
-        hu:
-          L1: 0.73
-          L2: 0.78
-          Linf: 0.62
-        hv:
-          L1: 0.73
-          L2: 0.78
-          Linf: 0.62
+  # Convergence study parameters (optional)
+  convergence:
+    num_refinements: 3
+    base_refinement: 1
+    expected_rates:
+      h:
+        L1: 1
+        L2: 1
+        Linf: 0.48
+      hu:
+        L1: 0.73
+        L2: 0.78
+        Linf: 0.62
+      hv:
+        L1: 0.73
+        L2: 0.78
+        Linf: 0.62
 ```
 
 The `mms` section defines the forms of the manufactured solutions for the
@@ -104,7 +105,7 @@ every MMS driver input file, without developing code and rebuilding RDycore.
 
 ### Convergence studies
 
-The optional `convergence` sub-subsection contains the following parameters for
+The optional `convergence` subsection contains the following parameters for
 performing convergence studies that determine whether the MMS problem has been
 solved successfully for each solution component:
 
@@ -117,7 +118,7 @@ solved successfully for each solution component:
   mesh loaded from a file should be refined twice before performing a
   convergence study.
 * `expected_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
-  entries for each relevant component name giving the expected rates of
+  entries for each relevant solution component name giving the expected rates of
   convergence for the appropriate error norms. Each of the component names and
   expected rates are optional, so you can specify only those you want to use
   as pass/fail criteria.

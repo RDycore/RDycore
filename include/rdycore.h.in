@@ -24,6 +24,9 @@
 // maximum length of names (config parameters, fields in DM sections, etc)
 #define MAX_NAME_LEN @MAX_NAME_LEN@
 
+// maximum number of sediment size classes
+#define MAX_NUM_SEDIMENT_CLASSES @MAX_NUM_SEDIMENT_CLASSES@
+
 //-------------------
 // RDycore Interface
 //-------------------

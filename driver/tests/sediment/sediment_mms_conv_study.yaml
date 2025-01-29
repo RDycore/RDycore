@@ -48,41 +48,33 @@ mms:
     # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
 
-    # Convergence study parameters (optional)
-    convergence:
-      num_refinements: 3
-      base_refinement: 1 # <-- start at this refinement level
-      expected_rates:
-        h:
-          L1: 0.94
-          L2: 0.95
-          Linf: 0.94
-        hu:
-          L1: 0.91
-          L2: 0.93
-          Linf: 0.77
-        hv:
-          L1: 0.91
-          L2: 0.93
-          Linf: 0.77
-
   sediment: # functions of x, y, t (non-normalized units)
-    # water height
-    ci:    C * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
-    dcidx: C * K * sin(K*y) * cos(K*x) * exp(t/T)
-    dcidy: C * K * sin(K*x) * cos(K*y) * exp(t/T)
-    dcidt: C / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    c0:    C * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dc0dx: C * K * sin(K*y) * cos(K*x) * exp(t/T)
+    dc0dy: C * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dc0dt: C / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
 
-    # Convergence study parameters (optional)
-    convergence:
-      num_refinements: 3
-      base_refinement: 1 # <-- start at this refinement level
-      expected_rates:
-        hci:
-          L1: 0.94
-          L2: 0.95
-          Linf: 0.94
-
+  # Convergence study parameters (optional)
+  convergence:
+    num_refinements: 3
+    base_refinement: 1 # <-- start at this refinement level
+    expected_rates: # uses solution names in enabled physics above
+      h:
+        L1: 0.94
+        L2: 0.95
+        Linf: 0.94
+      hu:
+        L1: 0.91
+        L2: 0.93
+        Linf: 0.77
+      hv:
+        L1: 0.91
+        L2: 0.93
+        Linf: 0.77
+      c0:
+        L1: 0.94
+        L2: 0.95
+        Linf: 0.94
 
 logging:
   level: none

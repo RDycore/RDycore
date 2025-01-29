@@ -45,23 +45,23 @@ mms:
     # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
 
-    # Convergence study parameters (optional)
-    convergence:
-      num_refinements: 3
-      base_refinement: 1 # <-- start at this refinement level
-      expected_rates:
-        h:
-          L1: 0.94
-          L2: 0.95
-          Linf: 0.94
-        hu:
-          L1: 0.91
-          L2: 0.93
-          Linf: 0.77
-        hv:
-          L1: 0.91
-          L2: 0.93
-          Linf: 0.77
+  # Convergence study parameters (optional)
+  convergence:
+    num_refinements: 3
+    base_refinement: 1 # <-- start at this refinement level
+    expected_rates: # uses solution function names above
+      h:
+        L1: 0.94
+        L2: 0.95
+        Linf: 0.94
+      hu:
+        L1: 0.91
+        L2: 0.93
+        Linf: 0.77
+      hv:
+        L1: 0.91
+        L2: 0.93
+        Linf: 0.77
 
 logging:
   level: none

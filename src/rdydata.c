@@ -119,9 +119,11 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
              num_edges, boundary_index, boundary.num_edges);
 
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
-  PetscCheck(boundary_cond.sediment->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
-             boundary_cond.sediment->type);
+  for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
+    PetscCheck(boundary_cond.sediment[i]->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+               "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
+               boundary_cond.sediment[i]->type);
+  }
 
   OperatorData dirichlet;
   PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));

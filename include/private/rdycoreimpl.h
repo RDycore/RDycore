@@ -110,6 +110,9 @@ struct _p_RDy {
   PetscInt     num_boundaries;
   RDyBoundary *boundaries;
 
+  // sediment size classes
+  PetscInt num_sediment_classes;
+
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;
 

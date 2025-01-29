@@ -167,8 +167,8 @@ file(COPY
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed)
     foreach(lang c f90)
-      add_test(mms_single_run_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_single_run.yaml ${${config}_args})
-      add_test(mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_conv_study.yaml ${${config}_args})
+      add_test(swe_mms_single_run_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_single_run.yaml ${${config}_args})
+      add_test(swe_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_conv_study.yaml ${${config}_args})
     endforeach()
   endforeach()
 endforeach()
