@@ -330,12 +330,11 @@ static PetscErrorCode DestroyInteriorFlux(void *context) {
 
 /// Creates a PetscOperator that computes fluxes between pairs of cells on the
 /// domain's interior, suitable for the shallow water equations.
-/// @param [in]    mesh        a mesh representing the domain
+/// @param [in]    mesh        mesh defining the computational domain of the operator
+/// @param [in]    config      RDycore's configuration
 /// @param [inout] diagnostics a set of diagnostics that can be updated by the PetscOperator
-/// @param [in]    tiny_h      the water height below which dry conditions are assumed
 /// @param [out]   petsc_op    the newly created PetscOperator
-PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscReal h_anuga_regular,
-                                                  PetscOperator *petsc_op) {
+PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   const PetscInt num_comp = 3;
@@ -345,8 +344,8 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnos
   *interior_flux_op = (InteriorFluxOperator){
       .mesh            = mesh,
       .diagnostics     = diagnostics,
-      .tiny_h          = tiny_h,
-      .h_anuga_regular = h_anuga_regular,
+      .tiny_h          = config.physics.flow.tiny_h,
+      .h_anuga_regular = config.physics.flow.h_anuga_regular,
   };
 
   // allocate left/right/edge Riemann data structures
@@ -570,16 +569,16 @@ static PetscErrorCode DestroyBoundaryFlux(void *context) {
 
 /// Creates a PetscOperator that computes fluxes through edges on the boundary
 /// of a domain, suitable for the shallow water equations.
-/// @param [in]    mesh               a mesh representing the domain
+/// @param [in]    mesh               mesh defining the computational domain of the operator
+/// @param [in]    config             RDycore's configuration
 /// @param [in]    boundary           the boundary through which fluxes are to be computed
 /// @param [in]    boundary_condition the boundary condition associated with the boundary of interest
 /// @param [in]    boundary_values    a Vec storing Dirichlet values (if any) for this boundary
 /// @param [inout] boundary_fluxes    a Vec storing fluxes for this boundary
 /// @param [inout] diagnostics        a set of diagnostics that can be updated by the PetscOperator
-/// @param [in]    tiny_h             the water height below which dry conditions are assumed
 /// @param [out]   petsc_op           the newly created PetscOperator
-PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, Vec boundary_values,
-                                                  Vec boundary_fluxes, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscReal h_anuga_regular,
+PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
+                                                  Vec boundary_values, Vec boundary_fluxes, OperatorDiagnostics *diagnostics,
                                                   PetscOperator *petsc_op) {
   PetscFunctionBegin;
   BoundaryFluxOperator *boundary_flux_op;
@@ -591,8 +590,8 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
       .boundary_values    = boundary_values,
       .boundary_fluxes    = boundary_fluxes,
       .diagnostics        = diagnostics,
-      .tiny_h             = tiny_h,
-      .h_anuga_regular    = h_anuga_regular,
+      .tiny_h             = config.physics.flow.tiny_h,
+      .h_anuga_regular    = config.physics.flow.h_anuga_regular,
   };
 
   // allocate left/right/edge Riemann data structures
@@ -830,15 +829,12 @@ static PetscErrorCode DestroySource(void *context) {
 
 /// Creates a PetscOperator that computes sources within a region in a domain,
 /// suitable for the shallow water equations.
-/// @param [in]    mesh             a mesh representing the domain
-/// @param [in]    external_sources a Vec storing external source values (if any) for the domain
-/// @param [in]    mannings         a Vec storing Mannings coefficient values for the domain
-/// @param [in]    method           type of temporal method used for discretizing the friction source term
-/// @param [in]    tiny_h           the water height below which dry conditions are assumed
-/// @param [in]    xq2018_threshold the threshold use of the XL2018 implicit temporal method
-/// @param [out]   petsc_op         the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources, Vec mannings, RDyFlowSourceMethod method, PetscReal tiny_h,
-                                            PetscReal xq2018_threshold, PetscOperator *petsc_op) {
+/// @param [in]  mesh             mesh defining the computational domain of the operator
+/// @param [in]  config           RDycore's configuration
+/// @param [in]  external_sources a Vec storing external source values (if any) for the domain
+/// @param [in]  mannings         a Vec storing Mannings coefficient values for the domain
+/// @param [out] petsc_op         the newly created PetscOperator
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
@@ -846,14 +842,14 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, Vec external_sources,
       .mesh             = mesh,
       .external_sources = external_sources,
       .mannings         = mannings,
-      .tiny_h           = tiny_h,
-      .xq2018_threshold = xq2018_threshold,
+      .tiny_h           = config.physics.flow.tiny_h,
+      .xq2018_threshold = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)external_sources, &comm));
 
-  switch (method) {
+  switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
       break;
