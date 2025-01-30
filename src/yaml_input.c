@@ -1575,11 +1575,24 @@ static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions *swe_mm
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode DestroySedimentManufacturedSolutions(RDyMMSSedimentSolutions *sed_mms) {
+  PetscFunctionBegin;
+  for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
+    if (sed_mms->expressions.c[i][0]) {
+      mupRelease((void *)sed_mms->solutions.c[i]);
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DestroyManufacturedSolutions(RDyMMSSection *mms) {
   PetscFunctionBegin;
 
   if (mms->swe.expressions.h[0]) {
     PetscCall(DestroySWEManufacturedSolutions(&mms->swe));
+  }
+  if (mms->sediment.expressions.c[0][0]) {
+    PetscCall(DestroySedimentManufacturedSolutions(&mms->sediment));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -17,7 +17,7 @@ static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
 // velocities, so we have to chain together a few things to evaluate x and y
 // momenta.
 
-static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
+static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   PetscFunctionBegin;
 
   // We only need a single Dirichlet boundary condition, populated with
@@ -34,13 +34,15 @@ static PetscErrorCode SetSWEAnalyticBoundaryCondition(RDy rdy) {
       .flow = &analytic_flow,
   };
 
+  static RDySedimentCondition analytic_sediments[MAX_NUM_SEDIMENT_CLASSES] = {0};
   for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
-    static RDySedimentCondition analytic_sediment = {
-        .name = "analytic_sediment_bc",
-        .type = CONDITION_DIRICHLET,
+    analytic_sediments[i] = (RDySedimentCondition){
+        .name          = "analytic_sediment_bc",
+        .type          = CONDITION_DIRICHLET,
+        .concentration = (void *)rdy->config.mms.sediment.solutions.c[i],
     };
-    analytic_sediment.concentration = (void *)rdy->config.mms.sediment.solutions.c[i];
-    analytic_bc.sediment[i]         = &analytic_sediment;
+    strncpy(analytic_sediments[i].expression, rdy->config.mms.sediment.expressions.c[i], MAX_EXPRESSION_LEN);
+    analytic_bc.sediment[i] = &analytic_sediments[i];
   }
 
   // Assign the boundary condition to each boundary.
@@ -234,7 +236,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
   PetscCall(InitBoundaries(rdy));
-  PetscCall(SetSWEAnalyticBoundaryCondition(rdy));
+  PetscCall(SetAnalyticBoundaryCondition(rdy));
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
