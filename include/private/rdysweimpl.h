@@ -6,13 +6,13 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
 
-PETSC_INTERN PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *, PetscReal, PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *, RDyBoundary, RDyCondition, PetscReal, PetscReal, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *, RDyFlowSourceMethod, PetscReal, PetscReal, PetscReal, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *, const RDyConfig, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *, const RDyConfig, RDyBoundary, RDyCondition, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *, const RDyConfig, CeedOperator *);
 
-PETSC_INTERN PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *, OperatorDiagnostics *, PetscReal, PetscReal, PetscOperator *);
-PETSC_INTERN PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *, RDyBoundary, RDyCondition, Vec, Vec, OperatorDiagnostics *, PetscReal,
-                                                               PetscReal, PetscOperator *);
-PETSC_INTERN PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *, Vec, Vec, RDyFlowSourceMethod, PetscReal, PetscReal, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *, const RDyConfig, OperatorDiagnostics *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *, const RDyConfig, RDyBoundary, RDyCondition, Vec, Vec, OperatorDiagnostics *,
+                                                               PetscOperator *);
+PETSC_INTERN PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *, const RDyConfig, Vec, Vec, PetscOperator *);
 
 #endif
