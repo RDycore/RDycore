@@ -1834,6 +1834,7 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
 <span class="w">  </span><span class="nt">flow</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swe</span>
 <span class="w">    </span><span class="nt">tiny_h</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
+<span class="w">    </span><span class="nt">h_anuga_regular</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.e-3</span>
 <span class="w">    </span><span class="nt">source</span><span class="p">:</span>
 <span class="w">      </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implicit_xq2018</span>
 <span class="w">      </span><span class="nt">xq2018_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-10</span>
@@ -1853,6 +1854,10 @@ parameters in this subsection are:</p>
    not yet supported). This parameter is required and has no default value.</li>
 <li><code>tiny_h</code>, which is the water height below which a given point is assumed to
   be dry. Default value: <code>1e-7</code></li>
+<li><code>h_anuga_regular</code>: is the water height used in velocity regularization using the
+  approach implemented in the ANUGA hydrodynamic model. e.g., the velocity in x-dir from the
+  momentum in x-dir is computed as <code>u = (hu) * h / (h^2 + h_anuga_regular^2)</code>. The
+  default value is <code>0.0</code>.</li>
 <li><code>source</code>: this subsection controls parameters governing how the flow source
   term is integrated in time. Parameters are:</li>
 <li><code>method</code>: the method for integrating the flow source term. Options are<ul>
