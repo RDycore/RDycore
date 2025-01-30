@@ -352,7 +352,9 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
 
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
-  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER, "Number of dof in local vector do not match flow and sediment dof!");
+  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER,
+             "Mismatch in number of dof in local vector (%" PetscInt_FMT ") and flow + sediment (%" PetscInt_FMT ")", n_dof,
+             num_flow_comp + num_sediment_comp);
 
   // Collect the h/hu/hv/hci for left and right cells to compute u/v/ci
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
@@ -449,23 +451,24 @@ static PetscErrorCode DestroySedimentInteriorFlux(void *context) {
 }
 
 /// @brief Creates an operator for computing fluxes through the interior edges.
-/// @param [in] mesh               a RDyMesh struct for the mesh
-/// @param [in] num_flow_comp      number of components in the flow equations
-/// @param [in] num_sediment_comp  number of components in the sediment dynamics equations
-/// @param [in] diagnostics        an OperatorDiagnostics struct
-/// @param [in] tiny_h             a height threshold for determining wet/dry cell
-/// @param [out] petsc_op          a PetscOperator struct that is created and returned
+/// @param [in]  mesh        mesh defining the computational domain of the operator
+/// @param [in]  config      RDycore's configuration
+/// @param [in]  diagnostics an OperatorDiagnostics struct
+/// @param [out] petsc_op    a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
-                                                       OperatorDiagnostics *diagnostics, const PetscReal tiny_h, PetscOperator *petsc_op) {
+PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics,
+                                                       PetscOperator *petsc_op) {
   PetscFunctionBegin;
+
+  PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  PetscInt num_sediment_comp = config.physics.sediment.num_classes;
 
   SedimentInteriorFluxOperator *interior_flux_op;
   PetscCall(PetscCalloc1(1, &interior_flux_op));
   *interior_flux_op = (SedimentInteriorFluxOperator){
       .mesh        = mesh,
       .diagnostics = diagnostics,
-      .tiny_h      = tiny_h,
+      .tiny_h      = config.physics.flow.tiny_h,
   };
 
   // allocate left/right/edge Riemann data structures
@@ -692,21 +695,23 @@ static PetscErrorCode DestroySedimentBoundaryFlux(void *context) {
 }
 
 /// @brief Creates an operator for computing fluxes through boundary edges.
-/// @param [in] mesh                a RDyMesh struct for the mesh
-/// @param [in] num_flow_comp       number of components in the flow equations
-/// @param [in] num_sediment_comp   number of components in the sediment dynamics equations
-/// @param [in] boundary            a RDyBoundary struct for the boundary edges
-/// @param [in] boundary_condition  a RDyCondition struct for all boundary conditions
-/// @param [in] boundary_values     a Vec containing values for the boundary conditions
-/// @param [in] boundary_fluxes     a Vec to accumulating boundary fluxes
-/// @param [in] diagnostics         an OperatorDiagnostics struct
-/// @param [in] tiny_h              a height threshold for determining wet/dry cell
+/// @param [in]  mesh               mesh defining the computational domain of the operator
+/// @param [in]  config             RDycore's configuration
+/// @param [in]  boundary           a RDyBoundary struct for the boundary edges
+/// @param [in]  boundary_condition a RDyCondition struct for all boundary conditions
+/// @param [in]  boundary_values    a Vec containing values for the boundary conditions
+/// @param [in]  boundary_fluxes    a Vec to accumulating boundary fluxes
+/// @param [in]  diagnostics        an OperatorDiagnostics struct
 /// @param [out] petsc_op           a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, PetscInt num_flow_comp, PetscInt num_sediment_comp, RDyBoundary boundary,
-                                                       RDyCondition boundary_condition, Vec boundary_values, Vec boundary_fluxes,
-                                                       OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
+PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
+                                                       Vec boundary_values, Vec boundary_fluxes, OperatorDiagnostics *diagnostics,
+                                                       PetscOperator *petsc_op) {
   PetscFunctionBegin;
+
+  PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  PetscInt num_sediment_comp = config.physics.sediment.num_classes;
+
   SedimentBoundaryFluxOperator *boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
   *boundary_flux_op = (SedimentBoundaryFluxOperator){
@@ -716,7 +721,7 @@ PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, PetscInt n
       .boundary_values    = boundary_values,
       .boundary_fluxes    = boundary_fluxes,
       .diagnostics        = diagnostics,
-      .tiny_h             = tiny_h,
+      .tiny_h             = config.physics.flow.tiny_h,
   };
 
   // allocate left/right/edge Riemann data structures
@@ -872,20 +877,18 @@ static PetscErrorCode DestroySedimentSource(void *context) {
 }
 
 /// @brief Creates an operator for computing source term contribution
-/// @param [in] mesh               a RDyMesh struct for the mesh
-/// @param [in] num_flow_comp      number of components in the flow equations
-/// @param [in] num_sediment_comp  number of components in the sediment dynamics equations
-/// @param [in] external_sources   a Vec containing source values for locally-owned cells
-/// @param [in] mannings           a Vec containing Manning roughness coefficient for SWE
-/// @param [in] method             an identifier for the type of time integration method
-/// @param [in] tiny_h             a height threshold for determining wet/dry cell
-/// @param [in] xq2018_threshold   threshold for the XQ2018 time integration method
-/// @param [out] petsc_op          a PetscOperator struct that is created and returned
+/// @param [in]  mesh             mesh defining the computational domain of the operator
+/// @param [in]  config           RDycore's configuration
+/// @param [in]  external_sources a Vec containing source values for locally-owned cells
+/// @param [in]  mannings         a Vec containing Manning roughness coefficient for SWE
+/// @param [out] petsc_op         a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, PetscInt num_flow_comp, PetscInt num_sediment_comp, Vec external_sources,
-                                                 Vec mannings, RDyFlowSourceMethod method, PetscReal tiny_h, PetscReal xq2018_threshold,
-                                                 PetscOperator *petsc_op) {
+PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
   PetscFunctionBegin;
+
+  PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  PetscInt num_sediment_comp = config.physics.sediment.num_classes;
+
   SedimentSourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (SedimentSourceOperator){
@@ -894,14 +897,14 @@ PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, PetscInt num_flo
       .num_sediment_comp = num_sediment_comp,
       .external_sources  = external_sources,
       .mannings          = mannings,
-      .tiny_h            = tiny_h,
-      .xq2018_threshold  = xq2018_threshold,
+      .tiny_h            = config.physics.flow.tiny_h,
+      .xq2018_threshold  = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)external_sources, &comm));
 
-  switch (method) {
+  switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCall(PetscOperatorCreate(source_op, ApplySedimentSourceSemiImplicit, DestroySedimentSource, petsc_op));
       break;

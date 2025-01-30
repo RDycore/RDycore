@@ -222,9 +222,9 @@ PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt size_class, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt sediment_class, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3 + size_class, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3 + sediment_class, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

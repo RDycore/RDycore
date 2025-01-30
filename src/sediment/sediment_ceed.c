@@ -1,6 +1,7 @@
 #include <petscdmceed.h>
 #include <private/rdysedimentimpl.h>
 
+#include "rdycore.h"
 #include "sediment_ceed_impl.h"
 
 // CEED uses C99 VLA features for shaping multidimensional
@@ -21,23 +22,23 @@ static int FreeContextPetsc(void *data) {
 }
 
 // creates a QFunction context for a flux or source operator with the given
-// minimum water height threshold
-static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const PetscReal tiny_h, const PetscReal xq2018_threshold,
-                                                     CeedQFunctionContext *qf_context) {
+// minimum parameters
+static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const RDyConfig config, CeedQFunctionContext *qf_context) {
   PetscFunctionBeginUser;
 
   SedimentContext sediment_ctx;
   PetscCall(PetscCalloc1(1, &sediment_ctx));
 
   sediment_ctx->dtime                   = 0.0;
-  sediment_ctx->tiny_h                  = tiny_h;
+  sediment_ctx->tiny_h                  = config.physics.flow.tiny_h;
   sediment_ctx->gravity                 = GRAVITY;
-  sediment_ctx->xq2018_threshold        = xq2018_threshold;
+  sediment_ctx->xq2018_threshold        = config.physics.flow.source.xq2018_threshold;
   sediment_ctx->kp_constant             = 0.001;
   sediment_ctx->settling_velocity       = 0.01;
   sediment_ctx->tau_critical_erosion    = 0.1;
   sediment_ctx->tau_critical_deposition = 1000.0;
   sediment_ctx->rhow                    = DENSITY_OF_WATER;
+  sediment_ctx->num_classes             = config.physics.sediment.num_classes;
 
   PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
 
@@ -69,25 +70,28 @@ static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const PetscReal 
 
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "rhow", offsetof(struct SedimentContext_, rhow), 1, "density of water"));
 
+  PetscCallCEED(
+      CeedQFunctionContextRegisterInt32(*qf_context, "num_classes", offsetof(struct SedimentContext_, num_classes), 1, "number of sediment classes"));
+
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
 /// @brief Creates a CEED operator for solving flow and sediment dynamics equation for interior edges
-/// @param [in] mesh               a RDymesh struct for the mesh
-/// @param [in] num_flow_comp      number of components for the flow problem
-/// @param [in] num_sediment_comp  number of components for the sediment dynamics problem. Currently only one component is supported.
-/// @param [in] tiny_h             the water height below which dry conditions are assumed
-/// @param [out] ceed_op           a CeedOperator that is created and returned
+/// @param [in]  mesh    mesh defining the computational domain of the operator
+/// @param [in]  config  RDycore's configuration
+/// @param [out] ceed_op a CeedOperator that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
-                                                      const PetscReal tiny_h, CeedOperator *ceed_op) {
+PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
 
-  CeedInt   num_comp = num_flow_comp + num_sediment_comp;
-  RDyCells *cells    = &mesh->cells;
-  RDyEdges *edges    = &mesh->edges;
+  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
+  CeedInt num_flow_comp     = 3 + num_sediment_comp;  // NOTE: SWE assumed!
+  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
 
   // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
@@ -105,8 +109,7 @@ PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const Petsc
 
   // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscReal            xq2018_threshold_dummy = 0.0;
-  PetscCall(CreateSedimentQFunctionContext(ceed, tiny_h, xq2018_threshold_dummy, &qf_context));
+  PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
@@ -209,24 +212,24 @@ PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const Petsc
 }
 
 /// @brief Creates a CEED operator for solving flow and sediment dynamics equation for a set of boundary edges
-/// @param [in] mesh               a RDymesh struct for the mesh
-/// @param [in] num_flow_comp      number of components for the flow problem
-/// @param [in] num_sediment_comp  number of components for the sediment dynamics problem. Currently only one component is supported.
-/// @param boundary                a RDyBoundary struct describing the boundary on which the boundary condition is applied
-/// @param boundary_condition      a RDyCondition describing the type of boundary condition
-/// @param [in] tiny_h             the water height below which dry conditions are assumed
-/// @param [out] ceed_op           a CeedOperator that is created and returned
+/// @param [in]  mesh               mesh defining the computational domain of the operator
+/// @param [in]  config             RDycore's configuration
+/// @param [in]  boundary           a RDyBoundary struct describing the boundary on which the boundary condition is applied
+/// @param [in]  boundary_condition a RDyCondition describing the type of boundary condition
+/// @param [out] ceed_op            a CeedOperator that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const PetscInt num_flow_comp, const PetscInt num_sediment_comp,
-                                                      RDyBoundary boundary, RDyCondition boundary_condition, PetscReal tiny_h,
+PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
                                                       CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
 
-  CeedInt   num_comp = num_flow_comp + num_sediment_comp;
-  RDyCells *cells    = &mesh->cells;
-  RDyEdges *edges    = &mesh->edges;
+  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
+  CeedInt num_flow_comp     = 3 + num_sediment_comp;  // NOTE: SWE assumed!
+  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
 
   // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
@@ -263,8 +266,7 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const Petsc
 
   // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscReal            xq2018_threshold_dummy = 0.0;
-  PetscCall(CreateSedimentQFunctionContext(ceed, tiny_h, xq2018_threshold_dummy, &qf_context));
+  PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
@@ -378,29 +380,27 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const Petsc
 }
 
 /// @brief Creates a CEED operator for solving flow and sediment dynamics equation for the source-sink term
-/// @param [in] mesh               a RDymesh struct for the mesh
-/// @param [in] num_flow_comp      number of components for the flow problem
-/// @param [in] num_sediment_comp  number of components for the sediment dynamics problem. Currently only one component is supported.
-/// @param [in]  method            type of temporal method used for discretizing the friction source term
-/// @param [in] tiny_h             the water height below which dry conditions are assumed
-/// @param xq2018_threshold        the threshold use of the XL2018 implicit temporal method
-/// @param [out] ceed_op           a CeedOperator that is created and returned
+/// @param [in]  mesh    mesh defining the computational domain of the operator
+/// @param [in]  config  RDycore's configuration
+/// @param [out] ceed_op a CeedOperator that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, PetscInt num_flow_comp, const PetscInt num_sediment_comp, RDyFlowSourceMethod method,
-                                                PetscReal tiny_h, PetscReal xq2018_threshold, CeedOperator *ceed_op) {
+PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
 
-  CeedInt   num_comp = num_flow_comp + num_sediment_comp;
-  RDyCells *cells    = &mesh->cells;
+  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
+  CeedInt num_flow_comp     = 3 + num_sediment_comp;  // NOTE: SWE assumed!
+  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+
+  RDyCells *cells = &mesh->cells;
 
   // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
   CeedInt       num_comp_geom = 2, num_comp_sediment_src = num_comp, num_comp_mannings_n = 1;
-  switch (method) {
+  switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentSourceTermSemiImplicit, SedimentSourceTermSemiImplicit_loc, &qf));
       break;
@@ -421,7 +421,7 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, PetscInt num_flow
 
   // create a context for the Q-function
   CeedQFunctionContext qf_context;
-  PetscCall(CreateSedimentQFunctionContext(ceed, tiny_h, xq2018_threshold, &qf_context));
+  PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
   PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
