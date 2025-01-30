@@ -35,8 +35,8 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
   const CeedScalar sqrt_gravity = sqrt(gravity);
   const CeedScalar hl = qL.h, hr = qR.h;
 
-  const CeedScalar denom_l = Square(hl) + h_anuga;
-  const CeedScalar denom_r = Square(hr) + h_anuga;
+  const CeedScalar denom_l = Square(hl) + Square(h_anuga);
+  const CeedScalar denom_r = Square(hr) + Square(h_anuga);
 
   const CeedScalar ul = SafeDiv(qL.hu * hl, denom_l, hl, tiny_h), vl = SafeDiv(qL.hv * hl, denom_l, hl, tiny_h);
   const CeedScalar ur = SafeDiv(qR.hu * hr, denom_r, hr, tiny_h), vr = SafeDiv(qR.hv * hr, denom_r, hr, tiny_h);
@@ -274,7 +274,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
     const CeedScalar h     = state.h;
     const CeedScalar hu    = state.hu;
     const CeedScalar hv    = state.hv;
-    const CeedScalar denom = Square(h) + h_anuga;
+    const CeedScalar denom = Square(h) + Square(h_anuga);
 
     const CeedScalar u = SafeDiv(state.hu * h, denom, h, tiny_h);
     const CeedScalar v = SafeDiv(state.hv * h, denom, h, tiny_h);

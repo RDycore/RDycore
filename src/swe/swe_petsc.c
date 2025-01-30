@@ -85,7 +85,7 @@ static PetscErrorCode ComputeRiemannVelocities(PetscReal tiny_h, PetscReal h_anu
       data->u[n] = 0.0;
       data->v[n] = 0.0;
     } else {
-      denom      = Square(data->h[n]) + h_anuga;
+      denom      = Square(data->h[n]) + Square(h_anuga);
       data->u[n] = data->hu[n] * data->h[n] / denom;
       data->v[n] = data->hv[n] * data->h[n] / denom;
     }
