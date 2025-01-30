@@ -6,7 +6,8 @@ option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
 
-set(MAX_NAME_LEN 128 CACHE STRING "Maximum allowable length of field/variable names")
+set(MAX_NAME_LEN              128 CACHE STRING "Maximum allowable length of field/variable names")
+set(MAX_NUM_SEDIMENT_CLASSES    5 CACHE STRING "Maximum number of sediment size classes")
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
@@ -162,6 +163,10 @@ configure_file(
   ${PROJECT_BINARY_DIR}/include/rdycore.h
   @ONLY
 )
+
+# Generate a header that handles our maximum number of sediment classes
+include(generate_cyaml_sediment_fields)
+generate_cyaml_sediment_fields()
 
 # Inherit libraries from PETSc for shared or static libs.
 extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)

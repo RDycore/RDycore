@@ -22,22 +22,7 @@ typedef struct {
   PetscReal A, B, C, D, E, F, G, H, J, I_, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z;
 } RDyMMSConstants;
 
-typedef struct {
-  PetscReal L1, L2, Linf;
-} RDyMMSErrorNorms;
-
-typedef struct {
-  RDyMMSErrorNorms h, hu, hv;
-} RDyMMSSWEConvergenceRates;
-
-typedef struct {
-  PetscInt                  num_refinements;
-  PetscInt                  base_refinement;
-  RDyMMSSWEConvergenceRates expected_rates;
-} RDyMMSSWEConvergence;
-
-// specification of a set of manufactured solutions for the
-// shallow water equations (SWE)
+// manufactured solutions for the shallow water equations (SWE)
 typedef struct {
   struct {
     // water height h(x, y, t) and partial derivatives
@@ -64,39 +49,43 @@ typedef struct {
     // Manning's roughness coefficient n(x, y)
     void *n;
   } solutions;
-
-  RDyMMSSWEConvergence convergence;
 } RDyMMSSWESolutions;
 
-typedef struct {
-  RDyMMSErrorNorms hci;
-} RDyMMSSedimentConvergenceRates;
-
-typedef struct {
-  PetscInt                       num_refinements;
-  PetscInt                       base_refinement;
-  RDyMMSSedimentConvergenceRates expected_rates;
-} RDyMMSSedimentConvergence;
-
+// manufactured solutions for sediment classes
 typedef struct {
   struct {
     // sediment concentration ci(x, y, t) and partial derivatives
-    MathExpression ci, dcidx, dcidy, dcidt;
+    MathExpression c[MAX_NUM_SEDIMENT_CLASSES], dcdx[MAX_NUM_SEDIMENT_CLASSES], dcdy[MAX_NUM_SEDIMENT_CLASSES], dcdt[MAX_NUM_SEDIMENT_CLASSES];
   } expressions;
 
   struct {
     // sediment concentration ci(x, y, t) and partial derivatives
-    void *ci, *dcidx, *dcidy, *dcidt;
+    // NOTE: uintptr_t is an integer big enough to store a pointer, so we can
+    // NOTE: use it as an element of an array (unlike void)
+    uintptr_t c[MAX_NUM_SEDIMENT_CLASSES], dcdx[MAX_NUM_SEDIMENT_CLASSES], dcdy[MAX_NUM_SEDIMENT_CLASSES], dcdt[MAX_NUM_SEDIMENT_CLASSES];
   } solutions;
-
-  RDyMMSSedimentConvergence convergence;
 } RDyMMSSedimentSolutions;
+
+typedef struct {
+  PetscReal L1, L2, Linf;
+} RDyMMSErrorNorms;
+
+typedef struct {
+  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_SEDIMENT_CLASSES];
+} RDyMMSConvergenceRates;
+
+typedef struct {
+  PetscInt               num_refinements;
+  PetscInt               base_refinement;
+  RDyMMSConvergenceRates expected_rates;
+} RDyMMSConvergence;
 
 // constants and expressions for manufactured solutions
 typedef struct {
   RDyMMSConstants         constants;
   RDyMMSSWESolutions      swe;
   RDyMMSSedimentSolutions sediment;
+  RDyMMSConvergence       convergence;
 } RDyMMSSection;
 
 #endif

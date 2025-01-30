@@ -254,20 +254,20 @@ typedef struct {
 // This type defines an initial condition and/or source/sink with named
 // flow, sediment, and salinity conditions.
 typedef struct {
-  char region[MAX_NAME_LEN + 1];    // name of associated region
-  char flow[MAX_NAME_LEN + 1];      // name of related flow condition
-  char sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
-  char salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
+  char region[MAX_NAME_LEN + 1];                              // name of associated region
+  char flow[MAX_NAME_LEN + 1];                                // name of related flow condition
+  char sediment[MAX_NUM_SEDIMENT_CLASSES][MAX_NAME_LEN + 1];  // name of related sediment condition
+  char salinity[MAX_NAME_LEN + 1];                            // name of related salinity condition
 } RDyRegionConditionSpec;
 
 // This type defines a boundary condition with named flow, sediment, and
 // salinity conditions.
 typedef struct {
-  PetscInt num_boundaries;                                    // number of associated boundaries
-  char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];  // names of associated boundaries
-  char     flow[MAX_NAME_LEN + 1];                            // name of related flow condition
-  char     sediment[MAX_NAME_LEN + 1];                        // name of related sediment condition
-  char     salinity[MAX_NAME_LEN + 1];                        // name of related salinity condition
+  PetscInt num_boundaries;                                        // number of associated boundaries
+  char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];      // names of associated boundaries
+  char     flow[MAX_NAME_LEN + 1];                                // name of related flow condition
+  char     sediment[MAX_NUM_SEDIMENT_CLASSES][MAX_NAME_LEN + 1];  // name of related sediment conditions
+  char     salinity[MAX_NAME_LEN + 1];                            // name of related salinity condition
 } RDyBoundaryConditionSpec;
 
 // -----------------------

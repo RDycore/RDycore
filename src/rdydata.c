@@ -109,9 +109,10 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
                                                      PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  PetscCheck(ndof == rdy->num_sediment_classes, rdy->comm, PETSC_ERR_USER,
+             "Mismatch in ndof (%" PetscInt_FMT ") and number of sediment classes (%" PetscInt_FMT ")", ndof, rdy->num_sediment_classes);
 
-  PetscCheck(ndof == 1, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%" PetscInt_FMT ") for the boundary condition need to be one.", ndof);
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
 
   RDyBoundary boundary = rdy->boundaries[boundary_index];
   PetscCheck(boundary.num_edges == num_edges, rdy->comm, PETSC_ERR_USER,
@@ -119,9 +120,11 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
              num_edges, boundary_index, boundary.num_edges);
 
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
-  PetscCheck(boundary_cond.sediment->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
-             boundary_cond.sediment->type);
+  for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
+    PetscCheck(boundary_cond.sediment[i]->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+               "Trying to set dirichlet values for sediment class %" PetscInt_FMT " on boundary %" PetscInt_FMT ", but it has a different type (%u)",
+               i, boundary_index, boundary_cond.sediment[i]->type);
+  }
 
   OperatorData dirichlet;
   PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
@@ -222,9 +225,9 @@ PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt sediment_class, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3 + sediment_class, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

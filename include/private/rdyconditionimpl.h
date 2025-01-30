@@ -10,7 +10,7 @@
 typedef struct {
   // flow, sediment, salinity conditions (NULL for none)
   RDyFlowCondition     *flow;
-  RDySedimentCondition *sediment;
+  RDySedimentCondition *sediment[MAX_NUM_SEDIMENT_CLASSES];
   RDySalinityCondition *salinity;
 
   // value(s) associated with the condition

@@ -9,12 +9,12 @@
 
 To build RDycore, you need:
 
-* [CMake v3.14+](https://cmake.org/)
+* A recent version of [CMake](https://cmake.org/)
 * GNU Make
 * reliable C and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
   or [Mpich](https://www.mpich.org/))
-* [PETSc](https://gitlab.com/petsc/petsc) `v3.22.0` or later
+* A recent release or hash of [PETSc](https://gitlab.com/petsc/petsc)
 
 You can obtain all of these freely (except perhaps your favorite Fortran
 compiler) on the Linux and Mac platforms. On Linux, just use your favorite
@@ -31,5 +31,5 @@ brew install cmake gfortran openmpi
 
 ## Configuring, Building, and Installing RDycore
 
-Detailed instructions for getting started with RDycore are
-[here](https://rdycore.github.io/RDycore/common/installation.html).
+Detailed instructions for getting started with RDycore, including required
+versions of the above software, are [here](https://rdycore.github.io/RDycore/common/installation.html).

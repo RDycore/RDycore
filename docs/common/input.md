@@ -444,7 +444,8 @@ physics:
     source:
       method: implicit_xq2018
       xq2018_threshold: 1e-10
-  sediment: false
+  sediment:
+    num_classes: 1
   salinity: false
 ```
 
@@ -473,8 +474,10 @@ parameters in this subsection are:
   * `xq2018_threshold`: threshold for the implicit integration of the source
     (valid only for the `implicit_xq2018` method; default value: `1e-10`)
 
-The second physical model is the sediment model. You can enable or disable this
-by setting the `sediment` parameter to `true` or `false`.
+The second physical model is the sediment dynamics model, which evolves the
+concentrations of distinct size classes of sediments. You can set the number of
+size classes with the `num_classes` parameter (default value: `0`). Disable
+sediment dynamics by setting `num_classes` to `0`.
 
 The third physical model is the salinity model, which you can also enable or
 disable this by setting the `salinity` parameter to `true` or `false`.
