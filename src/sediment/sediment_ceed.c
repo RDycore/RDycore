@@ -38,7 +38,8 @@ static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const RDyConfig 
   sediment_ctx->tau_critical_erosion    = 0.1;
   sediment_ctx->tau_critical_deposition = 1000.0;
   sediment_ctx->rhow                    = DENSITY_OF_WATER;
-  sediment_ctx->num_classes             = config.physics.sediment.num_classes;
+  sediment_ctx->sed_ndof                = config.physics.sediment.num_classes;
+  sediment_ctx->flow_ndof               = 3;  // NOTE: SWE assumed!
 
   PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
 
@@ -71,7 +72,8 @@ static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const RDyConfig 
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "rhow", offsetof(struct SedimentContext_, rhow), 1, "density of water"));
 
   PetscCallCEED(
-      CeedQFunctionContextRegisterInt32(*qf_context, "num_classes", offsetof(struct SedimentContext_, num_classes), 1, "number of sediment classes"));
+      CeedQFunctionContextRegisterInt32(*qf_context, "sed_ndof", offsetof(struct SedimentContext_, sed_ndof), 1, "number of sediment classes"));
+  PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "flow_ndof", offsetof(struct SedimentContext_, flow_ndof), 1, "number of flow DoF"));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
