@@ -109,6 +109,9 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
                                                      PetscReal *values) {
   PetscFunctionBegin;
 
+  PetscCheck(ndof == rdy->num_sediment_classes, rdy->comm, PETSC_ERR_USER,
+             "Mismatch in ndof (%" PetscInt_FMT ") and number of sediment classes (%" PetscInt_FMT ")", ndof, rdy->num_sediment_classes);
+
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
 
   RDyBoundary boundary = rdy->boundaries[boundary_index];
@@ -119,8 +122,8 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
     PetscCheck(boundary_cond.sediment[i]->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-               "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
-               boundary_cond.sediment[i]->type);
+               "Trying to set dirichlet values for sediment class %" PetscInt_FMT " on boundary %" PetscInt_FMT ", but it has a different type (%u)",
+               i, boundary_index, boundary_cond.sediment[i]->type);
   }
 
   OperatorData dirichlet;

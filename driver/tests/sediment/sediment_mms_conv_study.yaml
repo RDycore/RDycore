@@ -53,10 +53,10 @@ mms:
     dc0dx: C * K * sin(K*y) * cos(K*x) * exp(t/T)
     dc0dy: C * K * sin(K*x) * cos(K*y) * exp(t/T)
     dc0dt: C / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
-    c1:    C * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
-    dc1dx: C * K * sin(K*y) * cos(K*x) * exp(t/T)
-    dc1dy: C * K * sin(K*x) * cos(K*y) * exp(t/T)
-    dc1dt: C / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    c1:    C * (1 + sin(K*x)*sin(K*y)) * exp(-t/T)
+    dc1dx: C * K * sin(K*y) * cos(K*x) * exp(-t/T)
+    dc1dy: C * K * sin(K*x) * cos(K*y) * exp(-t/T)
+    dc1dt: -C / T * (1 + sin(K*x)*sin(K*y)) * exp(-t/T)
 
   # Convergence study parameters (optional)
   convergence:

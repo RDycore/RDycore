@@ -166,7 +166,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   strncpy(mms_comp_names[1], "hu ", MAX_NAME_LEN);
   strncpy(mms_comp_names[2], "hv ", MAX_NAME_LEN);
   for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
-    snprintf(mms_comp_names[3 + i], MAX_NAME_LEN, "c%" PetscInt_FMT, i);
+    snprintf(mms_comp_names[3 + i], MAX_NAME_LEN, "c%" PetscInt_FMT " ", i);
   }
 
   // if a refinement level is not specified, set the base refinement level
@@ -556,8 +556,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     PetscCall(EvaluateTemporalSolution(flow_bc->x_momentum, num_edges, x, y, time, u));
     PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, time, v));
 
-    // set the boundary values (SWE-specific)
-    // NOTE: ndof == 3 for SWE
+    // set flow boundary values (SWE-specific, ndof == 3)
     PetscReal *boundary_values;
     PetscCall(PetscCalloc1(3 * num_edges, &boundary_values));
     for (PetscInt e = 0; e < num_edges; ++e) {
@@ -567,6 +566,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     }
     PetscCall(RDySetFlowDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
 
+    // set sediment boundary values
     if (rdy->num_sediment_classes) {
       PetscInt   ndof = rdy->num_sediment_classes;
       PetscReal *sediment_boundary_values, *ci;
@@ -806,13 +806,13 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
+  PetscInt ndof = 3 + rdy->num_sediment_classes;  // NOTE: SWE assumed!
   if (rdy->config.mms.convergence.num_refinements) {
     PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
     // run a convergence study
     PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
     PetscPrintf(rdy->comm, "Convergence rates:\n");
-    PetscInt ndof = 3 + rdy->num_sediment_classes;
     for (PetscInt idof = 0; idof < ndof; idof++) {
       PetscPrintf(rdy->comm, "  %s: L1 = %g, L2 = %g, Linf = %g\n", mms_comp_names[idof], L1_conv_rates[idof], L2_conv_rates[idof],
                   Linf_conv_rates[idof]);
@@ -829,7 +829,7 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, L2);
     CheckConvergence(hv, 2, Linf);
 
-    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
       CheckConvergence(c[i], 3 + i, L1);
       CheckConvergence(c[i], 3 + i, L2);
       CheckConvergence(c[i], 3 + i, Linf);
@@ -852,7 +852,7 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     PetscInt  num_global_cells;
     PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
 
-    PrintErrorNorms(rdy->comm, cur_time, MAX_NUM_COMPONENTS, L1_norms, L2_norms, Linf_norms);
+    PrintErrorNorms(rdy->comm, cur_time, ndof, L1_norms, L2_norms, Linf_norms);
 
     PetscPrintf(rdy->comm, "  Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
     PetscPrintf(rdy->comm, "  Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
