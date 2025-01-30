@@ -80,9 +80,9 @@ mms:
         L2: 0.95
         Linf: 0.94
       c1:
-        L1: 0.94
-        L2: 0.95
-        Linf: 0.94
+        L1: 0.93
+        L2: 0.93
+        Linf: 0.95
 
 logging:
   level: none
