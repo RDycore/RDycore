@@ -1195,22 +1195,23 @@ a convergent manufactured solution. So these sections are replaced by a single
 <span class="w">    </span><span class="c1"># Manning coefficient n(x,y)</span>
 <span class="w">    </span><span class="nt">n</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">N * (1 + sin(K*x) * sin(K*y))</span>
 
-<span class="w">    </span><span class="c1"># Convergence study parameters (optional)</span>
-<span class="w">    </span><span class="nt">convergence</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">num_refinements</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
-<span class="w">      </span><span class="nt">expected_rates</span><span class="p">:</span>
-<span class="w">        </span><span class="nt">h</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">          </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">          </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.48</span>
-<span class="w">        </span><span class="nt">hu</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.73</span>
-<span class="w">          </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.78</span>
-<span class="w">          </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.62</span>
-<span class="w">        </span><span class="nt">hv</span><span class="p">:</span>
-<span class="w">          </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.73</span>
-<span class="w">          </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.78</span>
-<span class="w">          </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.62</span>
+<span class="w">  </span><span class="c1"># Convergence study parameters (optional)</span>
+<span class="w">  </span><span class="nt">convergence</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">num_refinements</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">    </span><span class="nt">base_refinement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">expected_rates</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">h</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">        </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">        </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.48</span>
+<span class="w">      </span><span class="nt">hu</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.73</span>
+<span class="w">        </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.78</span>
+<span class="w">        </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.62</span>
+<span class="w">      </span><span class="nt">hv</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.73</span>
+<span class="w">        </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.78</span>
+<span class="w">        </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.62</span>
 </code></pre></div>
 <p>The <code>mms</code> section defines the forms of the manufactured solutions for the
 model equations corresponding to parameters set in the <code>physics</code> section.</p>
@@ -1229,7 +1230,7 @@ elevation function, and <code>n</code>, the Manning coefficient) are functions o
 as needed by the model. This means you can define a new manufactured solution in
 every MMS driver input file, without developing code and rebuilding RDycore.</p>
 <h3 id="convergence-studies">Convergence studies</h3>
-<p>The optional <code>convergence</code> sub-subsection contains the following parameters for
+<p>The optional <code>convergence</code> subsection contains the following parameters for
 performing convergence studies that determine whether the MMS problem has been
 solved successfully for each solution component:</p>
 <ul>
@@ -1242,7 +1243,7 @@ solved successfully for each solution component:</p>
   mesh loaded from a file should be refined twice before performing a
   convergence study.</li>
 <li><code>expected_rates</code>: a sub-subsection with <code>L1</code>, <code>L2</code>, and <code>Linf</code>
-  entries for each relevant component name giving the expected rates of
+  entries for each relevant solution component name giving the expected rates of
   convergence for the appropriate error norms. Each of the component names and
   expected rates are optional, so you can specify only those you want to use
   as pass/fail criteria.</li>
