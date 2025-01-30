@@ -85,7 +85,6 @@ PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const Petsc
 
   Ceed ceed = CeedContext();
 
-  PetscCheck((num_sediment_comp == 1), PETSC_COMM_WORLD, PETSC_ERR_USER, "Ceed version of sediment only support one sediment class");
   CeedInt   num_comp = num_flow_comp + num_sediment_comp;
   RDyCells *cells    = &mesh->cells;
   RDyEdges *edges    = &mesh->edges;
@@ -225,7 +224,6 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const Petsc
 
   Ceed ceed = CeedContext();
 
-  PetscCheck((num_sediment_comp == 1), PETSC_COMM_WORLD, PETSC_ERR_USER, "Ceed version of sediment only support one sediment class");
   CeedInt   num_comp = num_flow_comp + num_sediment_comp;
   RDyCells *cells    = &mesh->cells;
   RDyEdges *edges    = &mesh->edges;
@@ -394,7 +392,6 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, PetscInt num_flow
 
   Ceed ceed = CeedContext();
 
-  PetscCheck((num_sediment_comp == 1), PETSC_COMM_WORLD, PETSC_ERR_USER, "Ceed version of sediment only support one sediment class");
   CeedInt   num_comp = num_flow_comp + num_sediment_comp;
   RDyCells *cells    = &mesh->cells;
 
@@ -402,7 +399,7 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, PetscInt num_flow
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
-  CeedInt       num_comp_geom = 2, num_comp_sediment_src = 4, num_comp_mannings_n = 1;
+  CeedInt       num_comp_geom = 2, num_comp_sediment_src = num_comp, num_comp_mannings_n = 1;
   switch (method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentSourceTermSemiImplicit, SedimentSourceTermSemiImplicit_loc, &qf));

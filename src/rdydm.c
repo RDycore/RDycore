@@ -178,9 +178,9 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
   rdy->sediment_fields.num_fields              = 1;
   rdy->sediment_fields.num_field_components[0] = num_sediment_class;
 
-  sprintf(rdy->sediment_fields.field_names[0], "Sediments");
+  snprintf(rdy->sediment_fields.field_names[0], MAX_NAME_LEN, "Sediments");
   for (PetscInt i = 0; i < num_sediment_class; i++) {
-    sprintf(rdy->sediment_fields.field_component_names[0][i], "Class_%" PetscInt_FMT, i);
+    snprintf(rdy->sediment_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
   }
 
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sediment_fields, &rdy->sediment_dm));
@@ -194,11 +194,11 @@ PetscErrorCode CreateFlowDM(RDy rdy) {
   rdy->flow_fields.num_fields              = 1;
   rdy->flow_fields.num_field_components[0] = 3;
 
-  sprintf(rdy->flow_fields.field_names[0], "Solution");
+  snprintf(rdy->flow_fields.field_names[0], MAX_NAME_LEN, "Solution");
 
-  sprintf(rdy->flow_fields.field_component_names[0][0], "Height");
-  sprintf(rdy->flow_fields.field_component_names[0][1], "MomentumX");
-  sprintf(rdy->flow_fields.field_component_names[0][2], "MomentumY");
+  snprintf(rdy->flow_fields.field_component_names[0][0], MAX_NAME_LEN, "Height");
+  snprintf(rdy->flow_fields.field_component_names[0][1], MAX_NAME_LEN, "MomentumX");
+  snprintf(rdy->flow_fields.field_component_names[0][2], MAX_NAME_LEN, "MomentumY");
 
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->flow_fields, &rdy->flow_dm));
 
