@@ -87,7 +87,7 @@ PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const RDyCo
   Ceed ceed = CeedContext();
 
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
-  CeedInt num_flow_comp     = 3 + num_sediment_comp;  // NOTE: SWE assumed!
+  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   CeedInt num_comp          = num_flow_comp + num_sediment_comp;
 
   RDyCells *cells = &mesh->cells;
@@ -225,7 +225,7 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
   Ceed ceed = CeedContext();
 
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
-  CeedInt num_flow_comp     = 3 + num_sediment_comp;  // NOTE: SWE assumed!
+  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   CeedInt num_comp          = num_flow_comp + num_sediment_comp;
 
   RDyCells *cells = &mesh->cells;
@@ -390,7 +390,7 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
   Ceed ceed = CeedContext();
 
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
-  CeedInt num_flow_comp     = 3 + num_sediment_comp;  // NOTE: SWE assumed!
+  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   CeedInt num_comp          = num_flow_comp + num_sediment_comp;
 
   RDyCells *cells = &mesh->cells;
