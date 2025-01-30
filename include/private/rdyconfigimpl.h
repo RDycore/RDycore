@@ -59,8 +59,9 @@ typedef struct {
 
 // physics flow parameters
 typedef struct {
-  RDyPhysicsFlowMode mode;    // flow mode
-  PetscReal          tiny_h;  // depth below which no flow occurs
+  RDyPhysicsFlowMode mode;             // flow mode
+  PetscReal          tiny_h;           // depth below which no flow occurs
+  PetscReal          h_anuga_regular;  // ANUGA height parameter used for velocity regularization.
   RDyFlowSource      source;
 } RDyPhysicsFlow;
 

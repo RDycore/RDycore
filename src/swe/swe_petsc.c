@@ -76,16 +76,18 @@ static PetscErrorCode DestroyRiemannEdgeData(RiemannEdgeData data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ComputeRiemannVelocities(PetscReal tiny_h, RiemannStateData *data) {
+static PetscErrorCode ComputeRiemannVelocities(PetscReal tiny_h, PetscReal h_anuga, RiemannStateData *data) {
   PetscFunctionBeginUser;
+  PetscReal denom;
 
   for (PetscInt n = 0; n < data->num_states; n++) {
     if (data->h[n] < tiny_h) {
       data->u[n] = 0.0;
       data->v[n] = 0.0;
     } else {
-      data->u[n] = data->hu[n] / data->h[n];
-      data->v[n] = data->hv[n] / data->h[n];
+      denom      = Square(data->h[n]) + Square(h_anuga);
+      data->u[n] = data->hu[n] * data->h[n] / denom;
+      data->v[n] = data->hv[n] * data->h[n] / denom;
     }
   }
 
@@ -206,12 +208,13 @@ static PetscErrorCode ComputeRoeFlux(RiemannStateData *datal, RiemannStateData *
 //------------------------
 
 typedef struct {
-  RDyMesh             *mesh;          // domain mesh
-  PetscReal            tiny_h;        // minimum water height for wet conditions
-  RiemannStateData     left_states;   // "left" riemann states on interior edges
-  RiemannStateData     right_states;  // "right" riemann states on interior edges
-  RiemannEdgeData      edges;         // riemann fluxes on interior edges
-  OperatorDiagnostics *diagnostics;   // courant number, etc
+  RDyMesh             *mesh;             // domain mesh
+  PetscReal            tiny_h;           // minimum water height for wet conditions
+  PetscReal            h_anuga_regular;  // ANUGA height parameter used in velocity regularization
+  RiemannStateData     left_states;      // "left" riemann states on interior edges
+  RiemannStateData     right_states;     // "right" riemann states on interior edges
+  RiemannEdgeData      edges;            // riemann fluxes on interior edges
+  OperatorDiagnostics *diagnostics;      // courant number, etc
 } InteriorFluxOperator;
 
 static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
@@ -260,9 +263,10 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
     }
   }
 
-  const PetscReal tiny_h = interior_flux_op->tiny_h;
-  PetscCall(ComputeRiemannVelocities(tiny_h, datal));
-  PetscCall(ComputeRiemannVelocities(tiny_h, datar));
+  const PetscReal tiny_h  = interior_flux_op->tiny_h;
+  const PetscReal h_anuga = interior_flux_op->h_anuga_regular;
+  PetscCall(ComputeRiemannVelocities(tiny_h, h_anuga, datal));
+  PetscCall(ComputeRiemannVelocities(tiny_h, h_anuga, datar));
 
   // call Riemann solver (only Roe currently supported)
   PetscCall(ComputeRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
@@ -330,7 +334,8 @@ static PetscErrorCode DestroyInteriorFlux(void *context) {
 /// @param [inout] diagnostics a set of diagnostics that can be updated by the PetscOperator
 /// @param [in]    tiny_h      the water height below which dry conditions are assumed
 /// @param [out]   petsc_op    the newly created PetscOperator
-PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
+PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscReal h_anuga_regular,
+                                                  PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   const PetscInt num_comp = 3;
@@ -338,9 +343,10 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, OperatorDiagnos
   InteriorFluxOperator *interior_flux_op;
   PetscCall(PetscCalloc1(1, &interior_flux_op));
   *interior_flux_op = (InteriorFluxOperator){
-      .mesh        = mesh,
-      .diagnostics = diagnostics,
-      .tiny_h      = tiny_h,
+      .mesh            = mesh,
+      .diagnostics     = diagnostics,
+      .tiny_h          = tiny_h,
+      .h_anuga_regular = h_anuga_regular,
   };
 
   // allocate left/right/edge Riemann data structures
@@ -377,6 +383,7 @@ typedef struct {
   Vec                  boundary_fluxes;     // boundary flux values vector
   OperatorDiagnostics *diagnostics;         // courant number, boundary fluxes
   PetscReal            tiny_h;              // minimum water height for wet conditions
+  PetscReal            h_anuga_regular;     // ANUGA height parameter used in velocity regularization
   RiemannStateData     left_states;
   RiemannStateData     right_states;
   RiemannEdgeData      edges;
@@ -478,8 +485,10 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
   RiemannEdgeData  *data_edge = &boundary_flux_op->edges;
 
   // copy the "left cell" values into the "left states"
-  const PetscReal tiny_h = boundary_flux_op->tiny_h;
-  RDyEdges       *edges  = &boundary_flux_op->mesh->edges;
+  const PetscReal tiny_h  = boundary_flux_op->tiny_h;
+  const PetscReal h_anuga = boundary_flux_op->h_anuga_regular;
+
+  RDyEdges *edges = &boundary_flux_op->mesh->edges;
   for (PetscInt e = 0; e < boundary.num_edges; ++e) {
     PetscInt edge_id            = boundary.edge_ids[e];
     PetscInt left_local_cell_id = edges->cell_ids[2 * edge_id];
@@ -487,7 +496,7 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
     datal->hu[e]                = u_ptr[n_dof * left_local_cell_id + 1];
     datal->hv[e]                = u_ptr[n_dof * left_local_cell_id + 2];
   }
-  PetscCall(ComputeRiemannVelocities(tiny_h, datal));
+  PetscCall(ComputeRiemannVelocities(tiny_h, h_anuga, datal));
 
   // compute the "right" Riemann cell values using the boundary condition
   switch (boundary_condition.flow->type) {
@@ -498,7 +507,7 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
         datar->hu[e] = boundary_values_ptr[n_dof * e + 1];
         datar->hv[e] = boundary_values_ptr[n_dof * e + 2];
       }
-      PetscCall(ComputeRiemannVelocities(tiny_h, datar));
+      PetscCall(ComputeRiemannVelocities(tiny_h, h_anuga, datar));
       break;
     case CONDITION_REFLECTING:
       PetscCall(ApplyReflectingBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
@@ -570,7 +579,8 @@ static PetscErrorCode DestroyBoundaryFlux(void *context) {
 /// @param [in]    tiny_h             the water height below which dry conditions are assumed
 /// @param [out]   petsc_op           the newly created PetscOperator
 PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary boundary, RDyCondition boundary_condition, Vec boundary_values,
-                                                  Vec boundary_fluxes, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscOperator *petsc_op) {
+                                                  Vec boundary_fluxes, OperatorDiagnostics *diagnostics, PetscReal tiny_h, PetscReal h_anuga_regular,
+                                                  PetscOperator *petsc_op) {
   PetscFunctionBegin;
   BoundaryFluxOperator *boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
@@ -582,6 +592,7 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, RDyBoundary bou
       .boundary_fluxes    = boundary_fluxes,
       .diagnostics        = diagnostics,
       .tiny_h             = tiny_h,
+      .h_anuga_regular    = h_anuga_regular,
   };
 
   // allocate left/right/edge Riemann data structures

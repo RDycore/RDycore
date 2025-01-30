@@ -137,6 +137,7 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
   Ceed                ceed             = CeedContext();
   RDyFlowSourceMethod time_method      = op->config->physics.flow.source.method;
   PetscReal           tiny_h           = op->config->physics.flow.tiny_h;
+  PetscReal           h_anuga_regular  = op->config->physics.flow.h_anuga_regular;
   PetscReal           xq2018_threshold = op->config->physics.flow.source.xq2018_threshold;
 
   //---------------
@@ -147,7 +148,7 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
 
   // suboperator 0: fluxes between interior cells
   CeedOperator interior_flux_op;
-  PetscCall(CreateSWECeedInteriorFluxOperator(op->mesh, tiny_h, &interior_flux_op));
+  PetscCall(CreateSWECeedInteriorFluxOperator(op->mesh, tiny_h, h_anuga_regular, &interior_flux_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux, interior_flux_op));
   PetscCallCEED(CeedOperatorDestroy(&interior_flux_op));
 
@@ -156,7 +157,7 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
     CeedOperator boundary_flux_op;
     RDyBoundary  boundary  = op->boundaries[b];
     RDyCondition condition = op->boundary_conditions[b];
-    PetscCall(CreateSWECeedBoundaryFluxOperator(op->mesh, boundary, condition, tiny_h, &boundary_flux_op));
+    PetscCall(CreateSWECeedBoundaryFluxOperator(op->mesh, boundary, condition, tiny_h, h_anuga_regular, &boundary_flux_op));
     PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux, boundary_flux_op));
     PetscCallCEED(CeedOperatorDestroy(&boundary_flux_op));
   }
@@ -170,7 +171,7 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
   PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.source));
 
   CeedOperator source_op;
-  PetscCall(CreateSWECeedSourceOperator(op->mesh, time_method, tiny_h, xq2018_threshold, &source_op));
+  PetscCall(CreateSWECeedSourceOperator(op->mesh, time_method, tiny_h, h_anuga_regular, xq2018_threshold, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
   PetscCallCEED(CeedOperatorDestroy(&source_op));
 
@@ -255,11 +256,12 @@ static PetscErrorCode AddPetscFlowOperators(Operator *op) {
 
   RDyFlowSourceMethod time_method      = op->config->physics.flow.source.method;
   PetscReal           tiny_h           = op->config->physics.flow.tiny_h;
+  PetscReal           h_anuga_regular  = op->config->physics.flow.h_anuga_regular;
   PetscReal           xq2018_threshold = op->config->physics.flow.source.xq2018_threshold;
 
   // flux suboperator 0: fluxes between interior cells
   PetscOperator interior_flux_op;
-  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->diagnostics, tiny_h, &interior_flux_op));
+  PetscCall(CreateSWEPetscInteriorFluxOperator(op->mesh, &op->diagnostics, tiny_h, h_anuga_regular, &interior_flux_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
@@ -268,7 +270,7 @@ static PetscErrorCode AddPetscFlowOperators(Operator *op) {
     RDyBoundary   boundary  = op->boundaries[b];
     RDyCondition  condition = op->boundary_conditions[b];
     PetscCall(CreateSWEPetscBoundaryFluxOperator(op->mesh, boundary, condition, op->petsc.boundary_values[b], op->petsc.boundary_fluxes[b],
-                                                 &op->diagnostics, tiny_h, &boundary_flux_op));
+                                                 &op->diagnostics, tiny_h, h_anuga_regular, &boundary_flux_op));
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, boundary_flux_op));
   }
 
