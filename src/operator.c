@@ -182,23 +182,17 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
 static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
   PetscFunctionBegin;
 
-  // set up operators for the shallow water equations
-
-  Ceed ceed = CeedContext();
-
   //---------------
   // Flux Operator
   //---------------
 
-  PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.flux));
-
-  // suboperator 0: fluxes between interior cells
+  // fluxes between interior cells
   CeedOperator interior_flux_op;
   PetscCall(CreateSedimentCeedInteriorFluxOperator(op->mesh, *op->config, &interior_flux_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.flux, interior_flux_op));
   PetscCallCEED(CeedOperatorDestroy(&interior_flux_op));
 
-  // suboperators 1 to num_boundaries: fluxes on boundary edges
+  // fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
     CeedOperator boundary_flux_op;
     RDyBoundary  boundary  = op->boundaries[b];
@@ -214,8 +208,6 @@ static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
   // Source Operator
   //-----------------
 
-  PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.source));
-
   CeedOperator source_op;
   PetscCall(CreateSedimentCeedSourceOperator(op->mesh, *op->config, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
@@ -229,9 +221,8 @@ static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
 static PetscErrorCode AddCeedOperators(Operator *op) {
   PetscFunctionBegin;
 
-  if (!op->config->physics.sediment.num_classes) {
-    PetscCall(AddCeedFlowOperators(op));
-  } else {
+  PetscCall(AddCeedFlowOperators(op));
+  if (op->config->physics.sediment.num_classes) {
     PetscCall(AddCeedSedimentOperators(op));
   }
 
@@ -283,20 +274,16 @@ static PetscErrorCode AddPetscFlowOperators(Operator *op) {
 static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
   PetscFunctionBegin;
 
-  PetscCall(PetscCompositeOperatorCreate(&op->petsc.flux));
-  PetscCall(PetscCompositeOperatorCreate(&op->petsc.source));
-
   if (op->config->physics.flow.mode != FLOW_SWE) {
     PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Sediment only supported with SWE");
   }
 
-  // flux suboperator 0: fluxes between interior cells
-
+  // fluxes between interior cells
   PetscOperator interior_flux_op;
   PetscCall(CreateSedimentPetscInteriorFluxOperator(op->mesh, *op->config, &op->diagnostics, &interior_flux_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, interior_flux_op));
 
-  // flux suboperators 1 to num_boundaries: fluxes on boundary edges
+  // fluxes on boundary edges
   for (CeedInt b = 0; b < op->num_boundaries; ++b) {
     PetscOperator boundary_flux_op;
     RDyBoundary   boundary  = op->boundaries[b];
@@ -306,7 +293,7 @@ static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
     PetscCall(PetscCompositeOperatorAddSub(op->petsc.flux, boundary_flux_op));
   }
 
-  // domain-wide SWE source operator
+  // domain-wide sediment source operator
   PetscOperator source_op;
   PetscCall(CreateSedimentPetscSourceOperator(op->mesh, *op->config, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS],
                                               &source_op));
@@ -321,10 +308,9 @@ static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
 static PetscErrorCode AddPetscOperators(Operator *op) {
   PetscFunctionBegin;
 
-  if (!op->config->physics.sediment.num_classes) {
-    PetscCall(AddPetscFlowOperators(op));
-  } else {
-    PetscCall(AddPetscSedimentOperators(op));
+  PetscCall(AddPetscFlowOperators(op));
+  if (op->config->physics.sediment.num_classes) {
+    //    PetscCall(AddPetscSedimentOperators(op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

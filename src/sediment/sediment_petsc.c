@@ -177,37 +177,30 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
 
   PetscInt ci_index_offset;
 
-  PetscReal cihat[MAX_NUM_SECTION_FIELD_COMPONENTS];
-  PetscReal dch[MAX_NUM_SECTION_FIELD_COMPONENTS];
-  PetscReal R[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS];
-  PetscReal A[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS];
-  PetscReal dW[MAX_NUM_SECTION_FIELD_COMPONENTS];
-  PetscReal FL[MAX_NUM_SECTION_FIELD_COMPONENTS], FR[MAX_NUM_SECTION_FIELD_COMPONENTS];
-
-  // initialize
-  for (PetscInt i = 0; i < MAX_NUM_SECTION_FIELD_COMPONENTS; i++) {
-    for (PetscInt j = 0; j < MAX_NUM_SECTION_FIELD_COMPONENTS; j++) {
-      R[i][j] = 0.0;
-    }
-  }
+  PetscReal cihat[MAX_NUM_SECTION_FIELD_COMPONENTS]                               = {0};
+  PetscReal dch[MAX_NUM_SECTION_FIELD_COMPONENTS]                                 = {0};
+  PetscReal R[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
+  PetscReal A[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
+  PetscReal dW[MAX_NUM_SECTION_FIELD_COMPONENTS]                                  = {0};
+  PetscReal FL[MAX_NUM_SECTION_FIELD_COMPONENTS] = {0}, FR[MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
 
   for (PetscInt i = 0; i < num_states; ++i) {
     // compute Roe averages
-    PetscReal duml  = pow(hl[i], 0.5);
-    PetscReal dumr  = pow(hr[i], 0.5);
-    PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
-    PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
-    PetscReal hhat  = duml * dumr;
+    PetscReal duml = pow(hl[i], 0.5);
+    PetscReal dumr = pow(hr[i], 0.5);
+    // PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
+    // PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
+    // PetscReal hhat  = duml * dumr;
     PetscReal uhat  = (duml * ul[i] + dumr * ur[i]) / (duml + dumr);
     PetscReal vhat  = (duml * vl[i] + dumr * vr[i]) / (duml + dumr);
     PetscReal chat  = pow(0.5 * GRAVITY * (hl[i] + hr[i]), 0.5);
     PetscReal uperp = uhat * cn[i] + vhat * sn[i];
 
-    PetscReal dh     = hr[i] - hl[i];
-    PetscReal du     = ur[i] - ul[i];
-    PetscReal dv     = vr[i] - vl[i];
-    PetscReal dupar  = -du * sn[i] + dv * cn[i];
-    PetscReal duperp = du * cn[i] + dv * sn[i];
+    PetscReal dh = hr[i] - hl[i];
+    // PetscReal du     = ur[i] - ul[i];
+    // PetscReal dv     = vr[i] - vl[i];
+    // PetscReal dupar  = -du * sn[i] + dv * cn[i];
+    // PetscReal duperp = du * cn[i] + dv * sn[i];
 
     ci_index_offset = i * sed_ncomp;
     for (PetscInt j = 0; j < sed_ncomp; j++) {
@@ -215,20 +208,23 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
       dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
     }
 
+    /*
     dW[0] = 0.5 * (dh - hhat * duperp / chat);
     dW[1] = hhat * dupar;
     dW[2] = 0.5 * (dh + hhat * duperp / chat);
+    */
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      dW[j + 3] = dch[j] - cihat[j] * dh;
+      dW[flow_ncomp + j] = dch[j] - cihat[j] * dh;
     }
 
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
     PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
-    PetscReal al1    = uperpl - cl;
-    PetscReal al3    = uperpl + cl;
-    PetscReal ar1    = uperpr - cr;
-    PetscReal ar3    = uperpr + cr;
+    // PetscReal al1    = uperpl - cl;
+    // PetscReal al3    = uperpl + cl;
+    // PetscReal ar1    = uperpr - cr;
+    // PetscReal ar3    = uperpr + cr;
 
+    /*
     R[0][0] = 1.0;
     R[0][1] = 0.0;
     R[0][2] = 1.0;
@@ -238,18 +234,20 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     R[2][0] = vhat - chat * sn[i];
     R[2][1] = cn[i];
     R[2][2] = vhat + chat * sn[i];
+    */
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      R[j + 3][0]     = cihat[j];
-      R[j + 3][2]     = cihat[j];
-      R[j + 3][j + 3] = 1.0;
+      R[flow_ncomp + j][0]              = cihat[j];
+      R[flow_ncomp + j][2]              = cihat[j];
+      R[flow_ncomp + j][flow_ncomp + j] = 1.0;
     }
 
-    PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
-    PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
-    PetscReal a1  = fabs(uperp - chat);
-    PetscReal a2  = fabs(uperp);
-    PetscReal a3  = fabs(uperp + chat);
+    // PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
+    // PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
+    // PetscReal a1  = fabs(uperp - chat);
+    PetscReal a2 = fabs(uperp);
+    // PetscReal a3  = fabs(uperp + chat);
 
+    /*
     // Critical flow fix
     if (a1 < da1) {
       a1 = 0.5 * (a1 * a1 / da1 + da1);
@@ -257,20 +255,19 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     if (a3 < da3) {
       a3 = 0.5 * (a3 * a3 / da3 + da3);
     }
+    */
 
     // Compute interface flux
-    for (PetscInt i = 0; i < 3; i++) {
-      for (PetscInt j = 0; j < 3; j++) {
-        A[i][j] = 0.0;
-      }
-    }
+    /*
     A[0][0] = a1;
     A[1][1] = a2;
     A[2][2] = a3;
+    */
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      A[j + 3][j + 3] = a2;
+      A[j + flow_ncomp][j + flow_ncomp] = a2;
     }
 
+    /*
     FL[0] = uperpl * hl[i];
     FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
     FL[2] = vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i];
@@ -278,20 +275,23 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     FR[0] = uperpr * hr[i];
     FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
     FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
+    */
 
     ci_index_offset = i * sed_ncomp;
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      FL[j + 3] = hl[i] * uperpl * cil[ci_index_offset + j];
-      FR[j + 3] = hr[i] * uperpr * cir[ci_index_offset + j];
+      FL[flow_ncomp + j] = hl[i] * uperpl * cil[ci_index_offset + j];
+      FR[flow_ncomp + j] = hr[i] * uperpr * cir[ci_index_offset + j];
     }
 
     // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
     for (PetscInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
       for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
-        if (dof2 == 0) {
-          fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
-        }
-        fij[soln_ncomp * i + dof1] = fij[soln_ncomp * i + dof1] - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
+        // for (PetscInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
+        //   for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
+        //     if (dof2 == 0) {
+        //       fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
+        //     }
+        fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]) - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
       }
     }
 
@@ -317,8 +317,8 @@ typedef struct {
 /// @brief Computes the fluxes through the interior edges of mesh locally owned and
 ///        adds contribution in f_global Vec.
 /// @param [in] context  a SedimentInteriorFluxOperator
-/// @param [in] fields   a PetscOperatorFields ! FIXME: Can possibly be deleted
-/// @param [in] dt       time step             ! FIXME: Can possibly be deleted
+/// @param [in] fields   a PetscOperatorFields
+/// @param [in] dt       time step
 /// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
 /// @param [in] f_global a Vec for storing RHS contrinution from interior edges
 /// @return 0 on success, or a non-zero error code on failure
@@ -363,6 +363,7 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
     PetscInt right_local_cell_id = edges->cell_ids[2 * edge_id + 1];
 
     if (right_local_cell_id != -1) {
+      // NOTE: SWE assumed!
       datal->h[e]  = u_ptr[n_dof * left_local_cell_id + 0];
       datal->hu[e] = u_ptr[n_dof * left_local_cell_id + 1];
       datal->hv[e] = u_ptr[n_dof * left_local_cell_id + 2];
@@ -372,8 +373,8 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
       datar->hv[e] = u_ptr[n_dof * right_local_cell_id + 2];
 
       for (PetscInt s = 0; s < num_sediment_comp; s++) {
-        datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
-        datar->hci[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + 3 + s];
+        datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + num_flow_comp + s];
+        datar->hci[e * num_sediment_comp + s] = u_ptr[n_dof * right_local_cell_id + num_flow_comp + s];
       }
     }
   }
@@ -386,7 +387,7 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
   // call Riemann solver (only Roe currently supported)
   PetscCall(ComputeSedimentRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
 
-  // accummulate the flux values in the global flux vector
+  // accumulate the flux values in the global flux vector
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
     PetscInt edge_id             = edges->internal_edge_ids[e];
     PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
@@ -601,12 +602,14 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
   for (PetscInt e = 0; e < boundary.num_edges; ++e) {
     PetscInt edge_id            = boundary.edge_ids[e];
     PetscInt left_local_cell_id = edges->cell_ids[2 * edge_id];
-    datal->h[e]                 = u_ptr[n_dof * left_local_cell_id + 0];
-    datal->hu[e]                = u_ptr[n_dof * left_local_cell_id + 1];
-    datal->hv[e]                = u_ptr[n_dof * left_local_cell_id + 2];
+
+    // NOTE: SWE assumed!
+    datal->h[e]  = u_ptr[n_dof * left_local_cell_id + 0];
+    datal->hu[e] = u_ptr[n_dof * left_local_cell_id + 1];
+    datal->hv[e] = u_ptr[n_dof * left_local_cell_id + 2];
 
     for (PetscInt s = 0; s < num_sediment_comp; s++) {
-      datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + 3 + s];
+      datal->hci[e * num_sediment_comp + s] = u_ptr[n_dof * left_local_cell_id + num_flow_comp + s];
     }
   }
 
@@ -619,11 +622,12 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
     case CONDITION_DIRICHLET:
       // copy Dirichlet boundary values into the "right states"
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+        // NOTE: SWE assumed!
         datar->h[e]  = boundary_values_ptr[n_dof * e + 0];
         datar->hu[e] = boundary_values_ptr[n_dof * e + 1];
         datar->hv[e] = boundary_values_ptr[n_dof * e + 2];
         for (PetscInt s = 0; s < num_sediment_comp; s++) {
-          datar->hci[e * num_sediment_comp + s] = boundary_values_ptr[n_dof * e + 3 + s];
+          datar->hci[e * num_sediment_comp + s] = boundary_values_ptr[n_dof * e + num_flow_comp + s];
         }
       }
       PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));
@@ -663,7 +667,7 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
         }
 
         PetscInt owned_cell_id = cells->local_to_owned[local_cell_id];
-        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+        for (PetscInt i_dof = num_flow_comp; i_dof < n_dof; i_dof++) {
           f_ptr[n_dof * owned_cell_id + i_dof] += boundary_fluxes_ptr[n_dof * e + i_dof] * (-edge_len / cell_area);
         }
       }
@@ -777,6 +781,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   RDyMesh                *mesh              = source_op->mesh;
   RDyCells               *cells             = &mesh->cells;
   PetscReal               tiny_h            = source_op->tiny_h;
+  PetscInt                num_flow_comp     = source_op->num_flow_comp;
   PetscInt                num_sediment_comp = source_op->num_sediment_comp;
 
   // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
@@ -808,20 +813,20 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
 
-      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal h  = u_ptr[n_dof * c + 0];  // NOTE: SWE assumed!
       PetscReal hu = u_ptr[n_dof * c + 1];
       PetscReal hv = u_ptr[n_dof * c + 2];
 
-      PetscReal dz_dx = cells->dz_dx[c];
-      PetscReal dz_dy = cells->dz_dy[c];
+      // PetscReal dz_dx = cells->dz_dx[c];
+      // PetscReal dz_dy = cells->dz_dy[c];
 
-      PetscReal bedx = dz_dx * GRAVITY * h;
-      PetscReal bedy = dz_dy * GRAVITY * h;
+      // PetscReal bedx = dz_dx * GRAVITY * h;
+      // PetscReal bedy = dz_dy * GRAVITY * h;
 
-      PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
-      PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
+      // PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
+      // PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
 
-      PetscReal tbx = 0.0, tby = 0.0;
+      // PetscReal tbx = 0.0, tby = 0.0;
 
       if (h >= tiny_h) {  // wet conditions
         PetscReal u = hu / h;
@@ -833,27 +838,29 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
 
-        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
-        PetscReal tb       = Cd * velocity / h;
-        PetscReal factor   = tb / (1.0 + dt * tb);
+        // PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+        // PetscReal tb       = Cd * velocity / h;
+        // PetscReal factor   = tb / (1.0 + dt * tb);
 
-        tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
-        tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+        // tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
+        // tby = (hv + dt * Fsum_y - dt * bedy) * factor;
 
         for (PetscInt s = 0; s < num_sediment_comp; s++) {
-          PetscReal ci    = u_ptr[n_dof * c + 3 + s] / h;
+          PetscReal ci    = u_ptr[n_dof * c + num_flow_comp + s] / h;
           PetscReal tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
-          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + 3 + s];
+          f_ptr[n_dof * owned_cell_id + num_flow_comp + s] += (ei - di);
         }
       }
 
+      /*
       // NOTE: we accumulate everything into the RHS vector by convention.
       f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
       f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+      */
     }
   }
 
