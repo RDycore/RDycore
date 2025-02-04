@@ -98,7 +98,7 @@ clay and 1.13 for loam.
 #### Overland flow-driven entrainment and re-entrainment rates
 
 \begin{eqnarray}
-r_p &=& (1-H)f_p}\frac{F(\Omega-\Omega_{cr})}{J} \\
+r_p &=& (1-H)f_p\frac{F(\Omega-\Omega_{cr})}{J} \\
 r_{rp} &=& H\frac{M_p}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
 \end{eqnarray}
 
@@ -282,7 +282,7 @@ balance the bed slope terms for the still water condition.
 The fluxes at the interface between cells can be approximated with Roe's method:
 
 \begin{equation}
-\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} =
+\mathbf{\vec{F}} \cdot \vec{n} \approx \mathbf{F}_{\parallel,f} =
 \frac{1}{2} \left(\mathbf{F}_{\parallel,L} + \mathbf{F}_{\parallel,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
 \end{equation}
 
