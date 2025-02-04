@@ -154,6 +154,10 @@ struct _p_RDy {
   PetscViewerAndFormat *output_vf;
 };
 
+// floating point exceptions (GNU-specific)
+PETSC_INTERN PetscErrorCode EnableFloatingPointExceptions(void);
+PETSC_INTERN PetscErrorCode DisableFloatingPointExceptions(void);
+
 // these are used by both the main (RDycore) driver and the MMS driver
 PETSC_INTERN PetscErrorCode DetermineConfigPrefix(RDy, char *);
 PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);     // for RDycore driver only!
