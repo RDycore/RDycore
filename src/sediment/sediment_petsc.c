@@ -595,7 +595,9 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
 
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
-  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER, "Number of dof in local vector do not match flow and sediment dof!");
+  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER,
+             "Mismatch in number of dof in local vector (%" PetscInt_FMT ") and flow + sediment (%" PetscInt_FMT ")", n_dof,
+             num_flow_comp + num_sediment_comp);
 
   // copy the "left cell" values into the "left states"
   RDyEdges *edges = &boundary_flux_op->mesh->edges;
@@ -808,6 +810,9 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
 
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER,
+             "Mismatch in number of dof in local vector (%" PetscInt_FMT ") and flow + sediment (%" PetscInt_FMT ")", n_dof,
+             num_flow_comp + num_sediment_comp);
 
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {

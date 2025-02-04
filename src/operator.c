@@ -310,7 +310,7 @@ static PetscErrorCode AddPetscOperators(Operator *op) {
 
   PetscCall(AddPetscFlowOperators(op));
   if (op->config->physics.sediment.num_classes) {
-    //    PetscCall(AddPetscSedimentOperators(op));
+    PetscCall(AddPetscSedimentOperators(op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

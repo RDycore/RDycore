@@ -95,6 +95,7 @@ static PetscErrorCode ComputeRiemannVelocities(PetscReal tiny_h, PetscReal h_anu
 }
 
 /// Computes flux based on Roe solver
+/// @param [in] n_dof the TOTAL number of components in the flux vector (>= 3)
 /// @param [in] *datal A RiemannDataSWE for values left of the edges
 /// @param [in] *datar A RiemannDataSWE for values right of the edges
 /// @param [in] sn array containing sines of the angles between edges and y-axis (length N)
@@ -102,8 +103,8 @@ static PetscErrorCode ComputeRiemannVelocities(PetscReal tiny_h, PetscReal h_anu
 /// @param [out] fij array containing fluxes through edges (length 3*N)
 /// @param [out] amax array storing maximum courant number on edges (length N)
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeRoeFlux(RiemannStateData *datal, RiemannStateData *datar, const PetscReal *sn, const PetscReal *cn, PetscReal *fij,
-                                     PetscReal *amax) {
+static PetscErrorCode ComputeRoeFlux(PetscInt n_dof, RiemannStateData *datal, RiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
+                                     PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
   PetscReal *hl = datal->h;
@@ -135,10 +136,11 @@ static PetscErrorCode ComputeRoeFlux(RiemannStateData *datal, RiemannStateData *
     PetscReal dupar  = -du * sn[i] + dv * cn[i];
     PetscReal duperp = du * cn[i] + dv * sn[i];
 
-    PetscReal dW[3];
-    dW[0] = 0.5 * (dh - hhat * duperp / chat);
-    dW[1] = hhat * dupar;
-    dW[2] = 0.5 * (dh + hhat * duperp / chat);
+    PetscReal dW[3] = {
+        0.5 * (dh - hhat * duperp / chat),
+        hhat * dupar,
+        0.5 * (dh + hhat * duperp / chat),
+    };
 
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
     PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
@@ -147,16 +149,11 @@ static PetscErrorCode ComputeRoeFlux(RiemannStateData *datal, RiemannStateData *
     PetscReal ar1    = uperpr - cr;
     PetscReal ar3    = uperpr + cr;
 
-    PetscReal R[3][3] = {0};
-    R[0][0]           = 1.0;
-    R[0][1]           = 0.0;
-    R[0][2]           = 1.0;
-    R[1][0]           = uhat - chat * cn[i];
-    R[1][1]           = -sn[i];
-    R[1][2]           = uhat + chat * cn[i];
-    R[2][0]           = vhat - chat * sn[i];
-    R[2][1]           = cn[i];
-    R[2][2]           = vhat + chat * sn[i];
+    PetscReal R[3][3] = {
+        {1.0,                 0.0,    1.0                },
+        {uhat - chat * cn[i], -sn[i], uhat + chat * cn[i]},
+        {vhat - chat * sn[i], cn[i],  vhat + chat * sn[i]},
+    };
 
     PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
     PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
@@ -173,24 +170,28 @@ static PetscErrorCode ComputeRoeFlux(RiemannStateData *datal, RiemannStateData *
     }
 
     // Compute interface flux
-    PetscReal A[3][3] = {0};
-    A[0][0]           = a1;
-    A[1][1]           = a2;
-    A[2][2]           = a3;
+    PetscReal A[3][3] = {
+        {a1,  0.0, 0.0},
+        {0.0, a2,  0.0},
+        {0.0, 0.0, a3 },
+    };
 
-    PetscReal FL[3], FR[3];
-    FL[0] = uperpl * hl[i];
-    FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
-    FL[2] = vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i];
+    PetscReal FL[3] = {
+        uperpl * hl[i],
+        ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i],
+        vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i],
+    };
 
-    FR[0] = uperpr * hr[i];
-    FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
-    FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
+    PetscReal FR[3] = {
+        uperpr * hr[i],
+        ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i],
+        vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i],
+    };
 
     // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-    fij[3 * i + 0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0][0] * dW[0] - R[0][1] * A[1][1] * dW[1] - R[0][2] * A[2][2] * dW[2]);
-    fij[3 * i + 1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0][0] * dW[0] - R[1][1] * A[1][1] * dW[1] - R[1][2] * A[2][2] * dW[2]);
-    fij[3 * i + 2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0][0] * dW[0] - R[2][1] * A[1][1] * dW[1] - R[2][2] * A[2][2] * dW[2]);
+    fij[n_dof * i + 0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0][0] * dW[0] - R[0][1] * A[1][1] * dW[1] - R[0][2] * A[2][2] * dW[2]);
+    fij[n_dof * i + 1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0][0] * dW[0] - R[1][1] * A[1][1] * dW[1] - R[1][2] * A[2][2] * dW[2]);
+    fij[n_dof * i + 2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0][0] * dW[0] - R[2][1] * A[1][1] * dW[1] - R[2][2] * A[2][2] * dW[2]);
 
     amax[i] = chat + fabs(uperp);
   }
@@ -231,7 +232,7 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
 
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
-  // PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+  PetscCheck(n_dof >= 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be at least 3!");
 
   RiemannStateData *datal        = &interior_flux_op->left_states;
   RiemannStateData *datar        = &interior_flux_op->right_states;
@@ -264,7 +265,8 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
   PetscCall(ComputeRiemannVelocities(tiny_h, h_anuga, datar));
 
   // call Riemann solver (only Roe currently supported)
-  PetscCall(ComputeRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+  // NOTE: flux_vec_int has only 3 components here
+  PetscCall(ComputeRoeFlux(3, datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
 
   // accummulate the flux values in the global flux vector
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
@@ -291,6 +293,7 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
           else courant_num_diags->global_cell_id = cells->global_ids[right_local_cell_id];
         }
 
+        // NOTE: however many DoF we have, SWE only computes 3 fluxes
         for (PetscInt i_dof = 0; i_dof < 3; i_dof++) {
           if (cells->is_owned[left_local_cell_id]) {
             PetscInt left_owned_cell_id = cells->local_to_owned[left_local_cell_id];
@@ -471,7 +474,7 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
 
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
-  // PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+  PetscCheck(n_dof >= 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be at least 3!");
 
   // apply boundary conditions
   RiemannStateData *datal     = &boundary_flux_op->left_states;
@@ -514,7 +517,8 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
   }
 
   // solve the Riemann problem (only the Roe method is currently supported)
-  PetscCall(ComputeRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+  // NOTE: boundary_fluxes_ptr has n_dof components
+  PetscCall(ComputeRoeFlux(n_dof, datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
 
   // accumulate the flux values in f_global
   RDyCells                 *cells             = &boundary_flux_op->mesh->cells;
@@ -538,7 +542,7 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
         }
 
         PetscInt owned_cell_id = cells->local_to_owned[local_cell_id];
-        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+        for (PetscInt i_dof = 0; i_dof < 3; i_dof++) {
           f_ptr[n_dof * owned_cell_id + i_dof] += boundary_fluxes_ptr[n_dof * e + i_dof] * (-edge_len / cell_area);
         }
       }
@@ -646,10 +650,9 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscScalar *flux_div_ptr;
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
-  PetscInt size;
-  PetscCall(VecGetSize(source_vec, &size));
-  PetscInt n_dof = size / mesh->num_owned_cells;
-  // PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof >= 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be at least 3!");
 
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
@@ -742,10 +745,9 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscScalar *flux_div_ptr;
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
-  PetscInt size;
-  PetscCall(VecGetSize(source_vec, &size));
-  PetscInt n_dof = size / mesh->num_owned_cells;
-  // PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof >= 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be at least 3!");
 
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
