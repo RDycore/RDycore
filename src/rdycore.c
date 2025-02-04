@@ -7,42 +7,6 @@
 static PetscBool initialized_ = PETSC_FALSE;
 PetscClassId     RDY_CLASSID;
 
-// set up floating point exception trapping on GNU compilers where supported
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
-#if !defined(NDEBUG) && defined(__GNUC__)
-
-#define _GNU_SOURCE
-#include <fenv.h>
-
-PetscErrorCode EnableFloatingPointExceptions(void) {
-  PetscFunctionBegin;
-  feenableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode DisableFloatingPointExceptions(void) {
-  PetscFunctionBegin;
-  fedisableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-#pragma GCC diagnostic pop
-
-#else  // non-GNU compiler
-
-PetscErrorCode EnableFloatingPointExceptions(void) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode DisableFloatingPointExceptions(void) {
-  PetscFunctionBegin;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-#endif
-
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
 PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
@@ -62,10 +26,6 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
 
     // initialize our Courant number diagnostics MPI datatype / operator
     PetscCall(InitCourantNumberDiagnostics());
-
-#ifndef NDEBUG
-    EnableFloatingPointExceptions();
-#endif
 
     initialized_ = PETSC_TRUE;
   }
@@ -94,10 +54,6 @@ PetscErrorCode RDyInitFortran(void) {
 
     // initialize our Courant number diagnostics MPI datatype / operator
     PetscCall(InitCourantNumberDiagnostics());
-
-#ifndef NDEBUG
-    EnableFloatingPointExceptions();
-#endif
 
     initialized_ = PETSC_TRUE;
   }
