@@ -186,21 +186,21 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
 
   for (PetscInt i = 0; i < num_states; ++i) {
     // compute Roe averages
-    PetscReal duml = pow(hl[i], 0.5);
-    PetscReal dumr = pow(hr[i], 0.5);
-    // PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
-    // PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
-    // PetscReal hhat  = duml * dumr;
+    PetscReal duml  = pow(hl[i], 0.5);
+    PetscReal dumr  = pow(hr[i], 0.5);
+    PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
+    PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
+    PetscReal hhat  = duml * dumr;
     PetscReal uhat  = (duml * ul[i] + dumr * ur[i]) / (duml + dumr);
     PetscReal vhat  = (duml * vl[i] + dumr * vr[i]) / (duml + dumr);
     PetscReal chat  = pow(0.5 * GRAVITY * (hl[i] + hr[i]), 0.5);
     PetscReal uperp = uhat * cn[i] + vhat * sn[i];
 
     PetscReal dh = hr[i] - hl[i];
-    // PetscReal du     = ur[i] - ul[i];
-    // PetscReal dv     = vr[i] - vl[i];
+    PetscReal du = ur[i] - ul[i];
+    PetscReal dv = vr[i] - vl[i];
     // PetscReal dupar  = -du * sn[i] + dv * cn[i];
-    // PetscReal duperp = du * cn[i] + dv * sn[i];
+    PetscReal duperp = du * cn[i] + dv * sn[i];
 
     ci_index_offset = i * sed_ncomp;
     for (PetscInt j = 0; j < sed_ncomp; j++) {
@@ -208,21 +208,19 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
       dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
     }
 
-    /*
     dW[0] = 0.5 * (dh - hhat * duperp / chat);
-    dW[1] = hhat * dupar;
+    // dW[1] = hhat * dupar;
     dW[2] = 0.5 * (dh + hhat * duperp / chat);
-    */
     for (PetscInt j = 0; j < sed_ncomp; j++) {
       dW[flow_ncomp + j] = dch[j] - cihat[j] * dh;
     }
 
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
     PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
-    // PetscReal al1    = uperpl - cl;
-    // PetscReal al3    = uperpl + cl;
-    // PetscReal ar1    = uperpr - cr;
-    // PetscReal ar3    = uperpr + cr;
+    PetscReal al1    = uperpl - cl;
+    PetscReal al3    = uperpl + cl;
+    PetscReal ar1    = uperpr - cr;
+    PetscReal ar3    = uperpr + cr;
 
     /*
     R[0][0] = 1.0;
@@ -241,13 +239,12 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
       R[flow_ncomp + j][flow_ncomp + j] = 1.0;
     }
 
-    // PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
-    // PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
-    // PetscReal a1  = fabs(uperp - chat);
-    PetscReal a2 = fabs(uperp);
-    // PetscReal a3  = fabs(uperp + chat);
+    PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
+    PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
+    PetscReal a1  = fabs(uperp - chat);
+    PetscReal a2  = fabs(uperp);
+    PetscReal a3  = fabs(uperp + chat);
 
-    /*
     // Critical flow fix
     if (a1 < da1) {
       a1 = 0.5 * (a1 * a1 / da1 + da1);
@@ -255,14 +252,11 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     if (a3 < da3) {
       a3 = 0.5 * (a3 * a3 / da3 + da3);
     }
-    */
 
     // Compute interface flux
-    /*
     A[0][0] = a1;
-    A[1][1] = a2;
+    // A[1][1] = a2;
     A[2][2] = a3;
-    */
     for (PetscInt j = 0; j < sed_ncomp; j++) {
       A[j + flow_ncomp][j + flow_ncomp] = a2;
     }
@@ -291,6 +285,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
         //     if (dof2 == 0) {
         //       fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
         //     }
+        // NOTE: relevant components of A and dW are determined by nonzero
+        // NOTE: elements of R that couple flow to sediment classes
         fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]) - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
       }
     }
@@ -856,7 +852,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
-          f_ptr[n_dof * owned_cell_id + num_flow_comp + s] += (ei - di);
+          f_ptr[n_dof * owned_cell_id + num_flow_comp + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + num_flow_comp + s];
         }
       }
 
