@@ -27,6 +27,12 @@
 // maximum number of sediment size classes
 #define MAX_NUM_SEDIMENT_CLASSES @MAX_NUM_SEDIMENT_CLASSES@
 
+// maximum number of fields in a model's state representation
+#define MAX_NUM_FIELDS 1
+
+// maximum number of components per field
+#define MAX_NUM_FIELD_COMPONENTS (3 + @MAX_NUM_SEDIMENT_CLASSES@)
+
 //-------------------
 // RDycore Interface
 //-------------------

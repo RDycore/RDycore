@@ -1,6 +1,3 @@
-#ifndef SEDIMENT_PETSC_H
-#define SEDIMENT_PETSC_H
-
 #include <petscsys.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
@@ -175,17 +172,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
   PetscInt sed_ncomp  = datal->num_sediment_comp;
   PetscInt soln_ncomp = flow_ncomp + sed_ncomp;
 
-  PetscInt ci_index_offset;
-
-  PetscReal cihat[MAX_NUM_SECTION_FIELD_COMPONENTS]                               = {0};
-  PetscReal dch[MAX_NUM_SECTION_FIELD_COMPONENTS]                                 = {0};
-  PetscReal R[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
-  PetscReal A[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
-  PetscReal dW[MAX_NUM_SECTION_FIELD_COMPONENTS]                                  = {0};
-  PetscReal FL[MAX_NUM_SECTION_FIELD_COMPONENTS] = {0}, FR[MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
-
+  // compute the Roe averaged flux fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
   for (PetscInt i = 0; i < num_states; ++i) {
-    // compute Roe averages
     PetscReal duml  = pow(hl[i], 0.5);
     PetscReal dumr  = pow(hr[i], 0.5);
     PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
@@ -196,71 +184,75 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     PetscReal chat  = pow(0.5 * GRAVITY * (hl[i] + hr[i]), 0.5);
     PetscReal uperp = uhat * cn[i] + vhat * sn[i];
 
-    PetscReal dh = hr[i] - hl[i];
-    PetscReal du = ur[i] - ul[i];
-    PetscReal dv = vr[i] - vl[i];
-    // PetscReal dupar  = -du * sn[i] + dv * cn[i];
+    PetscReal dh     = hr[i] - hl[i];
+    PetscReal du     = ur[i] - ul[i];
+    PetscReal dv     = vr[i] - vl[i];
+    PetscReal dupar  = -du * sn[i] + dv * cn[i];
     PetscReal duperp = du * cn[i] + dv * sn[i];
 
-    ci_index_offset = i * sed_ncomp;
+    PetscReal cihat[MAX_NUM_SEDIMENT_CLASSES], dch[MAX_NUM_SEDIMENT_CLASSES];
+    PetscInt  ci_index_offset = i * sed_ncomp;
     for (PetscInt j = 0; j < sed_ncomp; j++) {
       cihat[j] = (duml * cil[ci_index_offset + j] + dumr * cir[ci_index_offset + j]) / (duml + dumr);
       dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
     }
 
-    dW[0] = 0.5 * (dh - hhat * duperp / chat);
-    // dW[1] = hhat * dupar;
-    dW[2] = 0.5 * (dh + hhat * duperp / chat);
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      dW[flow_ncomp + j] = dch[j] - cihat[j] * dh;
-    }
+    // compute R
 
-    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
-    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
-    PetscReal al1    = uperpl - cl;
-    PetscReal al3    = uperpl + cl;
-    PetscReal ar1    = uperpr - cr;
-    PetscReal ar3    = uperpr + cr;
-
-    /*
-    R[0][0] = 1.0;
-    R[0][1] = 0.0;
-    R[0][2] = 1.0;
-    R[1][0] = uhat - chat * cn[i];
-    R[1][1] = -sn[i];
-    R[1][2] = uhat + chat * cn[i];
-    R[2][0] = vhat - chat * sn[i];
-    R[2][1] = cn[i];
-    R[2][2] = vhat + chat * sn[i];
-    */
+    PetscReal R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {
+        {1.0,                 1.0,    1.0                }, // NOTE: assumes SWE!
+        {uhat - chat * cn[i], -sn[i], uhat + chat * cn[i]},
+        {vhat - chat * sn[i], cn[i],  vhat + chat * sn[i]},
+    };
     for (PetscInt j = 0; j < sed_ncomp; j++) {
       R[flow_ncomp + j][0]              = cihat[j];
       R[flow_ncomp + j][2]              = cihat[j];
       R[flow_ncomp + j][flow_ncomp + j] = 1.0;
     }
 
-    PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
-    PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
-    PetscReal a1  = fabs(uperp - chat);
-    PetscReal a2  = fabs(uperp);
-    PetscReal a3  = fabs(uperp + chat);
+    // compute A (diagonal)
 
-    // Critical flow fix
+    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
+    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
+
+    PetscReal a1 = fabs(uperp - chat);
+    PetscReal a2 = fabs(uperp);
+    PetscReal a3 = fabs(uperp + chat);
+
+    // critical flow fix
+    PetscReal al1 = uperpl - cl;
+    PetscReal ar1 = uperpr - cr;
+    PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
     if (a1 < da1) {
       a1 = 0.5 * (a1 * a1 / da1 + da1);
     }
+    PetscReal al3 = uperpl + cl;
+    PetscReal ar3 = uperpr + cr;
+    PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
     if (a3 < da3) {
       a3 = 0.5 * (a3 * a3 / da3 + da3);
     }
 
-    // Compute interface flux
-    A[0][0] = a1;
-    // A[1][1] = a2;
-    A[2][2] = a3;
+    PetscReal A[MAX_NUM_FIELD_COMPONENTS] = {a1, a2, a3};
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      A[j + flow_ncomp][j + flow_ncomp] = a2;
+      A[j + flow_ncomp] = a2;
     }
 
+    // compute dW
+
+    PetscReal dW[MAX_NUM_FIELD_COMPONENTS] = {
+        0.5 * (dh - hhat * duperp / chat),  // NOTE: assumes SWE!
+        hhat * dupar,
+        0.5 * (dh + hhat * duperp / chat),
+    };
+    for (PetscInt j = 0; j < sed_ncomp; j++) {
+      dW[flow_ncomp + j] = dch[j] - cihat[j] * dh;
+    }
+
+    // compute interface fluxes for sediment classes
+
+    PetscReal FL[MAX_NUM_SEDIMENT_CLASSES] = {0};
+    PetscReal FR[MAX_NUM_SEDIMENT_CLASSES] = {0};
     /*
     FL[0] = uperpl * hl[i];
     FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
@@ -271,27 +263,20 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
     */
 
-    ci_index_offset = i * sed_ncomp;
     for (PetscInt j = 0; j < sed_ncomp; j++) {
       FL[flow_ncomp + j] = hl[i] * uperpl * cil[ci_index_offset + j];
       FR[flow_ncomp + j] = hr[i] * uperpr * cir[ci_index_offset + j];
     }
 
-    // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-    for (PetscInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
+    // compute fij = 0.5*(FL + FR - matmul(R, matmul(A, dW))
+    for (PetscInt dof1 = flow_ncomp; dof1 < soln_ncomp; dof1++) {
+      fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
       for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
-        // for (PetscInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
-        //   for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
-        //     if (dof2 == 0) {
-        //       fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
-        //     }
-        // NOTE: relevant components of A and dW are determined by nonzero
-        // NOTE: elements of R that couple flow to sediment classes
-        fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]) - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
+        fij[soln_ncomp * i + dof1] -= 0.5 * R[dof1][dof2] * A[dof2] * dW[dof2];
       }
     }
 
-    amax[i] = chat + fabs(uperp);
+    // amax[i] = chat + fabs(uperp);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -352,7 +337,7 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
              "Mismatch in number of dof in local vector (%" PetscInt_FMT ") and flow + sediment (%" PetscInt_FMT ")", n_dof,
              num_flow_comp + num_sediment_comp);
 
-  // Collect the h/hu/hv/hci for left and right cells to compute u/v/ci
+  // collect the h/hu/hv/hci for left and right cells to compute u/v/ci
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
     PetscInt edge_id             = edges->internal_edge_ids[e];
     PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
@@ -922,4 +907,3 @@ PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, const RDyConfig 
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-#endif

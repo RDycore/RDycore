@@ -35,10 +35,6 @@ struct SedimentState_ {
 };
 typedef struct SedimentState_ SedimentState;
 
-#ifndef MAX_NUM_SECTION_FIELD_COMPONENTS
-#define MAX_NUM_SECTION_FIELD_COMPONENTS 10
-#endif
-
 /// computes the flux across an edge using Roe's approximate Riemann solver
 /// for flow and sediment transport
 CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, SedimentState qL, SedimentState qR,
@@ -55,13 +51,13 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
   }
   const CeedScalar ur = SafeDiv(qR.hu, hr, tiny_h), vr = SafeDiv(qR.hv, hr, tiny_h);
 
-  CeedScalar cihat[MAX_NUM_SECTION_FIELD_COMPONENTS]                               = {0};
-  CeedScalar dch[MAX_NUM_SECTION_FIELD_COMPONENTS]                                 = {0};
-  CeedScalar dW[MAX_NUM_SECTION_FIELD_COMPONENTS]                                  = {0};
-  CeedScalar R[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
-  CeedScalar A[MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NUM_SECTION_FIELD_COMPONENTS] = {0};
-  CeedScalar FL[MAX_NUM_SECTION_FIELD_COMPONENTS]                                  = {0};
-  CeedScalar FR[MAX_NUM_SECTION_FIELD_COMPONENTS]                                  = {0};
+  CeedScalar cihat[MAX_NUM_FIELD_COMPONENTS]                       = {0};
+  CeedScalar dch[MAX_NUM_FIELD_COMPONENTS]                         = {0};
+  CeedScalar dW[MAX_NUM_FIELD_COMPONENTS]                          = {0};
+  CeedScalar R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {0};
+  CeedScalar A[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {0};
+  CeedScalar FL[MAX_NUM_FIELD_COMPONENTS]                          = {0};
+  CeedScalar FR[MAX_NUM_FIELD_COMPONENTS]                          = {0};
 
   CeedScalar duml  = sqrt(hl);
   CeedScalar dumr  = sqrt(hr);
