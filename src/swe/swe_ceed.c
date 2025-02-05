@@ -449,8 +449,8 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
 /// shallow water equations.
 ///
 /// Active input fields:
-///    * `q[num_owned_cells][3]` - an array associating a 3-DOF solution input
-///      state with each (owned) cell in the domain
+///    * `q[num_owned_cells][3+sed_ncomp]` - an array associating a solution
+///      input state with each (owned) cell in the domain
 ///
 /// Passive input fields:
 ///    * `geom[num_owned_cells][2]` - an array associating 2 geometric factors
@@ -467,8 +467,8 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
 ///      source components with each (owned) cell in the domain
 ///
 /// Active output fields:
-///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
-///      value with each (owned) cell in the domain
+///    * `cell[num_owned_cells][3+sed_ncomp]` - an array associating source values
+///      with each (owned) cell in the domain
 ///
 /// Q-function context field labels:
 ///    * `time step` - the time step used by the operator
