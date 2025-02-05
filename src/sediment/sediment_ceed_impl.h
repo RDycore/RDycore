@@ -75,7 +75,7 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
 
   // compute R
   CeedScalar R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {
-      {1.0,              1.0, 1.0             }, // NOTE: assumes SWE!
+      {1.0,              0.0, 1.0             }, // NOTE: assumes SWE!
       {uhat - chat * cn, -sn, uhat + chat * cn},
       {vhat - chat * sn, cn,  vhat + chat * sn},
   };
@@ -133,7 +133,7 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
     }
   }
 
-  //*amax = chat + fabs(uperp);
+  *amax = chat + fabs(uperp);
 }
 
 // The following Q functions use C99 VLA features for shaping multidimensional
@@ -298,30 +298,12 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
     for (CeedInt j = 0; j < sed_ndof; ++j) {
       state.hci[j] = q[flow_ndof + j][i];
     }
+
     const CeedScalar h = state.h;
-    // const CeedScalar hu = state.hu;
-    // const CeedScalar hv = state.hv;
-
-    // const CeedScalar dz_dx = geom[0][i];
-    // const CeedScalar dz_dy = geom[1][i];
-
-    // const CeedScalar bedx = dz_dx * gravity * h;
-    // const CeedScalar bedy = dz_dy * gravity * h;
-
-    // const CeedScalar Fsum_x = riemannf[1][i];
-    // const CeedScalar Fsum_y = riemannf[2][i];
-
-    // CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
-      const CeedScalar Cd = gravity * Square(mannings_n[0][i]) * pow(h, -1.0 / 3.0);
       const CeedScalar u  = SafeDiv(state.hu, h, tiny_h);
       const CeedScalar v  = SafeDiv(state.hv, h, tiny_h);
-
-      // const CeedScalar velocity = sqrt(Square(u) + Square(v));
-      // const CeedScalar tb = Cd * velocity / h;
-      // const CeedScalar factor = tb / (1.0 + dt * tb);
-      // tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
-      // tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+      const CeedScalar Cd = gravity * Square(mannings_n[0][i]) * pow(h, -1.0 / 3.0);
 
       for (CeedInt j = 0; j < sed_ndof; ++j) {
         const CeedScalar ci    = SafeDiv(state.hci[j], h, tiny_h);
@@ -332,11 +314,6 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
         cell[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (ei - di) + ext_src[flow_ndof + j][i];
       }
     }
-    /*
-    cell[0][i] = riemannf[0][i] + ext_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
-    cell[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
-    */
   }
   return 0;
 }

@@ -1100,7 +1100,7 @@ PetscErrorCode GetOperatorRegionalExternalSource(Operator *op, RDyRegion region,
 
   PetscCall(CreateOperatorRegionData(op, region, op->num_components, source_data));
   if (CeedEnabled()) {
-    PetscCall(GetCeedSourceOperatorRegionData(op, region, "swe_src", source_data));
+    PetscCall(GetCeedSourceOperatorRegionData(op, region, "ext_src", source_data));
   } else {  // petsc
     PetscCall(GetPetscSourceOperatorRegionData(op, region, op->petsc.external_sources, source_data));
   }
@@ -1122,7 +1122,7 @@ PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *op, RDyRegion reg
   PetscCall(CheckOperatorRegion(op, region, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedSourceOperatorRegionData(op, region, "swe_src", source_data));
+    PetscCallCEED(RestoreCeedSourceOperatorRegionData(op, region, "ext_src", source_data));
   } else {
     PetscCallCEED(RestorePetscSourceOperatorRegionData(op, region, op->petsc.external_sources, source_data));
   }
@@ -1313,7 +1313,7 @@ PetscErrorCode GetOperatorDomainExternalSource(Operator *op, OperatorData *sourc
 
   PetscCall(CreateOperatorDomainData(op, op->num_components, source_data));
   if (CeedEnabled()) {
-    PetscCall(GetCeedSourceOperatorDomainData(op, "swe_src", source_data));
+    PetscCall(GetCeedSourceOperatorDomainData(op, "ext_src", source_data));
   } else {  // petsc
     PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
   }
@@ -1333,7 +1333,7 @@ PetscErrorCode RestoreOperatorDomainExternalSource(Operator *op, OperatorData *s
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedSourceOperatorDomainData(op, "swe_src", source_data));
+    PetscCallCEED(RestoreCeedSourceOperatorDomainData(op, "ext_src", source_data));
   } else {
     PetscCallCEED(RestorePetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
   }

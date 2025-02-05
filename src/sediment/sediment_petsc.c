@@ -155,16 +155,6 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
                                              const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
-  PetscReal *hl  = datal->h;
-  PetscReal *ul  = datal->u;
-  PetscReal *vl  = datal->v;
-  PetscReal *cil = datal->ci;
-
-  PetscReal *hr  = datar->h;
-  PetscReal *ur  = datar->u;
-  PetscReal *vr  = datar->v;
-  PetscReal *cir = datar->ci;
-
   PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
 
   PetscInt num_states = datal->num_states;
@@ -174,32 +164,42 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
 
   // compute the Roe averaged flux fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
   for (PetscInt i = 0; i < num_states; ++i) {
-    PetscReal duml  = pow(hl[i], 0.5);
-    PetscReal dumr  = pow(hr[i], 0.5);
-    PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
-    PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
+    PetscReal hl = datal->h[i];
+    PetscReal ul = datal->u[i];
+    PetscReal vl = datal->v[i];
+
+    PetscReal hr = datar->h[i];
+    PetscReal ur = datar->u[i];
+    PetscReal vr = datar->v[i];
+
+    PetscReal *cil = &datal->ci[sed_ncomp * i];
+    PetscReal *cir = &datar->ci[sed_ncomp * i];
+
+    PetscReal duml  = pow(hl, 0.5);
+    PetscReal dumr  = pow(hr, 0.5);
+    PetscReal cl    = pow(GRAVITY * hl, 0.5);
+    PetscReal cr    = pow(GRAVITY * hr, 0.5);
     PetscReal hhat  = duml * dumr;
-    PetscReal uhat  = (duml * ul[i] + dumr * ur[i]) / (duml + dumr);
-    PetscReal vhat  = (duml * vl[i] + dumr * vr[i]) / (duml + dumr);
-    PetscReal chat  = pow(0.5 * GRAVITY * (hl[i] + hr[i]), 0.5);
+    PetscReal uhat  = (duml * ul + dumr * ur) / (duml + dumr);
+    PetscReal vhat  = (duml * vl + dumr * vr) / (duml + dumr);
+    PetscReal chat  = pow(0.5 * GRAVITY * (hl + hr), 0.5);
     PetscReal uperp = uhat * cn[i] + vhat * sn[i];
 
-    PetscReal dh     = hr[i] - hl[i];
-    PetscReal du     = ur[i] - ul[i];
-    PetscReal dv     = vr[i] - vl[i];
+    PetscReal dh     = hr - hl;
+    PetscReal du     = ur - ul;
+    PetscReal dv     = vr - vl;
     PetscReal dupar  = -du * sn[i] + dv * cn[i];
     PetscReal duperp = du * cn[i] + dv * sn[i];
 
     PetscReal cihat[MAX_NUM_SEDIMENT_CLASSES], dch[MAX_NUM_SEDIMENT_CLASSES];
-    PetscInt  ci_index_offset = i * sed_ncomp;
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      cihat[j] = (duml * cil[ci_index_offset + j] + dumr * cir[ci_index_offset + j]) / (duml + dumr);
-      dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
+      cihat[j] = (duml * cil[j] + dumr * cir[j]) / (duml + dumr);
+      dch[j]   = cir[j] * hr - cil[j] * hl;
     }
 
     // compute R
     PetscReal R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {
-        {1.0,                 1.0,    1.0                }, // NOTE: assumes SWE!
+        {1.0,                 0.0,    1.0                }, // NOTE: assumes SWE!
         {uhat - chat * cn[i], -sn[i], uhat + chat * cn[i]},
         {vhat - chat * sn[i], cn[i],  vhat + chat * sn[i]},
     };
@@ -210,8 +210,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     }
 
     // compute A (diagonal)
-    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
-    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
+    PetscReal uperpl = ul * cn[i] + vl * sn[i];
+    PetscReal uperpr = ur * cn[i] + vr * sn[i];
     PetscReal a1     = fabs(uperp - chat);
     PetscReal a2     = fabs(uperp);
     PetscReal a3     = fabs(uperp + chat);
@@ -232,7 +232,7 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
 
     PetscReal A[MAX_NUM_FIELD_COMPONENTS] = {a1, a2, a3};
     for (PetscInt j = 0; j < sed_ncomp; j++) {
-      A[j + flow_ncomp] = a2;
+      A[flow_ncomp + j] = a2;
     }
 
     // compute dW
@@ -248,8 +248,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     // compute fij = 0.5*(FL + FR - matmul(R, matmul(A, dW))
     for (PetscInt dof1 = flow_ncomp; dof1 < soln_ncomp; dof1++) {
       PetscInt  j                = dof1 - flow_ncomp;  // sediment index
-      PetscReal FL               = hl[i] * uperpl * cil[ci_index_offset + j];
-      PetscReal FR               = hr[i] * uperpr * cir[ci_index_offset + j];
+      PetscReal FL               = hl * uperpl * cil[j];
+      PetscReal FR               = hr * uperpr * cir[j];
       fij[soln_ncomp * i + dof1] = 0.5 * (FL + FR);
       for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
         fij[soln_ncomp * i + dof1] -= 0.5 * R[dof1][dof2] * A[dof2] * dW[dof2];
@@ -763,11 +763,11 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
 
   // access previously-computed flux divergence data
-  Vec flux_div;
-  PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
-  PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
-  PetscScalar *flux_div_ptr;
-  PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
+  // Vec flux_div;
+  // PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
+  // PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
+  // PetscScalar *flux_div_ptr;
+  // PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
@@ -817,6 +817,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
+          // NOTE: riemann flux divergence is already in F, so we don't need to add it
           f_ptr[n_dof * owned_cell_id + num_flow_comp + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + num_flow_comp + s];
         }
       }
