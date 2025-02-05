@@ -42,7 +42,6 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
                                                    CeedScalar *amax) {
   const CeedScalar sqrt_gravity = sqrt(gravity);
   const CeedScalar hl = qL.h, hr = qR.h;
-
   const CeedScalar ul = SafeDiv(qL.hu, hl, tiny_h), vl = SafeDiv(qL.hv, hl, tiny_h);
   CeedScalar       cil[MAX_NUM_SEDIMENT_CLASSES], cir[MAX_NUM_SEDIMENT_CLASSES];
   for (CeedInt j = 0; j < sed_ndof; ++j) {
@@ -51,14 +50,7 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
   }
   const CeedScalar ur = SafeDiv(qR.hu, hr, tiny_h), vr = SafeDiv(qR.hv, hr, tiny_h);
 
-  CeedScalar cihat[MAX_NUM_FIELD_COMPONENTS]                       = {0};
-  CeedScalar dch[MAX_NUM_FIELD_COMPONENTS]                         = {0};
-  CeedScalar dW[MAX_NUM_FIELD_COMPONENTS]                          = {0};
-  CeedScalar R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {0};
-  CeedScalar A[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {0};
-  CeedScalar FL[MAX_NUM_FIELD_COMPONENTS]                          = {0};
-  CeedScalar FR[MAX_NUM_FIELD_COMPONENTS]                          = {0};
-
+  // compute the Roe averaged flux fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
   CeedScalar duml  = sqrt(hl);
   CeedScalar dumr  = sqrt(hr);
   CeedScalar cl    = sqrt_gravity * duml;
@@ -75,86 +67,73 @@ CEED_QFUNCTION_HELPER void SedimentRiemannFlux_Roe(const CeedScalar gravity, con
   CeedScalar dupar  = -du * sn + dv * cn;
   CeedScalar duperp = du * cn + dv * sn;
 
+  CeedScalar cihat[MAX_NUM_SEDIMENT_CLASSES], dch[MAX_NUM_SEDIMENT_CLASSES];
   for (CeedInt j = 0; j < sed_ndof; j++) {
     cihat[j] = (duml * cil[j] + dumr * cir[j]) / (duml + dumr);
     dch[j]   = cir[j] * hr - cil[j] * hl;
   }
 
-  dW[0] = 0.5 * (dh - hhat * duperp / chat);
-  dW[1] = hhat * dupar;
-  dW[2] = 0.5 * (dh + hhat * duperp / chat);
+  // compute R
+  CeedScalar R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {
+      {1.0,              1.0, 1.0             }, // NOTE: assumes SWE!
+      {uhat - chat * cn, -sn, uhat + chat * cn},
+      {vhat - chat * sn, cn,  vhat + chat * sn},
+  };
   for (CeedInt j = 0; j < sed_ndof; j++) {
-    dW[j + 3] = dch[j] - cihat[j] * dh;
+    R[flow_ndof + j][0]             = cihat[j];
+    R[flow_ndof + j][2]             = cihat[j];
+    R[flow_ndof + j][flow_ndof + j] = 1.0;
   }
 
+  // compute A (diagonal)
   CeedScalar uperpl = ul * cn + vl * sn;
   CeedScalar uperpr = ur * cn + vr * sn;
-  CeedScalar al1    = uperpl - cl;
-  CeedScalar al3    = uperpl + cl;
-  CeedScalar ar1    = uperpr - cr;
-  CeedScalar ar3    = uperpr + cr;
+  CeedScalar a1     = fabs(uperp - chat);
+  CeedScalar a2     = fabs(uperp);
+  CeedScalar a3     = fabs(uperp + chat);
 
-  R[0][0] = 1.0;
-  R[0][1] = 0.0;
-  R[0][2] = 1.0;
-  R[1][0] = uhat - chat * cn;
-  R[1][1] = -sn;
-  R[1][2] = uhat + chat * cn;
-  R[2][0] = vhat - chat * sn;
-  R[2][1] = cn;
-  R[2][2] = vhat + chat * sn;
-  for (CeedInt j = 0; j < sed_ndof; j++) {
-    R[j + 3][0]     = cihat[j];
-    R[j + 3][2]     = cihat[j];
-    R[j + 3][j + 3] = 1.0;
-  }
-
+  // apply critical flow fix
+  CeedScalar al1 = uperpl - cl;
+  CeedScalar ar1 = uperpr - cr;
   CeedScalar da1 = fmax(0.0, 2.0 * (ar1 - al1));
-  CeedScalar da3 = fmax(0.0, 2.0 * (ar3 - al3));
-  CeedScalar a1  = fabs(uperp - chat);
-  CeedScalar a2  = fabs(uperp);
-  CeedScalar a3  = fabs(uperp + chat);
-
-  // Critical flow fix
   if (a1 < da1) {
     a1 = 0.5 * (a1 * a1 / da1 + da1);
   }
+  CeedScalar al3 = uperpl + cl;
+  CeedScalar ar3 = uperpr + cr;
+  CeedScalar da3 = fmax(0.0, 2.0 * (ar3 - al3));
   if (a3 < da3) {
     a3 = 0.5 * (a3 * a3 / da3 + da3);
   }
 
-  // Compute interface flux
-  A[0][0] = a1;
-  A[1][1] = a2;
-  A[2][2] = a3;
-  for (CeedInt j = 0; j < sed_ndof; j++) {
-    A[j + 3][j + 3] = a2;
+  CeedScalar A[MAX_NUM_FIELD_COMPONENTS] = {a1, a2, a3};
+  for (PetscInt j = 0; j < sed_ndof; j++) {
+    A[flow_ndof + j] = a2;
   }
 
-  FL[0] = uperpl * hl;
-  FL[1] = ul * uperpl * hl + 0.5 * gravity * hl * hl * cn;
-  FL[2] = vl * uperpl * hl + 0.5 * gravity * hl * hl * sn;
-
-  FR[0] = uperpr * hr;
-  FR[1] = ur * uperpr * hr + 0.5 * gravity * hr * hr * cn;
-  FR[2] = vr * uperpr * hr + 0.5 * gravity * hr * hr * sn;
-
+  // compute dW
+  CeedScalar dW[MAX_NUM_FIELD_COMPONENTS] = {
+      0.5 * (dh - hhat * duperp / chat),  // NOTE: assumes SWE!
+      hhat * dupar,
+      0.5 * (dh + hhat * duperp / chat),
+  };
   for (CeedInt j = 0; j < sed_ndof; j++) {
-    FL[j + 3] = hl * uperpl * cil[j];
-    FR[j + 3] = hr * uperpr * cir[j];
+    dW[flow_ndof + j] = dch[j] - cihat[j] * dh;
   }
 
-  // flux = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-  CeedInt soln_ncomp = flow_ndof + sed_ndof;
-  for (CeedInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
-    flux[dof1] = 0.5 * (FL[dof1] + FR[dof1]);
-
-    for (CeedInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
-      flux[dof1] = flux[dof1] - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
+  // compute fij = 0.5*(FL + FR - matmul(R, matmul(A, dW))
+  CeedInt soln_ndof = flow_ndof + sed_ndof;
+  for (CeedInt dof1 = flow_ndof; dof1 < soln_ndof; dof1++) {
+    CeedInt    j  = dof1 - flow_ndof;  // sediment index
+    CeedScalar FL = hl * uperpl * cil[j];
+    CeedScalar FR = hr * uperpr * cir[j];
+    flux[dof1]    = 0.5 * (FL + FR);
+    for (CeedInt dof2 = 0; dof2 < soln_ndof; dof2++) {
+      flux[dof1] -= 0.5 * R[dof1][dof2] * A[dof2] * dW[dof2];
     }
   }
 
-  *amax = chat + fabs(uperp);
+  //*amax = chat + fabs(uperp);
 }
 
 // The following Q functions use C99 VLA features for shaping multidimensional
@@ -189,7 +168,7 @@ CEED_QFUNCTION(SedimentFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const i
     SedimentState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     for (CeedInt j = 0; j < sed_ndof; ++j) {
       qL.hci[j] = q_L[flow_ndof + j][i];
-      qR.hci[j] = q_R[3 + j][i];
+      qR.hci[j] = q_R[flow_ndof + j][i];
     }
     CeedScalar flux[tot_ndof], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
@@ -228,8 +207,8 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const C
     SedimentState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
     SedimentState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     for (CeedInt j = 0; j < ѕed_ndof; ++j) {
-      qL.hci[j] = q_L[3 + j][i];
-      qR.hci[j] = q_R[3 + j][i];
+      qL.hci[j] = q_L[flow_ndof + j][i];
+      qR.hci[j] = q_R[flow_ndof + j][i];
     }
     if (qL.h > tiny_h) {
       CeedScalar flux[tot_ndof], amax;
@@ -264,7 +243,7 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const 
     CeedScalar    sn = geom[0][i], cn = geom[1][i];
     SedimentState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
     for (CeedInt j = 0; j < sed_ndof; ++j) {
-      qL.hci[j] = q_L[3 + j][i];
+      qL.hci[j] = q_L[flow_ndof + j][i];
     }
     if (qL.h > tiny_h) {
       CeedScalar    dum1 = sn * sn - cn * cn;
@@ -290,15 +269,15 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const 
 
 // flow and sediment regional source operator Q-function
 CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
-  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
+  // const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
+  const CeedScalar(*ext_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
   const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
   const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
   const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
   CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   const SedimentContext context             = (SedimentContext)ctx;
 
-  const CeedScalar dt                      = context->dtime;
+  // const CeedScalar dt                      = context->dtime;
   const CeedScalar tiny_h                  = context->tiny_h;
   const CeedScalar gravity                 = context->gravity;
   const CeedScalar kp_constant             = context->kp_constant;
@@ -307,52 +286,57 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
   const CeedScalar tau_critical_deposition = context->tau_critical_deposition;
   const CeedScalar rhow                    = context->rhow;
 
+  const CeedInt flow_ndof = context->flow_ndof;
+  const CeedInt sed_ndof  = context->sed_ndof;
+
   for (CeedInt i = 0; i < Q; i++) {
-    SedimentState state = {.h = q[0][i], .hu = q[1][i], .hv = q[2][i]};
-    for (CeedInt j = 0; j < context->sed_ndof; ++j) {
-      state.hci[j] = q[3 + j][i];
+    SedimentState state = {
+        .h  = q[0][i],
+        .hu = q[1][i],
+        .hv = q[2][i],
+    };
+    for (CeedInt j = 0; j < sed_ndof; ++j) {
+      state.hci[j] = q[flow_ndof + j][i];
     }
-    const CeedScalar h  = state.h;
-    const CeedScalar hu = state.hu;
-    const CeedScalar hv = state.hv;
+    const CeedScalar h = state.h;
+    // const CeedScalar hu = state.hu;
+    // const CeedScalar hv = state.hv;
 
-    const CeedScalar u = SafeDiv(state.hu, h, tiny_h);
-    const CeedScalar v = SafeDiv(state.hv, h, tiny_h);
+    // const CeedScalar dz_dx = geom[0][i];
+    // const CeedScalar dz_dy = geom[1][i];
 
-    const CeedScalar dz_dx = geom[0][i];
-    const CeedScalar dz_dy = geom[1][i];
+    // const CeedScalar bedx = dz_dx * gravity * h;
+    // const CeedScalar bedy = dz_dy * gravity * h;
 
-    const CeedScalar bedx = dz_dx * gravity * h;
-    const CeedScalar bedy = dz_dy * gravity * h;
+    // const CeedScalar Fsum_x = riemannf[1][i];
+    // const CeedScalar Fsum_y = riemannf[2][i];
 
-    const CeedScalar Fsum_x = riemannf[1][i];
-    const CeedScalar Fsum_y = riemannf[2][i];
-
-    CeedScalar tbx = 0.0, tby = 0.0;
+    // CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
       const CeedScalar Cd = gravity * Square(mannings_n[0][i]) * pow(h, -1.0 / 3.0);
+      const CeedScalar u  = SafeDiv(state.hu, h, tiny_h);
+      const CeedScalar v  = SafeDiv(state.hv, h, tiny_h);
 
-      const CeedScalar velocity = sqrt(Square(u) + Square(v));
+      // const CeedScalar velocity = sqrt(Square(u) + Square(v));
+      // const CeedScalar tb = Cd * velocity / h;
+      // const CeedScalar factor = tb / (1.0 + dt * tb);
+      // tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
+      // tby = (hv + dt * Fsum_y - dt * bedy) * factor;
 
-      const CeedScalar tb = Cd * velocity / h;
-
-      const CeedScalar factor = tb / (1.0 + dt * tb);
-
-      tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
-      tby = (hv + dt * Fsum_y - dt * bedy) * factor;
-
-      for (CeedInt j = 0; j < context->sed_ndof; ++j) {
+      for (CeedInt j = 0; j < sed_ndof; ++j) {
         const CeedScalar ci    = SafeDiv(state.hci[j], h, tiny_h);
         CeedScalar       tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
         CeedScalar       ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
         CeedScalar       di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
-        cell[3 + j][i]         = riemannf[3 + j][i] + (ei - di) + swe_src[3 + j][i];
+
+        cell[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (ei - di) + ext_src[flow_ndof + j][i];
       }
     }
-
-    cell[0][i] = riemannf[0][i] + swe_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx + swe_src[1][i];
-    cell[2][i] = riemannf[2][i] - bedy - tby + swe_src[2][i];
+    /*
+    cell[0][i] = riemannf[0][i] + ext_src[0][i];
+    cell[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
+    cell[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
+    */
   }
   return 0;
 }

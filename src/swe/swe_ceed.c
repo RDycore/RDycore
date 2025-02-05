@@ -120,9 +120,12 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, const RDyConfig 
 
   Ceed ceed = CeedContext();
 
-  CeedInt   num_comp = 3;
-  RDyCells *cells    = &mesh->cells;
-  RDyEdges *edges    = &mesh->edges;
+  CeedInt num_flow_comp = 3;
+  CeedInt num_sed_comp  = config.physics.sediment.num_classes;
+  CeedInt num_comp      = num_flow_comp + num_sed_comp;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
 
   // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
@@ -286,9 +289,12 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
 
   Ceed ceed = CeedContext();
 
-  CeedInt   num_comp = 3;
-  RDyCells *cells    = &mesh->cells;
-  RDyEdges *edges    = &mesh->edges;
+  CeedInt num_flow_comp = 3;
+  CeedInt num_sed_comp  = config.physics.sediment.num_classes;
+  CeedInt num_comp      = num_flow_comp + num_sed_comp;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
 
   // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
@@ -455,10 +461,10 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
 ///           evaluated at the cell center
 ///    * `mannings_n[num_owned_cells][1]` - an array associating the Mannings
 ///      coefficient for the material within each (owned) cell in the domain
-///    * `riemannf[num_owned_cells][3]` - an array associating a 3-component
-///      flux divergence with each (owned) cell in the domain
-///    * `swe_src[num_owned_cells][3]` - an array associating 3 external source
-///      components with each (owned) cell in the domain
+///    * `riemannf[num_owned_cells][3+sed_ncomp]` - an array associating a flux
+///      divergence with each (owned) cell in the domain
+///    * `swe_src[num_owned_cells][3+sed_ncomp]` - an array associating external
+///      source components with each (owned) cell in the domain
 ///
 /// Active output fields:
 ///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
@@ -477,14 +483,17 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, const RDyConfig config
 
   Ceed ceed = CeedContext();
 
-  CeedInt   num_comp = 3;
-  RDyCells *cells    = &mesh->cells;
+  CeedInt num_flow_comp = 3;
+  CeedInt num_sed_comp  = config.physics.sediment.num_classes;
+  CeedInt num_comp      = num_flow_comp + num_sed_comp;
+
+  RDyCells *cells = &mesh->cells;
 
   // create the Q-function that underlies the operator, and set its inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
-  CeedInt       num_comp_geom = 2, num_comp_swe_src = 3, num_comp_mannings_n = 1;
+  CeedInt       num_comp_geom = 2, num_comp_swe_src = num_comp, num_comp_mannings_n = 1;
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermSemiImplicit, SWESourceTermSemiImplicit_loc, &qf));

@@ -198,7 +198,6 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     }
 
     // compute R
-
     PetscReal R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS] = {
         {1.0,                 1.0,    1.0                }, // NOTE: assumes SWE!
         {uhat - chat * cn[i], -sn[i], uhat + chat * cn[i]},
@@ -211,15 +210,13 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     }
 
     // compute A (diagonal)
-
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
     PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
+    PetscReal a1     = fabs(uperp - chat);
+    PetscReal a2     = fabs(uperp);
+    PetscReal a3     = fabs(uperp + chat);
 
-    PetscReal a1 = fabs(uperp - chat);
-    PetscReal a2 = fabs(uperp);
-    PetscReal a3 = fabs(uperp + chat);
-
-    // critical flow fix
+    // apply critical flow fix
     PetscReal al1 = uperpl - cl;
     PetscReal ar1 = uperpr - cr;
     PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
@@ -239,7 +236,6 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     }
 
     // compute dW
-
     PetscReal dW[MAX_NUM_FIELD_COMPONENTS] = {
         0.5 * (dh - hhat * duperp / chat),  // NOTE: assumes SWE!
         hhat * dupar,
@@ -249,28 +245,12 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
       dW[flow_ncomp + j] = dch[j] - cihat[j] * dh;
     }
 
-    // compute interface fluxes for sediment classes
-
-    PetscReal FL[MAX_NUM_SEDIMENT_CLASSES] = {0};
-    PetscReal FR[MAX_NUM_SEDIMENT_CLASSES] = {0};
-    /*
-    FL[0] = uperpl * hl[i];
-    FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
-    FL[2] = vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i];
-
-    FR[0] = uperpr * hr[i];
-    FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
-    FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
-    */
-
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      FL[flow_ncomp + j] = hl[i] * uperpl * cil[ci_index_offset + j];
-      FR[flow_ncomp + j] = hr[i] * uperpr * cir[ci_index_offset + j];
-    }
-
     // compute fij = 0.5*(FL + FR - matmul(R, matmul(A, dW))
     for (PetscInt dof1 = flow_ncomp; dof1 < soln_ncomp; dof1++) {
-      fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
+      PetscInt  j                = dof1 - flow_ncomp;  // sediment index
+      PetscReal FL               = hl[i] * uperpl * cil[ci_index_offset + j];
+      PetscReal FR               = hr[i] * uperpr * cir[ci_index_offset + j];
+      fij[soln_ncomp * i + dof1] = 0.5 * (FL + FR);
       for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
         fij[soln_ncomp * i + dof1] -= 0.5 * R[dof1][dof2] * A[dof2] * dW[dof2];
       }
