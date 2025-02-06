@@ -382,14 +382,11 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
 }
 
 /// @brief Creates a CEED operator for solving flow and sediment dynamics equation for the source-sink term
-/// @param [in]  mesh       mesh defining the computational domain of the operator
-/// @param [in]  config     RDycore's configuration
-/// @param [in]  ext_source a CEED vector and restriction representing external sources
-/// @param [in]  mat_props  a CEED vector and restriction representing material properties
-/// @param [out] ceed_op    a CeedOperator that is created and returned
+/// @param [in]  mesh    mesh defining the computational domain of the operator
+/// @param [in]  config  RDycore's configuration
+/// @param [out] ceed_op a CeedOperator that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config, CeedVectorAndRestriction ext_source,
-                                                CeedVectorAndRestriction mat_props, CeedOperator *ceed_op) {
+PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -477,10 +474,9 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
+  // NOTE: "ext_src" and "mat_props" fields are added via CreateOperator.
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "ext_src", ext_source.restriction, CEED_BASIS_COLLOCATED, ext_source.vector));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mat_props", mat_props.restriction, CEED_BASIS_COLLOCATED, mat_props.vector));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 

@@ -31,28 +31,13 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
   op->dm   = dm;
   op->mesh = mesh;
 
-  // create vectors
+  // create bookkeeping vectors
   if (CeedEnabled()) {
     Ceed     ceed     = CeedContext();
     PetscInt num_comp = op->num_components;
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.u_local));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.rhs));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_owned_cells * num_comp, &op->ceed.sources));
-
-    // create a vector of external source terms
-    CeedInt ext_src_strides[] = {num_comp, 1, num_comp};
-    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, mesh->num_owned_cells, 1, num_comp, mesh->num_owned_cells * num_comp, ext_src_strides,
-                                                   &op->ceed.external_sources.restriction));
-    PetscCallCEED(CeedElemRestrictionCreateVector(op->ceed.external_sources.restriction, &op->ceed.external_sources.vector, NULL));
-    PetscCallCEED(CeedVectorSetValue(op->ceed.external_sources.vector, 0.0));
-
-    // create material property vector
-    CeedInt matprop_strides[] = {OPERATOR_NUM_MATERIAL_PROPERTIES, 1, OPERATOR_NUM_MATERIAL_PROPERTIES};
-    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, mesh->num_owned_cells, 1, OPERATOR_NUM_MATERIAL_PROPERTIES,
-                                                   mesh->num_owned_cells * OPERATOR_NUM_MATERIAL_PROPERTIES, matprop_strides,
-                                                   &op->ceed.material_properties.restriction));
-    PetscCallCEED(CeedElemRestrictionCreateVector(op->ceed.material_properties.restriction, &op->ceed.material_properties.vector, NULL));
-    PetscCallCEED(CeedVectorSetValue(op->ceed.material_properties.vector, 0.0));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -181,7 +166,7 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
   PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.source));
 
   CeedOperator source_op;
-  PetscCall(CreateSWECeedSourceOperator(op->mesh, *op->config, op->ceed.external_sources, op->ceed.material_properties, &source_op));
+  PetscCall(CreateSWECeedSourceOperator(op->mesh, *op->config, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
   PetscCallCEED(CeedOperatorDestroy(&source_op));
 
@@ -220,7 +205,7 @@ static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
   //-----------------
 
   CeedOperator source_op;
-  PetscCall(CreateSedimentCeedSourceOperator(op->mesh, *op->config, op->ceed.external_sources, op->ceed.material_properties, &source_op));
+  PetscCall(CreateSedimentCeedSourceOperator(op->mesh, *op->config, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
   PetscCallCEED(CeedOperatorDestroy(&source_op));
 
@@ -326,7 +311,7 @@ static PetscErrorCode AddPetscOperators(Operator *op) {
 
 // sets up a field named "riemannf" for the source operator, associating
 // it with a vector that stores flux divergences computed by the flux operator
-static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
+static PetscErrorCode AddOperatorFields(Operator *op) {
   PetscFunctionBegin;
 
   // Create a flux divergence PETSc vector with the same characteristics as
@@ -345,6 +330,23 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
     PetscCallCEED(
         CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, solution_strides, &flux_div_restriction));
     PetscCallCEED(CeedElemRestrictionCreateVector(flux_div_restriction, &op->ceed.flux_divergence, NULL));
+    PetscCallCEED(CeedVectorSetValue(op->ceed.flux_divergence, 0.0));
+
+    // create a vector of external source terms
+    CeedElemRestriction ext_src_restriction;
+    CeedInt             ext_src_strides[] = {num_comp, 1, num_comp};
+    PetscCallCEED(
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, ext_src_strides, &ext_src_restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(ext_src_restriction, &op->ceed.external_sources, NULL));
+    PetscCallCEED(CeedVectorSetValue(op->ceed.external_sources, 0.0));
+
+    // create material property vector
+    CeedElemRestriction mat_props_restriction;
+    CeedInt             matprop_strides[] = {OPERATOR_NUM_MATERIAL_PROPERTIES, 1, OPERATOR_NUM_MATERIAL_PROPERTIES};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, OPERATOR_NUM_MATERIAL_PROPERTIES,
+                                                   num_owned_cells * OPERATOR_NUM_MATERIAL_PROPERTIES, matprop_strides, &mat_props_restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(mat_props_restriction, &op->ceed.material_properties, NULL));
+    PetscCallCEED(CeedVectorSetValue(op->ceed.material_properties, 0.0));
 
     // add this vector to all source sub-operators
     CeedInt num_source_suboperators;
@@ -353,10 +355,14 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
     PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
     for (CeedInt i = 0; i < num_source_suboperators; ++i) {
       PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_COLLOCATED, op->ceed.flux_divergence));
+      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "ext_src", ext_src_restriction, CEED_BASIS_COLLOCATED, op->ceed.external_sources));
+      PetscCallCEED(
+          CeedOperatorSetField(source_suboperators[i], "mat_props", mat_props_restriction, CEED_BASIS_COLLOCATED, op->ceed.material_properties));
     }
 
-    // clean up (the suboperators keep references to restrictions and vectors)
     PetscCallCEED(CeedElemRestrictionDestroy(&flux_div_restriction));
+    PetscCallCEED(CeedElemRestrictionDestroy(&ext_src_restriction));
+    PetscCallCEED(CeedElemRestrictionDestroy(&mat_props_restriction));
   } else {
     PetscCall(PetscOperatorSetField(op->petsc.source, "riemannf", op->flux_divergence));
   }
@@ -374,8 +380,8 @@ static PetscErrorCode AddPhysicsOperators(Operator *op) {
     PetscCall(AddPetscOperators(op));
   }
 
-  // set up our flux divergence vector(s)
-  PetscCall(AddOperatorFluxDivergence(op));
+  // set up fields common to all operators
+  PetscCall(AddOperatorFields(op));
 
   // initialize diagnostics
   PetscCall(ResetOperatorDiagnostics(op));
@@ -449,13 +455,11 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
-    if ((*op)->ceed.external_sources.vector) {
-      PetscCallCEED(CeedElemRestrictionDestroy(&((*op)->ceed.external_sources.restriction)));
-      PetscCallCEED(CeedVectorDestroy(&(*op)->ceed.external_sources.vector));
+    if ((*op)->ceed.external_sources) {
+      PetscCallCEED(CeedVectorDestroy(&(*op)->ceed.external_sources));
     }
-    if ((*op)->ceed.material_properties.vector) {
-      PetscCallCEED(CeedElemRestrictionDestroy(&((*op)->ceed.material_properties.restriction)));
-      PetscCallCEED(CeedVectorDestroy(&(*op)->ceed.material_properties.vector));
+    if ((*op)->ceed.material_properties) {
+      PetscCallCEED(CeedVectorDestroy(&(*op)->ceed.material_properties));
     }
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
@@ -1013,12 +1017,12 @@ static PetscErrorCode CreateOperatorRegionData(Operator *op, RDyRegion region, P
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion region, CeedVectorAndRestriction ceed_data, OperatorData *region_data) {
+static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion region, CeedVector vec, OperatorData *region_data) {
   PetscFunctionBegin;
 
   // copy out operator data
   PetscInt num_comp = region_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(ceed_data.vector, CEED_MEM_HOST, &region_data->array_pointer));
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &region_data->array_pointer));
   CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = region_data->array_pointer;
   for (PetscInt c = 0; c < num_comp; ++c) {
@@ -1030,8 +1034,7 @@ static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion re
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegion region, CeedVectorAndRestriction ceed_data,
-                                                          OperatorData *region_data) {
+static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegion region, CeedVector vec, OperatorData *region_data) {
   PetscFunctionBegin;
 
   // copy the data into place
@@ -1046,7 +1049,7 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   }
 
   // release the array
-  PetscCallCEED(CeedVectorRestoreArray(ceed_data.vector, &region_data->array_pointer));
+  PetscCallCEED(CeedVectorRestoreArray(vec, &region_data->array_pointer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1192,12 +1195,12 @@ static PetscErrorCode CreateOperatorDomainData(Operator *op, PetscInt num_comp, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, CeedVectorAndRestriction ceed_data, OperatorData *domain_data) {
+static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, CeedVector vec, OperatorData *domain_data) {
   PetscFunctionBegin;
 
   // copy out operator data
   PetscInt num_comp = domain_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(ceed_data.vector, CEED_MEM_HOST, &domain_data->array_pointer));
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &domain_data->array_pointer));
   CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = domain_data->array_pointer;
   for (PetscInt c = 0; c < num_comp; ++c) {
@@ -1208,7 +1211,7 @@ static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, CeedVectorAn
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, CeedVectorAndRestriction ceed_data, OperatorData *domain_data) {
+static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, CeedVector vec, OperatorData *domain_data) {
   PetscFunctionBegin;
 
   // copy the data into place
@@ -1222,7 +1225,7 @@ static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, CeedVect
   }
 
   // release the array
-  PetscCallCEED(CeedVectorRestoreArray(ceed_data.vector, &domain_data->array_pointer));
+  PetscCallCEED(CeedVectorRestoreArray(vec, &domain_data->array_pointer));
 
   *domain_data = (OperatorData){0};
   PetscFunctionReturn(PETSC_SUCCESS);

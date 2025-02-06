@@ -475,13 +475,10 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
 ///    * `small h value` - the water height below which dry conditions are assumed
 ///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
-/// @param [in]  mesh       mesh defining the computational domain of the operator
-/// @param [in]  config     RDycore's configuration
-/// @param [in]  ext_source a CEED vector and restriction representing external sources
-/// @param [in]  mat_props  a CEED vector and restriction representing material properties
-/// @param [out] ceed_op    the newly created CeedOperator
-PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, const RDyConfig config, CeedVectorAndRestriction ext_source,
-                                           CeedVectorAndRestriction mat_props, CeedOperator *ceed_op) {
+/// @param [in]  mesh    mesh defining the computational domain of the operator
+/// @param [in]  config  RDycore's configuration
+/// @param [out] ceed_op the newly created CeedOperator
+PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, const RDyConfig config, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -569,10 +566,9 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, const RDyConfig config
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
+  // NOTE: "ext_src" and "mat_props" fields are added via CreateOperator.
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "ext_src", ext_source.restriction, CEED_BASIS_COLLOCATED, ext_source.vector));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mat_props", mat_props.restriction, CEED_BASIS_COLLOCATED, mat_props.vector));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 

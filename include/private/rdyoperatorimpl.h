@@ -93,13 +93,6 @@ PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOpe
 // CEED data structures
 //----------------------
 
-// This type holds a CEED vector and its associated restriction, which makes it
-// easier to pass vectors between CEED operators.
-typedef struct {
-  CeedVector          vector;
-  CeedElemRestriction restriction;
-} CeedVectorAndRestriction;
-
 //----------
 // Operator
 //----------
@@ -147,13 +140,16 @@ typedef struct Operator {
       PetscReal dt;
 
       // bookkeeping vectors used by operator(s)
-      CeedVector u_local, rhs, sources, flux_divergence;
+      CeedVector u_local, rhs, sources;
+
+      // domain-wide flux_divergence vector;
+      CeedVector flux_divergence;
 
       // domain-wide external source vector
-      CeedVectorAndRestriction external_sources;
+      CeedVector external_sources;
 
       // domain-wide material property vector (# of components == # of scalar properties)
-      CeedVectorAndRestriction material_properties;
+      CeedVector material_properties;
     } ceed;
 
     // PETSc operator data

@@ -137,8 +137,8 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    SWEState   qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    SWEState   qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
+    SWEState   qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     CeedScalar flux[3], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
       SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
@@ -170,8 +170,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    SWEState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
+    SWEState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar flux[3], amax;
       SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
@@ -200,7 +200,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
 
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
-    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState   qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar dum1 = sn * sn - cn * cn;
       CeedScalar dum2 = 2.0 * sn * cn;
@@ -232,7 +232,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
 
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
-    SWEState   qL    = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState   qL    = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
     CeedScalar q     = fabs(qL.hu * cn + qL.hv * sn);
     CeedScalar hR    = pow(q * q / gravity, 1.0 / 3.0);
     CeedScalar speed = sqrt(gravity * hR);
@@ -266,7 +266,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    SWEState         state = {.h = q[0][i], .hu = q[1][i], .hv = q[2][i]};
     const CeedScalar h     = state.h;
     const CeedScalar hu    = state.hu;
     const CeedScalar hv    = state.hv;
@@ -325,7 +325,7 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
   const CeedScalar xq2018_threshold = context->xq2018_threshold;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    SWEState         state = {.h = q[0][i], .hu = q[1][i], .hv = q[2][i]};
     const CeedScalar h     = state.h;
     const CeedScalar hu    = state.hu;
     const CeedScalar hv    = state.hv;

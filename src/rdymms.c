@@ -799,10 +799,10 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define CheckConvergence(comp, comp_index, norm)                                                                                  \
-  if (norm##_conv_rates[comp_index] <= rdy->config.mms.convergence.expected_rates.comp.norm) {                                    \
-    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, mms_comp_names[comp_index], \
-            norm##_conv_rates[comp_index], rdy->config.mms.convergence.expected_rates.comp.norm);                                 \
+#define CheckConvergence(comp, comp_index, norm)                                                                                         \
+  if (isnan(norm##_conv_rates[comp_index]) || (norm##_conv_rates[comp_index] <= rdy->config.mms.convergence.expected_rates.comp.norm)) { \
+    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, mms_comp_names[comp_index],        \
+            norm##_conv_rates[comp_index], rdy->config.mms.convergence.expected_rates.comp.norm);                                        \
   }
 
 PetscErrorCode RDyMMSRun(RDy rdy) {
