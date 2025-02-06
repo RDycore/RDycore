@@ -460,7 +460,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
 ///        2. dz/dy, the derivative of the elevation function z(x, y) w.r.t. y,
 ///           evaluated at the cell center
 ///    * `mat_props[num_owned_cells][1]` - an array assigning material
-///      proprerties (e.g. the Mannings coefficient) to each (owned) cell in the domain
+///      properties (e.g. the Mannings coefficient) to each (owned) cell in the domain
 ///    * `riemannf[num_owned_cells][3+sed_ncomp]` - an array associating a flux
 ///      divergence with each (owned) cell in the domain
 ///    * `ext_src[num_owned_cells][3+sed_ncomp]` - an array associating external
