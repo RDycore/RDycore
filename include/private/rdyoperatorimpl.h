@@ -89,6 +89,17 @@ PETSC_INTERN PetscErrorCode PetscOperatorSetField(PetscOperator, const char *, V
 PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);
 
+//----------------------
+// CEED data structures
+//----------------------
+
+// This type holds a CEED vector and its associated restriction, which makes it
+// easier to pass vectors between CEED operators.
+typedef struct {
+  CeedVector          vector;
+  CeedElemRestriction restriction;
+} CeedVectorAndRestriction;
+
 //----------
 // Operator
 //----------
@@ -135,8 +146,14 @@ typedef struct Operator {
       // timestep last set on operators
       PetscReal dt;
 
-      // vectors used by operator(s)
+      // bookkeeping vectors used by operator(s)
       CeedVector u_local, rhs, sources, flux_divergence;
+
+      // domain-wide external source vector
+      CeedVectorAndRestriction external_sources;
+
+      // domain-wide material property vector (# of components == # of scalar properties)
+      CeedVectorAndRestriction material_properties;
     } ceed;
 
     // PETSc operator data
@@ -154,8 +171,8 @@ typedef struct Operator {
       // domain-wide external source vector
       Vec external_sources;
 
-      // array of domain-wide material property data Vecs, indexed by property_id
-      Vec *material_properties;
+      // domain-wide material property vector (# of components == # of scalar properties)
+      Vec material_properties;
     } petsc;
   };
 
@@ -204,10 +221,10 @@ PETSC_INTERN PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *, RD
 PETSC_INTERN PetscErrorCode GetOperatorDomainExternalSource(Operator *, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorDomainExternalSource(Operator *, OperatorData *);
 
-PETSC_INTERN PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode GetOperatorDomainMaterialProperty(Operator *, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorRegionalMaterialProperties(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorRegionalMaterialProperties(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorDomainMaterialProperties(Operator *, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorDomainMaterialProperties(Operator *, OperatorData *);
 
 // diagnostics
 PETSC_INTERN PetscErrorCode ResetOperatorDiagnostics(Operator *);

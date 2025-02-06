@@ -38,6 +38,21 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.u_local));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.rhs));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_owned_cells * num_comp, &op->ceed.sources));
+
+    // create a vector of external source terms
+    CeedInt ext_src_strides[] = {num_comp, 1, num_comp};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, mesh->num_owned_cells, 1, num_comp, mesh->num_owned_cells * num_comp, ext_src_strides,
+                                                   &op->ceed.external_sources.restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(op->ceed.external_sources.restriction, &op->ceed.external_sources.vector, NULL));
+    PetscCallCEED(CeedVectorSetValue(op->ceed.external_sources.vector, 0.0));
+
+    // create material property vector
+    CeedInt matprop_strides[] = {OPERATOR_NUM_MATERIAL_PROPERTIES, 1, OPERATOR_NUM_MATERIAL_PROPERTIES};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, mesh->num_owned_cells, 1, OPERATOR_NUM_MATERIAL_PROPERTIES,
+                                                   mesh->num_owned_cells * OPERATOR_NUM_MATERIAL_PROPERTIES, matprop_strides,
+                                                   &op->ceed.material_properties.restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(op->ceed.material_properties.restriction, &op->ceed.material_properties.vector, NULL));
+    PetscCallCEED(CeedVectorSetValue(op->ceed.material_properties.vector, 0.0));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -90,11 +105,7 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
   // the PETSc operator, similar to how restrictions are used in CEED
   if (!CeedEnabled()) {
     PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, op->num_components, &op->petsc.external_sources));
-
-    PetscCall(PetscCalloc1(OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));  // NOLINT(bugprone-sizeof-expression)
-    for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
-      PetscCall(CreateSequentialVector(comm, op->mesh->num_owned_cells, 1, &op->petsc.material_properties[p]));
-    }
+    PetscCall(CreateSequentialVector(comm, op->mesh->num_owned_cells, OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -170,7 +181,7 @@ static PetscErrorCode AddCeedFlowOperators(Operator *op) {
   PetscCallCEED(CeedCompositeOperatorCreate(ceed, &op->ceed.source));
 
   CeedOperator source_op;
-  PetscCall(CreateSWECeedSourceOperator(op->mesh, *op->config, &source_op));
+  PetscCall(CreateSWECeedSourceOperator(op->mesh, *op->config, op->ceed.external_sources, op->ceed.material_properties, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
   PetscCallCEED(CeedOperatorDestroy(&source_op));
 
@@ -209,7 +220,7 @@ static PetscErrorCode AddCeedSedimentOperators(Operator *op) {
   //-----------------
 
   CeedOperator source_op;
-  PetscCall(CreateSedimentCeedSourceOperator(op->mesh, *op->config, &source_op));
+  PetscCall(CreateSedimentCeedSourceOperator(op->mesh, *op->config, op->ceed.external_sources, op->ceed.material_properties, &source_op));
   PetscCallCEED(CeedCompositeOperatorAddSub(op->ceed.source, source_op));
   PetscCallCEED(CeedOperatorDestroy(&source_op));
 
@@ -256,8 +267,7 @@ static PetscErrorCode AddPetscFlowOperators(Operator *op) {
 
   // domain-wide SWE source operator
   PetscOperator source_op;
-  PetscCall(
-      CreateSWEPetscSourceOperator(op->mesh, *op->config, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS], &source_op));
+  PetscCall(CreateSWEPetscSourceOperator(op->mesh, *op->config, op->petsc.external_sources, op->petsc.material_properties, &source_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.source, source_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -295,8 +305,7 @@ static PetscErrorCode AddPetscSedimentOperators(Operator *op) {
 
   // domain-wide sediment source operator
   PetscOperator source_op;
-  PetscCall(CreateSedimentPetscSourceOperator(op->mesh, *op->config, op->petsc.external_sources, op->petsc.material_properties[OPERATOR_MANNINGS],
-                                              &source_op));
+  PetscCall(CreateSedimentPetscSourceOperator(op->mesh, *op->config, op->petsc.external_sources, op->petsc.material_properties, &source_op));
   PetscCall(PetscCompositeOperatorAddSub(op->petsc.source, source_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -329,12 +338,12 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
     Ceed    ceed               = CeedContext();
     CeedInt num_comp           = op->num_components;
     CeedInt num_owned_cells    = op->mesh->num_owned_cells;
-    CeedInt flux_div_strides[] = {num_comp, 1, num_comp};
+    CeedInt solution_strides[] = {num_comp, 1, num_comp};
 
     // create a vector that provides flux divergence data to the source operator
     CeedElemRestriction flux_div_restriction;
     PetscCallCEED(
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, flux_div_strides, &flux_div_restriction));
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, solution_strides, &flux_div_restriction));
     PetscCallCEED(CeedElemRestrictionCreateVector(flux_div_restriction, &op->ceed.flux_divergence, NULL));
 
     // add this vector to all source sub-operators
@@ -440,6 +449,14 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
+    if ((*op)->ceed.external_sources.vector) {
+      PetscCallCEED(CeedElemRestrictionDestroy(&((*op)->ceed.external_sources.restriction)));
+      PetscCallCEED(CeedVectorDestroy(&(*op)->ceed.external_sources.vector));
+    }
+    if ((*op)->ceed.material_properties.vector) {
+      PetscCallCEED(CeedElemRestrictionDestroy(&((*op)->ceed.material_properties.restriction)));
+      PetscCallCEED(CeedVectorDestroy(&(*op)->ceed.material_properties.vector));
+    }
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }
@@ -451,9 +468,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscFree((*op)->petsc.boundary_values);
     PetscFree((*op)->petsc.boundary_fluxes);
     PetscCall(VecDestroy(&(*op)->petsc.external_sources));
-    for (PetscInt p = 0; p < 1; ++p) {
-      PetscCall(VecDestroy(&(*op)->petsc.material_properties[p]));
-    }
+    PetscCall(VecDestroy(&(*op)->petsc.material_properties));
     PetscFree((*op)->petsc.material_properties);
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.flux));
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.source));
@@ -998,22 +1013,12 @@ static PetscErrorCode CreateOperatorRegionData(Operator *op, RDyRegion region, P
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion region, const char *field_name, OperatorData *region_data) {
+static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion region, CeedVectorAndRestriction ceed_data, OperatorData *region_data) {
   PetscFunctionBegin;
-
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
-  CeedOperator source_op = sub_ops[0];
-
-  // fetch the relevant vector
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(source_op, field_name, &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
   // copy out operator data
   PetscInt num_comp = region_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &region_data->array_pointer));
+  PetscCallCEED(CeedVectorGetArray(ceed_data.vector, CEED_MEM_HOST, &region_data->array_pointer));
   CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = region_data->array_pointer;
   for (PetscInt c = 0; c < num_comp; ++c) {
@@ -1025,12 +1030,9 @@ static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion re
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegion region, const char *field_name, OperatorData *region_data) {
+static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegion region, CeedVectorAndRestriction ceed_data,
+                                                          OperatorData *region_data) {
   PetscFunctionBegin;
-
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
-  CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
   PetscInt num_comp = region_data->num_components;
@@ -1044,11 +1046,7 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   }
 
   // release the array
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(source_op, field_name, &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-  PetscCallCEED(CeedVectorRestoreArray(vec, &region_data->array_pointer));
+  PetscCallCEED(CeedVectorRestoreArray(ceed_data.vector, &region_data->array_pointer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1100,7 +1098,7 @@ PetscErrorCode GetOperatorRegionalExternalSource(Operator *op, RDyRegion region,
 
   PetscCall(CreateOperatorRegionData(op, region, op->num_components, source_data));
   if (CeedEnabled()) {
-    PetscCall(GetCeedSourceOperatorRegionData(op, region, "ext_src", source_data));
+    PetscCall(GetCeedSourceOperatorRegionData(op, region, op->ceed.external_sources, source_data));
   } else {  // petsc
     PetscCall(GetPetscSourceOperatorRegionData(op, region, op->petsc.external_sources, source_data));
   }
@@ -1122,7 +1120,7 @@ PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *op, RDyRegion reg
   PetscCall(CheckOperatorRegion(op, region, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedSourceOperatorRegionData(op, region, "ext_src", source_data));
+    PetscCallCEED(RestoreCeedSourceOperatorRegionData(op, region, op->ceed.external_sources, source_data));
   } else {
     PetscCallCEED(RestorePetscSourceOperatorRegionData(op, region, op->petsc.external_sources, source_data));
   }
@@ -1135,66 +1133,45 @@ PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *op, RDyRegion reg
 // Regional Material Property Operator Data
 //------------------------------------------
 
-const char *material_property_names[] = {
-    "mannings_n",
-};
-
-/// Provides read-write access to the operator's material property array data
-/// for a given region and material property.
+/// Provides read-write access to the operator's material properties array data
+/// for a given region.
 /// @param [in]  op the operator for which data access is provided
 /// @param [in]  region the region for which access to material propety data is provided
-/// @param [in]  property_id the ID for the desired material property
 /// @param [out] property_data the array data to which access is provided
-PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id,
-                                                   OperatorData *property_data) {
+PetscErrorCode GetOperatorRegionalMaterialProperties(Operator *op, RDyRegion region, OperatorData *property_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorRegion(op, region, comm));
 
-  // NOTE: only single-component material property data currently supported!
-  PetscCall(CreateOperatorRegionData(op, region, 1, property_data));
-  switch (property_id) {
-    case OPERATOR_MANNINGS:
-      if (CeedEnabled()) {
-        PetscCall(GetCeedSourceOperatorRegionData(op, region, material_property_names[property_id], property_data));
-      } else {
-        PetscCall(GetPetscSourceOperatorRegionData(op, region, op->petsc.material_properties[property_id], property_data));
-      }
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
+  PetscCall(CreateOperatorRegionData(op, region, OPERATOR_NUM_MATERIAL_PROPERTIES, property_data));
+  if (CeedEnabled()) {
+    PetscCall(GetCeedSourceOperatorRegionData(op, region, op->ceed.material_properties, property_data));
+  } else {
+    PetscCall(GetPetscSourceOperatorRegionData(op, region, op->petsc.material_properties, property_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Releases access to the operator's material property array data for a region
-/// and property for which access was provided via @ref GetOperatorRegionalMaterialProperty.
+/// Releases access to the operator's regional material properties array data
+/// for which access was provided via @ref GetOperatorRegionalMaterialProperty.
 /// This operation can cause data to be copied between memory spaces.
 /// @param [in]  op the operator for which data access is released
 /// @param [in]  region the region for which access to material propety data is released
-/// @param [in]  property_id the ID for the desired material property
 /// @param [out] property_data the array data for which access is released
-PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *op, RDyRegion region, OperatorMaterialPropertyId property_id,
-                                                       OperatorData *property_data) {
+PetscErrorCode RestoreOperatorRegionalMaterialProperties(Operator *op, RDyRegion region, OperatorData *property_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorRegion(op, region, comm));
 
-  switch (property_id) {
-    case OPERATOR_MANNINGS:
-      if (CeedEnabled()) {
-        PetscCall(RestoreCeedSourceOperatorRegionData(op, region, material_property_names[property_id], property_data));
-      } else {
-        PetscCall(RestorePetscSourceOperatorRegionData(op, region, op->petsc.material_properties[property_id], property_data));
-      }
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
+  if (CeedEnabled()) {
+    PetscCall(RestoreCeedSourceOperatorRegionData(op, region, op->ceed.material_properties, property_data));
+  } else {
+    PetscCall(RestorePetscSourceOperatorRegionData(op, region, op->petsc.material_properties, property_data));
   }
   PetscCall(DestroyOperatorData(property_data));
 
@@ -1215,22 +1192,12 @@ static PetscErrorCode CreateOperatorDomainData(Operator *op, PetscInt num_comp, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *field_name, OperatorData *domain_data) {
+static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, CeedVectorAndRestriction ceed_data, OperatorData *domain_data) {
   PetscFunctionBegin;
-
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
-  CeedOperator source_op = sub_ops[0];
-
-  // fetch the relevant vector
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(source_op, field_name, &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
   // copy out operator data
   PetscInt num_comp = domain_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &domain_data->array_pointer));
+  PetscCallCEED(CeedVectorGetArray(ceed_data.vector, CEED_MEM_HOST, &domain_data->array_pointer));
   CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = domain_data->array_pointer;
   for (PetscInt c = 0; c < num_comp; ++c) {
@@ -1241,12 +1208,8 @@ static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const char *field_name, OperatorData *domain_data) {
+static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, CeedVectorAndRestriction ceed_data, OperatorData *domain_data) {
   PetscFunctionBegin;
-
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
-  CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
   PetscInt num_comp = domain_data->num_components;
@@ -1259,11 +1222,7 @@ static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const ch
   }
 
   // release the array
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(source_op, field_name, &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-  PetscCallCEED(CeedVectorRestoreArray(vec, &domain_data->array_pointer));
+  PetscCallCEED(CeedVectorRestoreArray(ceed_data.vector, &domain_data->array_pointer));
 
   *domain_data = (OperatorData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1313,7 +1272,7 @@ PetscErrorCode GetOperatorDomainExternalSource(Operator *op, OperatorData *sourc
 
   PetscCall(CreateOperatorDomainData(op, op->num_components, source_data));
   if (CeedEnabled()) {
-    PetscCall(GetCeedSourceOperatorDomainData(op, "ext_src", source_data));
+    PetscCall(GetCeedSourceOperatorDomainData(op, op->ceed.external_sources, source_data));
   } else {  // petsc
     PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
   }
@@ -1333,7 +1292,7 @@ PetscErrorCode RestoreOperatorDomainExternalSource(Operator *op, OperatorData *s
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedSourceOperatorDomainData(op, "ext_src", source_data));
+    PetscCallCEED(RestoreCeedSourceOperatorDomainData(op, op->ceed.external_sources, source_data));
   } else {
     PetscCallCEED(RestorePetscSourceOperatorDomainData(op, op->petsc.external_sources, source_data));
   }
@@ -1342,57 +1301,35 @@ PetscErrorCode RestoreOperatorDomainExternalSource(Operator *op, OperatorData *s
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Provides read-write access to the operator's material property array data
-/// for the given material property on the entire domain.
+/// Provides read-write access to the operator's material properties array data,
+/// in which each component is a material property.
 /// @param [in]  op the operator for which data access is provided
-/// @param [in]  property_id the ID for the desired material property
 /// @param [out] property_data the array data to which access is provided
-PetscErrorCode GetOperatorDomainMaterialProperty(Operator *op, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
+PetscErrorCode GetOperatorDomainMaterialProperties(Operator *op, OperatorData *property_data) {
   PetscFunctionBegin;
 
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-
-  // NOTE: only single-component material property data currently supported!
-  PetscCall(CreateOperatorDomainData(op, 1, property_data));
-  switch (property_id) {
-    case OPERATOR_MANNINGS:
-      if (CeedEnabled()) {
-        PetscCall(GetCeedSourceOperatorDomainData(op, material_property_names[property_id], property_data));
-      } else {
-        PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.material_properties[property_id], property_data));
-      }
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
+  PetscCall(CreateOperatorDomainData(op, OPERATOR_NUM_MATERIAL_PROPERTIES, property_data));
+  if (CeedEnabled()) {
+    PetscCall(GetCeedSourceOperatorDomainData(op, op->ceed.material_properties, property_data));
+  } else {
+    PetscCall(GetPetscSourceOperatorDomainData(op, op->petsc.material_properties, property_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Releases access to the operator's material property array data for the given
-/// property on the entire domain for which access was provided via
-/// @ref GetOperatorDomainMaterialProperty. This operation can cause data to be
-/// copied between memory spaces.
+/// Releases access to the operator's material properties array data
+/// for which access was provided via @ref GetOperatorDomainMaterialProperty.
+/// This operation can cause data to be copied between memory spaces.
 /// @param [in]  op the operator for which data access is released
-/// @param [in]  property_id the ID for the desired material property
 /// @param [out] property_data the array data for which access is released
-PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *op, OperatorMaterialPropertyId property_id, OperatorData *property_data) {
+PetscErrorCode RestoreOperatorDomainMaterialProperties(Operator *op, OperatorData *property_data) {
   PetscFunctionBegin;
 
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-
-  switch (property_id) {
-    case OPERATOR_MANNINGS:
-      if (CeedEnabled()) {
-        PetscCall(RestoreCeedSourceOperatorDomainData(op, material_property_names[property_id], property_data));
-      } else {
-        PetscCall(RestorePetscSourceOperatorDomainData(op, op->petsc.material_properties[property_id], property_data));
-      }
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid material property ID: %u", property_id);
+  if (CeedEnabled()) {
+    PetscCall(RestoreCeedSourceOperatorDomainData(op, op->ceed.material_properties, property_data));
+  } else {
+    PetscCall(RestorePetscSourceOperatorDomainData(op, op->petsc.material_properties, property_data));
   }
   PetscCall(DestroyOperatorData(property_data));
 

@@ -715,13 +715,13 @@ PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyC
 //-----------------
 
 typedef struct {
-  RDyMesh  *mesh;               // domain mesh
-  PetscInt  num_flow_comp;      // number of flow components
-  PetscInt  num_sediment_comp;  // number of sediment components
-  Vec       external_sources;   // external source vector
-  Vec       mannings;           // mannings coefficient vector
-  PetscReal tiny_h;             // minimum water height for wet conditions
-  PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
+  RDyMesh  *mesh;                 // domain mesh
+  PetscInt  num_flow_comp;        // number of flow components
+  PetscInt  num_sediment_comp;    // number of sediment components
+  Vec       external_sources;     // external source vector
+  Vec       material_properties;  // material properties vector
+  PetscReal tiny_h;               // minimum water height for wet conditions
+  PetscReal xq2018_threshold;     // threshold for the XQ2018's implicit time integration of source term
 } SedimentSourceOperator;
 
 /// @brief Set the contribution of the source-term using the semi-implicit time integeration method
@@ -740,7 +740,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
 
   SedimentSourceOperator *source_op         = context;
   Vec                     source_vec        = source_op->external_sources;
-  Vec                     mannings_vec      = source_op->mannings;
+  Vec                     mat_props_vec     = source_op->material_properties;
   RDyMesh                *mesh              = source_op->mesh;
   RDyCells               *cells             = &mesh->cells;
   PetscReal               tiny_h            = source_op->tiny_h;
@@ -756,11 +756,11 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   const PetscReal rhow                    = DENSITY_OF_WATER;
 
   // access Vec data
-  PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
-  PetscCall(VecGetArray(source_vec, &source_ptr));      // sequential vector
-  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // sequential vector
-  PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
-  PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
+  PetscScalar *source_ptr, *mat_props_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));        // sequential vector
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));                // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));               // domain global vector (indexed by owned cells)
 
   // access previously-computed flux divergence data
   // Vec flux_div;
@@ -775,6 +775,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
              "Mismatch in number of dof in local vector (%" PetscInt_FMT ") and flow + sediment (%" PetscInt_FMT ")", n_dof,
              num_flow_comp + num_sediment_comp);
 
+  PetscInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -799,7 +800,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
         PetscReal v = hv / h;
 
         // Manning's coefficient
-        PetscReal N_mannings = mannings_ptr[c];
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * c + OPERATOR_MANNINGS];
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
@@ -835,7 +836,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   PetscCall(VecRestoreArray(u_local, &u_ptr));
   PetscCall(VecRestoreArray(f_global, &f_ptr));
   PetscCall(VecRestoreArray(source_vec, &source_ptr));
-  PetscCall(VecRestoreArray(mannings_vec, &mannings_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -851,13 +852,14 @@ static PetscErrorCode DestroySedimentSource(void *context) {
 }
 
 /// @brief Creates an operator for computing source term contribution
-/// @param [in]  mesh             mesh defining the computational domain of the operator
-/// @param [in]  config           RDycore's configuration
-/// @param [in]  external_sources a Vec containing source values for locally-owned cells
-/// @param [in]  mannings         a Vec containing Manning roughness coefficient for SWE
-/// @param [out] petsc_op         a PetscOperator struct that is created and returned
+/// @param [in]  mesh                mesh defining the computational domain of the operator
+/// @param [in]  config              RDycore's configuration
+/// @param [in]  external_sources    a Vec containing source values for locally-owned cells
+/// @param [in]  material_properties a Vec containing Manning roughness coefficient for SWE
+/// @param [out] petsc_op            a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
+PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec material_properties,
+                                                 PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
@@ -866,13 +868,13 @@ PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, const RDyConfig 
   SedimentSourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (SedimentSourceOperator){
-      .mesh              = mesh,
-      .num_flow_comp     = num_flow_comp,
-      .num_sediment_comp = num_sediment_comp,
-      .external_sources  = external_sources,
-      .mannings          = mannings,
-      .tiny_h            = config.physics.flow.tiny_h,
-      .xq2018_threshold  = config.physics.flow.source.xq2018_threshold,
+      .mesh                = mesh,
+      .num_flow_comp       = num_flow_comp,
+      .num_sediment_comp   = num_sediment_comp,
+      .external_sources    = external_sources,
+      .material_properties = material_properties,
+      .tiny_h              = config.physics.flow.tiny_h,
+      .xq2018_threshold    = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;

@@ -269,12 +269,12 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const 
 
 // flow and sediment regional source operator Q-function
 CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  const CeedScalar(*ext_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
-  const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
-  const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
-  const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
-  CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  const SedimentContext context             = (SedimentContext)ctx;
+  const CeedScalar(*ext_src)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
+  const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // material properties
+  const CeedScalar(*riemannf)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SedimentContext context            = (SedimentContext)ctx;
 
   // const CeedScalar dt                      = context->dtime;
   const CeedScalar tiny_h                  = context->tiny_h;
@@ -300,9 +300,10 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
 
     const CeedScalar h = state.h;
     if (h > tiny_h) {
-      const CeedScalar u  = SafeDiv(state.hu, h, tiny_h);
-      const CeedScalar v  = SafeDiv(state.hv, h, tiny_h);
-      const CeedScalar Cd = gravity * Square(mannings_n[0][i]) * pow(h, -1.0 / 3.0);
+      const CeedScalar u          = SafeDiv(state.hu, h, tiny_h);
+      const CeedScalar v          = SafeDiv(state.hv, h, tiny_h);
+      const CeedScalar mannings_n = mat_props[OPERATOR_MANNINGS][i];
+      const CeedScalar Cd         = gravity * Square(mannings_n) * pow(h, -1.0 / 3.0);
 
       for (CeedInt j = 0; j < sed_ndof; ++j) {
         const CeedScalar ci    = SafeDiv(state.hci[j], h, tiny_h);
