@@ -762,13 +762,6 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
   PetscCall(VecGetArray(u_local, &u_ptr));                // domain local vector (indexed by local cells)
   PetscCall(VecGetArray(f_global, &f_ptr));               // domain global vector (indexed by owned cells)
 
-  // access previously-computed flux divergence data
-  // Vec flux_div;
-  // PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
-  // PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
-  // PetscScalar *flux_div_ptr;
-  // PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
-
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
   PetscCheck(n_dof == num_flow_comp + num_sediment_comp, comm, PETSC_ERR_USER,
@@ -784,33 +777,11 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
       PetscReal hu = u_ptr[n_dof * c + 1];
       PetscReal hv = u_ptr[n_dof * c + 2];
 
-      // PetscReal dz_dx = cells->dz_dx[c];
-      // PetscReal dz_dy = cells->dz_dy[c];
-
-      // PetscReal bedx = dz_dx * GRAVITY * h;
-      // PetscReal bedy = dz_dy * GRAVITY * h;
-
-      // PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
-      // PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
-
-      // PetscReal tbx = 0.0, tby = 0.0;
-
       if (h >= tiny_h) {  // wet conditions
-        PetscReal u = hu / h;
-        PetscReal v = hv / h;
-
-        // Manning's coefficient
+        PetscReal u          = hu / h;
+        PetscReal v          = hv / h;
         PetscReal N_mannings = mat_props_ptr[num_mat_props * c + OPERATOR_MANNINGS];
-
-        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
-        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
-
-        // PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
-        // PetscReal tb       = Cd * velocity / h;
-        // PetscReal factor   = tb / (1.0 + dt * tb);
-
-        // tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
-        // tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+        PetscReal Cd         = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
 
         for (PetscInt s = 0; s < num_sediment_comp; s++) {
           PetscReal ci    = u_ptr[n_dof * c + num_flow_comp + s] / h;
@@ -822,13 +793,6 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
           f_ptr[n_dof * owned_cell_id + num_flow_comp + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + num_flow_comp + s];
         }
       }
-
-      /*
-      // NOTE: we accumulate everything into the RHS vector by convention.
-      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
-      f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
-      f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
-      */
     }
   }
 

@@ -334,9 +334,8 @@ static PetscErrorCode AddOperatorFields(Operator *op) {
 
     // create a vector of external source terms
     CeedElemRestriction ext_src_restriction;
-    CeedInt             ext_src_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, ext_src_strides, &ext_src_restriction));
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, solution_strides, &ext_src_restriction));
     PetscCallCEED(CeedElemRestrictionCreateVector(ext_src_restriction, &op->ceed.external_sources, NULL));
     PetscCallCEED(CeedVectorSetValue(op->ceed.external_sources, 0.0));
 
@@ -348,7 +347,7 @@ static PetscErrorCode AddOperatorFields(Operator *op) {
     PetscCallCEED(CeedElemRestrictionCreateVector(mat_props_restriction, &op->ceed.material_properties, NULL));
     PetscCallCEED(CeedVectorSetValue(op->ceed.material_properties, 0.0));
 
-    // add this vector to all source sub-operators
+    // add these vectors to all source sub-operators
     CeedInt num_source_suboperators;
     PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source, &num_source_suboperators));
     CeedOperator *source_suboperators;
@@ -657,7 +656,7 @@ PetscErrorCode ResetOperatorDiagnostics(Operator *op) {
 static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edges, RDyMesh *mesh, CourantNumberDiagnostics *courant_diags) {
   PetscFunctionBegin;
 
-  // get the relevant interior sub-operator
+  // get the interior flow sub-operator
   CeedOperator *sub_ops;
   PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
   CeedOperator interior_flux_op = sub_ops[0];
@@ -696,7 +695,7 @@ static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edge
   for (PetscInt b = 0; b < num_boundaries; ++b) {
     RDyBoundary boundary = boundaries[b];
 
-    // get the relevant boundary sub-operator
+    // get the relevant flow boundary sub-operator
     CeedOperator *sub_ops;
     PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
     CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];

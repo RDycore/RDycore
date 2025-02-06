@@ -488,12 +488,12 @@ PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, con
              "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_index,
              region.num_owned_cells);
 
-  OperatorData mannings_data;
-  PetscCall(GetOperatorRegionalMaterialProperties(rdy->operator, region, &mannings_data));
+  OperatorData property_data;
+  PetscCall(GetOperatorRegionalMaterialProperties(rdy->operator, region, &property_data));
   for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-    mannings_data.values[OPERATOR_MANNINGS][c] = n_values[c];
+    property_data.values[OPERATOR_MANNINGS][c] = n_values[c];
   }
-  PetscCall(RestoreOperatorRegionalMaterialProperties(rdy->operator, region, &mannings_data));
+  PetscCall(RestoreOperatorRegionalMaterialProperties(rdy->operator, region, &property_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -504,12 +504,12 @@ PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal *n_
   PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_USER,
              "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
 
-  OperatorData mannings_data;
-  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & mannings_data));
+  OperatorData property_data;
+  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & property_data));
   for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
-    mannings_data.values[OPERATOR_MANNINGS][c] = n_values[c];
+    property_data.values[OPERATOR_MANNINGS][c] = n_values[c];
   }
-  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & mannings_data));
+  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & property_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
