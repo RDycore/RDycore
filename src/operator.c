@@ -341,9 +341,9 @@ static PetscErrorCode AddOperatorFields(Operator *op) {
 
     // create material property vector
     CeedElemRestriction mat_props_restriction;
-    CeedInt             matprop_strides[] = {OPERATOR_NUM_MATERIAL_PROPERTIES, 1, OPERATOR_NUM_MATERIAL_PROPERTIES};
+    CeedInt             mat_prop_strides[] = {OPERATOR_NUM_MATERIAL_PROPERTIES, 1, OPERATOR_NUM_MATERIAL_PROPERTIES};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, OPERATOR_NUM_MATERIAL_PROPERTIES,
-                                                   num_owned_cells * OPERATOR_NUM_MATERIAL_PROPERTIES, matprop_strides, &mat_props_restriction));
+                                                   num_owned_cells * OPERATOR_NUM_MATERIAL_PROPERTIES, mat_prop_strides, &mat_props_restriction));
     PetscCallCEED(CeedElemRestrictionCreateVector(mat_props_restriction, &op->ceed.material_properties, NULL));
     PetscCallCEED(CeedVectorSetValue(op->ceed.material_properties, 0.0));
 
@@ -472,7 +472,6 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscFree((*op)->petsc.boundary_fluxes);
     PetscCall(VecDestroy(&(*op)->petsc.external_sources));
     PetscCall(VecDestroy(&(*op)->petsc.material_properties));
-    PetscFree((*op)->petsc.material_properties);
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.flux));
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.source));
   }
@@ -826,6 +825,9 @@ static PetscErrorCode DestroyOperatorData(OperatorData *data) {
 static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
+  // FIXME: this only works for a single set of boundary sub-operators (e.g. SWE)
+  // FIXME: and has to be modified to incorporate e.g. sediment transport
+
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
   PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux, &sub_ops));
@@ -852,6 +854,9 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
 
 static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
   PetscFunctionBegin;
+
+  // FIXME: this only works for a single set of boundary sub-operators (e.g. SWE)
+  // FIXME: and has to be modified to incorporate e.g. sediment transport
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;

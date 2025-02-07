@@ -174,7 +174,7 @@ PetscErrorCode CreateSWECeedInteriorFluxOperator(RDyMesh *mesh, const RDyConfig 
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-    // create a vector to store flux divergences
+    // create a vector to store inter-cell fluxes
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
@@ -374,7 +374,7 @@ PetscErrorCode CreateSWECeedBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig 
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-    // create a vector to store accumulated fluxes (flux divergences)
+    // create a vector to store boundary fluxes
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
@@ -493,7 +493,6 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, const RDyConfig config
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
-  CeedInt       num_comp_geom = 2, num_comp_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermSemiImplicit, SWESourceTermSemiImplicit_loc, &qf));
@@ -506,9 +505,10 @@ PetscErrorCode CreateSWECeedSourceOperator(RDyMesh *mesh, const RDyConfig config
       break;
   }
 
+  CeedInt num_comp_geom = 2, num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "ext_src", num_comp, CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddInput(qf, "mat_props", num_comp_mat_props, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "mat_props", num_mat_props, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE));
