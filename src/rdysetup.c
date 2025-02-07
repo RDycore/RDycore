@@ -516,7 +516,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
 
 // sets up materials
 //   unsafe for refinement if file is given for surface composition
-static PetscErrorCode InitMaterialProperties(RDy rdy) {
+PetscErrorCode InitMaterialProperties(RDy rdy) {
   PetscFunctionBegin;
 
   // check that each region has a material assigned to it
@@ -1092,7 +1092,7 @@ PetscErrorCode InitSolver(RDy rdy) {
 }
 
 // initialize the data on the right hand side of the boundary edges
-static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
+PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   PetscFunctionBegin;
 
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -1130,7 +1130,7 @@ static PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
 /// @brief Initializes a homogeneous water source term.
 /// @param rdy A RDy struct
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode InitSourceConditions(RDy rdy) {
+PetscErrorCode InitSourceConditions(RDy rdy) {
   PetscFunctionBegin;
 
   if (rdy->config.num_sources > 0) {
@@ -1229,6 +1229,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   } else {
     rdy->log = stdout;
   }
+
+  rdy->mesh_was_refined = PETSC_FALSE;
+  rdy->num_refinements  = 0;
 
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));

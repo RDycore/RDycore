@@ -1,0 +1,50 @@
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  final_time: 0.05
+  unit: seconds
+  time_step : 0.005
+  coupling_interval: 0.01
+
+#output:
+#  format: xdmf
+#  step_interval: 100
+
+grid:
+  file: mms_triangles_dx1.exo
+
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: domain
+    flow: domain_flow_ic
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    height: 10
+    x_momentum: 0
+    y_momentum: 0
