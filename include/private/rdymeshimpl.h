@@ -99,6 +99,9 @@ typedef struct {
 
   // vertex positions
   RDyPoint *points;
+
+  // weights to estimate values at vertex from cell centers
+  PetscReal *wts_c2v;
 } RDyVertices;
 
 // A struct of arrays storing information about edges separating mesh cells.

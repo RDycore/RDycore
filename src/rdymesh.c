@@ -227,8 +227,11 @@ static PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, PetscInt ncells_p
 
   PetscCall(PetscCalloc1(num_vertices * nedges_per_vertex, &vertices->edge_ids));
   PetscCall(PetscCalloc1(num_vertices * ncells_per_vertex, &vertices->cell_ids));
+  PetscCall(PetscCalloc1(num_vertices * ncells_per_vertex, &vertices->wts_c2v));
+
   FILL(num_vertices * nedges_per_vertex, vertices->edge_ids, -1);
   FILL(num_vertices * ncells_per_vertex, vertices->cell_ids, -1);
+  FILL(num_vertices * ncells_per_vertex, vertices->wts_c2v, 0.0);
 
   for (PetscInt ivertex = 0; ivertex < num_vertices; ivertex++) {
     vertices->ids[ivertex] = ivertex;
@@ -387,6 +390,7 @@ static PetscErrorCode RDyVerticesDestroy(RDyVertices vertices) {
   PetscCall(PetscFree(vertices.cell_ids));
   PetscCall(PetscFree(vertices.edge_ids));
   PetscCall(PetscFree(vertices.points));
+  PetscCall(PetscFree(vertices.wts_c2v));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -811,6 +815,213 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
     }
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Solves a 2x2 linear system AX = B
+/// @param [in] A a 2x2 matrix
+/// @param [in] B right hand side vector
+/// @param [out] X solution
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode SolveATwoByTwoLinearSystem(const PetscReal A[2][2], const PetscReal B[2], PetscReal X[2]) {
+  PetscFunctionBegin;
+
+  PetscReal denom = (A[0][0] * A[1][1] - Square(A[0][1]));
+
+  PetscCheck(denom != 0.0, PETSC_COMM_SELF, PETSC_ERR_USER, "determinant of the matrix is 0.0");
+
+  X[0] = (A[0][1] * B[1] - A[1][1] * B[0]) / denom;
+  X[1] = (A[0][1] * B[0] - A[0][0] * B[1]) / denom;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Computes determinant of a 3x3 matrix
+/// @param A [in] a 3x3 matrix
+/// @param d [out] determinant
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode DeterminantOfThreeByThree(const PetscReal A[3][3], PetscReal *d) {
+  PetscFunctionBegin;
+
+  PetscReal d0 = (A[1][1] * A[2][2] - A[1][2] * A[2][1]);
+  PetscReal d1 = (A[1][0] * A[2][2] - A[2][0] * A[1][2]);
+  PetscReal d2 = (A[1][0] * A[2][1] - A[2][0] * A[1][1]);
+
+  *d = A[0][0] * d0 - A[0][1] * d1 + A[0][2] * d2;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Solves a 3x3 linear system AX = S using Cramer's rule
+/// @param [in] A a 3x3 matrix
+/// @param [in] B right hand side vector
+/// @param [out] S solution
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode SolveAThreeByThreeLinearSystem(PetscReal A[3][3], PetscReal B[3], PetscReal S[3]) {
+  PetscFunctionBegin;
+
+  PetscReal X[3][3], Y[3][3], Z[3][3];
+
+  // create the three temporary matrices by copying A matrix
+  for (PetscInt r = 0; r < 3; ++r) {
+    for (PetscInt c = 0; c < 3; ++c) {
+      X[r][c] = A[r][c];
+      Y[r][c] = A[r][c];
+      Z[r][c] = A[r][c];
+    }
+  }
+
+  // replace the columns of the temporary matrices by B vector
+  for (PetscInt r = 0; r < 3; ++r) X[r][0] = B[r];
+  for (PetscInt r = 0; r < 3; ++r) Y[r][1] = B[r];
+  for (PetscInt r = 0; r < 3; ++r) Z[r][2] = B[r];
+
+  // compute determinant of matrices
+  PetscReal detA, detX, detY, detZ;
+  DeterminantOfThreeByThree(A, &detA);
+  DeterminantOfThreeByThree(X, &detX);
+  DeterminantOfThreeByThree(Y, &detY);
+  DeterminantOfThreeByThree(Z, &detZ);
+
+  PetscCheck(detA != 0.0, PETSC_COMM_SELF, PETSC_ERR_USER, "determinant of the matrix is 0.0");
+
+  S[0] = detX / detA;
+  S[1] = detY / detA;
+  S[2] = detZ / detA;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/// @brief Compute weights to estimate values at vertices (Xv) from values at
+///        cell centers (Xc) using pseudo-Laplacian approach
+///
+///   Xv = sum(wj * Xc) / sum(wj) = sum( wj/sum(wj) * Xc)
+///
+/// where wj = 1 + lambda_x * dxj + lambda_y * dyj + lambda_z * dzj
+///
+/// The wj is obtained by solve a system of 3x3 linear system given by
+///
+///   | sum(dxj^2)     sum(dxj * dyj) sum(dxj * dzj) |   | lambda_x |     | sum(dxj) |
+///   | sum(dxj * dyj) sum(dyj^2)     sum(dyj * dzj) | x | lambda_y | = - | sum(dyj) |
+///   | sum(dxj * dzj) sim(dyj * dzj) sum(dzj^2)     |   | lambda_z |     | sum(dzj) |
+///
+///  where
+///    dxj = (xc_j - xv_i) distance in x-dir between the j-th cell center and i-th vertex
+///    dyj = (yc_j - yv_i) distance in y-dir between the j-th cell center and i-th vertex
+///    dzj = (zc_j - zv_i) distance in z-dir between the j-th cell center and i-th vertex
+///
+/// @param mesh
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode ComputeWeightsCell2VetexValue_PseudoLaplacian(RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  RDyCells    *cells     = &mesh->cells;
+  RDyVertices *vertices  = &mesh->vertices;
+  PetscInt     nvertices = mesh->num_vertices_global;
+
+  PetscReal *dx, *dy, *dz, *w;
+  PetscCall(PetscCalloc1(mesh->max_ncells_per_vertex, &dx));
+  PetscCall(PetscCalloc1(mesh->max_ncells_per_vertex, &dy));
+  PetscCall(PetscCalloc1(mesh->max_ncells_per_vertex, &dz));
+  PetscCall(PetscCalloc1(mesh->max_ncells_per_vertex, &w));
+
+  for (PetscInt ivertex = 0; ivertex < nvertices; ++ivertex) {
+    PetscInt offset = vertices->cell_offsets[ivertex];
+
+    if (vertices->num_cells[ivertex] == 1) {
+      vertices->wts_c2v[offset] = 1.0;
+
+    } else {
+      PetscReal A[3][3] = {
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+      };
+      PetscReal B[3] = {0.0, 0.0, 0.0};
+      PetscReal L[3] = {0.0, 0.0, 0.0};
+
+      for (PetscInt c = 0; c < vertices->num_cells[ivertex]; ++c) {
+        PetscInt index = offset + c;
+        PetscInt icell = vertices->cell_ids[index];
+
+        w[c] = 0.0;
+
+        dx[c] = cells->centroids[icell].X[0] - vertices->points[ivertex].X[0];
+        dy[c] = cells->centroids[icell].X[1] - vertices->points[ivertex].X[1];
+        dz[c] = cells->centroids[icell].X[2] - vertices->points[ivertex].X[2];
+
+        PetscReal dx2 = Square(dx[c]);
+        PetscReal dy2 = Square(dy[c]);
+        PetscReal dz2 = Square(dz[c]);
+
+        PetscReal dxdy = dx[c] * dy[c];
+        PetscReal dydz = dy[c] * dz[c];
+        PetscReal dxdz = dx[c] * dz[c];
+
+        A[0][0] += dx2;
+        A[0][1] += dxdy;
+        A[0][2] += dxdz;
+
+        A[1][0] += dxdy;
+        A[1][1] += dy2;
+        A[1][2] += dydz;
+
+        A[2][0] += dxdz;
+        A[2][1] += dydz;
+        A[2][2] += dz2;
+
+        B[0] -= dx[c];
+        B[1] -= dy[c];
+        B[2] -= dz[c];
+      }
+
+      if (A[2][2] == 0.0) {  // is the entry for z zero? (this could happen when topography is flat)
+
+        // create a smaller 2x2 problem
+        PetscReal Asub[2][2] = {
+            {A[0][0], A[0][1]},
+            {A[1][0], A[1][1]},
+        };
+
+        PetscReal Bsub[2] = {B[0], B[1]};
+        PetscReal Lsub[2] = {0.0, 0.0};
+
+        PetscCall(SolveATwoByTwoLinearSystem(Asub, Bsub, Lsub));
+
+        for (PetscInt r = 0; r < 2; ++r) {
+          L[r] = Lsub[r];
+        }
+
+      } else {
+        // solve the 3x3 linear system
+        PetscCall(SolveAThreeByThreeLinearSystem(A, B, L));
+      }
+
+      // compute the weights and their sum
+      PetscReal wsum = 0.0;
+      for (PetscInt c = 0; c < vertices->num_cells[ivertex]; ++c) {
+        w[c] = 1.0 + L[0] * dx[c] + L[1] * dy[c] + L[2] * dz[0];
+        wsum += w[c];
+      }
+
+      // save normalized weights
+      for (PetscInt c = 0; c < vertices->num_cells[ivertex]; ++c) {
+        PetscInt index           = offset + c;
+        vertices->wts_c2v[index] = w[c] / wsum;
+      }
+    }
+  }
+
+  // clean up
+  PetscCall(PetscFree(dx));
+  PetscCall(PetscFree(dy));
+  PetscCall(PetscFree(dz));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ComputeAdditionalVertexAttributes(DM dm, RDyMesh *mesh) {
+  PetscFunctionBegin;
+  PetscCall(ComputeWeightsCell2VetexValue_PseudoLaplacian(mesh));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1291,6 +1502,7 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   PetscCall(RDyVerticesCreateFromDM(dm, mesh->max_ncells_per_vertex, mesh->max_nedges_per_vertex, &mesh->vertices, &mesh->num_vertices_global));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
+  PetscCall(ComputeAdditionalVertexAttributes(dm, mesh));
 
   // Count up local cells.
   mesh->num_owned_cells = 0;
