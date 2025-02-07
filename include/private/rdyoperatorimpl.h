@@ -139,8 +139,17 @@ typedef struct Operator {
       // timestep last set on operators
       PetscReal dt;
 
-      // bookkeeping vectors used by operator(s)
+      // bookkeeping vectors
       CeedVector u_local, rhs, sources;
+
+      // array of boundary restrictions (needed for setting operator fields)
+      CeedElemRestriction *boundary_restrictions;
+
+      // array of Dirichlet boundary value vectors, indexed by boundary
+      CeedVector *boundary_values;
+
+      // array of boundary flux vectors, indexed by boundary
+      CeedVector *boundary_fluxes;
 
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;

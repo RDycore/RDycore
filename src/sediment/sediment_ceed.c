@@ -274,8 +274,8 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
   // create vectors (and their supporting restrictions) for the operator
-  CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum;
-  CeedVector          geom, flux, dirichlet, cnum;
+  CeedElemRestriction q_restrict_l, c_restrict_l, restrict_geom, restrict_cnum;
+  CeedVector          geom, cnum;
   {
     CeedInt num_edges = boundary.num_edges;
 
@@ -310,12 +310,6 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-    // create a vector to store boundary fluxes
-    CeedInt f_strides[] = {num_comp, 1, num_comp};
-    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
-    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
-    PetscCallCEED(CeedVectorSetValue(flux, 0.0));
-
     // create a vector to store the courant number for each edge
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp_cnum, num_edges * num_comp_cnum, cnum_strides, &restrict_cnum));
@@ -344,37 +338,21 @@ PetscErrorCode CreateSedimentCeedBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
       PetscCallCEED(CeedElemRestrictionView(q_restrict_l, stdout));
       PetscCallCEED(CeedElemRestrictionView(c_restrict_l, stdout));
     }
-
-    // create a vector to store (Dirichlet) boundary values if needed
-    if (offset_dirichlet) {
-      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, num_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                              offset_dirichlet, &restrict_dirichlet));
-      PetscCall(PetscFree(offset_dirichlet));
-      if (0) PetscCallCEED(CeedElemRestrictionView(restrict_dirichlet, stdout));
-      PetscCallCEED(CeedElemRestrictionCreateVector(restrict_dirichlet, &dirichlet, NULL));
-      PetscCallCEED(CeedVectorSetValue(dirichlet, 0.0));
-    }
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
-    PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_COLLOCATED, dirichlet));
-  }
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
-  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedVectorDestroy(&geom));
-  PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
 
