@@ -1019,9 +1019,273 @@ static PetscErrorCode ComputeWeightsCell2VetexValue_PseudoLaplacian(RDyMesh *mes
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ComputeAreaOfTriangleIn2D(PetscReal x1[2], PetscReal x2[2], PetscReal x3[2], PetscReal *area) {
+  PetscFunctionBegin;
+
+  PetscReal A[3][3] = {
+      {x1[0], x1[1], 1.0},
+      {x2[0], x2[1], 1.0},
+      {x3[0], x3[1], 1.0},
+  };
+
+  PetscReal det;
+  PetscCall(DeterminantOfThreeByThree(A, &det));
+  *area = fabs(det) / 2.0;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ComputeGradientMatrix(RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyEdges    *edges    = &mesh->edges;
+  RDyVertices *vertices = &mesh->vertices;
+
+  PetscInt ncells                = mesh->num_cells;
+  PetscInt nvertices             = mesh->num_vertices_global;
+  PetscInt max_nedges_per_cell   = mesh->max_nedges_per_cell;
+  PetscInt max_ncells_per_vertex = mesh->max_ncells_per_vertex;
+
+  Mat UCellandUVert_From_UCell;
+  Mat Grad_From_UCellandUVert;
+  Mat Grad_From_UCell;
+
+  PetscInt nrow, ncol, nz;
+
+  nrow = ncells + nvertices;
+  ncol = ncells;
+  nz   = ncells;
+  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, nrow, ncol, nz, NULL, &UCellandUVert_From_UCell));
+
+  nrow = 2 * (ncells + nvertices);  // for gradient in x and y direction
+  ncol = ncells + nvertices;
+  nz   = 2 * max_nedges_per_cell + 1;
+  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, nrow, ncol, nz, NULL, &Grad_From_UCellandUVert));
+
+  nrow = 2 * ncells;
+  ncol = ncells;
+  nz   = 4 * max_ncells_per_vertex;
+  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, nrow, ncol, nz, NULL, &Grad_From_UCell));
+
+  PetscReal *Wx, *Wy;
+  PetscInt  *IDs;
+  PetscCall(PetscCalloc1(2 * max_nedges_per_cell + 1, &Wx));
+  PetscCall(PetscCalloc1(2 * max_nedges_per_cell + 1, &Wy));
+  PetscCall(PetscCalloc1(2 * max_nedges_per_cell + 1, &IDs));
+
+  for (PetscInt icell = 0; icell < ncells; ++icell) {
+    PetscInt edge_offset = cells->edge_offsets[icell];
+    PetscInt num_edges   = cells->num_edges[icell];
+
+    for (PetscInt i = 0; i < 2 * max_nedges_per_cell + 1; ++i) {
+      Wx[i]  = 0.0;
+      Wy[i]  = 0.0;
+      IDs[i] = -1;
+    }
+
+    PetscReal area_total = 0.0;
+
+    IDs[0] = icell;
+
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      PetscInt iedge = cells->edge_ids[edge_offset + e];
+
+      PetscInt icell_L = edges->cell_ids[2 * iedge];
+      PetscInt icell_R = edges->cell_ids[2 * iedge + 1];
+
+      PetscInt v_offset = iedge * 2;
+      PetscInt vid_beg  = edges->vertex_ids[v_offset + 0];
+      PetscInt vid_end  = edges->vertex_ids[v_offset + 1];
+
+      if (icell_R != -1) {
+        // edge is not on the boundary
+
+        PetscReal X1[2], X3[2], Xm[2], Xa[2];
+
+        if (icell == icell_L) {
+          IDs[e + 1] = icell_R;
+          for (PetscInt idim = 0; idim < 2; ++idim) {
+            Xm[idim] = cells->centroids[icell_L].X[idim];
+            Xa[idim] = cells->centroids[icell_R].X[idim];
+
+            X1[idim] = vertices->points[vid_beg].X[idim];
+            X3[idim] = vertices->points[vid_end].X[idim];
+
+            IDs[e + num_edges + 1] = vid_beg + ncells;
+          }
+        } else {
+          IDs[e + 1] = icell_L;
+          for (PetscInt idim = 0; idim < 2; ++idim) {
+            Xm[idim] = cells->centroids[icell_R].X[idim];
+            Xa[idim] = cells->centroids[icell_L].X[idim];
+
+            X1[idim] = vertices->points[vid_end].X[idim];
+            X3[idim] = vertices->points[vid_beg].X[idim];
+
+            IDs[e + num_edges + 1] = vid_end + ncells;
+          }
+        }
+
+        PetscReal x13 = X3[0] - X1[0];
+        PetscReal y13 = X3[1] - X1[1];
+
+        PetscReal xma = Xa[0] - Xm[0];
+        PetscReal yma = Xa[1] - Xm[1];
+
+        PetscReal area_1a3 = 0.0, area_13m = 0.0;
+
+        PetscCall(ComputeAreaOfTriangleIn2D(X1, Xa, X3, &area_1a3));
+        PetscCall(ComputeAreaOfTriangleIn2D(X1, X3, Xm, &area_13m));
+
+        area_total += (area_1a3 + area_13m);
+
+        Wx[0] -= y13 / 2.0;
+        Wy[0] += x13 / 2.0;
+
+        Wx[e + 1] += y13 / 2.0;
+        Wy[e + 1] -= x13 / 2.0;
+
+        Wx[e + num_edges + 1] += yma / 2.0;
+        Wy[e + num_edges + 1] -= xma / 2.0;
+
+        if (e == num_edges - 1) {
+          Wx[num_edges + 1] -= yma / 2.0;
+          Wy[num_edges + 1] += xma / 2.0;
+        } else {
+          Wx[e + num_edges + 2] -= yma / 2.0;
+          Wy[e + num_edges + 2] += xma / 2.0;
+        }
+
+      } else {
+        // edge is on the boundary
+
+        PetscReal X1[2], X3[2], Xm[2];
+
+        IDs[e + 1] = -1;
+
+        for (PetscInt idim = 0; idim < 2; ++idim) {
+          Xm[idim] = cells->centroids[icell_L].X[idim];
+
+          X1[idim] = vertices->points[vid_beg].X[idim];
+          X3[idim] = vertices->points[vid_end].X[idim];
+
+          IDs[e + num_edges + 1] = vid_beg + ncells;
+        }
+
+        PetscReal x31 = X1[0] - X3[0];
+        PetscReal y31 = X1[1] - X3[1];
+
+        PetscReal xm3 = X3[0] - Xm[0];
+        PetscReal ym3 = X3[1] - Xm[1];
+
+        PetscReal x1m = Xm[0] - X1[0];
+        PetscReal y1m = Xm[1] - X1[1];
+
+        Wx[0] += y31 / 2.0;
+        Wy[0] -= x31 / 2.0;
+
+        Wx[e + num_edges + 1] += ym3 / 2.0;
+        Wy[e + num_edges + 1] -= xm3 / 2.0;
+
+        if (e == num_edges - 1) {
+          Wx[num_edges + 1] += y1m / 2.0;
+          Wy[num_edges + 1] -= x1m / 2.0;
+        } else {
+          Wx[e + num_edges + 2] += y1m / 2.0;
+          Wy[e + num_edges + 2] -= x1m / 2.0;
+        }
+
+        PetscReal area_13m = 0.0;
+
+        PetscCall(ComputeAreaOfTriangleIn2D(X1, X3, Xm, &area_13m));
+
+        area_total += area_13m;
+      }
+    }
+
+    // normalize the entries by area_total and set them in the matrix
+    for (PetscInt i = 0; i < 2 * max_nedges_per_cell + 1; ++i) {
+      Wx[i] = Wx[i] / area_total;
+      Wy[i] = Wy[i] / area_total;
+
+      if (IDs[i] > -1) {
+        PetscInt row;
+
+        // add entries for gradient in x-dir
+        row = 2 * icell;
+        PetscCall(MatSetValue(Grad_From_UCellandUVert, row, IDs[i], Wx[i], INSERT_VALUES));
+
+        // add entries for gradient in y-dir
+        row = 2 * icell + 1;
+        PetscCall(MatSetValue(Grad_From_UCellandUVert, row, IDs[i], Wy[i], INSERT_VALUES));
+      }
+    }
+  }
+
+  PetscCall(MatAssemblyBegin(Grad_From_UCellandUVert, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(Grad_From_UCellandUVert, MAT_FINAL_ASSEMBLY));
+
+  // now, setup UCellandUVert_From_UCell
+
+  // put 1.0 on the diagonal for the rows 0 to ncell-1
+  for (PetscInt icell = 0; icell < ncells; ++icell) {
+    PetscCall(MatSetValue(UCellandUVert_From_UCell, icell, icell, 1.0, INSERT_VALUES));
+  }
+
+  //
+  for (PetscInt v = 0; v < nvertices; ++v) {
+    PetscInt offset = vertices->cell_offsets[v];
+    PetscInt row    = v + ncells;
+    for (PetscInt c = 0; c < vertices->num_cells[v]; ++c) {
+      PetscInt  index = offset + c;
+      PetscInt  icell = vertices->cell_ids[index];
+      PetscReal value = vertices->wts_c2v[index];
+
+      PetscCall(MatSetValue(UCellandUVert_From_UCell, row, icell, value, INSERT_VALUES));
+    }
+  }
+
+  PetscCall(MatAssemblyBegin(UCellandUVert_From_UCell, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(UCellandUVert_From_UCell, MAT_FINAL_ASSEMBLY));
+
+  PetscCall(MatMatMult(Grad_From_UCellandUVert, UCellandUVert_From_UCell, MAT_INITIAL_MATRIX, PETSC_CURRENT, &Grad_From_UCell));
+
+  if (1) {
+    PetscViewer viewer;
+
+    char     filename[100];
+    PetscInt rank;
+
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+
+    sprintf(filename, "Grad_From_UCellandUVert_n%d.bin", rank);
+    PetscViewerBinaryOpen(PETSC_COMM_SELF, filename, FILE_MODE_WRITE, &viewer);
+    PetscCall(MatView(Grad_From_UCellandUVert, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+
+    sprintf(filename, "UCellandUVert_From_UCell_n%d.bin", rank);
+    PetscViewerBinaryOpen(PETSC_COMM_SELF, filename, FILE_MODE_WRITE, &viewer);
+    PetscCall(MatView(UCellandUVert_From_UCell, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+
+    sprintf(filename, "Grad_From_UCell_n%d.bin", rank);
+    PetscViewerBinaryOpen(PETSC_COMM_SELF, filename, FILE_MODE_WRITE, &viewer);
+    PetscCall(MatView(Grad_From_UCell, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
+
+  PetscCall(PetscFree(Wx));
+  PetscCall(PetscFree(Wy));
+  PetscCall(PetscFree(IDs));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ComputeAdditionalVertexAttributes(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
   PetscCall(ComputeWeightsCell2VetexValue_PseudoLaplacian(mesh));
+  PetscCall(ComputeGradientMatrix(mesh));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
