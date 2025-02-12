@@ -135,8 +135,14 @@ typedef struct Operator {
       // timestep last set on operators
       PetscReal dt;
 
-      // vectors used by operator(s)
-      CeedVector u_local, rhs, sources, flux_divergence;
+      // bookkeeping vectors
+      CeedVector u_local, rhs, sources;
+
+      // domain-wide flux_divergence vector;
+      CeedVector flux_divergence;
+
+      // domain-wide material property vector (# of components == # of scalar properties)
+      CeedVector material_properties;
     } ceed;
 
     // PETSc operator data
@@ -154,8 +160,8 @@ typedef struct Operator {
       // domain-wide external source vector
       Vec external_sources;
 
-      // array of domain-wide material property data Vecs, indexed by property_id
-      Vec *material_properties;
+      // domain-wide material property vector (# of components == # of scalar properties)
+      Vec material_properties;
     } petsc;
   };
 
@@ -204,10 +210,10 @@ PETSC_INTERN PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *, RD
 PETSC_INTERN PetscErrorCode GetOperatorDomainExternalSource(Operator *, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorDomainExternalSource(Operator *, OperatorData *);
 
-PETSC_INTERN PetscErrorCode GetOperatorRegionalMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorRegionalMaterialProperty(Operator *, RDyRegion, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode GetOperatorDomainMaterialProperty(Operator *, OperatorMaterialPropertyId, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorDomainMaterialProperty(Operator *, OperatorMaterialPropertyId, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorRegionalMaterialProperties(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorRegionalMaterialProperties(Operator *, RDyRegion, OperatorData *);
+PETSC_INTERN PetscErrorCode GetOperatorDomainMaterialProperties(Operator *, OperatorData *);
+PETSC_INTERN PetscErrorCode RestoreOperatorDomainMaterialProperties(Operator *, OperatorData *);
 
 // diagnostics
 PETSC_INTERN PetscErrorCode ResetOperatorDiagnostics(Operator *);

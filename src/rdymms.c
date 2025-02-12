@@ -628,10 +628,10 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 
     // evaluate and set material properties
     if (rdy->config.physics.flow.mode == FLOW_SWE) {
-      OperatorData mannings;
-      PetscCall(GetOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings));
-      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, mannings.values[0]));
-      PetscCall(RestoreOperatorRegionalMaterialProperty(rdy->operator, region, OPERATOR_MANNINGS, &mannings));
+      OperatorData material_properties;
+      PetscCall(GetOperatorRegionalMaterialProperties(rdy->operator, region, &material_properties));
+      PetscCall(EvaluateSpatialSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, material_properties.values[OPERATOR_MANNINGS]));
+      PetscCall(RestoreOperatorRegionalMaterialProperties(rdy->operator, region, &material_properties));
     }
     PetscCall(PetscFree(cell_x));
     PetscCall(PetscFree(cell_y));
@@ -799,10 +799,10 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define CheckConvergence(comp, comp_index, norm)                                                                                  \
-  if (norm##_conv_rates[comp_index] <= rdy->config.mms.convergence.expected_rates.comp.norm) {                                    \
-    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, mms_comp_names[comp_index], \
-            norm##_conv_rates[comp_index], rdy->config.mms.convergence.expected_rates.comp.norm);                                 \
+#define CheckConvergence(comp, comp_index, norm)                                                                                         \
+  if (isnan(norm##_conv_rates[comp_index]) || (norm##_conv_rates[comp_index] <= rdy->config.mms.convergence.expected_rates.comp.norm)) { \
+    SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, mms_comp_names[comp_index],        \
+            norm##_conv_rates[comp_index], rdy->config.mms.convergence.expected_rates.comp.norm);                                        \
   }
 
 PetscErrorCode RDyMMSRun(RDy rdy) {

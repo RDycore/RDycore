@@ -142,7 +142,7 @@ PetscErrorCode CreateSedimentCeedInteriorFluxOperator(RDyMesh *mesh, const RDyCo
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
-    // create a vector to store flux divergences
+    // create a vector to store inter-cell fluxes
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
@@ -401,7 +401,7 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
   CeedQFunction qf;
-  CeedInt       num_comp_geom = 2, num_comp_sediment_src = num_comp, num_comp_mannings_n = 1;
+  CeedInt       num_comp_geom = 2, num_comp_sediment_src = num_comp;
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentSourceTermSemiImplicit, SedimentSourceTermSemiImplicit_loc, &qf));
@@ -414,9 +414,10 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
       break;
   }
 
+  CeedInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddInput(qf, "swe_src", num_comp_sediment_src, CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddInput(qf, "mannings_n", num_comp_mannings_n, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "ext_src", num_comp_sediment_src, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "mat_props", num_mat_props, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE));
@@ -429,8 +430,8 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
   // create vectors (and their supporting restrictions) for the operator
-  CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_swe, restrict_mannings_n;
-  CeedVector          geom, swe_src, mannings_n;
+  CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_ext_src, restrict_mat_props;
+  CeedVector          geom, ext_src, mat_props;
   {
     PetscInt num_local_cells = mesh->num_cells;
     PetscInt num_owned_cells = mesh->num_owned_cells;
@@ -452,20 +453,20 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
     // create a vector of external source terms
-    CeedInt strides_swe_src[] = {num_comp_sediment_src, 1, num_comp_sediment_src};
+    CeedInt strides_ext_src[] = {num_comp_sediment_src, 1, num_comp_sediment_src};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_sediment_src, num_owned_cells * num_comp_sediment_src,
-                                                   strides_swe_src, &restrict_swe));
-    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_swe, &swe_src, NULL));
-    PetscCallCEED(CeedVectorSetValue(swe_src, 0.0));
+                                                   strides_ext_src, &restrict_ext_src));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_ext_src, &ext_src, NULL));
+    PetscCallCEED(CeedVectorSetValue(ext_src, 0.0));
 
     // create a vector that stores Manning's coefficient for the region of interest
     // NOTE: we zero-initialize this coefficient here; it must be set before use
     // NOTE: using (Get/Restore)OperatorMaterialProperty
-    CeedInt strides_mannings_n[] = {num_comp_mannings_n, 1, num_comp_mannings_n};
-    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_mannings_n, num_owned_cells * num_comp_mannings_n,
-                                                   strides_mannings_n, &restrict_mannings_n));
-    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_mannings_n, &mannings_n, NULL));
-    PetscCallCEED(CeedVectorSetValue(mannings_n, 0.0));
+    CeedInt strides_mat_props[] = {num_mat_props, 1, num_mat_props};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_mat_props, num_owned_cells * num_mat_props, strides_mat_props,
+                                                   &restrict_mat_props));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_mat_props, &mat_props, NULL));
+    PetscCallCEED(CeedVectorSetValue(mat_props, 0.0));
 
     // create element restrictions for (active) input/output cell states
     CeedInt *offset_c, *offset_q;
@@ -492,20 +493,20 @@ PetscErrorCode CreateSedimentCeedSourceOperator(RDyMesh *mesh, RDyConfig config,
   // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "swe_src", restrict_swe, CEED_BASIS_COLLOCATED, swe_src));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mannings_n", restrict_mannings_n, CEED_BASIS_COLLOCATED, mannings_n));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "ext_src", restrict_ext_src, CEED_BASIS_COLLOCATED, ext_src));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mat_props", restrict_mat_props, CEED_BASIS_COLLOCATED, mat_props));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
 
   // clean up
-  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_swe));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_ext_src));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
-  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_mannings_n));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_mat_props));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_c));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_q));
   PetscCallCEED(CeedVectorDestroy(&geom));
-  PetscCallCEED(CeedVectorDestroy(&swe_src));
-  PetscCallCEED(CeedVectorDestroy(&mannings_n));
+  PetscCallCEED(CeedVectorDestroy(&ext_src));
+  PetscCallCEED(CeedVectorDestroy(&mat_props));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);

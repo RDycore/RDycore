@@ -4,17 +4,13 @@
 #include <petsc.h>
 #include <rdycore.h>
 
-// maximum numbers of supported fields/components in a DM section
-#define MAX_NUM_SECTION_FIELDS 5
-#define MAX_NUM_SECTION_FIELD_COMPONENTS 3 + MAX_NUM_SEDIMENT_CLASSES
-
 // this struct specifies the number, degrees of freedom, and names of fields in
 // a section within a DM
 typedef struct {
   PetscInt num_fields;
-  char     field_names[MAX_NUM_SECTION_FIELDS][MAX_NAME_LEN + 1];
-  PetscInt num_field_components[MAX_NUM_SECTION_FIELDS];
-  char     field_component_names[MAX_NUM_SECTION_FIELDS][MAX_NUM_SECTION_FIELD_COMPONENTS][MAX_NAME_LEN + 1];
+  char     field_names[MAX_NUM_FIELDS][MAX_NAME_LEN + 1];
+  PetscInt num_field_components[MAX_NUM_FIELDS];
+  char     field_component_names[MAX_NUM_FIELDS][MAX_NUM_FIELD_COMPONENTS][MAX_NAME_LEN + 1];
 } SectionFieldSpec;
 
 PETSC_INTERN PetscErrorCode CreateCellCenteredDMFromDM(DM, const SectionFieldSpec, DM *);
