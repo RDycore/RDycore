@@ -140,9 +140,6 @@ typedef struct Operator {
 
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;
-
-      // domain-wide material property vector (# of components == # of scalar properties)
-      CeedVector material_properties;
     } ceed;
 
     // PETSc operator data
