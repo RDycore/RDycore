@@ -6,6 +6,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
 
+PETSC_INTERN PetscErrorCode CreateSedimentQFunctionContext(Ceed, const RDyConfig, CeedQFunctionContext *);
 PETSC_INTERN PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *, const RDyConfig, OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *, const RDyConfig, RDyBoundary, RDyCondition, Vec, Vec,
                                                                     OperatorDiagnostics *, PetscOperator *);

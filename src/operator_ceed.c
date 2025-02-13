@@ -47,99 +47,6 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
-static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
-
-// frees a data context allocated using PETSc, returning a libCEED error code
-static int FreeContextPetsc(void *data) {
-  if (PetscFree(data)) return CeedError(NULL, CEED_ERROR_ACCESS, "PetscFree failed");
-  return CEED_ERROR_SUCCESS;
-}
-
-// SWE-only Q function context
-static PetscErrorCode CreateSWEQFunctionContext(Ceed ceed, const RDyConfig config, CeedQFunctionContext *qf_context) {
-  PetscFunctionBeginUser;
-
-  SWEContext swe_ctx;
-  PetscCall(PetscCalloc1(1, &swe_ctx));
-
-  swe_ctx->dtime            = 0.0;
-  swe_ctx->tiny_h           = config.physics.flow.tiny_h;
-  swe_ctx->gravity          = 9.806;
-  swe_ctx->xq2018_threshold = config.physics.flow.source.xq2018_threshold;
-  swe_ctx->h_anuga_regular  = config.physics.flow.h_anuga_regular;
-
-  PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
-  PetscCallCEED(CeedQFunctionContextSetData(*qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*swe_ctx), swe_ctx));
-  PetscCallCEED(CeedQFunctionContextSetDataDestroy(*qf_context, CEED_MEM_HOST, FreeContextPetsc));
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct SWEContext_, dtime), 1, "Time step of TS"));
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "small h value", offsetof(struct SWEContext_, tiny_h), 1,
-                                                   "Height threshold below which dry condition is assumed"));
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "h_anuga_regular", offsetof(struct SWEContext_, h_anuga_regular), 1,
-                                                   "ANUGA height parameter for velocity regularization"));
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SWEContext_, gravity), 1, "Accelaration due to gravity"));
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "xq2018_threshold", offsetof(struct SWEContext_, xq2018_threshold), 1,
-                                                   "Threshold for the treatment of Implicit XQ2018 method"));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
-// SWE + sediment dynamics Q function context
-static PetscErrorCode CreateSedimentQFunctionContext(Ceed ceed, const RDyConfig config, CeedQFunctionContext *qf_context) {
-  PetscFunctionBeginUser;
-
-  SedimentContext sediment_ctx;
-  PetscCall(PetscCalloc1(1, &sediment_ctx));
-
-  sediment_ctx->dtime                   = 0.0;
-  sediment_ctx->tiny_h                  = config.physics.flow.tiny_h;
-  sediment_ctx->gravity                 = GRAVITY;
-  sediment_ctx->xq2018_threshold        = config.physics.flow.source.xq2018_threshold;
-  sediment_ctx->kp_constant             = 0.001;
-  sediment_ctx->settling_velocity       = 0.01;
-  sediment_ctx->tau_critical_erosion    = 0.1;
-  sediment_ctx->tau_critical_deposition = 1000.0;
-  sediment_ctx->rhow                    = DENSITY_OF_WATER;
-  sediment_ctx->sed_ndof                = config.physics.sediment.num_classes;
-  sediment_ctx->flow_ndof               = 3;  // NOTE: SWE assumed!
-
-  PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
-
-  PetscCallCEED(CeedQFunctionContextSetData(*qf_context, CEED_MEM_HOST, CEED_USE_POINTER, sizeof(*sediment_ctx), sediment_ctx));
-
-  PetscCallCEED(CeedQFunctionContextSetDataDestroy(*qf_context, CEED_MEM_HOST, FreeContextPetsc));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct SedimentContext_, dtime), 1, "Time step of TS"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "small h value", offsetof(struct SedimentContext_, tiny_h), 1,
-                                                   "Height threshold below which dry condition is assumed"));
-  PetscCallCEED(
-      CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct SedimentContext_, gravity), 1, "Accelaration due to gravity"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "xq2018_threshold", offsetof(struct SedimentContext_, xq2018_threshold), 1,
-                                                   "Threshold for the treatment of Implicit XQ2018 method"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "kp_constant", offsetof(struct SedimentContext_, kp_constant), 1,
-                                                   "Krone-Partheniades erosion law constant [kg/m2/s]"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "settling_velocity", offsetof(struct SedimentContext_, settling_velocity), 1,
-                                                   "settling velocity of sediment class"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "tau_critical_erosion", offsetof(struct SedimentContext_, tau_critical_erosion), 1,
-                                                   "critical shear stress for erosion (N/m2)"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "tau_critical_deposition", offsetof(struct SedimentContext_, tau_critical_deposition),
-                                                   1, "critical shear stress for deposition (N/m2)"));
-
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "rhow", offsetof(struct SedimentContext_, rhow), 1, "density of water"));
-
-  PetscCallCEED(
-      CeedQFunctionContextRegisterInt32(*qf_context, "sed_ndof", offsetof(struct SedimentContext_, sed_ndof), 1, "number of sediment classes"));
-  PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "flow_ndof", offsetof(struct SedimentContext_, flow_ndof), 1, "number of flow DoF"));
-
-  PetscFunctionReturn(CEED_ERROR_SUCCESS);
-}
-
 static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
   PetscFunctionBeginUser;
 
@@ -675,10 +582,10 @@ static PetscErrorCode CreateCeedSource0Operator(const RDyConfig config, RDyMesh 
   // add inputs/outputs
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation
-  CeedInt num_comp_geom = 2, num_comp_sediment_src = num_comp;
+  CeedInt num_comp_geom = 2, num_comp_ext_src = num_comp;
   CeedInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddInput(qf, "ext_src", num_comp_sediment_src, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "ext_src", num_comp_ext_src, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "mat_props", num_mat_props, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
@@ -708,9 +615,9 @@ static PetscErrorCode CreateCeedSource0Operator(const RDyConfig config, RDyMesh 
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
 
     // create a vector of external source terms
-    CeedInt strides_ext_src[] = {num_comp_sediment_src, 1, num_comp_sediment_src};
-    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_sediment_src, num_owned_cells * num_comp_sediment_src,
-                                                   strides_ext_src, &restrict_ext_src));
+    CeedInt strides_ext_src[] = {num_comp_ext_src, 1, num_comp_ext_src};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp_ext_src, num_owned_cells * num_comp_ext_src, strides_ext_src,
+                                                   &restrict_ext_src));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_ext_src, &ext_src, NULL));
     PetscCallCEED(CeedVectorSetValue(ext_src, 0.0));
 
