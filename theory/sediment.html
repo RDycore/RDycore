@@ -1358,7 +1358,7 @@ obtained with a best fit using experimental data. For example, <span class="arit
 clay and 1.13 for loam.</p>
 <h4 id="overland-flow-driven-entrainment-and-re-entrainment-rates">Overland flow-driven entrainment and re-entrainment rates</h4>
 <div class="arithmatex">\[\begin{eqnarray}
-r_p &amp;=&amp; (1-H)f_p}\frac{F(\Omega-\Omega_{cr})}{J} \\
+r_p &amp;=&amp; (1-H)f_p\frac{F(\Omega-\Omega_{cr})}{J} \\
 r_{rp} &amp;=&amp; H\frac{M_p}{M_{t}}\frac{F(\Omega - \Omega_{cr})}{(\rho_{s}-\rho_{w})gh/\rho_{s}} \tag{6}\label{6}
 \end{eqnarray}\]</div>
 <p>where</p>
@@ -1512,7 +1512,7 @@ thrust correction</em> terms suggested by Bradford and Sanders [2002]. These ter
 balance the bed slope terms for the still water condition.</p>
 <p>The fluxes at the interface between cells can be approximated with Roe's method:</p>
 <div class="arithmatex">\[\begin{equation}
-\mathbf{F} \cdot \mathbf{n} \approx \mathbf{F}_{\parallel,f} =
+\mathbf{\vec{F}} \cdot \vec{n} \approx \mathbf{F}_{\parallel,f} =
 \frac{1}{2} \left(\mathbf{F}_{\parallel,L} + \mathbf{F}_{\parallel,R}-\mathbf{\hat{R}} |\mathbf{\hat{\Lambda}}| \mathbf{\Delta\hat{V}} \right)
 \end{equation}\]</div>
 <p>where the subscript <span class="arithmatex">\(f\)</span> annotates the interface between two adjacent cells,
