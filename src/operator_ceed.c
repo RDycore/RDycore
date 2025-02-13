@@ -8,6 +8,37 @@
 #include "sediment/sediment_ceed_impl.h"
 #include "swe/swe_ceed_impl.h"
 
+//-----------------------------
+// CEED sub-operators overview
+//-----------------------------
+//
+// The CEED implementation of the shallow water equations consists of two
+// composite operators: one for computing fluxes and the other for sources.
+// Each of these operators comprises one or more sub-operators, and accepts as
+// input a local solution vector, producing the solution's time derivative
+// within a global "right hand side" vector.
+//
+// The flux operator consists of the following sub-operators:
+//
+// * for the entire domain: an interior flux sub-operator that accepts the local
+//   solution vector as input and computes the fluxes on pairs of cells on the
+//   interior of the computational domain. This sub-operator is created by the
+//   function CreateSWECeedInteriorFluxOperator.
+// * for each domain boundary: a boundary flux sub-operator that accepts the
+//   local solution vector as input and computes the fluxes into/out of cells
+//   adjacent to boundary edges. Each sub-operator is created by the function
+//   CreateSWECeedBoundaryFluxOperator.
+//
+// The source operator consists of the following sub-operators:
+//
+// * for the entire domain: a source sub-operator that accepts input from the
+//   interior and flux sub-operators and adds source terms to produce the
+//   time rate of change of the solution vector. This sub-operator is created
+//   by the function CreateSWECeedSourceOperator.
+//
+// The relevant function documentation includes a comprehensive list of input
+// and output fields for each sub-operator.
+
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
 #pragma GCC diagnostic push
@@ -131,7 +162,43 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Creates a CEED operator for solving flow and sediment dynamics equation for interior edges
+/// @brief Creates a CEED operator for solving governing equations by computing
+/// fluxes on interior edges
+/// Creates a CeedOperator that computes fluxes between pairs of cells on the
+/// domain's interior.
+///
+/// Active input fields:
+///    * `q_left[num_interior_edges][3]` - an array associating a 3-DOF left cell
+///      input state with each edge separating two interior cells
+///    * `q_right[num_interior_edges][3]` - an array associating a 3-DOF right cell
+///      input state with each edge separating two interior cells
+///
+/// Passive input fields:
+///    * `geom[num_interior_edges][4]` - an array associating 4 geometric factors
+///      with each edge separating two interior cells:
+///        1. sin(theta), where theta is the angle between the edge and the y axis
+///        2. cos(theta), where theta is the angle between the edge and the y axis
+///        3. -L / A_l, where L is the edge's length and A_l is the area of the "left" cell
+///        4. L / A_r, where L is the edge's length and A_r is the area of the "right" cell
+///
+/// Active output fields:
+///    * `cell_left[num_interior_edges][3]` - an array associating a 3-DOF left cell
+///      output state with each edge separating two interior cells
+///    * `cell_right[num_interior_edges][3]` - an array associating a 3-DOF right cell
+///      output state with each edge separating two interior cells
+///
+/// Passive output fields:
+///    * `flux[num_owned_cells][3]` - an array associating riemann fluxes
+///      with each owned cell
+///    * `courant_number[num_interior_edges][1]` - an array associating the
+///      Courant number (max wave speed) with each edge separating two interior
+///      cells
+///
+/// Q-function context field labels:
+///    * `time step` - the time step used by the operator
+///    * `small h value` - the water height below which dry conditions are assumed
+///    * `gravity` - the acceleration due to gravity [m/s/s]
+///
 /// @param [in]  config  RDycore's configuration
 /// @param [in]  mesh    mesh defining the computational domain of the operator
 /// @param [out] ceed_op a CeedOperator that is created and returned
@@ -307,7 +374,40 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Creates a CEED operator for solving flow and sediment dynamics equation for a set of boundary edges
+/// @brief Creates a CEED operator that computes fluxes through edges on the boundary of a domain.
+/// Creates a CeedOperator that computes fluxes through edges on the boundary
+/// of a domain.
+///
+/// Active input fields:
+///    * `q_left[num_boundary_edges][3]` - an array associating a 3-DOF left
+///      (interior) cell input state with each boundary edge
+///
+/// Passive input fields:
+///    * `geom[num_boundary_edges][3]` - an array associating 3 geometric factors
+///      with each boundary edge:
+///        1. sin(theta), where theta is the angle between the edge and the y axis
+///        2. cos(theta), where theta is the angle between the edge and the y axis
+///        3. -L / A_l, where L is the edge's length and A_l is the area of the
+///           "left" (interior) cell
+///    * `q_dirichlet[num_boundary_edges][3]` - an array associating 3 boundary
+///      values with each boundary edge (**iff the boundary associated with the
+///      sub-operator is assigned a dirichlet boundary condition**)
+///
+/// Active output fields:
+///    * `cell_left[num_boundary_edges][3]` - an array associating a 3-DOF left
+///      (interior) cell output state with each boundary edge
+///
+/// Passive output fields:
+///    * `flux[num_boundary_edges][3]` - an array associating riemann fluxes
+///      with each boundary edge (to be summed to compute their divergence)
+///    * `courant_number[num_interior_edges][1]` - an array associating the
+///      Courant number (max wave speed) with each boundary edge
+///
+/// Q-function context field labels:
+///    * `time step` - the time step used by the operator
+///    * `small h value` - the water height below which dry conditions are assumed
+///    * `gravity` - the acceleration due to gravity [m/s/s]
+///
 /// @param [in]  config             RDycore's configuration
 /// @param [in]  mesh               mesh defining the computational domain of the operator
 /// @param [in]  boundary           a RDyBoundary struct describing the boundary on which the boundary condition is applied
@@ -524,7 +624,36 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Creates a CEED operator for solving flow and sediment dynamics equation for the source-sink term
+/// @brief Creates a CEED operator for computing source terms within a domain.
+/// Creates a CeedOperator that computes sources for a domain.
+///
+/// Active input fields:
+///    * `q[num_owned_cells][3]` - an array associating a 3-DOF solution input
+///      state with each (owned) cell in the domain
+///
+/// Passive input fields:
+///    * `geom[num_owned_cells][2]` - an array associating 2 geometric factors
+///      with each (owned) cell in the domain:
+///        1. dz/dx, the derivative of the elevation function z(x, y) w.r.t. x,
+///           evaluated at the cell center
+///        2. dz/dy, the derivative of the elevation function z(x, y) w.r.t. y,
+///           evaluated at the cell center
+///    * `mat_props[num_owned_cells][N]` - an array associating material
+///      properties with each (owned) cell in the domain
+///    * `riemannf[num_owned_cells][3]` - an array associating a 3-component
+///      flux divergence with each (owned) cell in the domain
+///    * `ext_src[num_owned_cells][3]` - an array associating 3 external source
+///      components with each (owned) cell in the domain
+///
+/// Active output fields:
+///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
+///      value with each (owned) cell in the domain
+///
+/// Q-function context field labels:
+///    * `time step` - the time step used by the operator
+///    * `small h value` - the water height below which dry conditions are assumed
+///    * `gravity` - the acceleration due to gravity [m/s/s]
+///
 /// @param [in]  config  RDycore's configuration
 /// @param [in]  mesh    mesh defining the computational domain of the operator
 /// @param [out] ceed_op a CeedOperator that is created and returned
