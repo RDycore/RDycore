@@ -10,7 +10,8 @@ set(RDYCORE_C_SOURCE_FILES
   rdymms.c
   rdysetup.c
   operator.c
-  operator_diagnostics.c
+  operator_ceed.c
+  operator_petsc.c
   swe/swe_petsc.c
   swe/swe_ceed.c
   sediment/sediment_petsc.c
