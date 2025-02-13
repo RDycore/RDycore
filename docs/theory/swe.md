@@ -272,8 +272,8 @@ where
 
 \begin{eqnarray}
   \hat{h} & = & \sqrt{h_i h_j} \\
-  \hat{u} & = & \frac{ \sqrt{h_i} \vec{u}_i + \sqrt{h_j} \vec{u}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
-  \hat{v} & = & \frac{ \sqrt{h_i} \vec{v}_i + \sqrt{h_j} \vec{v}_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{u} & = & \frac{ \sqrt{h_i} u_i + \sqrt{h_j} u_j{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{v} & = & \frac{ \sqrt{h_i} v_i + \sqrt{h_j} v_j{ \sqrt{h_i} + \sqrt{h_j}} \\
   \hat{a} & = & \sqrt{\frac{g}{2} \left( h_i + h_j \right)},
 \end{eqnarray}
 

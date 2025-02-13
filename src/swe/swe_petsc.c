@@ -616,9 +616,9 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig
 //-----------------
 
 typedef struct {
-  RDyMesh  *mesh;              // domain mesh
-  Vec       external_sources;  // external source vector
-  Vec       mannings;          // mannings coefficient vector
+  RDyMesh  *mesh;  // domain mesh
+  Vec       external_sources;
+  Vec       material_properties;
   PetscReal tiny_h;            // minimum water height for wet conditions
   PetscReal xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
 } SourceOperator;
@@ -630,19 +630,19 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  SourceOperator *source_op    = context;
-  Vec             source_vec   = source_op->external_sources;
-  Vec             mannings_vec = source_op->mannings;
-  RDyMesh        *mesh         = source_op->mesh;
-  RDyCells       *cells        = &mesh->cells;
-  PetscReal       tiny_h       = source_op->tiny_h;
+  SourceOperator *source_op     = context;
+  Vec             source_vec    = source_op->external_sources;
+  Vec             mat_props_vec = source_op->material_properties;
+  RDyMesh        *mesh          = source_op->mesh;
+  RDyCells       *cells         = &mesh->cells;
+  PetscReal       tiny_h        = source_op->tiny_h;
 
   // access Vec data
-  PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
-  PetscCall(VecGetArray(source_vec, &source_ptr));      // sequential vector
-  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // sequential vector
-  PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
-  PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
+  PetscScalar *source_ptr, *mat_props_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));        // sequential vector
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));                // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));               // domain global vector (indexed by owned cells)
 
   // access previously-computed flux divergence data
   Vec flux_div;
@@ -656,6 +656,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
+  PetscInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -680,7 +681,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
         PetscReal v = hv / h;
 
         // Manning's coefficient
-        PetscReal N_mannings = mannings_ptr[owned_cell_id];
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + OPERATOR_MANNINGS];
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
@@ -704,7 +705,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscCall(VecRestoreArray(u_local, &u_ptr));
   PetscCall(VecRestoreArray(f_global, &f_ptr));
   PetscCall(VecRestoreArray(source_vec, &source_ptr));
-  PetscCall(VecRestoreArray(mannings_vec, &mannings_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -727,18 +728,18 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
 
   SourceOperator *source_op        = context;
   Vec             source_vec       = source_op->external_sources;
-  Vec             mannings_vec     = source_op->mannings;
+  Vec             mat_props_vec    = source_op->material_properties;
   RDyMesh        *mesh             = source_op->mesh;
   RDyCells       *cells            = &mesh->cells;
   PetscReal       tiny_h           = source_op->tiny_h;
   PetscReal       xq2018_threshold = source_op->xq2018_threshold;
 
   // access Vec data
-  PetscScalar *source_ptr, *mannings_ptr, *u_ptr, *f_ptr;
-  PetscCall(VecGetArray(source_vec, &source_ptr));      // sequential vector
-  PetscCall(VecGetArray(mannings_vec, &mannings_ptr));  // sequential vector
-  PetscCall(VecGetArray(u_local, &u_ptr));              // domain local vector (indexed by local cells)
-  PetscCall(VecGetArray(f_global, &f_ptr));             // domain global vector (indexed by owned cells)
+  PetscScalar *source_ptr, *mat_props_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));        // sequential vector
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));                // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));               // domain global vector (indexed by owned cells)
 
   // access previously-computed flux divergence data
   Vec flux_div;
@@ -752,6 +753,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
+  PetscInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -771,7 +773,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
       if (h >= tiny_h) {  // wet conditions
 
         // Manning's coefficient
-        PetscReal N_mannings = mannings_ptr[c];
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + OPERATOR_MANNINGS];
 
         PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
         PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
@@ -815,7 +817,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscCall(VecRestoreArray(u_local, &u_ptr));
   PetscCall(VecRestoreArray(f_global, &f_ptr));
   PetscCall(VecRestoreArray(source_vec, &source_ptr));
-  PetscCall(VecRestoreArray(mannings_vec, &mannings_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -829,21 +831,22 @@ static PetscErrorCode DestroySource(void *context) {
 
 /// Creates a PetscOperator that computes sources within a region in a domain,
 /// suitable for the shallow water equations.
-/// @param [in]  mesh             mesh defining the computational domain of the operator
-/// @param [in]  config           RDycore's configuration
-/// @param [in]  external_sources a Vec storing external source values (if any) for the domain
-/// @param [in]  mannings         a Vec storing Mannings coefficient values for the domain
-/// @param [out] petsc_op         the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
+/// @param [in]  mesh                mesh defining the computational domain of the operator
+/// @param [in]  config              RDycore's configuration
+/// @param [in]  external_sources    a Vec storing external source values (if any) for the domain
+/// @param [in]  material_properties a Vec storing material properties for the domain
+/// @param [out] petsc_op            the newly created PetscOperator
+PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec material_properties,
+                                            PetscOperator *petsc_op) {
   PetscFunctionBegin;
   SourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (SourceOperator){
-      .mesh             = mesh,
-      .external_sources = external_sources,
-      .mannings         = mannings,
-      .tiny_h           = config.physics.flow.tiny_h,
-      .xq2018_threshold = config.physics.flow.source.xq2018_threshold,
+      .mesh                = mesh,
+      .external_sources    = external_sources,
+      .material_properties = material_properties,
+      .tiny_h              = config.physics.flow.tiny_h,
+      .xq2018_threshold    = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;

@@ -549,17 +549,19 @@ static PetscErrorCode InitMaterialProperties(RDy rdy) {
   }
 
   // set the properties on the operator
-  OperatorData material_property;
-  for (PetscInt property = 0; property < OPERATOR_NUM_MATERIAL_PROPERTIES; ++property) {
-    PetscCall(GetOperatorDomainMaterialProperty(rdy->operator, property, &material_property));
-    for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
-      if (rdy->mesh.cells.is_owned[i]) {
-        PetscInt owned_cell                     = rdy->mesh.cells.local_to_owned[i];
-        material_property.values[0][owned_cell] = material_property_values[property][i];
+  OperatorData material_properties;
+  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & material_properties));
+  for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
+    if (rdy->mesh.cells.is_owned[i]) {
+      PetscInt owned_cell = rdy->mesh.cells.local_to_owned[i];
+      for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+        material_properties.values[p][owned_cell] = material_property_values[p][i];
       }
     }
-    PetscCall(RestoreOperatorDomainMaterialProperty(rdy->operator, OPERATOR_MANNINGS, &material_property));
-    PetscCall(PetscFree(material_property_values[property]));
+  }
+  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & material_properties));
+  for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+    PetscCall(PetscFree(material_property_values[p]));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

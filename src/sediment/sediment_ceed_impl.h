@@ -294,13 +294,13 @@ CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const 
 
 // flow and sediment regional source operator Q-function
 CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  const CeedScalar(*geom)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
-  const CeedScalar(*swe_src)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
-  const CeedScalar(*mannings_n)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // mannings coefficient
-  const CeedScalar(*riemannf)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
-  const CeedScalar(*q)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];
-  CeedScalar(*cell)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  const SedimentContext context             = (SedimentContext)ctx;
+  const CeedScalar(*geom)[CEED_Q_VLA]      = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
+  const CeedScalar(*ext_src)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
+  const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // material properties
+  const CeedScalar(*riemannf)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SedimentContext context            = (SedimentContext)ctx;
 
   const CeedScalar dt                      = context->dtime;
   const CeedScalar tiny_h                  = context->tiny_h;
@@ -334,7 +334,8 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
 
     CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
-      const CeedScalar Cd = gravity * Square(mannings_n[0][i]) * pow(h, -1.0 / 3.0);
+      const CeedScalar mannings_n = mat_props[OPERATOR_MANNINGS][i];
+      const CeedScalar Cd         = gravity * Square(mannings_n) * pow(h, -1.0 / 3.0);
 
       const CeedScalar velocity = sqrt(Square(u) + Square(v));
 
@@ -350,13 +351,13 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
         CeedScalar       tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
         CeedScalar       ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
         CeedScalar       di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
-        cell[3 + j][i]         = riemannf[3 + j][i] + (ei - di) + swe_src[3 + j][i];
+        cell[3 + j][i]         = riemannf[3 + j][i] + (ei - di) + ext_src[3 + j][i];
       }
     }
 
-    cell[0][i] = riemannf[0][i] + swe_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx + swe_src[1][i];
-    cell[2][i] = riemannf[2][i] - bedy - tby + swe_src[2][i];
+    cell[0][i] = riemannf[0][i] + ext_src[0][i];
+    cell[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
+    cell[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
   }
   return 0;
 }
