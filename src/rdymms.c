@@ -444,9 +444,9 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       }
     }
 
-    PetscCall(RDySetRegionalWaterSource(rdy, 0, N, h_source));
-    PetscCall(RDySetRegionalXMomentumSource(rdy, 0, N, hu_source));
-    PetscCall(RDySetRegionalYMomentumSource(rdy, 0, N, hv_source));
+    PetscCall(RDySetRegionalWaterSource(rdy, 1, N, h_source));
+    PetscCall(RDySetRegionalXMomentumSource(rdy, 1, N, hu_source));
+    PetscCall(RDySetRegionalYMomentumSource(rdy, 1, N, hv_source));
 
     if (rdy->config.physics.sediment.num_classes) {
       PetscReal *ci[MAX_NUM_SEDIMENT_CLASSES], *dcidx[MAX_NUM_SEDIMENT_CLASSES], *dcidy[MAX_NUM_SEDIMENT_CLASSES], *dcidt[MAX_NUM_SEDIMENT_CLASSES];
@@ -491,7 +491,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
             ++l;
           }
         }
-        PetscCall(RDySetRegionalSedimentSource(rdy, 0, i, N, hci_source));
+        PetscCall(RDySetRegionalSedimentSource(rdy, 1, i, N, hci_source));
       }
 
       for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
