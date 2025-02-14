@@ -56,62 +56,58 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
   CeedScalar dupar  = -du * sn + dv * cn;
   CeedScalar duperp = du * cn + dv * sn;
 
-  CeedScalar dW[3];
-  dW[0] = 0.5 * (dh - hhat * duperp / chat);
-  dW[1] = hhat * dupar;
-  dW[2] = 0.5 * (dh + hhat * duperp / chat);
+  // compute R
+  CeedScalar R[3][3] = {
+      {1.0,              0.0, 1.0             },
+      {uhat - chat * cn, -sn, uhat + chat * cn},
+      {vhat - chat * sn, cn,  vhat + chat * sn},
+  };
 
+  // compute A
   CeedScalar uperpl = ul * cn + vl * sn;
   CeedScalar uperpr = ur * cn + vr * sn;
-  CeedScalar al1    = uperpl - cl;
-  CeedScalar al3    = uperpl + cl;
-  CeedScalar ar1    = uperpr - cr;
-  CeedScalar ar3    = uperpr + cr;
+  CeedScalar a1     = fabs(uperp - chat);
+  CeedScalar a2     = fabs(uperp);
+  CeedScalar a3     = fabs(uperp + chat);
 
-  CeedScalar R[3][3];
-  R[0][0] = 1.0;
-  R[0][1] = 0.0;
-  R[0][2] = 1.0;
-  R[1][0] = uhat - chat * cn;
-  R[1][1] = -sn;
-  R[1][2] = uhat + chat * cn;
-  R[2][0] = vhat - chat * sn;
-  R[2][1] = cn;
-  R[2][2] = vhat + chat * sn;
-
+  // apply critical flow fix
+  CeedScalar al1 = uperpl - cl;
+  CeedScalar ar1 = uperpr - cr;
   CeedScalar da1 = fmax(0.0, 2.0 * (ar1 - al1));
-  CeedScalar da3 = fmax(0.0, 2.0 * (ar3 - al3));
-  CeedScalar a1  = fabs(uperp - chat);
-  CeedScalar a2  = fabs(uperp);
-  CeedScalar a3  = fabs(uperp + chat);
-
-  // Critical flow fix
   if (a1 < da1) {
     a1 = 0.5 * (a1 * a1 / da1 + da1);
   }
+  CeedScalar al3 = uperpl + cl;
+  CeedScalar ar3 = uperpr + cr;
+  CeedScalar da3 = fmax(0.0, 2.0 * (ar3 - al3));
   if (a3 < da3) {
     a3 = 0.5 * (a3 * a3 / da3 + da3);
   }
+  CeedScalar A[3] = {a1, a2, a3};
 
-  // Compute interface flux
-  CeedScalar A[3][3] = {0};
-  A[0][0]            = a1;
-  A[1][1]            = a2;
-  A[2][2]            = a3;
+  // compute dW
+  CeedScalar dW[3] = {
+      0.5 * (dh - hhat * duperp / chat),
+      hhat * dupar,
+      0.5 * (dh + hhat * duperp / chat),
+  };
 
-  CeedScalar FL[3], FR[3];
-  FL[0] = uperpl * hl;
-  FL[1] = ul * uperpl * hl + 0.5 * gravity * hl * hl * cn;
-  FL[2] = vl * uperpl * hl + 0.5 * gravity * hl * hl * sn;
-
-  FR[0] = uperpr * hr;
-  FR[1] = ur * uperpr * hr + 0.5 * gravity * hr * hr * cn;
-  FR[2] = vr * uperpr * hr + 0.5 * gravity * hr * hr * sn;
+  // compute interface fluxs
+  CeedScalar FL[3] = {
+      uperpl * hl,
+      ul * uperpl * hl + 0.5 * gravity * hl * hl * cn,
+      vl * uperpl * hl + 0.5 * gravity * hl * hl * sn,
+  };
+  CeedScalar FR[3] = {
+      uperpr * hr,
+      ur * uperpr * hr + 0.5 * gravity * hr * hr * cn,
+      vr * uperpr * hr + 0.5 * gravity * hr * hr * sn,
+  };
 
   // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-  flux[0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0][0] * dW[0] - R[0][1] * A[1][1] * dW[1] - R[0][2] * A[2][2] * dW[2]);
-  flux[1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0][0] * dW[0] - R[1][1] * A[1][1] * dW[1] - R[1][2] * A[2][2] * dW[2]);
-  flux[2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0][0] * dW[0] - R[2][1] * A[1][1] * dW[1] - R[2][2] * A[2][2] * dW[2]);
+  flux[0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0] * dW[0] - R[0][1] * A[1] * dW[1] - R[0][2] * A[2] * dW[2]);
+  flux[1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0] * dW[0] - R[1][1] * A[1] * dW[1] - R[1][2] * A[2] * dW[2]);
+  flux[2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0] * dW[0] - R[2][1] * A[1] * dW[1] - R[2][2] * A[2] * dW[2]);
 
   *amax = chat + fabs(uperp);
 }
@@ -141,8 +137,8 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    SWEState   qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    SWEState   qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
+    SWEState   qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     CeedScalar flux[3], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
       SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
@@ -174,8 +170,8 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    SWEState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
+    SWEState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar flux[3], amax;
       SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
@@ -204,7 +200,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
 
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
-    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState   qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar dum1 = sn * sn - cn * cn;
       CeedScalar dum2 = 2.0 * sn * cn;
@@ -236,7 +232,7 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
 
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
-    SWEState   qL    = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState   qL    = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
     CeedScalar q     = fabs(qL.hu * cn + qL.hv * sn);
     CeedScalar hR    = pow(q * q / gravity, 1.0 / 3.0);
     CeedScalar speed = sqrt(gravity * hR);
@@ -270,7 +266,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    SWEState         state = {.h = q[0][i], .hu = q[1][i], .hv = q[2][i]};
     const CeedScalar h     = state.h;
     const CeedScalar hu    = state.hu;
     const CeedScalar hv    = state.hv;
@@ -329,7 +325,7 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
   const CeedScalar xq2018_threshold = context->xq2018_threshold;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    SWEState         state = {.h = q[0][i], .hu = q[1][i], .hv = q[2][i]};
     const CeedScalar h     = state.h;
     const CeedScalar hu    = state.hu;
     const CeedScalar hv    = state.hv;
