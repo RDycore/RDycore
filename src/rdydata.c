@@ -178,21 +178,44 @@ PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscInt size, PetscReal *values) {
+// given a region ID, find its index in the array storing information about regions
+static PetscErrorCode GetRegionIndexFromID(RDy rdy, PetscInt region_id, PetscInt *region_idx) {
   PetscFunctionBegin;
-  PetscCall(CheckRegionIndex(rdy, region_idx));
-  RDyRegion region = rdy->regions[region_idx];
-  PetscCheck(size == region.num_owned_cells, rdy->comm, PETSC_ERR_USER,
-             "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_idx,
-             region.num_owned_cells);
 
-  if (region.num_owned_cells) {
-    OperatorData source_data;
-    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
-    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-      source_data.values[component][c] = values[c];
+  // initialize it to zero
+  *region_idx = -1;
+
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion *region = &rdy->regions[r];
+    if (region->id == region_id) {
+      *region_idx = r;
+      break;
     }
-    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_id, PetscInt component, PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscInt region_idx;
+  PetscCall(GetRegionIndexFromID(rdy, region_id, &region_idx));
+
+  if (region_idx > -1) {
+    RDyRegion region = rdy->regions[region_idx];
+    PetscCheck(size == region.num_owned_cells, rdy->comm, PETSC_ERR_USER,
+               "Wrong size (%" PetscInt_FMT ") for owned cells in region %" PetscInt_FMT " (%" PetscInt_FMT ")", size, region_idx,
+               region.num_owned_cells);
+
+    if (region.num_owned_cells) {
+      OperatorData source_data;
+      PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+      for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+        source_data.values[component][c] = values[c];
+      }
+      PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -201,48 +224,51 @@ static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_
 /// Sets the external water source term on the region with the given index to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
-PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 0, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_id, 0, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the external x-momentum term on the region with the given index to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
-PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 1, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_id, 1, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the external y-momentum term on the region with the given index to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
-PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 2, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_id, 2, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt sediment_class, PetscInt size, PetscReal *values) {
+PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_id, PetscInt sediment_class, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(SetRegionalSourceComponent(rdy, region_idx, 3 + sediment_class, size, values));
+  PetscCall(SetRegionalSourceComponent(rdy, region_id, 3 + sediment_class, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const PetscInt region_idx, PetscInt component, PetscReal value) {
+static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const PetscInt region_id, PetscInt component, PetscReal value) {
   PetscFunctionBegin;
-  PetscCall(CheckRegionIndex(rdy, region_idx));
+  PetscInt region_idx;
+  PetscCall(GetRegionIndexFromID(rdy, region_id, &region_idx));
 
-  RDyRegion region = rdy->regions[region_idx];
-  if (region.num_owned_cells) {
-    OperatorData source_data;
-    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
-    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-      source_data.values[component][c] = value;
+  if (region_idx > -1) {
+    RDyRegion region = rdy->regions[region_idx];
+    if (region.num_owned_cells) {
+      OperatorData source_data;
+      PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+      for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+        source_data.values[component][c] = value;
+      }
+      PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
     }
-    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -250,25 +276,25 @@ static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const Petsc
 
 /// Sets the external water source term on the region with the given index to
 /// the single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscReal value) {
+PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
-  PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_idx, 0, value));
+  PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_id, 0, value));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the external x-momentum source term on the region with the given index
 /// to the single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value) {
+PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
-  PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_idx, 1, value));
+  PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_id, 1, value));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Sets the external y-momentum source term on the region with the given index
 /// to the single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value) {
+PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
-  PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_idx, 2, value));
+  PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_id, 2, value));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

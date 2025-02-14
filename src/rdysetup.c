@@ -360,30 +360,32 @@ PetscErrorCode InitBoundaries(RDy rdy) {
     }
 
     // process boundary data
-    for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
-      PetscInt boundary_id = boundary_ids[b];
-      IS       edge_is;
-      PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
-      if (edge_is) {
-        PetscInt num_edges;
-        PetscCall(ISGetLocalSize(edge_is, &num_edges));
-        RDyLogDebug(rdy, "  Found boundary %" PetscInt_FMT " (%" PetscInt_FMT " edges)", boundary_id, num_edges);
+    if (boundary_edge_present) {
+      for (PetscInt b = 0; b < num_boundaries_in_file; ++b) {
+        PetscInt boundary_id = boundary_ids[b];
+        IS       edge_is;
+        PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
+        if (edge_is) {
+          PetscInt num_edges;
+          PetscCall(ISGetLocalSize(edge_is, &num_edges));
+          RDyLogDebug(rdy, "  Found boundary %" PetscInt_FMT " (%" PetscInt_FMT " edges)", boundary_id, num_edges);
 
-        // we can't use this boundary ID for unassigned edges
-        if (unassigned_edge_boundary_id == boundary_id) ++unassigned_edge_boundary_id;
+          // we can't use this boundary ID for unassigned edges
+          if (unassigned_edge_boundary_id == boundary_id) ++unassigned_edge_boundary_id;
 
-        // intersect this IS with our domain boundary IS to produce the edges
-        // to subtract from our unassigned edge IS
-        IS assigned_edges_is, new_unassigned_edges_is;
-        PetscCall(ISIntersect(edge_is, boundary_edge_is, &assigned_edges_is));
-        PetscCall(ISDifference(unassigned_edges_is, assigned_edges_is, &new_unassigned_edges_is));
-        ISDestroy(&assigned_edges_is);
-        ISDestroy(&unassigned_edges_is);
-        unassigned_edges_is = new_unassigned_edges_is;
+          // intersect this IS with our domain boundary IS to produce the edges
+          // to subtract from our unassigned edge IS
+          IS assigned_edges_is, new_unassigned_edges_is;
+          PetscCall(ISIntersect(edge_is, boundary_edge_is, &assigned_edges_is));
+          PetscCall(ISDifference(unassigned_edges_is, assigned_edges_is, &new_unassigned_edges_is));
+          ISDestroy(&assigned_edges_is);
+          ISDestroy(&unassigned_edges_is);
+          unassigned_edges_is = new_unassigned_edges_is;
 
-        ++rdy->num_boundaries;
+          ++rdy->num_boundaries;
+        }
+        PetscCall(ISDestroy(&edge_is));
       }
-      PetscCall(ISDestroy(&edge_is));
     }
     PetscCall(ISRestoreIndices(boundary_id_is, &boundary_ids));
     PetscCall(ISDestroy(&boundary_id_is));
