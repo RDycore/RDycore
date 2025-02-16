@@ -126,6 +126,16 @@ struct _p_RDy {
   FILE *log;
 
   //--------------------------
+  // Refinements
+  //--------------------------
+
+  // identifies if the mesh has been refined and the model has not taken a step
+  PetscBool mesh_was_refined;
+
+  // number of times the mesh has been refined
+  PetscInt num_refinements;
+
+  //--------------------------
   // Solver and solution data
   //--------------------------
 
