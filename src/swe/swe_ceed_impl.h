@@ -3,8 +3,12 @@
 
 #include <ceed/types.h>
 
+#ifndef Square
 #define Square(x) ((x) * (x))
+#endif
+#ifndef SafeDiv
 #define SafeDiv(a, b, c, tiny) ((c) > (tiny) ? (a) / (b) : 0.0)
+#endif
 
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
@@ -29,88 +33,11 @@ struct SWEState_ {
 };
 typedef struct SWEState_ SWEState;
 
-// riemann solver -- called by other Q-functions
-CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL, SWEState qR,
-                                              CeedScalar sn, CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
-  const CeedScalar sqrt_gravity = sqrt(gravity);
-  const CeedScalar hl = qL.h, hr = qR.h;
-
-  const CeedScalar denom_l = Square(hl) + Square(h_anuga);
-  const CeedScalar denom_r = Square(hr) + Square(h_anuga);
-
-  const CeedScalar ul = SafeDiv(qL.hu * hl, denom_l, hl, tiny_h), vl = SafeDiv(qL.hv * hl, denom_l, hl, tiny_h);
-  const CeedScalar ur = SafeDiv(qR.hu * hr, denom_r, hr, tiny_h), vr = SafeDiv(qR.hv * hr, denom_r, hr, tiny_h);
-  CeedScalar       duml  = sqrt(hl);
-  CeedScalar       dumr  = sqrt(hr);
-  CeedScalar       cl    = sqrt_gravity * duml;
-  CeedScalar       cr    = sqrt_gravity * dumr;
-  CeedScalar       hhat  = duml * dumr;
-  CeedScalar       uhat  = (duml * ul + dumr * ur) / (duml + dumr);
-  CeedScalar       vhat  = (duml * vl + dumr * vr) / (duml + dumr);
-  CeedScalar       chat  = sqrt(0.5 * gravity * (hl + hr));
-  CeedScalar       uperp = uhat * cn + vhat * sn;
-
-  CeedScalar dh     = hr - hl;
-  CeedScalar du     = ur - ul;
-  CeedScalar dv     = vr - vl;
-  CeedScalar dupar  = -du * sn + dv * cn;
-  CeedScalar duperp = du * cn + dv * sn;
-
-  // compute R
-  CeedScalar R[3][3] = {
-      {1.0,              0.0, 1.0             },
-      {uhat - chat * cn, -sn, uhat + chat * cn},
-      {vhat - chat * sn, cn,  vhat + chat * sn},
-  };
-
-  // compute A
-  CeedScalar uperpl = ul * cn + vl * sn;
-  CeedScalar uperpr = ur * cn + vr * sn;
-  CeedScalar a1     = fabs(uperp - chat);
-  CeedScalar a2     = fabs(uperp);
-  CeedScalar a3     = fabs(uperp + chat);
-
-  // apply critical flow fix
-  CeedScalar al1 = uperpl - cl;
-  CeedScalar ar1 = uperpr - cr;
-  CeedScalar da1 = fmax(0.0, 2.0 * (ar1 - al1));
-  if (a1 < da1) {
-    a1 = 0.5 * (a1 * a1 / da1 + da1);
-  }
-  CeedScalar al3 = uperpl + cl;
-  CeedScalar ar3 = uperpr + cr;
-  CeedScalar da3 = fmax(0.0, 2.0 * (ar3 - al3));
-  if (a3 < da3) {
-    a3 = 0.5 * (a3 * a3 / da3 + da3);
-  }
-  CeedScalar A[3] = {a1, a2, a3};
-
-  // compute dW
-  CeedScalar dW[3] = {
-      0.5 * (dh - hhat * duperp / chat),
-      hhat * dupar,
-      0.5 * (dh + hhat * duperp / chat),
-  };
-
-  // compute interface fluxs
-  CeedScalar FL[3] = {
-      uperpl * hl,
-      ul * uperpl * hl + 0.5 * gravity * hl * hl * cn,
-      vl * uperpl * hl + 0.5 * gravity * hl * hl * sn,
-  };
-  CeedScalar FR[3] = {
-      uperpr * hr,
-      ur * uperpr * hr + 0.5 * gravity * hr * hr * cn,
-      vr * uperpr * hr + 0.5 * gravity * hr * hr * sn,
-  };
-
-  // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-  flux[0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0] * dW[0] - R[0][1] * A[1] * dW[1] - R[0][2] * A[2] * dW[2]);
-  flux[1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0] * dW[0] - R[1][1] * A[1] * dW[1] - R[1][2] * A[2] * dW[2]);
-  flux[2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0] * dW[0] - R[2][1] * A[1] * dW[1] - R[2][2] * A[2] * dW[2]);
-
-  *amax = chat + fabs(uperp);
-}
+// supported Riemann solver types
+#include "swe_roe_ceed_impl.h"
+typedef enum {
+  RIEMANN_FLUX_ROE,
+} RiemannFluxType;
 
 // The following Q functions use C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
@@ -121,7 +48,7 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
 #pragma clang diagnostic ignored "-Wvla"
 
 // SWE interior flux operator Q-function
-CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(SWEFlux)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
@@ -141,7 +68,11 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
     SWEState   qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     CeedScalar flux[3], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
-      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+      switch (flux_type) {
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         cell_R[j][i]     = flux[j] * geom[3][i];
@@ -154,8 +85,12 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   return 0;
 }
 
+CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFlux(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
 // SWE boundary flux operator Q-function (Dirichlet condition)
-CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // Dirichlet boundary values
@@ -174,7 +109,11 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
     SWEState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
     if (qL.h > tiny_h) {
       CeedScalar flux[3], amax;
-      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+      switch (flux_type) {
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         accum_flux[j][i] = flux[j];
@@ -185,8 +124,12 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
   return 0;
 }
 
+CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEBoundaryFlux_Dirichlet(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
 // SWE boundary flux operator Q-function (reflecting condition)
-CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(SWEBoundaryFlux_Reflecting)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
@@ -206,7 +149,11 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
       CeedScalar dum2 = 2.0 * sn * cn;
       SWEState   qR   = {qL.h, qL.hu * dum1 - qL.hv * dum2, -qL.hu * dum2 - qL.hv * dum1};
       CeedScalar flux[3], amax;
-      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+      switch (flux_type) {
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+          break;
+      }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
       }
@@ -216,8 +163,12 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
   return 0;
 }
 
+CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
 // SWE boundary flux operator Q-function (outflow condition)
-CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(SWEBoundaryFlux_Outflow)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
@@ -239,7 +190,11 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
     SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
-      SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+      switch (flux_type) {
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+          break;
+      }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         accum_flux[j][i] = flux[j];
@@ -248,6 +203,10 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
     }
   }
   return 0;
+}
+
+CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEBoundaryFlux_Outflow(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
 
 // SWE regional source operator Q-function
