@@ -3,6 +3,13 @@
 
 #include "swe_petsc_impl.h"
 
+// silence unused function warnings
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+
 // Computes eigenvalues lambda, right eigenvectors R, parameter change dW, and
 // the maximum wave speed for the shallow water equations
 static PetscErrorCode ComputeSWERoeEigenspectrum(const PetscReal hl, const PetscReal ul, const PetscReal vl, const PetscReal hr, const PetscReal ur,
@@ -124,4 +131,6 @@ static PetscErrorCode ComputeSWERoeFlux(RiemannStateData *datal, RiemannStateDat
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+#pragma GCC diagnostic   pop
+#pragma clang diagnostic pop
 #endif  // SWE_ROE_PETSC_IMPL_H

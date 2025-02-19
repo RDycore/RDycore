@@ -340,8 +340,6 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
 }
 
 #pragma GCC diagnostic   pop
-#pragma GCC diagnostic   pop
-#pragma clang diagnostic pop
 #pragma clang diagnostic pop
 
 #endif
