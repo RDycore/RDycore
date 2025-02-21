@@ -5,26 +5,7 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
-static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
-static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
-
-// riemann left and right states
-typedef struct {
-  PetscInt   num_states;         // number of states
-  PetscInt   num_flow_comp;      // number of flow components
-  PetscInt   num_sediment_comp;  // number of sediment components
-  PetscReal *h, *hu, *hv, *hci;  // prognostic variables
-  PetscReal *u, *v, *ci;         // diagnostic variables
-} SedimentRiemannStateData;
-
-typedef struct {
-  PetscInt   num_edges;          // number of edges
-  PetscInt   num_flow_comp;      // number of flow components
-  PetscInt   num_sediment_comp;  // number of sediment components
-  PetscReal *cn, *sn;            // cosine and sine of the angle between edges and y-axis
-  PetscReal *fluxes;             // fluxes through the edge
-  PetscReal *amax;               // courant number on edges
-} SedimentRiemannEdgeData;
+#include "sediment_roe_petsc_impl.h"
 
 /// @brief Allocates memory for prognostic (h/hu/hv/hci) and diagnostic (u/v/ci) variables stored at
 ///        cell centers for sediment dynamics
@@ -146,166 +127,12 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal t
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Computes the flux for SWE and sediments across the edge using Roe's approximate Riemann solve
-/// @param [in] *datal A SedimentRiemannStateData for values left of the edges
-/// @param [in] *datar A SedimentRiemannStateData for values right of the edges
-/// @param [in] sn array containing sines of the angles between edges and y-axis
-/// @param [in] cn array containing cosines of the angles between edges and y-axis
-/// @param [out] fij array containing fluxes through edges
-/// @param [out] amax array storing maximum courant number on edges
-/// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, SedimentRiemannStateData *datar, const PetscReal *sn,
-                                             const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
-  PetscFunctionBeginUser;
-
-  PetscReal *hl  = datal->h;
-  PetscReal *ul  = datal->u;
-  PetscReal *vl  = datal->v;
-  PetscReal *cil = datal->ci;
-
-  PetscReal *hr  = datar->h;
-  PetscReal *ur  = datar->u;
-  PetscReal *vr  = datar->v;
-  PetscReal *cir = datar->ci;
-
-  PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
-
-  PetscInt num_states = datal->num_states;
-  PetscInt flow_ncomp = datal->num_flow_comp;
-  PetscInt sed_ncomp  = datal->num_sediment_comp;
-  PetscInt soln_ncomp = flow_ncomp + sed_ncomp;
-
-  PetscInt ci_index_offset;
-
-  PetscReal cihat[MAX_NUM_FIELD_COMPONENTS];
-  PetscReal dch[MAX_NUM_FIELD_COMPONENTS];
-  PetscReal R[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS];
-  PetscReal A[MAX_NUM_FIELD_COMPONENTS][MAX_NUM_FIELD_COMPONENTS];
-  PetscReal dW[MAX_NUM_FIELD_COMPONENTS];
-  PetscReal FL[MAX_NUM_FIELD_COMPONENTS], FR[MAX_NUM_FIELD_COMPONENTS];
-
-  // initialize
-  for (PetscInt i = 0; i < MAX_NUM_FIELD_COMPONENTS; i++) {
-    for (PetscInt j = 0; j < MAX_NUM_FIELD_COMPONENTS; j++) {
-      R[i][j] = 0.0;
-    }
-  }
-
-  for (PetscInt i = 0; i < num_states; ++i) {
-    // compute Roe averages
-    PetscReal duml  = pow(hl[i], 0.5);
-    PetscReal dumr  = pow(hr[i], 0.5);
-    PetscReal cl    = pow(GRAVITY * hl[i], 0.5);
-    PetscReal cr    = pow(GRAVITY * hr[i], 0.5);
-    PetscReal hhat  = duml * dumr;
-    PetscReal uhat  = (duml * ul[i] + dumr * ur[i]) / (duml + dumr);
-    PetscReal vhat  = (duml * vl[i] + dumr * vr[i]) / (duml + dumr);
-    PetscReal chat  = pow(0.5 * GRAVITY * (hl[i] + hr[i]), 0.5);
-    PetscReal uperp = uhat * cn[i] + vhat * sn[i];
-
-    PetscReal dh     = hr[i] - hl[i];
-    PetscReal du     = ur[i] - ul[i];
-    PetscReal dv     = vr[i] - vl[i];
-    PetscReal dupar  = -du * sn[i] + dv * cn[i];
-    PetscReal duperp = du * cn[i] + dv * sn[i];
-
-    ci_index_offset = i * sed_ncomp;
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      cihat[j] = (duml * cil[ci_index_offset + j] + dumr * cir[ci_index_offset + j]) / (duml + dumr);
-      dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
-    }
-
-    dW[0] = 0.5 * (dh - hhat * duperp / chat);
-    dW[1] = hhat * dupar;
-    dW[2] = 0.5 * (dh + hhat * duperp / chat);
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      dW[j + 3] = dch[j] - cihat[j] * dh;
-    }
-
-    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
-    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
-    PetscReal al1    = uperpl - cl;
-    PetscReal al3    = uperpl + cl;
-    PetscReal ar1    = uperpr - cr;
-    PetscReal ar3    = uperpr + cr;
-
-    R[0][0] = 1.0;
-    R[0][1] = 0.0;
-    R[0][2] = 1.0;
-    R[1][0] = uhat - chat * cn[i];
-    R[1][1] = -sn[i];
-    R[1][2] = uhat + chat * cn[i];
-    R[2][0] = vhat - chat * sn[i];
-    R[2][1] = cn[i];
-    R[2][2] = vhat + chat * sn[i];
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      R[j + 3][0]     = cihat[j];
-      R[j + 3][2]     = cihat[j];
-      R[j + 3][j + 3] = 1.0;
-    }
-
-    PetscReal da1 = fmax(0.0, 2.0 * (ar1 - al1));
-    PetscReal da3 = fmax(0.0, 2.0 * (ar3 - al3));
-    PetscReal a1  = fabs(uperp - chat);
-    PetscReal a2  = fabs(uperp);
-    PetscReal a3  = fabs(uperp + chat);
-
-    // Critical flow fix
-    if (a1 < da1) {
-      a1 = 0.5 * (a1 * a1 / da1 + da1);
-    }
-    if (a3 < da3) {
-      a3 = 0.5 * (a3 * a3 / da3 + da3);
-    }
-
-    // Compute interface flux
-    for (PetscInt i = 0; i < 3; i++) {
-      for (PetscInt j = 0; j < 3; j++) {
-        A[i][j] = 0.0;
-      }
-    }
-    A[0][0] = a1;
-    A[1][1] = a2;
-    A[2][2] = a3;
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      A[j + 3][j + 3] = a2;
-    }
-
-    FL[0] = uperpl * hl[i];
-    FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
-    FL[2] = vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i];
-
-    FR[0] = uperpr * hr[i];
-    FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
-    FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
-
-    ci_index_offset = i * sed_ncomp;
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
-      FL[j + 3] = hl[i] * uperpl * cil[ci_index_offset + j];
-      FR[j + 3] = hr[i] * uperpr * cir[ci_index_offset + j];
-    }
-
-    // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-    for (PetscInt dof1 = 0; dof1 < soln_ncomp; dof1++) {
-      for (PetscInt dof2 = 0; dof2 < soln_ncomp; dof2++) {
-        if (dof2 == 0) {
-          fij[soln_ncomp * i + dof1] = 0.5 * (FL[dof1] + FR[dof1]);
-        }
-        fij[soln_ncomp * i + dof1] = fij[soln_ncomp * i + dof1] - 0.5 * R[dof1][dof2] * A[dof2][dof2] * dW[dof2];
-      }
-    }
-
-    amax[i] = chat + fabs(uperp);
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 //------------------------
 // Interior Flux Operator
 //------------------------
 
 typedef struct {
+  RDyNumericsRiemann       riemann;       // riemann solver type
   RDyMesh                 *mesh;          // domain mesh
   PetscReal                tiny_h;        // minimum water height for wet conditions
   SedimentRiemannStateData left_states;   // "left" riemann states on interior edges
@@ -383,8 +210,14 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
   PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datal));
   PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));
 
-  // call Riemann solver (only Roe currently supported)
-  PetscCall(ComputeSedimentRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+  // call Riemann solver
+  switch (interior_flux_op->riemann) {
+    case RIEMANN_ROE:
+      PetscCall(ComputeSedimentRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+  }
 
   // accummulate the flux values in the global flux vector
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
@@ -499,6 +332,7 @@ PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, const RDyC
 //------------------------
 
 typedef struct {
+  RDyNumericsRiemann       riemann;             // riemann solver type
   RDyMesh                 *mesh;                // domain mesh
   RDyBoundary              boundary;            // boundary associated with this sub-operator
   RDyCondition             boundary_condition;  // boundary condition associated with this sub-operator
@@ -638,8 +472,14 @@ static PetscErrorCode ApplySedimentBoundaryFlux(void *context, PetscOperatorFiel
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);
   }
 
-  // call Riemann solver (only Roe currently supported)
-  PetscCall(ComputeSedimentRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+  // call Riemann solver
+  switch (boundary_flux_op->riemann) {
+    case RIEMANN_ROE:
+      PetscCall(ComputeSedimentRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+  }
 
   // accumulate the flux values in f_global
   RDyCells                 *cells             = &boundary_flux_op->mesh->cells;
