@@ -64,8 +64,8 @@ CEED_QFUNCTION_HELPER int SedimentFlux(void *ctx, CeedInt Q, const CeedScalar *c
   const CeedInt tot_ndof  = flow_ndof + sed_ndof;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SedimentState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
-    SedimentState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
+    SedimentState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SedimentState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
     for (CeedInt j = 0; j < sed_ndof; ++j) {
       qL.hci[j] = q_L[flow_ndof + j][i];
       qR.hci[j] = q_R[3 + j][i];
@@ -113,8 +113,8 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, c
   const CeedInt tot_ndof  = flow_ndof + ѕed_ndof;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SedimentState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
-    SedimentState qR = {.h = q_R[0][i], .hu = q_R[1][i], .hv = q_R[2][i]};
+    SedimentState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SedimentState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
     for (CeedInt j = 0; j < ѕed_ndof; ++j) {
       qL.hci[j] = q_L[3 + j][i];
       qR.hci[j] = q_R[3 + j][i];
@@ -159,7 +159,7 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Reflecting(void *ctx, CeedInt Q, 
 
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar    sn = geom[0][i], cn = geom[1][i];
-    SedimentState qL = {.h = q_L[0][i], .hu = q_L[1][i], .hv = q_L[2][i]};
+    SedimentState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     for (CeedInt j = 0; j < sed_ndof; ++j) {
       qL.hci[j] = q_L[3 + j][i];
     }
@@ -213,7 +213,7 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
   const CeedScalar rhow                    = context->rhow;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SedimentState state = {.h = q[0][i], .hu = q[1][i], .hv = q[2][i]};
+    SedimentState state = {q[0][i], q[1][i], q[2][i]};
     for (CeedInt j = 0; j < context->sed_ndof; ++j) {
       state.hci[j] = q[3 + j][i];
     }
