@@ -541,13 +541,13 @@ static PetscErrorCode InitMaterialProperties(RDy rdy) {
   }
 
   // read material properties in from regional specifications and/or files
-  PetscReal *material_property_values[OPERATOR_NUM_MATERIAL_PROPERTIES];
-  for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+  PetscReal *material_property_values[NUM_MATERIAL_PROPERTIES];
+  for (PetscInt p = 0; p < NUM_MATERIAL_PROPERTIES; ++p) {
     PetscCall(PetscCalloc1(rdy->mesh.num_cells, &material_property_values[p]));
   }
   for (PetscInt imat = 0; imat < rdy->config.num_materials; ++imat) {
     RDyMaterialPropertiesSpec mat_props_spec = rdy->config.materials[imat].properties;
-    READ_MATERIAL_PROPERTY(manning, mat_props_spec, material_property_values[OPERATOR_MANNINGS]);
+    READ_MATERIAL_PROPERTY(manning, mat_props_spec, material_property_values[MATERIAL_PROPERTY_MANNINGS]);
   }
 
   // set the properties on the operator
@@ -556,13 +556,13 @@ static PetscErrorCode InitMaterialProperties(RDy rdy) {
   for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
     if (rdy->mesh.cells.is_owned[i]) {
       PetscInt owned_cell = rdy->mesh.cells.local_to_owned[i];
-      for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+      for (PetscInt p = 0; p < NUM_MATERIAL_PROPERTIES; ++p) {
         material_properties.values[p][owned_cell] = material_property_values[p][i];
       }
     }
   }
   PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & material_properties));
-  for (PetscInt p = 0; p < OPERATOR_NUM_MATERIAL_PROPERTIES; ++p) {
+  for (PetscInt p = 0; p < NUM_MATERIAL_PROPERTIES; ++p) {
     PetscCall(PetscFree(material_property_values[p]));
   }
 

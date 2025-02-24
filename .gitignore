@@ -7,3 +7,7 @@ compile_commands.json
 site/
 *.cgns
 .clangd
+
+# files generated within the source tree
+src/swe/swe_ceed.h
+src/sediment/sediment_ceed.h

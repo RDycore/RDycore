@@ -1,7 +1,7 @@
 #ifndef SWE_OPERATORS_IMPL_H
 #define SWE_OPERATORS_IMPL_H
 
-#include <ceed/types.h>
+#include "swe_ceed.h"
 
 #ifndef Square
 #define Square(x) ((x) * (x))
@@ -248,7 +248,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
 
     CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
-      const CeedScalar mannings_n = mat_props[OPERATOR_MANNINGS][i];
+      const CeedScalar mannings_n = mat_props[MATERIAL_PROPERTY_MANNINGS][i];
       const CeedScalar Cd         = gravity * Square(mannings_n) * pow(h, -1.0 / 3.0);
 
       const CeedScalar velocity = sqrt(Square(u) + Square(v));
@@ -311,7 +311,7 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
       const CeedScalar mx = hu + Ax * dt;
       const CeedScalar my = hv + Ay * dt;
 
-      const CeedScalar mannings_n = mat_props[OPERATOR_MANNINGS][i];
+      const CeedScalar mannings_n = mat_props[MATERIAL_PROPERTY_MANNINGS][i];
       const CeedScalar lambda     = gravity * Square(mannings_n) * pow(h, -4.0 / 3.0) * pow(Square(mx / h) + Square(my / h), 0.5);
 
       CeedScalar qx_nplus1 = 0.0, qy_nplus1 = 0.0;

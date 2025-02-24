@@ -90,7 +90,7 @@ static PetscErrorCode SetOperatorRegions(Operator *op, PetscInt num_regions, RDy
   // the PETSc operator, similar to how restrictions are used in CEED
   if (!CeedEnabled()) {
     PetscCall(CreateSequentialVector(comm, op->num_components * op->mesh->num_owned_cells, op->num_components, &op->petsc.external_sources));
-    PetscCall(CreateSequentialVector(comm, op->mesh->num_owned_cells, OPERATOR_NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));
+    PetscCall(CreateSequentialVector(comm, op->mesh->num_owned_cells, NUM_MATERIAL_PROPERTIES, &op->petsc.material_properties));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1016,7 +1016,7 @@ PetscErrorCode GetOperatorRegionalMaterialProperties(Operator *op, RDyRegion reg
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
   PetscCall(CheckOperatorRegion(op, region, comm));
 
-  PetscCall(CreateOperatorRegionData(op, region, OPERATOR_NUM_MATERIAL_PROPERTIES, property_data));
+  PetscCall(CreateOperatorRegionData(op, region, NUM_MATERIAL_PROPERTIES, property_data));
   if (CeedEnabled()) {
     PetscCall(GetCeedSourceOperatorRegionData(op, region, "mat_props", property_data));
   } else {
@@ -1197,7 +1197,7 @@ PetscErrorCode RestoreOperatorDomainExternalSource(Operator *op, OperatorData *s
 PetscErrorCode GetOperatorDomainMaterialProperties(Operator *op, OperatorData *property_data) {
   PetscFunctionBegin;
 
-  PetscCall(CreateOperatorDomainData(op, OPERATOR_NUM_MATERIAL_PROPERTIES, property_data));
+  PetscCall(CreateOperatorDomainData(op, NUM_MATERIAL_PROPERTIES, property_data));
   if (CeedEnabled()) {
     PetscCallCEED(GetCeedSourceOperatorDomainData(op, "mat_props", property_data));
   } else {
