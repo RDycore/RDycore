@@ -200,12 +200,6 @@ typedef struct {
   PetscReal  *array_pointer;   // pointer to CEED/PETSc array owning data (used internally)
 } OperatorData;
 
-// operator material property identifiers
-typedef enum {
-  OPERATOR_MANNINGS = 0,
-  OPERATOR_NUM_MATERIAL_PROPERTIES,
-} OperatorMaterialPropertyId;
-
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryValues(Operator *, RDyBoundary, OperatorData *);
 

@@ -517,7 +517,7 @@ PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, con
   OperatorData property_data;
   PetscCall(GetOperatorRegionalMaterialProperties(rdy->operator, region, &property_data));
   for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-    property_data.values[OPERATOR_MANNINGS][c] = n_values[c];
+    property_data.values[MATERIAL_PROPERTY_MANNINGS][c] = n_values[c];
   }
   PetscCall(RestoreOperatorRegionalMaterialProperties(rdy->operator, region, &property_data));
 
@@ -533,7 +533,7 @@ PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal *n_
   OperatorData property_data;
   PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & property_data));
   for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
-    property_data.values[OPERATOR_MANNINGS][c] = n_values[c];
+    property_data.values[MATERIAL_PROPERTY_MANNINGS][c] = n_values[c];
   }
   PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & property_data));
 

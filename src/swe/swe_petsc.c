@@ -540,7 +540,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
+  PetscInt num_mat_props = NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -565,7 +565,7 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
         PetscReal v = hv / h;
 
         // Manning's coefficient
-        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + OPERATOR_MANNINGS];
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + MATERIAL_PROPERTY_MANNINGS];
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
@@ -637,7 +637,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
+  PetscInt num_mat_props = NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -657,7 +657,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
       if (h >= tiny_h) {  // wet conditions
 
         // Manning's coefficient
-        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + OPERATOR_MANNINGS];
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + MATERIAL_PROPERTY_MANNINGS];
 
         PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
         PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];

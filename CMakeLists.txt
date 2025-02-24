@@ -8,6 +8,15 @@ option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
 
 set(MAX_NAME_LEN              128 CACHE STRING "Maximum allowable length of field/variable names")
 set(MAX_NUM_SEDIMENT_CLASSES    5 CACHE STRING "Maximum number of sediment size classes")
+set(MAX_NUM_FIELDS              1 CACHE STRING "Maximum number of fields in a model's state")
+
+# Material property (integer) identifiers.
+# (we generate them here to allow GPU JIT compilers to see them)
+set(MATERIAL_PROPERTY_MANNINGS 0)
+set(NUM_MATERIAL_PROPERTIES    1)
+
+# options dependent upon above options
+math(EXPR MAX_NUM_FIELD_COMPONENTS "3 + ${MAX_NUM_SEDIMENT_CLASSES}")
 
 # CMake files live in the cmake/ directory.
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
@@ -136,7 +145,7 @@ message(STATUS "Generating project files in build directory: ${PROJECT_BINARY_DI
 message(STATUS "C compiler is ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION})")
 message(STATUS "Fortran compiler is ${CMAKE_Fortran_COMPILER} (${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION})")
 
-# Version numbers (written to rdycore.h).
+# Version numbers (written to private/config.h).
 set(RDYCORE_MAJOR_VERSION 0)
 set(RDYCORE_MINOR_VERSION 1)
 set(RDYCORE_PATCH_VERSION 0)
@@ -159,8 +168,8 @@ include_directories(${PROJECT_BINARY_DIR}/include) # for generated rdycore.h
 
 # Generate a header from our build parameters.
 configure_file(
-  ${PROJECT_SOURCE_DIR}/include/rdycore.h.in
-  ${PROJECT_BINARY_DIR}/include/rdycore.h
+  ${PROJECT_SOURCE_DIR}/include/private/config.h.in
+  ${PROJECT_BINARY_DIR}/include/private/config.h
   @ONLY
 )
 

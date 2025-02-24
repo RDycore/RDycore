@@ -583,7 +583,7 @@ static PetscErrorCode CreateCeedSource0Operator(const RDyConfig config, RDyMesh 
   // NOTE: the order in which these inputs and outputs are specified determines
   // NOTE: their indexing within the Q-function's implementation
   CeedInt num_comp_geom = 2, num_comp_ext_src = num_comp;
-  CeedInt num_mat_props = OPERATOR_NUM_MATERIAL_PROPERTIES;
+  CeedInt num_mat_props = NUM_MATERIAL_PROPERTIES;
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "ext_src", num_comp_ext_src, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "mat_props", num_mat_props, CEED_EVAL_NONE));
