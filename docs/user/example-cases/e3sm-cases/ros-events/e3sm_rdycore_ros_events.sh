@@ -23,7 +23,7 @@ display_help() {
   echo "   --mach <pm-cpu|pm-gpu|frontier>         Supported machine name"
   echo "   --frontier-node-type <cpu|gpu>          To run on Frontier CPUs or GPUs"
   echo "   -N, --node  <N>                         Number of nodes (default = 1)"
-  echo "   --project <project-id>                  Project ID that will charged for the job"
+  echo "   --project-id <project-id>               Project ID that will charged for the job"
   echo "   --ros_event <1996PacN,1996MidA,2017CA>  Supported dataset name (i.e. daymet|imerg|mrms|mswep|nldas)"
   echo "   --deltaT <value>                        Temperature anomaly"
   return 0
@@ -38,7 +38,7 @@ do
     --e3sm-dir) e3sm_dir="$2"; shift ;;
     -N | --node) N="$2"; shift ;;
     --ros_event) ros_event="$2"; shift ;;
-    --ros_event) deltaT="$2"; shift ;;
+    --deltaT) deltaT="$2"; shift ;;
     -h | --help)
       display_help
       exit 0
@@ -64,7 +64,8 @@ if [ "$deltaT" = "" ]; then
     exit 0
 elif [ "$deltaT" = "0" ]; then
     # Supported
-elif
+    echo "Supported deltaT = " $deltaT
+else
     echo "Unsupported deltaT = " $deltaT
     display_help
     exit 0
@@ -81,7 +82,7 @@ if [ "$mach" == "pm-cpu" ]; then
   data_dir=/global/cfs/projectdirs/m4267/shared/data/ros
   device="cpu"
   ntasks=$((N*128))
-  macros_file_in=${PWD}/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
+  macros_file_in=${PWD}/../harvey-flooding/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
   macros_file_out=gnu_pm-cpu.cmake
   compiler=gnu
 
@@ -90,7 +91,7 @@ elif [ "$mach" == "pm-gpu" ]; then
   data_dir=/global/cfs/projectdirs/m4267/shared/data/ros
   device="gpu"
   ntasks=$((N*4))
-  macros_file_in=${PWD}/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
+  macros_file_in=${PWD}/../harvey-flooding/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
   macros_file_out=gnugpu_pm-gpu.cmake
   compiler=gnugpu
 
@@ -121,6 +122,7 @@ if [ "$ros_event" = "1996PacN" ]; then
   atm_forcing_name=atm_forcing.L15.PN
   atm_forcing_domain_file=domain_domain.lnd.nldas.PN_c231005.nc
   domainFile=domain_ROS_1996_PN_c230427.nc
+  domainPath=${data_dir}/e3sm/PN
   surfdataFile=surfdata_ROS_1996_PN_c230428_v2.nc
   finidatFile=ROS_1996_PN_FLOOD_Optimal_future_0K_P_spinup_20240909.elm.r.1996-01-01-00000.nc
   frivinp_rtm=${data_dir}/e3sm/PN1996_jigsaw_1km_90m/MOSART_PN1996_c241106.nc
@@ -134,7 +136,7 @@ if [ "$ros_event" = "1996PacN" ]; then
   RDYCORE_BIN_MAP=${data_dir}/rdycore/PN1996_jigsaw_1km_90m/map_MOSART_to_RDycore_PN1996_jigsaw_1km_90m.int32.bin
 fi
 
-if [ "$supported_dataset" -eq 0 ]; then
+if [ "$supported_event" -eq 0 ]; then
     echo "The following ROS event is not supported: " $ros_event
     display_help
     exit 0
@@ -146,7 +148,7 @@ fi
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 # 1. Let's build RDycore
-
+src_dir=${e3sm_dir}
 rdycore_dir=$e3sm_dir/externals/rdycore/
 
 cd $rdycore_dir
@@ -197,6 +199,11 @@ cd ${case_dir}/${case_name}
 ./xmlchange ROF_NCPL=48
 ./xmlchange LND2ROF_FMAPNAME=$LND2ROF
 ./xmlchange ROF2LND_FMAPNAME=$ROF2LND
+
+./xmlchange JOB_QUEUE=debug
+./xmlchange JOB_WALLCLOCK_TIME=00:30:00
+./xmlchange STOP_N=1
+./xmlchange STOP_OPTION=ndays
 
 cat >> user_nl_elm << EOF
  fsurdat = '${domainPath}/${surfdataFile}'
