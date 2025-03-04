@@ -85,6 +85,8 @@ if [ "$mach" == "pm-cpu" ]; then
   macros_file_in=${PWD}/../harvey-flooding/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
   macros_file_out=gnu_pm-cpu.cmake
   compiler=gnu
+  nldas_dir="/global/cfs/cdirs/e3sm/inputdata/atm/datm7/NLDAS"
+  domain_dir="/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.clm"
 
 elif [ "$mach" == "pm-gpu" ]; then
 
@@ -119,8 +121,9 @@ if [ "$ros_event" = "1996PacN" ]; then
   start_date="1996-01-01"
 
   # E3SM-files that won't change if RDycore resolution is changed
-  atm_forcing_name=atm_forcing.L15.PN
+  atm_forcing_name=atm_forcing.L15.PN.${deltaT}degree_P_2yrs
   atm_forcing_domain_file=domain_domain.lnd.nldas.PN_c231005.nc
+  atm_forcing_dir="${data_dir}/e3sm/forcing_data/${atm_forcing_name}"
   domainFile=domain_ROS_1996_PN_c230427.nc
   domainPath=${data_dir}/e3sm/PN
   surfdataFile=surfdata_ROS_1996_PN_c230428_v2.nc
@@ -276,12 +279,11 @@ fi
 
 cp ./CaseDocs/datm.streams.txt.CLMMOSARTTEST ./user_datm.streams.txt.CLMMOSARTTEST
 chmod +rw ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.clm@/global/cfs/projectdirs/m4267/shared/data/ros/e3sm/forcing_data/atm_forcing.L15.PN@" ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@domain.lnd.nldas2_0224x0464_c110415.nc@domain_domain.lnd.nldas.PN_c231005.nc@" ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@/global/cfs/cdirs/e3sm/inputdata/atm/datm7/NLDAS@/global/cfs/projectdirs/m4267/shared/data/ros/e3sm/forcing_data//atm_forcing.L15.PN.${deltaT}degree_P_2yrs@" ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@clmforc.nldas@elmforc.L15.PN.${deltaT}degree@" ./user_datm.streams.txt.CLMMOSARTTEST
+sed -i "s/${domain_dir//\//\\/}/${atm_forcing_dir//\//\\/}/g" ./user_datm.streams.txt.CLMMOSARTTEST
+sed -i "s/domain.lnd.nldas2_0224x0464_c110415.nc/${atm_forcing_domain_file}g" ./user_datm.streams.txt.CLMMOSARTTEST
+sed -i "s/${nldas_dir//\//\\/}/${atm_forcing_dir//\//\\/}/g" ./user_datm.streams.txt.CLMMOSARTTEST
+sed -i "s@clmforc.nldas/elmforc.L15.PN.${deltaT}degreeg" ./user_datm.streams.txt.CLMMOSARTTEST
 sed -i '/ZBOT/d' ./user_datm.streams.txt.CLMMOSARTTEST
-
 
 rundir=`./xmlquery RUNDIR --value`
 
