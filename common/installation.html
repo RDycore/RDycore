@@ -541,6 +541,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#frequently-asked-questions-faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      Frequently Asked Questions (FAQ)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1171,6 +1180,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#frequently-asked-questions-faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      Frequently Asked Questions (FAQ)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1596,6 +1614,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#frequently-asked-questions-faq" class="md-nav__link">
+    <span class="md-ellipsis">
+      Frequently Asked Questions (FAQ)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1863,6 +1890,33 @@ srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><s
 srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-n8<span class="w"> </span>-c1<span class="w"> </span>../../rdycore<span class="w"> </span>ex2b_ic_file.yaml<span class="w"> </span><span class="se">\</span>
 -ceed<span class="w"> </span>/gpu/hip<span class="w"> </span>-dm_vec_type<span class="w"> </span>hip<span class="w"> </span>-log_view<span class="w"> </span>-log_view_gpu_time
 </code></pre></div>
+<h2 id="frequently-asked-questions-faq">Frequently Asked Questions (FAQ)</h2>
+<p><strong>When I try to configure RDycore, PETSc is not found! I get an error message
+like this:</strong></p>
+<div class="highlight"><pre><span></span><code>-- Checking for module &#39;PETSc&#39;
+--   No package &#39;PETSc&#39; found
+CMake Error at &lt;gibberish&gt;
+  A required package was not found
+Call Stack (most recent call first):
+  &lt;more gibberish&gt;/Modules/FindPkgConfig.cmake:829 (_pkg_check_modules_internal)
+  CMakeLists.txt:39 (pkg_check_modules)
+
+
+-- Configuring incomplete, errors occurred!
+</code></pre></div>
+<p><strong>How do I tell CMake where to find PETSc?</strong></p>
+<p>RDycore uses the UNIX <code>pkg-config</code> tool to figure out where PETSc is installed.
+Specifically, it looks for a file named <code>&lt;package-name&gt;.pc</code> that contains
+relevant information about the installation. You can tell it where to search
+using the <code>PKG_CONFIG_PATH</code> environment variable similarly to how you use the
+<code>PATH</code> variable to search for the UNIX commands you use.</p>
+<p>Typically, PETSc installs <code>PETSc.pc</code> in the following location:</p>
+<div class="highlight"><pre><span></span><code>$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig/PETSc.pc
+</code></pre></div>
+<p>So if you modify <code>PKG_CONFIG_PATH</code> to contain <code>$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig</code>,
+(e.g. <code>export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"</code>),
+CMake can find your PETSc installation. This is probably required if you are
+installing PETSc in a peculiar place.</p>
 
 
 
