@@ -307,3 +307,40 @@ srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml -ceed /cpu/self -log_view
 srun -N 1 -n8 -c1 ../../rdycore ex2b_ic_file.yaml \
 -ceed /gpu/hip -dm_vec_type hip -log_view -log_view_gpu_time
 ```
+
+## Frequently Asked Questions (FAQ)
+
+**When I try to configure RDycore, PETSc is not found! I get an error message
+like this:**
+
+```
+-- Checking for module 'PETSc'
+--   No package 'PETSc' found
+CMake Error at <gibberish>
+  A required package was not found
+Call Stack (most recent call first):
+  <more gibberish>/Modules/FindPkgConfig.cmake:829 (_pkg_check_modules_internal)
+  CMakeLists.txt:39 (pkg_check_modules)
+
+
+-- Configuring incomplete, errors occurred!
+```
+
+**How do I tell CMake where to find PETSc?**
+
+RDycore uses the UNIX `pkg-config` tool to figure out where PETSc is installed.
+Specifically, it looks for a file named `<package-name>.pc` that contains
+relevant information about the installation. You can tell it where to search
+using the `PKG_CONFIG_PATH` environment variable similarly to how you use the
+`PATH` variable to search for the UNIX commands you use.
+
+Typically, PETSc installs `PETSc.pc` in the following location:
+
+```
+$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig/PETSc.pc
+```
+
+So if you modify `PKG_CONFIG_PATH` to contain `$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig`,
+(e.g. `export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"`),
+CMake can find your PETSc installation. This is probably required if you are
+installing PETSc in a peculiar place.
