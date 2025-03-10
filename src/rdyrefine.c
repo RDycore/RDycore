@@ -45,6 +45,12 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Create the project matrix from the coarse grid to the fine grid. This assumes
+///        that all the cells of the coarse grid have been refined.
+/// @param dm_coarse    The coarse grid DM
+/// @param dm_fine      The fine grid DM
+/// @param CoarseToFine The projection matrix from coarse to fine grid
+/// @return 
 static PetscErrorCode CreateProjectionMatrix(DM dm_coarse, DM dm_fine, Mat *CoarseToFine) {
   PetscFunctionBegin;
 
@@ -85,7 +91,13 @@ static PetscErrorCode CreateProjectionMatrix(DM dm_coarse, DM dm_fine, Mat *Coar
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode InitSolutionFromCoarseRDy(Vec X_coarse, Vec u_global) {
+/// @brief Project the initial condition from the coarse grid to the fine grid using
+///        a projection matrix.
+/// @param CoarseToFine Projection matrix from coarse to fine grid
+/// @param X_coarse 
+/// @param X_fine
+/// @return 
+static PetscErrorCode InitSolutionFromCoarseRDy(Mat CoarseToFine, Vec X_coarse, Vec X_fine) {
   PetscFunctionBegin;
 
   PetscInt n_local_coarse, ndof_coarse;
@@ -93,30 +105,48 @@ static PetscErrorCode InitSolutionFromCoarseRDy(Vec X_coarse, Vec u_global) {
   PetscCall(VecGetBlockSize(X_coarse, &ndof_coarse));
 
   PetscInt n_local_fine, ndof_fine;
-  PetscCall(VecGetLocalSize(u_global, &n_local_fine));
-  PetscCall(VecGetBlockSize(u_global, &ndof_fine));
+  PetscCall(VecGetLocalSize(X_fine, &n_local_fine));
+  PetscCall(VecGetBlockSize(X_fine, &ndof_fine));
 
   // PetscCheck(ndof_coarse == ndof_fine, comm, PETSC_ERR_USER, "The block size is not same");
   PetscInt ndof = ndof_fine;
 
-  PetscScalar *x_ptr_coarse, *x_ptr_fine;
+  PetscScalar *x_ptr_coarse, *x_ptr_fine, *x_ptr;
   PetscCall(VecGetArray(X_coarse, &x_ptr_coarse));
-  PetscCall(VecGetArray(u_global, &x_ptr_fine));
+  PetscCall(VecGetArray(X_fine, &x_ptr_fine));
 
-  PetscInt num_refined_cells = 4;  // assuming homogeneous refinement over the entire domain
+  Vec coarse_1dof, fine_1dof;
+  PetscCall(VecCreateMPI(PETSC_COMM_WORLD, n_local_coarse, PETSC_DECIDE, &coarse_1dof));
+  PetscCall(VecCreateMPI(PETSC_COMM_WORLD, n_local_fine, PETSC_DECIDE, &fine_1dof));
 
-  PetscInt count = 0;
-  for (PetscInt i = 0; i < n_local_coarse / ndof; i++) {
-    for (PetscInt j = 0; j < num_refined_cells; j++) {
-      for (PetscInt idof = 0; idof < ndof; idof++) {
-        x_ptr_fine[count * ndof + idof] = x_ptr_coarse[i * ndof + idof];
-      }
-      count++;
+  PetscInt ncells_fine = n_local_fine / ndof;
+  PetscInt ncells_coarse = n_local_coarse / ndof;
+
+  for (PetscInt idof = 0; idof < ndof; idof++) {
+
+    // fill the coarse 1 dof vector
+    PetscCall(VecGetArray(coarse_1dof, &x_ptr));
+    for (PetscInt c = 0; c < ncells_coarse; c++) {
+      x_ptr[c] = x_ptr_coarse[c * ndof + idof];
     }
+    PetscCall(VecRestoreArray(coarse_1dof, &x_ptr));
+
+    // project the coarse 1 dof vector to the fine 1 dof vector
+    PetscCall(MatMult(CoarseToFine, coarse_1dof, fine_1dof));
+
+    // fill the fine 1 dof vector
+    PetscCall(VecGetArray(fine_1dof, &x_ptr));
+    for (PetscInt c = 0; c < ncells_fine; c++) {
+      x_ptr_fine[c * ndof + idof] = x_ptr[c];
+    }
+    PetscCall(VecRestoreArray(fine_1dof, &x_ptr));
   }
 
   PetscCall(VecRestoreArray(X_coarse, &x_ptr_coarse));
-  PetscCall(VecRestoreArray(u_global, &x_ptr_fine));
+  PetscCall(VecRestoreArray(X_fine, &x_ptr_fine));
+
+  PetscCall(VecDestroy(&coarse_1dof));
+  PetscCall(VecDestroy(&fine_1dof));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -254,7 +284,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
   // initialize the refined solution from existing previous solution
-  PetscCall(InitSolutionFromCoarseRDy(U_coarse, rdy->u_global));
+  PetscCall(InitSolutionFromCoarseRDy(CoarseToFine, U_coarse, rdy->u_global));
 
   // destroy the operator
   PetscCall(DestroyOperator(&rdy->operator));
