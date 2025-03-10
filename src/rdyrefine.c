@@ -45,6 +45,46 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateProjectionMatrix(DM dm_coarse, DM dm_fine, Mat *CoarseToFine) {
+  PetscFunctionBegin;
+
+  // get the local size of the vectors
+  Vec U_coarse, U_fine;
+
+  PetscCall(DMCreateGlobalVector(dm_coarse, &U_coarse));
+  PetscCall(DMCreateGlobalVector(dm_fine, &U_fine));
+
+  PetscInt row, col;
+  PetscCall(VecGetLocalSize(U_coarse, &col));
+  PetscCall(VecGetLocalSize(U_fine, &row));
+
+  PetscCall(VecDestroy(&U_coarse));
+  PetscCall(VecDestroy(&U_fine));
+
+  // now create the projection matrix
+  PetscInt d_nz = 4; // assuming all cells have been refined
+  PetscInt o_nz = 0;
+
+  PetscCall(MatCreateAIJ(PETSC_COMM_WORLD, row, col, PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, CoarseToFine));
+
+  for (PetscInt j = 0; j < col; j++) {
+    for (PetscInt i = 0; i < d_nz; i++) {
+      PetscInt row = j * d_nz + i;
+      PetscInt col = j;
+      PetscScalar val = 1.0;
+
+      PetscCall(MatSetValue(*CoarseToFine, row, col, val, INSERT_VALUES));
+    }
+  }
+  PetscCall(MatSetFromOptions(*CoarseToFine));
+  PetscCall(MatAssemblyBegin(*CoarseToFine, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(*CoarseToFine, MAT_FINAL_ASSEMBLY));
+
+  if (0) MatView(*CoarseToFine, PETSC_VIEWER_STDOUT_WORLD);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode InitSolutionFromCoarseRDy(Vec X_coarse, Vec u_global) {
   PetscFunctionBegin;
 
@@ -172,6 +212,10 @@ PetscErrorCode RDyRefine(RDy rdy) {
   Vec U_coarse;
   PetscCall(VecDuplicate(rdy->u_global, &U_coarse));
   PetscCall(VecCopy(rdy->u_global, U_coarse));
+
+  // create the mapping from coarse to fine
+  Mat CoarseToFine;
+  PetscCall(CreateProjectionMatrix(rdy->dm, dm_fine, &CoarseToFine));
 
   // create data structure for the refined regions from existing coarse regions
   RDyRegion *refined_regions = NULL;
