@@ -129,6 +129,9 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
   # make sure libgfortran appears in our rpath
   execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
                   OUTPUT_VARIABLE gfortran_library_location)
+  if (NOT gfortran_library_location)
+    message(FATAL_ERROR "Couldn't determine library location for Fortran compiler ${CMAKE_Fortran_COMPILER}")
+  endif()
   get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
   list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
   list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
