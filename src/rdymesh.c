@@ -200,6 +200,8 @@ static PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.areas));
   PetscCall(PetscFree(cells.dz_dx));
   PetscCall(PetscFree(cells.dz_dy));
+  PetscCall(PetscFree(cells.local_to_owned));
+  PetscCall(PetscFree(cells.owned_to_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
