@@ -7,6 +7,8 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
+#include <petsc/private/dmpleximpl.h> /*I      "petscdmplex.h"   I*/
+
 #define MAX_COMP_NAME_LENGTH 20
 
 static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt *num_regions, RDyRegion **regions) {
@@ -161,7 +163,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscFunctionBegin;
 
   // mark the grid cells for refinement
-  PetscInt cStart, cEnd;
+  PetscInt cStart, cEnd, parent;
   DMLabel  label;
 
   PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &cStart, &cEnd));
@@ -175,7 +177,26 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(DMAdaptLabel(rdy->dm, label, &dm_fine));
   PetscCall(DMCopyDisc(rdy->dm, dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
-
+  PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
+  PetscCall(DMGetCoordinatesLocalSetUp(dm_fine));
+  if (1) {
+    DM refTree;
+    PetscCall(DMPlexGetReferenceTree(rdy->dm, &refTree));
+    PetscCall(DMPlexSetReferenceTree(dm_fine, refTree));
+  }
+  for (parent = cStart; parent < cEnd; parent++) {
+    PetscInt        numChildren, i;
+    const PetscInt *children; printf("%d)",(int)parent);
+    PetscCall(DMPlexGetTreeChildren(rdy->dm, parent, &numChildren, &children));
+    for (i = 0; i < numChildren; i++) {
+      int p = children[i];
+      printf(" %d",p);
+    }
+    printf("\n");
+  }
+  DM_Plex     *mesh = (DM_Plex *)rdy->dm->data;
+  printf("****** %p\n",mesh->childSection);
+  if (mesh->childSection) PetscCall(PetscSectionView(mesh->childSection, PETSC_VIEWER_STDOUT_WORLD));
   {
     PetscSection sec;
     PetscCall(DMGetLocalSection(rdy->dm, &sec));
@@ -183,15 +204,15 @@ PetscErrorCode RDyRefine(RDy rdy) {
     PetscSectionGetNumFields(sec, &nfields);
     printf("++++++++++++++++++++++++++++++++++++\n");
     printf("About coarse DM: \n");
-    printf("nfields = %d\n", nfields);
+    printf("nfields = %d\n", (int)nfields);
     for (PetscInt f = 0; f < nfields; f++) {
       PetscInt ncomp;
       PetscCall(PetscSectionGetFieldComponents(sec, f, &ncomp));
-      printf("  field = %d; num_component = %d\n", f, ncomp);
+      printf("  field = %d; num_component = %d\n", (int)f, (int)ncomp);
       for (PetscInt c = 0; c < ncomp; c++) {
         const char *comp_name;
         PetscSectionGetComponentName(sec, f, c, &comp_name);
-        printf("    field = %d; component = %d; comp_name = %s\n", f, c, comp_name);
+        printf("    field = %d; component = %d; comp_name = %s\n", (int)f, (int)c, comp_name);
       }
     }
   }
@@ -203,15 +224,15 @@ PetscErrorCode RDyRefine(RDy rdy) {
     PetscSectionGetNumFields(sec, &nfields);
     printf("++++++++++++++++++++++++++++++++++++\n");
     printf("About refined DM: \n");
-    printf("nfields = %d\n", nfields);
+    printf("nfields = %d\n", (int)nfields);
     for (PetscInt f = 0; f < nfields; f++) {
       PetscInt ncomp;
       PetscCall(PetscSectionGetFieldComponents(sec, f, &ncomp));
-      printf("  field = %d; num_component = %d\n", f, ncomp);
+      printf("  field = %d; num_component = %d\n", (int)f, (int)ncomp);
       for (PetscInt c = 0; c < ncomp; c++) {
         const char *comp_name;
         PetscSectionGetComponentName(sec, f, c, &comp_name);
-        printf("    field = %d; component = %d; comp_name = %s\n", f, c, comp_name);
+        printf("    field = %d; component = %d; comp_name = %s\n", (int)f, (int)c, comp_name);
       }
     }
     printf("++++++++++++++++++++++++++++++++++++\n");
@@ -285,7 +306,8 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // initialize the refined solution from existing previous solution
   PetscCall(InitSolutionFromCoarseRDy(CoarseToFine, U_coarse, rdy->u_global));
-
+  PetscCall(MatDestroy(&CoarseToFine));
+ 
   // destroy the operator
   PetscCall(DestroyOperator(&rdy->operator));
 
