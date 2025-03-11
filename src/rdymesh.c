@@ -187,6 +187,7 @@ static PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.global_ids));
   PetscCall(PetscFree(cells.natural_ids));
   PetscCall(PetscFree(cells.is_owned));
+  PetscCall(PetscFree(cells.local_to_owned));
   PetscCall(PetscFree(cells.num_vertices));
   PetscCall(PetscFree(cells.num_edges));
   PetscCall(PetscFree(cells.num_neighbors));
