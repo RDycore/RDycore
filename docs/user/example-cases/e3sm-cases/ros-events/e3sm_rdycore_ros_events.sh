@@ -24,7 +24,7 @@ display_help() {
   echo "   --frontier-node-type <cpu|gpu>          To run on Frontier CPUs or GPUs"
   echo "   -N, --node  <N>                         Number of nodes (default = 1)"
   echo "   --project-id <project-id>               Project ID that will charged for the job"
-  echo "   --ros_event <1996PacN,1996MidA,2017CA>  Supported dataset name (i.e. daymet|imerg|mrms|mswep|nldas)"
+  echo "   --ros-event <1996PacN,1996MidA,2017CA>  Supported dataset name (i.e. daymet|imerg|mrms|mswep|nldas)"
   echo "   --deltaT <value>                        Temperature anomaly"
   return 0
 }  
@@ -37,7 +37,7 @@ do
     --project-id) project_id="$2"; shift ;;
     --e3sm-dir) e3sm_dir="$2"; shift ;;
     -N | --node) N="$2"; shift ;;
-    --ros_event) ros_event="$2"; shift ;;
+    --ros-event) ros_event="$2"; shift ;;
     --deltaT) deltaT="$2"; shift ;;
     -h | --help)
       display_help
@@ -119,7 +119,7 @@ if [ "$ros_event" = "1996PacN" ]; then
   start_date="1996-01-01"
 
   # E3SM-files that won't change if RDycore resolution is changed
-  atm_forcing_name=atm_forcing.L15.PN
+  atm_forcing_name=atm_forcing.L15.PN.${deltaT}degree_P_2yrs
   atm_forcing_domain_file=domain_domain.lnd.nldas.PN_c231005.nc
   domainFile=domain_ROS_1996_PN_c230427.nc
   domainPath=${data_dir}/e3sm/PN
@@ -128,12 +128,37 @@ if [ "$ros_event" = "1996PacN" ]; then
   frivinp_rtm=${data_dir}/e3sm/PN1996_jigsaw_1km_90m/MOSART_PN1996_c241106.nc
   LND2ROF=${data_dir}/e3sm/PN1996_jigsaw_1km_90m/map_ELM_to_MOSART_PN1996.nc
   ROF2LND=${LND2ROF}
+  datm_file_names=elmforc.L15.PN.${deltaT}degree
 
   # The following files will have to updated if RDycore resolution is changed
   RDYCORE_YAML_FILE=${data_dir}/rdycore/PN1996_jigsaw_1km_90m/PN1996_jigsaw_1km_90m.CriticalOutFlowBC.yaml
   RDYCORE_IC_FILE=${data_dir}/rdycore/PN1996_jigsaw_1km_90m/PN1996_jigsaw_1km_90m_manning.int32.bin
   RDYCORE_MESH_FILE=${data_dir}/rdycore/PN1996_jigsaw_1km_90m/PN1996_jigsaw_1km_90m.exo
   RDYCORE_BIN_MAP=${data_dir}/rdycore/PN1996_jigsaw_1km_90m/map_MOSART_to_RDycore_PN1996_jigsaw_1km_90m.int32.bin
+
+elif [ "$ros_event" = "2017CA" ]; then
+  supported_event=1
+
+  yr_start="2016"
+  yr_end="2016"
+  start_date="2016-01-01"
+
+  atm_forcing_name=atm_forcing.L15.CA.${deltaT}degree_P_2yrs
+  atm_forcing_domain_file=domain_L15_c230330.nc
+  domainFile=domain_ROS_2017_c230130.nc
+  domainPath=${data_dir}/e3sm/CA2017_jigsaw_1km
+  surfdataFile=surfdata_ROS_2017_c230131.nc
+  finidatFile=ROS_2017_CA_FLOOD_Optimal_future_0K_P_spinup_20240909.elm.r.2017-01-01-00000.nc
+  frivinp_rtm=${data_dir}/e3sm/CA2017_jigsaw_1km/MOSART_CA2017_c250311.nc
+  LND2ROF=${data_dir}/e3sm/CA2017_jigsaw_1km/map_ELM_to_MOSART_CA2017.nc
+  ROF2LND=${LND2ROF}
+  datm_file_names=elmforc.L15.CA.${deltaT}degree
+
+  RDYCORE_YAML_FILE=${data_dir}/rdycore/CA2017_jigsaw_1km/CA2017_jigsaw_1km.CriticalOutFlowBC.yaml
+  #RDYCORE_IC_FILE=${data_dir}/rdycore/CA2017_jigsaw_1km/
+  RDYCORE_MESH_FILE=${data_dir}/rdycore/CA2017_jigsaw_1km/CA2017_jigsaw_1km.exo
+  RDYCORE_BIN_MAP=${data_dir}/rdycore/CA2017_jigsaw_1km/map_MOSART_to_RDycore_CA2017_jigsaw_1km.int32.bin
+  RDYCORE_MANNING_FILE=${data_dir}/rdycore/CA2017_jigsaw_1km/CA2017_jigsaw_1km_manning.int32.bin
 fi
 
 if [ "$supported_event" -eq 0 ]; then
@@ -276,10 +301,10 @@ fi
 
 cp ./CaseDocs/datm.streams.txt.CLMMOSARTTEST ./user_datm.streams.txt.CLMMOSARTTEST
 chmod +rw ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.clm@/global/cfs/projectdirs/m4267/shared/data/ros/e3sm/forcing_data/atm_forcing.L15.PN@" ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@domain.lnd.nldas2_0224x0464_c110415.nc@domain_domain.lnd.nldas.PN_c231005.nc@" ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@/global/cfs/cdirs/e3sm/inputdata/atm/datm7/NLDAS@/global/cfs/projectdirs/m4267/shared/data/ros/e3sm/forcing_data//atm_forcing.L15.PN.${deltaT}degree_P_2yrs@" ./user_datm.streams.txt.CLMMOSARTTEST
-perl -w -i -p -e "s@clmforc.nldas@elmforc.L15.PN.${deltaT}degree@" ./user_datm.streams.txt.CLMMOSARTTEST
+perl -w -i -p -e "s@/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.clm@/global/cfs/projectdirs/m4267/shared/data/ros/e3sm/forcing_data/${atm_forcing_name}@" ./user_datm.streams.txt.CLMMOSARTTEST
+perl -w -i -p -e "s@domain.lnd.nldas2_0224x0464_c110415.nc@${atm_forcing_domain_file}@" ./user_datm.streams.txt.CLMMOSARTTEST
+perl -w -i -p -e "s@/global/cfs/cdirs/e3sm/inputdata/atm/datm7/NLDAS@/global/cfs/projectdirs/m4267/shared/data/ros/e3sm/forcing_data/${atm_forcing_name}@" ./user_datm.streams.txt.CLMMOSARTTEST
+perl -w -i -p -e "s@clmforc.nldas@${datm_file_names}@" ./user_datm.streams.txt.CLMMOSARTTEST
 sed -i '/ZBOT/d' ./user_datm.streams.txt.CLMMOSARTTEST
 
 
@@ -288,10 +313,16 @@ rundir=`./xmlquery RUNDIR --value`
 cd $rundir
 
 cp $RDYCORE_YAML_FILE    rdycore.yaml
-ln -s $RDYCORE_IC_FILE   .
 ln -s $RDYCORE_MESH_FILE .
 ln -s $RDYCORE_BIN_MAP   map_MOSART_to_RDycore.bin
 
+if [ "$ros_event" = "1996PacN" ]; then
+  ln -s $RDYCORE_IC_FILE .
+fi
+
+if [ "$ros_event" = "2017CA" ]; then
+  ln -s $RDYCORE_MANNING_FILE .
+fi
 
 cd ${case_dir}/${case_name}
 ./case.build
