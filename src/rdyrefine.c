@@ -8,11 +8,208 @@
 #include <private/rdysweimpl.h>
 
 #include <petsc/private/dmpleximpl.h> /*I      "petscdmplex.h"   I*/
+typedef struct {
+  PetscInt adapt; /* Flag for adaptation of the surface mesh */
+} AppCtx;
 
-#define MAX_COMP_NAME_LENGTH 20
+static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options)
+{
+  PetscFunctionBeginUser;
+  options->adapt = 1;
+
+  PetscOptionsBegin(comm, "", "Meshing Interpolation Test Options", "DMPLEX");
+  PetscCall(PetscOptionsInt("-adapt", "Number of adaptation steps mesh", "ex10.c", options->adapt, &options->adapt, NULL));
+  PetscOptionsEnd();
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode CreateDomainLabel(DM dm)
+{
+  DMLabel  label;
+  PetscInt cStart, cEnd, c;
+
+  PetscFunctionBeginUser;
+  PetscCall(DMGetCoordinatesLocalSetUp(dm));
+  PetscCall(DMCreateLabel(dm, "Cell Sets"));
+  PetscCall(DMGetLabel(dm, "Cell Sets", &label));
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+  for (c = cStart; c < cEnd; ++c) {
+    PetscReal centroid[3], volume, x, y;
+
+    PetscCall(DMPlexComputeCellGeometryFVM(dm, c, &volume, centroid, NULL));
+    x = centroid[0];
+    y = centroid[1];
+    /* Headwaters are (0.0,0.25)--(0.1,0.75) */
+    if ((x >= 0.0 && x < 0.1) && (y >= 0.25 && y <= 0.75)) {
+      PetscCall(DMLabelSetValue(label, c, 1));
+      continue;
+    }
+    /* River channel is (0.1,0.45)--(1.0,0.55) */
+    if ((x >= 0.1 && x <= 1.0) && (y >= 0.45 && y <= 0.55)) {
+      PetscCall(DMLabelSetValue(label, c, 2));
+      continue;
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *CoarseToFine, AppCtx *ctx)
+{
+  DM              dmCur = dm, last_dm;
+  DMLabel         label;
+  IS              valueIS, vIS;
+  PetscBool       hasLabel;
+  const PetscInt *values;
+  PetscReal      *volConst; /* Volume constraints for each label value */
+  PetscReal       ratio;
+  PetscInt        dim, Nv, v, cStart, cEnd, c;
+  PetscBool       adapt;
+  Mat             cToF[10]
+
+  PetscFunctionBeginUser;
+  if (!ctx->adapt) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(DMHasLabel(dmCur, "Cell Sets", &hasLabel));
+  if (!hasLabel) PetscCall(CreateDomainLabel(dmCur));
+  PetscCall(DMGetDimension(dmCur, &dim));
+  ratio = PetscPowRealInt(0.5, dim);
+  /* Get volume constraints */
+  PetscCall(DMGetLabel(dmCur, "Cell Sets", &label));
+  PetscCall(DMLabelGetValueIS(label, &vIS));
+  PetscCall(ISDuplicate(vIS, &valueIS));
+  PetscCall(ISDestroy(&vIS));
+  /* Sorting ruins the label */
+  PetscCall(ISSort(valueIS));
+  PetscCall(ISGetLocalSize(valueIS, &Nv));
+  PetscCall(ISGetIndices(valueIS, &values));
+  PetscCall(PetscMalloc1(Nv, &volConst));
+  for (v = 0; v < Nv; ++v) {
+    char opt[128];
+
+    volConst[v] = PETSC_MAX_REAL;
+    PetscCall(PetscSNPrintf(opt, 128, "-volume_constraint_%d", (int)values[v]));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, opt, &volConst[v], NULL));
+  }
+  PetscCall(ISRestoreIndices(valueIS, &values));
+  PetscCall(ISDestroy(&valueIS));
+  /* Adapt mesh iteratively */
+  PetscCall(PetscObjectSetName((PetscObject)dmCur, "coarse"));
+  PetscCall(DMViewFromOptions(dmCur, NULL, "-adapt_dm_view"));
+  adapt = PETSC_TRUE;
+  for (PetscInt ilev = 0 ; ilev < ctx->adapt && adapt && ilev < 9 ; ilev++) {
+    DM       dmAdapt;
+    DMLabel  adaptLabel;
+    PetscInt nAdaptLoc[2], nAdapt[2];
+
+    nAdaptLoc[0] = nAdaptLoc[1] = 0;
+    nAdapt[0] = nAdapt[1] = 0;
+    /* Adaptation is not preserving the domain label */
+    PetscCall(DMHasLabel(dmCur, "Cell Sets", &hasLabel));
+    if (!hasLabel) PetscCall(CreateDomainLabel(dmCur));
+    PetscCall(DMGetLabel(dmCur, "Cell Sets", &label));
+    PetscCall(DMLabelGetValueIS(label, &vIS));
+    PetscCall(ISDuplicate(vIS, &valueIS));
+    PetscCall(ISDestroy(&vIS));
+    /* Sorting directly the label's value IS would corrupt the label so we duplicate the IS first */
+    PetscCall(ISSort(valueIS));
+    PetscCall(ISGetLocalSize(valueIS, &Nv));
+    PetscCall(ISGetIndices(valueIS, &values));
+    /* Construct adaptation label */
+    PetscCall(DMLabelCreate(PETSC_COMM_SELF, "adapt", &adaptLabel));
+    PetscCall(DMPlexGetHeightStratum(dmCur, 0, &cStart, &cEnd));
+    for (c = cStart; c < cEnd; ++c) {
+      PetscReal volume, centroid[3];
+      PetscInt  value, vidx;
+
+      PetscCall(DMPlexComputeCellGeometryFVM(dmCur, c, &volume, centroid, NULL));
+      PetscCall(DMLabelGetValue(label, c, &value));
+      if (value < 0) continue;
+      PetscCall(PetscFindInt(value, Nv, values, &vidx));
+      PetscCheck(vidx >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Value %" PetscInt_FMT " for cell %" PetscInt_FMT " does not exist in label", value, c);
+      if (volume > volConst[vidx] || 1) { // enable
+        PetscCall(DMLabelSetValue(adaptLabel, c, DM_ADAPT_REFINE));
+        ++nAdaptLoc[0];
+      }
+      if (volume < volConst[vidx] * ratio && 0) { // disable
+        PetscCall(DMLabelSetValue(adaptLabel, c, DM_ADAPT_COARSEN));
+        ++nAdaptLoc[1];
+      }
+    }
+    PetscCall(ISRestoreIndices(valueIS, &values));
+    PetscCall(ISDestroy(&valueIS));
+    PetscCallMPI(MPIU_Allreduce(&nAdaptLoc, &nAdapt, 2, MPIU_INT, MPI_SUM, PetscObjectComm((PetscObject)dmCur)));
+    last_dm = dmCur;
+    adapt = PETSC_FALSE;
+    cToF[ilev] = cToF[ilev+1] = NULL;
+    if (nAdapt[0]) {
+      DM cdm,rcdm;
+      Mat CoarseToFine;
+      DMPlexTransform tr;
+      PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, cpStart, fcStart, fcEnd, r, col, i;
+      PetscScalar val = 1.0;
+      PetscCall(PetscInfo(dmCur, "Adapted mesh, marking %" PetscInt_FMT " cells for refinement, and %" PetscInt_FMT " cells for coarsening\n", nAdapt[0], nAdapt[1]));
+      PetscCall(DMAdaptLabel(dmCur, adaptLabel, &dmAdapt)); // DMRefine
+      PetscCall(DMCopyDisc(dmCur, dmAdapt));
+      PetscCall(DMGetCoordinateDM(dmCur, &cdm));
+      PetscCall(DMGetCoordinateDM(dmAdapt, &rcdm));
+      PetscCall(DMCopyDisc(cdm, rcdm));
+      //PetscCall(DMPlexTransformCreateDiscLabels(tr, dm_fine));
+      ((DM_Plex *)(dmAdapt)->data)->useHashLocation = ((DM_Plex *)dmCur->data)->useHashLocation;
+      PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "adapting"));
+      PetscCall(DMViewFromOptions(dmAdapt, NULL, "-adapt_dm_view"));
+      PetscCall(DMSetCoarseDM(dmAdapt, dmCur));
+      PetscCall(DMPlexTransformCreate(PETSC_COMM_SELF, &tr));
+      PetscCall(DMPlexTransformSetType(tr, DMPLEXREFINEREGULAR));
+      PetscCall(DMPlexTransformSetDM(tr, dmAdapt));
+      PetscCall(DMPlexTransformSetFromOptions(tr));
+      PetscCall(DMPlexTransformSetUp(tr));
+      // make interpolation matrix
+      PetscCall(DMPlexGetHeightStratum(dmCur, 0, &ccStart, &ccEnd));
+      PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
+      PetscCall(MatCreateAIJ(PETSC_COMM_WORLD, bs*(fcEnd-fcStart), bs*(ccEnd-ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, &CoarseToFine));
+      PetscCall(MatSetBlockSize(CoarseToFine,bs));
+      PetscCall(DMPlexGetChart(dmCur, &cpStart, NULL));
+      for (PetscInt fc = fcStart; fc < fcEnd; fc++) {
+        DMPolytopeType  ct, qct;
+        PetscCall(DMPlexTransformGetSourcePoint(tr, fc, &ct, &qct, &col, &r));
+        for (i = 0 ; i < bs ; i++) {
+          PetscCall(MatSetValue(CoarseToFine, bs*(fc - fcStart) + i, bs*col + i, val, INSERT_VALUES));
+        }
+      }
+      PetscCall(MatSetFromOptions(CoarseToFine));
+      PetscCall(MatAssemblyBegin(CoarseToFine, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(CoarseToFine, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatViewFromOptions(CoarseToFine, NULL, "-adapt_mat_view"));
+      PetscCall(DMPlexTransformDestroy(&tr));
+      if (last_dm != dm) PetscCall(DMDestroy(&last_dm));
+      last_dm = dmAdapt;
+      dmCur = dmAdapt;
+      cToF[ilev] = CoarseToFine;
+      adapt = PETSC_TRUE;
+    }
+    PetscCall(DMLabelDestroy(&adaptLabel));
+  }
+  PetscCall(PetscFree(volConst));
+  *dm_fine = last_dm;
+  PetscCall(PetscObjectSetName((PetscObject)*dm_fine, "refined"));
+  PetscCall(DMViewFromOptions(*dm_fine, NULL, "-adapt_dm_view"));
+  // make final interpoation matrix CoarseToFine
+  if (!cToF[0]) *CoarseToFine = NULL;
+  else if (!cToF[1]) *CoarseToFine = cToF[0];
+  else {
+    Mat AA;
+    for (int ii = 1; cToF[ii] ; ii++) {
+      PetscCall(MatMatMult(cToF[ii], cToF[ii-1], MAT_INITIAL_MATRIX, PETSC_DETERMINE, &AA));
+      PetscCall(MatViewFromOptions(cToF[ii], NULL, "-adapt_mat_view"));
+      PetscCall(MatDestroy(&cToF[ii-1]));
+      PetscCall(MatDestroy(&cToF[ii]));
+      *CoarseToFine = cToF[ii] = AA;
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt *num_regions, RDyRegion **regions) {
-  PetscFunctionBegin;
+  PetscFunctionBeginUser;
 
   *num_regions = rdy_coarse->num_regions;
 
@@ -47,52 +244,6 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Create the project matrix from the coarse grid to the fine grid. This assumes
-///        that all the cells of the coarse grid have been refined.
-/// @param dm_coarse    The coarse grid DM
-/// @param dm_fine      The fine grid DM
-/// @param CoarseToFine The projection matrix from coarse to fine grid
-/// @return 
-static PetscErrorCode CreateProjectionMatrix(DM dm_coarse, DM dm_fine, Mat *CoarseToFine) {
-  PetscFunctionBegin;
-
-  // get the local size of the vectors
-  Vec U_coarse, U_fine;
-
-  PetscCall(DMCreateGlobalVector(dm_coarse, &U_coarse));
-  PetscCall(DMCreateGlobalVector(dm_fine, &U_fine));
-
-  PetscInt row, col;
-  PetscCall(VecGetLocalSize(U_coarse, &col));
-  PetscCall(VecGetLocalSize(U_fine, &row));
-
-  PetscCall(VecDestroy(&U_coarse));
-  PetscCall(VecDestroy(&U_fine));
-
-  // now create the projection matrix
-  PetscInt d_nz = 4; // assuming all cells have been refined
-  PetscInt o_nz = 0;
-
-  PetscCall(MatCreateAIJ(PETSC_COMM_WORLD, row, col, PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, CoarseToFine));
-
-  for (PetscInt j = 0; j < col; j++) {
-    for (PetscInt i = 0; i < d_nz; i++) {
-      PetscInt row = j * d_nz + i;
-      PetscInt col = j;
-      PetscScalar val = 1.0;
-
-      PetscCall(MatSetValue(*CoarseToFine, row, col, val, INSERT_VALUES));
-    }
-  }
-  PetscCall(MatSetFromOptions(*CoarseToFine));
-  PetscCall(MatAssemblyBegin(*CoarseToFine, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(*CoarseToFine, MAT_FINAL_ASSEMBLY));
-
-  if (0) MatView(*CoarseToFine, PETSC_VIEWER_STDOUT_WORLD);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// @brief Project the initial condition from the coarse grid to the fine grid using
 ///        a projection matrix.
 /// @param CoarseToFine Projection matrix from coarse to fine grid
@@ -100,7 +251,7 @@ static PetscErrorCode CreateProjectionMatrix(DM dm_coarse, DM dm_fine, Mat *Coar
 /// @param X_fine
 /// @return 
 static PetscErrorCode InitSolutionFromCoarseRDy(Mat CoarseToFine, Vec X_coarse, Vec X_fine) {
-  PetscFunctionBegin;
+  PetscFunctionBeginUser;
 
   PetscInt n_local_coarse, ndof_coarse;
   PetscCall(VecGetLocalSize(X_coarse, &n_local_coarse));
@@ -160,43 +311,22 @@ extern PetscErrorCode InitDirichletBoundaryConditions(RDy rdy);
 extern PetscErrorCode InitSourceConditions(RDy rdy);
 
 PetscErrorCode RDyRefine(RDy rdy) {
-  PetscFunctionBegin;
-
-  // mark the grid cells for refinement
-  PetscInt cStart, cEnd, parent;
-  DMLabel  label;
-
-  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &cStart, &cEnd));
-  PetscCall(DMLabelCreate(PETSC_COMM_SELF, "adapt", &label));
-  for (PetscInt c = cStart; c < cEnd; c++) {
-    PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
-  }
-
-  // create a refined DM
+  AppCtx user;
+  Mat CoarseToFine;
   DM dm_fine;
-  PetscCall(DMAdaptLabel(rdy->dm, label, &dm_fine));
-  PetscCall(DMCopyDisc(rdy->dm, dm_fine));
+  Vec U_coarse;
+  PetscInt ndof_coarse;
+  PetscFunctionBeginUser;
+  PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
+  PetscCall(ProcessOptions(PETSC_COMM_WORLD, &user));
+  /* Adapt */
+  PetscCall(AdaptMesh(rdy->dm, ndof_coarse, &dm_fine, &CoarseToFine, &user));
+  PetscCall(DMLocalizeCoordinates(dm_fine));
+  /* PetscCall(PetscObjectSetName((PetscObject)dm_fine, "Mesh")); */
+  /* PetscCall(DMSetFromOptions(dm_fine)); */
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
   PetscCall(DMGetCoordinatesLocalSetUp(dm_fine));
-  if (1) {
-    DM refTree;
-    PetscCall(DMPlexGetReferenceTree(rdy->dm, &refTree));
-    PetscCall(DMPlexSetReferenceTree(dm_fine, refTree));
-  }
-  for (parent = cStart; parent < cEnd; parent++) {
-    PetscInt        numChildren, i;
-    const PetscInt *children; printf("%d)",(int)parent);
-    PetscCall(DMPlexGetTreeChildren(rdy->dm, parent, &numChildren, &children));
-    for (i = 0; i < numChildren; i++) {
-      int p = children[i];
-      printf(" %d",p);
-    }
-    printf("\n");
-  }
-  DM_Plex     *mesh = (DM_Plex *)rdy->dm->data;
-  printf("****** %p\n",mesh->childSection);
-  if (mesh->childSection) PetscCall(PetscSectionView(mesh->childSection, PETSC_VIEWER_STDOUT_WORLD));
   {
     PetscSection sec;
     PetscCall(DMGetLocalSection(rdy->dm, &sec));
@@ -260,13 +390,8 @@ PetscErrorCode RDyRefine(RDy rdy) {
   // PetscCall(DMCreateInterpolation(rdy->dm, dm_fine, &A, &Ascale));
 
   // make a copy of the old solution
-  Vec U_coarse;
   PetscCall(VecDuplicate(rdy->u_global, &U_coarse));
   PetscCall(VecCopy(rdy->u_global, U_coarse));
-
-  // create the mapping from coarse to fine
-  Mat CoarseToFine;
-  PetscCall(CreateProjectionMatrix(rdy->dm, dm_fine, &CoarseToFine));
 
   // create data structure for the refined regions from existing coarse regions
   RDyRegion *refined_regions = NULL;
