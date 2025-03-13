@@ -1,0 +1,1648 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="index.html">
+      
+      
+        <link rel="next" href="sediment.html">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.8">
+    
+    
+      
+        <title>Shallow Water Equations - RDycore: A River / Flooding dynamical core for E3SM</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#shallow-water-equations" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RDycore: A River / Flooding dynamical core for E3SM
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Shallow Water Equations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RDycore: A River / Flooding dynamical core for E3SM
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/input.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    YAML Input Specification
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/mms.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MMS Driver
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    RDycore Example Cases
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            RDycore Example Cases
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/dam-break/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Idealized dam break problem
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5_3" id="__nav_2_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Hurricane Harvey
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            Hurricane Harvey
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    With MRMS rainfall and outflow BC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    With average rainfall and ocean BC
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    E3SM-RDycore Example Cases
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            E3SM-RDycore Example Cases
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hurricane Harvey
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Developer Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Developer Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/development.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Development Process
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/organization.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Code Structure and Organization
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/style.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Style Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/tools.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer Tools
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/ceed.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    SWE implementation using libCEED
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Theory Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Theory Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Shallow Water Equations
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="swe.html" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Shallow Water Equations
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-discretization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Spatial Discretization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spatial Discretization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#boundary-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Boundary conditions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluating-normal-fluxes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Evaluating normal fluxes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      Source terms
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Source terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#net-runoff-production-mathbfs_r" class="md-nav__link">
+    <span class="md-ellipsis">
+      Net runoff production \(\mathbf{S}_r\)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bed-elevation-slope-term-mathbfs_b" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bed elevation slope term \(\mathbf{S}_b\)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bed-friction-roughness-term-mathbfs_f" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bed friction roughness term \(\mathbf{S}_f\)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temporal-discretization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Temporal Discretization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sediment.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sediment Transport
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-discretization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Spatial Discretization
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spatial Discretization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#boundary-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Boundary conditions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluating-normal-fluxes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Evaluating normal fluxes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      Source terms
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Source terms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#net-runoff-production-mathbfs_r" class="md-nav__link">
+    <span class="md-ellipsis">
+      Net runoff production \(\mathbf{S}_r\)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bed-elevation-slope-term-mathbfs_b" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bed elevation slope term \(\mathbf{S}_b\)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bed-friction-roughness-term-mathbfs_f" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bed friction roughness term \(\mathbf{S}_f\)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temporal-discretization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Temporal Discretization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="shallow-water-equations">Shallow Water Equations</h1>
+<p>The two-dimensional shallow water equations can be written in the conservative
+form</p>
+<div class="arithmatex">\[
+\frac{\partial\mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x} + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f \tag{1}\label{1}
+\]</div>
+<p>Here,</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{U}
+  =
+  \begin{bmatrix}
+  h \\[.5em]
+  hu \\[.5em]
+  hv
+  \end{bmatrix},
+\end{align}\]</div>
+<p>is the <em>solution vector</em>, with components</p>
+<ul>
+<li><span class="arithmatex">\(h\)</span>, the flow depth</li>
+<li><span class="arithmatex">\(u\)</span>, the vertically-averaged velocity in the <span class="arithmatex">\(x\)</span> direction</li>
+<li><span class="arithmatex">\(v\)</span>, the vertically-averaged velocity in the <span class="arithmatex">\(y\)</span> direction</li>
+</ul>
+<p>The terms <span class="arithmatex">\(\mathbf{E}\)</span> and <span class="arithmatex">\(\mathbf{G}\)</span> on the left hand side of <span class="arithmatex">\(\eqref{1}\)</span> are
+the <em>flux vectors</em> in the <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial dimensions:</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{E}
+  =
+  \begin{bmatrix}
+  hu \\[.5em]
+  hu^2 + \frac{1}{2}gh^2 \\[.5em]
+  huv
+  \end{bmatrix},
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{G}
+  =
+  \begin{bmatrix}
+  hv \\[.5em]
+  huv \\[.5em]
+  hv^2 + \frac{1}{2}gh^2
+  \end{bmatrix},
+\end{align}\]</div>
+<p>where <span class="arithmatex">\(g\)</span> is the acceleration due to gravity.</p>
+<p>The three source terms on the right hand side of <span class="arithmatex">\(\eqref{1}\)</span> represent
+contributions to <span class="arithmatex">\(\mathbf{U}\)</span> from</p>
+<ul>
+<li><span class="arithmatex">\(\mathbf{S}_r\)</span>, <em>net runoff (water) production</em></li>
+<li><span class="arithmatex">\(\mathbf{S}_b\)</span>, <em>bed elevation slope</em></li>
+<li><span class="arithmatex">\(\mathbf{S}_f\)</span>, <em>bed friction roughness</em>.</li>
+</ul>
+<p>These source terms are</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{S}_r
+  =
+  \begin{bmatrix}
+  Q \\[.5em]
+  0 \\[.5em]
+  0
+  \end{bmatrix},
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{S}_b
+  =
+  \begin{bmatrix}
+  0 \\[.5em]
+  -gh\frac{\partial z}{\partial x} \\[.5em]
+  -gh\frac{\partial z}{\partial y}
+  \end{bmatrix},
+\end{align}\]</div>
+<p>and</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{S}_f
+  =
+  \begin{bmatrix}
+  0 \\[.5em]
+  - C_D u \sqrt{u^2 + v^2} \\[.5em]
+  - C_D v \sqrt{u^2 + v^2}
+  \end{bmatrix}.
+\end{align}\]</div>
+<p>It is sometimes convenient to interpret the terms involving <span class="arithmatex">\(\mathbf{E}\)</span> and
+<span class="arithmatex">\(\mathbf{G}\)</span> as the (two-dimensional) divergence of a multi-component spatial
+vector called the <em>flux function</em> <span class="arithmatex">\(\mathbf{\vec{F}}\)</span>.</p>
+<div class="arithmatex">\[
+\frac{\partial\mathbf{U}}{\partial t} + \vec{\nabla}\cdot\mathbf{\vec{F}}(\mathbf{U}) = \mathbf{S}(\mathbf{U})\tag{2}\label{2}
+\]</div>
+<p>where <span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y) = (\mathbf{E}, \mathbf{G})\)</span>.</p>
+<p>We have written <span class="arithmatex">\(\mathbf{\vec{F}}\)</span> and <span class="arithmatex">\(\mathbf{S}\)</span> in <span class="arithmatex">\(\eqref{2}\)</span> in a way that
+emphasizes that these functions depend on the solution vector <span class="arithmatex">\(\mathbf{U}\)</span>.</p>
+<h2 id="spatial-discretization">Spatial Discretization</h2>
+<p>We can rewrite the shallow water equations in a form more convenient for
+numerical treatment by defining a computational domain <span class="arithmatex">\(\Omega\)</span> bounded by a
+piecewise linear closed curve <span class="arithmatex">\(\Gamma = \partial\Omega\)</span>.</p>
+<p>We create a discrete representation by partitioning <span class="arithmatex">\(\Omega\)</span> into disjoint
+cells, with <span class="arithmatex">\(\Omega_i\)</span> representing cell <span class="arithmatex">\(i\)</span>. The boundary of cell <span class="arithmatex">\(i\)</span>, written
+<span class="arithmatex">\(\partial\Omega_i\)</span>, is the set of faces separating it from its neighboring
+cells. Using this notation, we obtain a discrete set of equations for the
+solution in cell <span class="arithmatex">\(i\)</span> by integrating <span class="arithmatex">\(\eqref{1}\)</span> over <span class="arithmatex">\(\Omega_i\)</span> and using
+Green's theorem:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\int_{\Omega_i} \left[ \frac{\partial\mathbf{E}}{\partial x} +
+\frac{\partial\mathbf{G}}{\partial y} \right] d\Omega_i &amp;=&amp;
+\int_{\Omega_i} \mathbf{S} d\Omega_i \nonumber\\
+\frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\oint_{\partial\Omega_i} \left( \mathbf{E}~dy - \mathbf{G}~dx \right) &amp;=&amp;
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{3}\label{3}
+\end{eqnarray}\]</div>
+<p>This equation can be used to approximate discontinuous flows, because all
+quantities appear under integrals. By contrast, <span class="arithmatex">\(\eqref{1}\)</span> cannot be used
+where derivatives of <span class="arithmatex">\(\mathbf{U}\)</span> don't exist.</p>
+<p>We can interpret the line integral in <span class="arithmatex">\(\eqref{3}\)</span> in terms of the flux
+<span class="arithmatex">\(\mathbf{\vec{F}} = (\mathbf{F}_x, \mathbf{F}_y)\)</span> between a cell <span class="arithmatex">\(i\)</span> and its
+neighboring cells.</p>
+<div class="arithmatex">\[
+ \frac{\partial}{\partial t} \int_{\Omega_i} \mathbf{U} d\Omega_i +
+\oint_{\partial\Omega_i} \mathbf{\vec{F}} \cdot \vec{n}~dl =
+\int_{\Omega_i} \mathbf{S} d\Omega_i \tag{4}\label{4}
+\]</div>
+<p>Here, we have defined a unit normal vector <span class="arithmatex">\(\vec{n} = (n_x, n_y)\)</span>
+pointing outward along the cell boundary <span class="arithmatex">\(\partial\Omega_i\)</span>. <span class="arithmatex">\(\eqref{4}\)</span> is a
+"surface integral" with a differential arc length <span class="arithmatex">\(dl\)</span> integrated over the
+boundary of cell <span class="arithmatex">\(i\)</span>. One obtains this surface integral by integrating <span class="arithmatex">\(\eqref{2}\)</span>
+over the domain <span class="arithmatex">\(\Omega\)</span> and applying the (two-dimensional) divergence theorem
+to the flux term.</p>
+<p>In the rest of this section, we use the flux form <span class="arithmatex">\(\eqref{4}\)</span> of the shallow
+water equations.</p>
+<p>We can obtain a finite volume method for these equations by defining
+<em>horizontally-averaged</em> quantities for flow depth and velocities:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+h_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} h d\Omega_i \\
+u_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} u d\Omega_i \\
+v_i &amp;=&amp; \frac{1}{A_i}\int_{\Omega_i} v d\Omega_i
+\end{eqnarray}\]</div>
+<p>where <span class="arithmatex">\(A_i = \int_{\Omega_i}d\Omega_i\)</span> is the area enclosed within cell <span class="arithmatex">\(i\)</span>. We
+also introduce the <em>horizontally-averaged solution vector</em></p>
+<div class="arithmatex">\[
+\mathbf{U}_i = [h_i, h_i u_i, h_i v_i]^T
+\]</div>
+<p>and the <em>horizontally-averaged source vector</em></p>
+<div class="arithmatex">\[
+\mathbf{S}_i = \frac{1}{A_i}\int_{\Omega_i} \left(\mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f\right) d\Omega_i.
+\]</div>
+<p>Finally, we define the <em>face-averaged normal flux vector</em> between cell <span class="arithmatex">\(i\)</span> and
+an adjoining cell <span class="arithmatex">\(j\)</span>:</p>
+<div class="arithmatex">\[
+\mathbf{F}_{ij} = \frac{1}{l_{ij}}\int_{\partial\Omega_i\bigcap\partial\Omega_j}\mathbf{\vec{F}}\cdot\vec{n}~dl \tag{5}\label{5}
+\]</div>
+<p>where <span class="arithmatex">\(l_{ij}\)</span> is the length of the face connecting cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>.</p>
+<p>With these definitions, the shallow water equations in cell <span class="arithmatex">\(i\)</span> are</p>
+<div class="arithmatex">\[
+\frac{\partial\mathbf{U}_i}{\partial t} + \sum_j\mathbf{F}_{ij} l_{ij} = \mathbf{S}_i, \tag{6}\label{6}
+\]</div>
+<p>where the index <span class="arithmatex">\(j\)</span> in each term of the sum refers to a neighboring cell of cell <span class="arithmatex">\(i\)</span>.</p>
+<h3 id="boundary-conditions">Boundary conditions</h3>
+<p>To incorporate boundary conditions, we partition the domain boundary <span class="arithmatex">\(\Gamma\)</span>
+into disjoint line segments, each of which represents a <em>boundary face</em>
+<span class="arithmatex">\(\Gamma_i\)</span>. Every cell <span class="arithmatex">\(j\)</span> that touches the boundary <span class="arithmatex">\(\Gamma\)</span> has at least one
+boundary face. Such a cell is a <em>boundary cell</em>. The boundary <span class="arithmatex">\(\Gamma\)</span> consists
+entirely of faces of boundary cells.</p>
+<p>In dealing with boundary conditions, we must distinguish between the faces a
+boundary cell <span class="arithmatex">\(i\)</span> <em>does</em> and <em>does not</em> share with the boundary <span class="arithmatex">\(\Gamma\)</span>:</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\frac{\partial\mathbf{U}_i}{\partial t} +
+\sum_{j: \partial\Omega_j\subset\Gamma}\mathbf{F}_{ij}^{\Gamma} l_{ij} &amp;+&amp;
+\sum_{j: \partial\Omega_j\not\subset\Gamma}\mathbf{F}_{ij} l_{ij}
+&amp;= \mathbf{S}_i. \tag{7}\label{7} \\
+\text{(boundary)}&amp; &amp;\text{(interior)} &amp;
+\end{eqnarray}\]</div>
+<p>To enforce boundary conditions, we must compute the effective boundary fluxes
+<span class="arithmatex">\(\mathbf{F}_{ij}^{\Gamma}\)</span> that appear in the first sum in <span class="arithmatex">\(\eqref{7}\)</span>. These
+boundary fluxes have specific forms depending on their respective boundary
+conditions.</p>
+<h3 id="evaluating-normal-fluxes">Evaluating normal fluxes</h3>
+<p>We have reduced the spatial discretization of our finite volume method to the
+calculation of normal fluxes between neighboring cells and on boundary faces.
+The normal flux function is</p>
+<div class="arithmatex">\[\begin{equation}
+\mathbf{\vec{F}}\cdot\vec{n} = \mathbf{E} n_x + \mathbf{G} n_y.
+\end{equation}\]</div>
+<p>We can evaluate <span class="arithmatex">\(\mathbf{F}_{ij} \approx \mathbf{\vec{F}}\cdot\vec{n}\)</span>, the
+approximate normal flux at a face shared shared by <em>interior cells</em> <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>,
+by solving the relevant Riemann problem using Roe's method. If we designate
+<span class="arithmatex">\(\phi\)</span> as the angle between <span class="arithmatex">\(\vec{n}\)</span> and the <span class="arithmatex">\(x\)</span> axis and adopt <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>
+subscripts for quantities respectively in cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span>, we can approximate
+the normal flux by the expression</p>
+<div class="arithmatex">\[\begin{equation}
+\mathbf{F}_{ij} = \frac{1}{2} \left( \mathbf{\vec{F}}_i + \mathbf{\vec{F}}_j - \mathbf{\hat{R}} |\mathbf{\hat{\Lambda}| \mathbf{\Delta}\hat{V}} \right)
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\Delta f\)</span> is the variation of the quantity of <span class="arithmatex">\(f\)</span> along a face. In
+particular,</p>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{R}
+  =
+  \begin{bmatrix}
+  1 &amp; 0 &amp; 1  \\[.5em]
+  \hat{u} - \hat{a}\cos\phi &amp; -\sin\phi &amp; \hat{u} + \hat{a}\cos\phi  \\[.5em]
+  \hat{v} - \hat{a}\sin\phi &amp;  \cos\phi &amp; \hat{v} + \hat{a}\sin\phi
+  \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  \mathbf{\Delta\hat{V}}
+  =
+  \begin{bmatrix}
+  \frac{1}{2} \left( \Delta h - \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right) \\[.5em]
+  \hat{h}u_\perp \\[.5em]
+  \frac{1}{2} \left( \Delta h + \frac{\hat{h}\Delta u_\parallel}{\hat{a}} \right)
+  \end{bmatrix}
+\end{align}\]</div>
+<div class="arithmatex">\[\begin{align}
+  |\mathbf{\hat{\Lambda}}|
+  =
+  \begin{bmatrix}
+  | \hat{u}_\parallel - \hat{a} |^* &amp; 0 &amp; 0  \\[.5em]
+  0                                 &amp; |\hat{u}_\parallel| &amp; 0 \\[.5em]  
+  0                                 &amp;                     &amp; | \hat{u}_\parallel + \hat{a} |^* 
+  \end{bmatrix}
+\end{align}\]</div>
+<p>where</p>
+<div class="arithmatex">\[\begin{eqnarray}
+  \hat{h} &amp; = &amp; \sqrt{h_i h_j} \\
+  \hat{u} &amp; = &amp; \frac{ \sqrt{h_i} u_i + \sqrt{h_j} u_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{v} &amp; = &amp; \frac{ \sqrt{h_i} v_i + \sqrt{h_j} v_j}{ \sqrt{h_i} + \sqrt{h_j}} \\
+  \hat{a} &amp; = &amp; \sqrt{\frac{g}{2} \left( h_i + h_j \right)},
+\end{eqnarray}\]</div>
+<p><span class="arithmatex">\(\Delta f = f_j - f_i\)</span> is the change in the quantity <span class="arithmatex">\(f\)</span> moving from cell
+<span class="arithmatex">\(i\)</span> to <span class="arithmatex">\(j\)</span>, and <span class="arithmatex">\(w_\parallel = \vec{w}\cdot\vec{n}\)</span> and
+<span class="arithmatex">\(w_\perp = |\vec{w} - w_\parallel \vec{n}|\)</span> for any vector <span class="arithmatex">\(\vec{w}\)</span>.</p>
+<p>We have used asterisks in the expression for <span class="arithmatex">\(|\mathbf{\hat{\Lambda}}|\)</span> to
+indicate that the eigenvalues 
+<span class="arithmatex">\(\hat{\lambda}_1 = \hat{u}_\perp - \hat{a}\)</span> and
+<span class="arithmatex">\(\hat{\lambda}_3 = \hat{u}_\perp + \hat{a}\)</span> 
+must be adjusted, since Roe's method does not provide the correct flux for
+critical flow.</p>
+<div class="arithmatex">\[\begin{eqnarray}
+  |\hat{\lambda}|_1 &amp;=&amp; \frac{\hat{\lambda}^2_1}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_1 &lt; \Delta \lambda/2$} \\
+  |\hat{\lambda}|_3 &amp;=&amp; \frac{\hat{\lambda}^2_2}{\Delta \lambda} + \frac{\Delta \lambda}{4} \mbox{$~$ if $~ -\Delta \lambda/2 &lt; \hat{\lambda}_3 &lt; \Delta \lambda/2$}
+\end{eqnarray}\]</div>
+<h3 id="source-terms">Source terms</h3>
+<p>Recall that there are three source terms <span class="arithmatex">\(\mathbf{S}_r\)</span>, <span class="arithmatex">\(\mathbf{S}_b\)</span>, and
+<span class="arithmatex">\(\mathbf{S}_f\)</span>. In this section, we write the source terms for the momentum
+vector as <span class="arithmatex">\(\mathbf{S}_b = [0, \mathbf{\vec{S}}_b]^T\)</span> and <span class="arithmatex">\(\mathbf{S}_f = [0, \mathbf{\vec{S}}_f]^T\)</span>
+because their second and third components correspond to the spatial components
+of the momentum vector.</p>
+<h4 id="net-runoff-production-mathbfs_r">Net runoff production <span class="arithmatex">\(\mathbf{S}_r\)</span></h4>
+<p>This source term contributes only to height of the water, and is expressed as
+<span class="arithmatex">\(\mathbf{S}_r = [Q_r, 0, 0]^T\)</span>, where <span class="arithmatex">\(Q_r\)</span>, <em>the net runoff production</em>,
+with units of water height per unit time, is</p>
+<ul>
+<li>a constant</li>
+<li>a spatially homogeneous time-dependent function <span class="arithmatex">\(Q_r(t)\)</span>, or</li>
+<li>a spatially heterogeneous time-dependent function <span class="arithmatex">\(Q_r(x, y, t)\)</span>.</li>
+</ul>
+<p>In any case, we can approximate the integral of this term using the mean value
+theorem of calculus:</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} S_r~d\Omega_i = \int_{\Omega_i} [Q_r, 0, 0]^T~d\Omega \approx [Q_r A_i, 0, 0]^T,
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(A_i\)</span> is the area of cell <span class="arithmatex">\(i\)</span>.</p>
+<h4 id="bed-elevation-slope-term-mathbfs_b">Bed elevation slope term <span class="arithmatex">\(\mathbf{S}_b\)</span></h4>
+<p>This term represents the force of gravity on the water and can be
+approximated as</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} \mathbf{\vec{S}}_b~d\Omega_i = \int_{\Omega_i} -gh\nabla z~d\Omega_i \approx -gh\left(\overline{\frac{\partial z}{\partial x}}, \overline{\frac{\partial z}{\partial y}}\right) A_i
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(\nabla z = (\partial z/\partial x, \partial z/\partial y)\)</span> is the two-dimensional
+gradient of the bed elevation function <span class="arithmatex">\(z\)</span>.</p>
+<p>For a triangular grid cell,</p>
+<div class="arithmatex">\[\begin{eqnarray}
+\overline{\frac{\partial z}{\partial x}} &amp;=&amp; \frac{(y_2 - y_0)(z_1 - z_0) - (y_1 - y_0)(z_2 - z_0)}{(y_2 - y_0)(x_1 - x_0) - (y_1 - y_0)(x_2 - x_0)} \\
+\overline{\frac{\partial z}{\partial y}} &amp;=&amp; \frac{(x_2 - x_0)(z_1 - z_0) - (x_1 - x_0)(z_2 - z_0)}{(x_2 - y_0)(x_1 - x_0) - (x_1 - y_0)(y_2 - y_0)}.
+\end{eqnarray}\]</div>
+<h4 id="bed-friction-roughness-term-mathbfs_f">Bed friction roughness term <span class="arithmatex">\(\mathbf{S}_f\)</span></h4>
+<p>Like the runoff term, this term involves only quantities within a single cell
+and can be approximated by the mean value theorem:</p>
+<div class="arithmatex">\[\begin{equation}
+\int_{\Omega_i} \mathbf{\vec{S}}_f~d\Omega_i = \int_{\Omega_i} C_D \vec{u} \sqrt{u^2 + v^2}~d\Omega_i \approx C_D \vec{u}_i \sqrt{u_i^2 + v_i^2} A_i
+\end{equation}\]</div>
+<p>where <span class="arithmatex">\(C_D = g n_i^2 h_i^{-1/3}\)</span> and <span class="arithmatex">\(\vec{u}_i = (u, v)\)</span>
+are, respectively, the drag coefficient and the flow velocity vector in cell <span class="arithmatex">\(i\)</span>.
+The <span class="arithmatex">\(x\)</span> and <span class="arithmatex">\(y\)</span> spatial components of <span class="arithmatex">\(\mathbf{\vec{S}}_f\)</span> contribute to the
+second and third components of the source term.</p>
+<h2 id="temporal-discretization">Temporal Discretization</h2>
+<p>The above spatial discretization produces a "semi-discrete" system of equations
+that can be integrated using various methods for solving systems of ordinary
+differential equations. The following methods of integration are provided by
+PETSc and supported for RDycore:</p>
+<ul>
+<li><a href="https://petsc.org/release/manualpages/TS/TSEULER/">Forward Euler</a></li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li>
+<p><a href="https://ascelibrary.org/doi/10.1061/%28ASCE%290733-9429%282002%29128%3A3%28289%29">Bradford, S. F., &amp; Sanders, B. F. (2002). Finite-volume model for shallow-water flooding of arbitrary topography. Journal of hydraulic engineering, 128(3), 289-298.</a></p>
+</li>
+<li>
+<p><a href="https://www.sciencedirect.com/science/article/pii/S0309170811002211?via%3Dihub">Kim, J., Warnock, A., Ivanov, V. Y., &amp; Katopodes, N. D. (2012).
+Coupled modeling of hydrologic and hydrodynamic processes including
+overland and channel flow. Advances in water resources, 37, 104-126.</a></p>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+        <script src="../javascript/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
