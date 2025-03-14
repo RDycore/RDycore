@@ -64,7 +64,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscReal       ratio;
   PetscInt        dim, Nv, v, cStart, cEnd, c;
   PetscBool       adapt;
-  Mat             cToF[10]
+  Mat             cToF[10];
 
   PetscFunctionBeginUser;
   if (!ctx->adapt) PetscFunctionReturn(PETSC_SUCCESS);
