@@ -50,12 +50,17 @@ elm_domain_file=domain_mid_atlantic_270x471_c250310.nc
 mosart_file=MOSART_delaware_113505_c250311.nc
 e2m_map_file=map_ELM_to_MOSART_delaware_113505_c250311.nc
 m2e_map_file=map_MOSART_to_ELM_delaware_113505_c250311.nc
-m2r_map_file=map_MOSART_to_RDycore_delaware_113505.int32.bin
 
+m2r_map_file=map_MOSART_to_RDycore_delaware_113505.int32.bin
 rdycore_yaml_file=Delaware.CriticalOutflowBC.yaml
 rdycore_ic_file=delaware.ic.int32.bin
 rdycore_mesh_file=delaware.exo
 
+m2r_map_file=map_MOSART_to_RDycore_delaware_30m_113505.int32.bin
+rdycore_yaml_file=Delaware_30m.OceanDirichletBC.yaml
+rdycore_ic_file=delaware_30m.ic.int32.bin
+rdycore_mesh_file=delaware_30m.v3.1.0.h5
+rdycore_mannings_file=delaware_30m_manning.int32.bin
 
 if [ "$mach" == "pm-cpu" ]; then 
 
@@ -241,6 +246,7 @@ cd $rundir
 cp $rdycore_data_dir/inputdeck/$rdycore_yaml_file rdycore.yaml
 ln -s $rdycore_data_dir/ic/$rdycore_ic_file  .
 ln -s $rdycore_data_dir/mesh/$rdycore_mesh_file .
+ln -s $rdycore_data_dir/mannings/$rdycore_mannings_file .
 ln -s $elm_data_dir/$m2r_map_file map_MOSART_to_RDycore.bin
 
 cp $elm_data_dir/map.${elm_delaware_id}.*.nc
