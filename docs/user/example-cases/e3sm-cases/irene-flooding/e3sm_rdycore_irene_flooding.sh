@@ -59,7 +59,7 @@ rdycore_mesh_file=delaware.exo
 m2r_map_file=map_MOSART_to_RDycore_delaware_30m_113505.int32.bin
 rdycore_yaml_file=Delaware_30m.OceanDirichletBC.yaml
 rdycore_ic_file=delaware_30m.ic.int32.bin
-rdycore_mesh_file=delaware_30m.v3.1.0.h5
+rdycore_mesh_file=delaware_30m.int32.c250316.h5
 rdycore_mannings_file=delaware_30m_manning.int32.bin
 
 if [ "$mach" == "pm-cpu" ]; then 
