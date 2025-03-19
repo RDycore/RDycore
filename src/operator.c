@@ -1113,7 +1113,6 @@ static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const ch
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
   PetscCallCEED(CeedVectorRestoreArray(vec, &domain_data->array_pointer));
 
-  *domain_data = (OperatorData){0};
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1144,7 +1143,6 @@ static PetscErrorCode RestorePetscSourceOperatorDomainData(Operator *op, Vec vec
     }
   }
   PetscCall(VecRestoreArray(vec, &data));
-  *domain_data = (OperatorData){0};
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
