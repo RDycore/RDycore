@@ -126,7 +126,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
       PetscCall(PetscFindInt(value, Nv, values, &vidx));
       PetscCheck(vidx >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Value %" PetscInt_FMT " for cell %" PetscInt_FMT " does not exist in label", value, c);
       if (volume > volConst[vidx] || 1) { // enable
-        PetscCall(DMLabelSetValue(adaptLabel, c, DM_ADAPT_REFINE));
+        //PetscCall(DMLabelSetValue(adaptLabel, c, DM_ADAPT_REFINE));
         ++nAdaptLoc[0];
       }
       if (volume < volConst[vidx] * ratio && 0) { // disable
