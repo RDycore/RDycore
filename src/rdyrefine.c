@@ -93,7 +93,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscCall(ISDestroy(&valueIS));
   /* Adapt mesh iteratively */
   PetscCall(PetscObjectSetName((PetscObject)dmCur, "coarse"));
-  PetscCall(DMViewFromOptions(dmCur, NULL, "-adapt_dm_view"));
+  PetscCall(DMViewFromOptions(dmCur, NULL, "-adapt_pre_dm_view"));
   adapt = PETSC_TRUE;
   for (PetscInt ilev = 0 ; ilev < ctx->adapt && adapt && ilev < 9 ; ilev++) {
     DM       dmAdapt;
@@ -155,8 +155,12 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
       //PetscCall(DMPlexTransformCreateDiscLabels(tr, dm_fine));
       ((DM_Plex *)(dmAdapt)->data)->useHashLocation = ((DM_Plex *)dmCur->data)->useHashLocation;
       PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "adapting"));
-      PetscCall(DMViewFromOptions(dmAdapt, NULL, "-adapt_dm_view"));
+
+      char opt[128];
+      PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view_%d", (int)ilev));
+      PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
       PetscCall(DMSetCoarseDM(dmAdapt, dmCur));
+      // create the transformation
       PetscCall(DMPlexTransformCreate(PETSC_COMM_SELF, &tr));
       PetscCall(DMPlexTransformSetType(tr, DMPLEXREFINEREGULAR));
       PetscCall(DMPlexTransformSetDM(tr, dmAdapt));
@@ -191,7 +195,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscCall(PetscFree(volConst));
   *dm_fine = last_dm;
   PetscCall(PetscObjectSetName((PetscObject)*dm_fine, "refined"));
-  PetscCall(DMViewFromOptions(*dm_fine, NULL, "-adapt_dm_view"));
+  PetscCall(DMViewFromOptions(*dm_fine, NULL, "-adapt_post_dm_view"));
   // make final interpoation matrix CoarseToFine
   if (!cToF[0]) *CoarseToFine = NULL;
   else if (!cToF[1]) *CoarseToFine = cToF[0];
