@@ -26,7 +26,7 @@ display_help() {
     echo "For Frontier (--mach frontier): "
     echo "  --config 1: Without debugging, 64bit indices, and HDF5 1.14.3"
     echo "  --config 2: With debugging, 64bit indices, and HDF5 1.14.3"
-    echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.12.2.1"
+    echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.14.3"
     echo
     echo "For Compy (--mach compy): "
     echo "  --config 3: Without debugging, 32bit indices, and HDF5 1.10.5"
@@ -87,15 +87,15 @@ elif [ "$mach" = "pm-gpu" ]; then
 
 elif [ "$mach" = "frontier"  ]; then
 
-  MODULE_FILE=$DIR/modules.frontier.gnugpu
-  export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc_v3.22.0
+  MODULE_FILE=$DIR/modules.frontier.craygnu-mphipcc
+  export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc_v3.22.4
 
   if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=gnugpu-hdf5_1_14_3-opt-64bit-gcc-12-3-0-v3.22.0
+      export PETSC_ARCH=craygnu-mphipcc-hdf5_1_14_3-opt-64bit-gcc-13-3-0-v3.22.4
   elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=gnugpu-hdf5_1_14_3-debug-64bit-gcc-12-3-0-v3.22.0
+      export PETSC_ARCH=craygnu-mphipcc-hdf5_1_14_3-debug-64bit-gcc-13-3-0-v3.22.4
   elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=gnugpu-opt-32bit-gcc-12-3-0-v3.22.0
+      export PETSC_ARCH=craygnu-mphipcc-opt-32bit-gcc-13-3-0-v3.22.4
   fi
 
 #elif [ "$mach" = "aurora"  ]; then
@@ -142,9 +142,19 @@ echo ""
 echo "  source $MODULE_FILE"
 echo "  export PETSC_DIR=$PETSC_DIR"
 echo "  export PETSC_ARCH=$PETSC_ARCH"
+if [ "$mach" = "frontier" ]; then
+echo "  "
+echo "  # Additionally, updating PKG_CONFIG_PATH on Frontier via:"
+echo "  export PKG_CONFIG_PATH=\$PETSC_DIR/\$PETSC_ARCH/lib/pkgconfig:\$PKG_CONFIG_PATH"
+echo "  "
+fi
 echo ""
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 source $MODULE_FILE
 export PETSC_DIR=$PETSC_DIR
 export PETSC_ARCH=$PETSC_ARCH
+
+if [ "$mach" = "frontier" ]; then
+  export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"
+fi
 
