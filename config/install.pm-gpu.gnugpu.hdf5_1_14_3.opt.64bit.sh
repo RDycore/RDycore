@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# source modules.pm-gpu.gnugpu
+# source modules.pm-cpu.gnu
 
 ./configure \
 --with-cc=cc \
@@ -21,10 +21,10 @@
 --with-kokkos-kernels-tpl=0 \
 --with-make-np=8 \
 --with-64-bit-indices=1 \
---with-netcdf-dir=/opt/cray/pe/netcdf-hdf5parallel/4.9.0.3/gnu/9.1 \
---with-pnetcdf-dir=/opt/cray/pe/parallel-netcdf/1.12.3.3/gnu/9.1 \
+--with-netcdf-dir=/opt/cray/pe/netcdf-hdf5parallel/4.9.0.9/gnu/12.3 \
+--with-pnetcdf-dir=/opt/cray/pe/parallel-netcdf/1.12.3.9/gnu/12.3 \
 --download-hdf5=1 \
---with-cuda-dir=/opt/nvidia/hpc_sdk/Linux_x86_64/22.7/cuda/11.7 \
+--with-cuda-dir=/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/12.4 \
 --with-cuda-arch=80 \
 --download-parmetis \
 --download-metis \
@@ -37,5 +37,5 @@
 --download-libceed \
 --download-cgns-commit=HEAD \
 --with-debugging=0 \
-PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-11-2-0-v3.22.0
+PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-13-2-1-v3.22.4
 
