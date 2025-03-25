@@ -10,28 +10,35 @@
 #include <petsc/private/dmpleximpl.h> /*I      "petscdmplex.h"   I*/
 typedef struct {
   PetscInt adapt; /* Flag for adaptation of the surface mesh */
+  PetscBool metric;  /* Flag to use metric adaptation, instead of tagging */
 } AppCtx;
 
 static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options)
 {
+  PetscMPIInt size;
+
   PetscFunctionBeginUser;
   options->adapt = 1;
+  options->metric = PETSC_FALSE;
+  PetscCallMPI(MPI_Comm_size(comm, &size));
 
   PetscOptionsBegin(comm, "", "Meshing Interpolation Test Options", "DMPLEX");
   PetscCall(PetscOptionsInt("-adapt", "Number of adaptation steps mesh", "ex10.c", options->adapt, &options->adapt, NULL));
+  PetscCall(PetscOptionsBool("-metric", "Flag for metric refinement", "ex41.c", options->metric, &options->metric, NULL));
   PetscOptionsEnd();
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateDomainLabel(DM dm)
+static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel)
 {
+  /* PetscMPIInt rank; */
   DMLabel  label;
   PetscInt cStart, cEnd, c;
 
-  PetscFunctionBeginUser;
+  PetscFunctionBegin;
+  PetscCall(DMLabelCreate(PETSC_COMM_SELF, "Adaptation Label", adaptLabel));
+  label = *adaptLabel;
   PetscCall(DMGetCoordinatesLocalSetUp(dm));
-  PetscCall(DMCreateLabel(dm, "Cell Sets"));
-  PetscCall(DMGetLabel(dm, "Cell Sets", &label));
   PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
   for (c = cStart; c < cEnd; ++c) {
     PetscReal centroid[3], volume, x, y;
@@ -40,160 +47,94 @@ static PetscErrorCode CreateDomainLabel(DM dm)
     x = centroid[0];
     y = centroid[1];
     /* Headwaters are (0.0,0.25)--(0.1,0.75) */
-    if ((x >= 0.0 && x < 0.1) && (y >= 0.25 && y <= 0.75)) {
-      PetscCall(DMLabelSetValue(label, c, 1));
-      continue;
-    }
-    /* River channel is (0.1,0.45)--(1.0,0.55) */
-    if ((x >= 0.1 && x <= 1.0) && (y >= 0.45 && y <= 0.55)) {
-      PetscCall(DMLabelSetValue(label, c, 2));
-      continue;
+    if ((x >= 0.0 && x < 1.) && (y >= 0. && y <= 1.)) {
+      PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
+      //PetscCall(PetscPrintf(PETSC_COMM_SELF, "refine: %" PetscInt_FMT "\n", c));
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine)
+{
+  DMPlexTransform tr;
+  DM              odm;
+  PetscInt        cStart, cEnd, bs, Istart, Jstart;
+  PetscScalar val = 1.0;
+
+  PetscFunctionBegin;
+  PetscCall(MatGetBlockSize(CoarseToFine, &bs));
+  PetscCall(DMPlexGetTransform(dm, &tr));
+  printf("******* ConstructRefineTree DMPlexTransform = %p\n", tr);
+  if (!tr) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(DMPlexTransformGetDM(tr, &odm));
+  PetscCall(DMPlexGetHeightStratum(odm, 0, &cStart, &cEnd));
+  PetscCall(MatGetOwnershipRange(CoarseToFine, &Istart, NULL));
+  PetscCall(MatGetOwnershipRangeColumn(CoarseToFine, &Jstart, NULL));
+  for (PetscInt c = cStart; c < cEnd; ++c) {
+    DMPolytopeType  ct;
+    DMPolytopeType *rct;
+    PetscInt       *rsize, *rcone, *rornt;
+    PetscInt        Nct, dim, pNew = 0;
+
+    PetscCall(PetscPrintf(PETSC_COMM_SELF, "Cell %" PetscInt_FMT " produced new cells", c));
+    PetscCall(DMPlexGetCellType(odm, c, &ct));
+    dim = DMPolytopeTypeGetDim(ct);
+    PetscCall(DMPlexTransformCellTransform(tr, ct, c, NULL, &Nct, &rct, &rsize, &rcone, &rornt));
+    for (PetscInt n = 0; n < Nct; ++n) {
+      if (DMPolytopeTypeGetDim(rct[n]) != dim) continue;
+      for (PetscInt r = 0; r < rsize[n]; ++r) {
+        PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], c, r, &pNew));
+        PetscCall(PetscPrintf(PETSC_COMM_SELF, " %" PetscInt_FMT, pNew));
+        for (PetscInt i = 0 ; i < bs ; i++) {
+          PetscCall(MatSetValue(CoarseToFine, Istart + bs*(pNew - 0) + i, Jstart + bs*(c - cStart) + i, val, INSERT_VALUES));
+        }
+      }
+    }
+    PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
+  }
+  PetscCall(MatSetFromOptions(CoarseToFine));
+  PetscCall(MatAssemblyBegin(CoarseToFine, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(CoarseToFine, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatViewFromOptions(CoarseToFine, NULL, "-adapt_mat_view"));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *CoarseToFine, AppCtx *ctx)
 {
-  DM              dmCur = dm, last_dm;
-  DMLabel         label;
-  IS              valueIS, vIS;
-  PetscBool       hasLabel;
-  const PetscInt *values;
-  PetscReal      *volConst; /* Volume constraints for each label value */
-  PetscReal       ratio;
-  PetscInt        dim, Nv, v, cStart, cEnd, c;
-  PetscBool       adapt;
+  DM              dmCur = dm;
   Mat             cToF[10];
 
   PetscFunctionBeginUser;
-  if (!ctx->adapt) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscCall(DMHasLabel(dmCur, "Cell Sets", &hasLabel));
-  if (!hasLabel) PetscCall(CreateDomainLabel(dmCur));
-  PetscCall(DMGetDimension(dmCur, &dim));
-  ratio = PetscPowRealInt(0.5, dim);
-  /* Get volume constraints */
-  PetscCall(DMGetLabel(dmCur, "Cell Sets", &label));
-  PetscCall(DMLabelGetValueIS(label, &vIS));
-  PetscCall(ISDuplicate(vIS, &valueIS));
-  PetscCall(ISDestroy(&vIS));
-  /* Sorting ruins the label */
-  PetscCall(ISSort(valueIS));
-  PetscCall(ISGetLocalSize(valueIS, &Nv));
-  PetscCall(ISGetIndices(valueIS, &values));
-  PetscCall(PetscMalloc1(Nv, &volConst));
-  for (v = 0; v < Nv; ++v) {
-    char opt[128];
-
-    volConst[v] = PETSC_MAX_REAL;
-    PetscCall(PetscSNPrintf(opt, 128, "-volume_constraint_%d", (int)values[v]));
-    PetscCall(PetscOptionsGetReal(NULL, NULL, opt, &volConst[v], NULL));
-  }
-  PetscCall(ISRestoreIndices(valueIS, &values));
-  PetscCall(ISDestroy(&valueIS));
-  /* Adapt mesh iteratively */
-  PetscCall(PetscObjectSetName((PetscObject)dmCur, "coarse"));
   PetscCall(DMViewFromOptions(dmCur, NULL, "-adapt_pre_dm_view"));
-  adapt = PETSC_TRUE;
-  for (PetscInt ilev = 0 ; ilev < ctx->adapt && adapt && ilev < 9 ; ilev++) {
+  for (PetscInt ilev = 0 ; ilev < ctx->adapt && ilev < 9 ; ilev++) {
     DM       dmAdapt;
     DMLabel  adaptLabel;
-    PetscInt nAdaptLoc[2], nAdapt[2];
+    Mat CoarseToFine;
+    PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, fcStart, fcEnd;
+    char opt[128];
 
-    nAdaptLoc[0] = nAdaptLoc[1] = 0;
-    nAdapt[0] = nAdapt[1] = 0;
-    /* Adaptation is not preserving the domain label */
-    PetscCall(DMHasLabel(dmCur, "Cell Sets", &hasLabel));
-    if (!hasLabel) PetscCall(CreateDomainLabel(dmCur));
-    PetscCall(DMGetLabel(dmCur, "Cell Sets", &label));
-    PetscCall(DMLabelGetValueIS(label, &vIS));
-    PetscCall(ISDuplicate(vIS, &valueIS));
-    PetscCall(ISDestroy(&vIS));
-    /* Sorting directly the label's value IS would corrupt the label so we duplicate the IS first */
-    PetscCall(ISSort(valueIS));
-    PetscCall(ISGetLocalSize(valueIS, &Nv));
-    PetscCall(ISGetIndices(valueIS, &values));
-    /* Construct adaptation label */
-    PetscCall(DMLabelCreate(PETSC_COMM_SELF, "adapt", &adaptLabel));
-    PetscCall(DMPlexGetHeightStratum(dmCur, 0, &cStart, &cEnd));
-    for (c = cStart; c < cEnd; ++c) {
-      PetscReal volume, centroid[3];
-      PetscInt  value, vidx;
-
-      PetscCall(DMPlexComputeCellGeometryFVM(dmCur, c, &volume, centroid, NULL));
-      PetscCall(DMLabelGetValue(label, c, &value));
-      if (value < 0) continue;
-      PetscCall(PetscFindInt(value, Nv, values, &vidx));
-      PetscCheck(vidx >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Value %" PetscInt_FMT " for cell %" PetscInt_FMT " does not exist in label", value, c);
-      if (volume > volConst[vidx] || 1) { // enable
-        //PetscCall(DMLabelSetValue(adaptLabel, c, DM_ADAPT_REFINE));
-        ++nAdaptLoc[0];
-      }
-      if (volume < volConst[vidx] * ratio && 0) { // disable
-        PetscCall(DMLabelSetValue(adaptLabel, c, DM_ADAPT_COARSEN));
-        ++nAdaptLoc[1];
-      }
-    }
-    PetscCall(ISRestoreIndices(valueIS, &values));
-    PetscCall(ISDestroy(&valueIS));
-    PetscCallMPI(MPIU_Allreduce(&nAdaptLoc, &nAdapt, 2, MPIU_INT, MPI_SUM, PetscObjectComm((PetscObject)dmCur)));
-    last_dm = dmCur;
-    adapt = PETSC_FALSE;
-    cToF[ilev] = cToF[ilev+1] = NULL;
-    if (nAdapt[0]) {
-      DM cdm,rcdm;
-      Mat CoarseToFine;
-      DMPlexTransform tr;
-      PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, cpStart, fcStart, fcEnd, r, col, i;
-      PetscScalar val = 1.0;
-      PetscCall(PetscInfo(dmCur, "Adapted mesh, marking %" PetscInt_FMT " cells for refinement, and %" PetscInt_FMT " cells for coarsening\n", nAdapt[0], nAdapt[1]));
-      PetscCall(DMAdaptLabel(dmCur, adaptLabel, &dmAdapt)); // DMRefine
-      PetscCall(DMCopyDisc(dmCur, dmAdapt));
-      PetscCall(DMGetCoordinateDM(dmCur, &cdm));
-      PetscCall(DMGetCoordinateDM(dmAdapt, &rcdm));
-      PetscCall(DMCopyDisc(cdm, rcdm));
-      //PetscCall(DMPlexTransformCreateDiscLabels(tr, dm_fine));
-      ((DM_Plex *)(dmAdapt)->data)->useHashLocation = ((DM_Plex *)dmCur->data)->useHashLocation;
-      PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "adapting"));
-
-      char opt[128];
-      PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view_%d", (int)ilev));
-      PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
-      PetscCall(DMSetCoarseDM(dmAdapt, dmCur));
-      // create the transformation
-      PetscCall(DMPlexTransformCreate(PETSC_COMM_SELF, &tr));
-      PetscCall(DMPlexTransformSetType(tr, DMPLEXREFINEREGULAR));
-      PetscCall(DMPlexTransformSetDM(tr, dmAdapt));
-      PetscCall(DMPlexTransformSetFromOptions(tr));
-      PetscCall(DMPlexTransformSetUp(tr));
-      // make interpolation matrix
-      PetscCall(DMPlexGetHeightStratum(dmCur, 0, &ccStart, &ccEnd));
-      PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
-      PetscCall(MatCreateAIJ(PETSC_COMM_WORLD, bs*(fcEnd-fcStart), bs*(ccEnd-ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, &CoarseToFine));
-      PetscCall(MatSetBlockSize(CoarseToFine,bs));
-      PetscCall(DMPlexGetChart(dmCur, &cpStart, NULL));
-      for (PetscInt fc = fcStart; fc < fcEnd; fc++) {
-        DMPolytopeType  ct, qct;
-        PetscCall(DMPlexTransformGetSourcePoint(tr, fc, &ct, &qct, &col, &r));
-        for (i = 0 ; i < bs ; i++) {
-          PetscCall(MatSetValue(CoarseToFine, bs*(fc - fcStart) + i, bs*col + i, val, INSERT_VALUES));
-        }
-      }
-      PetscCall(MatSetFromOptions(CoarseToFine));
-      PetscCall(MatAssemblyBegin(CoarseToFine, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(CoarseToFine, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatViewFromOptions(CoarseToFine, NULL, "-adapt_mat_view"));
-      PetscCall(DMPlexTransformDestroy(&tr));
-      if (last_dm != dm) PetscCall(DMDestroy(&last_dm));
-      last_dm = dmAdapt;
-      dmCur = dmAdapt;
-      cToF[ilev] = CoarseToFine;
-      adapt = PETSC_TRUE;
-    }
+    PetscCall(CreateAdaptLabel(dmCur, ctx, &adaptLabel));
+    PetscCall(DMLabelView(adaptLabel, PETSC_VIEWER_STDOUT_WORLD));
+    PetscCall(DMAdaptLabel(dmCur, adaptLabel, &dmAdapt)); // DMRefine
     PetscCall(DMLabelDestroy(&adaptLabel));
+    cToF[ilev] = cToF[ilev+1] = NULL;
+    if (!dmAdapt) break; // nothing refined?
+    PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
+    PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view_%d", (int)ilev));
+    PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
+    // make interpolation matrix
+    PetscCall(DMPlexGetHeightStratum(dmCur, 0, &ccStart, &ccEnd));
+    PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
+    PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs*(fcEnd-fcStart), bs*(ccEnd-ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, &CoarseToFine));
+    PetscCall(MatSetBlockSize(CoarseToFine, bs));
+    PetscCall(ConstructRefineTree(dmAdapt, CoarseToFine));
+    cToF[ilev] = CoarseToFine;
+    if (dmCur != dm) PetscCall(DMDestroy(&dmCur));
+    dmCur = dmAdapt;
   }
-  PetscCall(PetscFree(volConst));
-  *dm_fine = last_dm;
+  *dm_fine = dmCur;
   PetscCall(PetscObjectSetName((PetscObject)*dm_fine, "refined"));
   PetscCall(DMViewFromOptions(*dm_fine, NULL, "-adapt_post_dm_view"));
   // make final interpoation matrix CoarseToFine
