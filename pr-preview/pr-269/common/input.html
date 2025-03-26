@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.50">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.9">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.a40c8224.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.4af4bdda.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
@@ -256,6 +256,7 @@
   
   <span class="md-ellipsis">
     Home
+    
   </span>
   
 
@@ -293,6 +294,7 @@
   
   <span class="md-ellipsis">
     User Guide
+    
   </span>
   
 
@@ -318,6 +320,7 @@
   
   <span class="md-ellipsis">
     Overview
+    
   </span>
   
 
@@ -339,6 +342,7 @@
   
   <span class="md-ellipsis">
     Installation
+    
   </span>
   
 
@@ -369,6 +373,7 @@
   
   <span class="md-ellipsis">
     YAML Input Specification
+    
   </span>
   
 
@@ -380,6 +385,7 @@
   
   <span class="md-ellipsis">
     YAML Input Specification
+    
   </span>
   
 
@@ -592,6 +598,7 @@
   
   <span class="md-ellipsis">
     MMS Driver
+    
   </span>
   
 
@@ -625,6 +632,7 @@
   
   <span class="md-ellipsis">
     RDycore Example Cases
+    
   </span>
   
 
@@ -650,6 +658,7 @@
   
   <span class="md-ellipsis">
     Overview
+    
   </span>
   
 
@@ -671,6 +680,7 @@
   
   <span class="md-ellipsis">
     Idealized dam break problem
+    
   </span>
   
 
@@ -704,6 +714,7 @@
   
   <span class="md-ellipsis">
     Hurricane Harvey
+    
   </span>
   
 
@@ -729,6 +740,7 @@
   
   <span class="md-ellipsis">
     Overview
+    
   </span>
   
 
@@ -750,6 +762,7 @@
   
   <span class="md-ellipsis">
     With MRMS rainfall and outflow BC
+    
   </span>
   
 
@@ -771,6 +784,7 @@
   
   <span class="md-ellipsis">
     With average rainfall and ocean BC
+    
   </span>
   
 
@@ -820,6 +834,7 @@
   
   <span class="md-ellipsis">
     E3SM-RDycore Example Cases
+    
   </span>
   
 
@@ -845,6 +860,7 @@
   
   <span class="md-ellipsis">
     Overview
+    
   </span>
   
 
@@ -866,6 +882,7 @@
   
   <span class="md-ellipsis">
     Hurricane Harvey
+    
   </span>
   
 
@@ -917,6 +934,7 @@
   
   <span class="md-ellipsis">
     Developer Guide
+    
   </span>
   
 
@@ -942,6 +960,7 @@
   
   <span class="md-ellipsis">
     Overview
+    
   </span>
   
 
@@ -963,6 +982,7 @@
   
   <span class="md-ellipsis">
     Installation
+    
   </span>
   
 
@@ -984,6 +1004,7 @@
   
   <span class="md-ellipsis">
     Development Process
+    
   </span>
   
 
@@ -1005,6 +1026,7 @@
   
   <span class="md-ellipsis">
     Code Structure and Organization
+    
   </span>
   
 
@@ -1026,6 +1048,7 @@
   
   <span class="md-ellipsis">
     Style Guide
+    
   </span>
   
 
@@ -1047,6 +1070,7 @@
   
   <span class="md-ellipsis">
     Developer Tools
+    
   </span>
   
 
@@ -1068,6 +1092,7 @@
   
   <span class="md-ellipsis">
     SWE implementation using libCEED
+    
   </span>
   
 
@@ -1111,6 +1136,7 @@
   
   <span class="md-ellipsis">
     Theory Guide
+    
   </span>
   
 
@@ -1136,6 +1162,7 @@
   
   <span class="md-ellipsis">
     Overview
+    
   </span>
   
 
@@ -1157,6 +1184,7 @@
   
   <span class="md-ellipsis">
     Shallow Water Equations
+    
   </span>
   
 
@@ -1178,6 +1206,7 @@
   
   <span class="md-ellipsis">
     Sediment Transport
+    
   </span>
   
 
@@ -1404,6 +1433,7 @@
               <article class="md-content__inner md-typeset">
                 
                   
+
 
 
 <h1 id="rdycore-yaml-input-specification">RDycore YAML Input Specification</h1>
@@ -1834,10 +1864,12 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
 <span class="w">  </span><span class="nt">flow</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swe</span>
 <span class="w">    </span><span class="nt">tiny_h</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
+<span class="w">    </span><span class="nt">h_anuga_regular</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.e-3</span>
 <span class="w">    </span><span class="nt">source</span><span class="p">:</span>
 <span class="w">      </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">implicit_xq2018</span>
 <span class="w">      </span><span class="nt">xq2018_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-10</span>
-<span class="w">  </span><span class="nt">sediment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">sediment</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">num_classes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <span class="w">  </span><span class="nt">salinity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
 <p>The <code>physics</code> section determines which model physics are active in RDycore.
@@ -1852,6 +1884,10 @@ parameters in this subsection are:</p>
    not yet supported). This parameter is required and has no default value.</li>
 <li><code>tiny_h</code>, which is the water height below which a given point is assumed to
   be dry. Default value: <code>1e-7</code></li>
+<li><code>h_anuga_regular</code>: is the water height used in velocity regularization using the
+  approach implemented in the ANUGA hydrodynamic model. e.g., the velocity in x-dir from the
+  momentum in x-dir is computed as <code>u = (hu) * h / (h^2 + h_anuga_regular^2)</code>. The
+  default value is <code>0.0</code>.</li>
 <li><code>source</code>: this subsection controls parameters governing how the flow source
   term is integrated in time. Parameters are:</li>
 <li><code>method</code>: the method for integrating the flow source term. Options are<ul>
@@ -1862,8 +1898,10 @@ parameters in this subsection are:</p>
 <li><code>xq2018_threshold</code>: threshold for the implicit integration of the source
     (valid only for the <code>implicit_xq2018</code> method; default value: <code>1e-10</code>)</li>
 </ul>
-<p>The second physical model is the sediment model. You can enable or disable this
-by setting the <code>sediment</code> parameter to <code>true</code> or <code>false</code>.</p>
+<p>The second physical model is the sediment dynamics model, which evolves the
+concentrations of distinct size classes of sediments. You can set the number of
+size classes with the <code>num_classes</code> parameter (default value: <code>0</code>). Disable
+sediment dynamics by setting <code>num_classes</code> to <code>0</code>.</p>
 <p>The third physical model is the salinity model, which you can also enable or
 disable this by setting the <code>salinity</code> parameter to <code>true</code> or <code>false</code>.</p>
 <h2 id="regions"><code>regions</code></h2>
@@ -2110,7 +2148,7 @@ sub-block.</p>
     <script id="__config" type="application/json">{"base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.60a45f97.min.js"></script>
+      <script src="../assets/javascripts/bundle.c8b220af.min.js"></script>
       
         <script src="../javascript/mathjax.js"></script>
       
