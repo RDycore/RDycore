@@ -65,7 +65,6 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine)
   PetscFunctionBegin;
   PetscCall(MatGetBlockSize(CoarseToFine, &bs));
   PetscCall(DMPlexGetTransform(dm, &tr));
-  printf("******* ConstructRefineTree DMPlexTransform = %p\n", tr);
   if (!tr) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(DMPlexTransformGetDM(tr, &odm));
   PetscCall(DMPlexGetHeightStratum(odm, 0, &cStart, &cEnd));
@@ -77,7 +76,7 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine)
     PetscInt       *rsize, *rcone, *rornt;
     PetscInt        Nct, dim, pNew = 0;
 
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "Cell %" PetscInt_FMT " produced new cells", c));
+    //PetscCall(PetscPrintf(PETSC_COMM_SELF, "Cell %" PetscInt_FMT " produced new cells", c));
     PetscCall(DMPlexGetCellType(odm, c, &ct));
     dim = DMPolytopeTypeGetDim(ct);
     PetscCall(DMPlexTransformCellTransform(tr, ct, c, NULL, &Nct, &rct, &rsize, &rcone, &rornt));
@@ -85,13 +84,13 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine)
       if (DMPolytopeTypeGetDim(rct[n]) != dim) continue;
       for (PetscInt r = 0; r < rsize[n]; ++r) {
         PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], c, r, &pNew));
-        PetscCall(PetscPrintf(PETSC_COMM_SELF, " %" PetscInt_FMT, pNew));
+        //PetscCall(PetscPrintf(PETSC_COMM_SELF, " %" PetscInt_FMT, pNew));
         for (PetscInt i = 0 ; i < bs ; i++) {
           PetscCall(MatSetValue(CoarseToFine, Istart + bs*(pNew - 0) + i, Jstart + bs*(c - cStart) + i, val, INSERT_VALUES));
         }
       }
     }
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
+    //PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
   }
   PetscCall(MatSetFromOptions(CoarseToFine));
   PetscCall(MatAssemblyBegin(CoarseToFine, MAT_FINAL_ASSEMBLY));
@@ -120,7 +119,10 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
     PetscCall(DMAdaptLabel(dmCur, adaptLabel, &dmAdapt)); // DMRefine
     PetscCall(DMLabelDestroy(&adaptLabel));
     cToF[ilev] = cToF[ilev+1] = NULL;
-    if (!dmAdapt) break; // nothing refined?
+    if (!dmAdapt) {
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "refine: level %" PetscInt_FMT "failed ???\n", ilev));
+      break; // nothing refined?
+    }
     PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
     PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view_%d", (int)ilev));
     PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
@@ -139,7 +141,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscCall(DMViewFromOptions(*dm_fine, NULL, "-adapt_post_dm_view"));
   // make final interpoation matrix CoarseToFine
   if (!cToF[0]) *CoarseToFine = NULL;
-  else if (!cToF[1]) *CoarseToFine = cToF[0];
+  else if (!cToF[1]) *CoarseToFine = cToF[0]; // one level 
   else {
     Mat AA;
     for (int ii = 1; cToF[ii] ; ii++) {
