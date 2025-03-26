@@ -110,7 +110,8 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
     char     opt[128];
 
     PetscCall(CreateAdaptLabel(dmCur, ctx, &adaptLabel));
-    PetscCall(DMLabelView(adaptLabel, PETSC_VIEWER_STDOUT_WORLD));
+    //PetscCall(DMLabelView(adaptLabel, PETSC_VIEWER_STDOUT_WORLD));
+    PetscCall(DMPlexSetSaveTransform(dmCur, PETSC_TRUE));
     PetscCall(DMAdaptLabel(dmCur, adaptLabel, &dmAdapt));  // DMRefine
     PetscCall(DMLabelDestroy(&adaptLabel));
     cToF[ilev] = cToF[ilev + 1] = NULL;
