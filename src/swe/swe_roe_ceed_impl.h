@@ -99,9 +99,9 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
   CeedScalar uperpl = ul * cn + vl * sn;
   CeedScalar uperpr = ur * cn + vr * sn;
   CeedScalar FL[3]  = {
-      uperpl * hl,
-      ul * uperpl * hl + 0.5 * gravity * hl * hl * cn,
-      vl * uperpl * hl + 0.5 * gravity * hl * hl * sn,
+       uperpl * hl,
+       ul * uperpl * hl + 0.5 * gravity * hl * hl * cn,
+       vl * uperpl * hl + 0.5 * gravity * hl * hl * sn,
   };
   CeedScalar FR[3] = {
       uperpr * hr,
