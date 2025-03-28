@@ -104,64 +104,40 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine, Mat FineToCoa
 }
 
 static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *CoarseToFine, Mat *FineToCoarse, AppCtx *ctx) {
-  DM  dmCur = dm;
-  Mat cToF[10], fToC[10];
-
   PetscFunctionBeginUser;
-  PetscCall(DMViewFromOptions(dmCur, NULL, "-adapt_pre_dm_view"));
-  for (PetscInt ilev = 0; ilev < ctx->adapt && ilev < 9; ilev++) {
-    DM       dmAdapt;
-    DMLabel  adaptLabel;
-    Mat      CoarseToFine, FineToCoarse;
-    PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, fcStart, fcEnd;
-    char     opt[128];
+  PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
-    PetscCall(CreateAdaptLabel(dmCur, ctx, &adaptLabel));
-    // PetscCall(DMLabelView(adaptLabel, PETSC_VIEWER_STDOUT_WORLD));
-    PetscCall(DMPlexSetSaveTransform(dmCur, PETSC_TRUE));
-    PetscCall(DMAdaptLabel(dmCur, adaptLabel, &dmAdapt));  // DMRefine
-    PetscCall(DMLabelDestroy(&adaptLabel));
-    cToF[ilev] = cToF[ilev + 1] = NULL;
-    fToC[ilev] = fToC[ilev + 1] = NULL;
-    if (!dmAdapt) {
-      PetscCall(PetscPrintf(PETSC_COMM_SELF, "refine: level %" PetscInt_FMT "failed ???\n", ilev));
-      break;  // nothing refined?
-    }
-    PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
-    PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view_%d", (int)ilev));
-    PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
-    // make interpolation matrix
-    PetscCall(DMPlexGetHeightStratum(dmCur, 0, &ccStart, &ccEnd));
-    PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
-    PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz,
-                           NULL, o_nz, NULL, &CoarseToFine));
-    PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz,
-                           NULL, o_nz, NULL, &FineToCoarse));
-    PetscCall(MatSetBlockSize(CoarseToFine, bs));
-    PetscCall(MatSetBlockSize(FineToCoarse, bs));
-    PetscCall(ConstructRefineTree(dmAdapt, CoarseToFine, FineToCoarse));
-    cToF[ilev] = CoarseToFine;
-    fToC[ilev] = FineToCoarse;
-    if (dmCur != dm) PetscCall(DMDestroy(&dmCur));
-    dmCur = dmAdapt;
+  DM       dmAdapt;
+  DMLabel  adaptLabel;
+  PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, fcStart, fcEnd;
+  char     opt[128];
+
+  PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
+  PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
+  PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
+  PetscCall(DMLabelDestroy(&adaptLabel));
+
+  if (!dmAdapt) {
+    PetscCheck(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
   }
-  *dm_fine = dmCur;
-  PetscCall(PetscObjectSetName((PetscObject)*dm_fine, "refined"));
-  PetscCall(DMViewFromOptions(*dm_fine, NULL, "-adapt_post_dm_view"));
-  // make final interpoation matrix CoarseToFine
-  if (!cToF[0]) *CoarseToFine = NULL;
-  else if (!cToF[1]) *CoarseToFine = cToF[0];  // one level
-  else {
-    Mat AA;
-    for (int ii = 1; cToF[ii]; ii++) {
-      PetscCall(MatMatMult(cToF[ii], cToF[ii - 1], MAT_INITIAL_MATRIX, PETSC_DETERMINE, &AA));
-      PetscCall(MatViewFromOptions(cToF[ii], NULL, "-adapt_mat_view"));
-      PetscCall(MatDestroy(&cToF[ii - 1]));
-      PetscCall(MatDestroy(&cToF[ii]));
-      *CoarseToFine = cToF[ii] = AA;
-    }
-  }
-  *FineToCoarse = fToC[0];
+
+  PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
+  PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view"));
+  PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
+
+  // make interpolation matrix
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &ccStart, &ccEnd));
+  PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
+  PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz,
+                         NULL, o_nz, NULL, CoarseToFine));
+  PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz,
+                         NULL, o_nz, NULL, FineToCoarse));
+  PetscCall(MatSetBlockSize(*CoarseToFine, bs));
+  PetscCall(MatSetBlockSize(*FineToCoarse, bs));
+  PetscCall(ConstructRefineTree(dmAdapt, *CoarseToFine, *FineToCoarse));
+
+  *dm_fine = dmAdapt;
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
