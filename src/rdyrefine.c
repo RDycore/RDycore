@@ -243,7 +243,7 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
 
   for (PetscInt r = 0; r < rdy_coarse->num_regions; ++r) {
     RDyRegion *region_coarse = &rdy_coarse->regions[r];
-    RDyRegion *region_fine   = regions[r];
+    RDyRegion *region_fine   = (*regions + r);
 
     region_fine->id = region_coarse->id;
     strcpy(region_fine->name, region_coarse->name);
