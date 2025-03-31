@@ -44,7 +44,7 @@ static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel) 
     x = centroid[0];
     y = centroid[1];
     /* Headwaters are (0.0,0.25)--(0.1,0.75) */
-    if ((x >= 0.0 && x < 1.) && (y >= 0. && y <= 1.)) {
+    if ((x >= 0.0 && x < 1.) && (y >= 3. && y <= 4.)) {
       PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
       // PetscCall(PetscPrintf(PETSC_COMM_SELF, "refine: %" PetscInt_FMT "\n", c));
     }
@@ -109,7 +109,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
 
   DM       dmAdapt;
   DMLabel  adaptLabel;
-  PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, fcStart, fcEnd;
+  PetscInt d_nz = 4, ccStart, ccEnd, fcStart, fcEnd;
   char     opt[128];
 
   PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
@@ -128,10 +128,8 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   // make interpolation matrix
   PetscCall(DMPlexGetHeightStratum(dm, 0, &ccStart, &ccEnd));
   PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
-  PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz,
-                         NULL, o_nz, NULL, CoarseToFine));
-  PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz,
-                         NULL, o_nz, NULL, FineToCoarse));
+  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), d_nz, NULL, CoarseToFine));
+  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), d_nz, NULL, FineToCoarse));
   PetscCall(MatSetBlockSize(*CoarseToFine, bs));
   PetscCall(MatSetBlockSize(*FineToCoarse, bs));
   PetscCall(ConstructRefineTree(dmAdapt, *CoarseToFine, *FineToCoarse));
@@ -144,15 +142,17 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
 /// @brief Given the coarse-to-fine mesh matrix, determine the mapping from coarse cells to fine cells.
 /// @param rdy_coarse       RDy struct corresponding to the coarse mesh
 /// @param CoarseToFine     Matrix to remap data from coarse to fine mesh
-/// @param X_coarse         A global Vec on the coarse mesh
-/// @param X_fine           A global Vec on the fine mesh
+/// @param X_coarse         A local Vec on the coarse mesh
+/// @param X_fine           A local Vec on the fine mesh
+/// @param fineIsOwned      For all fine cells, whether the cell is owned by this rank
 /// @param fineToCoarseMap  For all fine cells, the corresponding coarse cell ID
 /// @param coarseToFineMap  For all coarse cells, the corresponding fine cell IDs
 /// @param coarseNumFine    For all coarse cells, the number of fine cells
 /// @param coarseOffsetFine Offset for each coarse cell in the coarseToFineMap
 /// @return PETSC_SUCESS on success
-static PetscErrorCode DetermineCoarseToFineCellMapping(RDy rdy_coarse, Mat CoarseToFine, Vec X_coarse, Vec X_fine, PetscInt *fineToCoarseMap,
-                                                       PetscInt *coarseToFineMap, PetscInt *coarseNumFine, PetscInt *coarseOffsetFine) {
+static PetscErrorCode DetermineCoarseToFineCellMapping(RDy rdy_coarse, Mat CoarseToFine, Vec X_coarse, Vec X_fine, PetscInt *fineIsOwned,
+                                                       PetscInt *fineToCoarseMap, PetscInt *coarseToFineMap, PetscInt *coarseNumFine,
+                                                       PetscInt *coarseOffsetFine) {
   PetscFunctionBeginUser;
 
   RDyMesh  *mesh  = &rdy_coarse->mesh;
@@ -161,30 +161,37 @@ static PetscErrorCode DetermineCoarseToFineCellMapping(RDy rdy_coarse, Mat Coars
   PetscInt ndof;
   PetscCall(VecGetBlockSize(X_coarse, &ndof));
 
-  PetscScalar *x_ptr_coarse, *x_ptr_fine;
+  // create Vec to mark owned cells
+  Vec X_coarse_owned, X_fine_owned;
+  PetscCall(VecDuplicate(X_coarse, &X_coarse_owned));
+  PetscCall(VecDuplicate(X_fine, &X_fine_owned));
 
-  // Put the natural cell ID in the first position of X_coarse
-  // and -1 in the rest of the positions
+  PetscScalar *x_ptr_coarse, *x_ptr_coarse_owned, *x_ptr_fine, *x_ptr_fine_owned;
+
+  // - Put the local cell ID in the first position of X_coarse
+  //   and -1 in the rest of the positions
+  // - Put 1 or 0 in the first position of X_coarse_owned to indicate
+  //   if the cell is owned or not, and -1 in the rest of the positions
   PetscCall(VecGetArray(X_coarse, &x_ptr_coarse));
+  PetscCall(VecGetArray(X_coarse_owned, &x_ptr_coarse_owned));
 
-  PetscInt owned_cell_count = 0;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
-    if (cells->is_owned[c]) {
-      // put natural cell ID in the first position
-      x_ptr_coarse[owned_cell_count * ndof] = cells->natural_ids[c];
+    x_ptr_coarse[c * ndof]       = c;
+    x_ptr_coarse_owned[c * ndof] = cells->is_owned[c];
 
-      // put -1 in the rest of the positions
-      for (PetscInt idof = 1; idof < ndof; idof++) {
-        x_ptr_coarse[owned_cell_count * ndof + idof] = -1;
-      }
-      owned_cell_count++;
+    // put -1 in the rest of the positions
+    for (PetscInt idof = 1; idof < ndof; idof++) {
+      x_ptr_coarse[c * ndof + idof]       = -1;
+      x_ptr_coarse_owned[c * ndof + idof] = -1;
     }
   }
   PetscCall(VecRestoreArray(X_coarse, &x_ptr_coarse));
+  PetscCall(VecRestoreArray(X_coarse_owned, &x_ptr_coarse_owned));
 
   // Multiply the coarse-to-fine matrix with the coarse vector
   // to get the fine vector
   PetscCall(MatMult(CoarseToFine, X_coarse, X_fine));
+  PetscCall(MatMult(CoarseToFine, X_coarse_owned, X_fine_owned));
 
   PetscInt numFine, numCoarse;
   PetscCall(VecGetLocalSize(X_fine, &numFine));
@@ -195,11 +202,14 @@ static PetscErrorCode DetermineCoarseToFineCellMapping(RDy rdy_coarse, Mat Coars
   // For each fine cell, determine the corresponding coarse cell
   // and keep track of the number of fine cells corresponding to each coarse cell
   PetscCall(VecGetArray(X_fine, &x_ptr_fine));
+  PetscCall(VecGetArray(X_fine_owned, &x_ptr_fine_owned));
+
   for (PetscInt c = 0; c < numFine; c++) {
-    // get the natural cell ID
+    // get the local cell ID of the coarse cell
     PetscInt coarse_cell_id = (PetscInt)x_ptr_fine[c * ndof];
 
     fineToCoarseMap[c] = coarse_cell_id;
+    fineIsOwned[c]     = (PetscInt)x_ptr_fine_owned[c * ndof];
     coarseNumFine[coarse_cell_id]++;
   }
 
@@ -229,17 +239,49 @@ static PetscErrorCode DetermineCoarseToFineCellMapping(RDy rdy_coarse, Mat Coars
     coarseNumFine[coarse_cell_id]++;
   }
   PetscCall(VecRestoreArray(X_fine, &x_ptr_fine));
+  PetscCall(VecRestoreArray(X_fine_owned, &x_ptr_fine_owned));
+
+  // clean up
+  PetscCall(VecDestroy(&X_coarse_owned));
+  PetscCall(VecDestroy(&X_fine_owned));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt *coarseToFineMap, PetscInt *coarseNumFine,
-                                                        PetscInt *coarseOffsetFine, PetscInt *num_regions, RDyRegion **regions) {
+/// @brief For all the regions in the coarse mesh, create the corresponding regions in the fine mesh.
+/// @param rdy_coarse       RDy struct corresponding to the coarse mesh
+/// @param numFine          Number of local cells in the fine mesh
+/// @param fineIsOwned      For all fine cells, whether the cell is owned by this rank
+/// @param coarseToFineMap  For all coarse cells, the corresponding fine cell IDs
+/// @param coarseNumFine    For all coarse cells, the number of fine cells that the coarse cell was split into
+/// @param coarseOffsetFine For all coarse cells, the offset in the coarseToFineMap for the coarse cell
+/// @param num_regions      Number of regions for the fine mesh
+/// @param regions          Regions for the fine mesh
+/// @return PETSC_SUCESS on success
+static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt numFine, PetscInt *fineIsOwned, PetscInt *coarseToFineMap,
+                                                        PetscInt *coarseNumFine, PetscInt *coarseOffsetFine, PetscInt *num_regions,
+                                                        RDyRegion **regions) {
   PetscFunctionBeginUser;
+
+  RDyMesh  *mesh  = &rdy_coarse->mesh;
+  RDyCells *cells = &mesh->cells;
 
   *num_regions = rdy_coarse->num_regions;
 
   PetscCall(PetscCalloc1(*num_regions, regions));
+
+  // For fine cells, determine the global IDs of local cells, which depends on if a local cell
+  // is owned or not.
+  PetscInt *fine_LocaltoGlobalIDs, count = 0;
+  PetscCall(PetscCalloc1(numFine, &fine_LocaltoGlobalIDs));
+  for (PetscInt c = 0; c < numFine; c++) {
+    if (fineIsOwned[c]) {
+      fine_LocaltoGlobalIDs[c] = count;
+      count++;
+    } else {
+      fine_LocaltoGlobalIDs[c] = -1;
+    }
+  }
 
   for (PetscInt r = 0; r < rdy_coarse->num_regions; ++r) {
     RDyRegion *region_coarse = &rdy_coarse->regions[r];
@@ -249,27 +291,66 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
     strcpy(region_fine->name, region_coarse->name);
 
     if (region_coarse->num_owned_cells > 0) {
+      //
+      // Determine the global IDs of "owned" cells in the fine region
+      //
+
+      // 1. Determine the number of owned fine cells in the fine region by
+      //    traversing the coarse region and counting the number of fine cells
+      //    corresponding to each "owened" coarse cell.
       PetscInt num_owned_fine_cells = 0;
       for (PetscInt c = 0; c < region_coarse->num_owned_cells; ++c) {
         PetscInt coarse_global_id = region_coarse->owned_cell_global_ids[c];
-        num_owned_fine_cells += coarseNumFine[coarse_global_id];
+        PetscInt coarse_local_id  = cells->owned_to_local[coarse_global_id];
+        num_owned_fine_cells += coarseNumFine[coarse_local_id];
       }
 
+      // 2. Allocate memory
       region_fine->num_owned_cells = num_owned_fine_cells;
-      region_fine->num_local_cells = num_owned_fine_cells;
+      PetscCall(PetscCalloc1(region_fine->num_owned_cells, &region_fine->owned_cell_global_ids));
 
-      PetscCall(PetscCalloc1(region_fine->num_local_cells, &region_fine->owned_cell_global_ids));
-      PetscCall(PetscCalloc1(region_fine->num_owned_cells, &region_fine->cell_local_ids));
-
-      PetscInt count = 0;
-
-      for (PetscInt c = 0; c < region_coarse->num_local_cells; ++c) {
+      // 3. Fill the global IDs of the owned cells in the fine region.
+      //    The coarseOffsetFine and coarseToFineMap use "local IDs".
+      //    So, the global ID of the corase cell must be converted to local ID
+      //    before using the coarseOffsetFine and coarseToFineMap.
+      count = 0;
+      for (PetscInt c = 0; c < region_coarse->num_owned_cells; ++c) {
         PetscInt coarse_global_id = region_coarse->owned_cell_global_ids[c];
-        PetscInt offset           = coarseOffsetFine[coarse_global_id];
+        PetscInt coarse_local_id  = cells->owned_to_local[coarse_global_id];
+        PetscInt offset           = coarseOffsetFine[coarse_local_id];
 
-        for (PetscInt j = 0; j < coarseNumFine[coarse_global_id]; j++) {
-          region_fine->owned_cell_global_ids[count] = coarseToFineMap[offset + j];
-          region_fine->cell_local_ids[count]        = coarseToFineMap[offset + j];
+        for (PetscInt j = 0; j < coarseNumFine[coarse_local_id]; j++) {
+          PetscInt fine_local_id                    = coarseToFineMap[offset + j];
+          region_fine->owned_cell_global_ids[count] = fine_LocaltoGlobalIDs[fine_local_id];
+          count++;
+        }
+      }
+
+      //
+      // Determine the local IDs of "local" cells in the fine region
+      //
+
+      // 1. Determine the number of local fine cells in the fine region by
+      //    traversing the coarse region and counting the number of fine cells
+      //    corresponding to each coarse cell.
+      PetscInt num_local_fine_cells = 0;
+      for (PetscInt c = 0; c < region_coarse->num_local_cells; ++c) {
+        PetscInt coarse_local_id = region_coarse->cell_local_ids[c];
+        num_local_fine_cells += coarseNumFine[coarse_local_id];
+      }
+
+      // 2. Allocate memory
+      region_fine->num_local_cells = num_local_fine_cells;
+      PetscCall(PetscCalloc1(region_fine->num_local_cells, &region_fine->cell_local_ids));
+
+      // 3. Fill the local IDs of the fine cells in the fine region.
+      count = 0;
+      for (PetscInt c = 0; c < region_coarse->num_local_cells; ++c) {
+        PetscInt coarse_local_id = region_coarse->cell_local_ids[c];
+        PetscInt offset          = coarseOffsetFine[coarse_local_id];
+
+        for (PetscInt j = 0; j < coarseNumFine[coarse_local_id]; j++) {
+          region_fine->cell_local_ids[count] = coarseToFineMap[offset + j];
           count++;
         }
       }
@@ -280,64 +361,7 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
     }
   }
 
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// @brief Project the initial condition from the coarse grid to the fine grid using
-///        a projection matrix.
-/// @param CoarseToFine Projection matrix from coarse to fine grid
-/// @param X_coarse
-/// @param X_fine
-/// @return
-static PetscErrorCode InitSolutionFromCoarseRDy(Mat CoarseToFine, Vec X_coarse, Vec X_fine) {
-  PetscFunctionBeginUser;
-
-  PetscInt n_local_coarse, ndof_coarse;
-  PetscCall(VecGetLocalSize(X_coarse, &n_local_coarse));
-  PetscCall(VecGetBlockSize(X_coarse, &ndof_coarse));
-
-  PetscInt n_local_fine, ndof_fine;
-  PetscCall(VecGetLocalSize(X_fine, &n_local_fine));
-  PetscCall(VecGetBlockSize(X_fine, &ndof_fine));
-
-  // PetscCheck(ndof_coarse == ndof_fine, comm, PETSC_ERR_USER, "The block size is not same");
-  PetscInt ndof = ndof_fine;
-
-  PetscScalar *x_ptr_coarse, *x_ptr_fine, *x_ptr;
-  PetscCall(VecGetArray(X_coarse, &x_ptr_coarse));
-  PetscCall(VecGetArray(X_fine, &x_ptr_fine));
-
-  Vec coarse_1dof, fine_1dof;
-  PetscCall(VecCreateMPI(PETSC_COMM_WORLD, n_local_coarse, PETSC_DECIDE, &coarse_1dof));
-  PetscCall(VecCreateMPI(PETSC_COMM_WORLD, n_local_fine, PETSC_DECIDE, &fine_1dof));
-
-  PetscInt ncells_fine   = n_local_fine / ndof;
-  PetscInt ncells_coarse = n_local_coarse / ndof;
-
-  for (PetscInt idof = 0; idof < ndof; idof++) {
-    // fill the coarse 1 dof vector
-    PetscCall(VecGetArray(coarse_1dof, &x_ptr));
-    for (PetscInt c = 0; c < ncells_coarse; c++) {
-      x_ptr[c] = x_ptr_coarse[c * ndof + idof];
-    }
-    PetscCall(VecRestoreArray(coarse_1dof, &x_ptr));
-
-    // project the coarse 1 dof vector to the fine 1 dof vector
-    PetscCall(MatMult(CoarseToFine, coarse_1dof, fine_1dof));
-
-    // fill the fine 1 dof vector
-    PetscCall(VecGetArray(fine_1dof, &x_ptr));
-    for (PetscInt c = 0; c < ncells_fine; c++) {
-      x_ptr_fine[c * ndof + idof] = x_ptr[c];
-    }
-    PetscCall(VecRestoreArray(fine_1dof, &x_ptr));
-  }
-
-  PetscCall(VecRestoreArray(X_coarse, &x_ptr_coarse));
-  PetscCall(VecRestoreArray(X_fine, &x_ptr_fine));
-
-  PetscCall(VecDestroy(&coarse_1dof));
-  PetscCall(VecDestroy(&fine_1dof));
+  PetscCall(PetscFree(fine_LocaltoGlobalIDs));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -352,7 +376,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   AppCtx   user;
   Mat      CoarseToFine, FineToCoarse;
   DM       dm_fine;
-  Vec      U_coarse, U_fine;
+  Vec      U_coarse_local, U_fine_local;
   PetscInt ndof_coarse;
   PetscFunctionBeginUser;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
@@ -423,40 +447,42 @@ PetscErrorCode RDyRefine(RDy rdy) {
     }
   }
 
-  // Mat A;
-  // Vec Ascale;
-  // PetscCall(DMCreateInterpolation(rdy->dm, dm_fine, &A, &Ascale));
-
   // make a copy of the old solution
-  PetscCall(VecDuplicate(rdy->u_global, &U_coarse));
-  PetscCall(VecCopy(rdy->u_global, U_coarse));
+  PetscCall(VecDuplicate(rdy->u_local, &U_coarse_local));
+  PetscCall(VecCopy(rdy->u_local, U_coarse_local));
 
   // determine the mapping of cells from fine to coarse mesh
-  PetscCall(DMCreateGlobalVector(dm_fine, &U_fine));
-  PetscInt *fineToCoarseMap, *coarseToFineMap, *coarseNumFine, *coarseOffsetFine;
+  PetscCall(DMCreateLocalVector(dm_fine, &U_fine_local));
+
+  PetscInt *fineToCoarseMap, *fineIsOwned, *coarseToFineMap, *coarseNumFine, *coarseOffsetFine;
 
   PetscInt numFine, numCoarse;
 
-  PetscCall(VecGetLocalSize(U_coarse, &numCoarse));
+  PetscCall(VecGetLocalSize(U_coarse_local, &numCoarse));
   PetscCall(PetscCalloc1(numCoarse, &coarseNumFine));
   PetscCall(PetscCalloc1(numCoarse, &coarseOffsetFine));
   for (PetscInt c = 0; c < numCoarse; c++) {
     coarseNumFine[c] = 0;
   }
 
-  PetscCall(VecGetLocalSize(U_fine, &numFine));
+  PetscCall(VecGetLocalSize(U_fine_local, &numFine));
+  PetscCall(PetscCalloc1(numFine, &fineIsOwned));
   PetscCall(PetscCalloc1(numFine, &fineToCoarseMap));
   PetscCall(PetscCalloc1(numFine, &coarseToFineMap));
 
   // determine the mapping of cells from coarse to fine mesh
-  PetscCall(DetermineCoarseToFineCellMapping(rdy, CoarseToFine, U_coarse, U_fine, fineToCoarseMap, coarseToFineMap, coarseNumFine, coarseOffsetFine));
-  PetscCall(VecDestroy(&U_fine));
+  PetscCall(DetermineCoarseToFineCellMapping(rdy, CoarseToFine, U_coarse_local, U_fine_local, fineIsOwned, fineToCoarseMap, coarseToFineMap,
+                                             coarseNumFine, coarseOffsetFine));
 
   // create data structure for the refined regions from existing coarse regions
   RDyRegion *refined_regions = NULL;
   PetscInt   num_regions;
 
-  PetscCall(CreateRefinedRegionsFromCoarseRDy(rdy, coarseToFineMap, coarseNumFine, coarseOffsetFine, &num_regions, &refined_regions));
+  PetscMPIInt rank;
+  PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)dm_fine), &rank));
+  PetscCall(
+      CreateRefinedRegionsFromCoarseRDy(rdy, numFine, fineIsOwned, coarseToFineMap, coarseNumFine, coarseOffsetFine, &num_regions, &refined_regions));
+  PetscCall(PetscFree(fineIsOwned));
   PetscCall(PetscFree(coarseNumFine));
   PetscCall(PetscFree(coarseOffsetFine));
   PetscCall(PetscFree(coarseToFineMap));
@@ -494,8 +520,10 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
 
   // initialize the refined solution from existing previous solution
-  PetscCall(InitSolutionFromCoarseRDy(CoarseToFine, U_coarse, rdy->u_global));
+  PetscCall(MatMult(CoarseToFine, U_coarse_local, rdy->u_local));
+  PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFine));
+  PetscCall(VecDestroy(&U_fine_local));
 
   // destroy the operator
   PetscCall(DestroyOperator(&rdy->operator));
