@@ -112,9 +112,9 @@ static PetscErrorCode ComputeSWERoeFlux(RiemannStateData *datal, RiemannStateDat
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
     PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
     PetscReal FL[3]  = {
-         uperpl * hl[i],
-         ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i],
-         vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i],
+        uperpl * hl[i],
+        ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i],
+        vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i],
     };
     PetscReal FR[3] = {
         uperpr * hr[i],
