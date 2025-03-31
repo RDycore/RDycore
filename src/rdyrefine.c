@@ -515,9 +515,13 @@ PetscErrorCode RDyRefine(RDy rdy) {
   rdy->num_regions = num_regions;
   rdy->regions     = refined_regions;
 
+  // mark the mesh was refined
+  rdy->mesh_was_refined = PETSC_TRUE;
+  rdy->num_refinements++;
+
   // destroy and recreate mesh
   PetscCall(RDyMeshDestroy(rdy->mesh));
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->num_refinements, &rdy->mesh));
 
   // initialize the refined solution from existing previous solution
   PetscCall(MatMult(CoarseToFine, U_coarse_local, rdy->u_local));
@@ -558,10 +562,6 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // initialize the source terms
   PetscCall(InitSourceConditions(rdy));
-
-  // mark the mesh was refined
-  rdy->mesh_was_refined = PETSC_TRUE;
-  rdy->num_refinements++;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

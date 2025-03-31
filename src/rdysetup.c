@@ -1284,7 +1284,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(CreateVectors(rdy));
 
   RDyLogDebug(rdy, "Creating FV mesh...");
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));

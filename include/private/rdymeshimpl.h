@@ -201,7 +201,7 @@ typedef struct RDyMesh {
 
 } RDyMesh;
 
-PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, RDyMesh *);
+PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, PetscInt, RDyMesh *);
 PETSC_INTERN PetscErrorCode RDyMeshDestroy(RDyMesh);
 
 #endif

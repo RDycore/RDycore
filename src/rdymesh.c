@@ -247,11 +247,14 @@ static PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, PetscInt ncells_p
 
 /// Creates a fully initialized RDyVertices struct from a given DM.
 /// @param [in] dm A DM that provides vertex data
+/// @param [in] refinement_level Number of refinement levels for the mesh
+/// @param [in] ncells_per_vertex Maximum number of cells per vertex
+/// @param [in] nedges_per_vertex Maximum number of edges per vertex
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
-///
+/// @param [out] num_vertices_global A pointer to the number of vertices in the global mesh
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex, PetscInt nedges_per_vertex, RDyVertices *vertices,
-                                              PetscInt *num_vertices_global) {
+static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, PetscInt ncells_per_vertex, PetscInt nedges_per_vertex,
+                                              RDyVertices *vertices, PetscInt *num_vertices_global) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -314,9 +317,7 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex,
   VecRestoreArray(coordinates, &coords);
 
   // fetch global vertex IDs if mesh is not refined
-  PetscInt refine_level;
-  PetscCall(DMGetRefineLevel(dm, &refine_level));
-  if (!refine_level) {
+  if (!refinement_level) {
     PetscMPIInt commsize;
     MPI_Comm    comm;
     PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -1260,15 +1261,16 @@ static PetscErrorCode DetermineMaxAttributesForCellsAndVertices(DM dm, RDyMesh *
 
 /// Creates an RDyMesh from a PETSc DM.
 /// @param [in] dm A PETSc DM
+/// @param [in] refinement_level The level of refinement for the mesh.
 /// @param [out] mesh A pointer to an RDyMesh that stores allocated data.
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
+PetscErrorCode RDyMeshCreateFromDM(DM dm, PetscInt refinement_level, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
 
   // save the number of refinements
-  PetscCall(DMGetRefineLevel(dm, &mesh->refine_level));
+  mesh->refine_level = refinement_level;
 
   // Determine the number of cells in the mesh
   PetscInt c_start, c_end;
@@ -1291,7 +1293,8 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
   // Create mesh elements from the DM
   PetscCall(RDyCellsCreateFromDM(dm, mesh->max_nvertices_per_cell, mesh->max_nedges_per_cell, &mesh->cells));
   PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, mesh->max_ncells_per_vertex, mesh->max_nedges_per_vertex, &mesh->vertices, &mesh->num_vertices_global));
+  PetscCall(RDyVerticesCreateFromDM(dm, refinement_level, mesh->max_ncells_per_vertex, mesh->max_nedges_per_vertex, &mesh->vertices,
+                                    &mesh->num_vertices_global));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
