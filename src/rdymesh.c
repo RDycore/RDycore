@@ -367,7 +367,6 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, 
     }
 
   } else {
-
     IS globalVertexNumbers;
     PetscCall(DMPlexGetVertexNumbering(dm, &globalVertexNumbers));
 
@@ -377,7 +376,7 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, 
     for (PetscInt v = v_start; v < v_end; v++) {
       PetscInt ivertex = v - v_start;
       if (ids[ivertex] < 0) vertices->global_ids[ivertex] = -ids[ivertex] - 1;
-      else                  vertices->global_ids[ivertex] = ids[ivertex];
+      else vertices->global_ids[ivertex] = ids[ivertex];
     }
 
     PetscCall(ISRestoreIndices(globalVertexNumbers, &ids));
@@ -1179,7 +1178,6 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(VecDuplicate(global_vec, &mesh->output.yc));
     PetscCall(VecDuplicate(global_vec, &mesh->output.zc));
   }
-
 
   // set names to the Vecs
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
