@@ -489,6 +489,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(PetscFree(fineToCoarseMap));
 
   // destroy the coarse vectors
+  PetscCall(VecCopy(rdy->u_local, U_coarse_local));
   PetscCall(RDyDestroyVectors(&rdy));
 
   // destroy the coarse DMs
@@ -525,6 +526,8 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // initialize the refined solution from existing previous solution
   PetscCall(MatMult(CoarseToFine, U_coarse_local, rdy->u_local));
+  PetscCall(VecView(U_coarse_local, PETSC_VIEWER_STDOUT_WORLD));
+  PetscCall(VecView(rdy->u_local, PETSC_VIEWER_STDOUT_WORLD));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFine));
   PetscCall(VecDestroy(&U_fine_local));
