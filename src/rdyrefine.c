@@ -52,6 +52,11 @@ static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Creates matrices for the interpolation between coarse and fine meshes.
+/// @param dm           The fine DM
+/// @param CoarseToFine Matrix for interpolating local Vec from coarse to fine grid
+/// @param FineToCoarse Matrix for interpolating local Vec from fine to coarse grid
+/// @return PETSC_SUCESS on success
 static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine, Mat FineToCoarse) {
   DMPlexTransform tr;
   DM              odm;
@@ -488,7 +493,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(PetscFree(fineToCoarseMap));
 
   // make a copy of the old solution
-  PetscCall(VecCopy(rdy->u_local, U_coarse_local));
+  PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_global, INSERT_VALUES, U_coarse_local));
 
   // destroy the coarse vectors
   PetscCall(RDyDestroyVectors(&rdy));
@@ -529,6 +534,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(MatMult(CoarseToFine, U_coarse_local, rdy->u_local));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFine));
+  PetscCall(VecDestroy(&U_coarse_local));
   PetscCall(VecDestroy(&U_fine_local));
 
   // destroy the operator
@@ -543,7 +549,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // destroy the boundaries and reallocate memory
   PetscCall(RDyDestroyBoundaries(&rdy));
-  PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundaries));
+  InitBoundaries(rdy);
 
   // reinitialize the operator
   PetscCall(InitOperator(rdy));
