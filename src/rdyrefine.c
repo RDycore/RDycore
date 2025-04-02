@@ -381,15 +381,15 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscFunctionBeginUser;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
   PetscCall(ProcessOptions(PETSC_COMM_WORLD, &user));
+
   /* Adapt */
   PetscCall(AdaptMesh(rdy->dm, ndof_coarse, &dm_fine, &CoarseToFine, &FineToCoarse, &user));
   PetscCall(DMLocalizeCoordinates(dm_fine));
-  /* PetscCall(PetscObjectSetName((PetscObject)dm_fine, "Mesh")); */
-  /* PetscCall(DMSetFromOptions(dm_fine)); */
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
   PetscCall(DMGetCoordinatesLocalSetUp(dm_fine));
-  {
+
+  if (0) {
     PetscSection sec;
     PetscCall(DMGetLocalSection(rdy->dm, &sec));
     PetscInt nfields;
@@ -409,7 +409,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
     }
   }
 
-  {
+  if (0) {
     PetscSection sec;
     PetscCall(DMGetLocalSection(dm_fine, &sec));
     PetscInt nfields;
@@ -447,9 +447,8 @@ PetscErrorCode RDyRefine(RDy rdy) {
     }
   }
 
-  // make a copy of the old solution
+  // create a local vector for the coarse mesh
   PetscCall(VecDuplicate(rdy->u_local, &U_coarse_local));
-  PetscCall(VecCopy(rdy->u_local, U_coarse_local));
 
   // determine the mapping of cells from fine to coarse mesh
   PetscCall(DMCreateLocalVector(dm_fine, &U_fine_local));
@@ -488,8 +487,10 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(PetscFree(coarseToFineMap));
   PetscCall(PetscFree(fineToCoarseMap));
 
-  // destroy the coarse vectors
+  // make a copy of the old solution
   PetscCall(VecCopy(rdy->u_local, U_coarse_local));
+
+  // destroy the coarse vectors
   PetscCall(RDyDestroyVectors(&rdy));
 
   // destroy the coarse DMs
@@ -526,8 +527,6 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // initialize the refined solution from existing previous solution
   PetscCall(MatMult(CoarseToFine, U_coarse_local, rdy->u_local));
-  PetscCall(VecView(U_coarse_local, PETSC_VIEWER_STDOUT_WORLD));
-  PetscCall(VecView(rdy->u_local, PETSC_VIEWER_STDOUT_WORLD));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFine));
   PetscCall(VecDestroy(&U_fine_local));
