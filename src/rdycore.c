@@ -179,6 +179,7 @@ PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
     }
   }
   if ((*rdy)->boundaries) PetscFree((*rdy)->boundaries);
+  (*rdy)->num_boundaries = 0;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
