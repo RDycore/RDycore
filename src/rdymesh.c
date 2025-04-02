@@ -365,6 +365,22 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, 
         vertices->global_ids[ivertex] -= min_vertex_idx;
       }
     }
+
+  } else {
+
+    IS globalVertexNumbers;
+    PetscCall(DMPlexGetVertexNumbering(dm, &globalVertexNumbers));
+
+    const PetscInt *ids;
+    PetscCall(ISGetIndices(globalVertexNumbers, &ids));
+
+    for (PetscInt v = v_start; v < v_end; v++) {
+      PetscInt ivertex = v - v_start;
+      if (ids[ivertex] < 0) vertices->global_ids[ivertex] = -ids[ivertex] - 1;
+      else                  vertices->global_ids[ivertex] = ids[ivertex];
+    }
+
+    PetscCall(ISRestoreIndices(globalVertexNumbers, &ids));
   }
 
   // compute total number of vertices
@@ -1011,13 +1027,19 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
             .num_field_components = {max_num_vertices},
             .field_names          = {"Cell Connections"},
   };
-  PetscCall(CreateCellCenteredDMFromDM(dm, field_spec, &local_dm));
+  PetscCall(CreateCellCenteredDMFromDM(dm, mesh->refine_level, field_spec, &local_dm));
 
   Vec          global_vec, natural_vec;
   PetscScalar *vec_ptr;
   PetscInt     n;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+  PetscBool useNatural;
+  PetscCall(DMGetUseNatural(dm, &useNatural));
+  if (useNatural) {
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+  } else {
+    PetscCall(VecDuplicate(global_vec, &natural_vec));
+  }
 
   PetscCall(VecGetLocalSize(global_vec, &n));
   PetscCheck(n == mesh->num_owned_cells * max_num_vertices, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
@@ -1039,8 +1061,12 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
-  PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-  PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+  if (useNatural) {
+    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+  } else {
+    PetscCall(VecCopy(global_vec, natural_vec));
+  }
 
   if (0) {
     PetscCall(VecView(global_vec, PETSC_VIEWER_STDOUT_WORLD));
@@ -1133,16 +1159,27 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
       .field_names          = {"Cell Coordinates"},
   };
 
-  PetscCall(CreateCellCenteredDMFromDM(dm, local_spec, &local_dm));
+  PetscCall(CreateCellCenteredDMFromDM(dm, mesh->refine_level, local_spec, &local_dm));
 
   Vec global_vec, natural_vec;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
 
-  // create the Vec for storing coordinates in nautral order
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+  PetscBool useNatural;
+  PetscCall(DMGetUseNatural(dm, &useNatural));
+  if (useNatural) {
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+
+    // create the Vec for storing coordinates in nautral order
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+  } else {
+    PetscCall(VecDuplicate(global_vec, &natural_vec));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.xc));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.yc));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.zc));
+  }
+
 
   // set names to the Vecs
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
@@ -1163,8 +1200,12 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
     // scatter the data from global to natural order
-    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+    if (useNatural) {
+      PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+      PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+    } else {
+      PetscCall(VecCopy(global_vec, natural_vec));
+    }
 
     // save the coordinate in appropriate Vec
     switch (idim) {
@@ -1313,11 +1354,9 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, PetscInt refinement_level, RDyMesh *me
 
   PetscCall(MPI_Allreduce(&mesh->num_owned_cells, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
-  if (!mesh->refine_level) {
-    PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
-    PetscCall(CreateCellConnectionVector(dm, mesh));
-    PetscCall(CreateCellCentroidVectors(dm, mesh));
-  }
+  PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
+  PetscCall(CreateCellConnectionVector(dm, mesh));
+  PetscCall(CreateCellCentroidVectors(dm, mesh));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

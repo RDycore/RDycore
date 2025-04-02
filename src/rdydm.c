@@ -42,16 +42,14 @@ static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateCellCenteredDMFromDM(DM dm, const SectionFieldSpec fields, DM *cc_dm) {
+PetscErrorCode CreateCellCenteredDMFromDM(DM dm, PetscInt refinment_level, const SectionFieldSpec fields, DM *cc_dm) {
   PetscFunctionBegin;
 
   PetscCall(DMClone(dm, cc_dm));
 
   PetscCall(CreateDMSection(*cc_dm, fields));
 
-  PetscInt refine_level;
-  PetscCall(DMGetRefineLevel(dm, &refine_level));
-  if (!refine_level) {
+  if (!refinment_level) {
     // copy adjacency info from the original DM
     PetscSF sf_migration, sf_natural;
     PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));
@@ -59,6 +57,8 @@ PetscErrorCode CreateCellCenteredDMFromDM(DM dm, const SectionFieldSpec fields, 
     PetscCall(DMSetNaturalSF(*cc_dm, sf_natural));
     PetscCall(DMSetUseNatural(*cc_dm, PETSC_TRUE));
     PetscCall(PetscSFDestroy(&sf_natural));
+  } else {
+    PetscCall(DMSetUseNatural(dm, PETSC_FALSE));
   }
   PetscSection section;
   PetscCall(DMGetLocalSection(*cc_dm, &section));
@@ -164,7 +164,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->diag_fields, &rdy->aux_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->diag_fields, &rdy->aux_dm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -183,7 +183,7 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
     snprintf(rdy->sediment_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
   }
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->sediment_fields, &rdy->sediment_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->sediment_fields, &rdy->sediment_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -200,7 +200,7 @@ PetscErrorCode CreateFlowDM(RDy rdy) {
   snprintf(rdy->flow_fields.field_component_names[0][1], MAX_NAME_LEN, "MomentumX");
   snprintf(rdy->flow_fields.field_component_names[0][2], MAX_NAME_LEN, "MomentumY");
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->flow_fields, &rdy->flow_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->flow_fields, &rdy->flow_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
