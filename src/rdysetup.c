@@ -1270,8 +1270,6 @@ PetscErrorCode RDySetup(RDy rdy) {
   };
   PetscCall(CreateAuxiliaryDM(rdy));
 
-  PetscCall(CreateFlowDM(rdy));
-
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));
     PetscCall(CreateSedimentDM(rdy));
