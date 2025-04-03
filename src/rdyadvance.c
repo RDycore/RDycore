@@ -125,7 +125,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyOutputViewer(RDy rdy) {
+PetscErrorCode DestroyOutputViewer(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->output_vf) PetscCall(PetscViewerAndFormatDestroy(&rdy->output_vf));
   if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));

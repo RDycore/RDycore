@@ -41,6 +41,7 @@ PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
 PETSC_EXTERN PetscErrorCode RDyRefine(RDy);
 
 // time integration
+PETSC_EXTERN PetscErrorCode DestroyOutputViewer(RDy);
 PETSC_EXTERN PetscErrorCode RDyAdvance(RDy);
 
 // Accessing data
