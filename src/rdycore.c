@@ -18,9 +18,6 @@ PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
       PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
     }
 
-    // some exit statuses don't get propagated without this vvv
-    PetscCall(PetscPushErrorHandler(PetscMPIAbortErrorHandler, NULL));
-
     // set up our logging class ID
     PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
 
@@ -45,9 +42,6 @@ PetscErrorCode RDyInitFortran(void) {
       // no need for PetscInitializeFortran because PetscInitialize is
       // called before this function in the rdycore Fortran module.
     }
-
-    // some exit statuses don't get propagated without this vvv
-    PetscCall(PetscPushErrorHandler(PetscMPIAbortErrorHandler, NULL));
 
     // set up our logging class ID
     PetscCall(PetscClassIdRegister("RDycore", &RDY_CLASSID));
