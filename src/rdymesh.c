@@ -20,6 +20,7 @@ static PetscInt QUAD_ID_EXODUS = 5;
 /// @param [in] nvertices_per_cell Maximum number of vertices per cell
 /// @param [in] nedges_per_cell Maximum number of edges per cell
 /// @param [out] cells A pointer to an RDyCells that stores allocated data.
+/// @param [out] num_cells A pointer to the number of cells
 ///
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells) {
@@ -84,7 +85,7 @@ static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_
 /// @param [out] cells A pointer to an RDyCells that stores allocated data.
 ///
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells) {
+static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells, PetscInt *num_cells) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -101,8 +102,8 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate cell storage
-  PetscInt num_cells = c_end - c_start;
-  PetscCall(RDyCellsCreate(num_cells, nvertices_per_cell, nedges_per_cell, cells));
+  *num_cells = c_end - c_start;
+  PetscCall(RDyCellsCreate(*num_cells, nvertices_per_cell, nedges_per_cell, cells));
 
   PetscInt num_owned_cells = 0;
   for (PetscInt c = c_start; c < c_end; c++) {
@@ -153,7 +154,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   FILL(num_owned_cells, cells->owned_to_local, -1);
 
   PetscInt count = 0;
-  for (PetscInt icell = 0; icell < num_cells; icell++) {
+  for (PetscInt icell = 0; icell < *num_cells; icell++) {
     if (cells->is_owned[icell]) {
       cells->local_to_owned[icell] = count;
       cells->owned_to_local[count] = icell;
@@ -161,7 +162,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
     }
   }
 
-  for (PetscInt icell = 0; icell < num_cells; icell++) {
+  for (PetscInt icell = 0; icell < *num_cells; icell++) {
     if (!cells->is_owned[icell]) {
       cells->local_to_owned[icell] = count;
       count++;
@@ -171,7 +172,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   // fetch global cell IDs.
   ISLocalToGlobalMapping map;
   PetscCall(DMGetLocalToGlobalMapping(dm, &map));
-  PetscCall(ISLocalToGlobalMappingApply(map, num_cells, cells->ids, cells->global_ids));
+  PetscCall(ISLocalToGlobalMappingApply(map, *num_cells, cells->ids, cells->global_ids));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -251,10 +252,11 @@ static PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, PetscInt ncells_p
 /// @param [in] ncells_per_vertex Maximum number of cells per vertex
 /// @param [in] nedges_per_vertex Maximum number of edges per vertex
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
+/// @param [out] num_vertices A pointer to the number of vertices in the local mesh
 /// @param [out] num_vertices_global A pointer to the number of vertices in the global mesh
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, PetscInt ncells_per_vertex, PetscInt nedges_per_vertex,
-                                              RDyVertices *vertices, PetscInt *num_vertices_global) {
+                                              RDyVertices *vertices, PetscInt *num_vertices, PetscInt *num_vertices_global) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -268,8 +270,8 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, 
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate vertex storage
-  PetscInt num_vertices = v_end - v_start;
-  PetscCall(RDyVerticesCreate(num_vertices, ncells_per_vertex, nedges_per_vertex, vertices));
+  *num_vertices = v_end - v_start;
+  PetscCall(RDyVerticesCreate(*num_vertices, ncells_per_vertex, nedges_per_vertex, vertices));
 
   PetscSection coordSection;
   Vec          coordinates;
@@ -446,9 +448,10 @@ static PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 /// Creates a fully initialized RDyEdges struct from a given DM.
 /// @param [in] dm A DM that provides edge data
 /// @param [out] edges A pointer to an RDyEdges that stores allocated data.
+/// @param [out] num_edges A pointer to the number of edges in the local mesh
 ///
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
+static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges, PetscInt *num_edges) {
   PetscFunctionBegin;
 
   MPI_Comm    comm;
@@ -467,8 +470,8 @@ static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate edge storage
-  PetscInt num_edges = e_end - e_start;
-  PetscCall(RDyEdgesCreate(num_edges, edges));
+  *num_edges = e_end - e_start;
+  PetscCall(RDyEdgesCreate(*num_edges, edges));
 
   for (PetscInt e = e_start; e < e_end; e++) {
     PetscInt  iedge = e - e_start;
@@ -1311,29 +1314,14 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, PetscInt refinement_level, RDyMesh *me
   // save the number of refinements
   mesh->refine_level = refinement_level;
 
-  // Determine the number of cells in the mesh
-  PetscInt c_start, c_end;
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
-  mesh->num_cells = c_end - c_start;
-
-  // Determine the number of edges in the mesh
-  PetscInt e_start, e_end;
-  PetscCall(DMPlexGetDepthStratum(dm, 1, &e_start, &e_end));
-  mesh->num_edges = e_end - e_start;
-
-  // Determine the number of vertices in the mesh
-  PetscInt v_start, v_end;
-  PetscCall(DMPlexGetDepthStratum(dm, 0, &v_start, &v_end));
-  mesh->num_vertices = v_end - v_start;
-
   // Determine few max attributes per cell and per vertex
   PetscCall(DetermineMaxAttributesForCellsAndVertices(dm, mesh));
 
   // Create mesh elements from the DM
-  PetscCall(RDyCellsCreateFromDM(dm, mesh->max_nvertices_per_cell, mesh->max_nedges_per_cell, &mesh->cells));
-  PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
+  PetscCall(RDyCellsCreateFromDM(dm, mesh->max_nvertices_per_cell, mesh->max_nedges_per_cell, &mesh->cells, &mesh->num_cells));
+  PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges, &mesh->num_edges));
   PetscCall(RDyVerticesCreateFromDM(dm, refinement_level, mesh->max_ncells_per_vertex, mesh->max_nedges_per_vertex, &mesh->vertices,
-                                    &mesh->num_vertices_global));
+                                    &mesh->num_vertices, &mesh->num_vertices_global));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
@@ -1365,9 +1353,21 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, PetscInt refinement_level, RDyMesh *me
 /// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscFunctionBegin;
-  PetscCall(RDyCellsDestroy(mesh.cells));
-  PetscCall(RDyEdgesDestroy(mesh.edges));
-  PetscCall(RDyVerticesDestroy(mesh.vertices));
+
+  if (mesh.num_cells) {
+    PetscCall(RDyCellsDestroy(mesh.cells));
+    mesh.num_cells = 0;
+  }
+
+  if (mesh.num_edges) {
+    PetscCall(RDyEdgesDestroy(mesh.edges));
+    mesh.num_edges = 0;
+  }
+
+  if (mesh.num_vertices) {
+    PetscCall(RDyVerticesDestroy(mesh.vertices));
+    mesh.num_vertices = 0;
+  }
 
   PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
   PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
@@ -1375,6 +1375,5 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(VecDestroy(&mesh.output.yc));
   PetscCall(VecDestroy(&mesh.output.zc));
 
-  mesh.num_cells = 0;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
