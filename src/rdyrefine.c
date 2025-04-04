@@ -541,13 +541,6 @@ PetscErrorCode RDyRefine(RDy rdy) {
   // destroy the operator
   PetscCall(DestroyOperator(&rdy->operator));
 
-  // save time and timestep from TS
-  PetscReal time, dt;
-  PetscInt  nstep;
-  PetscCall(TSGetTime(rdy->ts, &time));
-  PetscCall(TSGetTimeStep(rdy->ts, &dt));
-  PetscCall(TSGetStepNumber(rdy->ts, &nstep));
-
   // destroy the boundaries and reallocate memory
   PetscCall(RDyDestroyBoundaries(&rdy));
   InitBoundaries(rdy);
@@ -557,6 +550,17 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // reinitialize material properties
   PetscCall(InitMaterialProperties(rdy));
+
+  // save time and timestep from TS
+  PetscReal time, dt;
+  PetscInt  nstep;
+  PetscCall(TSGetTime(rdy->ts, &time));
+  PetscCall(TSGetTimeStep(rdy->ts, &dt));
+  PetscCall(TSGetStepNumber(rdy->ts, &nstep));
+
+  // destroy the TS and re-create it
+  PetscCall(TSDestroy(&rdy->ts));
+  PetscCall(InitSolver(rdy));
 
   // set the time and timstep in TS
   PetscCall(TSSetStepNumber(rdy->ts, nstep));
