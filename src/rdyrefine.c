@@ -534,6 +534,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(MatMult(CoarseToFine, U_coarse_local, rdy->u_local));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFine));
+  PetscCall(MatDestroy(&FineToCoarse));
   PetscCall(VecDestroy(&U_coarse_local));
   PetscCall(VecDestroy(&U_fine_local));
 
@@ -556,9 +557,6 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // reinitialize material properties
   PetscCall(InitMaterialProperties(rdy));
-
-  // reinitialize the solver
-  PetscCall(InitSolver(rdy));
 
   // set the time and timstep in TS
   PetscCall(TSSetStepNumber(rdy->ts, nstep));
