@@ -119,9 +119,12 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
 
   PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
-  PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
+  PetscBool option = PETSC_FALSE;
+  PetscOptionsGetBool(NULL, NULL, "-do_dmadaptlabel", &option, NULL);
+  if (option) PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
   PetscCall(DMLabelDestroy(&adaptLabel));
 
+  /*
   if (!dmAdapt) {
     PetscCheck(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
   }
@@ -140,6 +143,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscCall(ConstructRefineTree(dmAdapt, *CoarseToFine, *FineToCoarse));
 
   *dm_fine = dmAdapt;
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -389,6 +393,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   /* Adapt */
   PetscCall(AdaptMesh(rdy->dm, ndof_coarse, &dm_fine, &CoarseToFine, &FineToCoarse, &user));
+  /*
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
@@ -570,6 +575,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // initialize the source terms
   PetscCall(InitSourceConditions(rdy));
+  */
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

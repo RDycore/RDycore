@@ -36,11 +36,12 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetup(rdy));
 
     PetscCall(RDyAdvance(rdy));
+    PetscCall(RDyRefine(rdy));
 
-    while (!RDyFinished(rdy)) {
-      PetscCall(RDyRefine(rdy));
-      PetscCall(RDyAdvance(rdy));
-    }
+    //while (!RDyFinished(rdy)) {
+    //  PetscCall(RDyRefine(rdy));
+    //  PetscCall(RDyAdvance(rdy));
+    //}
 
     PetscCall(RDyDestroy(&rdy));
   }
