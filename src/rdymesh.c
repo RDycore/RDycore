@@ -1369,12 +1369,12 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(RDyEdgesDestroy(mesh.edges));
   PetscCall(RDyVerticesDestroy(mesh.vertices));
 
-  if (!mesh.refine_level) {
-    PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
-    PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
-    PetscCall(VecDestroy(&mesh.output.xc));
-    PetscCall(VecDestroy(&mesh.output.yc));
-    PetscCall(VecDestroy(&mesh.output.zc));
-  }
+  PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
+  PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
+  PetscCall(VecDestroy(&mesh.output.xc));
+  PetscCall(VecDestroy(&mesh.output.yc));
+  PetscCall(VecDestroy(&mesh.output.zc));
+
+  mesh.num_cells = 0;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
