@@ -71,28 +71,39 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine, Mat FineToCoa
   PetscCall(DMPlexGetHeightStratum(odm, 0, &cStart, &cEnd));
   PetscCall(MatGetOwnershipRange(CoarseToFine, &Istart, NULL));
   PetscCall(MatGetOwnershipRangeColumn(CoarseToFine, &Jstart, NULL));
-  for (PetscInt c = cStart; c < cEnd; ++c) {
-    DMPolytopeType  ct;
-    DMPolytopeType *rct;
-    PetscInt       *rsize, *rcone, *rornt;
-    PetscInt        Nct, dim, pNew = 0;
+  PetscMPIInt myrank, commsize;
+  PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)dm), &myrank));
+  PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)dm), &commsize));
 
-    // PetscCall(PetscPrintf(PETSC_COMM_SELF, "Cell %" PetscInt_FMT " produced new cells", c));
-    PetscCall(DMPlexGetCellType(odm, c, &ct));
-    dim = DMPolytopeTypeGetDim(ct);
-    PetscCall(DMPlexTransformCellTransform(tr, ct, c, NULL, &Nct, &rct, &rsize, &rcone, &rornt));
-    for (PetscInt n = 0; n < Nct; ++n) {
-      if (DMPolytopeTypeGetDim(rct[n]) != dim) continue;
-      for (PetscInt r = 0; r < rsize[n]; ++r) {
-        PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], c, r, &pNew));
-        // PetscCall(PetscPrintf(PETSC_COMM_SELF, " %" PetscInt_FMT, pNew));
-        for (PetscInt i = 0; i < bs; i++) {
-          PetscCall(MatSetValue(CoarseToFine, Istart + bs * (pNew - 0) + i, Jstart + bs * (c - cStart) + i, val, INSERT_VALUES));
-          PetscCall(MatSetValue(FineToCoarse, Jstart + bs * (c - cStart) + i, Istart + bs * (pNew - 0) + i, 1.0 / rsize[n], INSERT_VALUES));
+  for (PetscInt i = 0; i < commsize; i++) {
+    if (i == myrank) {
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
+      for (PetscInt c = cStart; c < cEnd; ++c) {
+        DMPolytopeType  ct;
+        DMPolytopeType *rct;
+        PetscInt       *rsize, *rcone, *rornt;
+        PetscInt        Nct, dim, pNew = 0;
+
+        PetscCall(PetscPrintf(PETSC_COMM_SELF, "Rank %d; Istart = %d Cell %" PetscInt_FMT " produced new cells", myrank, Istart, c));
+        PetscCall(DMPlexGetCellType(odm, c, &ct));
+        dim = DMPolytopeTypeGetDim(ct);
+        PetscCall(DMPlexTransformCellTransform(tr, ct, c, NULL, &Nct, &rct, &rsize, &rcone, &rornt));
+        for (PetscInt n = 0; n < Nct; ++n) {
+          if (DMPolytopeTypeGetDim(rct[n]) != dim) continue;
+          for (PetscInt r = 0; r < rsize[n]; ++r) {
+            PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], c, r, &pNew));
+            PetscCall(PetscPrintf(PETSC_COMM_SELF, " %" PetscInt_FMT, pNew));
+            for (PetscInt i = 0; i < bs; i++) {
+              //PetscCall(MatSetValue(CoarseToFine, Istart + bs * (pNew - 0) + i, Jstart + bs * (c - cStart) + i, val, INSERT_VALUES));
+              //PetscCall(MatSetValue(FineToCoarse, Jstart + bs * (c - cStart) + i, Istart + bs * (pNew - 0) + i, 1.0 / rsize[n], INSERT_VALUES));
+            }
+          }
         }
+        PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
       }
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
     }
-    // PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
+    MPI_Barrier(PETSC_COMM_WORLD);
   }
 
   PetscCall(MatSetFromOptions(CoarseToFine));
@@ -114,13 +125,54 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
 
   DM       dmAdapt;
   DMLabel  adaptLabel;
-  PetscInt d_nz = 4, ccStart, ccEnd, fcStart, fcEnd;
+  PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, fcStart, fcEnd;
   char     opt[128];
 
   PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
+
+  PetscMPIInt myrank, commsize;
+  PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)dm), &myrank));
+  PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)dm), &commsize));
+  if (!myrank) printf("Information about coarse DM\n");
+  for (PetscInt i = 0; i < commsize; i++) {
+    if (i == myrank) {
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "Rank %d: Cell_id, X, Y, Is_owned \n", myrank));
+      PetscInt c_start, c_end;
+
+      DMPlexGetHeightStratum(dm, 0, &c_start, &c_end);
+      for (PetscInt c = c_start; c < c_end; ++c) {
+        PetscReal area, centroid[3], normal[3];
+        DMPlexComputeCellGeometryFVM(dm, c, &area, &centroid, &normal[0]);
+        PetscInt gref, junkInt;
+        PetscCall(DMPlexGetPointGlobal(dm, c, &gref, &junkInt));
+        printf("%" PetscInt_FMT " %e %e %" PetscInt_FMT "\n", c, centroid[0], centroid[1], ((gref >= 0)));
+      }
+    }
+    MPI_Barrier(PETSC_COMM_WORLD);
+  }
+
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
   PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
   PetscCall(DMLabelDestroy(&adaptLabel));
+
+  if (!myrank) printf("Information about REFINED DM\n");
+  for (PetscInt i = 0; i < commsize; i++) {
+    if (i == myrank) {
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "Rank %d: Cell_id, X, Y \n", myrank));
+      PetscInt c_start, c_end;
+
+      DMPlexGetHeightStratum(dmAdapt, 0, &c_start, &c_end);
+      for (PetscInt c = c_start; c < c_end; ++c) {
+        PetscReal area, centroid[3], normal[3];
+        DMPlexComputeCellGeometryFVM(dmAdapt, c, &area, &centroid, &normal[0]);
+        PetscInt gref, junkInt;
+        //PetscCall(DMPlexGetPointGlobal(dmAdapt, c, &gref, &junkInt));
+        printf("%" PetscInt_FMT " %e %e \n", c, centroid[0], centroid[1]);
+      }
+    }
+    MPI_Barrier(PETSC_COMM_WORLD);
+  }
+
 
   if (!dmAdapt) {
     PetscCheck(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
@@ -133,11 +185,15 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   // make interpolation matrix
   PetscCall(DMPlexGetHeightStratum(dm, 0, &ccStart, &ccEnd));
   PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
-  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), d_nz, NULL, CoarseToFine));
-  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), d_nz, NULL, FineToCoarse));
+  //PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), d_nz, NULL, CoarseToFine));
+  //PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), d_nz, NULL, FineToCoarse));
+  PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (fcEnd-fcStart), bs * (ccEnd-ccStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, CoarseToFine));
+  PetscCall(MatCreateAIJ(PetscObjectComm((PetscObject)dm), bs * (ccEnd-ccStart), bs * (fcEnd-fcStart), PETSC_DETERMINE, PETSC_DETERMINE, d_nz, NULL, o_nz, NULL, FineToCoarse));
   PetscCall(MatSetBlockSize(*CoarseToFine, bs));
   PetscCall(MatSetBlockSize(*FineToCoarse, bs));
   PetscCall(ConstructRefineTree(dmAdapt, *CoarseToFine, *FineToCoarse));
+  MPI_Barrier(PETSC_COMM_WORLD);
+  exit(0);
 
   *dm_fine = dmAdapt;
 
