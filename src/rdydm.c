@@ -112,7 +112,7 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   // parallel refinement phase
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_"));
-  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
