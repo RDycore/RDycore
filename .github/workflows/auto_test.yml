@@ -23,8 +23,8 @@ jobs:
       matrix:
         os: [ubuntu-latest] #, macos-latest]
         build-type: [Debug] #, Release]
-        container: ["coherellc/rdycore-petsc:v3.22.0-int32",
-                    "coherellc/rdycore-petsc:v3.22.0-int64"]
+        container: ["coherellc/rdycore-petsc:95934b0d3-int32",
+                    "coherellc/rdycore-petsc:95934b0d3-int64"]
 
     # Steps for building and running tests.
     steps:
@@ -37,23 +37,22 @@ jobs:
 
     - name: Configuring RDycore (${{ matrix.build-type }})
       run: |
-        cmake -S . -B build \
+        cmake -S . -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} \
         -DENABLE_COVERAGE=ON \
-        -DENABLE_SANITIZERS=ON \
-        -DCMAKE_VERBOSE_MAKEFILE=ON
+        -DENABLE_SANITIZERS=ON
 
     - name: Building RDycore (${{ matrix.build-type }})
       run: |
         grep PETSC_VERSION_GIT $PETSC_DIR/$PETSC_ARCH/include/petscconf.h | sed -e s/#define\ //g
         cd build
-        make -j
+        ninja
 
     - name: Running tests (${{ matrix.build-type }})
       run: |
         set +e # disable "fast fail" (continue on test failures to show output)
         cd build
-        make test
+        ninja test
         failed=$?
         if [ $failed -ne 0 ]; then
           cat Testing/Temporary/LastTest.log
@@ -63,7 +62,7 @@ jobs:
     - name: Evaluating code coverage
       run: |
         cd build
-        make coverage
+        ninja coverage
 
     - name: Uploading coverage report to codecov.io
       if: ${{ (contains(matrix.os, 'ubuntu')) && (matrix.build-type == 'Debug') && (contains(matrix.container, 'int32')) }}

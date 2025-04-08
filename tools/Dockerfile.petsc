@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   locales \
   m4 \
   make \
+  ninja-build \
   patch \
   pkg-config \
   python3-distutils \
