@@ -10,8 +10,9 @@ You can build and run RDycore on the following platforms:
 
 To build RDycore, you need:
 
-* [CMake v3.14+](https://cmake.org/)
-* GNU Make
+* [CMake v3.14+](https://cmake.org/) for configuration
+* [GNU Make](https://www.gnu.org/software/make/) or [Ninja](https://ninja-build.org/)
+  for compilation and testing
 * reliable C, C++, and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
   or [MPICH](https://www.mpich.org/))
@@ -97,6 +98,13 @@ using the `CMAKE_INSTALL_PREFIX` parameter:
 
 ```bash
 cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/path/to/install
+```
+
+If you want build RDycore with Ninja instead of Make, you can ask CMake to
+generate Ninja files instead of Makefiles with the `-G` (generator) flag:
+
+```bash
+cmake -S . -B build -G Ninja
 ```
 
 ### Supported configuration options
