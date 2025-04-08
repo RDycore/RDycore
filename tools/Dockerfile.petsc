@@ -51,7 +51,6 @@ RUN \
     --with-cc=mpicc \
     --with-cxx=mpic++ \
     --with-fc=mpif90 \
-    --CFLAGS='-g -O0' --CXXFLAGS='-g -O0' --FFLAGS='-g -O0 -Wno-unused-function' \
     --with-clanguage=c \
     --with-debug=1 \
     --with-shared-libraries=1 \
