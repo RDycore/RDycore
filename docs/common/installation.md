@@ -138,11 +138,13 @@ If you have, these tools should be located in
 After you've configured RDycore, you can build it:
 
 1. Change to your build directory (e.g. `cd build`)
-2. Type `make -j` to build the library.
-3. To run tests for the library (and the included drivers), type `make test`.
+2. Type `make -j` or `ninja` to build the library.
+3. To run tests for the library (and the included drivers), type `make test` or
+   `ninja test`.
 4. To install the model to the location (indicated by your `CMAKE_INSTALL_PREFIX`,
-   if you specified it), type `make install`. By default, products are installed
-   in the `include`, `lib`, `bin`, and `share` subdirectories of this prefix.
+   if you specified it), type `make install` or `ninja install`. By default,
+   products are installed in the `include`, `lib`, `bin`, and `share`
+   subdirectories of this prefix.
 
 ### Running Tests
 
@@ -153,6 +155,12 @@ tests for RDycore is to change to your build directory and type
 
 ```
 make test
+```
+
+or
+
+```
+ninja test
 ```
 
 This runs every test defined in your build configuration and dumps the results
@@ -173,6 +181,12 @@ after building and running tests, type
 make coverage
 ```
 
+or
+
+```
+ninja coverage
+```
+
 to generate a single report (`coverage.info`) containing all coverage
 information. See the documentation for `gcov` and `lcov` (linked above) for
 details on how to interpret thіs information.
@@ -184,6 +198,12 @@ installed, you can run our tests using Valgrind's `memcheck` tool with
 
 ```
 make memcheck
+```
+
+or
+
+```
+ninja memcheck
 ```
 
 ## Making code changes and rebuilding
@@ -199,7 +219,7 @@ you created in step 1 above:
 
 ```bash
 cd /path/to/RDycore/build
-make -j
+make -j  # or ninja
 ```
 
 You can also run tests from this build directory with `make test`.
@@ -210,10 +230,10 @@ open with a terminal, sitting in your `build` directory. If you're using a fancy
 modern editor, it might have a CMake-based workflow that handles all of this for
 you.
 
-The build directory has a structure that mirrors the source directory, and you
-can type `make` in any one of its subdirectories to do partial builds. In
-practice, though, it's safest to always build from the top of the build tree.
-
+The build directory has a structure that mirrors the source directory. If you're
+using Make (and not Ninja) to build RDycore, you can type `make` in any one of
+its subdirectories to do partial builds. In practice, though, it's safest to
+always build from the top of the build tree.
 
 ## Preinstalled PETSc for RDycore on certain DOE machines
 
@@ -242,6 +262,8 @@ Frontier has a single type of compute node that has 64-core AMD and 4x AMD MI250
 Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-cores,
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.
+
+**NOTE: Replace `make -j4` with `ninja` below to use Ninja instead of Make.**
 
 ### Example: Building and running RDycore on Perlmutter CPU nodes
 
@@ -355,3 +377,11 @@ So if you modify `PKG_CONFIG_PATH` to contain `$PETSC_DIR/$PETSC_ARCH/lib/pkgcon
 (e.g. `export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"`),
 CMake can find your PETSc installation. This is probably required if you are
 installing PETSc in a peculiar place.
+
+**When I type `make`, it builds some things and then just sits there for hours!
+What's going on?**
+
+Currently (around April 8, 2025), CMake is not able to generate Makefiles for
+PETSc's Fortran bindings, so you should use Ninja instead to build RDycore. Just
+add `-G Ninja` to your CMake configuration command and use `ninja` instead of
+`make` (without the `-j` flag, as Ninja always does parallel builds).
