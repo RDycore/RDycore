@@ -1688,8 +1688,9 @@
 <h2 id="required-software">Required Software</h2>
 <p>To build RDycore, you need:</p>
 <ul>
-<li><a href="https://cmake.org/">CMake v3.14+</a></li>
-<li>GNU Make</li>
+<li><a href="https://cmake.org/">CMake v3.14+</a> for configuration</li>
+<li><a href="https://www.gnu.org/software/make/">GNU Make</a> or <a href="https://ninja-build.org/">Ninja</a>
+  for compilation and testing</li>
 <li>reliable C, C++, and Fortran compilers</li>
 <li>a working MPI installation (like <a href="https://www.open-mpi.org/">OpenMPI</a>
   or <a href="https://www.mpich.org/">MPICH</a>)</li>
@@ -1764,6 +1765,10 @@ directory. If you want to install RDycore somewhere afterward, e.g. to be able
 to configure E3SM to use it, you can set the prefix for the installation path
 using the <code>CMAKE_INSTALL_PREFIX</code> parameter:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>/path/to/install
+</code></pre></div>
+<p>If you want build RDycore with Ninja instead of Make, you can ask CMake to
+generate Ninja files instead of Makefiles with the <code>-G</code> (generator) flag:</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-G<span class="w"> </span>Ninja
 </code></pre></div>
 <h3 id="supported-configuration-options">Supported configuration options</h3>
 <p>CMake allows you to specify build options with the <code>-D</code> flag, as indicated in
