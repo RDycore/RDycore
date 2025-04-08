@@ -1796,11 +1796,13 @@ If you have, these tools should be located in
 <p>After you've configured RDycore, you can build it:</p>
 <ol>
 <li>Change to your build directory (e.g. <code>cd build</code>)</li>
-<li>Type <code>make -j</code> to build the library.</li>
-<li>To run tests for the library (and the included drivers), type <code>make test</code>.</li>
+<li>Type <code>make -j</code> or <code>ninja</code> to build the library.</li>
+<li>To run tests for the library (and the included drivers), type <code>make test</code> or
+   <code>ninja test</code>.</li>
 <li>To install the model to the location (indicated by your <code>CMAKE_INSTALL_PREFIX</code>,
-   if you specified it), type <code>make install</code>. By default, products are installed
-   in the <code>include</code>, <code>lib</code>, <code>bin</code>, and <code>share</code> subdirectories of this prefix.</li>
+   if you specified it), type <code>make install</code> or <code>ninja install</code>. By default,
+   products are installed in the <code>include</code>, <code>lib</code>, <code>bin</code>, and <code>share</code>
+   subdirectories of this prefix.</li>
 </ol>
 <h3 id="running-tests">Running Tests</h3>
 <p>RDycore uses <a href="https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html">CTest</a>,
@@ -1808,6 +1810,9 @@ CMake's testing program, to run its tests. CTest is very fancy and allows us to
 run tests selectively and in various ways, but all you need to do to run all the
 tests for RDycore is to change to your build directory and type</p>
 <div class="highlight"><pre><span></span><code>make test
+</code></pre></div>
+<p>or</p>
+<div class="highlight"><pre><span></span><code>ninja test
 </code></pre></div>
 <p>This runs every test defined in your build configuration and dumps the results
 to <code>Testing/Temporary/LastTest.log</code>.</p>
@@ -1821,6 +1826,9 @@ pass the <code>-DENABLE_COVERAGE=ON</code> flag to CMake when configuring your b
 after building and running tests, type</p>
 <div class="highlight"><pre><span></span><code>make coverage
 </code></pre></div>
+<p>or</p>
+<div class="highlight"><pre><span></span><code>ninja coverage
+</code></pre></div>
 <p>to generate a single report (<code>coverage.info</code>) containing all coverage
 information. See the documentation for <code>gcov</code> and <code>lcov</code> (linked above) for
 details on how to interpret thіs information.</p>
@@ -1828,6 +1836,9 @@ details on how to interpret thіs information.</p>
 <p>If you're using a Linux system and have <a href="https://valgrind.org/">Valgrind</a>
 installed, you can run our tests using Valgrind's <code>memcheck</code> tool with</p>
 <div class="highlight"><pre><span></span><code>make memcheck
+</code></pre></div>
+<p>or</p>
+<div class="highlight"><pre><span></span><code>ninja memcheck
 </code></pre></div>
 <h2 id="making-code-changes-and-rebuilding">Making code changes and rebuilding</h2>
 <p>Notice that you must build RDycore in a  <strong>build tree</strong>, separate from its source
@@ -1838,7 +1849,7 @@ you work in order to be productive in this kind of environment.</p>
 <p>When you make a code change, make sure you build from the build directory that
 you created in step 1 above:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore/build
-make<span class="w"> </span>-j
+make<span class="w"> </span>-j<span class="w">  </span><span class="c1"># or ninja</span>
 </code></pre></div>
 <p>You can also run tests from this build directory with <code>make test</code>.</p>
 <p>This is very different from how some people like to work. One method of making
@@ -1846,9 +1857,10 @@ this easier is to use an editor in a dedicated window, and have another window
 open with a terminal, sitting in your <code>build</code> directory. If you're using a fancy
 modern editor, it might have a CMake-based workflow that handles all of this for
 you.</p>
-<p>The build directory has a structure that mirrors the source directory, and you
-can type <code>make</code> in any one of its subdirectories to do partial builds. In
-practice, though, it's safest to always build from the top of the build tree.</p>
+<p>The build directory has a structure that mirrors the source directory. If you're
+using Make (and not Ninja) to build RDycore, you can type <code>make</code> in any one of
+its subdirectories to do partial builds. In practice, though, it's safest to
+always build from the top of the build tree.</p>
 <h2 id="preinstalled-petsc-for-rdycore-on-certain-doe-machines">Preinstalled PETSc for RDycore on certain DOE machines</h2>
 <p>The RDycore team supports installation of the model at following DOE machines:</p>
 <ol>
@@ -1870,6 +1882,7 @@ of CUDA to run on Perlmutter GPUs.</p>
 Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-cores,
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.</p>
+<p><strong>NOTE: Replace <code>make -j4</code> with <code>ninja</code> below to use Ninja instead of Make.</strong></p>
 <h3 id="example-building-and-running-rdycore-on-perlmutter-cpu-nodes">Example: Building and running RDycore on Perlmutter CPU nodes</h3>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
 
@@ -1964,6 +1977,12 @@ using the <code>PKG_CONFIG_PATH</code> environment variable similarly to how you
 (e.g. <code>export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"</code>),
 CMake can find your PETSc installation. This is probably required if you are
 installing PETSc in a peculiar place.</p>
+<p><strong>When I type <code>make</code>, it builds some things and then just sits there for hours!
+What's going on?</strong></p>
+<p>Currently (around April 8, 2025), CMake is not able to generate Makefiles for
+PETSc's Fortran bindings, so you should use Ninja instead to build RDycore. Just
+add <code>-G Ninja</code> to your CMake configuration command and use <code>ninja</code> instead of
+<code>make</code> (without the <code>-j</code> flag, as Ninja always does parallel builds).</p>
 
 
 
