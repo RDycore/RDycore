@@ -111,6 +111,9 @@ Step 3 above. Here are the options supported by RDycore:
 * **`CMAKE_VERBOSE_MAKEFILE=ON|OFF`**: if `ON`, displays compiler and linker
   output while building. Otherwise displays only the file being built.
 * **`ENABLE_COVERAGE=ON|OFF`**: if `ON`, enables code coverage instrumentation.
+* **`ENABLE_FORTRAN=ON|OFF`**: if `ON`, enables Fortran 90 bindings. This is `ON`
+  by default, but can be used to work around situations in which Fortran compilers
+  are causing issues.
 
 Since RDycore gets most of its configuration information from PETSc, we don't
 need to use most other CMake options.
