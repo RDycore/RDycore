@@ -50,4 +50,6 @@ if (ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-add_subdirectory(f90-mod)
+if (ENABLE_FORTRAN)
+  add_subdirectory(f90-mod)
+endif()

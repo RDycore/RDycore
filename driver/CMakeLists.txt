@@ -18,25 +18,22 @@ install(
 )
 
 # Fortran driver
-add_executable(rdycore_f90_exe
-  main.F90
-)
-set_target_properties(rdycore_f90_exe PROPERTIES OUTPUT_NAME rdycore_f90)
-target_include_directories(rdycore_f90_exe PRIVATE ${PROJECT_BINARY_DIR}/src/f90-mod)
-target_link_libraries(rdycore_f90_exe PRIVATE rdycore_f90)
+if (ENABLE_FORTRAN)
+  add_executable(rdycore_f90_exe main.F90)
+  set_target_properties(rdycore_f90_exe PROPERTIES OUTPUT_NAME rdycore_f90)
+  target_include_directories(rdycore_f90_exe PRIVATE ${PROJECT_BINARY_DIR}/src/f90-mod)
+  target_link_libraries(rdycore_f90_exe PRIVATE rdycore_f90)
 
-# MMS Fortran driver
-add_executable(rdycore_mms_f90
-  mms.F90
-)
-set_target_properties(rdycore_mms_f90 PROPERTIES OUTPUT_NAME rdycore_mms_f90)
-target_include_directories(rdycore_mms_f90 PRIVATE ${PROJECT_BINARY_DIR}/src/f90-mod)
-target_link_libraries(rdycore_mms_f90 PRIVATE rdycore_f90)
+  add_executable(rdycore_mms_f90 mms.F90)
+  set_target_properties(rdycore_mms_f90 PROPERTIES OUTPUT_NAME rdycore_mms_f90)
+  target_include_directories(rdycore_mms_f90 PRIVATE ${PROJECT_BINARY_DIR}/src/f90-mod)
+  target_link_libraries(rdycore_mms_f90 PRIVATE rdycore_f90)
 
-install(
-  TARGETS rdycore_mms_f90 rdycore_f90_exe
-  DESTINATION bin
-)
+  install(
+    TARGETS rdycore_mms_f90 rdycore_f90_exe
+    DESTINATION bin
+  )
+endif()
 
 # Tests for the driver.
 if (ENABLE_TESTS)

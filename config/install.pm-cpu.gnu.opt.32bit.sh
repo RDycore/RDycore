@@ -21,9 +21,9 @@
 --with-kokkos-kernels-tpl=0 \
 --with-make-np=8 \
 --with-64-bit-indices=0 \
---with-netcdf-dir=/opt/cray/pe/netcdf-hdf5parallel/4.9.0.3/gnu/9.1 \
---with-pnetcdf-dir=/opt/cray/pe/parallel-netcdf/1.12.3.3/gnu/9.1 \
---with-hdf5-dir=/opt/cray/pe/hdf5-parallel/1.12.2.3/gnu/9.1 \
+--with-netcdf-dir=/opt/cray/pe/netcdf-hdf5parallel/4.9.0.9/gnu/12.3 \
+--with-pnetcdf-dir=/opt/cray/pe/parallel-netcdf/1.12.3.9/gnu/12.3 \
+--with-hdf5-dir=/opt/cray/pe/hdf5-parallel/1.12.2.9/gnu/12.3 \
 --download-parmetis \
 --download-metis \
 --download-muparser \
@@ -35,5 +35,5 @@
 --download-libceed \
 --download-cgns-commit=HEAD \
 --with-debugging=0 \
-PETSC_ARCH=pm-cpu-opt-32bit-gcc-11-2-0-v3.22.0
+PETSC_ARCH=pm-cpu-opt-32bit-gcc-13-2-1-95934b0d393
 

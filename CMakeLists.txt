@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 3.14.0)
 
 # Configurable options
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
+option(ENABLE_FORTRAN  "Enable Fortran library bindings" ON)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
@@ -26,7 +27,9 @@ set(CLANG_FORMAT_VERSION 14)
 
 project(rdycore)
 enable_language(C)
-enable_language(Fortran)
+if (ENABLE_FORTRAN)
+  enable_language(Fortran)
+endif()
 
 # Make sure PETSc can be found with pkgconfig
 set(PETSC_DIR $ENV{PETSC_DIR})
@@ -38,7 +41,6 @@ find_package(PkgConfig REQUIRED)
 # PETSc
 pkg_check_modules(PETSc REQUIRED IMPORTED_TARGET PETSc)
 pkg_get_variable(PETSc_C_COMPILER PETSc ccompiler)
-pkg_get_variable(PETSc_Fortran_COMPILER PETSc fcompiler)
 include_directories(${PETSc_INCLUDE_DIRS})
 link_directories(${PETSc_LIBRARY_DIRS})
 list(APPEND CMAKE_BUILD_RPATH ${PETSC_DIR}/${PETSC_ARCH}/lib)
@@ -113,25 +115,28 @@ if (ENABLE_SANITIZERS)
 endif()
 
 # Fortran settings
-include(CheckFortranCompilerFlag)
-set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
-if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-  list(APPEND fflags "-fallow-argument-mismatch")
-  list(APPEND fflags "-Wno-allow-argument-mismatch")
-  list(APPEND fflags "-ffree-line-length-none")
-  foreach(fflag ${fflags})
-    check_fortran_compiler_flag(${fflag} result)
-    if (result)
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${fflag}")
-    endif()
-  endforeach()
+if (ENABLE_FORTRAN)
+  pkg_get_variable(PETSc_Fortran_COMPILER PETSc fcompiler)
+  include(CheckFortranCompilerFlag)
+  set(CMAKE_Fortran_COMPILER ${PETSc_Fortran_COMPILER})
+  if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    list(APPEND fflags "-fallow-argument-mismatch")
+    list(APPEND fflags "-Wno-allow-argument-mismatch")
+    list(APPEND fflags "-ffree-line-length-none")
+    foreach(fflag ${fflags})
+      check_fortran_compiler_flag(${fflag} result)
+      if (result)
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${fflag}")
+      endif()
+    endforeach()
 
-  # make sure libgfortran appears in our rpath
-  execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
-                  OUTPUT_VARIABLE gfortran_library_location)
-  get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
-  list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
-  list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
+    # make sure libgfortran appears in our rpath
+    execute_process(COMMAND ${CMAKE_Fortran_COMPILER} -print-file-name=libgfortran${CMAKE_SHARED_LIBRARY_SUFFIX}
+                    OUTPUT_VARIABLE gfortran_library_location)
+    get_filename_component(gfortran_library_dir ${gfortran_library_location} DIRECTORY)
+    list(APPEND CMAKE_BUILD_RPATH ${gfortran_library_dir})
+    list(APPEND CMAKE_INSTALL_RPATH ${gfortran_library_dir})
+  endif()
 endif()
 
 # By default, we build a Debug configuration.
@@ -143,7 +148,9 @@ endif()
 message(STATUS "Configuring RDycore (${CMAKE_BUILD_TYPE})")
 message(STATUS "Generating project files in build directory: ${PROJECT_BINARY_DIR}")
 message(STATUS "C compiler is ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION})")
-message(STATUS "Fortran compiler is ${CMAKE_Fortran_COMPILER} (${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION})")
+if (ENABLE_FORTRAN)
+  message(STATUS "Fortran compiler is ${CMAKE_Fortran_COMPILER} (${CMAKE_Fortran_COMPILER_ID} ${CMAKE_Fortran_COMPILER_VERSION})")
+endif()
 
 # Version numbers (written to private/config.h).
 set(RDYCORE_MAJOR_VERSION 0)
@@ -199,7 +206,9 @@ if (ENABLE_COVERAGE)
 
   # Add code coverage compiler flags
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} --coverage")
+  if (ENABLE_FORTRAN)
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} --coverage")
+  endif()
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 
   # Add a "make coverage" target.

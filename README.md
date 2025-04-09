@@ -9,12 +9,17 @@
 
 To build RDycore, you need:
 
-* A recent version of [CMake](https://cmake.org/)
-* GNU Make
+* A recent version of [CMake](https://cmake.org/) for configuration
+* [GNU Make](https://www.gnu.org/software/make/) or [Ninja](https://ninja-build.org/)
+  for compilation and testing
 * reliable C and Fortran compilers
 * a working MPI installation (like [OpenMPI](https://www.open-mpi.org/)
   or [Mpich](https://www.mpich.org/))
 * A recent release or hash of [PETSc](https://gitlab.com/petsc/petsc)
+
+**NOTE: CMake can't generate Makefiles for PETSc's newer Fortran bindings, so
+use Ninja instead. You can install Ninja using your favorite package manager
+(e.g. `brew install ninja` or `apt install ninja-build`).**
 
 You can obtain all of these freely (except perhaps your favorite Fortran
 compiler) on the Linux and Mac platforms. On Linux, just use your favorite
@@ -26,7 +31,7 @@ rest.
 For example, to download relevant software on your Mac using Homebrew, type
 
 ```
-brew install cmake gfortran openmpi
+brew install cmake gfortran openmpi ninja
 ```
 
 ## Configuring, Building, and Installing RDycore

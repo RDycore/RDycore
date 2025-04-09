@@ -130,12 +130,12 @@ program rdycore_f90
 
       if (rain_specified) then
         call opendata(rainfile, rain_vec, nrain)
-        PetscCallA(VecGetArrayF90(rain_vec, rain_ptr, ierr))
+        PetscCallA(VecGetArray(rain_vec, rain_ptr, ierr))
       endif
 
       if (bc_specified) then
         call opendata(bcfile, bc_vec, nbc)
-        PetscCallA(VecGetArrayF90(bc_vec, bc_ptr, ierr))
+        PetscCallA(VecGetArray(bc_vec, bc_ptr, ierr))
       endif
 
       ! create rdycore and set it up with the given file
@@ -260,11 +260,11 @@ program rdycore_f90
 
       deallocate(h, hu, hv, rain, bc_values, values, nat_id)
       if (rain_specified) then
-        PetscCallA(VecRestoreArrayF90(rain_vec, rain_ptr, ierr))
+        PetscCallA(VecRestoreArray(rain_vec, rain_ptr, ierr))
         PetscCallA(VecDestroy(rain_vec, ierr))
       endif
       if (bc_specified) then
-        PetscCallA(VecRestoreArrayF90(bc_vec, bc_ptr, ierr))
+        PetscCallA(VecRestoreArray(bc_vec, bc_ptr, ierr))
         PetscCallA(VecDestroy(bc_vec, ierr))
       endif
       PetscCallA(RDyDestroy(rdy_, ierr))

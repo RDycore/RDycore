@@ -16,7 +16,7 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       foreach(chkpt_fmt binary hdf5)
         add_test(swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -checkpoint_format ${chkpt_fmt})
       endforeach()
@@ -29,7 +29,7 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_dirichlet_bc.yaml ${MESH_DIR}/planar_
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_roe_ex2b_dirichlet_bc_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_dirichlet_bc.yaml ${${config}_args})
     endforeach()
   endforeach()
@@ -40,7 +40,7 @@ endforeach()
 foreach(np 1 2) # test on 1, 2 processes
   set(cgns_output_args -ts_monitor_solution cgns:output/ex2b-%d.cgns -viewer_cgns_batch_size 20 -ts_monitor_solution_interval 100)
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_roe_ex2b_cgns_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${cgns_output_args} ${${config}_args})
     endforeach()
   endforeach()
@@ -49,7 +49,7 @@ endforeach()
 # Checkpoint/restart tests
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       foreach(chkpt_fmt binary hdf5)
         if (chkpt_fmt STREQUAL "binary")
           set(chkpt_sfx "bin")
@@ -84,7 +84,7 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_roe_ex2b_ic_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b_ic_file.yaml ${${config}_args})
     endforeach()
   endforeach()
@@ -93,7 +93,7 @@ endforeach()
 # ex2b ensemble test
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b-ensemble.yaml
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(lang c f90)
+foreach(lang ${supported_languages})
   foreach(config basic ceed preload)
     add_test(swe_ensemble_${lang}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n 2 ${rdycore_${lang}_driver} ex2b-ensemble.yaml ${${config}_args})
   endforeach()
@@ -108,7 +108,7 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_roe_four_mounds_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} four_mounds_60x24.yaml ${${config}_args})
     endforeach()
   endforeach()
@@ -166,7 +166,7 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_mms_single_run_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_single_run.yaml ${${config}_args})
       add_test(swe_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_conv_study.yaml ${${config}_args})
     endforeach()
@@ -182,7 +182,7 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1 processes
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_roe_mixed_elements_ic_file_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} mixed_elements_ic_file.yaml ${${config}_args})
     endforeach()
   endforeach()
@@ -219,7 +219,7 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1) # test on 1 processes
   foreach(config basic ceed preload)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(swe_roe_quad_tri_mesh_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} quad_tri_mesh.yaml -homogeneous_rain_files Houston1km.rain.${PETSC_ID_TYPE}.bin,Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_rain_region_ids 1,3 -homogeneous_bc_files Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin,Houston1km.bc.${PETSC_ID_TYPE}.bin -homogeneous_bc_region_ids   1,2,4 ${${config}_args})
     endforeach()
   endforeach()

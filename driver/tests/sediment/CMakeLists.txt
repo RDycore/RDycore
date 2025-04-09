@@ -7,14 +7,13 @@ set(mms_c_driver ${mms_driver})
 set(ceed_args -ceed /cpu/self)
 set(preload_args -preload)
 
-# mms driver (C and Fortran)
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/sediment_mms_conv_study.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 2) # test on 1, 2 processes
   foreach(config basic ceed)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(sediment_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} sediment_mms_conv_study.yaml ${${config}_args})
     endforeach()
   endforeach()
@@ -28,7 +27,7 @@ file(COPY
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 2) # test on 1, 2 processes
   foreach(config basic ceed)
-    foreach(lang c f90)
+    foreach(lang ${supported_languages})
       add_test(sediment_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} sediment.yaml ${${config}_args})
     endforeach()
   endforeach()
