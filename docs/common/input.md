@@ -401,6 +401,8 @@ RDycore. The parameters that define these discretizations are
 ```yaml
 output:
   directory: output
+  fields:
+    - 
   format: xdmf
   step_interval: 100
   batch_size: 1
@@ -409,10 +411,24 @@ output:
   separate_grid_file: true
 ```
 
-The `output` section control simulation output, including visualization and
-time series data (and excluding checkpoint data). Relevant parameters are
+The `output` section controls simulation output, including visualization and
+time series data (**but excluding checkpoint data**). Relevant parameters are
 
-* `directory`: the name of the directory to which output is written. It can be a relative or absolute path, and is created if it doesn't already exist. Default value: `output`
+* `directory`: the name of the directory to which output is written. It can be
+  a relative or absolute path, and is created if it doesn't already exist.
+  Default value: `output`
+* `fields`: a list of fields to include in each output file, expressed in YAML
+  array syntax (typically with hyphenated items on separate lines). This item is
+  optional, and if omitted the included fields are the components of the
+  solution (e.g. `Height`, `MomentumX`, `MomentumY` for the shallow water
+  equations). Available options:
+    * `Height`: water height $h$
+    * `MomentumX`: $x$ momentum $hu$
+    * `MomentumY`: $y$ velocity $hv$
+    * `Concentration_I`: the concentration for sediment class $I$ (0, 1, 2, ...)
+    * `WaterSource`: the value of the source term for $h$
+    * `MomentumXSource`: the value of the source term for $hu$
+    * `MomentumYSource`: the value of the source term for $hv$
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
     * `binary`: output is written using PETSc's binary data format
