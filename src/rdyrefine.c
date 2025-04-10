@@ -76,8 +76,11 @@ static PetscErrorCode CreateInterpolator(DM adm, DM ddm, const PetscInt bs, Pets
   PetscCall(DMGetGlobalSection(ddm, &das));
   PetscCall(DMPlexTransformGetDM(tr, &dm));
   PetscCall(DMGetGlobalSection(dm, &s));
+  PetscCall(PetscObjectSetName((PetscObject)s, "section s-dm"));
   PetscCall(PetscSectionViewFromOptions(s, NULL, "-sec_view"));
+  PetscCall(PetscObjectSetName((PetscObject)as, "section as-adm"));
   PetscCall(PetscSectionViewFromOptions(as, NULL, "-sec_view"));
+  PetscCall(PetscObjectSetName((PetscObject)das, "section s-ddm"));
   PetscCall(PetscSectionViewFromOptions(das, NULL, "-sec_view"));
   PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
   PetscCall(MatCreate(PetscObjectComm((PetscObject)ddm), Interp));
@@ -125,10 +128,8 @@ PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)ddm), &myrank));
     PetscCall(MatGetOwnershipRanges(*Interp, &rStarts));
     PetscCall(PetscSFGetGraph(sf, NULL, &Nl, NULL, &remote));
     PetscCall(PetscMalloc1(Nl, &rows));
-    for (PetscInt l = 0, kk = 327; l < Nl; ++l) {
+    for (PetscInt l = 0; l < Nl; ++l) {
       rows[l] = remote[l].index + rStarts[remote[l].rank];
-      if (rows[l] > 344) PetscPrintf(PETSC_COMM_SELF,"\t\t[%d] %d) row %d remote[l].index = %d remote[l].rank = %d rstart = %d\n",myrank, (int)l, (int)rows[l], (int)remote[l].index, (int)remote[l].rank, (int)rStarts[2]);
-      if (rows[l] > 344) rows[l] = kk++;
     }
     
     PetscCall(ISCreateGeneral(PETSC_COMM_SELF, Nl, rows, PETSC_OWN_POINTER, &isrow));
@@ -149,7 +150,6 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   DM       adm, ddm = NULL;;
   DMLabel  adaptLabel;
   PetscSF sf = NULL;
-  //PetscInt d_nz = 4, o_nz = 0, ccStart, ccEnd, fcStart, fcEnd;
   char     opt[128];
 
   PetscFunctionBeginUser;
@@ -161,7 +161,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscMPIInt myrank, commsize;
   PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)dm), &myrank));
   PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)dm), &commsize));
-  if (!myrank) PetscPrintf(PETSC_COMM_SELF,"Information about coarse DM\n");
+  // if (!myrank) PetscPrintf(PETSC_COMM_SELF,"Information about coarse DM\n");
   /* for (PetscInt i = 0; i < commsize; i++) { */
   /*   if (i == myrank) { */
   /*     PetscInt c_start, c_end; */
