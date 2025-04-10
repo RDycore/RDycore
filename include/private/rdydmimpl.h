@@ -13,7 +13,7 @@ typedef struct {
   char     field_component_names[MAX_NUM_FIELDS][MAX_NUM_FIELD_COMPONENTS][MAX_NAME_LEN + 1];
 } SectionFieldSpec;
 
-PETSC_INTERN PetscErrorCode CreateCellCenteredDMFromDM(DM, const SectionFieldSpec, DM *);
+PETSC_INTERN PetscErrorCode CreateCellCenteredDMFromDM(DM, PetscInt, const SectionFieldSpec, DM *);
 PETSC_INTERN PetscErrorCode CreateDM(RDy);
 PETSC_INTERN PetscErrorCode CreateAuxiliaryDM(RDy);
 PETSC_INTERN PetscErrorCode CreateFlowDM(RDy);

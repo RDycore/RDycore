@@ -125,7 +125,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyOutputViewer(RDy rdy) {
+PetscErrorCode DestroyOutputViewer(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->output_vf) PetscCall(PetscViewerAndFormatDestroy(&rdy->output_vf));
   if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
@@ -246,6 +246,13 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(InitTimeSeries(rdy));
 
     RDyLogDebug(rdy, "Running simulation...");
+  }
+
+  if (rdy->mesh_was_refined) {
+    // create a viewer with the proper format for visualization output
+    PetscCall(CreateOutputViewer(rdy));
+
+    rdy->mesh_was_refined = PETSC_FALSE;
   }
 
   PetscReal time;

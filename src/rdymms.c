@@ -229,7 +229,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // note: this must be done after global vectors are created so a global
   // note: section exists for the DM
   RDyLogDebug(rdy, "Creating FV mesh...");
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, &rdy->mesh));
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));

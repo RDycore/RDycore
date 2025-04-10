@@ -79,7 +79,8 @@ elif [ "$mach" = "pm-gpu" ]; then
     elif [ "$config" -eq 2 ]; then
       export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-13-2-1-v3.22.4
     elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=pm-gpu-opt-32bit-gcc-13-2-1-v3.22.4
+      export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_plextransform
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-13-2-1-97b97d38c96
     else
       echo "Unsupported --config $config "
       display_help 
