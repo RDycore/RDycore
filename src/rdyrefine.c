@@ -55,7 +55,7 @@ static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateInterpolator(DM adm, DM ddm, PetscSF sf, Mat *Interp)
+static PetscErrorCode CreateInterpolator(DM adm, DM ddm, const PetscInt bs, PetscSF sf, Mat *Interp)
 {
   DM              dm;
   PetscDS         ds;
@@ -63,7 +63,7 @@ static PetscErrorCode CreateInterpolator(DM adm, DM ddm, PetscSF sf, Mat *Interp
   DMPlexTransform tr;
   PetscInt       *rows, *cols, *Nc;
   PetscScalar    *vals;
-  PetscInt        cStart, cEnd, m, nn;
+  PetscInt        cStart, cEnd, m, n;
 
   PetscFunctionBegin;
   PetscCall(DMGetDS(adm, &ds));
@@ -82,9 +82,11 @@ static PetscErrorCode CreateInterpolator(DM adm, DM ddm, PetscSF sf, Mat *Interp
   PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
   PetscCall(MatCreate(PetscObjectComm((PetscObject)ddm), Interp));
   PetscCall(PetscSectionGetConstrainedStorageSize(as, &m));
-  PetscCall(PetscSectionGetConstrainedStorageSize(s, &nn));
-  PetscCall(MatSetSizes(*Interp, m, nn, PETSC_DETERMINE, PETSC_DETERMINE));
+  PetscCall(PetscSectionGetConstrainedStorageSize(s, &n));
+  PetscCall(MatSetSizes(*Interp, m, n, PETSC_DETERMINE, PETSC_DETERMINE));
   PetscCall(MatSetUp(*Interp));
+PetscMPIInt myrank;
+PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)ddm), &myrank));
   for (PetscInt c = cStart; c < cEnd; ++c) {
     DMPolytopeType *rct, ct;
     PetscInt       *rsize, *rcone, *rornt;
@@ -97,6 +99,7 @@ static PetscErrorCode CreateInterpolator(DM adm, DM ddm, PetscSF sf, Mat *Interp
     PetscCall(DMPlexTransformCellTransform(tr, ct, c, NULL, &Nct, &rct, &rsize, &rcone, &rornt));
     for (PetscInt n = 0; n < Nct; ++n) {
       if (DMPolytopeTypeGetDim(rct[n]) != dim) continue;
+      //PetscPrintf(PETSC_COMM_SELF,"\t\t[%d] %d.%d size = %d\n",myrank, (int)c, (int)n, (int)rsize[n]);
       for (PetscInt r = 0; r < rsize[n]; ++r) {
         PetscInt cNew;
         PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], c, r, &cNew));
@@ -110,7 +113,6 @@ static PetscErrorCode CreateInterpolator(DM adm, DM ddm, PetscSF sf, Mat *Interp
   PetscCall(PetscFree3(rows, cols, vals));
   PetscCall(MatAssemblyBegin(*Interp, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(*Interp, MAT_FINAL_ASSEMBLY));
-
   if (sf) {
     Mat                In;
     IS                 isrow, iscol;
@@ -123,11 +125,16 @@ static PetscErrorCode CreateInterpolator(DM adm, DM ddm, PetscSF sf, Mat *Interp
     PetscCall(MatGetOwnershipRanges(*Interp, &rStarts));
     PetscCall(PetscSFGetGraph(sf, NULL, &Nl, NULL, &remote));
     PetscCall(PetscMalloc1(Nl, &rows));
-    for (PetscInt l = 0; l < Nl; ++l) rows[l] = remote[l].index; // + rStarts[remote[l].rank];
+    for (PetscInt l = 0, kk = 327; l < Nl; ++l) {
+      rows[l] = remote[l].index + rStarts[remote[l].rank];
+      if (rows[l] > 344) PetscPrintf(PETSC_COMM_SELF,"\t\t[%d] %d) row %d remote[l].index = %d remote[l].rank = %d rstart = %d\n",myrank, (int)l, (int)rows[l], (int)remote[l].index, (int)remote[l].rank, (int)rStarts[2]);
+      if (rows[l] > 344) rows[l] = kk++;
+    }
+    
     PetscCall(ISCreateGeneral(PETSC_COMM_SELF, Nl, rows, PETSC_OWN_POINTER, &isrow));
     PetscCall(MatGetOwnershipRangeColumn(*Interp, &cStart, NULL));
-    PetscCall(ISCreateStride(PETSC_COMM_SELF, cStart - cEnd, cStart, 1, &iscol));
-    PetscCall(ISView(iscol, PETSC_VIEWER_STDOUT_SELF));
+    PetscCall(ISCreateStride(PETSC_COMM_SELF, n, cStart, 1, &iscol));
+    //PetscCall(ISSetBlockSize(iscol, bs));
     PetscCall(MatCreateSubMatrix(*Interp, isrow, iscol, MAT_INITIAL_MATRIX, &In));
     PetscCall(ISDestroy(&isrow));
     PetscCall(ISDestroy(&iscol));
@@ -146,7 +153,8 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   char     opt[128];
 
   PetscFunctionBeginUser;
-  PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
+  PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view"));
+  PetscCall(DMViewFromOptions(dm, NULL, opt));
   PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
 
   // view - debug
@@ -177,7 +185,6 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
   PetscCheck(adm, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
 
   PetscCall(PetscObjectSetName((PetscObject)adm, "Adapted Mesh - pre distribute"));
-  PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view"));
   PetscCall(DMViewFromOptions(adm, NULL, opt));
 
   // view - debug
@@ -221,7 +228,7 @@ static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *Coar
     ddm = adm;
   }
 
-  PetscCall(CreateInterpolator(adm, ddm, sf, CoarseToFine));
+  PetscCall(CreateInterpolator(adm, ddm, bs, sf, CoarseToFine));
   PetscCall(PetscSFDestroy(&sf));
   PetscCall(MatSetBlockSize(*CoarseToFine, bs));
   PetscCall(MatTranspose(*CoarseToFine, MAT_INITIAL_MATRIX, FineToCoarse));
