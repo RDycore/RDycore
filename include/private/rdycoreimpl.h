@@ -99,6 +99,9 @@ struct _p_RDy {
   SectionFieldSpec flow_fields;
   Vec              flow_u_global, flow_u_local;
 
+  // DM cache of non-overlap
+  DM               no_overlap_dm;
+
   // mesh representing simulation domain
   RDyMesh mesh;
 

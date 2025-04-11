@@ -479,15 +479,39 @@ extern PetscErrorCode InitSourceConditions(RDy rdy);
 PetscErrorCode RDyRefine(RDy rdy) {
   AppCtx   user;
   Mat      CoarseToFine, FineToCoarse;
-  DM       dm_fine;
+  DM       dm_fine, dm_nolap;
   Vec      U_coarse_local, U_fine_local;
   PetscInt ndof_coarse;
+  PetscMPIInt size;
   PetscFunctionBeginUser;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
   PetscCall(ProcessOptions(PETSC_COMM_WORLD, &user));
 
   /* Adapt */
-  PetscCall(AdaptMesh(rdy->dm, ndof_coarse, &dm_fine, &CoarseToFine, &FineToCoarse, &user));
+  //PetscCall(DMClone(dm, &dm_nolap));
+  //PetscCall(DMCopyDisc(dm, dm_nolap));
+  PetscCallMPI(MPI_Comm_size(rdy->comm, &size));
+  if (size > 1) dm_nolap = rdy->no_overlap_dm;
+  else dm_nolap = rdy->dm;
+  PetscCall(AdaptMesh(dm_nolap, ndof_coarse, &dm_fine, &CoarseToFine, &FineToCoarse, &user));
+
+  if (size > 1) {
+    DM      dmOverlap;
+    PetscSF sfOverlap, sfMigration, sfMigrationNew;
+
+    PetscCall(DMDestroy(&dm_nolap));
+    PetscCall(DMPlexGetMigrationSF(dm_fine, &sfMigration));
+    PetscCall(DMPlexDistributeOverlap(dm_fine, 1, &sfOverlap, &dmOverlap));
+    PetscCall(DMPlexRemapMigrationSF(sfOverlap, sfMigration, &sfMigrationNew));
+    PetscCall(PetscSFDestroy(&sfOverlap));
+    PetscCall(DMPlexSetMigrationSF(dmOverlap, sfMigrationNew));
+    PetscCall(PetscSFDestroy(&sfMigrationNew));
+    //PetscCall(DMDestroy(&dm_fine));
+    PetscCall(DMDestroy(&rdy->no_overlap_dm));
+    rdy->no_overlap_dm = dm_fine;
+    PetscCall(PetscObjectReference((PetscObject)dm_fine));
+    dm_fine = dmOverlap;
+  }
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));

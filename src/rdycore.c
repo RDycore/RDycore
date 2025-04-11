@@ -226,6 +226,8 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
     PetscCall(PetscFClose((*rdy)->comm, (*rdy)->log));
   }
 
+  if ((*rdy)->no_overlap_dm) PetscCall(DMDestroy(&(*rdy)->no_overlap_dm));
+
   MPI_Comm_free(&((*rdy)->comm));
   PetscCall(PetscFree(*rdy));
   *rdy = NULL;

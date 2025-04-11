@@ -118,7 +118,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
 
   // Overlap meshes after refinement
-  if (size > 1 &&0) {
+  if (size > 1) {
     DM      dmOverlap;
     PetscSF sfOverlap, sfMigration, sfMigrationNew;
 
@@ -128,7 +128,10 @@ PetscErrorCode CreateDM(RDy rdy) {
     PetscCall(PetscSFDestroy(&sfOverlap));
     PetscCall(DMPlexSetMigrationSF(dmOverlap, sfMigrationNew));
     PetscCall(PetscSFDestroy(&sfMigrationNew));
-    PetscCall(DMDestroy(&rdy->dm));
+    // cache the non-overlap DM for refinement
+    if (rdy->no_overlap_dm) PetscCall(DMDestroy(&rdy->no_overlap_dm));
+    rdy->no_overlap_dm = rdy->dm;
+    PetscCall(PetscObjectReference((PetscObject)rdy->dm));
     rdy->dm = dmOverlap;
   }
 
