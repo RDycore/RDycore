@@ -509,7 +509,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
     //PetscCall(DMDestroy(&dm_fine));
     PetscCall(DMDestroy(&rdy->no_overlap_dm));
     rdy->no_overlap_dm = dm_fine;
-    PetscCall(PetscObjectReference((PetscObject)dm_fine));
+    //PetscCall(PetscObjectReference((PetscObject)dm_fine));
     dm_fine = dmOverlap;
   }
   PetscCall(DMLocalizeCoordinates(dm_fine));

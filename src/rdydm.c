@@ -131,7 +131,7 @@ PetscErrorCode CreateDM(RDy rdy) {
     // cache the non-overlap DM for refinement
     if (rdy->no_overlap_dm) PetscCall(DMDestroy(&rdy->no_overlap_dm));
     rdy->no_overlap_dm = rdy->dm;
-    PetscCall(PetscObjectReference((PetscObject)rdy->dm));
+    // PetscCall(PetscObjectReference((PetscObject)rdy->dm)); we can not take a ref if there is not refinement
     rdy->dm = dmOverlap;
   }
 
