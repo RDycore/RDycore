@@ -42,14 +42,14 @@ static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateCellCenteredDMFromDM(DM dm, PetscInt refinment_level, const SectionFieldSpec fields, DM *cc_dm) {
+PetscErrorCode CreateCellCenteredDMFromDM(DM dm, PetscInt refinement_level, const SectionFieldSpec fields, DM *cc_dm) {
   PetscFunctionBegin;
 
   PetscCall(DMClone(dm, cc_dm));
 
   PetscCall(CreateDMSection(*cc_dm, fields));
 
-  if (!refinment_level) {
+  if (!refinement_level) {
     // copy adjacency info from the original DM
     PetscSF sf_migration, sf_natural;
     PetscCall(DMPlexGetMigrationSF(dm, &sf_migration));

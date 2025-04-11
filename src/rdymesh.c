@@ -20,7 +20,6 @@ static PetscInt QUAD_ID_EXODUS = 5;
 /// @param [in] nvertices_per_cell Maximum number of vertices per cell
 /// @param [in] nedges_per_cell Maximum number of edges per cell
 /// @param [out] cells A pointer to an RDyCells that stores allocated data.
-/// @param [out] num_cells A pointer to the number of cells
 ///
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells) {
@@ -82,7 +81,10 @@ static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_
 
 /// Creates a fully initialized RDyCells struct from a given DM.
 /// @param [in] dm A DM that provides cell data
+/// @param [in] nvertices_per_cell Maximum number of vertices per cell
+/// @param [in] nedges_per_cell Maximum number of edges per cell
 /// @param [out] cells A pointer to an RDyCells that stores allocated data.
+/// @param [out] num_cells A pointer to the number of cells
 ///
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells, PetscInt *num_cells) {

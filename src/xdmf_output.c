@@ -64,7 +64,7 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer, 
     PetscCall(PetscFree(comp));
   }
 
-  PetscCall(VecDestroy(&data_vec));  // FIXME: does this leave an extra ref in non-natural case?
+  PetscCall(VecDestroy(&data_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

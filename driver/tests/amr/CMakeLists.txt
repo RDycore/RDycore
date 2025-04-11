@@ -6,7 +6,7 @@ set(amr_c_driver ${amr_driver})
 set(ceed_args -ceed /cpu/self)
 set(preload_args -preload)
 
-# mms driver (C and Fortran)
+# AMR driver (C and Fortran)
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/amr_dx1.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
