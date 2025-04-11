@@ -1236,6 +1236,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   rdy->mesh_was_refined = PETSC_FALSE;
   rdy->num_refinements  = 0;
+  rdy->no_overlap_dm = NULL;
 
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
