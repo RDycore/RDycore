@@ -3,22 +3,22 @@
 #include <rdycore.h>
 #include <string.h>
 
-static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) {
+static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer, PetscInt num_refinements) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
 
   // create and populate a multi-component vector
-  Vec       data_vec;
-  PetscBool use_natural;
-  PetscCall(DMGetUseNatural(dm, &use_natural));
-  if (use_natural) {
+  Vec data_vec;
+
+  if (!num_refinements) {
     PetscCall(DMPlexCreateNaturalVector(dm, &data_vec));
     PetscCall(DMPlexGlobalToNaturalBegin(dm, global_vec, data_vec));
     PetscCall(DMPlexGlobalToNaturalEnd(dm, global_vec, data_vec));
   } else {
-    data_vec = global_vec;
+    PetscCall(VecDuplicate(global_vec, &data_vec));
+    PetscCall(VecCopy(global_vec, data_vec));
     PetscCall(PetscObjectReference((PetscObject)data_vec));
   }
 
@@ -64,7 +64,7 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer) 
     PetscCall(PetscFree(comp));
   }
 
-  if (use_natural) PetscCall(VecDestroy(&data_vec));  // FIXME: does this leave an extra ref in non-natural case?
+  PetscCall(VecDestroy(&data_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -129,8 +129,8 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   char group_name[PETSC_MAX_PATH_LEN];
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, viewer));
-  PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, viewer));
+  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, viewer, rdy->num_refinements));
+  PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, viewer, rdy->num_refinements));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // write the grid

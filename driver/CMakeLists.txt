@@ -12,8 +12,15 @@ add_executable(rdycore_mms
 set_target_properties(rdycore_mms PROPERTIES OUTPUT_NAME rdycore_mms)
 target_link_libraries(rdycore_mms PRIVATE rdycore)
 
+# AMR C driver
+add_executable(rdycore_amr
+  amr.c
+)
+set_target_properties(rdycore_amr PROPERTIES OUTPUT_NAME rdycore_amr)
+target_link_libraries(rdycore_amr PRIVATE rdycore)
+
 install(
-  TARGETS rdycore_exe rdycore_mms
+  TARGETS rdycore_exe rdycore_mms rdycore_amr
   DESTINATION bin
 )
 

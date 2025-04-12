@@ -81,10 +81,13 @@ static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_
 
 /// Creates a fully initialized RDyCells struct from a given DM.
 /// @param [in] dm A DM that provides cell data
+/// @param [in] nvertices_per_cell Maximum number of vertices per cell
+/// @param [in] nedges_per_cell Maximum number of edges per cell
 /// @param [out] cells A pointer to an RDyCells that stores allocated data.
+/// @param [out] num_cells A pointer to the number of cells
 ///
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells) {
+static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, PetscInt nedges_per_cell, RDyCells *cells, PetscInt *num_cells) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -101,8 +104,8 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate cell storage
-  PetscInt num_cells = c_end - c_start;
-  PetscCall(RDyCellsCreate(num_cells, nvertices_per_cell, nedges_per_cell, cells));
+  *num_cells = c_end - c_start;
+  PetscCall(RDyCellsCreate(*num_cells, nvertices_per_cell, nedges_per_cell, cells));
 
   PetscInt num_owned_cells = 0;
   for (PetscInt c = c_start; c < c_end; c++) {
@@ -153,7 +156,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   FILL(num_owned_cells, cells->owned_to_local, -1);
 
   PetscInt count = 0;
-  for (PetscInt icell = 0; icell < num_cells; icell++) {
+  for (PetscInt icell = 0; icell < *num_cells; icell++) {
     if (cells->is_owned[icell]) {
       cells->local_to_owned[icell] = count;
       cells->owned_to_local[count] = icell;
@@ -161,7 +164,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
     }
   }
 
-  for (PetscInt icell = 0; icell < num_cells; icell++) {
+  for (PetscInt icell = 0; icell < *num_cells; icell++) {
     if (!cells->is_owned[icell]) {
       cells->local_to_owned[icell] = count;
       count++;
@@ -171,7 +174,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
   // fetch global cell IDs.
   ISLocalToGlobalMapping map;
   PetscCall(DMGetLocalToGlobalMapping(dm, &map));
-  PetscCall(ISLocalToGlobalMappingApply(map, num_cells, cells->ids, cells->global_ids));
+  PetscCall(ISLocalToGlobalMappingApply(map, *num_cells, cells->ids, cells->global_ids));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -187,6 +190,7 @@ static PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.global_ids));
   PetscCall(PetscFree(cells.natural_ids));
   PetscCall(PetscFree(cells.is_owned));
+  PetscCall(PetscFree(cells.local_to_owned));
   PetscCall(PetscFree(cells.num_vertices));
   PetscCall(PetscFree(cells.num_edges));
   PetscCall(PetscFree(cells.num_neighbors));
@@ -200,6 +204,8 @@ static PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.areas));
   PetscCall(PetscFree(cells.dz_dx));
   PetscCall(PetscFree(cells.dz_dy));
+  PetscCall(PetscFree(cells.local_to_owned));
+  PetscCall(PetscFree(cells.owned_to_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -244,11 +250,15 @@ static PetscErrorCode RDyVerticesCreate(PetscInt num_vertices, PetscInt ncells_p
 
 /// Creates a fully initialized RDyVertices struct from a given DM.
 /// @param [in] dm A DM that provides vertex data
+/// @param [in] refinement_level Number of refinement levels for the mesh
+/// @param [in] ncells_per_vertex Maximum number of cells per vertex
+/// @param [in] nedges_per_vertex Maximum number of edges per vertex
 /// @param [out] vertices A pointer to an RDyVertices that stores allocated data.
-///
+/// @param [out] num_vertices A pointer to the number of vertices in the local mesh
+/// @param [out] num_vertices_global A pointer to the number of vertices in the global mesh
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex, PetscInt nedges_per_vertex, RDyVertices *vertices,
-                                              PetscInt *num_vertices_global) {
+static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt refinement_level, PetscInt ncells_per_vertex, PetscInt nedges_per_vertex,
+                                              RDyVertices *vertices, PetscInt *num_vertices, PetscInt *num_vertices_global) {
   PetscFunctionBegin;
 
   PetscInt dim;
@@ -262,8 +272,8 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex,
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate vertex storage
-  PetscInt num_vertices = v_end - v_start;
-  PetscCall(RDyVerticesCreate(num_vertices, ncells_per_vertex, nedges_per_vertex, vertices));
+  *num_vertices = v_end - v_start;
+  PetscCall(RDyVerticesCreate(*num_vertices, ncells_per_vertex, nedges_per_vertex, vertices));
 
   PetscSection coordSection;
   Vec          coordinates;
@@ -311,9 +321,7 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex,
   VecRestoreArray(coordinates, &coords);
 
   // fetch global vertex IDs if mesh is not refined
-  PetscInt refine_level;
-  PetscCall(DMGetRefineLevel(dm, &refine_level));
-  if (!refine_level) {
+  if (!refinement_level) {
     PetscMPIInt commsize;
     MPI_Comm    comm;
     PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -361,6 +369,21 @@ static PetscErrorCode RDyVerticesCreateFromDM(DM dm, PetscInt ncells_per_vertex,
         vertices->global_ids[ivertex] -= min_vertex_idx;
       }
     }
+
+  } else {
+    IS globalVertexNumbers;
+    PetscCall(DMPlexGetVertexNumbering(dm, &globalVertexNumbers));
+
+    const PetscInt *ids;
+    PetscCall(ISGetIndices(globalVertexNumbers, &ids));
+
+    for (PetscInt v = v_start; v < v_end; v++) {
+      PetscInt ivertex = v - v_start;
+      if (ids[ivertex] < 0) vertices->global_ids[ivertex] = -ids[ivertex] - 1;
+      else vertices->global_ids[ivertex] = ids[ivertex];
+    }
+
+    PetscCall(ISRestoreIndices(globalVertexNumbers, &ids));
   }
 
   // compute total number of vertices
@@ -427,9 +450,10 @@ static PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 /// Creates a fully initialized RDyEdges struct from a given DM.
 /// @param [in] dm A DM that provides edge data
 /// @param [out] edges A pointer to an RDyEdges that stores allocated data.
+/// @param [out] num_edges A pointer to the number of edges in the local mesh
 ///
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
+static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges, PetscInt *num_edges) {
   PetscFunctionBegin;
 
   MPI_Comm    comm;
@@ -448,8 +472,8 @@ static PetscErrorCode RDyEdgesCreateFromDM(DM dm, RDyEdges *edges) {
   DMPlexGetDepthStratum(dm, 0, &v_start, &v_end);
 
   // allocate edge storage
-  PetscInt num_edges = e_end - e_start;
-  PetscCall(RDyEdgesCreate(num_edges, edges));
+  *num_edges = e_end - e_start;
+  PetscCall(RDyEdgesCreate(*num_edges, edges));
 
   for (PetscInt e = e_start; e < e_end; e++) {
     PetscInt  iedge = e - e_start;
@@ -1007,13 +1031,19 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
             .num_field_components = {max_num_vertices},
             .field_names          = {"Cell Connections"},
   };
-  PetscCall(CreateCellCenteredDMFromDM(dm, field_spec, &local_dm));
+  PetscCall(CreateCellCenteredDMFromDM(dm, mesh->refine_level, field_spec, &local_dm));
 
   Vec          global_vec, natural_vec;
   PetscScalar *vec_ptr;
   PetscInt     n;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+  PetscBool useNatural;
+  PetscCall(DMGetUseNatural(dm, &useNatural));
+  if (useNatural) {
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+  } else {
+    PetscCall(VecDuplicate(global_vec, &natural_vec));
+  }
 
   PetscCall(VecGetLocalSize(global_vec, &n));
   PetscCheck(n == mesh->num_owned_cells * max_num_vertices, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
@@ -1035,8 +1065,12 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
-  PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-  PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+  if (useNatural) {
+    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+  } else {
+    PetscCall(VecCopy(global_vec, natural_vec));
+  }
 
   if (0) {
     PetscCall(VecView(global_vec, PETSC_VIEWER_STDOUT_WORLD));
@@ -1129,16 +1163,26 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
       .field_names          = {"Cell Coordinates"},
   };
 
-  PetscCall(CreateCellCenteredDMFromDM(dm, local_spec, &local_dm));
+  PetscCall(CreateCellCenteredDMFromDM(dm, mesh->refine_level, local_spec, &local_dm));
 
   Vec global_vec, natural_vec;
   PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
 
-  // create the Vec for storing coordinates in nautral order
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
-  PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+  PetscBool useNatural;
+  PetscCall(DMGetUseNatural(dm, &useNatural));
+  if (useNatural) {
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
+
+    // create the Vec for storing coordinates in nautral order
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+  } else {
+    PetscCall(VecDuplicate(global_vec, &natural_vec));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.xc));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.yc));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.zc));
+  }
 
   // set names to the Vecs
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
@@ -1159,8 +1203,12 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
     // scatter the data from global to natural order
-    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+    if (useNatural) {
+      PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+      PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+    } else {
+      PetscCall(VecCopy(global_vec, natural_vec));
+    }
 
     // save the coordinate in appropriate Vec
     switch (idim) {
@@ -1257,38 +1305,25 @@ static PetscErrorCode DetermineMaxAttributesForCellsAndVertices(DM dm, RDyMesh *
 
 /// Creates an RDyMesh from a PETSc DM.
 /// @param [in] dm A PETSc DM
+/// @param [in] refinement_level The level of refinement for the mesh.
 /// @param [out] mesh A pointer to an RDyMesh that stores allocated data.
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
+PetscErrorCode RDyMeshCreateFromDM(DM dm, PetscInt refinement_level, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   PetscCall(PetscMemzero(mesh, sizeof(RDyMesh)));
 
   // save the number of refinements
-  PetscCall(DMGetRefineLevel(dm, &mesh->refine_level));
-
-  // Determine the number of cells in the mesh
-  PetscInt c_start, c_end;
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &c_start, &c_end));
-  mesh->num_cells = c_end - c_start;
-
-  // Determine the number of edges in the mesh
-  PetscInt e_start, e_end;
-  PetscCall(DMPlexGetDepthStratum(dm, 1, &e_start, &e_end));
-  mesh->num_edges = e_end - e_start;
-
-  // Determine the number of vertices in the mesh
-  PetscInt v_start, v_end;
-  PetscCall(DMPlexGetDepthStratum(dm, 0, &v_start, &v_end));
-  mesh->num_vertices = v_end - v_start;
+  mesh->refine_level = refinement_level;
 
   // Determine few max attributes per cell and per vertex
   PetscCall(DetermineMaxAttributesForCellsAndVertices(dm, mesh));
 
   // Create mesh elements from the DM
-  PetscCall(RDyCellsCreateFromDM(dm, mesh->max_nvertices_per_cell, mesh->max_nedges_per_cell, &mesh->cells));
-  PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges));
-  PetscCall(RDyVerticesCreateFromDM(dm, mesh->max_ncells_per_vertex, mesh->max_nedges_per_vertex, &mesh->vertices, &mesh->num_vertices_global));
+  PetscCall(RDyCellsCreateFromDM(dm, mesh->max_nvertices_per_cell, mesh->max_nedges_per_cell, &mesh->cells, &mesh->num_cells));
+  PetscCall(RDyEdgesCreateFromDM(dm, &mesh->edges, &mesh->num_edges));
+  PetscCall(RDyVerticesCreateFromDM(dm, refinement_level, mesh->max_ncells_per_vertex, mesh->max_nedges_per_vertex, &mesh->vertices,
+                                    &mesh->num_vertices, &mesh->num_vertices_global));
   PetscCall(ComputeAdditionalEdgeAttributes(dm, mesh));
   PetscCall(ComputeAdditionalCellAttributes(dm, mesh));
 
@@ -1307,11 +1342,9 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
 
   PetscCall(MPI_Allreduce(&mesh->num_owned_cells, &mesh->num_cells_global, 1, MPI_INTEGER, MPI_SUM, comm));
 
-  if (!mesh->refine_level) {
-    PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
-    PetscCall(CreateCellConnectionVector(dm, mesh));
-    PetscCall(CreateCellCentroidVectors(dm, mesh));
-  }
+  PetscCall(CreateCoordinatesVectorInNaturalOrder(comm, mesh));
+  PetscCall(CreateCellConnectionVector(dm, mesh));
+  PetscCall(CreateCellCentroidVectors(dm, mesh));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1322,16 +1355,27 @@ PetscErrorCode RDyMeshCreateFromDM(DM dm, RDyMesh *mesh) {
 /// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscFunctionBegin;
-  PetscCall(RDyCellsDestroy(mesh.cells));
-  PetscCall(RDyEdgesDestroy(mesh.edges));
-  PetscCall(RDyVerticesDestroy(mesh.vertices));
 
-  if (!mesh.refine_level) {
-    PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
-    PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
-    PetscCall(VecDestroy(&mesh.output.xc));
-    PetscCall(VecDestroy(&mesh.output.yc));
-    PetscCall(VecDestroy(&mesh.output.zc));
+  if (mesh.num_cells) {
+    PetscCall(RDyCellsDestroy(mesh.cells));
+    mesh.num_cells = 0;
   }
+
+  if (mesh.num_edges) {
+    PetscCall(RDyEdgesDestroy(mesh.edges));
+    mesh.num_edges = 0;
+  }
+
+  if (mesh.num_vertices) {
+    PetscCall(RDyVerticesDestroy(mesh.vertices));
+    mesh.num_vertices = 0;
+  }
+
+  PetscCall(VecDestroy(&mesh.output.vertices_xyz_norder));
+  PetscCall(VecDestroy(&mesh.output.cell_conns_norder));
+  PetscCall(VecDestroy(&mesh.output.xc));
+  PetscCall(VecDestroy(&mesh.output.yc));
+  PetscCall(VecDestroy(&mesh.output.zc));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }

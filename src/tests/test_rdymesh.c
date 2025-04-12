@@ -92,8 +92,10 @@ static void TestRDyMeshCreateFromDM(void **state) {
   assert_int_equal(0, DMSetRefineLevel(dm, 1));
 
   // Now create a local mesh representation.
-  RDyMesh mesh;
-  assert_int_equal(0, RDyMeshCreateFromDM(dm, &mesh));
+  RDyMesh  mesh;
+  PetscInt refine_level;
+  assert_int_equal(0, DMGetRefineLevel(dm, &refine_level));
+  assert_int_equal(0, RDyMeshCreateFromDM(dm, refine_level, &mesh));
   // I expected the following statement to be true, but it's not (for nproc > 1)
   //  assert_int_equal(Nx * Ny, mesh.num_cells);
   assert_true(mesh.num_owned_cells <= Nx * Ny);  // (== iff nproc == 1)
