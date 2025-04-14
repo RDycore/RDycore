@@ -393,7 +393,6 @@ contains
     PetscInt                 :: num_values
     PetscScalar, pointer     :: data_for_rdycore(:)
     !
-    PetscScalar, pointer     :: bc_ptr(:)
     PetscInt                 :: i, ndata
     PetscInt                 :: cur_bc_idx, prev_bc_idx
     PetscReal                :: cur_bc
@@ -462,21 +461,21 @@ program rdycore_f90
   PetscErrorCode       :: ierr
   PetscInt             :: n, step, iedge
   PetscInt             :: nbconds, ibcond, num_edges, bcond_type
-  PetscReal, pointer   :: h(:), hu(:), hv(:), rain(:), values(:), values_bnd(:)
-  PetscInt,  pointer   :: nat_id(:), nat_id_bnd_cell(:)
+  PetscReal, pointer   :: rain(:), values(:)
+  PetscInt,  pointer   :: nat_id(:)
   integer(RDyTimeUnit) :: time_unit
   PetscReal            :: time, time_step, prev_time, coupling_interval, cur_time
 
   PetscBool            :: rain_specified, bc_specified
   character(len=1024)  :: rainfile, bcfile
   Vec                  :: rain_vec, bc_vec
-  PetscScalar, pointer :: rain_ptr(:), bc_ptr(:)
+  PetscScalar, pointer :: rain_ptr(:)
   PetscInt             :: nrain, nbc, num_edges_dirc_bc
   PetscInt             :: dirc_bc_idx, global_dirc_bc_idx
   PetscInt             :: cur_rain_idx, prev_rain_idx
   PetscInt             :: cur_bc_idx, prev_bc_idx
   PetscReal            :: cur_rain, cur_bc
-  PetscBool            :: interpolate_rain, interpolate_bc, flg
+  PetscBool            :: interpolate_rain, flg
   type(BoundaryCondition) :: bc_dataset
   PetscInt, parameter  :: ndof = 3
 
@@ -492,24 +491,16 @@ program rdycore_f90
     if (trim(config_file) /= trim('-help')) then
 
       PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-rain', rainfile, rain_specified, ierr))
-      PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-homogeneous_bc_file', bcfile, bc_specified, ierr))
 
       ! Flags to temporally interpolate rain and bc forcing
       interpolate_rain = PETSC_FALSE
-      interpolate_bc   = PETSC_FALSE
       PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-temporally_interpolate_rain', interpolate_rain, flg, ierr))
-      PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-temporally_interpolate_bc', interpolate_bc, flg, ierr))
 
       call ParseBoundaryDataOptions(bc_dataset)
 
       if (rain_specified) then
         call opendata(rainfile, rain_vec, nrain)
         PetscCallA(VecGetArray(rain_vec, rain_ptr, ierr))
-      endif
-
-      if (bc_specified) then
-        call opendata(bcfile, bc_vec, nbc)
-        PetscCallA(VecGetArray(bc_vec, bc_ptr, ierr))
       endif
 
       ! create rdycore and set it up with the given file
@@ -520,45 +511,7 @@ program rdycore_f90
 
       ! allocate arrays for inspecting simulation data
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
-      allocate(h(n), hu(n), hv(n), rain(n), values(n), nat_id(n))
-
-      ! get some mesh attributes
-      PetscCallA(RDyGetLocalCellXCentroids(rdy_, n, values, ierr))
-      PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, values, ierr))
-      PetscCallA(RDyGetLocalCellZCentroids(rdy_, n, values, ierr))
-      PetscCallA(RDyGetLocalCellNaturalIDs(rdy_, n, nat_id, ierr))
-
-      values(:) = 0.d0
-      PetscCallA(RDySetDomainXMomentumSource(rdy_, n, values, ierr))
-      PetscCallA(RDySetDomainYMomentumSource(rdy_, n, values, ierr))
-
-      ! get information about boundary conditions
-      dirc_bc_idx = 0
-      num_edges_dirc_bc = 0
-      PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbconds, ierr))
-      do ibcond = 1, nbconds
-        PetscCallA(RDyGetNumBoundaryEdges(rdy_, ibcond, num_edges, ierr))
-        PetscCallA(RDyGetBoundaryConditionFlowType(rdy_, ibcond, bcond_type, ierr))
-
-        if (bcond_type == CONDITION_DIRICHLET) then
-          if (bc_specified .and. dirc_bc_idx > 0) then
-            SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "When BC file specified via -homogeneous_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml")
-          endif
-          dirc_bc_idx = ibcond
-          num_edges_dirc_bc = num_edges
-        endif
-
-        allocate(nat_id_bnd_cell(num_edges), values_bnd(num_edges))
-        PetscCallA(RDyGetBoundaryCellNaturalIDs(rdy_, ibcond, num_edges, nat_id_bnd_cell, ierr))
-        PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellXCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellYCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
-        PetscCallA(RDyGetBoundaryCellZCentroids(rdy_, ibcond, num_edges, values_bnd, ierr))
-
-        deallocate(nat_id_bnd_cell)
-      enddo
+      allocate(rain(n), values(n))
 
       ! run the simulation to completion using the time parameters in the
       ! config file
@@ -617,19 +570,12 @@ program rdycore_f90
           SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Non-positive step index!")
         end if
 
-        PetscCallA(RDyGetLocalCellHeights(rdy_, n, h, ierr))
-        PetscCallA(RDyGetLocalCellXMomenta(rdy_, n, hu, ierr))
-        PetscCallA(RDyGetLocalCellYMomenta(rdy_, n, hv, ierr))
       end do
 
-      deallocate(h, hu, hv, rain, values, nat_id)
+      deallocate(rain, values)
       if (rain_specified) then
         PetscCallA(VecRestoreArray(rain_vec, rain_ptr, ierr))
         PetscCallA(VecDestroy(rain_vec, ierr))
-      endif
-      if (bc_specified) then
-        PetscCallA(VecRestoreArray(bc_vec, bc_ptr, ierr))
-        PetscCallA(VecDestroy(bc_vec, ierr))
       endif
 
       call DestroyBoundaryConditionDataset(rdy_, bc_dataset)
