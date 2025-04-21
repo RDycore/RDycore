@@ -1262,12 +1262,32 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   PetscCall(CreateDM(rdy));
 
-  // create the auxiliary DM, which handles diagnostics and I/O
-  rdy->diag_fields = (SectionFieldSpec){
-      .num_fields           = 1,
-      .num_field_components = {1},
-      .field_names          = {"Parameter"},
-  };
+  // create the auxiliary DM, which handles requested diagnostics and I/O
+  if (rdy->config.output.fields_count > 0) {
+    rdy->diag_fields = (SectionFieldSpec){0};
+    for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
+      // a diagnostic field is a requested output field that doesn't belong
+      // to the solution vector
+      PetscBool is_diag_field = PETSC_TRUE;
+      for (PetscInt j = 0; j < rdy->soln_fields.num_fields; ++j) {
+        if (!strcmp(rdy->soln_fields.field_names[j], rdy->config.output.fields[i])) {
+          is_diag_field = PETSC_FALSE;
+          break;
+        }
+      }
+      if (is_diag_field) {
+        strcpy(rdy->diag_fields.field_names[rdy->diag_fields.num_fields], rdy->config.output.fields[i]);
+        rdy->diag_fields.num_field_components[rdy->diag_fields.num_fields] = 1;
+        ++rdy->diag_fields.num_fields;
+      }
+    }
+  } else {  // default diagnostics
+    rdy->diag_fields = (SectionFieldSpec){
+        .num_fields           = 1,
+        .num_field_components = {1},
+        .field_names          = {"Parameter"},
+    };
+  }
   PetscCall(CreateAuxiliaryDM(rdy));
 
   if (rdy->config.physics.sediment.num_classes) {

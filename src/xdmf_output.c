@@ -3,9 +3,8 @@
 #include <rdycore.h>
 #include <string.h>
 
-// writes output fields that match the given set, or a default set
-static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, char **output_fields, PetscInt n_output_fields, PetscViewer viewer,
-                                     PetscInt num_refinements) {
+// writes output fields that match the given set; writes all fields if none are given
+static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, RDyOutputSection output, PetscViewer viewer, PetscInt num_refinements) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -62,11 +61,11 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, char **output_fields
     }
     PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
     for (PetscInt c = 0; c < bs; ++c) {
-      if (n_output_fields > 0) {
+      if (output.fields_count > 0) {
         const char *name;
         PetscCall(PetscObjectGetName((PetscObject)comp[c], &name));
-        for (PetscInt i = 0; i < n_output_fields; ++i) {
-          if (!strcmp(output_fields[i], name)) {
+        for (PetscInt i = 0; i < output.fields_count; ++i) {
+          if (!strcmp(output.fields[i], name)) {
             PetscCall(VecView(comp[c], viewer));
             PetscCall(VecDestroy(&comp[c]));
             break;
@@ -142,14 +141,12 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
 
   // write time-dependent solution and diagnostic fields
-  char   **output_fields   = rdy->config.output.fields;
-  PetscInt n_output_fields = rdy->config.output.fields_count;
-  char     group_name[PETSC_MAX_PATH_LEN];
+  char group_name[PETSC_MAX_PATH_LEN];
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, output_fields, n_output_fields, viewer, rdy->num_refinements));
-  if (n_output_fields > 0) {  // diagnostics only written out if specified
-    PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, output_fields, n_output_fields, viewer, rdy->num_refinements));
+  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->num_refinements));
+  if (rdy->config.output.fields_count > 0) {  // diagnostics are written only by request
+    PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, rdy->config.output, viewer, rdy->num_refinements));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 

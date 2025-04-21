@@ -823,8 +823,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // check sediment dynamics settings
   PetscCheck(config->physics.sediment.num_classes <= MAX_NUM_SEDIMENT_CLASSES, comm, PETSC_ERR_USER,
-             "The specified number of sediment classes (%" PetscInt_FMT ") exceeds the maximum (%d)", config->physics.sediment.num_classes,
-             MAX_NUM_SEDIMENT_CLASSES);
+             "The specified number of sediment classes (%" PetscInt_FMT ") exceeds the maximum (%" PetscInt_FMT ")",
+             config->physics.sediment.num_classes, MAX_NUM_SEDIMENT_CLASSES);
 
   // check numerics settings
   if (config->numerics.spatial != SPATIAL_FV) {
@@ -1008,7 +1008,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     if (config->output.fields_count > 0) {
       static const char *valid_output_fields[] = {
-          "Height", "MomentumX", "MomentumY", "Concentration%d", "WaterSource", "MomentumXSource", "MomentumYSource", "Concentration%dSource", NULL,
+          "Height",      "MomentumX",       "MomentumY",       "Concentration%" PetscInt_FMT,
+          "WaterSource", "MomentumXSource", "MomentumYSource", "Concentration%" PetscInt_FMT "Source",
+          NULL,
       };
       for (PetscInt f = 0; f < config->output.fields_count; ++f) {
         PetscBool valid = PETSC_FALSE;

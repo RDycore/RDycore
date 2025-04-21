@@ -228,6 +228,55 @@ static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Updates diagnostic fields in the auxiliary DM
+static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
+  PetscFunctionBegin;
+
+  // Fetch diagnostics from the operator.
+  OperatorData diagnostics = {0};
+  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & diagnostics));
+
+  // construct a set of available source fields
+  static char diagnostics_names[3 + MAX_NUM_SEDIMENT_CLASSES + 1][MAX_NAME_LEN] = {
+      "WaterSource",
+      "MomentumXSource",
+      "MomentumYSource",
+  };
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(diagnostics_names[3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "Source", i);
+  }
+
+  PetscSection section;
+  PetscCall(DMGetLocalSection(rdy->aux_dm, &section));
+
+  PetscInt num_fields;
+  PetscCall(PetscSectionGetNumFields(section, &num_fields));
+  for (PetscInt f = 0; f < num_fields; ++f) {
+    // NOTE: at present, all diagnostic fields have a single component
+    const char *name;
+    PetscCall(PetscSectionGetFieldName(section, f, &name));
+
+    int diag_index;
+    for (diag_index = 0; diagnostics_names[diag_index][0]; ++diag_index) {
+      // FIXME: If our aux_dm is refined, diagnostics are stored in global
+      // FIXME: vectors; if not, they are in natural vectors. We don't have this
+      // FIXME: information available in this context, unfortunately, unless
+      // FIXME: the DM itself knows whether it's refined!
+      PetscBool is_refined = PETSC_FALSE;  // FIXME: !!!
+      if (is_refined) {
+        // FIXME: copy local vector values to DM global vector
+      } else {
+        // FIXME: copy local vector values to DM natural vector
+      }
+    }
+  }
+
+  // put toys away
+  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & diagnostics));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Advances the solution by the coupling interval specified in the input
 /// configuration.
 PetscErrorCode RDyAdvance(RDy rdy) {
@@ -332,6 +381,8 @@ PetscErrorCode RDyAdvance(RDy rdy) {
       PetscCall(UpdateOperatorDiagnostics(rdy->operator));
     }
   }
+
+  PetscCall(UpdateDiagnosticFields(rdy));
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
