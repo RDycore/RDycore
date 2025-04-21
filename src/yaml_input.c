@@ -234,9 +234,14 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 // output section
 // ---------------
 // output:
+//   directory: <output-directory>
+//   fields: <list-of-output-fields>
 //   format: <binary|xdmf|cgns>
-//   interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
+//   step_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
+//   time_series:
+//     boundary_fluxes: <number-of-steps-between-flux-dumps>
+//   separate_grid_file: <true|false>
 
 // mapping of strings to file formats
 static const cyaml_strval_t output_file_formats[] = {
@@ -244,6 +249,11 @@ static const cyaml_strval_t output_file_formats[] = {
     {"binary", OUTPUT_BINARY},
     {"xdmf",   OUTPUT_XDMF  },
     {"cgns",   OUTPUT_CGNS  },
+};
+
+// a single selected output field entry
+static const cyaml_schema_value_t output_field_schema = {
+	CYAML_VALUE_STRING(CYAML_FLAG_POINTER, char, 0, CYAML_UNLIMITED),
 };
 
 // mapping of time_series fields to members of RDyTimeSeries
@@ -255,6 +265,8 @@ static const cyaml_schema_field_t output_time_series_fields_schema[] = {
 // mapping of output fields to members of RDyOutputSection
 static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_STRING("directory", CYAML_FLAG_OPTIONAL, RDyOutputSection, directory, 0),
+    CYAML_FIELD_SEQUENCE("fields", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyOutputSection, fields, &output_field_schema, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_ENUM("fields", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_INT("step_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, step_interval),
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),

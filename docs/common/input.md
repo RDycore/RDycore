@@ -402,7 +402,10 @@ RDycore. The parameters that define these discretizations are
 output:
   directory: output
   fields:
-    - 
+    - Height
+    - MomentumX
+    - MomentumY
+    - WaterSource
   format: xdmf
   step_interval: 100
   batch_size: 1
@@ -419,9 +422,9 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
   Default value: `output`
 * `fields`: a list of fields to include in each output file, expressed in YAML
   array syntax (typically with hyphenated items on separate lines). This item is
-  optional, and if omitted the included fields are the components of the
+  optional, and if omitted the selected fields are the components of the
   solution (e.g. `Height`, `MomentumX`, `MomentumY` for the shallow water
-  equations). Available options:
+  equations). Available options are
     * `Height`: water height $h$
     * `MomentumX`: $x$ momentum $hu$
     * `MomentumY`: $y$ velocity $hv$
