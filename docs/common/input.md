@@ -428,10 +428,11 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
     * `Height`: water height $h$
     * `MomentumX`: $x$ momentum $hu$
     * `MomentumY`: $y$ velocity $hv$
-    * `Concentration_I`: the concentration for sediment class $I$ (0, 1, 2, ...)
+    * `ConcentrationI`: the concentration for sediment class $I$ (0, 1, 2, ...)
     * `WaterSource`: the value of the source term for $h$
     * `MomentumXSource`: the value of the source term for $hu$
     * `MomentumYSource`: the value of the source term for $hv$
+    * `ConcentrationISource`: the value of the source term for sediment class $I$
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
     * `binary`: output is written using PETSc's binary data format

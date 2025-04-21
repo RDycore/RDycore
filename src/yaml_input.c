@@ -788,6 +788,7 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   }
 
   SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
+
   SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
   SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
@@ -1003,6 +1004,31 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
       PetscCheck(t2 >= t1, comm, PETSC_ERR_USER, "output.time_interval needs be larger than or equal to time.coupling_interval");
       PetscCheck(PetscEqualReal(floor(t2 / t1) * t1 - t2, 0.0), comm, PETSC_ERR_USER,
                  "output.time_interval should be a multiple of time.coupling_interval");
+    }
+
+    if (config->output.fields_count > 0) {
+      static const char *valid_output_fields[] = {
+          "Height", "MomentumX", "MomentumY", "Concentration%d", "WaterSource", "MomentumXSource", "MomentumYSource", "Concentration%dSource", NULL,
+      };
+      for (PetscInt f = 0; f < config->output.fields_count; ++f) {
+        PetscBool valid = PETSC_FALSE;
+        for (PetscInt v = 0; valid_output_fields[v]; ++v) {
+          if (!strcmp(valid_output_fields[v], config->output.fields[f])) {
+            valid = true;
+            break;
+          } else {  // try substituting a species size class index
+            char size_class_field[MAX_NAME_LEN];
+            for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
+              snprintf(size_class_field, MAX_NAME_LEN, valid_output_fields[v], i);
+              if (!strcmp(size_class_field, config->output.fields[f])) {
+                valid = true;
+                break;
+              }
+            }
+          }
+        }
+        PetscCheck(valid, comm, PETSC_ERR_USER, "Invalid output field requested: %s", config->output.fields[f]);
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1323,13 +1349,13 @@ PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
   PetscFunctionBegin;
 
   memset(prefix, 0, sizeof(char) * (strlen(rdy->config_file) + 1));
-  char *p = strstr(rdy->config_file, ".yaml");
+  char *p = strcasestr(rdy->config_file, ".yaml");
   if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
-    p = strstr(rdy->config_file, ".yml");
+    p = strcasestr(rdy->config_file, ".yml");
   }
   if (p) {
     size_t prefix_len = p - rdy->config_file;
-    strncpy(prefix, rdy->config_file, prefix_len);
+    strlcpy(prefix, rdy->config_file, prefix_len);
   } else {
     strcpy(prefix, rdy->config_file);
   }

@@ -3,7 +3,9 @@
 #include <rdycore.h>
 #include <string.h>
 
-static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer, PetscInt num_refinements) {
+// writes output fields that match the given set, or a default set
+static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, char **output_fields, PetscInt n_output_fields, PetscViewer viewer,
+                                     PetscInt num_refinements) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -12,11 +14,13 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer, 
   // create and populate a multi-component vector
   Vec data_vec;
 
-  if (!num_refinements) {
+  if (!num_refinements) {  // FIXME: can't we get this info from the DM itself?
     PetscCall(DMPlexCreateNaturalVector(dm, &data_vec));
     PetscCall(DMPlexGlobalToNaturalBegin(dm, global_vec, data_vec));
     PetscCall(DMPlexGlobalToNaturalEnd(dm, global_vec, data_vec));
   } else {
+    // a refined DM doesn't have a meaningful natural ordering, so we dump a
+    // global vector instead
     PetscCall(VecDuplicate(global_vec, &data_vec));
     PetscCall(VecCopy(global_vec, data_vec));
     PetscCall(PetscObjectReference((PetscObject)data_vec));
@@ -58,8 +62,20 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, PetscViewer viewer, 
     }
     PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
     for (PetscInt c = 0; c < bs; ++c) {
-      PetscCall(VecView(comp[c], viewer));
-      PetscCall(VecDestroy(&comp[c]));
+      if (n_output_fields > 0) {
+        const char *name;
+        PetscCall(PetscObjectGetName((PetscObject)comp[c], &name));
+        for (PetscInt i = 0; i < n_output_fields; ++i) {
+          if (!strcmp(output_fields[i], name)) {
+            PetscCall(VecView(comp[c], viewer));
+            PetscCall(VecDestroy(&comp[c]));
+            break;
+          }
+        }
+      } else {  // no output fields specified -- write out all data
+        PetscCall(VecView(comp[c], viewer));
+        PetscCall(VecDestroy(&comp[c]));
+      }
     }
     PetscCall(PetscFree(comp));
   }
@@ -126,11 +142,15 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
 
   // write time-dependent solution and diagnostic fields
-  char group_name[PETSC_MAX_PATH_LEN];
+  char   **output_fields   = rdy->config.output.fields;
+  PetscInt n_output_fields = rdy->config.output.fields_count;
+  char     group_name[PETSC_MAX_PATH_LEN];
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, viewer, rdy->num_refinements));
-  PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, viewer, rdy->num_refinements));
+  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, output_fields, n_output_fields, viewer, rdy->num_refinements));
+  if (n_output_fields > 0) {  // diagnostics only written out if specified
+    PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, output_fields, n_output_fields, viewer, rdy->num_refinements));
+  }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // write the grid
