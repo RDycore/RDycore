@@ -823,7 +823,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // check sediment dynamics settings
   PetscCheck(config->physics.sediment.num_classes <= MAX_NUM_SEDIMENT_CLASSES, comm, PETSC_ERR_USER,
-             "The specified number of sediment classes (%" PetscInt_FMT ") exceeds the maximum (%" PetscInt_FMT ")",
+             "The specified number of sediment classes (%" PetscInt_FMT ") exceeds the maximum (%d)",
              config->physics.sediment.num_classes, MAX_NUM_SEDIMENT_CLASSES);
 
   // check numerics settings
