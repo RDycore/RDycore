@@ -325,7 +325,14 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     // accumulate f_local into f_global
     PetscCall(VecZeroEntries(f_global));
-    PetscCall(DMLocalToGlobal(op->dm, f_local, ADD_VALUES, f_global));
+    PetscBool compute_all_flux = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-compute_all_flux", &compute_all_flux, NULL));
+
+    if (compute_all_flux) {
+      PetscCall(DMLocalToGlobal(op->dm, f_local, INSERT_VALUES, f_global));
+    } else {
+      PetscCall(DMLocalToGlobal(op->dm, f_local, ADD_VALUES, f_global));
+    }
 
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.rhs, MemTypeP2C(mem_type), &f_local_ptr));
