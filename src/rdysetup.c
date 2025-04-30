@@ -1269,16 +1269,20 @@ PetscErrorCode RDySetup(RDy rdy) {
       // a diagnostic field is a requested output field that doesn't belong
       // to the solution vector
       PetscBool is_diag_field = PETSC_TRUE;
-      for (PetscInt j = 0; j < rdy->soln_fields.num_fields; ++j) {
-        if (!strcmp(rdy->soln_fields.field_names[j], rdy->config.output.fields[i])) {
+      for (PetscInt j = 0; j < rdy->soln_fields.num_field_components[0]; ++j) {
+        if (!strcmp(rdy->soln_fields.field_component_names[0][j], rdy->config.output.fields[i])) {
           is_diag_field = PETSC_FALSE;
           break;
         }
       }
       if (is_diag_field) {
-        strcpy(rdy->diag_fields.field_names[rdy->diag_fields.num_fields], rdy->config.output.fields[i]);
-        rdy->diag_fields.num_field_components[rdy->diag_fields.num_fields] = 1;
-        ++rdy->diag_fields.num_fields;
+        if (!rdy->diag_fields.num_fields) {
+          rdy->diag_fields.num_fields = 1;
+          strcpy(rdy->diag_fields.field_names[0], "Diagnostics");
+          rdy->diag_fields.num_field_components[0] = 0;
+        }
+        strcpy(rdy->diag_fields.field_component_names[0][rdy->diag_fields.num_field_components[0]], rdy->config.output.fields[i]);
+        ++rdy->diag_fields.num_field_components[0];
       }
     }
   } else {  // default diagnostics
