@@ -740,9 +740,10 @@ contains
     implicit none
     !
     type(RDy)               :: rdy_
-    type(SourceSink) :: rain_dataset
+    type(SourceSink)        :: rain_dataset
     PetscReal               :: cur_time
     !
+    PetscInt, parameter     :: region_idx = 1
     PetscErrorCode          :: ierr
 
     select case (rain_dataset%datatype)
@@ -751,17 +752,17 @@ contains
     case (DATASET_CONSTANT)
       if (rain_dataset%ndata > 0) then
         call SetConstantRainfall(rain_dataset%constant%rate, rain_dataset%ndata, rain_dataset%data_for_rdycore)
-        call RDySetRegionalWaterSource(rdy_, 1, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+        call RDySetRegionalWaterSource(rdy_, region_idx, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
       endif
     case (DATASET_HOMOGENEOUS)
       if (rain_dataset%ndata > 0) then
         call SetHomogeneousData(rain_dataset%homogeneous, cur_time, rain_dataset%ndata, rain_dataset%data_for_rdycore)
-        call RDySetRegionalWaterSource(rdy_, 1, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+        call RDySetRegionalWaterSource(rdy_, region_idx, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
       endif
     case (DATASET_RASTER)
       if (rain_dataset%ndata > 0) then
         call SetRasterData(rain_dataset%raster, cur_time, rain_dataset%ndata, rain_dataset%data_for_rdycore)
-        call RDySetRegionalWaterSource(rdy_, 1, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+        call RDySetRegionalWaterSource(rdy_, region_idx, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
       endif
     case default
       SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend this to other types of rainfall datasets")
@@ -911,6 +912,7 @@ contains
     type(BoundaryCondition) :: bc_dataset
     PetscReal               :: cur_time
     !
+    PetscInt, parameter     :: ndof = 3
     PetscErrorCode          :: ierr
 
     select case (bc_dataset%datatype)
@@ -918,8 +920,8 @@ contains
       ! do nothing
     case (DATASET_HOMOGENEOUS)
       if (bc_dataset%ndata > 0) then
-        call SetHomogeneousBoundary(bc_dataset%homogeneous, cur_time, bc_dataset%ndata / 3, bc_dataset%data_for_rdycore)
-        PetscCallA(RDySetFlowDirichletBoundaryValues(rdy_, bc_dataset%dirichlet_bc_idx, bc_dataset%ndata / 3, 3, bc_dataset%data_for_rdycore, ierr))
+        call SetHomogeneousBoundary(bc_dataset%homogeneous, cur_time, bc_dataset%ndata / ndof, bc_dataset%data_for_rdycore)
+        PetscCallA(RDySetFlowDirichletBoundaryValues(rdy_, bc_dataset%dirichlet_bc_idx, bc_dataset%ndata / ndof, ndof, bc_dataset%data_for_rdycore, ierr))
       endif
     case (DATASET_UNSTRUCTURED)
     case default
