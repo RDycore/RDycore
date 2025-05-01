@@ -394,6 +394,9 @@ typedef struct {
   // MMS-specific section (used only by the MMS driver)
   RDyMMSSection mms;
 
+  // handle different flux communication patterns
+  PetscBool rdy_flux_single_comm;
+
 } RDyConfig;
 
 // ensemble member configuration (see ensemble.c)

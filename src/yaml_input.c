@@ -690,6 +690,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
+    CYAML_FIELD_BOOL("rdy_flux_single_comm", CYAML_FLAG_OPTIONAL, RDyConfig, rdy_flux_single_comm),
     CYAML_FIELD_END
 };
 

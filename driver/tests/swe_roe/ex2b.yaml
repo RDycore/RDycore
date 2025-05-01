@@ -89,3 +89,6 @@ flow_conditions:
     type: reflecting
   - name: outflow_bc
     type: critical-outflow
+
+rdy_flux_single_comm: true
+

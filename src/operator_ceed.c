@@ -5,6 +5,7 @@
 #include <private/rdysedimentimpl.h>
 #include <private/rdysweimpl.h>
 
+#include "petscsystypes.h"
 #include "sediment/sediment_ceed_impl.h"
 #include "swe/swe_ceed_impl.h"
 
@@ -604,9 +605,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   // flux suboperator 0: fluxes between interior cells
 
   CeedOperator interior_flux_op;
-  PetscBool compute_all_flux = PETSC_FALSE;
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-compute_all_flux", &compute_all_flux, NULL));
-  if (compute_all_flux) {
+  if (config->rdy_flux_single_comm) {
     PetscCall(CreateCeedAllInteriorFluxOperator(*config, mesh, &interior_flux_op));
   } else {
     PetscCall(CreateCeedInteriorFluxOperator(*config, mesh, &interior_flux_op));
