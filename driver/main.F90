@@ -10,6 +10,8 @@ module rdy_driver
 #define DATASET_UNSTRUCTURED 4
 #define DATASET_MULTI_HOMOGENEOUS 5
 
+#define PETSC_ID_TYPE "int32"
+
   type :: time_struct
     PetscInt :: year
     PetscInt :: month
@@ -17,6 +19,10 @@ module rdy_driver
     PetscInt :: hour
     PetscInt :: minute
   end type time_struct
+
+  type, public :: ConstantDataset
+    PetscReal :: rate
+  end type ConstantDataset
 
   type, public :: HomogeneousDataset
     character(len=1024) :: filename
@@ -26,6 +32,37 @@ module rdy_driver
     PetscBool    :: temporally_interpolate
     PetscInt     :: cur_idx, prev_idx
   end type HomogeneousDataset
+
+  type, public :: RasterDataset
+    character(len=1024) :: dir
+    character(len=1024) :: file
+    character(len=1024) :: map_file
+
+    type(time_struct)  :: start_date, current_date
+
+    PetscInt :: header_offset
+
+    Vec :: data_vec
+    PetscScalar, pointer :: data_ptr(:)
+
+    ! temporal duration of the rainfall dataset
+    PetscReal :: dtime_in_hour
+    PetscInt  :: ndata_file
+
+    ! header of dataset
+    PetscInt :: ncols, nrows
+    PetscReal :: xlc, ylc
+    PetscReal :: cellsize
+
+    PetscInt           :: mesh_ncells_local      ! number of cells locally owned
+    PetscInt, pointer  :: data2mesh_idx(:)       ! for each RDycore element (cells or boundary edges), the index of the data in the raster dataset
+    PetscReal, pointer :: data_xc(:), data_yc(:) ! x and y coordinates of data
+    PetscReal, pointer :: mesh_xc(:), mesh_yc(:) ! x and y coordinates of RDycore elments
+
+    PetscBool :: write_map_for_debugging         ! if true, write the mapping between the RDycore cells and the dataset for debugging
+    PetscBool :: write_map                       ! if true, write the map between the RDycore cells and the dataset
+    PetscBool :: read_map                        ! if true, read the map between the RDycore cells and the dataset
+  end type RasterDataset
 
   type, public :: UnstructuredDataset
     character(len=1024) :: dir
@@ -44,16 +81,27 @@ module rdy_driver
 
     type(time_struct)  :: start_date, current_date
 
-    PetscInt           :: mesh_nelements          ! number of cells or boundary edges in RDycore mesh
-    PetscInt, pointer  :: data2mesh_idx(:)        ! for each RDycore element (cells or boundary edges), the index of the data in the unstructured dataset
-    PetscReal, pointer :: data_xc(:), data_yc(:)  ! x and y coordinates of data
-    PetscReal, pointer :: mesh_xc(:), mesh_yc(:)  ! x and y coordinates of RDycore elments
+    PetscInt           :: mesh_nelements         ! number of cells or boundary edges in RDycore mesh
+    PetscInt, pointer  :: data2mesh_idx(:)       ! for each RDycore element (cells or boundary edges), the index of the data in the unstructured dataset
+    PetscReal, pointer :: data_xc(:), data_yc(:) ! x and y coordinates of data
+    PetscReal, pointer :: mesh_xc(:), mesh_yc(:) ! x and y coordinates of RDycore elments
 
-    PetscBool :: write_map_for_debugging  ! if true, write the mapping between the RDycore cells and the dataset for debugging
-    PetscBool :: write_map                ! if true, write the map between the RDycore cells and the dataset
-    PetscBool :: read_map                 ! if true, read the map between the RDycore cells and the dataset
+    PetscBool :: write_map_for_debugging         ! if true, write the mapping between the RDycore cells and the dataset for debugging
+    PetscBool :: write_map                       ! if true, write the map between the RDycore cells and the dataset
+    PetscBool :: read_map                        ! if true, read the map between the RDycore cells and the dataset
 
   end type UnstructuredDataset
+
+  type, public :: SourceSink
+    PetscInt :: datatype
+
+    type(ConstantDataset)    :: constant
+    type(HomogeneousDataset) :: homogeneous
+    type(RasterDataset)      :: raster
+
+    PetscInt             :: ndata
+    PetscScalar, pointer :: data_for_rdycore(:)
+  end type SourceSink
 
   type, public :: BoundaryCondition
     PetscInt :: datatype
@@ -61,8 +109,8 @@ module rdy_driver
     type(HomogeneousDataset)  :: homogeneous
     type(UnstructuredDataset) :: unstructured
 
-    PetscInt :: ndata
-    PetscInt :: dirichlet_bc_idx
+    PetscInt             :: ndata
+    PetscInt             :: dirichlet_bc_idx
     PetscScalar, pointer :: data_for_rdycore(:)
   end type BoundaryCondition
 
@@ -138,6 +186,80 @@ contains
 
   end subroutine
 
+  subroutine ParseRainfallDataOptions(rain)
+    !
+    implicit none
+    !
+    type(SourceSink) :: rain
+    !
+    PetscInt                      :: dataset_type_count
+    PetscBool                     :: flg
+    PetscBool                     :: constant_rain_flag
+    PetscBool                     :: homogeneous_rain_flag
+    PetscBool                     :: raster_rain_flag
+    PetscBool                     :: raster_start_date_flag
+    PetscInt,pointer,dimension(:) :: date
+    PetscInt                      :: ndate = 5
+    PetscErrorCode                :: ierr
+
+    dataset_type_count = 0
+
+    rain%datatype                           = DATASET_UNSET
+    rain%ndata                              = 0
+    rain%constant%rate                      = 0.d0
+    rain%homogeneous%temporally_interpolate = PETSC_FALSE
+
+    ! Constant rainfall dataset
+    PetscCallA(PetscOptionsGetReal(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-constant_rain_rate', rain%constant%rate, constant_rain_flag, ierr))
+    if (constant_rain_flag) then
+      rain%datatype = DATASET_CONSTANT
+      dataset_type_count = dataset_type_count + 1
+    endif
+
+    ! Homogeneous rainfall dataset
+    PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-temporally_interpolate_spatially_homogeneous_rain', rain%homogeneous%temporally_interpolate, flg, ierr))
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-homogeneous_rain_file', rain%homogeneous%filename, homogeneous_rain_flag, ierr))
+    if (homogeneous_rain_flag) then
+      rain%datatype = DATASET_HOMOGENEOUS
+      dataset_type_count = dataset_type_count + 1
+    endif
+
+    ! Raster rainfall dataset
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-raster_rain_dir', rain%raster%dir, raster_rain_flag, ierr))
+    PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-raster_rain_write_map_for_debugging', rain%raster%write_map_for_debugging, flg, ierr))
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-raster_rain_write_map_file', rain%raster%map_file, rain%raster%write_map, ierr))
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-raster_rain_read_map_file', rain%raster%map_file, rain%raster%read_map, ierr))
+    if (raster_rain_flag) then
+      rain%datatype = DATASET_RASTER
+      dataset_type_count = dataset_type_count + 1
+
+      allocate(date(ndate))
+      PetscCall(PetscOptionsGetIntArray(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, "-raster_rain_start_date", date, ndate, raster_start_date_flag, ierr));
+      if (ndate /= 5) then
+        SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "-raster_rain_start_date should be in YY,MO,DD,HH,MM format")
+      endif
+      rain%raster%start_date%year   = date(1)
+      rain%raster%start_date%month  = date(2)
+      rain%raster%start_date%day    = date(3)
+      rain%raster%start_date%hour   = date(4)
+      rain%raster%start_date%minute = date(5)
+
+      rain%raster%current_date%year   = date(1)
+      rain%raster%current_date%month  = date(2)
+      rain%raster%current_date%day    = date(3)
+      rain%raster%current_date%hour   = date(4)
+      rain%raster%current_date%minute = date(5)
+
+      deallocate(date)
+    endif
+
+    if (dataset_type_count > 1) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one rainfall dataset type cannot be specified")
+    endif
+
+  end subroutine ParseRainfallDataOptions
+
+
   ! Parse the command line options for the boundary condition dataset
   subroutine ParseBoundaryDataOptions(bc)
     !
@@ -175,6 +297,8 @@ contains
     PetscCall(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, "-unstructured_bc_write_map_for_debugging", bc%unstructured%write_map_for_debugging, flg, ierr))
     PetscCall(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, "-unstructured_bc_write_map_file", bc%unstructured%map_file, bc%unstructured%write_map, ierr))
     PetscCall(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, "-unstructured_bc_read_map_file", bc%unstructured%map_file, bc%unstructured%read_map, ierr))
+
+    allocate(date(ndate))
     PetscCall(PetscOptionsGetIntArray(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, "-unstructured_bc_start_date", date, ndate, unstructured_start_date_flag, ierr))
 
     if (unstructured_start_date_flag) then
@@ -220,7 +344,7 @@ contains
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
     type(HomogeneousDataset) :: data
     PetscErrorCode           :: ierr
@@ -244,7 +368,7 @@ contains
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
     type(HomogeneousDataset) :: data
     PetscErrorCode           :: ierr
@@ -263,19 +387,19 @@ contains
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
-    type(RDy)               :: rdy_
-    PetscInt               :: dirc_bc_idx, num_edges_dirc_bc
-    PetscMPIInt            :: global_dirc_bc_idx
-    PetscBool              :: multiple_dirc_bcs_present
+    type(RDy)      :: rdy_
+    PetscInt       :: dirc_bc_idx, num_edges_dirc_bc
+    PetscMPIInt    :: global_dirc_bc_idx
+    PetscBool      :: multiple_dirc_bcs_present
     !
-    PetscInt :: ibcond, nbconds, num_edges, bcond_type
-    PetscErrorCode           :: ierr
+    PetscInt       :: ibcond, nbconds, num_edges, bcond_type
+    PetscErrorCode :: ierr
 
-    dirc_bc_idx       = -1
-    global_dirc_bc_idx = -1
-    num_edges_dirc_bc = 0
+    dirc_bc_idx               = -1
+    global_dirc_bc_idx        = -1
+    num_edges_dirc_bc         = 0
     multiple_dirc_bcs_present = PETSC_FALSE
 
     PetscCallA(RDyGetNumBoundaryConditions(rdy_, nbconds, ierr))
@@ -302,7 +426,7 @@ contains
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
     type(RDy)               :: rdy_
     type(BoundaryCondition) :: bc_dataset
@@ -328,13 +452,373 @@ contains
 
   end subroutine DoPostprocessForBoundaryHomogeneousDataset
 
+  subroutine DetermineDatasetFilename(dir, current_date, file)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    character(len=1024) :: dir
+    type(time_struct)   :: current_date
+    character(len=1024) :: file
+    !
+    PetscErrorCode      :: ierr
+
+    write(file, '(A,"/",I4,"-",I2.2,"-",I2.2,":",I2.2,"-",I2.2,".",A,".bin")') trim(dir), current_date%year, current_date%month,  current_date%day, current_date%hour, current_date%minute, PETSC_ID_TYPE
+
+  end subroutine DetermineDatasetFilename
+
+  subroutine OpenRasterDataset(data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RasterDataset) :: data
+    !
+    character(len=PETSC_MAX_PATH_LEN) :: outputString
+    PetscInt                          :: tmpInt
+    PetscErrorCode                    :: ierr
+
+    call DetermineDatasetFilename(data%dir, data%current_date, data%file)
+    write(outputString,'(a,a,a)') 'Opening  ',trim(data%file),'\n'
+    PetscCallA(PetscPrintf(PETSC_COMM_WORLD, outputString, ierr))
+
+    data%dtime_in_hour = 1.0
+    data%ndata_file    = 1
+
+    call opendata(data%file, data%data_vec, tmpInt)
+    PetscCallA(VecGetArray(data%data_vec, data%data_ptr, ierr))
+
+    data%header_offset = 5
+
+    data%ncols    = int(data%data_ptr(1))
+    data%nrows    = int(data%data_ptr(2))
+    data%xlc      = data%data_ptr(3)
+    data%ylc      = data%data_ptr(4)
+    data%cellsize = data%data_ptr(5)
+
+  end subroutine OpenRasterDataset
+
+  subroutine OpenNextRasterDataset(data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RasterDataset) :: data
+    !
+    character(len=PETSC_MAX_PATH_LEN) :: outputString
+    PetscInt                          :: tmpInt
+    PetscErrorCode                    :: ierr
+
+    PetscCallA(VecRestoreArray(data%data_vec, data%data_ptr, ierr))
+    PetscCallA(VecDestroy(data%data_vec, ierr))
+
+    data%current_date%hour = data%current_date%hour + 1
+
+    call OpenRasterDataset(data)
+
+  end subroutine OpenNextRasterDataset
+
+  subroutine GetCellCentroidsFromRDycoreMesh(rdy_, n, xc, yc)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)               :: rdy_
+    PetscInt                :: n
+    PetscReal, pointer      :: xc(:), yc(:)
+    PetscErrorCode          :: ierr
+
+    PetscCallA(RDyGetLocalCellXCentroids(rdy_, n, xc, ierr))
+    PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, yc, ierr))
+
+  end subroutine GetCellCentroidsFromRDycoreMesh
+
+  subroutine CreateRasterDatasetMapping(rdy_, data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)               :: rdy_
+    type(RasterDataset)     :: data
+    !
+    PetscInt               :: ndata, icell, irow, icol, count
+    PetscReal              :: xc, yc, dx, dy, dist, min_dist
+
+    ndata = data%ncols * data%nrows
+
+    do icell = 1, data%mesh_ncells_local
+      xc = data%mesh_xc(icell)
+      yc = data%mesh_yc(icell)
+      min_dist = (max(data%ncols, data%nrows) + 1.d0) * data%cellsize
+
+      count = 0
+      do irow = 1, data%nrows
+        do icol = 1, data%ncols
+          count = count + 1
+          dx = xc - data%data_xc(count)
+          dy = yc - data%data_yc(count)
+          dist = sqrt(dx * dx + dy * dy)
+          if (dist < min_dist) then
+            min_dist = dist
+            data%data2mesh_idx(icell) = count
+          endif
+        enddo
+      enddo
+    enddo
+
+  end subroutine CreateRasterDatasetMapping
+
+  subroutine DoPostprocessForSourceRasterDataset(rdy_, data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)           :: rdy_
+    type(RasterDataset) :: data
+    !
+    PetscInt            :: ndata, irow, icol, count
+    PetscErrorCode      :: ierr
+
+    ndata = data%ncols * data%nrows
+
+    allocate(data%data_xc(ndata))
+    allocate(data%data_yc(ndata))
+
+    count = 0
+    do irow = 1, data%nrows
+      do icol = 1, data%ncols
+        count = count + 1
+        data%data_xc(count) = data%xlc + (icol - 1) * data%cellsize + data%cellsize / 2.d0
+        data%data_yc(count) = data%ylc + (data%nrows - irow) * data%cellsize + data%cellsize / 2.d0
+      enddo
+    enddo
+
+    PetscCallA(RDyGetNumLocalCells(rdy_, data%mesh_ncells_local, ierr))
+    allocate(data%mesh_xc(data%mesh_ncells_local))
+    allocate(data%mesh_yc(data%mesh_ncells_local))
+    allocate(data%data2mesh_idx(data%mesh_ncells_local))
+
+    call GetCellCentroidsFromRDycoreMesh(rdy_, data%mesh_ncells_local, data%mesh_xc, data%mesh_yc)
+
+    call CreateRasterDatasetMapping(rdy_, data)
+
+  end subroutine DoPostprocessForSourceRasterDataset
+
+  subroutine CreateRainfallConditionDataset(rdy_, n, rain_dataset)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)               :: rdy_
+    PetscInt                :: n
+    type(SourceSink)        :: rain_dataset
+    !
+    PetscInt  :: expected_data_stride
+
+    select case (rain_dataset%datatype)
+    case (DATASET_UNSET)
+      ! do nothing
+    case (DATASET_CONSTANT)
+      rain_dataset%ndata = n
+      allocate(rain_dataset%data_for_rdycore(n))
+    case (DATASET_HOMOGENEOUS)
+      rain_dataset%ndata = n
+      allocate(rain_dataset%data_for_rdycore(n))
+      call OpenHomogeneousDataset(rain_dataset%homogeneous)
+    case (DATASET_RASTER)
+      rain_dataset%ndata = n
+      allocate(rain_dataset%data_for_rdycore(n))
+      call OpenRasterDataset(rain_dataset%raster)
+      call DoPostprocessForSourceRasterDataset(rdy_, rain_dataset%raster)
+    case default
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one rainfall condition type cannot be specified")
+    end select
+
+  end subroutine CreateRainfallConditionDataset
+
+  subroutine SetConstantRainfall(rate, num_values, data_for_rdycore)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    PetscReal                :: rate
+    PetscInt                 :: num_values
+    PetscScalar, pointer     :: data_for_rdycore(:)
+    !
+    PetscInt                 :: i
+
+    do i = 1, num_values
+      data_for_rdycore(i) = rate
+    enddo
+
+  end subroutine SetConstantRainfall
+
+  subroutine SetHomogeneousData(rain_data, cur_time, num_values, data_for_rdycore)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(HomogeneousDataset) :: rain_data
+    PetscReal                :: cur_time
+    PetscInt                 :: num_values
+    PetscScalar, pointer     :: data_for_rdycore(:)
+    !
+    PetscInt                 :: i, ndata
+    PetscInt                 :: cur_rain_idx, prev_rain_idx
+    PetscReal                :: cur_rain
+    PetscBool                :: temporally_interpolate
+
+    cur_rain_idx             = rain_data%cur_idx
+    prev_rain_idx            = rain_data%prev_idx
+    temporally_interpolate   = rain_data%temporally_interpolate
+    ndata                    = rain_data%ndata
+
+    call GetCurrentData(rain_data%data_ptr, ndata, cur_time, temporally_interpolate, cur_rain_idx, cur_rain);
+
+    do i = 1, num_values
+      data_for_rdycore(i) = cur_rain
+    enddo
+
+  end subroutine SetHomogeneousData
+
+  subroutine SetRasterData(data, cur_time, num_values, data_for_rdycore)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RasterDataset) :: data
+    PetscReal           :: cur_time
+    PetscInt            :: num_values
+    PetscScalar, pointer :: data_for_rdycore(:)
+    !
+    PetscInt            :: icell, idx, ndata, ndata_file
+    PetscInt            :: offset
+    PetscReal, parameter :: mm_per_hr_2_m_per_sec = 1.0 / (1000.d0 * 3600.d0)
+
+    if (cur_time / 3600.d0 >= (data%ndata_file) * data%dtime_in_hour) then
+      ndata_file = data%ndata_file
+      call OpenNextRasterDataset(data)
+      data%ndata_file = ndata_file + 1
+    endif
+
+    offset = data%header_offset;
+    do icell = 1, num_values
+      idx = data%data2mesh_idx(icell)
+      data_for_rdycore(icell) = data%data_ptr(idx + offset) * mm_per_hr_2_m_per_sec
+    enddo
+
+  end subroutine SetRasterData
+
+  ! Apply rainfall source to the RDycore object
+  subroutine ApplyRainfallDataset(rdy_, cur_time, rain_dataset)
+#include <petsc/finclude/petsc.h>
+#include <finclude/rdycore.h>
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)               :: rdy_
+    type(SourceSink) :: rain_dataset
+    PetscReal               :: cur_time
+    !
+    PetscErrorCode          :: ierr
+
+    select case (rain_dataset%datatype)
+    case (DATASET_UNSET)
+      ! do nothing
+    case (DATASET_CONSTANT)
+      if (rain_dataset%ndata > 0) then
+        call SetConstantRainfall(rain_dataset%constant%rate, rain_dataset%ndata, rain_dataset%data_for_rdycore)
+        call RDySetRegionalWaterSource(rdy_, 1, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+      endif
+    case (DATASET_HOMOGENEOUS)
+      if (rain_dataset%ndata > 0) then
+        call SetHomogeneousData(rain_dataset%homogeneous, cur_time, rain_dataset%ndata, rain_dataset%data_for_rdycore)
+        call RDySetRegionalWaterSource(rdy_, 1, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+      endif
+    case (DATASET_RASTER)
+      if (rain_dataset%ndata > 0) then
+        call SetRasterData(rain_dataset%raster, cur_time, rain_dataset%ndata, rain_dataset%data_for_rdycore)
+        call RDySetRegionalWaterSource(rdy_, 1, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+      endif
+    case default
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend this to other types of rainfall datasets")
+    end select
+
+  end subroutine ApplyRainfallDataset
+
+  subroutine DestroyRasterDataset(rain_dataset)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RasterDataset) :: rain_dataset
+    !
+    PetscErrorCode      :: ierr
+
+    ! get the data pointer to the data in the vector
+    PetscCallA(VecRestoreArray(rain_dataset%data_vec, rain_dataset%data_ptr, ierr))
+    PetscCallA(VecDestroy(rain_dataset%data_vec, ierr))
+
+  end subroutine DestroyRasterDataset
+
+  subroutine DestroyRainfallDataset(rain_dataset)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(SourceSink) :: rain_dataset
+
+    select case (rain_dataset%datatype)
+    case (DATASET_UNSET)
+      ! do nothing
+    case (DATASET_CONSTANT)
+      ! do nothing
+    case (DATASET_HOMOGENEOUS)
+      call DestroyHomogeneousDataset(rain_dataset%homogeneous)
+      deallocate(rain_dataset%data_for_rdycore)
+    case (DATASET_RASTER)
+      call DestroyRasterDataset(rain_dataset%raster)
+      deallocate(rain_dataset%data_for_rdycore)
+    case default
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one rainfall condition type cannot be specified")
+    end select
+
+  end subroutine DestroyRainfallDataset
+
   ! Set up boundary condition based on command line options
   subroutine CreateBoundaryConditionDataset(rdy_, bc_dataset)
     !
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
     type(RDy)               :: rdy_
     type(BoundaryCondition) :: bc_dataset
@@ -363,7 +847,7 @@ contains
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
     type(RDy)               :: rdy_
     type(BoundaryCondition) :: bc_dataset
@@ -386,7 +870,7 @@ contains
     use rdycore
     use petsc
     !
-      implicit none
+    implicit none
     !
     type(HomogeneousDataset) :: bc_data
     PetscReal                :: cur_time
@@ -476,6 +960,7 @@ program rdycore_f90
   PetscInt             :: cur_bc_idx, prev_bc_idx
   PetscReal            :: cur_rain, cur_bc
   PetscBool            :: interpolate_rain, flg
+  type(SourceSink)        :: rain_dataset
   type(BoundaryCondition) :: bc_dataset
   PetscInt, parameter  :: ndof = 3
 
@@ -496,6 +981,7 @@ program rdycore_f90
       interpolate_rain = PETSC_FALSE
       PetscCallA(PetscOptionsGetBool(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-temporally_interpolate_rain', interpolate_rain, flg, ierr))
 
+      call ParseRainfallDataOptions(rain_dataset)
       call ParseBoundaryDataOptions(bc_dataset)
 
       if (rain_specified) then
@@ -507,11 +993,12 @@ program rdycore_f90
       PetscCallA(RDyCreate(PETSC_COMM_WORLD, config_file, rdy_, ierr))
       PetscCallA(RDySetup(rdy_, ierr))
 
-      call CreateBoundaryConditionDataset(rdy_, bc_dataset)
-
       ! allocate arrays for inspecting simulation data
       PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
       allocate(rain(n), values(n))
+
+      call CreateRainfallConditionDataset(rdy_, n, rain_dataset)
+      call CreateBoundaryConditionDataset(rdy_, bc_dataset)
 
       ! run the simulation to completion using the time parameters in the
       ! config file
@@ -527,20 +1014,7 @@ program rdycore_f90
 
         PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
 
-        ! apply a 1 mm/hr rain over the entire domain (region 0)
-        if (.not. rain_specified) then
-          rain(:) = 1.d0/3600.d0/1000.d0
-          PetscCallA(RDySetDomainWaterSource(rdy_, n, rain, ierr))
-        else
-          PetscCallA(RDyGetTime(rdy_, time_unit, cur_time, ierr))
-          call getcurrentdata(rain_ptr, nrain, cur_time, interpolate_rain, cur_rain_idx, cur_rain)
-          if (interpolate_rain .or. cur_rain_idx /= prev_rain_idx) then
-            prev_rain_idx = cur_rain_idx
-            rain(:) = cur_rain
-            PetscCallA(RDySetDomainWaterSource(rdy_, n, rain, ierr))
-          endif
-        endif
-
+        call ApplyRainfallDataset(rdy_, cur_time, rain_dataset)
         call ApplyBoundaryCondition(rdy_, cur_time, bc_dataset);
 
         ! advance the solution by the coupling interval specified in the config file
@@ -578,6 +1052,7 @@ program rdycore_f90
         PetscCallA(VecDestroy(rain_vec, ierr))
       endif
 
+      call DestroyRainfallDataset(rain_dataset)
       call DestroyBoundaryConditionDataset(rdy_, bc_dataset)
 
       PetscCallA(RDyDestroy(rdy_, ierr))
