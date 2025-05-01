@@ -605,7 +605,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   // flux suboperator 0: fluxes between interior cells
 
   CeedOperator interior_flux_op;
-  if (config->rdy_flux_single_comm) {
+  if (config->numerics.flux_single_comm) {
     PetscCall(CreateCeedAllInteriorFluxOperator(*config, mesh, &interior_flux_op));
   } else {
     PetscCall(CreateCeedInteriorFluxOperator(*config, mesh, &interior_flux_op));

@@ -104,6 +104,7 @@ typedef struct {
   RDyNumericsSpatial  spatial;
   RDyNumericsTemporal temporal;
   RDyNumericsRiemann  riemann;
+  PetscBool flux_single_comm;
 } RDyNumericsSection;
 
 // ------------
@@ -393,9 +394,6 @@ typedef struct {
 
   // MMS-specific section (used only by the MMS driver)
   RDyMMSSection mms;
-
-  // handle different flux communication patterns
-  PetscBool rdy_flux_single_comm;
 
 } RDyConfig;
 

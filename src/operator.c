@@ -327,7 +327,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     //PetscBool compute_all_flux = PETSC_FALSE;
     //PetscCall(PetscOptionsGetBool(NULL, NULL, "-compute_all_flux", &compute_all_flux, NULL));
 
-    if (op->config->rdy_flux_single_comm) {
+    if (op->config->numerics.flux_single_comm) {
       PetscCall(DMLocalToGlobal(op->dm, f_local, INSERT_VALUES, f_global));
     } else {
       PetscCall(DMLocalToGlobal(op->dm, f_local, ADD_VALUES, f_global));

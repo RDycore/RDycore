@@ -10,6 +10,7 @@ numerics:
   spatial: fv
   temporal: euler
   riemann: roe
+  flux_single_comm: true
 
 logging:
   level: detail
@@ -90,5 +91,5 @@ flow_conditions:
   - name: outflow_bc
     type: critical-outflow
 
-rdy_flux_single_comm: true
+
 
