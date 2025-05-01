@@ -25,8 +25,8 @@ module rdycore
             RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
-            RDySetDomainWaterSource, RDySetDomainXMomentumSource, RDySetDomainYMomentumSource, &
-            RDySetDomainManningsN, RDySetInitialConditions, &
+            RDySetDomainWaterSource, RDySetRegionalWaterSource, RDySetDomainXMomentumSource, &
+            RDySetDomainYMomentumSource, RDySetDomainManningsN, RDySetInitialConditions, &
             RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile
 
   ! RDycore uses double-precision floating point numbers
@@ -335,6 +335,14 @@ module rdycore
     integer(c_int) function rdysetdomainwatersource_(rdy, size, watsrc) bind(c, name="RDySetDomainWaterSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: watsrc
+    end function
+
+    integer(c_int) function rdysetregionalwatersource_(rdy, region_idx, size, watsrc) bind(c, name="RDySetRegionalWaterSource")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: region_idx
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: watsrc
     end function
@@ -770,6 +778,15 @@ contains
     real(RDyDouble), pointer, intent(in) :: watsrc(:)
     integer,         intent(out)         :: ierr
     ierr = rdysetdomainwatersource_(rdy_%c_rdy, size, c_loc(watsrc))
+  end subroutine
+
+  subroutine RDySetRegionalWaterSource(rdy_, region_idx, size, watsrc, ierr)
+    type(RDy),       intent(inout)       :: rdy_
+    PetscInt,        intent(in)          :: region_idx
+    PetscInt,        intent(in)          :: size
+    real(RDyDouble), pointer, intent(in) :: watsrc(:)
+    integer,         intent(out)         :: ierr
+    ierr = rdysetregionalwatersource_(rdy_%c_rdy, region_idx, size, c_loc(watsrc))
   end subroutine
 
   subroutine RDySetDomainXMomentumSource(rdy_, size, xmomsrc, ierr)
