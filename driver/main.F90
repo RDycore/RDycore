@@ -81,6 +81,8 @@ module rdy_driver
 
     type(time_struct)  :: start_date, current_date
 
+    PetscInt :: header_offset
+
     PetscInt           :: mesh_nelements         ! number of cells or boundary edges in RDycore mesh
     PetscInt, pointer  :: data2mesh_idx(:)       ! for each RDycore element (cells or boundary edges), the index of the data in the unstructured dataset
     PetscReal, pointer :: data_xc(:), data_yc(:) ! x and y coordinates of data
@@ -524,6 +526,113 @@ contains
 
   end subroutine OpenNextRasterDataset
 
+  subroutine OpenUnstructuredDataset(data, expected_data_stride)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: data
+    PetscInt                  :: expected_data_stride
+    !
+    PetscInt                  :: size
+    PetscErrorCode            :: ierr
+
+    call DetermineDatasetFilename(data%dir, data%current_date, data%file)
+
+    data%dtime_in_hour = 1.0
+    data%ndata_file    = 1
+
+    ! open the dataset file and read the data into a vector
+    call opendata(data%file, data%data_vec, size)
+
+    ! get the data pointer to the data in the vector
+    PetscCallA(VecGetArray(data%data_vec, data%data_ptr, ierr))
+    PetscCallA(VecGetSize(data%data_vec, size, ierr))
+
+    data%header_offset = 2
+    data%ndata         = data%data_ptr(1)
+    data%stride        = data%data_ptr(2)
+
+    if ((size - 2) / data%stride /= data%ndata) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "The number of data points in the unstructured dataset is not equal to the expected number of data points")
+    endif
+
+    if (data%stride /= expected_data_stride) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of the unstructured dataset is not equal to the expected stride")
+    endif
+
+  end subroutine OpenUnstructuredDataset
+
+  subroutine OpenNextUnstructuredDataset(data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: data
+    !
+    character(len=PETSC_MAX_PATH_LEN) :: outputString
+    PetscInt                          :: tmpInt
+    PetscErrorCode                    :: ierr
+
+    PetscCallA(VecRestoreArray(data%data_vec, data%data_ptr, ierr))
+    PetscCallA(VecDestroy(data%data_vec, ierr))
+
+    data%current_date%hour = data%current_date%hour + 1
+
+    call OpenUnstructuredDataset(data, data%stride)
+
+  end subroutine OpenNextUnstructuredDataset
+
+  subroutine DoPostprocessForBoundaryUnstructuredDataset(rdy_, bc_dataset)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)               :: rdy_
+    type(BoundaryCondition) :: bc_dataset
+    !
+    PetscInt               :: dirc_bc_idx, num_edges_dirc_bc
+    PetscMPIInt            :: global_dirc_bc_idx
+    PetscBool              :: multiple_dirc_bcs_present
+
+    call FindDirichletBCID(rdy_, dirc_bc_idx, num_edges_dirc_bc, global_dirc_bc_idx, multiple_dirc_bcs_present)
+
+    ! do some sanity checking
+    if (multiple_dirc_bcs_present) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "When BC file specified via -unstructured_bc_file argument, only one CONDITION_DIRICHLET can be present in the yaml")
+    endif
+    if (global_dirc_bc_idx == -1) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "No Dirichlet BC specified in the yaml file")
+    endif
+
+    bc_dataset%ndata            = num_edges_dirc_bc * 3
+    bc_dataset%dirichlet_bc_idx = global_dirc_bc_idx
+
+    allocate(bc_dataset%data_for_rdycore(bc_dataset%ndata))
+    allocate(bc_dataset%unstructured%mesh_xc(num_edges_dirc_bc))
+    allocate(bc_dataset%unstructured%mesh_yc(num_edges_dirc_bc))
+    allocate(bc_dataset%unstructured%data2mesh_idx(bc_dataset%ndata))
+
+    if (bc_dataset%ndata > 0) then
+      bc_dataset%unstructured%mesh_nelements = num_edges_dirc_bc
+
+      call GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset%unstructured%mesh_xc, bc_dataset%unstructured%mesh_yc)
+
+      call ReadUnstructuredDatasetCoordinates(bc_dataset%unstructured)
+
+      ! set up the mapping between the dataset and boundary edges
+      call CreateUnstructuredDatasetMap(bc_dataset%unstructured)
+
+    endif
+
+  end subroutine DoPostprocessForBoundaryUnstructuredDataset
+
   subroutine GetCellCentroidsFromRDycoreMesh(rdy_, n, xc, yc)
     !
     use rdycore
@@ -540,6 +649,103 @@ contains
     PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, yc, ierr))
 
   end subroutine GetCellCentroidsFromRDycoreMesh
+
+  subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, n, idx, xc, yc)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)               :: rdy_
+    PetscInt                :: n, idx
+    PetscReal, pointer      :: xc(:), yc(:)
+    PetscErrorCode          :: ierr
+
+    PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, idx, n, xc, ierr))
+    PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, idx, n, yc, ierr))
+
+  end subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh
+
+  subroutine ReadUnstructuredDatasetCoordinates(data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: data
+    !
+    PetscInt                 :: ndata, stride, offset, i
+    PetscScalar, pointer     :: vec_ptr(:)
+    Vec                      :: vec
+    PetscViewer              :: viewer
+    PetscErrorCode           :: ierr
+
+    PetscCallA(VecCreate(PETSC_COMM_SELF, vec, ierr))
+    PetscCallA(PetscViewerBinaryOpen(PETSC_COMM_SELF, data%mesh_file, FILE_MODE_READ, viewer, ierr))
+    PetscCallA(VecLoad(vec, viewer, ierr))
+    PetscCallA(PetscViewerDestroy(viewer, ierr))
+
+    PetscCallA(VecGetArray(vec, vec_ptr, ierr))
+
+    data%ndata = vec_ptr(1)
+    allocate(data%data_xc(data%ndata))
+    allocate(data%data_yc(data%ndata))
+
+    stride = vec_ptr(2)
+    if (stride /= 2) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "The stride of the unstructured dataset is not equal to 2")
+    endif
+
+    offset = 2;
+    do i = 1, data%ndata
+      data%data_xc(i) = vec_ptr(offset + (i - 1) * stride + 1)
+      data%data_yc(i) = vec_ptr(offset + (i - 1) * stride + 2)
+    enddo
+
+    PetscCallA(VecRestoreArray(vec, vec_ptr, ierr))
+    PetscCallA(VecDestroy(vec, ierr))
+
+  end subroutine ReadUnstructuredDatasetCoordinates
+
+  subroutine CreateUnstructuredDatasetMap(data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: data
+    !
+    PetscInt                 :: ndata, icell, i, count
+    PetscReal                :: xc, yc, dx, dy, dist, min_dist
+
+    ndata = data%ndata
+
+    do icell = 1, data%mesh_nelements
+      xc = data%mesh_xc(icell)
+      yc = data%mesh_yc(icell)
+
+      count = 0
+      do i = 1, data%ndata
+        count = count + 1
+        dx = xc - data%data_xc(count)
+        dy = yc - data%data_yc(count)
+        dist = sqrt(dx * dx + dy * dy)
+        if (i == 1) then
+          min_dist = dist
+          data%data2mesh_idx(icell) = count
+        else
+          if (dist < min_dist) then
+            min_dist = dist
+            data%data2mesh_idx(icell) = count
+          endif
+        endif
+      enddo
+    enddo
+
+  end subroutine CreateUnstructuredDatasetMap
 
   subroutine CreateRasterDatasetMapping(rdy_, data)
     !
@@ -834,8 +1040,8 @@ contains
       call DoPostprocessForBoundaryHomogeneousDataset(rdy_, bc_dataset)
     case (DATASET_UNSTRUCTURED)
       expected_data_stride = 3;
-      !call OpenUnstructuredDataset(bc_dataset%unstructured, expected_data_stride));
-      !call DoPostprocessForBoundaryUnstructuredDataset(rdy_, bc_dataset));
+      call OpenUnstructuredDataset(bc_dataset%unstructured, expected_data_stride)
+      call DoPostprocessForBoundaryUnstructuredDataset(rdy_, bc_dataset)
     case default
       SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one boundary condition type cannot be specified")
     end select
@@ -898,6 +1104,37 @@ contains
 
   end subroutine SetHomogeneousBoundary
 
+  subroutine SetUnstructuredData(data, cur_time, num_values, data_for_rdycore)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: data
+    PetscReal                 :: cur_time
+    PetscInt                  :: num_values
+    PetscScalar, pointer      :: data_for_rdycore(:)
+    !
+    PetscInt                 :: ii, icell, idx, ndata_file, stride, offset
+
+    if (cur_time / 3600.d0 >= (data%ndata_file) * data%dtime_in_hour) then
+      ndata_file = data%ndata_file
+      call OpenNextUnstructuredDataset(data)
+      data%ndata_file = ndata_file + 1
+    endif
+
+    offset = data%header_offset;
+    do icell = 1, num_values
+      idx = (data%data2mesh_idx(icell) - 1) * stride
+      do ii = 1, stride
+        data_for_rdycore((icell - 1) * stride + ii) = data%data_ptr(idx + ii + offset)
+        if (icell == num_values) write(*,*)' (icell - 1) * stride + ii ', icell, stride, ii, (icell - 1) * stride + ii
+      enddo
+    enddo
+
+  end subroutine SetUnstructuredData
+
   ! Apply boundary condition to the RDycore object
   subroutine ApplyBoundaryCondition(rdy_, cur_time, bc_dataset)
 #include <petsc/finclude/petsc.h>
@@ -924,6 +1161,10 @@ contains
         PetscCallA(RDySetFlowDirichletBoundaryValues(rdy_, bc_dataset%dirichlet_bc_idx, bc_dataset%ndata / ndof, ndof, bc_dataset%data_for_rdycore, ierr))
       endif
     case (DATASET_UNSTRUCTURED)
+      if (bc_dataset%ndata > 0) then
+        call SetUnstructuredData(bc_dataset%unstructured, cur_time, bc_dataset%ndata / ndof, bc_dataset%data_for_rdycore)
+        PetscCallA(RDySetFlowDirichletBoundaryValues(rdy_, bc_dataset%dirichlet_bc_idx, bc_dataset%ndata / ndof, ndof, bc_dataset%data_for_rdycore, ierr))
+      endif
     case default
       SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one boundary condition type cannot be specified")
     end select
