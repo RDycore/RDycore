@@ -112,7 +112,7 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 /// @param [out] ceed_op a CeedOperator that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
 
-static PetscErrorCode CreateCeedAllInteriorFluxOperator(const RDyConfig config, RDyMesh *mesh, CeedOperator *ceed_op) {
+static PetscErrorCode CreateCeedInteriorFluxOperator_SingleComm(const RDyConfig config, RDyMesh *mesh, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -154,9 +154,8 @@ static PetscErrorCode CreateCeedAllInteriorFluxOperator(const RDyConfig config, 
     PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
     for (CeedInt e = 0; e < mesh->num_internal_edges; e++) {
       CeedInt iedge = edges->internal_edge_ids[e];
-      //if (!edges->is_owned[iedge]) continue;
-      CeedInt l        = edges->cell_ids[2 * iedge];
-      CeedInt r        = edges->cell_ids[2 * iedge + 1];
+      CeedInt l = edges->cell_ids[2 * iedge];
+      CeedInt r = edges->cell_ids[2 * iedge + 1];
       g[e][0] = edges->sn[iedge];
       g[e][1] = edges->cn[iedge];
       g[e][2] = -edges->lengths[iedge] / cells->areas[l];
@@ -182,9 +181,8 @@ static PetscErrorCode CreateCeedAllInteriorFluxOperator(const RDyConfig config, 
     PetscCall(PetscMalloc2(num_edges, &c_offset_l, num_edges, &c_offset_r));
     for (CeedInt e = 0; e < mesh->num_internal_edges; e++) {
       CeedInt iedge = edges->internal_edge_ids[e];
-      //if (!edges->is_owned[iedge]) continue;
-      CeedInt l              = edges->cell_ids[2 * iedge];
-      CeedInt r              = edges->cell_ids[2 * iedge + 1];
+      CeedInt l = edges->cell_ids[2 * iedge];
+      CeedInt r = edges->cell_ids[2 * iedge + 1];
       q_offset_l[e] = l * num_comp;
       q_offset_r[e] = r * num_comp;
       c_offset_l[e] = cells->local_to_owned[l] * num_comp;
@@ -234,7 +232,7 @@ static PetscErrorCode CreateCeedAllInteriorFluxOperator(const RDyConfig config, 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-static PetscErrorCode CreateCeedInteriorFluxOperator(const RDyConfig config, RDyMesh *mesh, CeedOperator *ceed_op) {
+static PetscErrorCode CreateCeedInteriorFluxOperator_DoubleComm(const RDyConfig config, RDyMesh *mesh, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -606,9 +604,9 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
 
   CeedOperator interior_flux_op;
   if (config->numerics.flux_single_comm) {
-    PetscCall(CreateCeedAllInteriorFluxOperator(*config, mesh, &interior_flux_op));
+    PetscCall(CreateCeedInteriorFluxOperator_SingleComm(*config, mesh, &interior_flux_op));
   } else {
-    PetscCall(CreateCeedInteriorFluxOperator(*config, mesh, &interior_flux_op));
+    PetscCall(CreateCeedInteriorFluxOperator_DoubleComm(*config, mesh, &interior_flux_op));
   }
   PetscCall(CeedCompositeOperatorAddSub(*flux_op, interior_flux_op));
 
