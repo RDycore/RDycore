@@ -427,7 +427,7 @@ contains
     !
     type(RDy)      :: rdy_
     PetscInt       :: dirc_bc_idx, num_edges_dirc_bc
-    PetscMPIInt    :: global_dirc_bc_idx
+    PetscInt       :: global_dirc_bc_idx
     PetscBool      :: multiple_dirc_bcs_present
     !
     PetscInt       :: ibcond, nbconds, num_edges, bcond_type
@@ -452,7 +452,7 @@ contains
       endif
     enddo
 
-    call MPI_Allreduce(dirc_bc_idx, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, PETSC_COMM_WORLD, ierr)
+    call MPI_Allreduce(dirc_bc_idx, global_dirc_bc_idx, 1, MPIU_INTEGER, MPI_MAX, PETSC_COMM_WORLD, ierr)
 
   end subroutine FindDirichletBCID
 
@@ -468,7 +468,7 @@ contains
     type(BoundaryCondition) :: bc_dataset
     !
     PetscInt    :: dirc_bc_idx, num_edges_dirc_bc
-    PetscMPIInt :: global_dirc_bc_idx
+    PetscInt    :: global_dirc_bc_idx
     PetscBool   :: multiple_dirc_bcs_present
 
     call FindDirichletBCID(rdy_, dirc_bc_idx, num_edges_dirc_bc, global_dirc_bc_idx, multiple_dirc_bcs_present)
@@ -632,7 +632,7 @@ contains
     type(BoundaryCondition) :: bc_dataset
     !
     PetscInt               :: dirc_bc_idx, num_edges_dirc_bc
-    PetscMPIInt            :: global_dirc_bc_idx
+    PetscInt               :: global_dirc_bc_idx
     PetscBool              :: multiple_dirc_bcs_present
 
     call FindDirichletBCID(rdy_, dirc_bc_idx, num_edges_dirc_bc, global_dirc_bc_idx, multiple_dirc_bcs_present)
