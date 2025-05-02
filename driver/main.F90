@@ -259,6 +259,8 @@ contains
     endif
 
     PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-unstructured_rain_dir', rain%unstructured%dir, unstructured_rain_flag, ierr))
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-unstructured_rain_write_map_file', rain%unstructured%map_file, rain%unstructured%write_map, ierr))
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-unstructured_rain_read_map_file', rain%unstructured%map_file, rain%unstructured%read_map, ierr))
     if (unstructured_rain_flag) then
       rain%datatype = DATASET_UNSTRUCTURED
       dataset_type_count = dataset_type_count + 1
@@ -621,6 +623,35 @@ contains
 
   end subroutine OpenNextUnstructuredDataset
 
+  subroutine WriteMap(rdy_, filename, ncells, d2m)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)           :: rdy_
+    character(len=1024) :: filename
+    PetscInt            :: ncells
+    PetscInt, pointer   :: d2m(:)
+    !
+    Vec                  :: global_vec
+    PetscScalar, pointer :: global_ptr(:)
+    PetscInt             :: i
+    PetscErrorCode       :: ierr
+
+    PetscCallA(RDyCreateOneDOFGlobalVec(rdy_, global_vec, ierr))
+    PetscCallA(VecGetArray(global_vec, global_ptr, ierr))
+    do i = 1, ncells
+      global_ptr(i) = d2m(i)
+    enddo
+    PetscCallA(VecRestoreArray(global_vec, global_ptr, ierr))
+
+    PetscCallA(RDyWriteOneDOFGlobalVecToBinaryFile(rdy_, filename, global_vec, ierr))
+    PetscCallA(VecDestroy(global_vec, ierr))
+
+  end subroutine WriteMap
+
   subroutine DoPostprocessForBoundaryUnstructuredDataset(rdy_, bc_dataset)
     !
     use rdycore
@@ -781,6 +812,41 @@ contains
 
   end subroutine CreateUnstructuredDatasetMap
 
+  subroutine ReadRainfallDatasetMap(rdy_, filename, ncells, d2m)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)           :: rdy_
+    character(len=1024) :: filename
+    PetscInt            :: ncells
+    PetscInt, pointer   :: d2m(:)
+    !
+    Vec                  :: global_vec
+    PetscScalar, pointer :: global_ptr(:)
+    PetscInt             :: size, i
+    PetscErrorCode       :: ierr
+
+    PetscCallA(RDyReadOneDOFGlobalVecFromBinaryFile(rdy_, filename, global_vec, ncells))
+
+    ! get the data pointer to the data in the vector
+    PetscCallA(VecGetArray(global_vec, global_ptr, ierr))
+    PetscCallA(VecGetSize(global_vec, size, ierr))
+    if (size /= ncells) then
+      SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "The number of cells in the rainfall dataset map is not equal to the expected number of cells")
+    endif
+
+    do i = 1, ncells
+      d2m(i) = global_ptr(i)
+    enddo
+
+    PetscCallA(VecRestoreArray(global_vec, global_ptr, ierr))
+    PetscCallA(VecDestroy(global_vec, ierr))
+
+  end subroutine ReadRainfallDatasetMap
+
   subroutine CreateRasterDatasetMapping(rdy_, data)
     !
     use rdycore
@@ -854,6 +920,13 @@ contains
 
     call CreateRasterDatasetMapping(rdy_, data)
 
+    if (data%write_map) then
+      call WriteMap(rdy_, data%map_file, data%mesh_ncells_local, data%data2mesh_idx)
+    endif
+    if (data%read_map) then
+      call ReadRainfallDatasetMap(rdy_, data%map_file, data%mesh_ncells_local, data%data2mesh_idx)
+    endif
+
   end subroutine DoPostprocessForSourceRasterDataset
 
   subroutine DoPostprocessForSourceUnstructuredDataset(rdy_, data)
@@ -876,6 +949,14 @@ contains
     call GetCellCentroidsFromRDycoreMesh(rdy_, data%mesh_nelements, data%mesh_xc, data%mesh_yc)
     call ReadUnstructuredDatasetCoordinates(data)
     call CreateUnstructuredDatasetMap(data)
+
+    if (data%write_map) then
+      call WriteMap(rdy_, data%map_file, data%mesh_nelements, data%data2mesh_idx)
+    endif
+
+    if (data%read_map) then
+      call ReadRainfallDatasetMap(rdy_, data%map_file, data%mesh_nelements, data%data2mesh_idx)
+    endif
 
   end subroutine DoPostprocessForSourceUnstructuredDataset
 
