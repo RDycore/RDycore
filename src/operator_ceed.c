@@ -5,7 +5,7 @@
 #include <private/rdysedimentimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "petscsystypes.h"
+#include <petscsystypes.h>
 #include "sediment/sediment_ceed_impl.h"
 #include "swe/swe_ceed_impl.h"
 
