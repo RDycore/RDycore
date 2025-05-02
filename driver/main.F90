@@ -829,7 +829,7 @@ contains
     PetscInt             :: size, i
     PetscErrorCode       :: ierr
 
-    PetscCallA(RDyReadOneDOFGlobalVecFromBinaryFile(rdy_, filename, global_vec, ncells))
+    PetscCallA(RDyReadOneDOFGlobalVecFromBinaryFile(rdy_, filename, global_vec, ierr))
 
     ! get the data pointer to the data in the vector
     PetscCallA(VecGetArray(global_vec, global_ptr, ierr))
