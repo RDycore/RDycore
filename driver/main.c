@@ -579,7 +579,7 @@ static PetscErrorCode ReadRainfallDatasetMap(RDy rdy, const char filename[], Pet
 /// @param *global_dirc_bc_idx        [out] The maximum ID of a dirichlet BC across all MPI ranks
 /// @param *multiple_dirc_bcs_present [out] Is PETSC_TRUE if multiple diriclet BCs were found
 /// @return
-static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt *num_edges_dirc_bc, PetscMPIInt *global_dirc_bc_idx,
+static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt *num_edges_dirc_bc, PetscInt *global_dirc_bc_idx,
                                         PetscBool *multiple_dirc_bcs_present) {
   PetscFunctionBegin;
 
@@ -609,9 +609,7 @@ static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt
   }
 
   // find the ID of dirichlet BC across all ranks, which is need to check if a dirichlet BC was present on at least on rank
-  PetscMPIInt idx_32 = (PetscMPIInt)*dirc_bc_idx;  // For 64-bit integer, convert the BC index to 32-bit integer as we don't
-                                                   // number of BCs to require 64-bit integer
-  MPI_Allreduce(&idx_32, global_dirc_bc_idx, 1, MPI_INT, MPI_MAX, comm);
+  MPI_Allreduce(dirc_bc_idx, global_dirc_bc_idx, 1, MPIU_INT, MPI_MAX, comm);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -619,10 +617,10 @@ static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt
 static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
-  MPI_Comm    comm        = PETSC_COMM_WORLD;
-  PetscInt    dirc_bc_idx = 0, num_edges_dirc_bc = 0;
-  PetscMPIInt global_dirc_bc_idx = -1;
-  PetscBool   multiple_dirc_bcs_present;
+  MPI_Comm  comm        = PETSC_COMM_WORLD;
+  PetscInt  dirc_bc_idx = 0, num_edges_dirc_bc = 0;
+  PetscInt  global_dirc_bc_idx = -1;
+  PetscBool multiple_dirc_bcs_present;
 
   // find the info about the dirichlet BC
   PetscCall(FindDirichletBCID(rdy, &dirc_bc_idx, &num_edges_dirc_bc, &global_dirc_bc_idx, &multiple_dirc_bcs_present));
@@ -690,10 +688,10 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, Unstruc
 static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, BoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
-  MPI_Comm    comm        = PETSC_COMM_WORLD;
-  PetscInt    dirc_bc_idx = 0, num_edges_dirc_bc = 0;
-  PetscMPIInt global_dirc_bc_idx = -1;
-  PetscBool   multiple_dirc_bcs_present;
+  MPI_Comm  comm        = PETSC_COMM_WORLD;
+  PetscInt  dirc_bc_idx = 0, num_edges_dirc_bc = 0;
+  PetscInt  global_dirc_bc_idx = -1;
+  PetscBool multiple_dirc_bcs_present;
 
   // find the info about the dirichlet BC
   PetscCall(FindDirichletBCID(rdy, &dirc_bc_idx, &num_edges_dirc_bc, &global_dirc_bc_idx, &multiple_dirc_bcs_present));
