@@ -124,7 +124,9 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic ceed)
-    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    foreach(lang ${supported_languages})
+      add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Houston1km.DirichletBC.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -138,7 +140,9 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    foreach(lang ${supported_languages})
+      add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
