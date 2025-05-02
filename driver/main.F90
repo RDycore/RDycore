@@ -97,9 +97,10 @@ module rdy_driver
   type, public :: SourceSink
     PetscInt :: datatype
 
-    type(ConstantDataset)    :: constant
-    type(HomogeneousDataset) :: homogeneous
-    type(RasterDataset)      :: raster
+    type(ConstantDataset)     :: constant
+    type(HomogeneousDataset)  :: homogeneous
+    type(RasterDataset)       :: raster
+    type(UnstructuredDataset) :: unstructured
 
     PetscInt             :: ndata
     PetscScalar, pointer :: data_for_rdycore(:)
@@ -200,6 +201,8 @@ contains
     PetscBool                     :: homogeneous_rain_flag
     PetscBool                     :: raster_rain_flag
     PetscBool                     :: raster_start_date_flag
+    PetscBool                     :: unstructured_rain_flag
+    PetscBool                     :: unstructured_start_date_flag
     PetscInt,pointer,dimension(:) :: date
     PetscInt                      :: ndate = 5
     PetscErrorCode                :: ierr
@@ -251,6 +254,37 @@ contains
       rain%raster%current_date%day    = date(3)
       rain%raster%current_date%hour   = date(4)
       rain%raster%current_date%minute = date(5)
+
+      deallocate(date)
+    endif
+
+    PetscCallA(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, '-unstructured_rain_dir', rain%unstructured%dir, unstructured_rain_flag, ierr))
+    if (unstructured_rain_flag) then
+      rain%datatype = DATASET_UNSTRUCTURED
+      dataset_type_count = dataset_type_count + 1
+
+      allocate(date(ndate))
+      PetscCall(PetscOptionsGetIntArray(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, "-unstructured_rain_start_date", date, ndate, unstructured_start_date_flag, ierr));
+      if (ndate /= 5) then
+        SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "-unstructured_rain_start_date should be in YY,MO,DD,HH,MM format")
+      endif
+
+      PetscCall(PetscOptionsGetString(PETSC_NULL_OPTIONS, PETSC_NULL_CHARACTER, "-unstructured_rain_mesh_file", rain%unstructured%mesh_file, flg, ierr))
+      if (flg .eqv. PETSC_FALSE) then
+        SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Need to specify the mesh file -unstructured_rain_mesh_file <file>")
+      endif
+
+      rain%unstructured%start_date%year   = date(1)
+      rain%unstructured%start_date%month  = date(2)
+      rain%unstructured%start_date%day    = date(3)
+      rain%unstructured%start_date%hour   = date(4)
+      rain%unstructured%start_date%minute = date(5)
+
+      rain%unstructured%current_date%year   = date(1)
+      rain%unstructured%current_date%month  = date(2)
+      rain%unstructured%current_date%day    = date(3)
+      rain%unstructured%current_date%hour   = date(4)
+      rain%unstructured%current_date%minute = date(5)
 
       deallocate(date)
     endif
@@ -822,6 +856,29 @@ contains
 
   end subroutine DoPostprocessForSourceRasterDataset
 
+  subroutine DoPostprocessForSourceUnstructuredDataset(rdy_, data)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(RDy)                 :: rdy_
+    type(UnstructuredDataset) :: data
+    !
+    PetscErrorCode            :: ierr
+
+    PetscCallA(RDyGetNumLocalCells(rdy_, data%mesh_nelements, ierr))
+    allocate(data%mesh_xc(data%mesh_nelements))
+    allocate(data%mesh_yc(data%mesh_nelements))
+    allocate(data%data2mesh_idx(data%mesh_nelements))
+
+    call GetCellCentroidsFromRDycoreMesh(rdy_, data%mesh_nelements, data%mesh_xc, data%mesh_yc)
+    call ReadUnstructuredDatasetCoordinates(data)
+    call CreateUnstructuredDatasetMap(data)
+
+  end subroutine DoPostprocessForSourceUnstructuredDataset
+
   subroutine CreateRainfallConditionDataset(rdy_, n, rain_dataset)
     !
     use rdycore
@@ -850,6 +907,12 @@ contains
       allocate(rain_dataset%data_for_rdycore(n))
       call OpenRasterDataset(rain_dataset%raster)
       call DoPostprocessForSourceRasterDataset(rdy_, rain_dataset%raster)
+    case (DATASET_UNSTRUCTURED)
+      expected_data_stride = 1
+      rain_dataset%ndata = n
+      allocate(rain_dataset%data_for_rdycore(n))
+      call OpenUnstructuredDataset(rain_dataset%unstructured, expected_data_stride)
+      call DoPostprocessForSourceUnstructuredDataset(rdy_, rain_dataset%unstructured)
     case default
       SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one rainfall condition type cannot be specified")
     end select
@@ -970,6 +1033,11 @@ contains
         call SetRasterData(rain_dataset%raster, cur_time, rain_dataset%ndata, rain_dataset%data_for_rdycore)
         call RDySetRegionalWaterSource(rdy_, region_idx, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
       endif
+    case (DATASET_UNSTRUCTURED)
+      if (rain_dataset%ndata > 0) then
+        call SetUnstructuredData(rain_dataset%unstructured, cur_time, rain_dataset%ndata, rain_dataset%data_for_rdycore)
+        call RDySetRegionalWaterSource(rdy_, region_idx, rain_dataset%ndata, rain_dataset%data_for_rdycore, ierr)
+      endif
     case default
       SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend this to other types of rainfall datasets")
     end select
@@ -993,6 +1061,23 @@ contains
 
   end subroutine DestroyRasterDataset
 
+  subroutine DestroyUnstructuredDataset(rain_dataset)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: rain_dataset
+    !
+    PetscErrorCode      :: ierr
+
+    ! get the data pointer to the data in the vector
+    PetscCallA(VecRestoreArray(rain_dataset%data_vec, rain_dataset%data_ptr, ierr))
+    PetscCallA(VecDestroy(rain_dataset%data_vec, ierr))
+
+  end subroutine DestroyUnstructuredDataset
+
   subroutine DestroyRainfallDataset(rain_dataset)
     !
     use rdycore
@@ -1012,6 +1097,9 @@ contains
       deallocate(rain_dataset%data_for_rdycore)
     case (DATASET_RASTER)
       call DestroyRasterDataset(rain_dataset%raster)
+      deallocate(rain_dataset%data_for_rdycore)
+    case (DATASET_UNSTRUCTURED)
+      call DestroyUnstructuredDataset(rain_dataset%unstructured)
       deallocate(rain_dataset%data_for_rdycore)
     case default
       SETERRA(PETSC_COMM_WORLD, PETSC_ERR_USER, "More than one rainfall condition type cannot be specified")
@@ -1125,11 +1213,12 @@ contains
     endif
 
     offset = data%header_offset;
+    stride = data%stride
+
     do icell = 1, num_values
       idx = (data%data2mesh_idx(icell) - 1) * stride
       do ii = 1, stride
         data_for_rdycore((icell - 1) * stride + ii) = data%data_ptr(idx + ii + offset)
-        if (icell == num_values) write(*,*)' (icell - 1) * stride + ii ', icell, stride, ii, (icell - 1) * stride + ii
       enddo
     enddo
 
