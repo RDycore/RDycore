@@ -90,6 +90,3 @@ flow_conditions:
     type: reflecting
   - name: outflow_bc
     type: critical-outflow
-
-
-
