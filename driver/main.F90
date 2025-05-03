@@ -10,8 +10,6 @@ module rdy_driver
 #define DATASET_UNSTRUCTURED 4
 #define DATASET_MULTI_HOMOGENEOUS 5
 
-#define PETSC_ID_TYPE "int32"
-
   type :: time_struct
     PetscInt :: year
     PetscInt :: month
