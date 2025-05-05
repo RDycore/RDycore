@@ -1351,13 +1351,13 @@ PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
   PetscFunctionBegin;
 
   memset(prefix, 0, sizeof(char) * (strlen(rdy->config_file) + 1));
-  char *p = strcasestr(rdy->config_file, ".yaml");
+  char *p = strstr(rdy->config_file, ".yaml");
   if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
-    p = strcasestr(rdy->config_file, ".yml");
+    p = strstr(rdy->config_file, ".yml");
   }
   if (p) {
     size_t prefix_len = p - rdy->config_file;
-    strlcpy(prefix, rdy->config_file, prefix_len);
+    strncpy(prefix, rdy->config_file, prefix_len);
   } else {
     strcpy(prefix, rdy->config_file);
   }
