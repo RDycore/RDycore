@@ -25,6 +25,11 @@ checkpoint:
 
 output:
   format: xdmf
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+    - WaterSource
   step_interval: 100
   batch_size: 20
   time_series:
