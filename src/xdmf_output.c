@@ -122,6 +122,76 @@ static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Updates diagnostic fields in the auxiliary DM
+static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
+  PetscFunctionBegin;
+
+  // construct a set of available source fields (with a zero-length terminus)
+  static char diagnostics_names[3 + MAX_NUM_SEDIMENT_CLASSES + 1][MAX_NAME_LEN] = {
+      "WaterSource",
+      "MomentumXSource",
+      "MomentumYSource",
+  };
+  static PetscBool first_time = PETSC_TRUE;
+  if (first_time) {
+    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+      snprintf(diagnostics_names[3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "Source", i);
+    }
+    first_time = PETSC_FALSE;
+  }
+
+  // Fetch diagnostics from the operator.
+  OperatorData diagnostics = {0};
+  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & diagnostics));
+
+  PetscSection section;
+  PetscCall(DMGetLocalSection(rdy->aux_dm, &section));
+
+  // NOTE: at present, all diagnostics are stored as components of a single
+  // NOTE: "Diagnostics" field in a global vector (no halo cells)
+  PetscInt num_fields;
+  PetscCall(PetscSectionGetNumFields(section, &num_fields));
+  PetscCheck(num_fields == 1, rdy->comm, PETSC_ERR_USER, "Wrong number of diagnostic fields (%" PetscInt_FMT ", should be 1)", num_fields);
+
+  PetscInt num_diag_comps;
+  PetscCall(PetscSectionGetFieldComponents(section, 0, &num_diag_comps));
+  for (PetscInt c = 0; c < num_diag_comps; ++c) {
+    const char *diag_name;
+    PetscCall(PetscSectionGetComponentName(section, 0, c, &diag_name));
+
+    int diag_index;
+    for (diag_index = 0; diagnostics_names[diag_index][0]; ++diag_index) {
+      if (!strcmp(diag_name, diagnostics_names[diag_index])) {
+        // if our aux_dm is refined, diagnostics are stored in global
+        // vectors; if not, they are in natural vectors
+        if (rdy->num_refinements > 0) {
+          // global -> global
+          PetscReal *diag_data;
+          PetscCall(VecGetArrayWrite(rdy->diags_vec, &diag_data));
+          memcpy(diag_data, diagnostics.values[diag_index], rdy->mesh.num_owned_cells * sizeof(PetscReal));
+          PetscCall(VecRestoreArrayWrite(rdy->diags_vec, &diag_data));
+        } else {
+          // global -> natural
+          Vec global;
+          PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
+          PetscReal *diag_data;
+          PetscCall(VecGetArrayWrite(global, &diag_data));
+          memcpy(diag_data, diagnostics.values[diag_index], rdy->mesh.num_owned_cells * sizeof(PetscReal));
+          PetscCall(VecRestoreArrayWrite(global, &diag_data));
+          PetscCall(DMPlexGlobalToNaturalBegin(rdy->aux_dm, global, rdy->diags_vec));
+          PetscCall(DMPlexGlobalToNaturalEnd(rdy->aux_dm, global, rdy->diags_vec));
+          PetscCall(VecDestroy(&global));
+        }
+      }
+    }
+  }
+
+  // put toys away
+  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & diagnostics));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Writes a XDMF "heavy data" to an HDF5 file. The time is expressed in the
 // units given in the configuration file.
 static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
@@ -329,6 +399,9 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
 
     // write output
     if (write_output) {
+      // update diagnostic fields
+      PetscCall(UpdateDiagnosticFields(rdy));
+
       // save the time output was written
       output->prev_output_time = time;
 

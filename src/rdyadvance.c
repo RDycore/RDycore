@@ -228,72 +228,6 @@ static PetscErrorCode CalibrateSolverTimers(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Updates diagnostic fields in the auxiliary DM
-static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
-  PetscFunctionBegin;
-
-  // construct a set of available source fields (with a zero-length terminus)
-  static char diagnostics_names[3 + MAX_NUM_SEDIMENT_CLASSES + 1][MAX_NAME_LEN] = {
-      "WaterSource",
-      "MomentumXSource",
-      "MomentumYSource",
-  };
-  static PetscBool first_time = PETSC_TRUE;
-  if (first_time) {
-    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-      snprintf(diagnostics_names[3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "Source", i);
-    }
-    first_time = PETSC_FALSE;
-  }
-
-  // Fetch diagnostics from the operator.
-  OperatorData diagnostics = {0};
-  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & diagnostics));
-
-  PetscSection section;
-  PetscCall(DMGetLocalSection(rdy->aux_dm, &section));
-
-  PetscInt num_fields;
-  PetscCall(PetscSectionGetNumFields(section, &num_fields));
-  for (PetscInt f = 0; f < num_fields; ++f) {
-    // NOTE: at present, all diagnostic fields have a single component
-    // NOTE: and are stored in global ordering (no halo cells)
-    const char *name;
-    PetscCall(PetscSectionGetFieldName(section, f, &name));
-
-    int diag_index;
-    for (diag_index = 0; diagnostics_names[diag_index][0]; ++diag_index) {
-      if (!strcmp(name, diagnostics_names[diag_index])) {
-        // if our aux_dm is refined, diagnostics are stored in global
-        // vectors; if not, they are in natural vectors
-        if (rdy->num_refinements > 0) {
-          // global -> global
-          PetscReal *diag_data;
-          PetscCall(VecGetArrayWrite(rdy->diags_vec, &diag_data));
-          memcpy(diag_data, diagnostics.values[diag_index], rdy->mesh.num_owned_cells * sizeof(PetscReal));
-          PetscCall(VecRestoreArrayWrite(rdy->diags_vec, &diag_data));
-        } else {
-          // global -> natural
-          Vec global;
-          PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
-          PetscReal *diag_data;
-          PetscCall(VecGetArrayWrite(global, &diag_data));
-          memcpy(diag_data, diagnostics.values[diag_index], rdy->mesh.num_owned_cells * sizeof(PetscReal));
-          PetscCall(VecRestoreArrayWrite(global, &diag_data));
-          PetscCall(DMPlexGlobalToNaturalBegin(rdy->aux_dm, global, rdy->diags_vec));
-          PetscCall(DMPlexGlobalToNaturalEnd(rdy->aux_dm, global, rdy->diags_vec));
-          PetscCall(VecDestroy(&global));
-        }
-      }
-    }
-  }
-
-  // put toys away
-  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & diagnostics));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// Advances the solution by the coupling interval specified in the input
 /// configuration.
 PetscErrorCode RDyAdvance(RDy rdy) {
@@ -398,8 +332,6 @@ PetscErrorCode RDyAdvance(RDy rdy) {
       PetscCall(UpdateOperatorDiagnostics(rdy->operator));
     }
   }
-
-  PetscCall(UpdateDiagnosticFields(rdy));
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
