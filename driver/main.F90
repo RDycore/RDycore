@@ -538,6 +538,55 @@ contains
 
   end subroutine OpenRasterDataset
 
+  subroutine day_of_month(year, month, ndays)
+    PetscInt, intent(in) :: year, month
+    PetscInt, intent(out) :: ndays
+
+    select case (month)
+      case (1, 3, 5, 7, 8, 10, 12)
+        ndays = 31
+      case (4, 6, 9, 11)
+        ndays = 30
+      case (2)
+        if ((year / 400 == 0) .or. (year / 4 == 0) .and. (year / 100 /= 0)) then
+          ndays = 29
+        else
+          ndays = 28
+        end if
+    end select
+
+  end subroutine day_of_month
+
+  subroutine IncrementDateByOneHour(current_date)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(time_struct) :: current_date
+    !
+    PetscInt          :: ndays
+
+    current_date%hour = current_date%hour + 1
+
+    if (current_date%hour == 24) then
+      current_date%hour = 0
+      current_date%day = current_date%day + 1
+
+      call day_of_month(current_date%year, current_date%month, ndays)
+      if (current_date%day > ndays ) then
+        current_date%day = 1
+        current_date%month = current_date%month + 1
+        if (current_date%month > 12) then
+          current_date%month = 1
+          current_date%year = current_date%year + 1
+        endif
+      endif
+    endif
+
+  end subroutine IncrementDateByOneHour
+
   subroutine OpenNextRasterDataset(data)
     !
     use rdycore
@@ -554,7 +603,7 @@ contains
     PetscCallA(VecRestoreArray(data%data_vec, data%data_ptr, ierr))
     PetscCallA(VecDestroy(data%data_vec, ierr))
 
-    data%current_date%hour = data%current_date%hour + 1
+    call IncrementDateByOneHour(data%current_date)
 
     call OpenRasterDataset(data)
 
@@ -615,7 +664,7 @@ contains
     PetscCallA(VecRestoreArray(data%data_vec, data%data_ptr, ierr))
     PetscCallA(VecDestroy(data%data_vec, ierr))
 
-    data%current_date%hour = data%current_date%hour + 1
+    call IncrementDateByOneHour(data%current_date)
 
     call OpenUnstructuredDataset(data, data%stride)
 
