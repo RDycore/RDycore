@@ -127,6 +127,8 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   PetscFunctionBegin;
 
   // construct a set of available source fields (with a zero-length terminus)
+  // NOTE: so far, all our diagnostics are external source terms, so we can
+  // NOTE: get them all using GetOperatorDomainExternalSource()
   static char diagnostics_names[3 + MAX_NUM_SEDIMENT_CLASSES + 1][MAX_NAME_LEN] = {
       "WaterSource",
       "MomentumXSource",
@@ -140,10 +142,6 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
     first_time = PETSC_FALSE;
   }
 
-  // Fetch diagnostics from the operator.
-  OperatorData diagnostics = {0};
-  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & diagnostics));
-
   PetscSection section;
   PetscCall(DMGetLocalSection(rdy->aux_dm, &section));
 
@@ -153,41 +151,41 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   PetscCall(PetscSectionGetNumFields(section, &num_fields));
   PetscCheck(num_fields == 1, rdy->comm, PETSC_ERR_USER, "Wrong number of diagnostic fields (%" PetscInt_FMT ", should be 1)", num_fields);
 
-  PetscInt num_diag_comps;
-  PetscCall(PetscSectionGetFieldComponents(section, 0, &num_diag_comps));
-  for (PetscInt c = 0; c < num_diag_comps; ++c) {
+  PetscInt num_diags;
+  PetscCall(VecGetBlockSize(rdy->diags_vec, &num_diags));
+
+  // fetch the external source components to be output
+  PetscInt *ext_source_comps, num_diags_found = 0;
+  PetscCall(PetscMalloc1(num_diags, &ext_source_comps));
+  for (PetscInt c = 0; c < num_diags; ++c) {
     const char *diag_name;
     PetscCall(PetscSectionGetComponentName(section, 0, c, &diag_name));
-
-    int diag_index;
-    for (diag_index = 0; diagnostics_names[diag_index][0]; ++diag_index) {
-      if (!strcmp(diag_name, diagnostics_names[diag_index])) {
-        // if our aux_dm is refined, diagnostics are stored in global
-        // vectors; if not, they are in natural vectors
-        if (rdy->num_refinements > 0) {
-          // global -> global
-          PetscReal *diag_data;
-          PetscCall(VecGetArrayWrite(rdy->diags_vec, &diag_data));
-          memcpy(diag_data, diagnostics.values[diag_index], rdy->mesh.num_owned_cells * sizeof(PetscReal));
-          PetscCall(VecRestoreArrayWrite(rdy->diags_vec, &diag_data));
-        } else {
-          // global -> natural
-          Vec global;
-          PetscCall(DMCreateGlobalVector(rdy->aux_dm, &global));
-          PetscReal *diag_data;
-          PetscCall(VecGetArrayWrite(global, &diag_data));
-          memcpy(diag_data, diagnostics.values[diag_index], rdy->mesh.num_owned_cells * sizeof(PetscReal));
-          PetscCall(VecRestoreArrayWrite(global, &diag_data));
-          PetscCall(DMPlexGlobalToNaturalBegin(rdy->aux_dm, global, rdy->diags_vec));
-          PetscCall(DMPlexGlobalToNaturalEnd(rdy->aux_dm, global, rdy->diags_vec));
-          PetscCall(VecDestroy(&global));
-        }
-      }
+    if (!strcmp(diag_name, diagnostics_names[c])) {
+      ext_source_comps[num_diags_found++] = c;
     }
   }
 
+  if (num_diags_found == 0) {  // no diagnostics requested
+    PetscCall(PetscFree(ext_source_comps));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+
+  // fetch external sources from the operator
+  OperatorData ext_sources = {0};
+  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & ext_sources));
+
+  PetscReal *diag_data;
+  PetscCall(VecGetArrayWrite(rdy->diags_vec, &diag_data));
+  for (PetscInt c = 0; c < num_diags; ++c) {
+    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
+      diag_data[num_diags * i + c] = ext_sources.values[ext_source_comps[c]][i];
+    }
+  }
+  PetscCall(VecRestoreArrayWrite(rdy->diags_vec, &diag_data));
+
   // put toys away
-  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & diagnostics));
+  PetscCall(PetscFree(ext_source_comps));
+  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & ext_sources));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

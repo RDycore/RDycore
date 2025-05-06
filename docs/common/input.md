@@ -424,7 +424,8 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
   array syntax (typically with hyphenated items on separate lines). This item is
   optional, and if omitted the selected fields are the components of the
   solution (e.g. `Height`, `MomentumX`, `MomentumY` for the shallow water
-  equations). Available options are
+  equations). **NOTE: This feature works only for XDMF output!** Available
+  options are
     * `Height`: water height $h$
     * `MomentumX`: $x$ momentum $hu$
     * `MomentumY`: $y$ velocity $hv$
