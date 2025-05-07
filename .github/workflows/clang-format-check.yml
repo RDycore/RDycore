@@ -5,9 +5,9 @@ jobs:
     name: C code formatting check
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Check C formatting
-      uses: jidicula/clang-format-action@v4.11.0
+    - uses: actions/checkout@v4
+    - uses: DoozyX/clang-format-lint-action@v0.20
       with:
-        clang-format-version: '14'
-        check-path: 'driver,include,src'
+        source: 'driver include src'
+        extensions: 'h,c'
+        clangFormatVersion: 14
