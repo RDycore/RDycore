@@ -1868,7 +1868,7 @@ RDycore. The parameters that define these discretizations are</p>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MomentumY</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WaterSource</span>
 <span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xdmf</span>
-<span class="w">  </span><span class="nt">step_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">output_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
@@ -1903,7 +1903,7 @@ time series data (<strong>but excluding checkpoint data</strong>). Relevant para
 <li><code>cgns</code>: output is written to the <a href="https://cgns.github.io/">CFD General Notation System (CGNS)</a> format</li>
 </ul>
 </li>
-<li><code>step_interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
+<li><code>output_interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
 <li><code>time_interval</code>: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)</li>
 <li><code>time_unit</code>: units of temporal frequency output.</li>
 <li><code>batch_size</code>: the number of time steps for which output data is stored in a
