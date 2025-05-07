@@ -234,9 +234,14 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 // output section
 // ---------------
 // output:
+//   directory: <output-directory>
+//   fields: <list-of-output-fields>
 //   format: <binary|xdmf|cgns>
-//   interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
+//   output_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
+//   time_series:
+//     boundary_fluxes: <number-of-steps-between-flux-dumps>
+//   separate_grid_file: <true|false>
 
 // mapping of strings to file formats
 static const cyaml_strval_t output_file_formats[] = {
@@ -244,6 +249,11 @@ static const cyaml_strval_t output_file_formats[] = {
     {"binary", OUTPUT_BINARY},
     {"xdmf",   OUTPUT_XDMF  },
     {"cgns",   OUTPUT_CGNS  },
+};
+
+// a single selected output field entry
+static const cyaml_schema_value_t output_field_schema = {
+	CYAML_VALUE_STRING(CYAML_FLAG_POINTER, char, 0, CYAML_UNLIMITED),
 };
 
 // mapping of time_series fields to members of RDyTimeSeries
@@ -255,8 +265,10 @@ static const cyaml_schema_field_t output_time_series_fields_schema[] = {
 // mapping of output fields to members of RDyOutputSection
 static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_STRING("directory", CYAML_FLAG_OPTIONAL, RDyOutputSection, directory, 0),
+    CYAML_FIELD_SEQUENCE("fields", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyOutputSection, fields, &output_field_schema, 0, MAX_NUM_MATERIALS),
+    CYAML_FIELD_ENUM("fields", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
-    CYAML_FIELD_INT("step_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, step_interval),
+    CYAML_FIELD_INT("output_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, output_interval),
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
@@ -776,6 +788,7 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   }
 
   SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
+
   SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
   SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
@@ -961,7 +974,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
 
   // validate output options
-  if (config->output.format != OUTPUT_NONE || config->output.step_interval > 0 || config->output.time_interval > 0) {
+  if (config->output.format != OUTPUT_NONE || config->output.output_interval > 0 || config->output.time_interval > 0) {
     config->output.enable           = PETSC_TRUE;
     config->output.prev_output_time = -1.0;
   } else {
@@ -970,9 +983,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   if (config->output.enable) {
     PetscCheck((config->output.format != OUTPUT_NONE), comm, PETSC_ERR_USER, "Output requested, but the format is not specified.");
-    PetscCheck(!(config->output.step_interval == 0 && config->output.time_interval == 0), comm, PETSC_ERR_USER,
-               "Output requested, but neither step_interval nor time_interval specified.");
-    PetscCheck((config->output.step_interval >= 0), comm, PETSC_ERR_USER, "Output step interval must be specified as a positive number of steps.");
+    PetscCheck(!(config->output.output_interval == 0 && config->output.time_interval == 0), comm, PETSC_ERR_USER,
+               "Output requested, but neither output_interval nor time_interval specified.");
+    PetscCheck((config->output.output_interval >= 0), comm, PETSC_ERR_USER, "Output step interval must be specified as a positive number of steps.");
     PetscCheck((config->output.time_interval >= 0), comm, PETSC_ERR_USER, "Output time interval must be specified as a positive number of steps.");
     PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
                "Binary output does not support output batching");
@@ -991,6 +1004,33 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
       PetscCheck(t2 >= t1, comm, PETSC_ERR_USER, "output.time_interval needs be larger than or equal to time.coupling_interval");
       PetscCheck(PetscEqualReal(floor(t2 / t1) * t1 - t2, 0.0), comm, PETSC_ERR_USER,
                  "output.time_interval should be a multiple of time.coupling_interval");
+    }
+
+    if (config->output.fields_count > 0) {
+      static const char *valid_output_fields[] = {
+          "Height",      "MomentumX",       "MomentumY",       "Concentration%" PetscInt_FMT,
+          "WaterSource", "MomentumXSource", "MomentumYSource", "Concentration%" PetscInt_FMT "Source",
+          NULL,
+      };
+      for (PetscInt f = 0; f < config->output.fields_count; ++f) {
+        PetscBool valid = PETSC_FALSE;
+        for (PetscInt v = 0; valid_output_fields[v]; ++v) {
+          if (!strcmp(valid_output_fields[v], config->output.fields[f])) {
+            valid = true;
+            break;
+          } else {  // try substituting a species size class index
+            char size_class_field[MAX_NAME_LEN];
+            for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
+              snprintf(size_class_field, MAX_NAME_LEN, valid_output_fields[v], i);
+              if (!strcmp(size_class_field, config->output.fields[f])) {
+                valid = true;
+                break;
+              }
+            }
+          }
+        }
+        PetscCheck(valid, comm, PETSC_ERR_USER, "Invalid output field requested: %s", config->output.fields[f]);
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1154,10 +1194,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   //--------
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.step_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.output_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.step_interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.output_interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
@@ -1203,10 +1243,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   }
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.step_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.output_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.step_interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.output_interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }

@@ -401,24 +401,45 @@ RDycore. The parameters that define these discretizations are
 ```yaml
 output:
   directory: output
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+    - WaterSource
   format: xdmf
-  step_interval: 100
+  output_interval: 100
   batch_size: 1
   time_series:
     boundary_fluxes: 10
   separate_grid_file: true
 ```
 
-The `output` section control simulation output, including visualization and
-time series data (and excluding checkpoint data). Relevant parameters are
+The `output` section controls simulation output, including visualization and
+time series data (**but excluding checkpoint data**). Relevant parameters are
 
-* `directory`: the name of the directory to which output is written. It can be a relative or absolute path, and is created if it doesn't already exist. Default value: `output`
+* `directory`: the name of the directory to which output is written. It can be
+  a relative or absolute path, and is created if it doesn't already exist.
+  Default value: `output`
+* `fields`: a list of fields to include in each output file, expressed in YAML
+  array syntax (typically with hyphenated items on separate lines). This item is
+  optional, and if omitted the selected fields are the components of the
+  solution (e.g. `Height`, `MomentumX`, `MomentumY` for the shallow water
+  equations). **NOTE: This feature works only for XDMF output!** Available
+  options are
+    * `Height`: water height $h$
+    * `MomentumX`: $x$ momentum $hu$
+    * `MomentumY`: $y$ velocity $hv$
+    * `ConcentrationI`: the concentration for sediment class $I$ (0, 1, 2, ...)
+    * `WaterSource`: the value of the source term for $h$
+    * `MomentumXSource`: the value of the source term for $hu$
+    * `MomentumYSource`: the value of the source term for $hv$
+    * `ConcentrationISource`: the value of the source term for sediment class $I$
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
     * `binary`: output is written using PETSc's binary data format
     * `xdmf`: output is written to the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
     * `cgns`: output is written to the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
-* `step_interval`: the number of time steps between output dumps. Default value: 0 (no output)
+* `output_interval`: the number of time steps between output dumps. Default value: 0 (no output)
 * `time_interval`: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)
 * `time_unit`: units of temporal frequency output.
 * `batch_size`: the number of time steps for which output data is stored in a

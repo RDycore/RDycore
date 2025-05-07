@@ -22,7 +22,7 @@ time:
 
 output:
   format: xdmf
-  step_interval: 10000
+  output_interval: 10000
   time_interval: 600
   time_unit: seconds
   batch_size: 20

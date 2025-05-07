@@ -18,7 +18,7 @@ time:
 output:
   directory: dirichlet-bc-output
   format: xdmf
-  step_interval: 100
+  output_interval: 100
   batch_size: 20
   time_series:
     boundary_fluxes: 10

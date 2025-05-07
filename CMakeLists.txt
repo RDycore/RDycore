@@ -9,7 +9,7 @@ option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
 
 set(MAX_NAME_LEN              128 CACHE STRING "Maximum allowable length of field/variable names")
 set(MAX_NUM_SEDIMENT_CLASSES    5 CACHE STRING "Maximum number of sediment size classes")
-set(MAX_NUM_FIELDS              1 CACHE STRING "Maximum number of fields in a model's state")
+set(MAX_NUM_FIELDS             10 CACHE STRING "Maximum number of fields in a model's state")
 
 # Material property (integer) identifiers.
 # (we generate them here to allow GPU JIT compilers to see them)

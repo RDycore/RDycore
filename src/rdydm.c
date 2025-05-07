@@ -170,7 +170,7 @@ PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
 
 /// @brief  This function creates a DM for sediments
 /// @param rdy
-/// @return PETSC_SUCESS on success
+/// @return PETSC_SUCCESS on success
 PetscErrorCode CreateSedimentDM(RDy rdy) {
   PetscFunctionBegin;
   PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
