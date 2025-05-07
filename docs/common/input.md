@@ -407,7 +407,7 @@ output:
     - MomentumY
     - WaterSource
   format: xdmf
-  step_interval: 100
+  output_interval: 100
   batch_size: 1
   time_series:
     boundary_fluxes: 10
@@ -439,7 +439,7 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
     * `binary`: output is written using PETSc's binary data format
     * `xdmf`: output is written to the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
     * `cgns`: output is written to the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
-* `step_interval`: the number of time steps between output dumps. Default value: 0 (no output)
+* `output_interval`: the number of time steps between output dumps. Default value: 0 (no output)
 * `time_interval`: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)
 * `time_unit`: units of temporal frequency output.
 * `batch_size`: the number of time steps for which output data is stored in a

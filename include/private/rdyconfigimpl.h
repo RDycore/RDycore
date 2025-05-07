@@ -177,7 +177,7 @@ typedef struct {
   char          **fields;                         // array of selected output field names
   PetscInt        fields_count;                   // number of selected output fields
   RDyOutputFormat format;                         // file format
-  PetscInt        step_interval;                  // output interval [steps between outputs]
+  PetscInt        output_interval;                // output interval [steps between outputs]
   PetscInt        time_interval;                  // temporal interval at which output is written
   RDyTimeUnit     time_unit;                      // unit of time for temporal interval
   PetscInt        batch_size;                     // number of timesteps per output file (if available)

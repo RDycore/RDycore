@@ -201,7 +201,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   const char *units = TimeUnitAsString(rdy->config.time.unit);
 
   // create or append to a file depending on whether this step is the first in a dataset
-  PetscInt      dataset   = step / rdy->config.output.step_interval;
+  PetscInt      dataset   = step / rdy->config.output.output_interval;
   PetscFileMode file_mode = (dataset % rdy->config.output.batch_size == 0) ? FILE_MODE_WRITE : FILE_MODE_APPEND;
 
   RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 output at t = %g %s to %s", step, time, units, file_name);
@@ -391,8 +391,8 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
     }
 
     // check if it is time to output based on step interval
-    if (output->step_interval > 0 && !write_output) {
-      if (step % output->step_interval == 0) write_output = PETSC_TRUE;
+    if (output->output_interval > 0 && !write_output) {
+      if (step % output->output_interval == 0) write_output = PETSC_TRUE;
     }
 
     // write output

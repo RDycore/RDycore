@@ -237,7 +237,7 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 //   directory: <output-directory>
 //   fields: <list-of-output-fields>
 //   format: <binary|xdmf|cgns>
-//   step_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
+//   output_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
 //   time_series:
 //     boundary_fluxes: <number-of-steps-between-flux-dumps>
@@ -268,7 +268,7 @@ static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_SEQUENCE("fields", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyOutputSection, fields, &output_field_schema, 0, MAX_NUM_MATERIALS),
     CYAML_FIELD_ENUM("fields", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
     CYAML_FIELD_ENUM("format", CYAML_FLAG_OPTIONAL, RDyOutputSection, format, output_file_formats, CYAML_ARRAY_LEN(output_file_formats)),
-    CYAML_FIELD_INT("step_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, step_interval),
+    CYAML_FIELD_INT("output_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, output_interval),
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
@@ -974,7 +974,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
 
   // validate output options
-  if (config->output.format != OUTPUT_NONE || config->output.step_interval > 0 || config->output.time_interval > 0) {
+  if (config->output.format != OUTPUT_NONE || config->output.output_interval > 0 || config->output.time_interval > 0) {
     config->output.enable           = PETSC_TRUE;
     config->output.prev_output_time = -1.0;
   } else {
@@ -983,9 +983,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   if (config->output.enable) {
     PetscCheck((config->output.format != OUTPUT_NONE), comm, PETSC_ERR_USER, "Output requested, but the format is not specified.");
-    PetscCheck(!(config->output.step_interval == 0 && config->output.time_interval == 0), comm, PETSC_ERR_USER,
-               "Output requested, but neither step_interval nor time_interval specified.");
-    PetscCheck((config->output.step_interval >= 0), comm, PETSC_ERR_USER, "Output step interval must be specified as a positive number of steps.");
+    PetscCheck(!(config->output.output_interval == 0 && config->output.time_interval == 0), comm, PETSC_ERR_USER,
+               "Output requested, but neither output_interval nor time_interval specified.");
+    PetscCheck((config->output.output_interval >= 0), comm, PETSC_ERR_USER, "Output step interval must be specified as a positive number of steps.");
     PetscCheck((config->output.time_interval >= 0), comm, PETSC_ERR_USER, "Output time interval must be specified as a positive number of steps.");
     PetscCheck((config->output.batch_size == 0) || (config->output.format != OUTPUT_BINARY), comm, PETSC_ERR_USER,
                "Binary output does not support output batching");
@@ -1194,10 +1194,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   //--------
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.step_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.output_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.step_interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT "", rdy->config.output.output_interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
@@ -1243,10 +1243,10 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
   }
 
   // set the solution monitoring interval (except for XDMF, which does its own thing)
-  if ((rdy->config.output.step_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
+  if ((rdy->config.output.output_interval > 0) && (rdy->config.output.format != OUTPUT_XDMF)) {
     PetscCall(PetscOptionsHasName(NULL, NULL, "-ts_monitor_solution_interval", &has_param));
     if (!has_param) {
-      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.step_interval);
+      snprintf(value, VALUE_LEN, "%" PetscInt_FMT, rdy->config.output.output_interval);
       PetscOptionsSetValue(NULL, "-ts_monitor_solution_interval", value);
     }
   }
