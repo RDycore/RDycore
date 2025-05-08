@@ -1,6 +1,8 @@
 #if !defined(RDYCORECOREDEF_H)
 #define RDYCORECOREDEF_H
 
+#include <config.h>
+
 #define CONDITION_DIRICHLET 0
 #define CONDITION_NEUMANN 1
 #define CONDITION_REFLECTING 2
