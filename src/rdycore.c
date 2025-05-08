@@ -9,12 +9,9 @@ PetscClassId     RDY_CLASSID;
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
-PetscErrorCode RDyInit(int argc,
-          char *argv[], const char *help) {
+PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
   PetscFunctionBegin;
-  if (!initialized_)
-
-        {
+  if (!initialized_) {
     PetscBool petsc_initialized;
     PetscCall(PetscInitialized(&petsc_initialized));
     if (!petsc_initialized) {
