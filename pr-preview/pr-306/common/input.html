@@ -1862,17 +1862,40 @@ RDycore. The parameters that define these discretizations are</p>
 <h2 id="output"><code>output</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">output</span>
+<span class="w">  </span><span class="nt">fields</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Height</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MomentumX</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MomentumY</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WaterSource</span>
 <span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xdmf</span>
-<span class="w">  </span><span class="nt">step_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">output_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 <span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>The <code>output</code> section control simulation output, including visualization and
-time series data (and excluding checkpoint data). Relevant parameters are</p>
+<p>The <code>output</code> section controls simulation output, including visualization and
+time series data (<strong>but excluding checkpoint data</strong>). Relevant parameters are</p>
 <ul>
-<li><code>directory</code>: the name of the directory to which output is written. It can be a relative or absolute path, and is created if it doesn't already exist. Default value: <code>output</code></li>
+<li><code>directory</code>: the name of the directory to which output is written. It can be
+  a relative or absolute path, and is created if it doesn't already exist.
+  Default value: <code>output</code></li>
+<li><code>fields</code>: a list of fields to include in each output file, expressed in YAML
+  array syntax (typically with hyphenated items on separate lines). This item is
+  optional, and if omitted the selected fields are the components of the
+  solution (e.g. <code>Height</code>, <code>MomentumX</code>, <code>MomentumY</code> for the shallow water
+  equations). <strong>NOTE: This feature works only for XDMF output!</strong> Available
+  options are<ul>
+<li><code>Height</code>: water height <span class="arithmatex">\(h\)</span></li>
+<li><code>MomentumX</code>: <span class="arithmatex">\(x\)</span> momentum <span class="arithmatex">\(hu\)</span></li>
+<li><code>MomentumY</code>: <span class="arithmatex">\(y\)</span> velocity <span class="arithmatex">\(hv\)</span></li>
+<li><code>ConcentrationI</code>: the concentration for sediment class <span class="arithmatex">\(I\)</span> (0, 1, 2, ...)</li>
+<li><code>WaterSource</code>: the value of the source term for <span class="arithmatex">\(h\)</span></li>
+<li><code>MomentumXSource</code>: the value of the source term for <span class="arithmatex">\(hu\)</span></li>
+<li><code>MomentumYSource</code>: the value of the source term for <span class="arithmatex">\(hv\)</span></li>
+<li><code>ConcentrationISource</code>: the value of the source term for sediment class <span class="arithmatex">\(I\)</span></li>
+</ul>
+</li>
 <li><code>format</code>: the format of the output written. Available options are<ul>
 <li><code>none</code>: no output is written. This is the default value.</li>
 <li><code>binary</code>: output is written using PETSc's binary data format</li>
@@ -1880,7 +1903,7 @@ time series data (and excluding checkpoint data). Relevant parameters are</p>
 <li><code>cgns</code>: output is written to the <a href="https://cgns.github.io/">CFD General Notation System (CGNS)</a> format</li>
 </ul>
 </li>
-<li><code>step_interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
+<li><code>output_interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
 <li><code>time_interval</code>: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)</li>
 <li><code>time_unit</code>: units of temporal frequency output.</li>
 <li><code>batch_size</code>: the number of time steps for which output data is stored in a
