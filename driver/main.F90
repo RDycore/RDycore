@@ -122,7 +122,12 @@ contains
     print *, ""
   end subroutine
 
-
+  ! Opens the dataset file and reads the data into a PETSc Vec.
+  ! The data is in the following format:
+  !
+  ! time_1 data_1
+  ! time_2 data_2
+  ! time_3 data_3
   subroutine opendata(filename, data_vec, ndata)
     implicit none
     character(*)   :: filename
@@ -143,6 +148,8 @@ contains
 
   end subroutine
 
+  ! Given the current time, this function finds the data value
+  ! from spatially-homogeneous, temporally-varying dataset. 
   subroutine getcurrentdata(data_ptr, ndata, cur_time, temporally_interpolate, cur_data_idx, cur_data)
     implicit none
     PetscScalar, pointer   :: data_ptr(:)
@@ -187,6 +194,11 @@ contains
 
   end subroutine
 
+  ! Save information about rainfall dataset from the command line options
+  ! The supported dataset types are:
+  ! - constant
+  ! - spatially-homogeneous, temporally-varying
+  ! - spatially and temporally varyin raster
   subroutine ParseRainfallDataOptions(rain)
     !
     implicit none
@@ -295,8 +307,10 @@ contains
 
   end subroutine ParseRainfallDataOptions
 
-
-  ! Parse the command line options for the boundary condition dataset
+  ! Parse the command line options for the boundary condition dataset.
+  ! The supported dataset types are:
+  ! - spatially-homogeneous, temporally-varying
+  ! - spatially and temporally varying unstructured dataset
   subroutine ParseBoundaryDataOptions(bc)
     !
     implicit none
@@ -488,6 +502,8 @@ contains
 
   end subroutine DoPostprocessForBoundaryHomogeneousDataset
 
+  ! Determines the filename of the dataset based on the directory and date
+  ! The files are named as YYYY-MM-DD:HH-SS.<int32|int64>.bin
   subroutine DetermineDatasetFilename(dir, current_date, file)
     !
     use rdycore
@@ -505,6 +521,14 @@ contains
 
   end subroutine DetermineDatasetFilename
 
+  ! Opens the raster dataset file and reads the data into a PETSc Vec.
+  ! The file is assumed to be in binary format.
+  ! The metadata of the file contains
+  !  - number of columns
+  !  - number of rows
+  !  - x coordinate of the lower left corner
+  !  - y coordinate of the lower left corner
+  !  - cell size
   subroutine OpenRasterDataset(data)
     !
     use rdycore
@@ -538,6 +562,7 @@ contains
 
   end subroutine OpenRasterDataset
 
+  ! Returns the number of days in a month
   subroutine day_of_month(year, month, ndays)
     PetscInt, intent(in) :: year, month
     PetscInt, intent(out) :: ndays
@@ -557,6 +582,7 @@ contains
 
   end subroutine day_of_month
 
+  ! Adds one hour to current date and updates the date if necessary
   subroutine IncrementDateByOneHour(current_date)
     !
     use rdycore
@@ -587,6 +613,7 @@ contains
 
   end subroutine IncrementDateByOneHour
 
+  ! Closes the currently opened raster dataset and opens the next one
   subroutine OpenNextRasterDataset(data)
     !
     use rdycore
@@ -609,6 +636,7 @@ contains
 
   end subroutine OpenNextRasterDataset
 
+  ! Opens the unstructured dataset file and reads the data into a PETSc Vec.
   subroutine OpenUnstructuredDataset(data, expected_data_stride)
     !
     use rdycore
@@ -648,6 +676,7 @@ contains
 
   end subroutine OpenUnstructuredDataset
 
+  ! Closes the currently opened unstructured dataset and opens the next one
   subroutine OpenNextUnstructuredDataset(data)
     !
     use rdycore
@@ -670,6 +699,7 @@ contains
 
   end subroutine OpenNextUnstructuredDataset
 
+  ! Writes the mapping between the RDycore cells and the dataset to a file
   subroutine WriteMap(rdy_, filename, ncells, d2m)
     !
     use rdycore
@@ -699,6 +729,9 @@ contains
 
   end subroutine WriteMap
 
+  ! After reading the unstructured dataset, this function
+  ! postprocesses the data and sets up the mapping between
+  ! the RDycore cells and the dataset.
   subroutine DoPostprocessForBoundaryUnstructuredDataset(rdy_, bc_dataset)
     !
     use rdycore
@@ -745,6 +778,7 @@ contains
 
   end subroutine DoPostprocessForBoundaryUnstructuredDataset
 
+  ! Extracts the cell centroids from the RDycore mesh
   subroutine GetCellCentroidsFromRDycoreMesh(rdy_, n, xc, yc)
     !
     use rdycore
@@ -762,6 +796,7 @@ contains
 
   end subroutine GetCellCentroidsFromRDycoreMesh
 
+  ! Extracts the edge centroids from the RDycore mesh
   subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, n, idx, xc, yc)
     !
     use rdycore
@@ -779,6 +814,7 @@ contains
 
   end subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh
 
+  ! Reads the x and y coordinates of the unstructured dataset mesh
   subroutine ReadUnstructuredDatasetCoordinates(data)
     !
     use rdycore
@@ -821,6 +857,8 @@ contains
 
   end subroutine ReadUnstructuredDatasetCoordinates
 
+  ! Creates the mapping between the RDycore cells and the unstructured dataset
+  ! using nearest neighbor search
   subroutine CreateUnstructuredDatasetMap(data)
     !
     use rdycore
@@ -859,6 +897,7 @@ contains
 
   end subroutine CreateUnstructuredDatasetMap
 
+  ! Reads the mapping between the RDycore cells and the dataset from a file
   subroutine ReadRainfallDatasetMap(rdy_, filename, ncells, d2m)
     !
     use rdycore
@@ -894,6 +933,8 @@ contains
 
   end subroutine ReadRainfallDatasetMap
 
+  ! Creates the mapping between the RDycore cells and the raster dataset
+  ! using nearest neighbor search
   subroutine CreateRasterDatasetMapping(rdy_, data)
     !
     use rdycore
@@ -931,6 +972,12 @@ contains
 
   end subroutine CreateRasterDatasetMapping
 
+  ! Postprocesses the raster dataset for the source term, which includes
+  ! - extracting the cell centroids from the RDycore mesh
+  ! - creating the mapping between the RDycore cells and the raster dataset
+  ! - writing the mapping to a file if requested
+  ! - reading the mapping from a file if requested
+
   subroutine DoPostprocessForSourceRasterDataset(rdy_, data)
     !
     use rdycore
@@ -965,17 +1012,23 @@ contains
 
     call GetCellCentroidsFromRDycoreMesh(rdy_, data%mesh_ncells_local, data%mesh_xc, data%mesh_yc)
 
-    call CreateRasterDatasetMapping(rdy_, data)
+    if (data%read_map) then
+      call ReadRainfallDatasetMap(rdy_, data%map_file, data%mesh_ncells_local, data%data2mesh_idx)
+    else
+      call CreateRasterDatasetMapping(rdy_, data)
+    endif
 
     if (data%write_map) then
       call WriteMap(rdy_, data%map_file, data%mesh_ncells_local, data%data2mesh_idx)
     endif
-    if (data%read_map) then
-      call ReadRainfallDatasetMap(rdy_, data%map_file, data%mesh_ncells_local, data%data2mesh_idx)
-    endif
 
   end subroutine DoPostprocessForSourceRasterDataset
 
+  ! Postprocesses the unstructured dataset for the source term, which includes
+  ! - extracting the cell centroids from the RDycore mesh
+  ! - reading the coordinates of the unstructured dataset mesh
+  ! - creating or reading the mapping between the RDycore cells and the unstructured dataset 
+  ! - writing the mapping to a file if requested
   subroutine DoPostprocessForSourceUnstructuredDataset(rdy_, data)
     !
     use rdycore
@@ -995,18 +1048,20 @@ contains
 
     call GetCellCentroidsFromRDycoreMesh(rdy_, data%mesh_nelements, data%mesh_xc, data%mesh_yc)
     call ReadUnstructuredDatasetCoordinates(data)
-    call CreateUnstructuredDatasetMap(data)
+
+    if (data%read_map) then
+      call ReadRainfallDatasetMap(rdy_, data%map_file, data%mesh_nelements, data%data2mesh_idx)
+    else
+      call CreateUnstructuredDatasetMap(data)
+    endif
 
     if (data%write_map) then
       call WriteMap(rdy_, data%map_file, data%mesh_nelements, data%data2mesh_idx)
     endif
 
-    if (data%read_map) then
-      call ReadRainfallDatasetMap(rdy_, data%map_file, data%mesh_nelements, data%data2mesh_idx)
-    endif
-
   end subroutine DoPostprocessForSourceUnstructuredDataset
 
+  ! Creates the rainfall condition dataset based on the type of dataset
   subroutine CreateRainfallConditionDataset(rdy_, n, rain_dataset)
     !
     use rdycore
@@ -1047,6 +1102,7 @@ contains
 
   end subroutine CreateRainfallConditionDataset
 
+  ! Sets the rainfall rate for a constant rainfall dataset
   subroutine SetConstantRainfall(rate, num_values, data_for_rdycore)
     !
     use rdycore
@@ -1066,6 +1122,8 @@ contains
 
   end subroutine SetConstantRainfall
 
+  ! Sets the rainfall values for cells based on the spatially homogeneous, but
+  ! temporally-varying rainfall data
   subroutine SetHomogeneousData(rain_data, cur_time, num_values, data_for_rdycore)
     !
     use rdycore
@@ -1096,6 +1154,7 @@ contains
 
   end subroutine SetHomogeneousData
 
+  ! Sets the rainfall values for cells based on the raster dataset
   subroutine SetRasterData(data, cur_time, num_values, data_for_rdycore)
     !
     use rdycore
@@ -1172,6 +1231,7 @@ contains
 
   end subroutine ApplyRainfallDataset
 
+  ! Destroys the rainfall dataset
   subroutine DestroyRasterDataset(rain_dataset)
     !
     use rdycore
@@ -1189,6 +1249,7 @@ contains
 
   end subroutine DestroyRasterDataset
 
+  ! Destroys the unstructured dataset
   subroutine DestroyUnstructuredDataset(rain_dataset)
     !
     use rdycore
@@ -1206,6 +1267,7 @@ contains
 
   end subroutine DestroyUnstructuredDataset
 
+  ! Destroys the rainfall dataset
   subroutine DestroyRainfallDataset(rain_dataset)
     !
     use rdycore
@@ -1320,6 +1382,7 @@ contains
 
   end subroutine SetHomogeneousBoundary
 
+  ! Sets spatially varying BC conditions from an unstructured dataset
   subroutine SetUnstructuredData(data, cur_time, num_values, data_for_rdycore)
     !
     use rdycore
