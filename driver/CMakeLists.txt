@@ -25,6 +25,7 @@ install(
 )
 
 # Fortran driver
+if (0)
 add_executable(rdycore_f90_exe
   main.F90
 )
@@ -44,6 +45,7 @@ install(
   TARGETS rdycore_mms_f90 rdycore_f90_exe
   DESTINATION bin
 )
+endif()
 
 # Tests for the driver.
 if (ENABLE_TESTS)
