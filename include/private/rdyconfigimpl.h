@@ -104,6 +104,7 @@ typedef struct {
   RDyNumericsSpatial  spatial;
   RDyNumericsTemporal temporal;
   RDyNumericsRiemann  riemann;
+  PetscBool flux_single_comm;
 } RDyNumericsSection;
 
 // ------------

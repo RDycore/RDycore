@@ -10,6 +10,7 @@ numerics:
   spatial: fv
   temporal: euler
   riemann: roe
+  flux_single_comm: true
 
 logging:
   level: detail
