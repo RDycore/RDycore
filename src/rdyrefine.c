@@ -498,9 +498,15 @@ PetscErrorCode RDyRefine(RDy rdy) {
   // destroy the coarse vectors
   PetscCall(RDyDestroyVectors(&rdy));
 
-  // destroy the coarse DMs
-  PetscCall(DMDestroy(&rdy->dm));
-  PetscCall(DMDestroy(&rdy->aux_dm));
+  // keep a copy of base DMs, otherwise destroy the coarse DMs
+  if (!rdy->num_refinements) {
+    rdy->dm_amr_base     = rdy->dm;
+    rdy->aux_dm_amr_base = rdy->aux_dm;
+  } else {
+    // destroy the coarse DM
+    PetscCall(DMDestroy(&rdy->dm));
+    PetscCall(DMDestroy(&rdy->aux_dm));
+  }
 
   // set the DM to be the refined DM
   rdy->dm      = dm_fine;

@@ -217,6 +217,10 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   // destroy DMs
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
+  if ((*rdy)->num_refinements) {
+    if ((*rdy)->dm_amr_base) DMDestroy(&((*rdy)->dm_amr_base));
+    if ((*rdy)->aux_dm_amr_base) DMDestroy(&((*rdy)->aux_dm_amr_base));
+  }
 
   // destroy config data
   PetscCall(DestroyConfig((*rdy)));

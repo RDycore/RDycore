@@ -129,6 +129,9 @@ struct _p_RDy {
   // Refinements
   //--------------------------
 
+  DM dm_amr_base;
+  DM aux_dm_amr_base;
+
   // identifies if the mesh has been refined and the model has not taken a step
   PetscBool mesh_was_refined;
 
