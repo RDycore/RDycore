@@ -463,6 +463,29 @@ extern PetscErrorCode InitSolver(RDy rdy);
 extern PetscErrorCode InitDirichletBoundaryConditions(RDy rdy);
 extern PetscErrorCode InitSourceConditions(RDy rdy);
 
+/// @brief Computes A * B, and updates A or B with the result.
+/// @param A Matrix
+/// @param B Matrix
+/// @return PETSC_SUCESS on success
+static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
+  PetscFunctionBeginUser;
+  Mat tmp;
+
+  PetscCall(MatMatMult(*A, *B,  MAT_INITIAL_MATRIX, PETSC_DETERMINE, &tmp));
+
+  if (update_B) {
+    PetscCall(MatDestroy(B));
+    PetscCall(MatDuplicate(tmp, MAT_COPY_VALUES, B));
+  } else {
+    PetscCall(MatDestroy(A));
+    PetscCall(MatDuplicate(tmp, MAT_COPY_VALUES, A));
+  }
+
+  PetscCall(MatDestroy(&tmp));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
 PetscErrorCode RDyRefine(RDy rdy) {
   AppCtx   user;
   Mat      CoarseToFineMatNDof, FineToCoarseMatNDof;
@@ -589,10 +612,22 @@ PetscErrorCode RDyRefine(RDy rdy) {
   if (!rdy->num_refinements) {
     rdy->dm_amr_base     = rdy->dm;
     rdy->aux_dm_amr_base = rdy->aux_dm;
+
+    PetscCall(MatDuplicate(CoarseToFineMatNDof, MAT_COPY_VALUES, &rdy->BaseToCurrentMatNDof));
+    PetscCall(MatDuplicate(FineToCoarseMatNDof, MAT_COPY_VALUES, &rdy->CurrentToBaseMatNDof));
+    PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->BaseToCurrentMat1Dof));
+    PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->CurrentToBaseMat1Dof));
+
   } else {
+
     // destroy the coarse DM
     PetscCall(DMDestroy(&rdy->dm));
     PetscCall(DMDestroy(&rdy->aux_dm));
+
+    PetscCall(MatMultResuse(&CoarseToFineMatNDof, &rdy->BaseToCurrentMatNDof, PETSC_TRUE));
+    PetscCall(MatMultResuse(&rdy->CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
+    PetscCall(MatMultResuse(&CoarseToFineMat1Dof, &rdy->BaseToCurrentMat1Dof, PETSC_TRUE));
+    PetscCall(MatMultResuse(&rdy->CurrentToBaseMat1Dof, &FineToCoarseMat1Dof, PETSC_FALSE));
   }
 
   // set the DM to be the refined DM
@@ -628,6 +663,8 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFineMatNDof));
   PetscCall(MatDestroy(&FineToCoarseMatNDof));
+  PetscCall(MatDestroy(&CoarseToFineMat1Dof));
+  PetscCall(MatDestroy(&FineToCoarseMat1Dof));
   PetscCall(VecDestroy(&U_coarse_local));
   PetscCall(VecDestroy(&U_fine_local));
 
