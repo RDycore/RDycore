@@ -27,7 +27,7 @@ static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel) {
+static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
   /* PetscMPIInt rank; */
   DMLabel  label;
   PetscInt cStart, cEnd, c;
@@ -35,18 +35,23 @@ static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel) 
   PetscFunctionBegin;
   PetscCall(DMLabelCreate(PETSC_COMM_SELF, "Adaptation Label", adaptLabel));
   label = *adaptLabel;
-  PetscCall(DMGetCoordinatesLocalSetUp(dm));
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
-  for (c = cStart; c < cEnd; ++c) {
-    PetscReal centroid[3], volume, x, y;
 
-    PetscCall(DMPlexComputeCellGeometryFVM(dm, c, &volume, centroid, NULL));
-    x = centroid[0];
-    y = centroid[1];
-    /* Headwaters are (0.0,0.25)--(0.1,0.75) */
-    if ((x >= 0.0 && x < 1.) && (y >= 3. && y <= 4.)) {
-      PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
-      // PetscCall(PetscPrintf(PETSC_COMM_SELF, "refine: %" PetscInt_FMT "\n", c));
+  DM dm = rdy->dm;
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+
+  RDyMesh *mesh = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  for (c = cStart; c < cEnd; ++c) {
+    PetscReal x, y;
+
+    PetscInt icell = c - cStart;
+    if (cells->is_owned[icell]) {
+      x = cells->centroids[icell].X[0];
+      y = cells->centroids[icell].X[1];
+      if ((x >= 0.0 && x < 1.) && (y >= 3. && y <= 4.)) {
+        PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -170,7 +175,7 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
   if (!rdy->cells_marked_for_refinement) {
-    PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
+    PetscCall(CreateAdaptLabelInternal(rdy, &adaptLabel));
   } else {
     PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
     rdy->cells_marked_for_refinement = PETSC_FALSE;
