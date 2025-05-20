@@ -52,6 +52,56 @@ static PetscErrorCode CreateAdaptLabel(DM dm, AppCtx *ctx, DMLabel *adaptLabel) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Saves information regarding refinement of local cells.
+/// @param rdy         A RDy struct
+/// @param size        The number of local cells
+/// @param refine_cell True/False array indicating if the cell should be refined
+/// @return PETSC_SUCESS on success
+PetscErrorCode RDyMarkLocalCellsForRefinement (RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
+  PetscFunctionBegin;
+
+  rdy->cells_marked_for_refinement = PETSC_TRUE;
+
+  // check if the size of the array is equal to the number of local cells
+  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+
+  // copy the data
+  PetscCalloc1(size, &rdy->refine_cell);
+  for (PetscInt icell = 0; icell < size; ++icell) {
+    rdy->refine_cell[icell] = refine_cell[icell];
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Creates a label to refine cells based on the data previously provided by call
+///        to RDyMarkLocalCellsForRefinement
+/// @param rdy        RDy struct
+/// @param adaptLabel A DMLabel marks appropriate locally cells for refinement
+/// @return PETSC_SUCESS on success
+static PetscErrorCode CreateAdaptLabelFromMarkedCells(RDy rdy, DMLabel *adaptLabel) {
+
+  PetscFunctionBegin;
+  DMLabel  label;
+
+  PetscCall(DMLabelCreate(PETSC_COMM_SELF, "Adaptation Label", adaptLabel));
+  label = *adaptLabel;
+
+  PetscInt cStart, cEnd;
+  PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &cStart, &cEnd));
+
+  RDyMesh *mesh = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+
+  for (PetscInt c = 0; c < mesh->num_owned_cells; ++c) {
+    if (rdy->refine_cell[c]) {
+      PetscInt idx = cells->owned_to_local[c] + cStart;
+      PetscCall(DMLabelSetValue(label, idx, DM_ADAPT_REFINE));
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Creates matrices for the interpolation between coarse and fine meshes.
 /// @param dm           The fine DM
 /// @param CoarseToFine Matrix for interpolating local Vec from coarse to fine grid
@@ -108,16 +158,25 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFine, Mat FineToCoa
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode AdaptMesh(DM dm, const PetscInt bs, DM *dm_fine, Mat *CoarseToFine, Mat *FineToCoarse, AppCtx *ctx) {
+static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *CoarseToFine, Mat *FineToCoarse, AppCtx *ctx) {
   PetscFunctionBeginUser;
-  PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
+  DM       dm = rdy->dm;
   DM       dmAdapt;
   DMLabel  adaptLabel;
   PetscInt d_nz = 4, ccStart, ccEnd, fcStart, fcEnd;
   char     opt[128];
 
-  PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
+  PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
+
+  if (!rdy->cells_marked_for_refinement) {
+    PetscCall(CreateAdaptLabel(dm, ctx, &adaptLabel));
+  } else {
+    PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
+    rdy->cells_marked_for_refinement = PETSC_FALSE;
+    PetscFree(rdy->refine_cell);
+  }
+
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
   PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
   PetscCall(DMLabelDestroy(&adaptLabel));
@@ -388,7 +447,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(ProcessOptions(PETSC_COMM_WORLD, &user));
 
   /* Adapt */
-  PetscCall(AdaptMesh(rdy->dm, ndof_coarse, &dm_fine, &CoarseToFine, &FineToCoarse, &user));
+  PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFine, &FineToCoarse, &user));
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));

@@ -39,6 +39,7 @@ PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
 
 // RDycore support for AMR
 PETSC_EXTERN PetscErrorCode RDyRefine(RDy);
+PETSC_EXTERN PetscErrorCode RDyMarkLocalCellsForRefinement(RDy, const PetscInt, const PetscBool *);
 
 // time integration
 PETSC_EXTERN PetscErrorCode DestroyOutputViewer(RDy);
