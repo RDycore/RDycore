@@ -624,3 +624,50 @@ PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char filename[
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+// reads data for a single DOF from a binary file into a global Vec
+PetscErrorCode RDyReadOneDOFBaseGlobalVecFromBinaryFile(RDy rdy, const char filename[], Vec *global) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+
+  // create a naturally-ordered vector with a stride equal to the number of
+  Vec natural;
+
+  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm_amr_base, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm_amr_base, global));
+
+  // load the properties into the vector and copy them into place
+  PetscCall(VecLoad(natural, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  // scatter natural-to-global
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm_amr_base, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm_amr_base, natural, *global));
+
+  PetscCall(VecDestroy(&natural));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMapOneDOFGlobalBaseVecToCurrentGlobalVec(RDy rdy, Vec global_base, Vec *global_current) {
+  PetscFunctionBegin;
+
+  Vec local_base;
+  PetscCall(DMCreateLocalVector(rdy->aux_dm_amr_base, &local_base));
+
+  PetscCall(DMGlobalToLocalBegin(rdy->aux_dm_amr_base, global_base, INSERT_VALUES, local_base));
+  PetscCall(DMGlobalToLocalEnd(rdy->aux_dm_amr_base, global_base, INSERT_VALUES, local_base));
+
+  Vec local_current;
+  PetscCall(DMCreateLocalVector(rdy->aux_dm, &local_current));
+  PetscCall(MatMult(rdy->BaseToCurrentMat1Dof, local_base, local_current));
+
+  PetscCall(DMCreateGlobalVector(rdy->aux_dm, global_current));
+  PetscCall(DMLocalToGlobalBegin(rdy->aux_dm, local_current, INSERT_VALUES, *global_current));
+  PetscCall(DMLocalToGlobalEnd(rdy->aux_dm, local_current, INSERT_VALUES, *global_current));
+
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
