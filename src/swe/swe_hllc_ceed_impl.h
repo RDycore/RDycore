@@ -1,22 +1,18 @@
 #pragma once
-#include "rdycore.h"       
-
+#include "rdycore.h"
 
 CEED_QFUNCTION_HELPER void SWERiemannFlux_HLLC(CeedScalar gravity, CeedScalar tiny_h, CeedScalar h_anuga,
                                                SWEState qL, SWEState qR, CeedScalar sn, CeedScalar cn,
                                                CeedScalar flux[3], CeedScalar *amax) {
-  const CeedScalar unL = SafeDiv(qL.hu * cn + qL.hv * sn, qL.h, fabs(qL.h), RDY_TINY);
-  const CeedScalar unR = SafeDiv(qR.hu * cn + qR.hv * sn, qR.h, fabs(qR.h), RDY_TINY);
+  const CeedScalar unL = (qL.hu * cn + qL.hv * sn) / qL.h;
+  const CeedScalar unR = (qR.hu * cn + qR.hv * sn) / qR.h;
 
   const CeedScalar cL = sqrt(gravity * qL.h);
   const CeedScalar cR = sqrt(gravity * qR.h);
 
   const CeedScalar sL = fmin(unL - cL, unR - cR);
   const CeedScalar sR = fmax(unL + cL, unR + cR);
-  
-  const CeedScalar num = (qR.hu - qL.hu) + sL * qL.h - sR * qR.h;
-  const CeedScalar den = (qL.h - qR.h);
-  const CeedScalar s_star = SafeDiv(num, den, fabs(den), RDY_TINY);
+  const CeedScalar s_star = (qR.hu - qL.hu + sL * qL.h - sR * qR.h) / (qL.h - qR.h);
 
   *amax = fmax(fabs(sL), fabs(sR));
 
