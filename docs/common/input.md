@@ -403,27 +403,25 @@ RDycore. The parameters that define these discretizations are
 ```yaml
 observations:
   sites:
-    domain: false
     cells: [0, 1, 2, 3, 4, 5, 6]
   quantities:
     - Height
     - MomentumX
     - MomentumY
-  sampling:
+  time_sampling:
     instantaneous: true
-    averaged: 0.083 # 1 month, in units of years (specified in time section)
 ```
 
 The `observations` section allows the specification of **observation sites**:
 points in space at which desired quantities are sampled and possible averaged.
 Parameters include:
 
-* `sites`: the mechanism by which observation sites are determined.
-    * The `domain` parameter (`false` by default) defines an observation site
-      at the center of every cell in the unstructured mesh used by RDycore. This
-      is the easiest way to generate observation sites.
-    * The `cells` parameter accepts a list of global cell IDs within the mesh,
-      defining an observation site at the center of each given cell.
+* `sites`: the mechanism by which observation sites are specified. There
+  are two ways to specify observation sites:
+    * `cells`: accepts a list of global cell IDs within the mesh, defining an
+      observation site at the center of each given cell.
+    * `file`: accepts a text file specifying *natural cell IDs* in the line-
+      oriented format described below.
 * `quantities`: a list of quantities to be sampled at each observation site.
   Available options are
     * `Height`: water height $h$
@@ -433,9 +431,19 @@ Parameters include:
   site.
     * `instantaneous` (`false` by default) can be set to `true` to sample
       instantaneous values of the desired quantities at each site.
-    * `averaged` (off by default) can be set to the desired time interval over
-      which each quantity is averaged at each site. This interval is specified
-      in the units given within the `[time](input.md#time)` section.
+    * Time averaging is not yet supported, but we plan to add an `averaged`
+      parameter in the future.
+
+When specifying observation sites in a text file, use the following format:
+
+```
+number_of_observation_cells
+<natural_cell_id_0>
+<natural_cell_id_1>
+<natural_cell_id_2>
+...
+<natural_cell_id_N>
+```
 
 When using the RDycore driver, output is written to a tab-delimited text file.
 
