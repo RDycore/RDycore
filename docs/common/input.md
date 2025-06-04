@@ -36,6 +36,8 @@ broad categories:
       files or to the terminal
     * [output](input.md#output): configures simulation output, including
       scalable I/O formats and related parameters
+    * [observations](input.md#observations): configures observation points that
+      can report instantaneous or time-averaged quantities
     * [checkpoint](input.md#checkpoint): configures simulation checkpoint
       files, which are used for restarts
     * [restart](input.md#restart): configures whether a simulation is restarted
@@ -395,6 +397,47 @@ RDycore. The parameters that define these discretizations are
 * `riemann`: determines the form of the Riemann solver used for the shallow
   water equations. Can be `roe` for the Roe solver or `hllc` for the HLLC solver.
   Currently, only `roe` is implemented. Default value: `roe`
+
+## `observations`
+
+```yaml
+observations:
+  sites:
+    domain: false
+    cells: [0, 1, 2, 3, 4, 5, 6]
+  quantities:
+    - Height
+    - MomentumX
+    - MomentumY
+  sampling:
+    instantaneous: true
+    averaged: 0.083 # 1 month, in units of years (specified in time section)
+```
+
+The `observations` section allows the specification of **observation sites**:
+points in space at which desired quantities are sampled and possible averaged.
+Parameters include:
+
+* `sites`: the mechanism by which observation sites are determined.
+    * The `domain` parameter (`false` by default) defines an observation site
+      at the center of every cell in the unstructured mesh used by RDycore. This
+      is the easiest way to generate observation sites.
+    * The `cells` parameter accepts a list of global cell IDs within the mesh,
+      defining an observation site at the center of each given cell.
+* `quantities`: a list of quantities to be sampled at each observation site.
+  Available options are
+    * `Height`: water height $h$
+    * `MomentumX`: $x$ momentum $hu$
+    * `MomentumY`: $y$ velocity $hv$
+* `sampling`: the method by which each quantity is sampled at each observation
+  site.
+    * `instantaneous` (`false` by default) can be set to `true` to sample
+      instantaneous values of the desired quantities at each site.
+    * `averaged` (off by default) can be set to the desired time interval over
+      which each quantity is averaged at each site. This interval is specified
+      in the units given within the `[time](input.md#time)` section.
+
+When using the RDycore driver, output is written to a tab-delimited text file.
 
 ## `output`
 
