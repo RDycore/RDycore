@@ -38,6 +38,7 @@ typedef struct SWEState_ SWEState;
 // supported Riemann solver types
 #include "swe_hll_ceed_impl.h"
 #include "swe_hllc_ceed_impl.h"
+#include "swe_roe_ceed_impl.h"
 
 typedef enum {
   RIEMANN_FLUX_ROE,
