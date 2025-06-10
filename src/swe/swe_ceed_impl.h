@@ -1,6 +1,5 @@
 
 
-
 #ifndef SWE_OPERATORS_IMPL_H
 #define SWE_OPERATORS_IMPL_H
 
@@ -43,7 +42,7 @@ typedef struct SWEState_ SWEState;
 typedef enum {
   RIEMANN_FLUX_ROE,
   RIEMANN_FLUX_HLL,
-  RIEMANN_FLUX_HLLC
+  RIEMANN_FLUX_HLLC,
 } RiemannFluxType;
 
 // The following Q functions use C99 VLA features for shaping multidimensional
@@ -75,21 +74,20 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
     SWEState   qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
     CeedScalar flux[3], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
-
       switch (flux_type) {
-  case RIEMANN_FLUX_ROE:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLL:
-    SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLLC:
-    SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  default:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-}
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
 
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
@@ -108,7 +106,8 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
 }
 
 // SWE boundary flux operator Q-function (Dirichlet condition)
-CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
+CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
+                                                    RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // Dirichlet boundary values
@@ -128,19 +127,20 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
     if (qL.h > tiny_h) {
       CeedScalar flux[3], amax;
       switch (flux_type) {
-  case RIEMANN_FLUX_ROE:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLL:
-    SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLLC:
-    SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  default:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
+    }
   }
   return 0;
 }
@@ -172,20 +172,19 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
       SWEState   qR   = {qL.h, qL.hu * dum1 - qL.hv * dum2, -qL.hu * dum2 - qL.hv * dum1};
       CeedScalar flux[3], amax;
       switch (flux_type) {
-
-  case RIEMANN_FLUX_ROE:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLL:
-    SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLLC:
-    SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  default:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
       }
@@ -224,19 +223,19 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
       switch (flux_type) {
-  case RIEMANN_FLUX_ROE:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLL:
-    SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  case RIEMANN_FLUX_HLLC:
-    SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-  default:
-    SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
-    break;
-}
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
 
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
@@ -251,7 +250,6 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
 CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return SWEBoundaryFlux_Outflow(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
-
 
 // SWE regional source operator Q-function
 CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
@@ -387,8 +385,7 @@ CEED_QFUNCTION(SWEFlux_HLLC)(void *ctx, CeedInt Q, const CeedScalar *const in[],
   return SWEFlux(ctx, Q, in, out, RIEMANN_FLUX_HLLC);
 }
 
-#pragma GCC diagnostic   pop
+#pragma GCC diagnostic pop
 #pragma clang diagnostic pop
 
 #endif
-
