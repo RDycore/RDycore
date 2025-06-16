@@ -10,8 +10,8 @@ module rdycore
 
   implicit none
 
-  public :: RDyDouble, RDy, RDyInit, RDyFinalize, RDyInitialized, &
-            RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
+  public :: RDyDouble, RDy, RDyGetVersion, RDyGetBuildConfiguration, RDyInit, RDyFinalize, &
+            RDyInitialized, RDyCreate, RDySetup, RDyAdvance, RDyDestroy, &
             RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
             RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, &
             RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, RDyMMSRun, &
@@ -49,6 +49,17 @@ module rdycore
   end type RDy
 
   interface
+    integer(c_int) function rdygetversion_(major, minor, patch, release) bind(c, name="RDyGetVersion")
+      use iso_c_binding, only: c_int
+      PetscInt,  intent(out) :: major, minor, patch
+      PetscBool, intent(out) :: release
+    end function
+
+    integer(c_int) function rdygetbuildconfiguration_(c_build_config) bind(c, name="RDyGetBuildConfigurationF90")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value :: c_build_config
+    end function
+
     integer(c_int) function rdyinitfortran_() bind(c, name="RDyInitFortran")
       use iso_c_binding, only: c_int
     end function
@@ -437,6 +448,22 @@ module rdycore
   end interface
 
 contains
+
+  subroutine RDyGetVersion(major, minor, patch, release, ierr)
+    use petscsys
+    PetscInt,  intent(out) :: major, minor, patch
+    PetscBool, intent(out) :: release
+    integer,   intent(out) :: ierr
+  end subroutine
+
+  subroutine RDyGetBuildConfiguration(build_config, ierr)
+    use petscsys
+    use iso_c_binding
+    character(len=1024), target, intent(out) :: build_config
+    integer,                     intent(out) :: ierr
+
+    ierr = rdygetbuildconfiguration_(c_loc(build_config))
+  end subroutine
 
   subroutine RDyInit(ierr)
     use petscsys

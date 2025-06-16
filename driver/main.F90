@@ -1463,6 +1463,7 @@ program rdycore_f90
 
   implicit none
 
+  character(len=1024)  :: rdy_build_config;
   character(len=1024)  :: config_file
   type(RDy)            :: rdy_
   PetscErrorCode       :: ierr
@@ -1486,6 +1487,10 @@ program rdycore_f90
   type(SourceSink)        :: rain_dataset
   type(BoundaryCondition) :: bc_dataset
   PetscInt, parameter  :: ndof = 3
+
+  ! print out our version information
+  PetscCallA(RDyGetBuildConfiguration(rdy_build_config, ierr));
+  write(*,'(A)') trim(rdy_build_config)
 
   if (command_argument_count() < 1) then
     call usage()
