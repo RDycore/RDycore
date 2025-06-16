@@ -67,7 +67,7 @@ if [ "$mach" == "pm-cpu" ]; then
   data_dir=/global/cfs/projectdirs/m4267/shared/data/irene/delaware
   device="cpu"
   ntasks=$((N*128))
-  macros_file_in=${PWD}/../harvey-flooding/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-11-2-0-fc2888174f5
+  macros_file_in=${PWD}/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-13-2-1-95934b0d393
   macros_file_out=gnu_pm-cpu.cmake
   compiler=gnu
 
@@ -76,7 +76,7 @@ elif [ "$mach" == "pm-gpu" ]; then
   data_dir=/global/cfs/projectdirs/m4267/shared/data/irene/delaware
   device="gpu"
   ntasks=$((N*4))
-  macros_file_in=${PWD}/../harvey-flooding/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-11-2-0-fc2888174f5
+  macros_file_in=${PWD}/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-13-2-1-95934b0d393
   macros_file_out=gnugpu_pm-gpu.cmake
   compiler=gnugpu
 
@@ -117,12 +117,12 @@ then
   echo "So, attempting to build RDycore."
   echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 
-  cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+  cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH -G Ninja
 fi
 
 # Build 
 cd build-$PETSC_ARCH
-make -j4 install
+ninja -j4 install
 
 # 2. Create an E3SM case
 
