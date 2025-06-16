@@ -12,6 +12,10 @@
 
 typedef struct _p_RDy *RDy;
 
+// Version information
+PETSC_EXTERN PetscErrorCode RDyGetVersion(int *, int *, int *, PetscBool *);
+PETSC_EXTERN PetscErrorCode RDyGetBuildConfiguration(const char **);
+
 // Process initialization
 PETSC_EXTERN PetscErrorCode RDyInit(int, char *[], const char *);
 PETSC_EXTERN PetscErrorCode RDyInitFortran(void);

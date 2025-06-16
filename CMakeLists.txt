@@ -158,7 +158,21 @@ set(RDYCORE_MINOR_VERSION 1)
 set(RDYCORE_PATCH_VERSION 0)
 set(RDYCORE_VERSION "${RDYCORE_MAJOR_VERSION}.${RDYCORE_MINOR_VERSION}.${RDYCORE_PATCH_VERSION}")
 
-message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
+# Get the latest abbreviated commit hash of the working branch
+execute_process(
+  COMMAND git log -1 --format=%h
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE RDYCORE_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+
+if (RDYCORE_GIT_HASH)
+  message(STATUS "Configuring RDycore v${RDYCORE_VERSION} (git hash ${RDYCORE_GIT_HASH})")
+else()
+  set(RDYCORE_GIT_HASH "unknown")
+  message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
+endif()
 
 # For now, we build static libraries only.
 set(BUILD_SHARED_LIBS OFF)

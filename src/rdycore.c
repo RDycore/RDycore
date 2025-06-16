@@ -7,6 +7,60 @@
 static PetscBool initialized_ = PETSC_FALSE;
 PetscClassId     RDY_CLASSID;
 
+/// Fetches RDycore version information.
+PETSC_EXTERN PetscErrorCode RDyGetVersion(int *major, int *minor, int *patch, PetscBool *release) {
+  PetscFunctionBegin;
+  *major   = RDYCORE_MAJOR_VERSION;
+  *minor   = RDYCORE_MINOR_VERSION;
+  *patch   = RDYCORE_PATCH_VERSION;
+  *release = !strcmp("unknown", RDYCORE_GIT_HASH);  // for now, "unknown" git hash implies release
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Constructs a multi-line string describing detailed build information
+PETSC_EXTERN PetscErrorCode RDyGetBuildConfiguration(const char **build_config) {
+  PetscFunctionBegin;
+#define BUILD_STR_LEN 1024
+  static char build_str[BUILD_STR_LEN] = {0};
+  if (!build_str[0]) {
+    // RDycore version
+    int       rdy_major, rdy_minor, rdy_patch;
+    PetscBool rdy_release;
+    PetscCall(RDyGetVersion(&rdy_major, &rdy_minor, &rdy_patch, &rdy_release));
+
+    // PETSc version
+    PetscInt petsc_major, petsc_minor, petsc_patch, petsc_release;
+    PetscCall(PetscGetVersionNumber(&petsc_major, &petsc_minor, &petsc_patch, &petsc_release));
+
+    // CEED version
+    // FIXME: CeedGetGitVersion() and CeedGetBuildConfiguration() are not available in the
+    // FIXME: version we're currently using, so we can't yet include this information.
+    int  ceed_major, ceed_minor, ceed_patch;
+    bool ceed_release;
+    PetscCallCEED(CeedGetVersion(&ceed_major, &ceed_minor, &ceed_patch, &ceed_release));
+
+    snprintf(build_str, BUILD_STR_LEN,
+             "RDycore version %d.%d.%d (git hash %s)\n"
+             "Petsc version %" PetscInt_FMT ".%" PetscInt_FMT ".%" PetscInt_FMT
+             " (%s)\n"
+             "Ceed version %d.%d.%d (%s)\n",
+             rdy_major, rdy_minor, rdy_patch, RDYCORE_GIT_HASH, petsc_major, petsc_minor, petsc_patch, (petsc_release) ? "release" : "development",
+             ceed_major, ceed_minor, ceed_patch, (ceed_release) ? "release" : "development");
+  }
+  *build_config = build_str;
+#undef BUILD_STR_LEN
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// This allows the Fortran driver to extract build information
+PETSC_EXTERN PetscErrorCode RDyGetBuildConfigurationF90(char build_config[1024]) {
+  PetscFunctionBegin;
+  const char *c_build_config;
+  PetscCall(RDyGetBuildConfiguration(&c_build_config));
+  strncpy(build_config, c_build_config, 1024);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
 PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
