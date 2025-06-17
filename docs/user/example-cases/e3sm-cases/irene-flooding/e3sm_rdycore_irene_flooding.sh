@@ -248,6 +248,7 @@ ln -s $rdycore_data_dir/ic/$rdycore_ic_file  .
 ln -s $rdycore_data_dir/mesh/$rdycore_mesh_file .
 ln -s $rdycore_data_dir/mannings/$rdycore_mannings_file .
 ln -s $elm_data_dir/$m2r_map_file map_MOSART_to_RDycore.bin
+ln -s $elm_data_dir/map*.nc ./
 
 cp $elm_data_dir/map.${elm_delaware_id}.*.nc
 
