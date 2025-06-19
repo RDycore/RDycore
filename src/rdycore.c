@@ -216,7 +216,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscCall(DestroyTimeSeries(*rdy));
 
   // destroy DMs
-  if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
+  if ((*rdy)->output_diag_dm) DMDestroy(&((*rdy)->output_diag_dm));
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 

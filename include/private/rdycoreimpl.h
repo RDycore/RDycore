@@ -85,8 +85,8 @@ struct _p_RDy {
   PetscBool        refine;
 
   // auxiliary DM for diagnostics
-  DM               aux_dm;
-  SectionFieldSpec diag_fields;
+  DM               output_diag_dm;
+  SectionFieldSpec output_diag_fields;
   Vec              diags_vec;
 
   DM               dm_1dof;

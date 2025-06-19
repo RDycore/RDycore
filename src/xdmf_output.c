@@ -143,7 +143,7 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   }
 
   PetscSection section;
-  PetscCall(DMGetLocalSection(rdy->aux_dm, &section));
+  PetscCall(DMGetLocalSection(rdy->output_diag_dm, &section));
 
   // NOTE: at present, all diagnostics are stored as components of a single
   // NOTE: "Diagnostics" field in a global vector (no halo cells)
@@ -218,7 +218,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
   PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->num_refinements));
   if (rdy->config.output.fields_count > 0) {  // diagnostics are written only by request
-    PetscCall(WriteFieldData(rdy->aux_dm, rdy->diags_vec, rdy->config.output, viewer, rdy->num_refinements));
+    PetscCall(WriteFieldData(rdy->output_diag_dm, rdy->diags_vec, rdy->config.output, viewer, rdy->num_refinements));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
@@ -363,7 +363,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   }
 
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
-  PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->aux_dm, &rdy->mesh));
+  PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->output_diag_dm, &rdy->mesh));
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
 

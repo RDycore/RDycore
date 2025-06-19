@@ -1264,7 +1264,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // create the auxiliary DM, which handles requested diagnostics and I/O
   if (rdy->config.output.fields_count > 0) {
-    rdy->diag_fields = (SectionFieldSpec){0};
+    rdy->output_diag_fields = (SectionFieldSpec){0};
     for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
       // a diagnostic field is a requested output field that doesn't belong
       // to the solution vector
@@ -1276,13 +1276,13 @@ PetscErrorCode RDySetup(RDy rdy) {
         }
       }
       if (is_diag_field) {
-        if (!rdy->diag_fields.num_fields) {
-          rdy->diag_fields.num_fields = 1;
-          strcpy(rdy->diag_fields.field_names[0], "Diagnostics");
-          rdy->diag_fields.num_field_components[0] = 0;
+        if (!rdy->output_diag_fields.num_fields) {
+          rdy->output_diag_fields.num_fields = 1;
+          strcpy(rdy->output_diag_fields.field_names[0], "Diagnostics");
+          rdy->output_diag_fields.num_field_components[0] = 0;
         }
-        strcpy(rdy->diag_fields.field_component_names[0][rdy->diag_fields.num_field_components[0]], rdy->config.output.fields[i]);
-        ++rdy->diag_fields.num_field_components[0];
+        strcpy(rdy->output_diag_fields.field_component_names[0][rdy->output_diag_fields.num_field_components[0]], rdy->config.output.fields[i]);
+        ++rdy->output_diag_fields.num_field_components[0];
       }
     }
   }
