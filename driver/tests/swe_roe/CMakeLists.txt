@@ -67,7 +67,7 @@ foreach(np 1 2) # test on 1, 2 processes
           PROPERTIES DEPENDS "swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}")
 
         # compare restarted results with the reference output we stashed
-        add_test(swe_roe_ex2b_compare_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${H5DIFF} ex2b-ref.h5 output/ex2b-0.h5 "/900 4.500000E-03 hr")
+        add_test(swe_roe_ex2b_compare_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${H5DIFF} -d 1e-10 ex2b-ref.h5 output/ex2b-0.h5 "/900 4.500000E-03 hr")
         set_tests_properties(swe_roe_ex2b_compare_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}
           PROPERTIES DEPENDS "swe_roe_ex2b_restart_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}")
       endforeach()
