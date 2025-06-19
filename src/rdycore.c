@@ -78,8 +78,7 @@ PetscErrorCode RDyOnFinalize(void (*shutdown_func)(void)) {
 
 /// Shuts down a process in which RDyInit or RDyInitNotArguments was called.
 /// (Has no effect otherwise.)
-PetscErrorCode RDyFinalize(void) {
-  PetscFunctionBegin;
+PetscInt RDyFinalize(void) {
 
   // Call shutdown functions in reverse order, and destroy the list.
   if (shutdown_funcs_ != NULL) {
@@ -92,7 +91,7 @@ PetscErrorCode RDyFinalize(void) {
   PetscFinalize();
 
   initialized_ = PETSC_FALSE;
-  PetscFunctionReturn(PETSC_SUCCESS);
+  return 0;
 }
 
 /// Returns PETSC_TRUE if the RDyCore library has been initialized, PETSC_FALSE

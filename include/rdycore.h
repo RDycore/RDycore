@@ -16,7 +16,7 @@ typedef struct _p_RDy *RDy;
 PETSC_EXTERN PetscErrorCode RDyInit(int, char *[], const char *);
 PETSC_EXTERN PetscErrorCode RDyInitFortran(void);
 PETSC_EXTERN PetscErrorCode RDyOnFinalize(void (*)(void));
-PETSC_EXTERN PetscErrorCode RDyFinalize(void);
+PETSC_EXTERN PetscInt       RDyFinalize(void);
 PETSC_EXTERN PetscBool      RDyInitialized(void);
 
 // RDycore online configuration
