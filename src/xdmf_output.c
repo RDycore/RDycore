@@ -217,7 +217,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
   PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->num_refinements));
-  if (rdy->config.output.fields_count > 0) {  // diagnostics are written only by request
+  if (rdy->field_diags.num_fields > 0) {  // diagnostics are written only by request
     PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->num_refinements));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
@@ -398,7 +398,9 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
     // write output
     if (write_output) {
       // update diagnostic fields
-      PetscCall(UpdateDiagnosticFields(rdy));
+      if (rdy->field_diags.num_fields > 0) {
+        PetscCall(UpdateDiagnosticFields(rdy));
+      }
 
       // save the time output was written
       output->prev_output_time = time;
