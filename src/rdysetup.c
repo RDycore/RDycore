@@ -1264,7 +1264,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // create the auxiliary DM, which handles requested diagnostics and I/O
   if (rdy->config.output.fields_count > 0) {
-    rdy->field_diags = (SectionFieldSpec){0};
+    rdy->field_diags            = (SectionFieldSpec){0};
     rdy->field_diags.num_fields = 0;
     for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
       // a diagnostic field is a requested output field that doesn't belong
