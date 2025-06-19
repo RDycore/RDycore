@@ -1345,7 +1345,11 @@ PetscErrorCode RDySetup(RDy rdy) {
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data
   if (rdy->config.restart.file[0]) {
+    rdy->is_a_restart_run = PETSC_TRUE;
     PetscCall(ReadCheckpointFile(rdy, rdy->config.restart.file));
+  } else {
+    rdy->is_a_restart_run = PETSC_FALSE;
+    rdy->restart_step     = -1;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

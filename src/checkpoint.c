@@ -84,9 +84,11 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
   rdy->dt    = metadata->dt;
   if (rdy->config.restart.reinitialize) {
     PetscCall(TSSetTime(rdy->ts, 0.0));
+    rdy->restart_step = 0;
   } else {
     PetscCall(TSSetTime(rdy->ts, metadata->t));
     PetscCall(TSSetStepNumber(rdy->ts, metadata->step));
+    rdy->restart_step = metadata->step;
   }
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 

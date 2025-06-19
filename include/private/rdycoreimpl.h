@@ -140,6 +140,12 @@ struct _p_RDy {
   PetscInt num_refinements;
 
   //--------------------------
+  // Restart
+  //--------------------------
+  PetscBool is_a_restart_run;  // is this a restart run?
+  PetscInt  restart_step;
+
+  //--------------------------
   // Solver and solution data
   //--------------------------
 
