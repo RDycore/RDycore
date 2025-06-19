@@ -29,6 +29,10 @@ output:
   batch_size: 20
   time_series:
     boundary_fluxes: 10
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
 
 grid:
   file: planar_dam_10x5.msh
