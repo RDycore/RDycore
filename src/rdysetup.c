@@ -946,7 +946,7 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
   PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
   PetscCall(VecGetBlockSize(rdy->sediment_u_global, &sediment_ndof));
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
-  PetscCall(VecGetBlockSize(rdy->vec_diags, &diags_ndof));
+  PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
 
   PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
              "Blocksize of flow (=%" PetscInt_FMT ") and sediment (=%" PetscInt_FMT ") Vec do not sum to blocksize of solution (=%" PetscInt_FMT
@@ -955,14 +955,14 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
 
   // first, copy flow Vec into solution Vec
   for (PetscInt i = 0; i < flow_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->vec_diags, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->vec_diags, i, rdy->u_global, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_1dof, i, rdy->u_global, INSERT_VALUES));
   }
 
   // next, copy sediment Vec into solution Vec
   for (PetscInt i = 0; i < sediment_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->vec_diags, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->vec_diags, flow_ndof + i, rdy->u_global, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_1dof, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
