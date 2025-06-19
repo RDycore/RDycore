@@ -143,7 +143,7 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   }
 
   PetscSection section;
-  PetscCall(DMGetLocalSection(rdy->output_diag_dm, &section));
+  PetscCall(DMGetLocalSection(rdy->dm_diags, &section));
 
   // NOTE: at present, all diagnostics are stored as components of a single
   // NOTE: "Diagnostics" field in a global vector (no halo cells)
@@ -152,7 +152,7 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   PetscCheck(num_fields == 1, rdy->comm, PETSC_ERR_USER, "Wrong number of diagnostic fields (%" PetscInt_FMT ", should be 1)", num_fields);
 
   PetscInt num_diags;
-  PetscCall(VecGetBlockSize(rdy->diags_vec, &num_diags));
+  PetscCall(VecGetBlockSize(rdy->vec_diags, &num_diags));
 
   // fetch the external source components to be output
   PetscInt *ext_source_comps, num_diags_found = 0;
@@ -175,13 +175,13 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   PetscCall(GetOperatorDomainExternalSource(rdy->operator, & ext_sources));
 
   PetscReal *diag_data;
-  PetscCall(VecGetArrayWrite(rdy->diags_vec, &diag_data));
+  PetscCall(VecGetArrayWrite(rdy->vec_diags, &diag_data));
   for (PetscInt c = 0; c < num_diags; ++c) {
     for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
       diag_data[num_diags * i + c] = ext_sources.values[ext_source_comps[c]][i];
     }
   }
-  PetscCall(VecRestoreArrayWrite(rdy->diags_vec, &diag_data));
+  PetscCall(VecRestoreArrayWrite(rdy->vec_diags, &diag_data));
 
   // put toys away
   PetscCall(PetscFree(ext_source_comps));
@@ -218,7 +218,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
   PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->num_refinements));
   if (rdy->config.output.fields_count > 0) {  // diagnostics are written only by request
-    PetscCall(WriteFieldData(rdy->output_diag_dm, rdy->diags_vec, rdy->config.output, viewer, rdy->num_refinements));
+    PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->num_refinements));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
@@ -363,7 +363,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   }
 
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
-  PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->output_diag_dm, &rdy->mesh));
+  PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm_diags, &rdy->mesh));
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
 

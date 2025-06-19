@@ -500,7 +500,7 @@ PetscErrorCode RDyRefine(RDy rdy) {
 
   // destroy the coarse DMs
   PetscCall(DMDestroy(&rdy->dm));
-  PetscCall(DMDestroy(&rdy->output_diag_dm));
+  PetscCall(DMDestroy(&rdy->dm_diags));
   PetscCall(DMDestroy(&rdy->dm_1dof));
 
   // set the DM to be the refined DM

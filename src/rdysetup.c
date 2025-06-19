@@ -946,7 +946,7 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
   PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
   PetscCall(VecGetBlockSize(rdy->sediment_u_global, &sediment_ndof));
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
-  PetscCall(VecGetBlockSize(rdy->diags_vec, &diags_ndof));
+  PetscCall(VecGetBlockSize(rdy->vec_diags, &diags_ndof));
 
   PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
              "Blocksize of flow (=%" PetscInt_FMT ") and sediment (=%" PetscInt_FMT ") Vec do not sum to blocksize of solution (=%" PetscInt_FMT
@@ -955,14 +955,14 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
 
   // first, copy flow Vec into solution Vec
   for (PetscInt i = 0; i < flow_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->diags_vec, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->diags_vec, i, rdy->u_global, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->vec_diags, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_diags, i, rdy->u_global, INSERT_VALUES));
   }
 
   // next, copy sediment Vec into solution Vec
   for (PetscInt i = 0; i < sediment_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->diags_vec, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->diags_vec, flow_ndof + i, rdy->u_global, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->vec_diags, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_diags, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1264,7 +1264,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // create the auxiliary DM, which handles requested diagnostics and I/O
   if (rdy->config.output.fields_count > 0) {
-    rdy->output_diag_fields = (SectionFieldSpec){0};
+    rdy->field_diags = (SectionFieldSpec){0};
     for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
       // a diagnostic field is a requested output field that doesn't belong
       // to the solution vector
@@ -1276,13 +1276,13 @@ PetscErrorCode RDySetup(RDy rdy) {
         }
       }
       if (is_diag_field) {
-        if (!rdy->output_diag_fields.num_fields) {
-          rdy->output_diag_fields.num_fields = 1;
-          strcpy(rdy->output_diag_fields.field_names[0], "Diagnostics");
-          rdy->output_diag_fields.num_field_components[0] = 0;
+        if (!rdy->field_diags.num_fields) {
+          rdy->field_diags.num_fields = 1;
+          strcpy(rdy->field_diags.field_names[0], "Diagnostics");
+          rdy->field_diags.num_field_components[0] = 0;
         }
-        strcpy(rdy->output_diag_fields.field_component_names[0][rdy->output_diag_fields.num_field_components[0]], rdy->config.output.fields[i]);
-        ++rdy->output_diag_fields.num_field_components[0];
+        strcpy(rdy->field_diags.field_component_names[0][rdy->field_diags.num_field_components[0]], rdy->config.output.fields[i]);
+        ++rdy->field_diags.num_field_components[0];
       }
     }
   }
