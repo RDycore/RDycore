@@ -501,13 +501,14 @@ PetscErrorCode RDyRefine(RDy rdy) {
   // destroy the coarse DMs
   PetscCall(DMDestroy(&rdy->dm));
   PetscCall(DMDestroy(&rdy->aux_dm));
+  PetscCall(DMDestroy(&rdy->dm_1dof));
 
   // set the DM to be the refined DM
   rdy->dm      = dm_fine;
   rdy->flow_dm = rdy->dm;
 
   // create the auxiliary DM
-  PetscCall(CreateAuxiliaryDM(rdy));
+  PetscCall(CreateAuxiliaryDMs(rdy));
 
   // create new refined vectors
   PetscCall(CreateVectors(rdy));

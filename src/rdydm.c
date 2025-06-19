@@ -32,6 +32,7 @@ static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   // Set field and component names
   PetscSection sec;
 
+  printf("fields.num_fields = %d\n", fields.num_fields);
   PetscCall(DMGetLocalSection(dm, &sec));
   for (PetscInt f = 0; f < fields.num_fields; ++f) {
     PetscCall(PetscSectionSetFieldName(sec, f, fields.field_names[f]));
@@ -161,10 +162,11 @@ PetscErrorCode CreateDM(RDy rdy) {
 }
 
 /// This function creates an auxiliary (secondary) DM
-PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
+PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionBegin;
 
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->diag_fields, &rdy->aux_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_1dof, &rdy->dm_1dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -217,6 +219,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   // diagnostics are all piled into a single vector whose block size is the
   // total number of field components
   PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diags_vec));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

@@ -1285,14 +1285,16 @@ PetscErrorCode RDySetup(RDy rdy) {
         ++rdy->diag_fields.num_field_components[0];
       }
     }
-  } else {  // default diagnostics
-    rdy->diag_fields = (SectionFieldSpec){
-        .num_fields           = 1,
-        .num_field_components = {1},
-        .field_names          = {"Parameter"},
-    };
   }
-  PetscCall(CreateAuxiliaryDM(rdy));
+
+  rdy->field_1dof = (SectionFieldSpec){
+      .num_fields           = 1,
+      .num_field_components = {1},
+      .field_names          = {"Parameter"},
+  };
+
+  PetscCall(CreateAuxiliaryDMs(rdy));
+
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));

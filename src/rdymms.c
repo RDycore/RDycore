@@ -210,7 +210,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   for (PetscInt c = 0; c < rdy->diag_fields.num_field_components[0]; ++c) {
     snprintf(rdy->diag_fields.field_component_names[0][c], MAX_NAME_LEN, "%s error", rdy->soln_fields.field_component_names[0][c]);
   }
-  PetscCall(CreateAuxiliaryDM(rdy));
+  PetscCall(CreateAuxiliaryDMs(rdy));
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));

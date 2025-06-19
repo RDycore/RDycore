@@ -143,6 +143,7 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
   if ((*rdy)->diags_vec) PetscCall(VecDestroy(&(*rdy)->diags_vec));
+  if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -216,6 +217,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
 
   // destroy DMs
   if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
+  if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   // destroy config data

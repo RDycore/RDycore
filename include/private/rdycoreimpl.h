@@ -89,6 +89,10 @@ struct _p_RDy {
   SectionFieldSpec diag_fields;
   Vec              diags_vec;
 
+  DM               dm_1dof;
+  SectionFieldSpec field_1dof;
+  Vec              vec_1dof;
+
   // DM for sediment dynamics
   DM               sediment_dm;
   SectionFieldSpec sediment_fields;
