@@ -21,6 +21,12 @@ time:
 output:
   format: xdmf
   output_interval: 100
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+    - WaterSource
+    - MomentumXSource
 
 grid:
   file: DamBreak_grid5x10.exo

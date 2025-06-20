@@ -554,7 +554,7 @@ PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
 
 PetscErrorCode RDyCreateOneDOFGlobalVec(RDy rdy, Vec *global) {
   PetscFunctionBegin;
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, global));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -563,11 +563,11 @@ PetscErrorCode RDyWriteOneDOFGlobalVecToBinaryFile(RDy rdy, const char filename[
 
   // create a naturally-ordered vector with a stride equal to the number of
   Vec natural;
-  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+  PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
 
   // scatter global-to-natural
-  PetscCall(DMPlexGlobalToNaturalBegin(rdy->aux_dm, *global, natural));
-  PetscCall(DMPlexGlobalToNaturalEnd(rdy->aux_dm, *global, natural));
+  PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm_1dof, *global, natural));
+  PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm_1dof, *global, natural));
 
   // write the data to file
   PetscViewer viewer;
@@ -591,16 +591,16 @@ PetscErrorCode RDyReadOneDOFGlobalVecFromBinaryFile(RDy rdy, const char filename
   // create a naturally-ordered vector with a stride equal to the number of
   Vec natural;
 
-  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, global));
+  PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, global));
 
   // load the properties into the vector and copy them into place
   PetscCall(VecLoad(natural, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
 
   // scatter natural-to-global
-  PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, *global));
-  PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, *global));
 
   PetscCall(VecDestroy(&natural));
 
@@ -614,11 +614,11 @@ PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char filename[
   Vec global;
   PetscCall(RDyReadOneDOFGlobalVecFromBinaryFile(rdy, filename, &global));
 
-  PetscCall(DMCreateLocalVector(rdy->aux_dm, local));
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, local));
 
   // scatter global-to-local
-  PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, *local));
-  PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, *local));
 
   PetscCall(VecDestroy(&global));
 

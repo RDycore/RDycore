@@ -202,15 +202,15 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which contains error fields for each of the solution fields
-  rdy->diag_fields = (SectionFieldSpec){
+  rdy->field_diags = (SectionFieldSpec){
       .num_fields           = 1,
       .num_field_components = {rdy->soln_fields.num_field_components[0]},
       .field_names          = {"Error"},
   };
-  for (PetscInt c = 0; c < rdy->diag_fields.num_field_components[0]; ++c) {
-    snprintf(rdy->diag_fields.field_component_names[0][c], MAX_NAME_LEN, "%s error", rdy->soln_fields.field_component_names[0][c]);
+  for (PetscInt c = 0; c < rdy->field_diags.num_field_components[0]; ++c) {
+    snprintf(rdy->field_diags.field_component_names[0][c], MAX_NAME_LEN, "%s error", rdy->soln_fields.field_component_names[0][c]);
   }
-  PetscCall(CreateAuxiliaryDM(rdy));
+  PetscCall(CreateAuxiliaryDMs(rdy));
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));

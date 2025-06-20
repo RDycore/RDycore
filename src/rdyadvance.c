@@ -248,6 +248,13 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     RDyLogDebug(rdy, "Running simulation...");
   }
 
+  if (rdy->is_a_restart_run && rdy->restart_step == step) {
+    PetscCall(CreateOutputDirectory(rdy));
+
+    // create a viewer with the proper format for visualization output
+    PetscCall(CreateOutputViewer(rdy));
+  }
+
   if (rdy->mesh_was_refined) {
     // create a viewer with the proper format for visualization output
     PetscCall(CreateOutputViewer(rdy));

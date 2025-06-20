@@ -85,9 +85,13 @@ struct _p_RDy {
   PetscBool        refine;
 
   // auxiliary DM for diagnostics
-  DM               aux_dm;
-  SectionFieldSpec diag_fields;
-  Vec              diags_vec;
+  DM               dm_diags;
+  SectionFieldSpec field_diags;
+  Vec              vec_diags;
+
+  DM               dm_1dof;
+  SectionFieldSpec field_1dof;
+  Vec              vec_1dof;
 
   // DM for sediment dynamics
   DM               sediment_dm;
@@ -134,6 +138,12 @@ struct _p_RDy {
 
   // number of times the mesh has been refined
   PetscInt num_refinements;
+
+  //--------------------------
+  // Restart
+  //--------------------------
+  PetscBool is_a_restart_run;  // is this a restart run?
+  PetscInt  restart_step;
 
   //--------------------------
   // Solver and solution data
