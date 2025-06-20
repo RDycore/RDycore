@@ -120,6 +120,7 @@ static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
   PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "nproc", PETSC_INT, NULL, &rdy->nproc));
   if (rdy->config.restart.reinitialize) {
     PetscCall(TSSetTime(rdy->ts, 0.0));
+    rdy->restart_step = 0;
   } else {
     PetscReal t;
     PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "t", PETSC_DOUBLE, NULL, &t));
@@ -127,6 +128,7 @@ static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
     PetscInt step;
     PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "step", PETSC_INT, NULL, &step));
     PetscCall(TSSetStepNumber(rdy->ts, step));
+    rdy->restart_step = step;
   }
   PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "dt", PETSC_DOUBLE, NULL, &rdy->dt));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
