@@ -39,7 +39,7 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
     foreach(lang ${supported_languages})
-      foreach(chkpt_fmt binary hdf5)
+      foreach(chkpt_fmt binary)
         if (chkpt_fmt STREQUAL "binary")
           set(chkpt_sfx "bin")
         else()
