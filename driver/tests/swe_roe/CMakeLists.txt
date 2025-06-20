@@ -11,19 +11,6 @@ set(mms_c_driver ${mms_driver})
 set(ceed_args -ceed /cpu/self)
 set(preload_args -preload)
 
-# basic ex2b test
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2) # test on 1, 2 processes
-  foreach(config basic ceed preload)
-    foreach(lang ${supported_languages})
-      foreach(chkpt_fmt binary hdf5)
-        add_test(swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -checkpoint_format ${chkpt_fmt})
-      endforeach()
-    endforeach()
-  endforeach()
-endforeach()
-
 # Dirichlet BC test
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_dirichlet_bc.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -47,6 +34,8 @@ foreach(np 1 2) # test on 1, 2 processes
 endforeach()
 
 # Checkpoint/restart tests
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
     foreach(lang ${supported_languages})
@@ -56,8 +45,12 @@ foreach(np 1 2) # test on 1, 2 processes
         else()
           set(chkpt_sfx "h5")
         endif()
+
+        # run the original simulation
+        add_test(swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -checkpoint_format ${chkpt_fmt})
+
         # stash the original ex2b simulation's final HDF5 output
-        add_test(swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
+        add_test(swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} mv output/ex2b-0.h5 ex2b-ref.h5)
         set_tests_properties(swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}
           PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}")
 
