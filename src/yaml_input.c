@@ -230,6 +230,47 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+// --------------------
+// observations section
+// --------------------
+// observations:
+//   sites:
+//     cells: [0, 1, 2, 3, 4, 5, 6]
+//   quantities:
+//     - Height
+//     - MomentumX
+//     - MomentumY
+//   time_sampling:
+//     instantaneous: true
+
+static const cyaml_schema_value_t observations_sites_cell_entry = {
+	CYAML_VALUE_INT(CYAML_FLAG_DEFAULT, int),
+};
+
+// mapping of sites fields to members of RDyObservationSites
+static const cyaml_schema_field_t observations_sites_fields_schema[] = {
+    CYAML_FIELD_SEQUENCE("cells", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyObservationSites, cells, &observations_sites_cell_entry, 0, CYAML_UNLIMITED),
+    CYAML_FIELD_END
+};
+
+static const cyaml_schema_value_t observations_quantity_entry = {
+	CYAML_VALUE_INT(CYAML_FLAG_DEFAULT, int),
+};
+
+// mapping of sites fields to members of RDyObservationSites
+static const cyaml_schema_field_t observations_time_sampling_fields_schema[] = {
+    CYAML_FIELD_BOOL("instantaneous", CYAML_FLAG_OPTIONAL, RDyObservationTimeSampling, instantaneous),
+    CYAML_FIELD_END
+};
+
+// mapping of observation fields to members of RDyObservationsSection
+static const cyaml_schema_field_t observations_fields_schema[] = {
+    CYAML_FIELD_MAPPING("sites", CYAML_FLAG_DEFAULT, RDyObservationsSection, sites, observations_sites_fields_schema),
+    CYAML_FIELD_SEQUENCE("quantities", CYAML_FLAG_DEFAULT, RDyObservationsSection, quantities, &observations_quantity_entry, 0, CYAML_UNLIMITED),
+    CYAML_FIELD_MAPPING("time_sampling", CYAML_FLAG_DEFAULT, RDyObservationsSection, time_sampling, observations_time_sampling_fields_schema),
+    CYAML_FIELD_END
+};
+
 // ---------------
 // output section
 // ---------------
@@ -683,6 +724,7 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("logging", CYAML_FLAG_OPTIONAL, RDyConfig, logging, logging_fields_schema),
     CYAML_FIELD_MAPPING("checkpoint", CYAML_FLAG_OPTIONAL, RDyConfig, checkpoint, checkpoint_fields_schema),
     CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
+    CYAML_FIELD_MAPPING("observations", CYAML_FLAG_OPTIONAL, RDyConfig, observations, observations_fields_schema),
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, num_material_assignments, &surface_composition_entry, 0, MAX_NUM_REGIONS),
