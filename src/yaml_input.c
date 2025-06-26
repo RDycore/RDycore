@@ -230,18 +230,28 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// --------------------
-// observations section
-// --------------------
-// observations:
-//   sites:
-//     cells: [0, 1, 2, 3, 4, 5, 6]
-//   quantities:
-//     - Height
-//     - MomentumX
-//     - MomentumY
-//   time_sampling:
-//     instantaneous: true
+// ---------------
+// output section
+// ---------------
+// output:
+//   directory: <output-directory>
+//   fields: <list-of-output-fields>
+//   format: <binary|xdmf|cgns>
+//   output_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
+//   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
+//   separate_grid_file: <true|false>
+//   time_series:
+//     boundary_fluxes: <number-of-steps-between-flux-dumps>
+//     observations:
+//       sites:
+//         cells: [0, 1, 2, 3, 4, 5, 6]
+//       quantities:
+//         - Height
+//         - MomentumX
+//         - MomentumY
+//       time_sampling:
+//         instantaneous: true
+
 
 static const cyaml_schema_value_t observations_sites_cell_entry = {
 	CYAML_VALUE_INT(CYAML_FLAG_DEFAULT, int),
@@ -271,19 +281,6 @@ static const cyaml_schema_field_t observations_fields_schema[] = {
     CYAML_FIELD_END
 };
 
-// ---------------
-// output section
-// ---------------
-// output:
-//   directory: <output-directory>
-//   fields: <list-of-output-fields>
-//   format: <binary|xdmf|cgns>
-//   output_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
-//   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
-//   time_series:
-//     boundary_fluxes: <number-of-steps-between-flux-dumps>
-//   separate_grid_file: <true|false>
-
 // mapping of strings to file formats
 static const cyaml_strval_t output_file_formats[] = {
     {"none",   OUTPUT_NONE},
@@ -300,6 +297,7 @@ static const cyaml_schema_value_t output_field_schema = {
 // mapping of time_series fields to members of RDyTimeSeries
 static const cyaml_schema_field_t output_time_series_fields_schema[] = {
     CYAML_FIELD_INT("boundary_fluxes", CYAML_FLAG_DEFAULT, RDyTimeSeries, boundary_fluxes),
+    CYAML_FIELD_MAPPING("observations", CYAML_FLAG_OPTIONAL, RDyTimeSeries, observations, observations_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -313,8 +311,8 @@ static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
-    CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_BOOL("separate_grid_file", CYAML_FLAG_OPTIONAL, RDyOutputSection, separate_grid_file),
+    CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -724,7 +722,6 @@ static const cyaml_schema_field_t config_fields_schema[] = {
     CYAML_FIELD_MAPPING("logging", CYAML_FLAG_OPTIONAL, RDyConfig, logging, logging_fields_schema),
     CYAML_FIELD_MAPPING("checkpoint", CYAML_FLAG_OPTIONAL, RDyConfig, checkpoint, checkpoint_fields_schema),
     CYAML_FIELD_MAPPING("restart", CYAML_FLAG_OPTIONAL, RDyConfig, restart, restart_fields_schema),
-    CYAML_FIELD_MAPPING("observations", CYAML_FLAG_OPTIONAL, RDyConfig, observations, observations_fields_schema),
     CYAML_FIELD_MAPPING("output", CYAML_FLAG_OPTIONAL, RDyConfig, output, output_fields_schema),
     CYAML_FIELD_MAPPING("grid", CYAML_FLAG_DEFAULT, RDyConfig, grid, grid_fields_schema),
     CYAML_FIELD_SEQUENCE_COUNT("surface_composition", CYAML_FLAG_DEFAULT, RDyConfig, surface_composition, num_material_assignments, &surface_composition_entry, 0, MAX_NUM_REGIONS),

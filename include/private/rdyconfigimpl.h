@@ -157,10 +157,14 @@ typedef struct {
   PetscBool reinitialize;              // PETSC_TRUE resets simulation time to 0
 } RDyRestartSection;
 
-// --------------------
-// observations section
-// --------------------
+// --------------
+// output section
+// --------------
 
+// output file formats
+typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
+
+// observations
 typedef struct {
   int     *cells;
   PetscInt cells_count;
@@ -171,22 +175,17 @@ typedef struct {
 } RDyObservationTimeSampling;
 
 typedef struct {
+  PetscInt                   interval;
   RDyObservationSites        sites;
   const char               **quantities;
   PetscInt                   quantities_count;
   RDyObservationTimeSampling time_sampling;
 } RDyObservationsSection;
 
-// --------------
-// output section
-// --------------
-
-// output file formats
-typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
-
 // time series output interval parameters appended to files
 typedef struct {
-  PetscInt boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+  PetscInt               boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+  RDyObservationsSection observations;
 } RDyTimeSeries;
 
 // all output parameters
@@ -375,11 +374,10 @@ typedef struct {
   RDyNumericsSection numerics;
   RDyTimeSection     time;
 
-  RDyLoggingSection      logging;
-  RDyCheckpointSection   checkpoint;
-  RDyRestartSection      restart;
-  RDyObservationsSection observations;
-  RDyOutputSection       output;
+  RDyLoggingSection    logging;
+  RDyCheckpointSection checkpoint;
+  RDyRestartSection    restart;
+  RDyOutputSection     output;
 
   RDyGridSection grid;
 

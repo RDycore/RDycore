@@ -36,8 +36,6 @@ broad categories:
       files or to the terminal
     * [output](input.md#output): configures simulation output, including
       scalable I/O formats and related parameters
-    * [observations](input.md#observations): configures observation points that
-      can report instantaneous or time-averaged quantities
     * [checkpoint](input.md#checkpoint): configures simulation checkpoint
       files, which are used for restarts
     * [restart](input.md#restart): configures whether a simulation is restarted
@@ -398,55 +396,6 @@ RDycore. The parameters that define these discretizations are
   water equations. Can be `roe` for the Roe solver or `hllc` for the HLLC solver.
   Currently, only `roe` is implemented. Default value: `roe`
 
-## `observations`
-
-```yaml
-observations:
-  sites:
-    cells: [0, 1, 2, 3, 4, 5, 6]
-  quantities:
-    - Height
-    - MomentumX
-    - MomentumY
-  time_sampling:
-    instantaneous: true
-```
-
-The `observations` section allows the specification of **observation sites**:
-points in space at which desired quantities are sampled and possible averaged.
-Parameters include:
-
-* `sites`: the mechanism by which observation sites are specified. There
-  are two ways to specify observation sites:
-    * `cells`: accepts a list of global cell IDs within the mesh, defining an
-      observation site at the center of each given cell.
-    * `file`: accepts a text file specifying *natural cell IDs* in the line-
-      oriented format described below.
-* `quantities`: a list of quantities to be sampled at each observation site.
-  Available options are
-    * `Height`: water height $h$
-    * `MomentumX`: $x$ momentum $hu$
-    * `MomentumY`: $y$ velocity $hv$
-* `sampling`: the method by which each quantity is sampled at each observation
-  site.
-    * `instantaneous` (`false` by default) can be set to `true` to sample
-      instantaneous values of the desired quantities at each site.
-    * Time averaging is not yet supported, but we plan to add an `averaged`
-      parameter in the future.
-
-When specifying observation sites in a text file, use the following format:
-
-```
-number_of_observation_cells
-<natural_cell_id_0>
-<natural_cell_id_1>
-<natural_cell_id_2>
-...
-<natural_cell_id_N>
-```
-
-When using the RDycore driver, output is written to a tab-delimited text file.
-
 ## `output`
 
 ```yaml
@@ -460,9 +409,18 @@ output:
   format: xdmf
   output_interval: 100
   batch_size: 1
+  separate_grid_file: true
   time_series:
     boundary_fluxes: 10
-  separate_grid_file: true
+    observations:
+      sites:
+        cells: [0, 1, 2, 3, 4, 5, 6]
+      quantities:
+        - Height
+        - MomentumX
+        - MomentumY
+      time_sampling:
+        instantaneous: true
 ```
 
 The `output` section controls simulation output, including visualization and
@@ -496,14 +454,43 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
 * `batch_size`: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1
-* `time_series`: this subsection controls time series simulation output, which
-  is useful for inspection and possibly even coupling. Currently, this subsection
-  has only one parameter:
-    * `boundary_fluxes`: the interval (number of timesteps) at which boundary
-      flux data is appended to a tab-delimited text file
 * `separate_grid_file`: this optional parameter specifies whether the grid is
   written to its own file, which saves space in very large simulations. Currently,
   this option is only supported for `xdmf` output.
+* `time_series`: this subsection controls time series simulation output, which
+  is useful for inspection and possibly even coupling. Parameters:
+    * `boundary_fluxes`: the interval (number of timesteps) at which boundary
+      flux data is appended to a tab-delimited text file
+    * `observations`: allows the specification of **observation sites**: points in space at which
+      desired quantities are sampled and possible averaged. When using the RDycore driver,
+      observations are written to a tab-delimited text file. Parameters include:
+        * `sites`: the mechanism by which observation sites are specified. There
+          are two ways to specify observation sites:
+            * `cells`: accepts a list of global cell IDs within the mesh, defining an
+              observation site at the center of each given cell.
+            * `file`: accepts a text file specifying *natural cell IDs* in the line-
+              oriented format described below.
+        * `quantities`: a list of quantities to be sampled at each observation site.
+          Available options are
+            * `Height`: water height $h$
+            * `MomentumX`: $x$ momentum $hu$
+            * `MomentumY`: $y$ velocity $hv$
+        * `sampling`: the method by which each quantity is sampled at each observation site.
+            * `instantaneous` (`false` by default) can be set to `true` to sample instantaneous
+              values of the desired quantities at each site.
+            * Time averaging is not yet supported, but we plan to add an `averaged` parameter in
+              the future.
+
+When specifying observation sites in a text file, use the following format:
+
+```
+number_of_observation_cells
+<natural_cell_id_0>
+<natural_cell_id_1>
+<natural_cell_id_2>
+...
+<natural_cell_id_N>
+```
 
 ## `physics`
 

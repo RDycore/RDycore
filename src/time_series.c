@@ -65,6 +65,8 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
+  rdy->time_series.boundary_fluxes.last_step = -1;
+
   // allocate per-boundary flux offsets
   PetscCall(PetscCalloc1(rdy->num_boundaries + 1, &(rdy->time_series.boundary_fluxes.offsets)));
 
@@ -113,13 +115,47 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode InitObservations(RDy rdy) {
+  PetscFunctionBegin;
+
+  // set up a vector scatter operation to copy globally indexed observation site data to each local process
+  PetscInt num_comp;
+  PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
+  PetscInt *global_site_indices, *local_site_indices;
+  PetscInt  num_sites = rdy->config.output.time_series.observations.sites.cells_count;
+  PetscCall(PetscCalloc1(num_comp * num_sites, &global_site_indices));
+  PetscCall(PetscCalloc1(num_comp * num_sites, &local_site_indices));
+  for (PetscInt i = 0; i < num_sites; ++i) {
+    for (PetscInt c = 0; c < num_comp; ++c) {
+      global_site_indices[num_comp * i + c] = (PetscInt)rdy->config.output.time_series.observations.sites.cells[num_comp * i + c];
+    }
+  }
+
+  IS                     global_sites, local_sites;
+  ISLocalToGlobalMapping map;
+  PetscCall(DMGetLocalToGlobalMapping(rdy->dm, &map));
+  PetscCall(ISGlobalToLocalMappingApply(map, IS_GTOLM_DROP, num_comp * num_sites, global_site_indices, NULL, local_site_indices));
+  PetscCall(ISCreateGeneral(rdy->comm, num_comp * num_sites, global_site_indices, PETSC_OWN_POINTER, &global_sites));
+  PetscCall(ISCreateGeneral(rdy->comm, num_comp * num_sites, local_site_indices, PETSC_OWN_POINTER, &local_sites));
+  PetscCall(VecScatterCreate(rdy->u_global, global_sites, rdy->time_series.observations.u_sites, local_sites,
+                             &rdy->time_series.observations.scatter_sites));
+  PetscCall(ISDestroy(&global_sites));
+  PetscCall(ISDestroy(&local_sites));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Initializes time series data storage.
 PetscErrorCode InitTimeSeries(RDy rdy) {
   PetscFunctionBegin;
-  rdy->time_series           = (RDyTimeSeriesData){0};
-  rdy->time_series.last_step = -1;
+  rdy->time_series = (RDyTimeSeriesData){0};
   if (rdy->config.output.time_series.boundary_fluxes > 0) {
     InitBoundaryFluxes(rdy);
+  }
+  if (rdy->config.output.time_series.observations.interval > 0) {
+    InitObservations(rdy);
+  }
+  if (rdy->config.output.time_series.boundary_fluxes > 0 || rdy->config.output.time_series.observations.interval > 0) {
     PetscCall(TSMonitorSet(rdy->ts, WriteTimeSeries, rdy, NULL));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -254,12 +290,34 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) {
+  PetscFunctionBegin;
+
+  // FIXME:
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This monitoring function writes out all requested time series data.
 PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
 
   RDy rdy = ctx;
-  if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
+
+  // observations
+  int observations_interval = rdy->config.output.time_series.observations.interval;
+  if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series.observations.last_step)) {
+    // scatter site data from the global solution vector to our local sites vector
+    PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_sites, rdy->u_global, rdy->time_series.observations.u_sites, INSERT_VALUES,
+                              SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_sites, rdy->u_global, rdy->time_series.observations.u_sites, INSERT_VALUES,
+                            SCATTER_FORWARD));
+    PetscCall(WriteObservations(rdy, step, time));
+  }
+
+  // boundary fluxes
+  int boundary_flux_interval = rdy->config.output.time_series.boundary_fluxes;
+  if ((step % boundary_flux_interval == 0) && (step > rdy->time_series.boundary_fluxes.last_step)) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       RDyBoundary boundary = rdy->boundaries[b];
 
@@ -269,7 +327,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
       PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
-    rdy->time_series.last_step = step;
+    rdy->time_series.boundary_fluxes.last_step = step;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

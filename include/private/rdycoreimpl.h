@@ -22,8 +22,6 @@ PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {
-  // last step for which time series data was written
-  PetscInt last_step;
   // fluxes on boundary edges
   struct {
     // per-process numbers of local boundary edges on which fluxes are accumulated
@@ -40,7 +38,20 @@ typedef struct {
       PetscReal x_momentum;
       PetscReal y_momentum;
     } * fluxes;
+
+    // last step for which boundary flux time series data was written
+    PetscInt last_step;
   } boundary_fluxes;
+
+  // observations recorded at specific sites
+  struct {
+    // serial vector containing observation sites on local process
+    Vec u_sites;
+    // VecScatter governing observation site vector scatters
+    VecScatter scatter_sites;
+    // last step for which observations data was written
+    PetscInt last_step;
+  } observations;
 } RDyTimeSeriesData;
 
 // This type serves as a "virtual table" containing function pointers that
