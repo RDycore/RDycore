@@ -53,9 +53,19 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
 
   CeedQFunctionContext qf_context;
-  if (num_sediment_comp == 0) {  // flow only, and SWE is it!
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
-    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  if (num_sediment_comp == 0) {  
+    switch (config.numerics.riemann) {  //add
+     case RIEMANN_ROE:  //add
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
+      break; //add
+     case RIEMANN_HLL: //add
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HLL, SWEFlux_HLL_loc, qf)); //add
+      break; //add
+    default://add
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE,
+              "Unknown Riemann solver type for SWE");//add
+      }
+      PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
   } else {
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentFlux_Roe, SedimentFlux_Roe_loc, qf));
     PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
