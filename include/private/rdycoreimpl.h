@@ -45,10 +45,14 @@ typedef struct {
 
   // observations recorded at specific sites
   struct {
-    // serial vector containing observation sites on local process
-    Vec u_sites;
-    // VecScatter governing observation site vector scatters
-    VecScatter scatter_sites;
+    struct {
+      // fixed x, y, z coordinates of observation sites
+      PetscReal *x, *y, *z;
+      // serial vector containing observation sites on local process
+      Vec u;
+    } sites;
+    // VecScatter governing observation site vector scatter
+    VecScatter scatter_u;
     // last step for which observations data was written
     PetscInt last_step;
   } observations;

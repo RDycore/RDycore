@@ -118,30 +118,58 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 static PetscErrorCode InitObservations(RDy rdy) {
   PetscFunctionBegin;
 
-  // set up a vector on rank 0 to store instantaneous observations
-  PetscInt num_sites = rdy->config.output.time_series.observations.sites.cells_count;
-  PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_sites, &rdy->time_series.observations.u_sites));
+  // first, convert the site (cell) indices from natural to global order
+  // FIXME: look into application orderings?
+  Vec natural, global, local;
+  PetscCall(DMPlexCreateNaturalVector(rdy->flow_dm, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->flow_dm, &global));
+  PetscCall(DMCreateLocalVector(rdy->flow_dm, &local));
 
-  // set up a vector scatter operation to send globally indexed observation site data to our rank 0 vector
-  PetscInt num_comp;
-  PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
-  PetscInt *global_site_indices, *local_site_indices;
-  PetscCall(PetscCalloc1(num_comp * num_sites, &global_site_indices));
-  PetscCall(PetscCalloc1(num_comp * num_sites, &local_site_indices));
+  PetscInt num_sites  = rdy->config.output.time_series.observations.sites.cells_count;
+  int     *site_cells = rdy->config.output.time_series.observations.sites.cells;
   for (PetscInt i = 0; i < num_sites; ++i) {
-    for (PetscInt c = 0; c < num_comp; ++c) {
-      global_site_indices[num_comp * i + c] = (PetscInt)rdy->config.output.time_series.observations.sites.cells[num_comp * i + c];
-      local_site_indices[num_comp * i + c]  = num_comp * i + c;
-    }
+    PetscInt natural_id = (PetscInt)site_cells[i];
   }
 
-  IS global_sites, local_sites;
-  PetscCall(ISCreateGeneral(rdy->comm, num_comp * num_sites, global_site_indices, PETSC_OWN_POINTER, &global_sites));
-  PetscCall(ISCreateGeneral(rdy->comm, num_comp * num_sites, local_site_indices, PETSC_OWN_POINTER, &local_sites));
-  PetscCall(VecScatterCreate(rdy->u_global, global_sites, rdy->time_series.observations.u_sites, local_sites,
-                             &rdy->time_series.observations.scatter_sites));
-  PetscCall(ISDestroy(&global_sites));
-  PetscCall(ISDestroy(&local_sites));
+  // extract site (x, y) coordinates using the natural indices provided
+  PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.x));
+  PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
+  PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
+  const PetscReal *xc, *yc, *zc;
+  PetscCall(VecGetArrayRead(rdy->mesh.output.xc, &xc));
+  PetscCall(VecGetArrayRead(rdy->mesh.output.yc, &yc));
+  PetscCall(VecGetArrayRead(rdy->mesh.output.zc, &zc));
+  for (PetscInt i = 0; i < num_sites; ++i) {
+    rdy->time_series.observations.sites.x[i] = xc[site_cells[i]];
+    rdy->time_series.observations.sites.y[i] = yc[site_cells[i]];
+    rdy->time_series.observations.sites.z[i] = zc[site_cells[i]];
+  }
+
+  // set up a vector on rank 0 to store instantaneous observations
+  PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_sites, &rdy->time_series.observations.sites.u));
+
+  // set up a vector scatter operation to send globally indexed observation site data to our rank 0 vector
+  {
+    PetscInt num_comp;
+    PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
+    PetscInt *global_site_indices, *local_site_indices;
+    PetscCall(PetscCalloc1(num_comp * num_sites, &global_site_indices));
+    PetscCall(PetscCalloc1(num_comp * num_sites, &local_site_indices));
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      for (PetscInt c = 0; c < num_comp; ++c) {
+        global_site_indices[num_comp * i + c] = (PetscInt)rdy->config.output.time_series.observations.sites.cells[num_comp * i + c];
+        local_site_indices[num_comp * i + c]  = num_comp * i + c;
+      }
+    }
+
+    IS global_sites, local_sites;
+    PetscCall(ISCreateGeneral(rdy->comm, num_comp * num_sites, global_site_indices, PETSC_OWN_POINTER, &global_sites));
+    PetscCall(ISCreateGeneral(rdy->comm, num_comp * num_sites, local_site_indices, PETSC_OWN_POINTER, &local_sites));
+    PetscCall(VecScatterCreate(rdy->u_global, global_sites, rdy->time_series.observations.sites.u, local_sites,
+          &rdy->time_series.observations.scatter_u));
+    PetscCall(ISDestroy(&global_sites));
+    PetscCall(ISDestroy(&local_sites));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -313,15 +341,15 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
     PetscCall(VecGetSize(rdy->u_global, &num_sites));
     PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
     const PetscReal *values;
-    PetscCall(VecGetArrayRead(rdy->time_series.observations.u_sites, &values));
+    PetscCall(VecGetArrayRead(rdy->time_series.observations.sites.u, &values));
     for (PetscInt i = 0; i < num_sites; ++i) {
-      PetscReal x = 0.0;  // FIXME:
-      PetscReal y = 0.0;  // FIXME:
+      PetscReal x = rdy->time_series.observations.sites.x[i];
+      PetscReal y = rdy->time_series.observations.sites.y[i];
       for (PetscInt c = 0; c < num_comp; ++c) {
         PetscReal   value = values[num_comp * i + c];
         const char *name  = rdy->config.output.time_series.observations.quantities[c];
         PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "%e\t%f\t%f\t%s\t%e\n", time, x, y, name, value));
-        PetscCall(VecRestoreArrayRead(rdy->time_series.observations.u_sites, &values));
+        PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
       }
     }
   }
@@ -339,9 +367,9 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   int observations_interval = rdy->config.output.time_series.observations.interval;
   if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series.observations.last_step)) {
     // scatter site data from the global solution vector to our local sites vector
-    PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_sites, rdy->u_global, rdy->time_series.observations.u_sites, INSERT_VALUES,
+    PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_sites, rdy->u_global, rdy->time_series.observations.sites.u, INSERT_VALUES,
                               SCATTER_FORWARD));
-    PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_sites, rdy->u_global, rdy->time_series.observations.u_sites, INSERT_VALUES,
+    PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_sites, rdy->u_global, rdy->time_series.observations.sites.u, INSERT_VALUES,
                             SCATTER_FORWARD));
     PetscCall(WriteObservations(rdy, step, time));
   }
@@ -372,6 +400,13 @@ PetscErrorCode DestroyTimeSeries(RDy rdy) {
     PetscFree(rdy->time_series.boundary_fluxes.global_flux_md);
     PetscFree(rdy->time_series.boundary_fluxes.offsets);
     PetscFree(rdy->time_series.boundary_fluxes.fluxes);
+  }
+  if (rdy->time_series.observations.sites.x) {
+    PetscFree(rdy->time_series.observations.sites.x);
+    PetscFree(rdy->time_series.observations.sites.y);
+    PetscFree(rdy->time_series.observations.sites.z);
+    PetscCall(VecDestroy(&rdy->time_series.observations.sites.u));
+    PetscCall(VecScatterDestroy(&rdy->time_series.observations.scatter_sites));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
