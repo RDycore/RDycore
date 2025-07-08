@@ -413,6 +413,7 @@ output:
   time_series:
     boundary_fluxes: 10
     observations:
+      interval: 10
       sites:
         cells: [0, 1, 2, 3, 4, 5, 6]
       quantities:
@@ -464,12 +465,13 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
     * `observations`: allows the specification of **observation sites**: points in space at which
       desired quantities are sampled and possible averaged. When using the RDycore driver,
       observations are written to a tab-delimited text file. Parameters include:
+        * `interval`: the number of steps between recorded observations
         * `sites`: the mechanism by which observation sites are specified. There
           are two ways to specify observation sites:
-            * `cells`: accepts a list of global cell IDs within the mesh, defining an
+            * `cells`: accepts a list of **natural cell IDs** within the mesh, defining an
               observation site at the center of each given cell.
-            * `file`: accepts a text file specifying *natural cell IDs* in the line-
-              oriented format described below.
+            * `file`: accepts a text file specifying **natural cell IDs** in the line-oriented
+              format described below.
         * `quantities`: a list of quantities to be sampled at each observation site.
           Available options are
             * `Height`: water height $h$

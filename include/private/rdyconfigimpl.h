@@ -166,8 +166,8 @@ typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOut
 
 // observations
 typedef struct {
-  int     *cells;
-  PetscInt cells_count;
+  PetscInt *cells;
+  PetscInt  cells_count;
 } RDyObservationSites;
 
 typedef struct {

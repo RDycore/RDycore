@@ -46,9 +46,11 @@ typedef struct {
   // observations recorded at specific sites
   struct {
     struct {
+      // global indices corresponding to observation site natural cell indices in input
+      PetscInt *global_indices;
       // fixed x, y, z coordinates of observation sites
       PetscReal *x, *y, *z;
-      // serial vector containing observation sites on local process
+      // serial vector containing data for all observation sites on process 0
       Vec u;
     } sites;
     // VecScatter governing observation site vector scatter

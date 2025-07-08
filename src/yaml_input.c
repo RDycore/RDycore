@@ -243,6 +243,7 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 //   time_series:
 //     boundary_fluxes: <number-of-steps-between-flux-dumps>
 //     observations:
+//       interval: 10
 //       sites:
 //         cells: [0, 1, 2, 3, 4, 5, 6]
 //       quantities:
@@ -275,6 +276,7 @@ static const cyaml_schema_field_t observations_time_sampling_fields_schema[] = {
 
 // mapping of observation fields to members of RDyObservationsSection
 static const cyaml_schema_field_t observations_fields_schema[] = {
+    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyObservationsSection, interval),
     CYAML_FIELD_MAPPING("sites", CYAML_FLAG_DEFAULT, RDyObservationsSection, sites, observations_sites_fields_schema),
     CYAML_FIELD_SEQUENCE("quantities", CYAML_FLAG_DEFAULT, RDyObservationsSection, quantities, &observations_quantity_entry, 0, CYAML_UNLIMITED),
     CYAML_FIELD_MAPPING("time_sampling", CYAML_FLAG_DEFAULT, RDyObservationsSection, time_sampling, observations_time_sampling_fields_schema),
