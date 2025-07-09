@@ -177,8 +177,6 @@ typedef struct {
 typedef struct {
   PetscInt                   interval;
   RDyObservationSites        sites;
-  const char               **quantities;
-  PetscInt                   quantities_count;
   RDyObservationTimeSampling time_sampling;
 } RDyObservationsSection;
 

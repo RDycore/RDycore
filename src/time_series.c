@@ -118,6 +118,12 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 static PetscErrorCode InitObservations(RDy rdy) {
   PetscFunctionBegin;
 
+  // create an accumulation vector for storing instantaneous or time-averaged solution data
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->time_series.observations.accum_u));
+
+  // Set up a VectorScatter that transmits solution data from the accumulation vector to a
+  // sequential vector on rank 0, from which it can be output as recorded observations.
+
   // First, we convert the site (cell) indices from natural to global order to match the ordering
   // of the solution vector.
 
@@ -364,6 +370,12 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
 static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
+  // scatter the accumulation vector to the sites vector on rank 0
+  PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+                            INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+                          INSERT_VALUES, SCATTER_FORWARD));
+
   if (rdy->rank == 0) {
     // open the file in the appropriate writing mode
     char output_dir[PETSC_MAX_PATH_LEN], prefix[PETSC_MAX_PATH_LEN], path[PETSC_MAX_PATH_LEN];
@@ -380,8 +392,17 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
     }
 
     PetscInt num_sites, num_comp;
-    PetscCall(VecGetSize(rdy->u_global, &num_sites));
-    PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
+    PetscCall(VecGetSize(rdy->time_series.observations.accum_u, &num_sites));
+    PetscCall(VecGetBlockSize(rdy->time_series.observations.accum_u, &num_comp));
+
+    // retrieve the names of the solution vector components
+    const char  *component_names[MAX_NUM_FIELD_COMPONENTS];
+    PetscSection section;
+    PetscCall(DMGetLocalSection(rdy->dm, &section));
+    for (PetscInt c = 0; c < num_comp; ++c) {
+      PetscCall(PetscSectionGetComponentName(section, 0, c, &component_names[c]));
+    }
+
     const PetscReal *values;
     PetscCall(VecGetArrayRead(rdy->time_series.observations.sites.u, &values));
     for (PetscInt i = 0; i < num_sites; ++i) {
@@ -389,9 +410,8 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
       PetscReal y = rdy->time_series.observations.sites.y[i];
       PetscReal z = rdy->time_series.observations.sites.z[i];
       for (PetscInt c = 0; c < num_comp; ++c) {
-        PetscReal   value = values[num_comp * i + c];
-        const char *name  = rdy->config.output.time_series.observations.quantities[c];
-        PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "%e\t%f\t%f\t%f\t%s\t%e\n", time, x, y, z, name, value));
+        PetscReal value = values[num_comp * i + c];
+        PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "%e\t%f\t%f\t%f\t%s\t%e\n", time, x, y, z, component_names[c], value));
         PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
       }
     }
@@ -409,11 +429,10 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   // observations
   int observations_interval = rdy->config.output.time_series.observations.interval;
   if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series.observations.last_step)) {
-    // scatter site data from the global solution vector to our local sites vector
-    PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_u, rdy->u_global, rdy->time_series.observations.sites.u, INSERT_VALUES,
-                              SCATTER_FORWARD));
-    PetscCall(
-        VecScatterEnd(rdy->time_series.observations.scatter_u, rdy->u_global, rdy->time_series.observations.sites.u, INSERT_VALUES, SCATTER_FORWARD));
+    // FIXME: This VecCopy is only appropriate for time-averaged values, and we haven't figured out
+    // FIXME: how to articulate the averaging window yet. We should revisit this when we want
+    // FIXME: averaged values.
+    PetscCall(VecCopy(rdy->u_global, rdy->time_series.observations.accum_u));
     PetscCall(WriteObservations(rdy, step, time));
   }
 

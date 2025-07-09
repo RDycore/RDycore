@@ -55,6 +55,8 @@ typedef struct {
     } sites;
     // VecScatter governing observation site vector scatter
     VecScatter scatter_u;
+    // accumulation vector for averaged observations or for instantaneous values
+    Vec accum_u;
     // last step for which observations data was written
     PetscInt last_step;
   } observations;
