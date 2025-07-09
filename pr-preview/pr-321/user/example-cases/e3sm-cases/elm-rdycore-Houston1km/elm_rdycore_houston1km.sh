@@ -70,7 +70,7 @@ if [ "$mach" == "pm-cpu" ]; then
 
 elif [ "$mach" == "pm-gpu" ]; then
 
-  data_dir=/global/cfs/projectdirs/m4267/shared/data/irene/delaware
+  data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey/Houston1km
   device="gpu"
   macros_file_in=${PWD}/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-13-2-1-95934b0d393
   macros_file_out=gnugpu_pm-gpu.cmake
