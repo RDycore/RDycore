@@ -118,6 +118,8 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 static PetscErrorCode InitObservations(RDy rdy) {
   PetscFunctionBegin;
 
+  rdy->time_series.observations.last_step = -1;
+
   // create an accumulation vector for storing instantaneous or time-averaged solution data
   PetscCall(VecDuplicate(rdy->u_global, &rdy->time_series.observations.accum_u));
 
@@ -170,8 +172,9 @@ static PetscErrorCode InitObservations(RDy rdy) {
       z[i]              = rdy->mesh.cells.centroids[local_id].X[2];
     }
 
-    PetscInt *num_sites_from_proc = NULL, *displacements = NULL;
+    int *num_sites_from_proc = NULL, *displacements = NULL;
     if (rdy->rank == 0) {
+      PetscCall(PetscCalloc1(rdy->nproc, &num_sites_from_proc));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.x));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
@@ -183,12 +186,12 @@ static PetscErrorCode InitObservations(RDy rdy) {
         displacements[p] = displacements[p - 1] + num_sites_from_proc[p - 1];
       }
     }
-    PetscCallMPI(MPIU_Gatherv(x, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.x, num_sites_from_proc, displacements, MPI_DOUBLE,
-                              0, rdy->comm));
-    PetscCallMPI(MPIU_Gatherv(y, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.y, num_sites_from_proc, displacements, MPI_DOUBLE,
-                              0, rdy->comm));
-    PetscCallMPI(MPIU_Gatherv(z, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.z, num_sites_from_proc, displacements, MPI_DOUBLE,
-                              0, rdy->comm));
+    PetscCallMPI(MPI_Gatherv(x, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.x, num_sites_from_proc, displacements, MPI_DOUBLE, 0,
+                             rdy->comm));
+    PetscCallMPI(MPI_Gatherv(y, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.y, num_sites_from_proc, displacements, MPI_DOUBLE, 0,
+                             rdy->comm));
+    PetscCallMPI(MPI_Gatherv(z, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.z, num_sites_from_proc, displacements, MPI_DOUBLE, 0,
+                             rdy->comm));
     if (rdy->rank == 0) {
       PetscCall(PetscFree(num_sites_from_proc));
       PetscCall(PetscFree(displacements));
@@ -386,14 +389,15 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
     FILE *fp = NULL;
     if (step == 0) {  // write a header on the first step
       PetscCall(PetscFOpen(PETSC_COMM_SELF, path, "w", &fp));
-      PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "#time\tx\ty\tname\tvalue\n"));
+      PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "# time      \tx        \ty       \tz          \tname       \tvalue\n"));
     } else {
       PetscCall(PetscFOpen(PETSC_COMM_SELF, path, "a", &fp));
     }
 
     PetscInt num_sites, num_comp;
-    PetscCall(VecGetSize(rdy->time_series.observations.accum_u, &num_sites));
-    PetscCall(VecGetBlockSize(rdy->time_series.observations.accum_u, &num_comp));
+    PetscCall(VecGetBlockSize(rdy->time_series.observations.sites.u, &num_comp));
+    PetscCall(VecGetSize(rdy->time_series.observations.sites.u, &num_sites));
+    num_sites /= num_comp;
 
     // retrieve the names of the solution vector components
     const char  *component_names[MAX_NUM_FIELD_COMPONENTS];
@@ -411,10 +415,11 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
       PetscReal z = rdy->time_series.observations.sites.z[i];
       for (PetscInt c = 0; c < num_comp; ++c) {
         PetscReal value = values[num_comp * i + c];
-        PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "%e\t%f\t%f\t%f\t%s\t%e\n", time, x, y, z, component_names[c], value));
-        PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
+        PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "%e\t%f\t%f\t%f\t%s  \t%e\n", time, x, y, z, component_names[c], value));
       }
     }
+    PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
+    PetscCall(PetscFClose(rdy->comm, fp));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

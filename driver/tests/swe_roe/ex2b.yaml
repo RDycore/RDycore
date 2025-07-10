@@ -29,6 +29,12 @@ output:
   batch_size: 20
   time_series:
     boundary_fluxes: 10
+    observations:
+      interval: 10
+      sites:
+        cells: [0, 1, 2]
+      time_sampling:
+        instantaneous: true
 
 grid:
   file: planar_dam_10x5.msh
