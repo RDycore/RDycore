@@ -1659,11 +1659,6 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
 }
 
 int main(int argc, char *argv[]) {
-  // print out our version information
-  const char *rdy_build_config;
-  PetscCall(RDyGetBuildConfiguration(&rdy_build_config));
-  fprintf(stderr, "%s", rdy_build_config);
-
   // print usage info if no arguments given
   if (argc < 2) {
     usage(argv[0]);
@@ -1672,6 +1667,11 @@ int main(int argc, char *argv[]) {
 
   // initialize subsystems
   PetscCall(RDyInit(argc, argv, help_str));
+
+  // print out our version information
+  const char *rdy_build_config;
+  PetscCall(RDyGetBuildConfiguration(&rdy_build_config));
+  PetscFPrintf(PETSC_COMM_WORLD, stderr, "%s", rdy_build_config);
 
   if (strcmp(argv[1], "-help")) {  // if given a config file
     // create rdycore and set it up with the given file

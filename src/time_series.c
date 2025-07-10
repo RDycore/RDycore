@@ -44,7 +44,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
       n_recv_counts[p]     = num_md * rdy->time_series.boundary_fluxes.num_local_edges[p];
       n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
-    MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm));
     PetscCall(PetscCalloc1(num_md * num_global_edges, &rdy->time_series.boundary_fluxes.global_flux_md));
     for (PetscInt i = 0; i < num_md * num_global_edges; ++i) {
       rdy->time_series.boundary_fluxes.global_flux_md[i] = (PetscInt)global_flux_md[i];
@@ -54,7 +54,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
     PetscCall(PetscFree(n_recv_displs));
   } else {
     // send the root proc the local flux metadata
-    MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm));
   }
 
   PetscCall(PetscFree(local_flux_md));
@@ -179,9 +179,10 @@ static PetscErrorCode InitObservations(RDy rdy) {
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
     }
-    PetscCallMPI(MPI_Gather(&num_local_sites, 1, MPIU_INT, num_sites_from_proc, num_local_sites, MPIU_INT, 0, rdy->comm));
+    int inum_local_sites = (int)num_local_sites;
+    PetscCallMPI(MPI_Gather(&inum_local_sites, 1, MPI_INT, num_sites_from_proc, 1, MPI_INT, 0, rdy->comm));
     if (rdy->rank == 0) {
-      PetscCall(PetscCalloc1(num_sites, &displacements));
+      PetscCall(PetscCalloc1(rdy->nproc, &displacements));
       for (PetscInt p = 1; p < rdy->nproc; ++p) {
         displacements[p] = displacements[p - 1] + num_sites_from_proc[p - 1];
       }
@@ -319,7 +320,8 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     }
     PetscReal *global_flux_data;
     PetscCall(PetscCalloc1(num_data * num_global_edges, &global_flux_data));
-    MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0,
+                             rdy->comm));
     PetscCall(PetscFree(n_recv_counts));
     PetscCall(PetscFree(n_recv_displs));
 
@@ -353,7 +355,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     PetscCall(PetscFClose(rdy->comm, fp));
   } else {
     // send the root proc the local flux data
-    MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm));
   }
   PetscCall(PetscFree(local_flux_data));
 
@@ -388,10 +390,10 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
 
     FILE *fp = NULL;
     if (step == 0) {  // write a header on the first step
-      PetscCall(PetscFOpen(PETSC_COMM_SELF, path, "w", &fp));
-      PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "# time      \tx        \ty       \tz          \tname       \tvalue\n"));
+      PetscCall(PetscFOpen(rdy->comm, path, "w", &fp));
+      PetscCall(PetscFPrintf(rdy->comm, fp, "# time      \tx        \ty       \tz          \tname       \tvalue\n"));
     } else {
-      PetscCall(PetscFOpen(PETSC_COMM_SELF, path, "a", &fp));
+      PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));
     }
 
     PetscInt num_sites, num_comp;
@@ -415,7 +417,7 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
       PetscReal z = rdy->time_series.observations.sites.z[i];
       for (PetscInt c = 0; c < num_comp; ++c) {
         PetscReal value = values[num_comp * i + c];
-        PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "%e\t%f\t%f\t%f\t%s  \t%e\n", time, x, y, z, component_names[c], value));
+        PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%f\t%f\t%f\t%s  \t%e\n", time, x, y, z, component_names[c], value));
       }
     }
     PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
@@ -434,9 +436,9 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   // observations
   int observations_interval = rdy->config.output.time_series.observations.interval;
   if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series.observations.last_step)) {
-    // FIXME: This VecCopy is only appropriate for time-averaged values, and we haven't figured out
-    // FIXME: how to articulate the averaging window yet. We should revisit this when we want
-    // FIXME: averaged values.
+    // FIXME: This VecCopy is only appropriate for instantaneous observations; we haven't figured out
+    // FIXME: how to articulate the time averaged values (and their windows) yet. We should revisit this
+    // FIXME: when we want averaged values.
     PetscCall(VecCopy(rdy->u_global, rdy->time_series.observations.accum_u));
     PetscCall(WriteObservations(rdy, step, time));
   }
