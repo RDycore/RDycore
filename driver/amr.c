@@ -185,7 +185,8 @@ int main(int argc, char *argv[]) {
     PetscCall(ParseRefinementDataOptions(&refinement_dataset));
 
     RDyTimeUnit time_unit;
-    PetscReal time, time_step, prev_time;
+    PetscReal time, prev_time;
+    PetscCall(RDyGetTimeUnit(rdy, &time_unit));
     PetscCall(RDyGetTime(rdy, time_unit, &prev_time));
 
     if (refinement_dataset.is_defined) {
