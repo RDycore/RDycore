@@ -208,12 +208,24 @@ static PetscErrorCode InitObservations(RDy rdy) {
     PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
 
     Vec rank0_u;
-    PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, &rank0_u));
+    if (rdy->rank == 0) {
+      PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, &rank0_u));
+    } else {
+      PetscCall(VecCreateSeq(PETSC_COMM_SELF, 0, &rank0_u));
+    }
     PetscCall(VecSetBlockSize(rank0_u, num_comp));
 
-    IS global_site_indices;  // global indices of sites on local processes (corresponding to u_global)
-    PetscCall(ISCreateBlock(rdy->comm, num_comp, num_local_sites, local_sites_g, PETSC_USE_POINTER, &global_site_indices));
-    PetscCall(VecScatterCreate(rdy->u_global, global_site_indices, rank0_u, NULL, &rdy->time_series.observations.scatter_u));
+    IS global_site_indices, local_site_indices;
+    if (rdy->rank == 0) {
+      // FIXME: local_sites_g should be global_sites, an array of global site indices
+      PetscCall(ISCreateBlock(rdy->comm, num_comp, num_sites, local_sites_g, PETSC_USE_POINTER, &global_site_indices));
+      PetscCall(VecScatterCreate(rdy->u_global, global_site_indices, rank0_u, NULL, &rdy->time_series.observations.scatter_u));
+    } else {
+      PetscCall(ISCreateBlock(rdy->comm, num_comp, 0, NULL, PETSC_USE_POINTER, &global_site_indices));
+      PetscCall(ISCreateBlock(rdy->comm, num_comp, 0, NULL, PETSC_USE_POINTER, &local_site_indices));
+      PetscCall(VecScatterCreate(rdy->u_global, global_site_indices, rank0_u, local_site_indices, &rdy->time_series.observations.scatter_u));
+      PetscCall(ISDestroy(&local_site_indices));
+    }
     PetscCall(ISDestroy(&global_site_indices));
 
     rdy->time_series.observations.sites.u = rank0_u;
