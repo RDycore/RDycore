@@ -182,6 +182,67 @@ static PetscErrorCode InitObservations(RDy rdy) {
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
     }
+
+    // now get x/y/z coordinates of the sites on the rank 0
+    RDyMesh *mesh = &rdy->mesh;
+    RDyCells *cells = &mesh->cells;
+
+    Vec rank0_coord, global_coord;
+    VecScatter scatter_1dof;
+
+    // create a 1-DOF Vec to excahnge coordinates one at a time
+    PetscCall(RDyCreateOneDOFGlobalVec(rdy, &global_coord));
+
+    // create the Vec and VecScatter for rank 0
+    PetscCall(CreateVecAndVectorScatterForRankZero(rdy->rank, global_coord, num_sites, all_sites, &rank0_coord, &scatter_1dof));
+
+    // now loop over the coordinates and gather them one at a time
+    for (PetscInt icoord = 0; icoord < 3; ++icoord) {
+
+      PetscReal *coord_ptr;
+      PetscCall(VecGetArray(global_coord, &coord_ptr));
+      PetscInt count = 0;
+
+      // only put coordinates of owned cells
+      for (PetscInt i = 0; i < mesh->num_cells; ++i) {
+        if (cells->is_owned[i]) {
+          if (icoord == 0) {
+            coord_ptr[count] = cells->centroids[i].X[0];
+          } else if (icoord == 1) {
+            coord_ptr[count] = cells->centroids[i].X[1];
+          } else {
+            coord_ptr[count] = cells->centroids[i].X[2];
+          }
+          count++;
+        }
+      }
+
+      PetscCall(VecRestoreArray(global_coord, &coord_ptr));
+
+      // scatter the coordinates to rank 0
+      PetscCall(VecScatterBegin(scatter_1dof, global_coord, rank0_coord, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(scatter_1dof, global_coord, rank0_coord, INSERT_VALUES, SCATTER_FORWARD));
+
+      // now copy the coordinates to the observation sites
+      if (rdy->rank == 0) {
+        PetscCall(VecGetArray(rank0_coord, &coord_ptr));
+        for (PetscInt i = 0; i < num_sites; ++i) {
+          if (icoord == 0) {
+            rdy->time_series.observations.sites.x[i] = coord_ptr[i];
+          } else if (icoord == 1) {
+            rdy->time_series.observations.sites.y[i] = coord_ptr[i];
+          } else {
+            rdy->time_series.observations.sites.z[i] = coord_ptr[i];
+          }
+        }
+        PetscCall(VecRestoreArray(rank0_coord, &coord_ptr));
+      }
+    }
+
+    // clean up
+    PetscCall(VecDestroy(&global_coord));
+    PetscCall(VecDestroy(&rank0_coord));
+    PetscCall(VecScatterDestroy(&scatter_1dof));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
