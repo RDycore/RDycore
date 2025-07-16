@@ -1177,9 +1177,9 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
     PetscBool pause = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-pause", &pause, NULL));
     if (pause) {
-      pid_t pid          = getpid();  // local process ID
-      char  hostname[65] = {0};       // local hostname (64 characters + null terminator)
-      gethostname(hostname, 64);
+      pid_t pid                        = getpid();  // local process ID
+      char  hostname[MAX_NAME_LEN + 1] = {0};       // local hostname
+      gethostname(hostname, MAX_NAME_LEN);
       PetscFPrintf(rdy->comm, stderr, "Pausing... press Enter to resume.\n");
       if (rdy->nproc > 1) {
         pid_t *pids;
