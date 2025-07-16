@@ -123,87 +123,19 @@ static PetscErrorCode InitObservations(RDy rdy) {
   // create an accumulation vector for storing instantaneous or time-averaged solution data
   PetscCall(VecDuplicate(rdy->u_global, &rdy->time_series.observations.accum_u));
 
-  // Set up a VectorScatter that transmits solution data from the accumulation vector to a
-  // sequential vector on rank 0, from which it can be output as recorded observations.
-
-  // generate mappings of natural -> global and natural -> local indices on this process
-  PetscHMapI n2g_map, n2l_map;
-  PetscCall(PetscHMapICreate(&n2g_map));
-  PetscCall(PetscHMapICreate(&n2l_map));
-  for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
-    if (rdy->mesh.cells.local_to_owned[i] != -1) {  // map only locally owned cells
-      PetscCall(PetscHMapISet(n2g_map, rdy->mesh.cells.natural_ids[i], rdy->mesh.cells.global_ids[i]));
-      PetscCall(PetscHMapISet(n2l_map, rdy->mesh.cells.natural_ids[i], rdy->mesh.cells.ids[i]));
-    }
-  }
-
   // determine which sites are local to this process and record their global and local ids
   PetscInt  num_sites = rdy->config.output.time_series.observations.sites.cells_count;
   PetscInt *all_sites = rdy->config.output.time_series.observations.sites.cells;
-  PetscInt *local_sites_g, *local_sites_l, num_local_sites = 0;
-  PetscInt *global_site_ids = NULL;
-  PetscCall(PetscCalloc1(num_sites, &local_sites_g));
-  PetscCall(PetscCalloc1(num_sites, &local_sites_l));
-  for (PetscInt i = 0; i < num_sites; ++i) {
-    PetscInt global_id;
-    PetscCall(PetscHMapIGetWithDefault(n2g_map, all_sites[i], -1, &global_id));
-    if (global_id != -1) {
-      local_sites_g[num_local_sites] = global_id;
-      PetscCall(PetscHMapIGet(n2l_map, all_sites[i], &local_sites_l[num_local_sites]));
-      ++num_local_sites;
-    }
-  }
-  PetscCall(PetscHMapIDestroy(&n2g_map));
-  PetscCall(PetscHMapIDestroy(&n2l_map));
 
   // set up storage on rank 0 for observations and populate the global site indices and the
   // coordinate arrays, both of which are fixed for the duration of the simulation
   {
-    // extract local site coordinates
-    PetscInt  *local_site_ids;
-    PetscReal *x, *y, *z;
-    PetscCall(PetscCalloc1(num_local_sites, &local_site_ids));
-    PetscCall(PetscCalloc1(num_local_sites, &x));
-    PetscCall(PetscCalloc1(num_local_sites, &y));
-    PetscCall(PetscCalloc1(num_local_sites, &z));
-    for (PetscInt i = 0; i < num_local_sites; ++i) {
-      PetscInt local_id = local_sites_l[i];
-      local_site_ids[i] = local_id;
-      x[i]              = rdy->mesh.cells.centroids[local_id].X[0];
-      y[i]              = rdy->mesh.cells.centroids[local_id].X[1];
-      z[i]              = rdy->mesh.cells.centroids[local_id].X[2];
-    }
 
-    int *num_sites_from_proc = NULL, *displacements = NULL;
     if (rdy->rank == 0) {
-      PetscCall(PetscCalloc1(rdy->nproc, &num_sites_from_proc));
-      PetscCall(PetscCalloc1(num_sites, &global_site_ids));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.x));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
     }
-    int inum_local_sites = (int)num_local_sites;
-    PetscCallMPI(MPI_Gather(&inum_local_sites, 1, MPI_INT, num_sites_from_proc, 1, MPI_INT, 0, rdy->comm));
-    if (rdy->rank == 0) {
-      PetscCall(PetscCalloc1(rdy->nproc, &displacements));
-      for (PetscInt p = 1; p < rdy->nproc; ++p) {
-        displacements[p] = displacements[p - 1] + num_sites_from_proc[p - 1];
-      }
-    }
-    PetscCallMPI(MPI_Gatherv(local_site_ids, num_local_sites, MPIU_INT, global_site_ids, num_sites_from_proc, displacements, MPIU_INT, 0, rdy->comm));
-    PetscCallMPI(MPI_Gatherv(x, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.x, num_sites_from_proc, displacements, MPI_DOUBLE, 0,
-                             rdy->comm));
-    PetscCallMPI(MPI_Gatherv(y, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.y, num_sites_from_proc, displacements, MPI_DOUBLE, 0,
-                             rdy->comm));
-    PetscCallMPI(MPI_Gatherv(z, num_local_sites, MPI_DOUBLE, rdy->time_series.observations.sites.z, num_sites_from_proc, displacements, MPI_DOUBLE, 0,
-                             rdy->comm));
-    if (rdy->rank == 0) {
-      PetscCall(PetscFree(num_sites_from_proc));
-      PetscCall(PetscFree(displacements));
-    }
-    PetscCall(PetscFree(x));
-    PetscCall(PetscFree(y));
-    PetscCall(PetscFree(z));
   }
 
   // set up a vector scatter operation to send globally indexed observation site data to our rank 0 vector
@@ -222,7 +154,7 @@ static PetscErrorCode InitObservations(RDy rdy) {
       PetscInt *int_array;
       PetscCall(PetscCalloc1(num_sites, &int_array));
       for (PetscInt i = 0; i < num_sites; ++i) {
-        int_array[i] = global_site_ids[i];
+        int_array[i] = all_sites[i];
       }
       PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_from));
 
@@ -253,11 +185,6 @@ static PetscErrorCode InitObservations(RDy rdy) {
 
     rdy->time_series.observations.sites.u = rank0_u;
   }
-
-  // clean up
-  PetscCall(PetscFree(local_sites_l));
-  PetscCall(PetscFree(local_sites_g));
-  PetscCall(PetscFree(global_site_ids));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
