@@ -115,6 +115,50 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateVecAndVectorScatterForRankZero(PetscInt rank, Vec u_global, PetscInt num_sites, const PetscInt *all_sites, Vec *rank0_u, VecScatter *scatter) {
+  PetscFunctionBegin;
+
+  PetscInt num_comp;
+  PetscCall(VecGetBlockSize(u_global, &num_comp));
+
+  IS is_from, is_to;
+
+  if (rank == 0) {
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, rank0_u));
+    PetscCall(VecSetBlockSize(*rank0_u, num_comp));
+
+    // create an IS based on the natural IDs (of the observation sites) from the solution vector from which data will be scattered
+    PetscInt *int_array;
+    PetscCall(PetscCalloc1(num_sites, &int_array));
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      int_array[i] = all_sites[i];
+    }
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_from));
+
+    // create an IS for the SeqVec in which the values of solution vector will be gathered
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      int_array[i] = i;
+    }
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_to));
+
+    PetscCall(PetscFree(int_array));
+
+  } else {
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, 0, rank0_u));
+    PetscInt *int_array;
+    PetscCall(PetscCalloc1(0, &int_array));
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_from));
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_to));
+    PetscCall(PetscFree(int_array));
+  }
+
+  PetscCall(VecScatterCreate(u_global, is_from, *rank0_u, is_to, scatter));
+  PetscCall(ISDestroy(&is_from));
+  PetscCall(ISDestroy(&is_to));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode InitObservations(RDy rdy) {
   PetscFunctionBegin;
 
@@ -127,6 +171,8 @@ static PetscErrorCode InitObservations(RDy rdy) {
   PetscInt  num_sites = rdy->config.output.time_series.observations.sites.cells_count;
   PetscInt *all_sites = rdy->config.output.time_series.observations.sites.cells;
 
+  PetscCall(CreateVecAndVectorScatterForRankZero(rdy->rank, rdy->u_global, num_sites, all_sites, &rdy->time_series.observations.sites.u, &rdy->time_series.observations.scatter_u));
+
   // set up storage on rank 0 for observations and populate the global site indices and the
   // coordinate arrays, both of which are fixed for the duration of the simulation
   {
@@ -136,54 +182,6 @@ static PetscErrorCode InitObservations(RDy rdy) {
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
     }
-  }
-
-  // set up a vector scatter operation to send globally indexed observation site data to our rank 0 vector
-  {
-    PetscInt num_comp;
-    PetscCall(VecGetBlockSize(rdy->u_global, &num_comp));
-
-    Vec rank0_u;
-    IS is_from, is_to;
-
-    if (rdy->rank == 0) {
-      PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, &rank0_u));
-      PetscCall(VecSetBlockSize(rank0_u, num_comp));
-
-      // create an IS based on the natural IDs (of the observation sites) from the solution vector from which data will be scattered
-      PetscInt *int_array;
-      PetscCall(PetscCalloc1(num_sites, &int_array));
-      for (PetscInt i = 0; i < num_sites; ++i) {
-        int_array[i] = all_sites[i];
-      }
-      PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_from));
-
-      // create an IS for the SeqVec in which the values of solution vector will be gathered
-      for (PetscInt i = 0; i < num_sites; ++i) {
-        int_array[i] = i;
-      }
-      PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_to));
-
-      PetscCall(PetscFree(int_array));
-
-    } else {
-      PetscCall(VecCreateSeq(PETSC_COMM_SELF, 0, &rank0_u));
-      PetscInt *int_array;
-      PetscCall(PetscCalloc1(0, &int_array));
-      PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_from));
-      PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_to));
-      PetscCall(PetscFree(int_array));
-    }
-
-    PetscCall(VecScatterCreate(rdy->u_global, is_from, rank0_u, is_to, &rdy->time_series.observations.scatter_u));
-    {
-      PetscViewer viewer;
-      PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, "vec_scatter.txt", &viewer));
-      PetscCall(VecScatterView(rdy->time_series.observations.scatter_u, viewer));
-      PetscCall(PetscViewerDestroy(&viewer));
-    }
-
-    rdy->time_series.observations.sites.u = rank0_u;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
