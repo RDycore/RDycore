@@ -409,9 +409,15 @@ output:
   format: xdmf
   output_interval: 100
   batch_size: 1
+  separate_grid_file: true
   time_series:
     boundary_fluxes: 10
-  separate_grid_file: true
+    observations:
+      interval: 10
+      sites:
+        cells: [0, 1, 2, 3, 4, 5, 6]
+      time_sampling:
+        instantaneous: true
 ```
 
 The `output` section controls simulation output, including visualization and
@@ -445,14 +451,39 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
 * `batch_size`: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1
-* `time_series`: this subsection controls time series simulation output, which
-  is useful for inspection and possibly even coupling. Currently, this subsection
-  has only one parameter:
-    * `boundary_fluxes`: the interval (number of timesteps) at which boundary
-      flux data is appended to a tab-delimited text file
 * `separate_grid_file`: this optional parameter specifies whether the grid is
   written to its own file, which saves space in very large simulations. Currently,
   this option is only supported for `xdmf` output.
+* `time_series`: this subsection controls time series simulation output, which
+  is useful for inspection and possibly even coupling. Parameters:
+    * `boundary_fluxes`: the interval (number of timesteps) at which boundary
+      flux data is appended to a tab-delimited text file
+    * `observations`: allows the specification of **observation sites**--points in space at which
+      the components of the solution vector are sampled and possibly averaged. When using the
+      RDycore driver, observations are written to a tab-delimited text file. Parameters include:
+        * `interval`: the number of steps between recorded observations
+        * `sites`: the mechanism by which observation sites are specified. There are two ways to
+          specify observation sites:
+            * `cells`: accepts a list of **natural cell IDs** within the mesh, defining an
+              observation site at the center of each given cell.
+            * `file`: accepts a text file specifying **natural cell IDs** in the line-oriented
+              format described below.
+        * `sampling`: the method by which each component is sampled at each observation site.
+            * `instantaneous` (`false` by default) can be set to `true` to sample instantaneous
+              values at each site.
+            * Time averaging is not yet supported, but we plan to add an `averaged` parameter in
+              the future.
+
+When specifying observation sites in a text file, use the following format:
+
+```
+number_of_observation_cells
+<natural_cell_id_0>
+<natural_cell_id_1>
+<natural_cell_id_2>
+...
+<natural_cell_id_N>
+```
 
 ## `physics`
 

@@ -239,9 +239,44 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 //   format: <binary|xdmf|cgns>
 //   output_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
+//   separate_grid_file: <true|false>
 //   time_series:
 //     boundary_fluxes: <number-of-steps-between-flux-dumps>
-//   separate_grid_file: <true|false>
+//     observations:
+//       interval: 10
+//       sites:
+//         cells: [0, 1, 2, 3, 4, 5, 6]
+//       quantities:
+//         - Height
+//         - MomentumX
+//         - MomentumY
+//       time_sampling:
+//         instantaneous: true
+
+
+static const cyaml_schema_value_t observations_sites_cell_entry = {
+	CYAML_VALUE_INT(CYAML_FLAG_DEFAULT, int),
+};
+
+// mapping of sites fields to members of RDyObservationSites
+static const cyaml_schema_field_t observations_sites_fields_schema[] = {
+    CYAML_FIELD_SEQUENCE("cells", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyObservationSites, cells, &observations_sites_cell_entry, 0, CYAML_UNLIMITED),
+    CYAML_FIELD_END
+};
+
+// mapping of sites fields to members of RDyObservationSites
+static const cyaml_schema_field_t observations_time_sampling_fields_schema[] = {
+    CYAML_FIELD_BOOL("instantaneous", CYAML_FLAG_OPTIONAL, RDyObservationTimeSampling, instantaneous),
+    CYAML_FIELD_END
+};
+
+// mapping of observation fields to members of RDyObservationsSection
+static const cyaml_schema_field_t observations_fields_schema[] = {
+    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyObservationsSection, interval),
+    CYAML_FIELD_MAPPING("sites", CYAML_FLAG_DEFAULT, RDyObservationsSection, sites, observations_sites_fields_schema),
+    CYAML_FIELD_MAPPING("time_sampling", CYAML_FLAG_DEFAULT, RDyObservationsSection, time_sampling, observations_time_sampling_fields_schema),
+    CYAML_FIELD_END
+};
 
 // mapping of strings to file formats
 static const cyaml_strval_t output_file_formats[] = {
@@ -259,6 +294,7 @@ static const cyaml_schema_value_t output_field_schema = {
 // mapping of time_series fields to members of RDyTimeSeries
 static const cyaml_schema_field_t output_time_series_fields_schema[] = {
     CYAML_FIELD_INT("boundary_fluxes", CYAML_FLAG_DEFAULT, RDyTimeSeries, boundary_fluxes),
+    CYAML_FIELD_MAPPING("observations", CYAML_FLAG_OPTIONAL, RDyTimeSeries, observations, observations_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -272,8 +308,8 @@ static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
-    CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_BOOL("separate_grid_file", CYAML_FLAG_OPTIONAL, RDyOutputSection, separate_grid_file),
+    CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
 };
 
