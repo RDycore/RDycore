@@ -115,19 +115,21 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CreateVecAndVectorScatterForRankZero(PetscInt rank, Vec u_global, PetscInt num_sites, const PetscInt *all_sites, Vec *rank0_u, VecScatter *scatter) {
+static PetscErrorCode CreateRank0VecAndVecScatter(PetscInt rank, Vec v_global, PetscInt num_sites, const PetscInt *all_sites, Vec *v_rank0,
+                                                  VecScatter *scatter) {
   PetscFunctionBegin;
 
   PetscInt num_comp;
-  PetscCall(VecGetBlockSize(u_global, &num_comp));
+  PetscCall(VecGetBlockSize(v_global, &num_comp));
 
+  // index spaces for creating the VecScatter
   IS is_from, is_to;
 
   if (rank == 0) {
-    PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, rank0_u));
-    PetscCall(VecSetBlockSize(*rank0_u, num_comp));
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, v_rank0));
+    PetscCall(VecSetBlockSize(*v_rank0, num_comp));
 
-    // create an IS based on the natural IDs (of the observation sites) from the solution vector from which data will be scattered
+    // create an IS based on the natural IDs (of the observation sites) from the global vector from which data will be scattered
     PetscInt *int_array;
     PetscCall(PetscCalloc1(num_sites, &int_array));
     for (PetscInt i = 0; i < num_sites; ++i) {
@@ -135,16 +137,15 @@ static PetscErrorCode CreateVecAndVectorScatterForRankZero(PetscInt rank, Vec u_
     }
     PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_from));
 
-    // create an IS for the SeqVec in which the values of solution vector will be gathered
+    // create an IS for the rank 0 sequential Vec storing the selected data
     for (PetscInt i = 0; i < num_sites; ++i) {
       int_array[i] = i;
     }
     PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_to));
 
     PetscCall(PetscFree(int_array));
-
   } else {
-    PetscCall(VecCreateSeq(PETSC_COMM_SELF, 0, rank0_u));
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, 0, v_rank0));
     PetscInt *int_array;
     PetscCall(PetscCalloc1(0, &int_array));
     PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_from));
@@ -152,7 +153,8 @@ static PetscErrorCode CreateVecAndVectorScatterForRankZero(PetscInt rank, Vec u_
     PetscCall(PetscFree(int_array));
   }
 
-  PetscCall(VecScatterCreate(u_global, is_from, *rank0_u, is_to, scatter));
+  PetscCall(VecScatterCreate(v_global, is_from, *v_rank0, is_to, scatter));
+
   PetscCall(ISDestroy(&is_from));
   PetscCall(ISDestroy(&is_to));
 
@@ -171,12 +173,12 @@ static PetscErrorCode InitObservations(RDy rdy) {
   PetscInt  num_sites = rdy->config.output.time_series.observations.sites.cells_count;
   PetscInt *all_sites = rdy->config.output.time_series.observations.sites.cells;
 
-  PetscCall(CreateVecAndVectorScatterForRankZero(rdy->rank, rdy->u_global, num_sites, all_sites, &rdy->time_series.observations.sites.u, &rdy->time_series.observations.scatter_u));
+  PetscCall(CreateRank0VecAndVecScatter(rdy->rank, rdy->u_global, num_sites, all_sites, &rdy->time_series.observations.sites.u,
+                                        &rdy->time_series.observations.scatter_u));
 
   // set up storage on rank 0 for observations and populate the global site indices and the
   // coordinate arrays, both of which are fixed for the duration of the simulation
   {
-
     if (rdy->rank == 0) {
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.x));
       PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
@@ -184,23 +186,20 @@ static PetscErrorCode InitObservations(RDy rdy) {
     }
 
     // now get x/y/z coordinates of the sites on the rank 0
-    RDyMesh *mesh = &rdy->mesh;
+    RDyMesh  *mesh  = &rdy->mesh;
     RDyCells *cells = &mesh->cells;
 
-    Vec rank0_coord, global_coord;
+    Vec        coord_rank0, coord_global;
     VecScatter scatter_1dof;
 
-    // create a 1-DOF Vec to excahnge coordinates one at a time
-    PetscCall(RDyCreateOneDOFGlobalVec(rdy, &global_coord));
-
-    // create the Vec and VecScatter for rank 0
-    PetscCall(CreateVecAndVectorScatterForRankZero(rdy->rank, global_coord, num_sites, all_sites, &rank0_coord, &scatter_1dof));
+    // create a 1-DOF Vec and a Vec and VecScatter on rank 0 to exchange coordinates one at a time
+    PetscCall(RDyCreateOneDOFGlobalVec(rdy, &coord_global));
+    PetscCall(CreateRank0VecAndVecScatter(rdy->rank, coord_global, num_sites, all_sites, &coord_rank0, &scatter_1dof));
 
     // now loop over the coordinates and gather them one at a time
     for (PetscInt icoord = 0; icoord < 3; ++icoord) {
-
       PetscReal *coord_ptr;
-      PetscCall(VecGetArray(global_coord, &coord_ptr));
+      PetscCall(VecGetArray(coord_global, &coord_ptr));
       PetscInt count = 0;
 
       // only put coordinates of owned cells
@@ -217,15 +216,15 @@ static PetscErrorCode InitObservations(RDy rdy) {
         }
       }
 
-      PetscCall(VecRestoreArray(global_coord, &coord_ptr));
+      PetscCall(VecRestoreArray(coord_global, &coord_ptr));
 
       // scatter the coordinates to rank 0
-      PetscCall(VecScatterBegin(scatter_1dof, global_coord, rank0_coord, INSERT_VALUES, SCATTER_FORWARD));
-      PetscCall(VecScatterEnd(scatter_1dof, global_coord, rank0_coord, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterBegin(scatter_1dof, coord_global, coord_rank0, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(scatter_1dof, coord_global, coord_rank0, INSERT_VALUES, SCATTER_FORWARD));
 
       // now copy the coordinates to the observation sites
       if (rdy->rank == 0) {
-        PetscCall(VecGetArray(rank0_coord, &coord_ptr));
+        PetscCall(VecGetArray(coord_rank0, &coord_ptr));
         for (PetscInt i = 0; i < num_sites; ++i) {
           if (icoord == 0) {
             rdy->time_series.observations.sites.x[i] = coord_ptr[i];
@@ -235,13 +234,13 @@ static PetscErrorCode InitObservations(RDy rdy) {
             rdy->time_series.observations.sites.z[i] = coord_ptr[i];
           }
         }
-        PetscCall(VecRestoreArray(rank0_coord, &coord_ptr));
+        PetscCall(VecRestoreArray(coord_rank0, &coord_ptr));
       }
     }
 
     // clean up
-    PetscCall(VecDestroy(&global_coord));
-    PetscCall(VecDestroy(&rank0_coord));
+    PetscCall(VecDestroy(&coord_global));
+    PetscCall(VecDestroy(&coord_rank0));
     PetscCall(VecScatterDestroy(&scatter_1dof));
   }
 
