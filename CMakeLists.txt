@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.14.0)
 
 # Configurable options
 option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
-option(ENABLE_FORTRAN  "Enable Fortran library bindings" ON)
+option(ENABLE_FORTRAN  "Enable Fortran library bindings" OFF)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
