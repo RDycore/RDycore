@@ -32,7 +32,7 @@ output:
     observations:
       interval: 10
       sites:
-        cells: [0, 1, 2]
+        cells: [0, 1, 2, 43]
       time_sampling:
         instantaneous: true
 
