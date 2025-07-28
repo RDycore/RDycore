@@ -27,8 +27,7 @@
 // the maximum number of materials that can be defined for a simulation
 #define MAX_NUM_MATERIALS 32
 
-// the maximum number of flow/sediment/salinity conditions that can be defined for a
-// simulation
+// the maximum number of flow/sediment/salinity conditions that can be defined for a simulation
 #define MAX_NUM_CONDITIONS 32
 
 // The data structures below are intermediate representations of the sections
@@ -158,16 +157,33 @@ typedef struct {
   PetscBool reinitialize;              // PETSC_TRUE resets simulation time to 0
 } RDyRestartSection;
 
-// ---------------
+// --------------
 // output section
-// ---------------
+// --------------
 
 // output file formats
 typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
 
+// observations
+typedef struct {
+  PetscInt *cells;
+  PetscInt  cells_count;
+} RDyObservationSites;
+
+typedef struct {
+  PetscBool instantaneous;
+} RDyObservationTimeSampling;
+
+typedef struct {
+  PetscInt                   interval;
+  RDyObservationSites        sites;
+  RDyObservationTimeSampling time_sampling;
+} RDyObservationsSection;
+
 // time series output interval parameters appended to files
 typedef struct {
-  PetscInt boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+  PetscInt               boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+  RDyObservationsSection observations;
 } RDyTimeSeries;
 
 // all output parameters
