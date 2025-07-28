@@ -1870,9 +1870,15 @@ RDycore. The parameters that define these discretizations are</p>
 <span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xdmf</span>
 <span class="w">  </span><span class="nt">output_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">observations</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">      </span><span class="nt">sites</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cells</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">6</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">time_sampling</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">instantaneous</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>The <code>output</code> section controls simulation output, including visualization and
 time series data (<strong>but excluding checkpoint data</strong>). Relevant parameters are</p>
@@ -1909,17 +1915,45 @@ time series data (<strong>but excluding checkpoint data</strong>). Relevant para
 <li><code>batch_size</code>: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1</li>
-<li><code>time_series</code>: this subsection controls time series simulation output, which
-  is useful for inspection and possibly even coupling. Currently, this subsection
-  has only one parameter:<ul>
-<li><code>boundary_fluxes</code>: the interval (number of timesteps) at which boundary
-  flux data is appended to a tab-delimited text file</li>
-</ul>
-</li>
 <li><code>separate_grid_file</code>: this optional parameter specifies whether the grid is
   written to its own file, which saves space in very large simulations. Currently,
   this option is only supported for <code>xdmf</code> output.</li>
+<li><code>time_series</code>: this subsection controls time series simulation output, which
+  is useful for inspection and possibly even coupling. Parameters:<ul>
+<li><code>boundary_fluxes</code>: the interval (number of timesteps) at which boundary
+  flux data is appended to a tab-delimited text file</li>
+<li><code>observations</code>: allows the specification of <strong>observation sites</strong>--points in space at which
+  the components of the solution vector are sampled and possibly averaged. When using the
+  RDycore driver, observations are written to a tab-delimited text file. Parameters include:<ul>
+<li><code>interval</code>: the number of steps between recorded observations</li>
+<li><code>sites</code>: the mechanism by which observation sites are specified. There are two ways to
+  specify observation sites:<ul>
+<li><code>cells</code>: accepts a list of <strong>natural cell IDs</strong> within the mesh, defining an
+  observation site at the center of each given cell.</li>
+<li><code>file</code>: accepts a text file specifying <strong>natural cell IDs</strong> in the line-oriented
+  format described below.</li>
 </ul>
+</li>
+<li><code>sampling</code>: the method by which each component is sampled at each observation site.<ul>
+<li><code>instantaneous</code> (<code>false</code> by default) can be set to <code>true</code> to sample instantaneous
+  values at each site.</li>
+<li>Time averaging is not yet supported, but we plan to add an <code>averaged</code> parameter in
+  the future.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>When specifying observation sites in a text file, use the following format:</p>
+<div class="highlight"><pre><span></span><code>number_of_observation_cells
+&lt;natural_cell_id_0&gt;
+&lt;natural_cell_id_1&gt;
+&lt;natural_cell_id_2&gt;
+...
+&lt;natural_cell_id_N&gt;
+</code></pre></div>
 <h2 id="physics"><code>physics</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">physics</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">flow</span><span class="p">:</span>
