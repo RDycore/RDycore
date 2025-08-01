@@ -111,8 +111,6 @@ static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer
 
   PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
   PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
-
-  // NOTE: for some reason, these get deposited into the "fields" group(!)
   PetscCall(VecView(mesh->output.xc, viewer));
   PetscCall(VecView(mesh->output.yc, viewer));
   PetscCall(VecView(mesh->output.zc, viewer));
@@ -356,7 +354,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                           "          %s:/fields/%s\n"
+                           "          %s:/Domain/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
                            grid_coord_names[f], mesh->num_cells_global, h5_gridname, grid_coord_names[f]));
