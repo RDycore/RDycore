@@ -12,11 +12,11 @@ display_help() {
   echo "Usage: $0 " >&2
   echo
   echo "   -h, --help                              Display this message"
-  echo "   --e3sm-dir                              Path to E3SM-RDycore directory"
+  echo "   --e3sm_dir                              Path to E3SM-RDycore directory"
   echo "   --mach <pm-cpu|pm-gpu|frontier>         Supported machine name"
-  echo "   --frontier-node-type <cpu|gpu>          To run on Frontier CPUs or GPUs"
+  echo "   --frontier_node_type <cpu|gpu>          To run on Frontier CPUs or GPUs"
   echo "   --ntasks  <NTASKS>                      Number of MPI tasks"
-  echo "   --project-id <project-id>               Project ID that will charged for the job"
+  echo "   --project_id <project-id>               Project ID that will charged for the job"
   return 0
 }
 
@@ -24,9 +24,9 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     --mach ) mach="$2"; shift ;;
-    --frontier-node-type) frontier_node_type="$2"; shift ;;
-    --project-id) project_id="$2"; shift ;;
-    --e3sm-dir) e3sm_dir="$2"; shift ;;
+    --frontier_node_type) frontier_node_type="$2"; shift ;;
+    --project_id) project_id="$2"; shift ;;
+    --e3sm_dir) e3sm_dir="$2"; shift ;;
     --ntasks) ntasks="$2"; shift ;;
     -h | --help)
       display_help
@@ -121,9 +121,6 @@ cd $case_name
 ./xmlchange NTASKS=$ntasks
 ./xmlchange NTHRDS=1
 ./xmlchange PROJECT=$project_id
-
-./xmlchange ATM_NCPL=96
-./xmlchange ROF_NCPL=96
 
 ./xmlchange LND2ROF_FMAPNAME=$elm_data_dir/$l2r_map_file
 ./xmlchange ROF2LND_FMAPNAME=$elm_data_dir/$r2l_map_file
