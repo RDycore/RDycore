@@ -835,10 +835,10 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   // set some default output fields
   if (!config->output.fields_count) {
     config->output.fields_count = 3;
-    PetscCall(PetscCalloc(3, &config->output.fields));
-    PetscCall(PetscCalloc(MAX_NAME_LEN, &config->output.fields[0]));
-    PetscCall(PetscCalloc(MAX_NAME_LEN, &config->output.fields[1]));
-    PetscCall(PetscCalloc(MAX_NAME_LEN, &config->output.fields[2]));
+    PetscCall(PetscCalloc1(3, &config->output.fields));
+    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &config->output.fields[0]));
+    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &config->output.fields[1]));
+    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &config->output.fields[2]));
     strncpy(config->output.fields[0], "Height", MAX_NAME_LEN);
     strncpy(config->output.fields[1], "MomentumX", MAX_NAME_LEN);
     strncpy(config->output.fields[2], "MomentumY", MAX_NAME_LEN);
