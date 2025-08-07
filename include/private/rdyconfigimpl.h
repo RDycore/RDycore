@@ -1,6 +1,6 @@
 #ifndef RDYCONFIG_H
 #define RDYCONFIG_H
-
+#include "rdycore.h"
 #include <float.h>
 #include <limits.h>
 #include <petscviewer.h>
@@ -95,7 +95,8 @@ typedef enum {
 // riemann solvers for horizontal flow
 typedef enum {
   RIEMANN_ROE = 0,  // Roe solver
-  RIEMANN_HLLC      // Harten, Lax, van Leer Contact solver
+  RIEMANN_HLLC  ,   // Harten, Lax, van Leer Contact solver
+  RIEMANN_HLL
 } RDyNumericsRiemann;
 
 // all numerics parmeters

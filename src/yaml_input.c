@@ -116,6 +116,7 @@ static const cyaml_strval_t numerics_temporal_types[] = {
 static const cyaml_strval_t numerics_riemann_types[] = {
     {"roe",  RIEMANN_ROE },
     {"hllc", RIEMANN_HLLC},
+    {"hll",  RIEMANN_HLL},
 };
 
 // mapping of numerics fields to members of RDyNumericsSection

@@ -2,6 +2,7 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 
+
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
 #pragma GCC diagnostic push
