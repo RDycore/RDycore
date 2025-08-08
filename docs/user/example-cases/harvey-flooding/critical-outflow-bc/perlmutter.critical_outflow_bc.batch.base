@@ -7,6 +7,7 @@
 
 N=PLACEHOLDER_N;
 n=PLACEHOLDER_n
+is_petsc_run=PLACEHOLDER_PETSC_RUN
 is_cpu_run=PLACEHOLDER_CPU_RUN
 is_gpu_run=PLACEHOLDER_GPU_RUN
 RAIN_DIR=PLACEHOLDER_RAIN_DIR
@@ -15,7 +16,8 @@ RAIN_DIR=PLACEHOLDER_RAIN_DIR
 export RDYCORE_DIR=PLACEHOLDER_RDYCORE_DIR
 
 # Inputdeck for RDycore
-export YAML_FILE=Turning_30m.critical_outflow_bc.yaml
+export YAML_FILE=PLACEHOLDER_YAML_FILE
+#export YAML_FILE=Turning_30m.critical_outflow_bc.yaml
 
 # Load appropriate modules
 MACH=PLACEHOLDER_MACHINE_NAME
@@ -36,7 +38,16 @@ env > env.${SLURM_JOB_ID}.txt
 
 # Run the code
 
-if [ $is_cpu_run -eq 1 ]; then
+if [ $is_petsc_run -eq 1 ]; then
+
+  # Create a directory for the slurm job in which all log files would be saved
+  export DEST_DIR=cpu.N_${N}.${SLURM_JOB_ID}
+  mkdir ${DEST_DIR}
+
+  LOG_FILE=${MACH}.${PETSC_ARCH}.petsc_cpu.N_${N}.${SLURM_JOB_ID}.log
+  srun -N $N -n $n -c 2 ${RDYCORE_EXE} ${YAML_FILE} -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir $RAIN_DIR -ts_monitor -log_view 2>&1 | tee ${LOG_FILE}
+
+elif [ $is_cpu_run -eq 1 ]; then
 
   # Create a directory for the slurm job in which all log files would be saved
   export DEST_DIR=cpu.N_${N}.${SLURM_JOB_ID}

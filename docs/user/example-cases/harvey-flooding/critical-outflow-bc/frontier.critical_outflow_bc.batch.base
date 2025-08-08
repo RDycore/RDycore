@@ -14,7 +14,8 @@ RAIN_DIR=PLACEHOLDER_RAIN_DIR
 export RDYCORE_DIR=PLACEHOLDER_RDYCORE_DIR
 
 # Inputdeck for RDycore
-export YAML_FILE=Turning_30m.critical_outflow_bc.yaml
+export YAML_FILE=PLACEHOLDER_YAML_FILE
+#Turning_30m.critical_outflow_bc.yaml
 
 # Load appropriate modules
 MACH=PLACEHOLDER_MACHINE_NAME
