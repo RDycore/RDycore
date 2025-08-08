@@ -106,7 +106,7 @@ static PetscErrorCode ComputeSWERoeFlux(RiemannStateData *datal, RiemannStateDat
   for (PetscInt i = 0; i < num_states; ++i) {
     // compute eigenspectrum
     PetscReal A[3], R[3][3], dW[3];
-    PetscCall(ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A, R, dW, amax));
+    PetscCall(ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A, R, dW, &amax[i]));
 
     // compute interface fluxes
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
