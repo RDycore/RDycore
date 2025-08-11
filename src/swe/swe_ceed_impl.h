@@ -89,6 +89,71 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   return SWEFlux(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
 
+// SWE interior flux with slope reconstruction operator Q-function
+CEED_QFUNCTION_HELPER int SWEFluxReconstructed(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
+  const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
+  const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  // new input for slope reconstruction - must be called properly
+  const CeedScalar(*grad_q_L)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  const CeedScalar(*grad_q_R)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+
+  CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  const SWEContext context             = (SWEContext)ctx;
+
+  const CeedScalar dt      = context->dtime;
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
+  const CeedScalar gravity = context->gravity;
+
+  for (CeedInt i = 0; i < Q; i++) {
+
+    const CeedScalar dxL[2] = {-geom[0][i], -geom[1][i]};  
+    const CeedScalar dxR[2] = { geom[0][i],  geom[1][i]}; 
+
+    // reconstructed qL using gradient
+    SWEState qL = {
+      q_L[0][i] + grad_q_L[0][i] * dxL[0] + grad_q_L[1][i] * dxL[1],  // h
+      q_L[1][i] + grad_q_L[2][i] * dxL[0] + grad_q_L[3][i] * dxL[1],  // hu
+      q_L[2][i] + grad_q_L[4][i] * dxL[0] + grad_q_L[5][i] * dxL[1]   // hv
+    };
+
+    // reconstructed qR using gradient
+    SWEState qR = {
+      q_R[0][i] + grad_q_R[0][i] * dxR[0] + grad_q_R[1][i] * dxR[1],  // h
+      q_R[1][i] + grad_q_R[2][i] * dxR[0] + grad_q_R[3][i] * dxR[1],  // hu
+      q_R[2][i] + grad_q_R[4][i] * dxR[0] + grad_q_R[5][i] * dxR[1]   // hv
+    };
+
+    // 
+    CeedScalar flux[3], amax;
+    if (qL.h > tiny_h || qR.h > tiny_h) {
+      switch (flux_type) {
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+      }
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i]     = flux[j] * geom[2][i];
+        cell_R[j][i]     = flux[j] * geom[3][i];
+        accum_flux[j][i] = flux[j];
+      }
+      courant_num[0][i] = -amax * geom[2][i] * dt;
+      courant_num[1][i] = amax * geom[3][i] * dt;
+    }
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SWEFluxReconstructed_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFluxReconstructed(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
+
+
 // SWE boundary flux operator Q-function (Dirichlet condition)
 CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
                                                     RiemannFluxType flux_type) {
