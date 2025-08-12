@@ -4,6 +4,20 @@
 #include <private/rdydmimpl.h>
 #include <rdycore.h>
 
+static PetscErrorCode RenameDMFields(DM dm, SectionFieldSpec fields) {
+  PetscFunctionBeginUser;
+
+  PetscSection sec;
+  PetscCall(DMGetLocalSection(dm, &sec));
+  for (PetscInt f = 0; f < fields.num_fields; ++f) {
+    PetscCall(PetscSectionSetFieldName(sec, f, fields.field_names[f]));
+    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
+      if (fields.field_component_names[f][c][0]) PetscCall(PetscSectionSetComponentName(sec, f, c, fields.field_component_names[f][c]));
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// This function creates a Section appropriate for use by the given (primary) DM.
 static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscFunctionBeginUser;
@@ -30,15 +44,8 @@ static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscCall(DMCreateDS(dm));
 
   // Set field and component names
-  PetscSection sec;
+  PetscCall(RenameDMFields(dm, fields));
 
-  PetscCall(DMGetLocalSection(dm, &sec));
-  for (PetscInt f = 0; f < fields.num_fields; ++f) {
-    PetscCall(PetscSectionSetFieldName(sec, f, fields.field_names[f]));
-    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
-      if (fields.field_component_names[f][c][0]) PetscCall(PetscSectionSetComponentName(sec, f, c, fields.field_component_names[f][c]));
-    }
-  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -156,6 +163,9 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMCreateDS(rdy->dm));
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+
+  // rename the fields in the distributed section
+  PetscCall(RenameDMFields(rdy->dm, rdy->soln_fields));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
