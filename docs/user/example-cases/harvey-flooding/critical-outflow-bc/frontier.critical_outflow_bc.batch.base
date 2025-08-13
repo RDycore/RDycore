@@ -66,3 +66,5 @@ for file in `ls report*`; do mv $file ${SLURM_JOB_ID}.$file ; done
 mv *${SLURM_JOB_ID}.* ${DEST_DIR}
 cp ${YAML_FILE} ${DEST_DIR}
 
+# Move output files in the slurm job dir
+mv output ${DEST_DIR}
