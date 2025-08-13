@@ -82,6 +82,14 @@ CEED_QFUNCTION_HELPER int SedimentFlux(void *ctx, CeedInt Q, const CeedScalar *c
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
       courant_num[1][i] = amax * geom[3][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < tot_ndof; j++) {
+        cell_L[j][i]     = 0.0;
+        cell_R[j][i]     = 0.0;
+        accum_flux[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
+      courant_num[1][i] = 0.0;
     }
   }
   return 0;
@@ -129,6 +137,13 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, c
         accum_flux[j][i] = flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < tot_ndof; j++) {
+        cell_L[j][i]     = 0.0;
+        accum_flux[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
+      courant_num[1][i] = 0.0;
     }
   }
   return 0;
@@ -178,6 +193,11 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Reflecting(void *ctx, CeedInt Q, 
         cell_L[j][i] = flux[j] * geom[2][i];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < tot_ndof; j++) {
+        cell_L[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
     }
   }
   return 0;
