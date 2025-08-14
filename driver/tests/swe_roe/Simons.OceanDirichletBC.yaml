@@ -22,7 +22,6 @@ output:
   batch_size: 20
   time_series:
     boundary_fluxes: 1
-  separate_grid_file: true
 
 grid:
   file: simons.exo
