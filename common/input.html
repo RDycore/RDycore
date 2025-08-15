@@ -1870,7 +1870,6 @@ RDycore. The parameters that define these discretizations are</p>
 <span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xdmf</span>
 <span class="w">  </span><span class="nt">output_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
 <span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">  </span><span class="nt">separate_grid_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">time_series</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">boundary_fluxes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 <span class="w">    </span><span class="nt">observations</span><span class="p">:</span>
@@ -1905,8 +1904,8 @@ time series data (<strong>but excluding checkpoint data</strong>). Relevant para
 <li><code>format</code>: the format of the output written. Available options are<ul>
 <li><code>none</code>: no output is written. This is the default value.</li>
 <li><code>binary</code>: output is written using PETSc's binary data format</li>
-<li><code>xdmf</code>: output is written to the <a href="https://xdmf.org/index.php/XDMF_Model_and_Format">XDMF</a> format</li>
-<li><code>cgns</code>: output is written to the <a href="https://cgns.github.io/">CFD General Notation System (CGNS)</a> format</li>
+<li><code>xdmf</code>: output is written in the <a href="https://xdmf.org/index.php/XDMF_Model_and_Format">XDMF</a> format</li>
+<li><code>cgns</code>: output is written in the <a href="https://cgns.github.io/">CFD General Notation System (CGNS)</a> format</li>
 </ul>
 </li>
 <li><code>output_interval</code>: the number of time steps between output dumps. Default value: 0 (no output)</li>
@@ -1915,9 +1914,6 @@ time series data (<strong>but excluding checkpoint data</strong>). Relevant para
 <li><code>batch_size</code>: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1</li>
-<li><code>separate_grid_file</code>: this optional parameter specifies whether the grid is
-  written to its own file, which saves space in very large simulations. Currently,
-  this option is only supported for <code>xdmf</code> output.</li>
 <li><code>time_series</code>: this subsection controls time series simulation output, which
   is useful for inspection and possibly even coupling. Parameters:<ul>
 <li><code>boundary_fluxes</code>: the interval (number of timesteps) at which boundary
