@@ -91,16 +91,12 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, RDyOutputSection out
 static PetscErrorCode DetermineGridFile(RDy rdy, PetscInt step, PetscReal time, char *filename) {
   PetscFunctionBegin;
 
-  if (rdy->config.output.separate_grid_file) {
-    // the grid is stored in its own file
-    char prefix[PETSC_MAX_PATH_LEN], output_dir[PETSC_MAX_PATH_LEN];
-    PetscCall(DetermineConfigPrefix(rdy, prefix));
-    PetscCall(GetOutputDirectory(rdy, output_dir));
-    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
-  } else {
-    // the grid is stored in the base HDF5 file
-    DetermineOutputFile(rdy, step, time, "h5", filename);
-  }
+  // the grid is stored in its own file
+  char prefix[PETSC_MAX_PATH_LEN], output_dir[PETSC_MAX_PATH_LEN];
+  PetscCall(DetermineConfigPrefix(rdy, prefix));
+  PetscCall(GetOutputDirectory(rdy, output_dir));
+  snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -220,27 +216,19 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
-  // write the grid
-  if (rdy->config.output.separate_grid_file) {
-    // on the first step ONLY, write the grid to its own file
-    if (step == 0) {
-      char h5_gridname[PETSC_MAX_PATH_LEN];
-      PetscCall(DetermineGridFile(rdy, step, time, h5_gridname));
-      RDyLogDetail(rdy, "Step 0: writing XDMF HDF5 grid to %s", h5_gridname);
+  // on the first step ONLY, write the grid to its own file
+  if (step == 0) {
+    char h5_gridname[PETSC_MAX_PATH_LEN];
+    PetscCall(DetermineGridFile(rdy, step, time, h5_gridname));
+    RDyLogDetail(rdy, "Step 0: writing XDMF HDF5 grid to %s", h5_gridname);
 
-      PetscViewer grid_viewer;
-      PetscCall(PetscViewerHDF5Open(rdy->comm, h5_gridname, FILE_MODE_WRITE, &grid_viewer));
-      PetscCall(PetscViewerPushFormat(grid_viewer, PETSC_VIEWER_HDF5_XDMF));
-      PetscCall(PetscViewerHDF5SetCollective(grid_viewer, PETSC_TRUE));
-      PetscCall(WriteGrid(rdy->comm, &rdy->mesh, grid_viewer));
-      PetscCall(PetscViewerPopFormat(grid_viewer));
-      PetscCall(PetscViewerDestroy(&grid_viewer));
-    }
-  } else {
-    // write the grid with the rest of the HDF5 data if we're the first step in a batch.
-    if (dataset % rdy->config.output.batch_size == 0) {
-      PetscCall(WriteGrid(rdy->comm, &rdy->mesh, viewer));
-    }
+    PetscViewer grid_viewer;
+    PetscCall(PetscViewerHDF5Open(rdy->comm, h5_gridname, FILE_MODE_WRITE, &grid_viewer));
+    PetscCall(PetscViewerPushFormat(grid_viewer, PETSC_VIEWER_HDF5_XDMF));
+    PetscCall(PetscViewerHDF5SetCollective(grid_viewer, PETSC_TRUE));
+    PetscCall(WriteGrid(rdy->comm, &rdy->mesh, grid_viewer));
+    PetscCall(PetscViewerPopFormat(grid_viewer));
+    PetscCall(PetscViewerDestroy(&grid_viewer));
   }
 
   PetscCall(PetscViewerPopFormat(viewer));

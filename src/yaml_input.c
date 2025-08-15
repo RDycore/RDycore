@@ -239,7 +239,6 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 //   format: <binary|xdmf|cgns>
 //   output_interval: <number-of-steps-between-output-dumps> # default: 0 (no output)
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
-//   separate_grid_file: <true|false>
 //   time_series:
 //     boundary_fluxes: <number-of-steps-between-flux-dumps>
 //     observations:
@@ -308,7 +307,6 @@ static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_INT("time_interval", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_interval),
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
-    CYAML_FIELD_BOOL("separate_grid_file", CYAML_FLAG_OPTIONAL, RDyOutputSection, separate_grid_file),
     CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
     CYAML_FIELD_END
 };
@@ -1040,8 +1038,6 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
       config->output.batch_size = 1;
     }
-    PetscCheck(!config->output.separate_grid_file || (config->output.format == OUTPUT_XDMF), comm, PETSC_ERR_USER,
-               "separate_grid_file option is only supported for XDMF output");
 
     if (config->output.time_interval) {
       if (!coupling_interval_was_specified) config->time.coupling_interval = config->output.time_interval * 1.0;

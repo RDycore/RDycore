@@ -409,7 +409,6 @@ output:
   format: xdmf
   output_interval: 100
   batch_size: 1
-  separate_grid_file: true
   time_series:
     boundary_fluxes: 10
     observations:
@@ -443,17 +442,14 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
     * `binary`: output is written using PETSc's binary data format
-    * `xdmf`: output is written to the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
-    * `cgns`: output is written to the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
+    * `xdmf`: output is written in the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
+    * `cgns`: output is written in the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
 * `output_interval`: the number of time steps between output dumps. Default value: 0 (no output)
 * `time_interval`: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)
 * `time_unit`: units of temporal frequency output.
 * `batch_size`: the number of time steps for which output data is stored in a
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1
-* `separate_grid_file`: this optional parameter specifies whether the grid is
-  written to its own file, which saves space in very large simulations. Currently,
-  this option is only supported for `xdmf` output.
 * `time_series`: this subsection controls time series simulation output, which
   is useful for inspection and possibly even coupling. Parameters:
     * `boundary_fluxes`: the interval (number of timesteps) at which boundary
