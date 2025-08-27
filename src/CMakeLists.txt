@@ -23,11 +23,11 @@ set(RDYCORE_C_SOURCE_FILES
 )
 
 # generate <physics>_ceed.h headers inside each CEED operator implementation
-# directory so the JIT compilers have everything they need 
+# directory so the JIT compilers have everything they need
 foreach(physics swe;sediment)
   string(TOUPPER ${physics} PHYSICS)
   configure_file(
-    ${CMAKE_SOURCE_DIR}/include/private/physics_ceed.h.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/private/physics_ceed.h.in
     ${CMAKE_CURRENT_SOURCE_DIR}/${physics}/${physics}_ceed.h
     @ONLY
   )
