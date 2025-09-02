@@ -20,7 +20,7 @@ set(NUM_MATERIAL_PROPERTIES    1)
 math(EXPR MAX_NUM_FIELD_COMPONENTS "3 + ${MAX_NUM_SEDIMENT_CLASSES}")
 
 # CMake files live in the cmake/ directory.
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Use a specific version of clang-format.
 set(CLANG_FORMAT_VERSION 14)
