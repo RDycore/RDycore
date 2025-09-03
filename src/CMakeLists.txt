@@ -33,17 +33,17 @@ foreach(physics swe;sediment)
   )
 endforeach()
 
-add_library(rdycore ${RDYCORE_C_SOURCE_FILES})
-target_link_libraries(rdycore cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
-add_dependencies(rdycore cyaml yaml)
+add_library(rdycore_c ${RDYCORE_C_SOURCE_FILES})
+target_link_libraries(rdycore_c cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
+add_dependencies(rdycore_c cyaml yaml)
 
 install(
-  TARGETS rdycore
+  TARGETS rdycore_c
   DESTINATION lib
 )
 if (ENABLE_SANITIZERS)
-  target_compile_options(rdycore PUBLIC -fsanitize=${SANITIZERS})
-  target_link_options(rdycore PUBLIC -fsanitize=${SANITIZERS})
+  target_compile_options(rdycore_c PUBLIC -fsanitize=${SANITIZERS})
+  target_link_options(rdycore_c PUBLIC -fsanitize=${SANITIZERS})
 endif()
 
 # Unit tests for the main library
