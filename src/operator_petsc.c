@@ -213,6 +213,44 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscIn
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode CreatePetscFluxOperatorReconstructed(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
+                                       RDyCondition *boundary_conditions, Vec *boundary_values, Vec *boundary_fluxes,
+                                       OperatorDiagnostics *diagnostics, PetscOperator *flux_op) {
+  PetscFunctionBegin;
+
+  PetscCall(PetscCompositeOperatorCreate(flux_op));
+
+  if (config->physics.flow.mode != FLOW_SWE) {
+    PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
+  }
+
+  // flux suboperator 0: fluxes between interior cells (THIS IS THE KEY CHANGE)
+  PetscOperator interior_flux_op;
+  if (config->physics.sediment.num_classes > 0) {
+    // You'll need to create a reconstructed sediment version too
+    PetscCall(CreateSedimentPetscInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
+  } else {
+    // ** CHANGED: Call the reconstructed version (removed dm parameter) **
+    PetscCall(CreateSWEPetscInteriorFluxOperatorReconstructed(mesh, *config, diagnostics, &interior_flux_op));
+  }
+  PetscCall(PetscCompositeOperatorAddSub(*flux_op, interior_flux_op));
+
+  // flux suboperators 1 to num_boundaries: fluxes on boundary edges (same as original)
+  for (CeedInt b = 0; b < num_boundaries; ++b) {
+    PetscOperator boundary_flux_op;
+    RDyBoundary   boundary  = boundaries[b];
+    RDyCondition  condition = boundary_conditions[b];
+    if (config->physics.sediment.num_classes > 0) {
+      PetscCall(CreateSedimentPetscBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], diagnostics,
+                                                        &boundary_flux_op));
+    } else {
+      PetscCall(CreateSWEPetscBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], diagnostics,
+                                                   &boundary_flux_op));
+    }
+    PetscCall(PetscCompositeOperatorAddSub(*flux_op, boundary_flux_op));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 /// Creates a PETSc source operator appropriate for the given configuration.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain

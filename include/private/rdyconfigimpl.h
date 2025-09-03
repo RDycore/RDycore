@@ -103,6 +103,8 @@ typedef struct {
   RDyNumericsSpatial  spatial;
   RDyNumericsTemporal temporal;
   RDyNumericsRiemann  riemann;
+  PetscBool           use_slope_reconstruction;
+
 } RDyNumericsSection;
 
 // ------------
