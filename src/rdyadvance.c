@@ -78,9 +78,20 @@ PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// generates a filename in the given directory in the format <prefix>-YYYY-MM-DD-hh:mm:ss.<suffix>
+PetscErrorCode GeneratePrettyFilename(const char *directory, const char *prefix, time_t t, const char *suffix, char *filename) {
+  PetscFunctionBegin;
+  printf("time is %ld\n", t);
+  struct tm date;
+  localtime_r(&t, &date);
+  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%04d-%02d-%02d-%02d:%02d:%02d.%s", directory, prefix, date.tm_year, date.tm_mon, date.tm_mday,
+           date.tm_hour, date.tm_min, date.tm_sec, suffix);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Determines the appropriate output file name based on
 /// * the desired file format as specified by rdy->config.output_format
-/// * the time step index and simulation time
+/// * the simulation time
 /// * the specified suffix
 PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
   PetscFunctionBegin;
@@ -89,22 +100,20 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   PetscCall(DetermineConfigPrefix(rdy, prefix));
 
   // determine the current Gregorian time
-  time_t    t0 = mktime(&rdy->config.time.date);
-  time_t    t  = t0 + (time_t)time;
-  struct tm current_time;
-  localtime_r(&t, &current_time);
+  struct tm current_time = rdy->config.time.date;
+  current_time.tm_sec += (time_t)time;
+  time_t t = mktime(&current_time);
 
   // encode specific information into the filename based on its format
   char output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(GetOutputDirectory(rdy, output_dir));
   if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
-    PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
+    PetscCall(GeneratePrettyFilename(output_dir, prefix, t, suffix, filename));
   } else if (rdy->config.output.format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output.batch_size == 1) {
         // output from each step gets its own HDF5 file
-        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%4d-%2d-%2d-%2d:%2d:%2d.%s", output_dir, prefix, current_time.tm_year, current_time.tm_mon,
-                 current_time.tm_mday, current_time.tm_hour, current_time.tm_min, current_time.tm_sec, suffix);
+        PetscCall(GeneratePrettyFilename(output_dir, prefix, t, suffix, filename));
       } else {
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size      = rdy->config.output.batch_size;
@@ -118,7 +127,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
       PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
       // encode the step into the filename with zero-padding based on the
       // maximum step number
-      PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
+      PetscCall(GeneratePrettyFilename(output_dir, prefix, t, suffix, filename));
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
