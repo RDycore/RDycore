@@ -162,7 +162,7 @@ static const cyaml_schema_field_t adaptive_fields_schema[] = {
 
 // mapping of time fields to members of RDyTimeSection
 static const cyaml_schema_field_t time_fields_schema[] = {
-    CYAML_FIELD_STRING("date", CYAML_FLAG_OPTIONAL, RDyTimeSection, date, 0),
+    CYAML_FIELD_STRING("date", CYAML_FLAG_DEFAULT, RDyTimeSection, date_string, 10),
     CYAML_FIELD_FLOAT("stop", CYAML_FLAG_OPTIONAL, RDyTimeSection, stop),
     CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("stop_n", CYAML_FLAG_OPTIONAL, RDyTimeSection, stop_n),
@@ -885,6 +885,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
 
   PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");
+
+  // check time settings
+  int num_items = sscanf(config->time.date_string, "%4d-%2d-%2d-%2d:%2d:%2d", &config->time.date.tm_year, &config->time.date.tm_mon,
+                         &config->time.date.tm_mday, &config->time.date.tm_hour, &config->time.date.tm_min, &config->time.date.tm_sec);
+  printf("# items: %d\n", num_items);
+  PetscCheck(num_items == 3 || num_items == 6, comm, PETSC_ERR_USER, "Invalid date: %s (must be YYYY-MM-DD-hh:mm:ss)", config->time.date_string);
 
   // check adaptive time step setting
   if (config->time.adaptive.enable) {

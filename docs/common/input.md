@@ -700,13 +700,13 @@ time:
 The `time` section determines the time-stepping strategy used by RDycore using
 the following parameters:
 
-* `date`: a timestamp in the format `YYYY-MM-DD-hh:mm:ss`, where
+* `date`: a timestamp in the format `YYYY-MM-DD-hh:mm:ss` OR `YYYY-MM-DD`, where
     * `YYYY` is a 4-digit year
     * `MM` is a 2-digit month index
     * `DD` is a 2-digit calendar day
-    * `hh` is a 2-digit hour (0-23)
-    * `mm` is a 2-digit minute (0-59)
-    * `ss` is a 2-digit second (0-59)
+    * `hh` is a 2-digit hour (00-23, 00 if omitted)
+    * `mm` is a 2-digit minute (00-59, 00 if omitted)
+    * `ss` is a 2-digit second (00-59, 00 if omitted)
 * `stop`: the length of time after which the simulation stops (expressed in `unit`)
 * `unit`: the unit of measure in which `duration` is expressed. Available
   options are `seconds`, `minutes`, `hours`, `days`, `months`, and `years`.

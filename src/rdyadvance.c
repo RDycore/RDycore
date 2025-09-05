@@ -88,6 +88,12 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   char prefix[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
 
+  // determine the current Gregorian time
+  time_t    t0 = mktime(&rdy->config.time.date);
+  time_t    t  = t0 + (time_t)time;
+  struct tm current_time;
+  localtime_r(&t, &current_time);
+
   // encode specific information into the filename based on its format
   char output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(GetOutputDirectory(rdy, output_dir));
@@ -97,7 +103,8 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output.batch_size == 1) {
         // output from each step gets its own HDF5 file
-        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%" PetscInt_FMT ".%s", output_dir, prefix, step, suffix);
+        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%4d-%2d-%2d-%2d:%2d:%2d.%s", output_dir, prefix, current_time.tm_year, current_time.tm_mon,
+                 current_time.tm_mday, current_time.tm_hour, current_time.tm_min, current_time.tm_sec, suffix);
       } else {
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size      = rdy->config.output.batch_size;
