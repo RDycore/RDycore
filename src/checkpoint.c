@@ -166,10 +166,10 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     char                    checkpoint_dir[PETSC_MAX_PATH_LEN];
     PetscCall(GetCheckpointDirectory(rdy, checkpoint_dir));
     if (format == PETSC_VIEWER_NATIVE) {  // binary
-      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "bin", filename));
+      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "bin", filename));
       PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
     } else {  // HDF5
-      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "h5", filename));
+      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "h5", filename));
       PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
     }
 

@@ -11,7 +11,7 @@ logging:
   level: debug
 
 time:
-  final_time       : 1.0
+  stop             : 1.0
   time_step        : 0.5
   coupling_interval: 1.0
   unit             : seconds

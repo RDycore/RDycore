@@ -92,7 +92,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   char output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(GetOutputDirectory(rdy, output_dir));
   if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
-    PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
+    PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
   } else if (rdy->config.output.format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output.batch_size == 1) {
@@ -103,7 +103,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
         PetscInt batch_size      = rdy->config.output.batch_size;
         PetscInt output_interval = rdy->config.output.output_interval;
         PetscInt batch           = step / output_interval / batch_size;
-        PetscInt max_batch       = rdy->config.time.max_step / output_interval / batch_size;
+        PetscInt max_batch       = rdy->config.time.stop_n / output_interval / batch_size;
         if (max_batch < 1) max_batch = 1;
         PetscCall(GenerateIndexedFilename(output_dir, prefix, batch, max_batch, suffix, filename));
       }
@@ -111,7 +111,7 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
       PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
       // encode the step into the filename with zero-padding based on the
       // maximum step number
-      PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
+      PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
@@ -342,7 +342,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
-  PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
+  PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.stop, rdy->config.time.unit);
   if (time >= final_time) {
     // clean up
     PetscCall(DestroyOutputViewer(rdy));
@@ -362,7 +362,7 @@ PetscBool RDyFinished(RDy rdy) {
   PetscReal time_in_unit = ConvertTimeFromSeconds(time, rdy->config.time.unit);
   PetscInt  step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
-  if (rdy->config.time.final_time - time_in_unit < 1e-13) {  // FIXME: can we do better than this?
+  if (rdy->config.time.stop - time_in_unit < 1e-13) {  // FIXME: can we do better than this?
     finished = PETSC_TRUE;
   }
   PetscFunctionReturn(finished);

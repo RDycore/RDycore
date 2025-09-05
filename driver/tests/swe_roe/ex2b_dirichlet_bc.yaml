@@ -11,9 +11,9 @@ logging:
   level: detail
 
 time:
-  final_time: 0.005
+  stop: 0.005
   unit: seconds
-  max_step: 100
+  stop_n: 100
 
 output:
   directory: dirichlet-bc-output

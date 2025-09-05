@@ -118,9 +118,10 @@ typedef struct {
 
 // all time parameters
 typedef struct {
-  PetscReal              final_time;         // final simulation time [unit]
+  char                   date[20];           // simulation start date (YYYY-MM-DD-hh:mm:ss)
+  PetscReal              stop;               // final simulation time [unit]
   RDyTimeUnit            unit;               // unit in which time is expressed
-  PetscInt               max_step;           // maximum number of simulation time steps
+  PetscInt               stop_n;             // maximum number of simulation time steps
   PetscReal              time_step;          // minimum internal time step [unit]
   PetscReal              coupling_interval;  // time interval spanned by RDyAdvance [unit]
   RDyTimeAdaptiveSection adaptive;           // adaptive time step for explicity time integration

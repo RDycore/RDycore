@@ -690,35 +690,46 @@ materials is necessarily 1:1.
 
 ```yaml
 time:
-  final_time: 1
-    unit: years
-    max_step: 1000
-    time_step: 0.001
-    coupling_interval: 0.01
+  date: 2025-02-01-11:10:02
+  stop: 1
+  unit: years
+  stop_n: 1000
+  coupling_interval: 0.01
 ```
 
 The `time` section determines the time-stepping strategy used by RDycore using
 the following parameters:
 
-* `units`: the units in which time is expressed in the input file. Available
+* `date`: a timestamp in the format `YYYY-MM-DD-hh:mm:ss`, where
+    * `YYYY` is a 4-digit year
+    * `MM` is a 2-digit month index
+    * `DD` is a 2-digit calendar day
+    * `hh` is a 2-digit hour (0-23)
+    * `mm` is a 2-digit minute (0-59)
+    * `ss` is a 2-digit second (0-59)
+* `stop`: the length of time after which the simulation stops (expressed in `unit`)
+* `unit`: the unit of measure in which `duration` is expressed. Available
   options are `seconds`, `minutes`, `hours`, `days`, `months`, and `years`.
-  This parameter is required and has no default value.
-* `final_time`: the time at which the simulation ends (in the desired units)
-* `max_step`: the number of steps after which the simulation ends
+  This parameter is required if `stop` is used.
+* `stop_n`: the number of steps after which the simulation ends
 * `time_step`: a fixed size used for the time step in the desired units.
-* `coupling_inverval`: the time interval (in the desired units) at which
+* `coupling_inverval`: the time interval (expressed in `unit`) at which
   RDycore advances without coupling to E3SM. By default, RDycore runs a single
   time step without coupling to E3SM.
 
-Exactly two of `final_time`, `max_step`, and `time_step` must be specified.
-The missing parameter is then computed from those parameters given.
+The parameters `date` and `unit` are required.
 
-Additionally, RDycore can increase or decrease time step to meet a target Courant
-number via `adaptive` sub-block within the `time` block as shown below.
+If fixed timesteps are desired, exactly two of `stop`, `stop_n`, and `time_step`
+must be specified. The third of these parameters is then computed from the two given.
+
+RDycore supports adaptive timestepping, in which the time step is increased or
+decreased as necessary to meet a target Courant number. This behavior is enabled with
+the `adaptive` subsection within the `time` section:
 
 ```yaml
 time:
-  final_time        : 0.005
+  date              : 2025-02-01-11:10:02
+  stop              : 0.005
   coupling_interval : 0.001
   unit              : hours
   adaptive:
