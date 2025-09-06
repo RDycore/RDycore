@@ -5,7 +5,7 @@ function convert_asc_rainfall_data_to_dlnd_netcdf_files()
 % read by DLND (data land) component of E3SM.
 %
 % Example usage:
-% convert_asc_rainfall_data_to_dlnd_netcdf_files('')
+% convert_asc_rainfall_data_to_dlnd_netcdf_files()
 
 rainfall_data_name = 'daymet';
 inp_dir = rainfall_data_name;

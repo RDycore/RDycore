@@ -3,7 +3,8 @@
 - `daymet/asc`: Contains sample rainfall data in ASCII raster format.
 
 - `convert_asc_rainfall_data_to_dlnd_netcdf_files.m`: Converts ASCII raster format rainfall data
-in `daymet/asc ` into netcdf files that can be used by the DLND, data land, of E3SM.
+in `daymet/asc ` into netcdf files that can be used by the DLND, data land, of E3SM. This requires
+Mapping Toolbox.
 
 - `convert_asc_rainfall_data_to_petsc_binary_vec.m`: Converts ASCII raster format rainfall data
 in PETSc binary file that can be read by RDycore.
