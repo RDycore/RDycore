@@ -11,6 +11,7 @@ logging:
   level: debug
 
 time:
+  date             : 2017-08-26
   stop             : 4200.0
   time_step        : 30.0
   coupling_interval: 60.0
