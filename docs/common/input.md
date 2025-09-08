@@ -717,7 +717,8 @@ the following parameters:
   RDycore advances without coupling to E3SM. By default, RDycore runs a single
   time step without coupling to E3SM.
 
-The parameters `date` and `unit` are required.
+The `unit` parameter is required. If the `date` parameter is given, output filenames
+are timestamped relative to the start date; otherwise, they are indexed by time step.
 
 If fixed timesteps are desired, exactly two of `stop`, `stop_n`, and `time_step`
 must be specified. The third of these parameters is then computed from the two given.
