@@ -2144,31 +2144,44 @@ the material with which it is associated--the relationship between regions and
 materials is necessarily 1:1.</p>
 <h2 id="time"><code>time</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">time</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">final_time</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">unit</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">years</span>
-<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">max_step</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
-<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">time_step</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
-<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">coupling_interval</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
+<span class="w">  </span><span class="nt">date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2025-02-01-11:10:02</span>
+<span class="w">  </span><span class="nt">stop</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">unit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">years</span>
+<span class="w">  </span><span class="nt">stop_n</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w">  </span><span class="nt">coupling_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
 </code></pre></div>
 <p>The <code>time</code> section determines the time-stepping strategy used by RDycore using
 the following parameters:</p>
 <ul>
-<li><code>units</code>: the units in which time is expressed in the input file. Available
+<li><code>date</code>: a timestamp in the format <code>YYYY-MM-DD-hh:mm:ss</code> OR <code>YYYY-MM-DD</code>, where<ul>
+<li><code>YYYY</code> is a 4-digit year</li>
+<li><code>MM</code> is a 2-digit month index</li>
+<li><code>DD</code> is a 2-digit calendar day</li>
+<li><code>hh</code> is a 2-digit hour (00-23, 00 if omitted)</li>
+<li><code>mm</code> is a 2-digit minute (00-59, 00 if omitted)</li>
+<li><code>ss</code> is a 2-digit second (00-59, 00 if omitted)</li>
+</ul>
+</li>
+<li><code>stop</code>: the length of time after which the simulation stops (expressed in <code>unit</code>)</li>
+<li><code>unit</code>: the unit of measure in which <code>duration</code> is expressed. Available
   options are <code>seconds</code>, <code>minutes</code>, <code>hours</code>, <code>days</code>, <code>months</code>, and <code>years</code>.
-  This parameter is required and has no default value.</li>
-<li><code>final_time</code>: the time at which the simulation ends (in the desired units)</li>
-<li><code>max_step</code>: the number of steps after which the simulation ends</li>
+  This parameter is required if <code>stop</code> is used.</li>
+<li><code>stop_n</code>: the number of steps after which the simulation ends</li>
 <li><code>time_step</code>: a fixed size used for the time step in the desired units.</li>
-<li><code>coupling_inverval</code>: the time interval (in the desired units) at which
+<li><code>coupling_inverval</code>: the time interval (expressed in <code>unit</code>) at which
   RDycore advances without coupling to E3SM. By default, RDycore runs a single
   time step without coupling to E3SM.</li>
 </ul>
-<p>Exactly two of <code>final_time</code>, <code>max_step</code>, and <code>time_step</code> must be specified.
-The missing parameter is then computed from those parameters given.</p>
-<p>Additionally, RDycore can increase or decrease time step to meet a target Courant
-number via <code>adaptive</code> sub-block within the <code>time</code> block as shown below.</p>
+<p>The <code>unit</code> parameter is required. If the <code>date</code> parameter is given, output filenames
+are timestamped relative to the start date; otherwise, they are indexed by time step.</p>
+<p>If fixed timesteps are desired, exactly two of <code>stop</code>, <code>stop_n</code>, and <code>time_step</code>
+must be specified. The third of these parameters is then computed from the two given.</p>
+<p>RDycore supports adaptive timestepping, in which the time step is increased or
+decreased as necessary to meet a target Courant number. This behavior is enabled with
+the <code>adaptive</code> subsection within the <code>time</code> section:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">time</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">final_time        </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.005</span>
+<span class="w">  </span><span class="nt">date              </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2025-02-01-11:10:02</span>
+<span class="w">  </span><span class="nt">stop              </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.005</span>
 <span class="w">  </span><span class="nt">coupling_interval </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
 <span class="w">  </span><span class="nt">unit              </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hours</span>
 <span class="w">  </span><span class="nt">adaptive</span><span class="p">:</span>
