@@ -104,7 +104,7 @@ PetscErrorCode OverrideParameters(RDy rdy) {
 
   if (rdy->dt <= 0.0) {
     // ѕet a default timestep if needed
-    rdy->dt = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit) / rdy->config.time.max_step;
+    rdy->dt = ConvertTimeToSeconds(rdy->config.time.stop, rdy->config.time.unit) / rdy->config.time.stop_n;
   } else {
     // convert dt to seconds in any case
     rdy->dt = ConvertTimeToSeconds(rdy->dt, rdy->config.time.unit);
@@ -1081,7 +1081,7 @@ PetscErrorCode InitSolver(RDy rdy) {
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 
   if (!rdy->config.time.adaptive.enable) {
-    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
+    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.stop_n));
   }
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->u_global));

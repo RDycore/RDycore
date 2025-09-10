@@ -718,7 +718,7 @@ static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_com
 PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates, PetscReal *L2_conv_rates, PetscReal *Linf_conv_rates) {
   PetscFunctionBegin;
 
-  PetscReal final_time = rdy->config.time.final_time;
+  PetscReal final_time = rdy->config.time.stop;
 
   PetscInt dim;
   PetscCall(DMGetDimension(rdy->dm, &dim));
@@ -748,9 +748,9 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 
     // override timestepping info (no good way to do this currently)
     rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step;
-    rdys[r]->config.time.max_step  = rdys[r - 1]->config.time.max_step;
+    rdys[r]->config.time.stop_n    = rdys[r - 1]->config.time.stop_n;
     TSSetTimeStep(rdys[r]->ts, rdys[r]->config.time.time_step);
-    TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.max_step);
+    TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.stop_n);
   }
 
   for (PetscInt r = 0; r <= num_refinements; ++r) {

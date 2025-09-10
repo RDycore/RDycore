@@ -7,6 +7,7 @@
 #include <private/rdylogimpl.h>
 #include <private/rdymmsconfigimpl.h>
 #include <rdycore.h>
+#include <time.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
@@ -118,9 +119,11 @@ typedef struct {
 
 // all time parameters
 typedef struct {
-  PetscReal              final_time;         // final simulation time [unit]
+  char                   date_string[20];    // simulation start date string ("YYYY-MM-DD-hh:mm:ss")
+  struct tm              date;               // simulation start date (C representation)
+  PetscReal              stop;               // final simulation time [unit]
   RDyTimeUnit            unit;               // unit in which time is expressed
-  PetscInt               max_step;           // maximum number of simulation time steps
+  PetscInt               stop_n;             // maximum number of simulation time steps
   PetscReal              time_step;          // minimum internal time step [unit]
   PetscReal              coupling_interval;  // time interval spanned by RDyAdvance [unit]
   RDyTimeAdaptiveSection adaptive;           // adaptive time step for explicity time integration

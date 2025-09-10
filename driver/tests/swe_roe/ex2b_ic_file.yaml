@@ -14,9 +14,9 @@ logging:
   level: detail
 
 time:
-  final_time: 0.005
+  stop: 0.005
   unit: hours
-  max_step: 1000
+  stop_n: 1000
 
 output:
   format: xdmf
