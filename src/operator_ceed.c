@@ -54,16 +54,16 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 
   CeedQFunctionContext qf_context;
   if (num_sediment_comp == 0) {  
-    switch (config.numerics.riemann) {  //add
-     case RIEMANN_ROE:  //add
+    switch (config.numerics.riemann) {  
+     case RIEMANN_ROE:  
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
-      break; //add
-     case RIEMANN_HLL: //add
-      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HLL, SWEFlux_HLL_loc, qf)); //add
-      break; //add
-    default://add
+      break; 
+     case RIEMANN_HLL: 
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HLL, SWEFlux_HLL_loc, qf)); 
+      break; 
+    default:
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE,
-              "Unknown Riemann solver type for SWE");//add
+              "Unknown Riemann solver type for SWE");
       }
       PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
   } else {
