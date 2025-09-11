@@ -4,6 +4,10 @@
 #define SWE_OPERATORS_IMPL_H
 
 #include "swe_ceed.h"
+#include "math.h"
+#ifndef RDY_TINY
+#define RDY_TINY ((CeedScalar)1e-12)
+#endif
 
 #ifndef Square
 #define Square(x) ((x) * (x))

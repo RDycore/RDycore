@@ -6,9 +6,10 @@
 CEED_QFUNCTION_HELPER void SWERiemannFlux_HLL(CeedScalar gravity, CeedScalar tiny_h, CeedScalar h_anuga,
                                               SWEState qL, SWEState qR, CeedScalar sn, CeedScalar cn,
                                               CeedScalar flux[3], CeedScalar *amax) {
-  const CeedScalar unL = (qL.hu * cn + qL.hv * sn) / qL.h;
-  const CeedScalar unR = (qR.hu * cn + qR.hv * sn) / qR.h;
-
+ 
+  const CeedScalar unL = SafeDiv(qL.hu * cn + qL.hv * sn, qL.h, fabs(qL.h), RDY_TINY);
+  const CeedScalar unR = SafeDiv(qR.hu * cn + qR.hv * sn, qR.h, fabs(qR.h), RDY_TINY);   
+                               
   const CeedScalar cL = sqrt(gravity * qL.h);
   const CeedScalar cR = sqrt(gravity * qR.h);
 
