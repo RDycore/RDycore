@@ -152,7 +152,7 @@ PetscErrorCode MarkLocalCellsForRefinement(RDy rdy) {
   MPI_Reduce(&local_count, &global_count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
   if (myrank == 0) {
     printf("+++++++++++++++++++++++++++++++++++++++++++\n");
-    printf("Refining %d cells\n", global_count);
+    printf("Refining %" PetscInt_FMT " cells\n", global_count);
     printf("+++++++++++++++++++++++++++++++++++++++++++\n");
   }
 
