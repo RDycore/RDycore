@@ -135,15 +135,25 @@ PetscErrorCode MarkLocalCellsForRefinement(RDy rdy) {
   PetscCall(RDyGetLocalCellXCentroids(rdy, ncells_local, xc_local));
   PetscCall(RDyGetLocalCellYCentroids(rdy, ncells_local, yc_local));
 
+  PetscInt local_count = 0, global_count = 0;
   for (PetscInt icell = 0; icell < ncells_local; icell++) {
     // check if the cell is inside the region of interest
     if (xc_local[icell] > 0.0 && xc_local[icell] < 1.0 && yc_local[icell] > 3.0 && yc_local[icell] < 4.0) {
       // mark the cell for refinement
       refine_cell[icell] = PETSC_TRUE;
+      local_count++;
     } else {
       // do not mark the cell for refinement
       refine_cell[icell] = PETSC_FALSE;
     }
+  }
+  PetscMPIInt myrank;
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+  MPI_Reduce(&local_count, &global_count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  if (myrank == 0) {
+    printf("+++++++++++++++++++++++++++++++++++++++++++\n");
+    printf("Refining %d cells\n", global_count);
+    printf("+++++++++++++++++++++++++++++++++++++++++++\n");
   }
 
   PetscCall(RDyMarkLocalCellsForRefinement(rdy, ncells_local, refine_cell));
@@ -223,6 +233,8 @@ int main(int argc, char *argv[]) {
 
         PetscCall(VecDestroy(&global_base));
         PetscCall(VecDestroy(&global_current));
+      } else {
+        PetscCall(MarkLocalCellsForRefinement(rdy));
       }
 
       PetscCall(RDyRefine(rdy));
