@@ -123,12 +123,14 @@ PetscErrorCode CreateDM(RDy rdy) {
   refined = (pStart == pStartNew) && (pEnd == pEndNew) ? PETSC_FALSE : PETSC_TRUE;
 
   // distribution phase
-  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_dist_"));
-  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
-  PetscCall(DMSetFromOptions(rdy->dm));
-  PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
-  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
-  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+  if (refined) {
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_dist_"));
+    PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
+    PetscCall(DMSetFromOptions(rdy->dm));
+    PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+    PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+  }
 
   // Overlap meshes after refinement
   if (size > 1) {
