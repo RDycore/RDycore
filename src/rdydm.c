@@ -108,13 +108,21 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
 
   // parallel refinement phase
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_"));
+  PetscCall(DMSetFromOptions(rdy->dm));
+  PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+
+  // distribution phase
+  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_dist_"));
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
 
   // Overlap meshes after refinement
