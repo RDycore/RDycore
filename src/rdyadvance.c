@@ -172,11 +172,13 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
         break;
       case OUTPUT_XDMF:
         // we don't actually use this viewer, so maybe this doesn't matter?
+        if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
         PetscCall(PetscViewerCreate(rdy->comm, &rdy->output_viewer));
         PetscCall(PetscViewerSetType(rdy->output_viewer, PETSCVIEWERHDF5));
         format = PETSC_VIEWER_HDF5_XDMF;
         break;
       case OUTPUT_BINARY:
+        if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
         PetscCall(PetscViewerCreate(rdy->comm, &rdy->output_viewer));
         PetscCall(PetscViewerSetType(rdy->output_viewer, PETSCVIEWERBINARY));
     }
@@ -184,6 +186,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
     // apply any command-line option overrides
     if (rdy->output_viewer) {
       PetscCall(PetscViewerSetFromOptions(rdy->output_viewer));
+      if (rdy->output_vf) PetscCall(PetscViewerAndFormatDestroy(&rdy->output_vf));
       PetscCall(PetscViewerAndFormatCreate(rdy->output_viewer, format, &rdy->output_vf));
     }
 

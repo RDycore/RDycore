@@ -668,6 +668,8 @@ PetscErrorCode RDyMapOneDOFGlobalBaseVecToCurrentGlobalVec(RDy rdy, Vec global_b
   PetscCall(DMLocalToGlobalBegin(rdy->aux_dm, local_current, INSERT_VALUES, *global_current));
   PetscCall(DMLocalToGlobalEnd(rdy->aux_dm, local_current, INSERT_VALUES, *global_current));
 
+  PetscCall(VecDestroy(&local_base));
+  PetscCall(VecDestroy(&local_current));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
