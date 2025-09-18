@@ -1,3 +1,5 @@
+
+
 #if !defined(RDYCORECOREDEF_H)
 #define RDYCORECOREDEF_H
 
