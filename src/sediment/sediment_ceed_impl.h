@@ -74,6 +74,8 @@ CEED_QFUNCTION_HELPER int SedimentFlux(void *ctx, CeedInt Q, const CeedScalar *c
         case RIEMANN_FLUX_ROE:
           SedimentRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, sed_ndof, flux, &amax);
           break;
+        default:
+          SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_SUP, "No sediment Riemann solver for flux type");
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
@@ -279,8 +281,8 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
   return 0;
 }
 
-#pragma GCC diagnostic   pop
-#pragma GCC diagnostic   pop
+#pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
 #pragma clang diagnostic pop
 #pragma clang diagnostic pop
 
