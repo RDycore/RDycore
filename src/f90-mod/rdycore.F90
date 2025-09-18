@@ -51,7 +51,9 @@ module rdycore
   interface
     integer(c_int) function rdygetversion_(major, minor, patch, release) bind(c, name="RDyGetVersion")
       use iso_c_binding, only: c_int
+
       use petscsys
+
       PetscInt,  intent(out) :: major, minor, patch
       PetscBool, intent(out) :: release
     end function
@@ -388,6 +390,14 @@ module rdycore
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
+    integer(c_int) function rdysetregionalwatersource_(rdy, region_idx, size, watsrc) bind(c, name="RDySetRegionalWaterSource")
+      use iso_c_binding, only: c_int, c_ptr
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: region_idx
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: watsrc
+    end function
+
     integer(c_int) function rdysetdomainxmomentumsource_(rdy, size, xmomsrc) bind(c, name="RDySetDomainXMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       use petscsys
@@ -430,6 +440,7 @@ module rdycore
 
     integer(c_int) function rdycreateonedofglobalvec_(rdy, global_vec) bind(c, name="RDyCreateOneDOFGlobalVec")
       use iso_c_binding, only: c_int, c_ptr
+ 
       use petscsys
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
@@ -457,6 +468,14 @@ module rdycore
     integer(c_int) function rdywriteonedofglobalvectobinaryfile_(rdy, filename, global_vec) bind(c, name="RDyWriteOneDOFGlobalVecToBinaryFile")
       use iso_c_binding, only: c_int, c_ptr
       use petscsys
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      type(c_ptr), value, intent(in)  :: filename
+      PetscFortranAddr,   intent(out) :: global_vec
+    end function
+
+    integer(c_int) function rdywriteonedofglobalvectobinaryfile_(rdy, filename, global_vec) bind(c, name="RDyWriteOneDOFGlobalVecToBinaryFile")
+      use iso_c_binding, only: c_int, c_ptr
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       type(c_ptr), value, intent(in)  :: filename
@@ -887,7 +906,9 @@ contains
   end subroutine
 
   subroutine RDySetRegionalWaterSource(rdy_, region_idx, size, watsrc, ierr)
+
     use petscsys
+
     type(RDy),       intent(inout)       :: rdy_
     PetscInt,        intent(in)          :: region_idx
     PetscInt,        intent(in)          :: size
@@ -942,7 +963,9 @@ contains
   end subroutine
 
   subroutine RDyCreateOneDOFGlobalVec(rdy_, global_vec, ierr)
+
     use petscsys
+
     use petscvec
     type(RDy),  intent(inout) :: rdy_
     type(tVec), intent(inout) :: global_vec  ! Vec

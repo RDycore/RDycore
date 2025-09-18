@@ -163,9 +163,10 @@ static const cyaml_schema_field_t adaptive_fields_schema[] = {
 
 // mapping of time fields to members of RDyTimeSection
 static const cyaml_schema_field_t time_fields_schema[] = {
-    CYAML_FIELD_FLOAT("final_time", CYAML_FLAG_OPTIONAL, RDyTimeSection, final_time),
+    CYAML_FIELD_STRING("date", CYAML_FLAG_OPTIONAL, RDyTimeSection, date_string, 10),
+    CYAML_FIELD_FLOAT("stop", CYAML_FLAG_OPTIONAL, RDyTimeSection, stop),
     CYAML_FIELD_ENUM("unit", CYAML_FLAG_DEFAULT, RDyTimeSection, unit, time_units, CYAML_ARRAY_LEN(time_units)),
-    CYAML_FIELD_INT("max_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, max_step),
+    CYAML_FIELD_INT("stop_n", CYAML_FLAG_OPTIONAL, RDyTimeSection, stop_n),
     CYAML_FIELD_FLOAT("time_step", CYAML_FLAG_OPTIONAL, RDyTimeSection, time_step),
     CYAML_FIELD_FLOAT( "coupling_interval", CYAML_FLAG_OPTIONAL, RDyTimeSection, coupling_interval),
     CYAML_FIELD_MAPPING("adaptive", CYAML_FLAG_OPTIONAL, RDyTimeSection, adaptive, adaptive_fields_schema),
@@ -242,7 +243,41 @@ static const cyaml_schema_field_t restart_fields_schema[] = {
 //   batch_size: <number-of-steps-stored-in-each-output-file> # default: 1
 //   time_series:
 //     boundary_fluxes: <number-of-steps-between-flux-dumps>
-//   separate_grid_file: <true|false>
+//     observations:
+//       interval: 10
+//       sites:
+//         cells: [0, 1, 2, 3, 4, 5, 6]
+//       quantities:
+//         - Height
+//         - MomentumX
+//         - MomentumY
+//       time_sampling:
+//         instantaneous: true
+
+
+static const cyaml_schema_value_t observations_sites_cell_entry = {
+	CYAML_VALUE_INT(CYAML_FLAG_DEFAULT, int),
+};
+
+// mapping of sites fields to members of RDyObservationSites
+static const cyaml_schema_field_t observations_sites_fields_schema[] = {
+    CYAML_FIELD_SEQUENCE("cells", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyObservationSites, cells, &observations_sites_cell_entry, 0, CYAML_UNLIMITED),
+    CYAML_FIELD_END
+};
+
+// mapping of sites fields to members of RDyObservationSites
+static const cyaml_schema_field_t observations_time_sampling_fields_schema[] = {
+    CYAML_FIELD_BOOL("instantaneous", CYAML_FLAG_OPTIONAL, RDyObservationTimeSampling, instantaneous),
+    CYAML_FIELD_END
+};
+
+// mapping of observation fields to members of RDyObservationsSection
+static const cyaml_schema_field_t observations_fields_schema[] = {
+    CYAML_FIELD_INT("interval", CYAML_FLAG_DEFAULT, RDyObservationsSection, interval),
+    CYAML_FIELD_MAPPING("sites", CYAML_FLAG_DEFAULT, RDyObservationsSection, sites, observations_sites_fields_schema),
+    CYAML_FIELD_MAPPING("time_sampling", CYAML_FLAG_DEFAULT, RDyObservationsSection, time_sampling, observations_time_sampling_fields_schema),
+    CYAML_FIELD_END
+};
 
 // mapping of strings to file formats
 static const cyaml_strval_t output_file_formats[] = {
@@ -260,6 +295,7 @@ static const cyaml_schema_value_t output_field_schema = {
 // mapping of time_series fields to members of RDyTimeSeries
 static const cyaml_schema_field_t output_time_series_fields_schema[] = {
     CYAML_FIELD_INT("boundary_fluxes", CYAML_FLAG_DEFAULT, RDyTimeSeries, boundary_fluxes),
+    CYAML_FIELD_MAPPING("observations", CYAML_FLAG_OPTIONAL, RDyTimeSeries, observations, observations_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -274,7 +310,6 @@ static const cyaml_schema_field_t output_fields_schema[] = {
     CYAML_FIELD_ENUM("time_unit", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_unit, time_units, CYAML_ARRAY_LEN(time_units)),
     CYAML_FIELD_INT("batch_size", CYAML_FLAG_OPTIONAL, RDyOutputSection, batch_size),
     CYAML_FIELD_MAPPING("time_series", CYAML_FLAG_OPTIONAL, RDyOutputSection, time_series, output_time_series_fields_schema),
-    CYAML_FIELD_BOOL("separate_grid_file", CYAML_FLAG_OPTIONAL, RDyOutputSection, separate_grid_file),
     CYAML_FIELD_END
 };
 
@@ -790,12 +825,24 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
 
   SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
 
-  SET_MISSING_PARAMETER(config->time.final_time, INVALID_REAL);
-  SET_MISSING_PARAMETER(config->time.max_step, INVALID_INT);
+  SET_MISSING_PARAMETER(config->time.stop, INVALID_REAL);
+  SET_MISSING_PARAMETER(config->time.stop_n, INVALID_INT);
   SET_MISSING_PARAMETER(config->time.time_step, INVALID_REAL);
   SET_MISSING_PARAMETER(config->time.coupling_interval, INVALID_REAL);
 
   if (!config->output.directory[0]) strcpy(config->output.directory, "output");
+
+  // set some default output fields
+  if (!config->output.fields_count) {
+    config->output.fields_count = 3;
+    PetscCall(PetscCalloc1(3, &config->output.fields));
+    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &config->output.fields[0]));
+    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &config->output.fields[1]));
+    PetscCall(PetscCalloc1(MAX_NAME_LEN + 1, &config->output.fields[2]));
+    strncpy(config->output.fields[0], "Height", MAX_NAME_LEN);
+    strncpy(config->output.fields[1], "MomentumX", MAX_NAME_LEN);
+    strncpy(config->output.fields[2], "MomentumY", MAX_NAME_LEN);
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -840,6 +887,13 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");
 
+  // check time settings
+  if (config->time.date_string[0]) {
+    int num_items = sscanf(config->time.date_string, "%4d-%2d-%2d-%2d:%2d:%2d", &config->time.date.tm_year, &config->time.date.tm_mon,
+                           &config->time.date.tm_mday, &config->time.date.tm_hour, &config->time.date.tm_min, &config->time.date.tm_sec);
+    PetscCheck(num_items == 3 || num_items == 6, comm, PETSC_ERR_USER, "Invalid date: %s (must be YYYY-MM-DD-hh:mm:ss)", config->time.date_string);
+  }
+
   // check adaptive time step setting
   if (config->time.adaptive.enable) {
     PetscCheck(config->time.adaptive.target_courant_number > 0.0, comm, PETSC_ERR_USER,
@@ -849,7 +903,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     PetscCheck(config->time.adaptive.initial_time_step > 0.0, comm, PETSC_ERR_USER, "time.adaptive.initial_time_step must be greater than 0.0");
 
     // ensure that max_step and time_step is not specified
-    PetscCheck(config->time.max_step == INVALID_INT, comm, PETSC_ERR_USER, "max_step cannot be specified with adaptive time step enabled");
+    PetscCheck(config->time.stop_n == INVALID_INT, comm, PETSC_ERR_USER, "max_step cannot be specified with adaptive time step enabled");
     PetscCheck(config->time.time_step == INVALID_REAL, comm, PETSC_ERR_USER, "time_step cannot be specified with adaptive time step enabled");
 
     // set time step
@@ -859,19 +913,19 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   // check time settings
   // 'final_time', 'max_step', 'time_step': exactly two of these three can be specified in the .yaml file.
   PetscInt num_time_settings = 0;
-  if (config->time.final_time != INVALID_REAL) ++num_time_settings;
-  if (config->time.max_step != INVALID_REAL) ++num_time_settings;
+  if (config->time.stop != INVALID_REAL) ++num_time_settings;
+  if (config->time.stop_n != INVALID_REAL) ++num_time_settings;
   if (config->time.time_step != INVALID_REAL) ++num_time_settings;
   PetscCheck(num_time_settings, comm, PETSC_ERR_USER,
              "Exactly 2 of time.final_time, time.max_step, time.time_step must be specified (%" PetscInt_FMT " given)", num_time_settings);
 
   // set the third parameter based on the two that are given
-  if (config->time.final_time == INVALID_REAL) {
-    config->time.final_time = config->time.max_step * config->time.time_step;
-  } else if (config->time.max_step == INVALID_INT) {
-    config->time.max_step = (PetscInt)(config->time.final_time / config->time.time_step);
+  if (config->time.stop == INVALID_REAL) {
+    config->time.stop = config->time.stop_n * config->time.time_step;
+  } else if (config->time.stop_n == INVALID_INT) {
+    config->time.stop_n = (PetscInt)(config->time.stop / config->time.time_step);
   } else {  // config->time.time_step == INVALID_REAL
-    config->time.time_step = config->time.final_time / config->time.max_step;
+    config->time.time_step = config->time.stop / config->time.stop_n;
   }
 
   // by default, the coupling interval is set to the final time (but in any case,
@@ -879,12 +933,11 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   PetscBool coupling_interval_was_specified;
   if (config->time.coupling_interval == INVALID_REAL) {
     coupling_interval_was_specified = PETSC_FALSE;
-    config->time.coupling_interval  = config->time.final_time;
+    config->time.coupling_interval  = config->time.stop;
   } else {
     coupling_interval_was_specified = PETSC_TRUE;
     PetscCheck(config->time.coupling_interval > 0.0, comm, PETSC_ERR_USER, "time.coupling_interval must be positive");
-    PetscCheck(config->time.coupling_interval <= config->time.final_time, comm, PETSC_ERR_USER,
-               "time.coupling_interval must not exceed time.final_time");
+    PetscCheck(config->time.coupling_interval <= config->time.stop, comm, PETSC_ERR_USER, "time.coupling_interval must not exceed time.final_time");
   }
 
   // we need initial conditions and material properties specified for each
@@ -993,8 +1046,6 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     if ((config->output.batch_size == 0) && (config->output.format != OUTPUT_NONE) && config->output.format != OUTPUT_BINARY) {
       config->output.batch_size = 1;
     }
-    PetscCheck(!config->output.separate_grid_file || (config->output.format == OUTPUT_XDMF), comm, PETSC_ERR_USER,
-               "separate_grid_file option is only supported for XDMF output");
 
     if (config->output.time_interval) {
       if (!coupling_interval_was_specified) config->time.coupling_interval = config->output.time_interval * 1.0;
@@ -1524,7 +1575,7 @@ static const char *TimeUnitString(RDyTimeUnit unit) {
 static PetscErrorCode PrintTime(RDy rdy) {
   PetscFunctionBegin;
   RDyLogDetail(rdy, "Time:");
-  RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.time.final_time, TimeUnitString(rdy->config.time.unit));
+  RDyLogDetail(rdy, "  Final time: %g %s", rdy->config.time.stop, TimeUnitString(rdy->config.time.unit));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

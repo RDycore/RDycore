@@ -35,6 +35,10 @@ add_library(yaml SHARED IMPORTED GLOBAL)
 set_target_properties(yaml PROPERTIES
   IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/lib/${LIBYAML_LIB_NAME})
 add_dependencies(yaml yaml_proj)
+install(
+  FILES ${CMAKE_BINARY_DIR}/lib/${LIBYAML_LIB_NAME}
+  DESTINATION lib
+)
 
 #---------------------------------------------------------------------
 # Build libcyaml, a schema-based YAML parser built on top of libyaml.
@@ -60,6 +64,10 @@ target_compile_definitions(cyaml PUBLIC
   VERSION_DEVEL=0
 )
 add_dependencies(cyaml yaml)
+install(
+  TARGETS cyaml
+  DESTINATION lib
+)
 
 if (ENABLE_TESTS)
   #----------------------------------------

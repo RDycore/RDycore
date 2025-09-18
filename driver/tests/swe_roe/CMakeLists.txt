@@ -11,19 +11,6 @@ set(mms_c_driver ${mms_driver})
 set(ceed_args -ceed /cpu/self)
 set(preload_args -preload)
 
-# basic ex2b test
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-foreach(np 1 2) # test on 1, 2 processes
-  foreach(config basic ceed preload)
-    foreach(lang ${supported_languages})
-      foreach(chkpt_fmt binary hdf5)
-        add_test(swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -checkpoint_format ${chkpt_fmt})
-      endforeach()
-    endforeach()
-  endforeach()
-endforeach()
-
 # Dirichlet BC test
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_dirichlet_bc.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -47,17 +34,23 @@ foreach(np 1 2) # test on 1, 2 processes
 endforeach()
 
 # Checkpoint/restart tests
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
     foreach(lang ${supported_languages})
-      foreach(chkpt_fmt binary hdf5)
+      foreach(chkpt_fmt binary)
         if (chkpt_fmt STREQUAL "binary")
           set(chkpt_sfx "bin")
         else()
           set(chkpt_sfx "h5")
         endif()
+
+        # run the original simulation
+        add_test(swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ex2b.yaml ${${config}_args} -checkpoint_format ${chkpt_fmt})
+
         # stash the original ex2b simulation's final HDF5 output
-        add_test(swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} cp output/ex2b-0.h5 ex2b-ref.h5)
+        add_test(swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config} mv output/ex2b-0.h5 ex2b-ref.h5)
         set_tests_properties(swe_roe_ex2b_reference_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}
           PROPERTIES DEPENDS "swe_roe_ex2b_${lang}_chkpt_${chkpt_fmt}_np_${np}_${config}")
 
@@ -124,7 +117,9 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic ceed)
-    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    foreach(lang ${supported_languages})
+      add_test(houston_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Houston1km.DirichletBC.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -138,7 +133,9 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
   foreach(config basic)
-    add_test(houston_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    foreach(lang ${supported_languages})
+      add_test(houston_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Houston1km.DirichletBC.adaptive_timestep.yaml -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -149,7 +146,9 @@ file (COPY
       DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1)
   foreach(config basic ceed)
-    add_test(houston_hetero_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -raster_rain_write_map_file houston_raster.${PETSC_ID_TYPE}.map ./ ${${config}_args})
+    foreach(lang ${supported_languages})
+      add_test(houston_hetero_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Houston1km.DirichletBC.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -raster_rain_write_map_file houston_raster.${PETSC_ID_TYPE}.map ./ ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 foreach(np 2)
@@ -205,8 +204,10 @@ file(COPY
 
 foreach(np 1) # test on 1 processes
   foreach(config basic)
-  add_test(simons_write_map_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_bc_write_map_for_debugging -unstructured_rain_write_map_file simons_unstructured_map.${PETSC_ID_TYPE}.bin ${${config}_args})
-  add_test(simons_read_map_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_bc_write_map_for_debugging -unstructured_rain_read_map_file simons_unstructured_map.${PETSC_ID_TYPE}.bin ${${config}_args})
+    foreach(lang ${supported_languages})
+      add_test(simons_write_map_np_${np}_${config}_${lang} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_bc_write_map_for_debugging -unstructured_rain_write_map_file simons_unstructured_map.${PETSC_ID_TYPE}.bin ${${config}_args})
+      add_test(simons_read_map_np_${np}_${config}_${lang} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Simons.OceanDirichletBC.yaml -unstructured_bc_dir simons-bc-${PETSC_ID_TYPE} -unstructured_bc_start_date 2011,08,27,14,0 -unstructured_bc_mesh_file simons-bc-${PETSC_ID_TYPE}/simons_bc_x_y.${PETSC_ID_TYPE}.bin -unstructured_rain_dir simons-ss-${PETSC_ID_TYPE} -unstructured_rain_start_date 2011,08,27,14,0 -unstructured_rain_mesh_file simons-ss-${PETSC_ID_TYPE}/simons_forcing_x_y.${PETSC_ID_TYPE}.bin -unstructured_bc_write_map_for_debugging -unstructured_rain_read_map_file simons_unstructured_map.${PETSC_ID_TYPE}.bin ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 

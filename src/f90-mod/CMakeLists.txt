@@ -14,8 +14,9 @@ else()
   add_library(rdycore_f90
     ${RDYCORE_F90_SOURCE_FILES}
   )
-  target_link_libraries(rdycore_f90 rdycore cyaml yaml ceed ${SYSTEM_LIBRARIES})
+  target_link_libraries(rdycore_f90 rdycore_c cyaml yaml ceed ${SYSTEM_LIBRARIES})
 endif()
+target_include_directories(rdycore_f90 PUBLIC ${PROJECT_BINARY_DIR}/include/private)
 
 install(
   TARGETS rdycore_f90

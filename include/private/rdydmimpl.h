@@ -15,7 +15,7 @@ typedef struct {
 
 PETSC_INTERN PetscErrorCode CreateCellCenteredDMFromDM(DM, PetscInt, const SectionFieldSpec, DM *);
 PETSC_INTERN PetscErrorCode CreateDM(RDy);
-PETSC_INTERN PetscErrorCode CreateAuxiliaryDM(RDy);
+PETSC_INTERN PetscErrorCode CreateAuxiliaryDMs(RDy);
 PETSC_INTERN PetscErrorCode CreateFlowDM(RDy);
 PETSC_INTERN PetscErrorCode CreateSedimentDM(RDy);
 PETSC_INTERN PetscErrorCode CreateVectors(RDy);

@@ -2,7 +2,6 @@ module purge
 module load  craype-x86-milan                                
 module load  libfabric/1.20.1                                
 module load  craype-network-ofi                              
-module load  xpmem/2.9.6-1.1_20240510205610__g087dc11fc19d   
 module load  gpu/1.0                    
 module load  sqs/2.0                    
 module load  conda/Miniforge3-24.7.1-0  

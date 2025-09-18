@@ -20,7 +20,7 @@ set(NUM_MATERIAL_PROPERTIES    1)
 math(EXPR MAX_NUM_FIELD_COMPONENTS "3 + ${MAX_NUM_SEDIMENT_CLASSES}")
 
 # CMake files live in the cmake/ directory.
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Use a specific version of clang-format.
 set(CLANG_FORMAT_VERSION 14)
@@ -158,7 +158,21 @@ set(RDYCORE_MINOR_VERSION 1)
 set(RDYCORE_PATCH_VERSION 0)
 set(RDYCORE_VERSION "${RDYCORE_MAJOR_VERSION}.${RDYCORE_MINOR_VERSION}.${RDYCORE_PATCH_VERSION}")
 
-message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
+# Get the latest abbreviated commit hash of the working branch
+execute_process(
+  COMMAND git log -1 --format=%h
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE RDYCORE_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+
+if (RDYCORE_GIT_HASH)
+  message(STATUS "Configuring RDycore v${RDYCORE_VERSION} (git hash ${RDYCORE_GIT_HASH})")
+else()
+  set(RDYCORE_GIT_HASH "unknown")
+  message(STATUS "Configuring RDycore v${RDYCORE_VERSION}")
+endif()
 
 # For now, we build static libraries only.
 set(BUILD_SHARED_LIBS OFF)

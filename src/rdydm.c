@@ -4,6 +4,20 @@
 #include <private/rdydmimpl.h>
 #include <rdycore.h>
 
+static PetscErrorCode RenameDMFields(DM dm, SectionFieldSpec fields) {
+  PetscFunctionBeginUser;
+
+  PetscSection sec;
+  PetscCall(DMGetLocalSection(dm, &sec));
+  for (PetscInt f = 0; f < fields.num_fields; ++f) {
+    PetscCall(PetscSectionSetFieldName(sec, f, fields.field_names[f]));
+    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
+      if (fields.field_component_names[f][c][0]) PetscCall(PetscSectionSetComponentName(sec, f, c, fields.field_component_names[f][c]));
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// This function creates a Section appropriate for use by the given (primary) DM.
 static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscFunctionBeginUser;
@@ -30,15 +44,8 @@ static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscCall(DMCreateDS(dm));
 
   // Set field and component names
-  PetscSection sec;
+  PetscCall(RenameDMFields(dm, fields));
 
-  PetscCall(DMGetLocalSection(dm, &sec));
-  for (PetscInt f = 0; f < fields.num_fields; ++f) {
-    PetscCall(PetscSectionSetFieldName(sec, f, fields.field_names[f]));
-    for (PetscInt c = 0; c < fields.num_field_components[f]; ++c) {
-      if (fields.field_component_names[f][c][0]) PetscCall(PetscSectionSetComponentName(sec, f, c, fields.field_component_names[f][c]));
-    }
-  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -157,14 +164,18 @@ PetscErrorCode CreateDM(RDy rdy) {
 
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
 
+  // rename the fields in the distributed section
+  PetscCall(RenameDMFields(rdy->dm, rdy->soln_fields));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// This function creates an auxiliary (secondary) DM
-PetscErrorCode CreateAuxiliaryDM(RDy rdy) {
+PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->diag_fields, &rdy->aux_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_diags, &rdy->dm_diags));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_1dof, &rdy->dm_1dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -216,7 +227,8 @@ PetscErrorCode CreateVectors(RDy rdy) {
 
   // diagnostics are all piled into a single vector whose block size is the
   // total number of field components
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, &rdy->diags_vec));
+  PetscCall(DMCreateGlobalVector(rdy->dm_diags, &rdy->vec_diags));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

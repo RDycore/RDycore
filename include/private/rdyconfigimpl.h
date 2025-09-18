@@ -7,6 +7,7 @@
 #include <private/rdylogimpl.h>
 #include <private/rdymmsconfigimpl.h>
 #include <rdycore.h>
+#include <time.h>
 
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
@@ -27,8 +28,7 @@
 // the maximum number of materials that can be defined for a simulation
 #define MAX_NUM_MATERIALS 32
 
-// the maximum number of flow/sediment/salinity conditions that can be defined for a
-// simulation
+// the maximum number of flow/sediment/salinity conditions that can be defined for a simulation
 #define MAX_NUM_CONDITIONS 32
 
 // The data structures below are intermediate representations of the sections
@@ -120,9 +120,11 @@ typedef struct {
 
 // all time parameters
 typedef struct {
-  PetscReal              final_time;         // final simulation time [unit]
+  char                   date_string[20];    // simulation start date string ("YYYY-MM-DD-hh:mm:ss")
+  struct tm              date;               // simulation start date (C representation)
+  PetscReal              stop;               // final simulation time [unit]
   RDyTimeUnit            unit;               // unit in which time is expressed
-  PetscInt               max_step;           // maximum number of simulation time steps
+  PetscInt               stop_n;             // maximum number of simulation time steps
   PetscReal              time_step;          // minimum internal time step [unit]
   PetscReal              coupling_interval;  // time interval spanned by RDyAdvance [unit]
   RDyTimeAdaptiveSection adaptive;           // adaptive time step for explicity time integration
@@ -159,16 +161,33 @@ typedef struct {
   PetscBool reinitialize;              // PETSC_TRUE resets simulation time to 0
 } RDyRestartSection;
 
-// ---------------
+// --------------
 // output section
-// ---------------
+// --------------
 
 // output file formats
 typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOutputFormat;
 
+// observations
+typedef struct {
+  PetscInt *cells;
+  PetscInt  cells_count;
+} RDyObservationSites;
+
+typedef struct {
+  PetscBool instantaneous;
+} RDyObservationTimeSampling;
+
+typedef struct {
+  PetscInt                   interval;
+  RDyObservationSites        sites;
+  RDyObservationTimeSampling time_sampling;
+} RDyObservationsSection;
+
 // time series output interval parameters appended to files
 typedef struct {
-  PetscInt boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+  PetscInt               boundary_fluxes;  // written to "boundary_fluxes.dat" [steps between outputs]
+  RDyObservationsSection observations;
 } RDyTimeSeries;
 
 // all output parameters
@@ -184,7 +203,6 @@ typedef struct {
   PetscInt        batch_size;                     // number of timesteps per output file (if available)
   RDyTimeSeries   time_series;                    // time series appended to text (.dat) files
   PetscReal       prev_output_time;               // previous time at which output was written
-  PetscBool       separate_grid_file;             // whether grid is written to a separate file
 } RDyOutputSection;
 
 // ------------
