@@ -22,7 +22,6 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, RDyOutputSection out
     // global vector instead
     PetscCall(VecDuplicate(global_vec, &data_vec));
     PetscCall(VecCopy(global_vec, data_vec));
-    PetscCall(PetscObjectReference((PetscObject)data_vec));
   }
 
   // fetch our section to extract names of components
