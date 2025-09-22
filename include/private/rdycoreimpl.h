@@ -152,6 +152,15 @@ struct _p_RDy {
   // Refinements
   //--------------------------
 
+  DM dm_amr_base;
+  DM dm_1dof_amr_base;
+
+  PetscBool cells_marked_for_refinement;
+  PetscBool *refine_cell;
+
+  Mat BaseToCurrentMatNDof, CurrentToBaseMatNDof;
+  Mat BaseToCurrentMat1Dof, CurrentToBaseMat1Dof;
+
   // identifies if the mesh has been refined and the model has not taken a step
   PetscBool mesh_was_refined;
 

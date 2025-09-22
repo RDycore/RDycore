@@ -272,6 +272,16 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
+  if ((*rdy)->num_refinements) {
+    if ((*rdy)->dm_amr_base) DMDestroy(&((*rdy)->dm_amr_base));
+    if ((*rdy)->dm_1dof_amr_base) DMDestroy(&((*rdy)->dm_1dof_amr_base));
+
+    if ((*rdy)->BaseToCurrentMatNDof) PetscCall(MatDestroy(&(*rdy)->BaseToCurrentMatNDof));
+    if ((*rdy)->CurrentToBaseMatNDof) PetscCall(MatDestroy(&(*rdy)->CurrentToBaseMatNDof));
+    if ((*rdy)->BaseToCurrentMat1Dof) PetscCall(MatDestroy(&(*rdy)->BaseToCurrentMat1Dof));
+    if ((*rdy)->CurrentToBaseMat1Dof) PetscCall(MatDestroy(&(*rdy)->CurrentToBaseMat1Dof));
+  }
+
   // destroy config data
   PetscCall(DestroyConfig((*rdy)));
 

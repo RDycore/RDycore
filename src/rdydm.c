@@ -115,14 +115,29 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
 
   // parallel refinement phase
+  PetscInt  pStart, pEnd, pStartNew, pEndNew;
+  PetscBool refined;
+  PetscCall(DMPlexGetChart(rdy->dm, &pStart, &pEnd));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_"));
-  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+  PetscCall(DMPlexGetChart(rdy->dm, &pStartNew, &pEndNew));
+  refined = (pStart == pStartNew) && (pEnd == pEndNew) ? PETSC_FALSE : PETSC_TRUE;
+
+  // distribution phase
+  if (refined) {
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_dist_"));
+    PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
+    PetscCall(DMSetFromOptions(rdy->dm));
+    PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+    PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+  }
 
   // Overlap meshes after refinement
   if (size > 1) {
@@ -148,7 +163,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   }
 
   // create parallel section and global-to-natural mapping
-  if (size > 1) {
+  if (size > 1 && !refined) {
     PetscSF sfMigration, sfNatural;
 
     PetscCall(DMPlexGetMigrationSF(rdy->dm, &sfMigration));
