@@ -631,7 +631,6 @@ PetscErrorCode RDyRefine(RDy rdy) {
   }
 
   // set the DM to be the refined DM
-  if (rdy->dm) PetscCall(DMDestroy(&rdy->dm));
   rdy->dm      = dm_fine;
   rdy->flow_dm = rdy->dm;
 
