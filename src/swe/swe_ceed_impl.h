@@ -64,12 +64,14 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -117,11 +119,15 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // Dirichlet boundary values
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  (void)accum_flux;
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  (void)courant_num;
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -160,10 +166,13 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  (void)courant_num;
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -209,11 +218,15 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  (void)accum_flux;
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  (void)courant_num;
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -267,6 +280,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
   const SWEContext context                 = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -326,6 +340,7 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
   const SWEContext context                 = (SWEContext)ctx;
 
   const CeedScalar dt               = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h           = context->tiny_h;
   const CeedScalar gravity          = context->gravity;
   const CeedScalar xq2018_threshold = context->xq2018_threshold;

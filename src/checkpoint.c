@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <errno.h>
 #include <petscviewerhdf5.h>
 #include <private/rdycoreimpl.h>
@@ -20,7 +21,7 @@ static PetscErrorCode GetCheckpointDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LE
       strcpy(checkpoint_dir, "checkpoints");
     }
   }
-  strncpy(dir, checkpoint_dir, PETSC_MAX_PATH_LEN - 1);
+  snprintf(dir, PETSC_MAX_PATH_LEN, "%s", checkpoint_dir);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -152,7 +153,7 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     // determine an appropriate prefix for checkpoint files
     char prefix[PETSC_MAX_PATH_LEN], filename[PETSC_MAX_PATH_LEN];
     if (rdy->config.checkpoint.prefix[0]) {
-      strncpy(prefix, rdy->config.checkpoint.prefix, PETSC_MAX_PATH_LEN);
+      snprintf(prefix, PETSC_MAX_PATH_LEN, "%s", rdy->config.checkpoint.prefix);
     } else {
       PetscCall(DetermineConfigPrefix(rdy, prefix));
     }
