@@ -156,7 +156,7 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
     CeedOperator *source_suboperators;
     PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
     for (CeedInt i = 0; i < num_source_suboperators; ++i) {
-      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_COLLOCATED, op->ceed.flux_divergence));
+      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_NONE, op->ceed.flux_divergence));
     }
 
     // clean up (the suboperators keep references to restrictions and vectors)
