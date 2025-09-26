@@ -216,7 +216,6 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply_));
       first_time = PETSC_FALSE;
     }
-
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.flux));
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
@@ -325,7 +324,11 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     // accumulate f_local into f_global
     PetscCall(VecZeroEntries(f_global));
-    PetscCall(DMLocalToGlobal(op->dm, f_local, ADD_VALUES, f_global));
+    if (op->config->numerics.flux_single_comm) {
+      PetscCall(DMLocalToGlobal(op->dm, f_local, INSERT_VALUES, f_global));
+    } else {
+      PetscCall(DMLocalToGlobal(op->dm, f_local, ADD_VALUES, f_global));
+    }
 
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.rhs, MemTypeP2C(mem_type), &f_local_ptr));
