@@ -251,8 +251,10 @@ endif()
 #--------------------
 
 # Add a "make memcheck" target that runs Valgrind on all tests (Linux only).
-include(add_memcheck_target)
-add_memcheck_target()
+if (NOT TARGET memcheck) # only add if not already present
+  include(add_memcheck_target)
+  add_memcheck_target()
+endif()
 
 # Create the following targets for checking code formatting:
 # make format-c       <-- reformats C code to conform to desired style
