@@ -66,11 +66,12 @@ jobs:
 
     - name: Uploading coverage report to codecov.io
       if: ${{ (contains(matrix.os, 'ubuntu')) && (matrix.build-type == 'Debug') && (contains(matrix.container, 'int32')) }}
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         fail_ci_if_error: true
         files: build/coverage.info
         #flags: unittests # optional
         name: RDycore
-        token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
+      env:
+        token: ${{ secrets.CODECOV_TOKEN }}
