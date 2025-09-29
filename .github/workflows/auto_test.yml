@@ -74,4 +74,4 @@ jobs:
         name: RDycore
         verbose: true
       env:
-        token: ${{ secrets.CODECOV_TOKEN }}
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
