@@ -225,7 +225,7 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
     if (step == 0) write_grid = PETSC_TRUE;
   } else {
     if (rdy->last_refinement_level_outputted < rdy->num_refinements) {
-      write_grid = PETSC_TRUE;
+      write_grid                           = PETSC_TRUE;
       rdy->last_refinement_level_outputted = rdy->num_refinements;
     }
   }

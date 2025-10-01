@@ -155,7 +155,7 @@ struct _p_RDy {
   DM dm_amr_base;
   DM dm_1dof_amr_base;
 
-  PetscBool cells_marked_for_refinement;
+  PetscBool  cells_marked_for_refinement;
   PetscBool *refine_cell;
 
   Mat BaseToCurrentMatNDof, CurrentToBaseMatNDof;
@@ -165,8 +165,8 @@ struct _p_RDy {
   PetscBool mesh_was_refined;
 
   // number of times the mesh has been refined
-  int num_refinements;
-  int last_refinement_level_outputted;
+  int       num_refinements;
+  int       last_refinement_level_outputted;
   PetscBool is_refinement_on;
 
   //--------------------------
