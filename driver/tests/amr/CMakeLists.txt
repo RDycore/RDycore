@@ -17,6 +17,7 @@ file(COPY
      ${REFINEMENT_DIR}/mms_triangles_dx1/2011-01-01:00-01.${PETSC_ID_TYPE}.bin
      ${REFINEMENT_DIR}/mms_triangles_dx1/2011-01-01:00-02.${PETSC_ID_TYPE}.bin
      ${REFINEMENT_DIR}/mms_triangles_dx1/2011-01-01:00-03.${PETSC_ID_TYPE}.bin
+     ${REFINEMENT_DIR}/mms_triangles_dx1/2011-01-01:00-04.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/mms_triangles_dx1-${PETSC_ID_TYPE}
     )
 foreach(np 3)
