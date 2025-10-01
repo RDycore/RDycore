@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     if (refinement_dataset.is_defined) {
       // determine the filename
       PetscCall(DetermineDatasetFilename(&refinement_dataset.current_date, refinement_dataset.dir, refinement_dataset.file));
-      printf("filename: %s\n", refinement_dataset.file);
+      if (!myrank) printf("refinement filename: %s\n", refinement_dataset.file);
       Vec global;
       PetscCall(RDyReadOneDOFBaseGlobalVecFromBinaryFile(rdy, refinement_dataset.file, &global));
 
@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
         mktime(current_date);
 
         PetscCall(DetermineDatasetFilename(&refinement_dataset.current_date, refinement_dataset.dir, refinement_dataset.file));
-        printf("filename: %s\n", refinement_dataset.file);
+        if (!myrank) printf("refinement filename: %s\n", refinement_dataset.file);
         Vec global_base, global_current;
         PetscCall(RDyReadOneDOFBaseGlobalVecFromBinaryFile(rdy, refinement_dataset.file, &global_base));
         PetscCall(RDyMapOneDOFGlobalBaseVecToCurrentGlobalVec(rdy, global_base, &global_current));
