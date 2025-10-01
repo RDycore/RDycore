@@ -94,7 +94,11 @@ static PetscErrorCode DetermineGridFile(RDy rdy, char *filename) {
   char prefix[PETSC_MAX_PATH_LEN], output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
   PetscCall(GetOutputDirectory(rdy, output_dir));
-  snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
+  if (!rdy->is_refinement_on) {
+    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
+  } else {
+    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.r%d.h5", output_dir, prefix, rdy->num_refinements);
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -216,8 +220,18 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // on the first step ONLY, write the grid to its own file
-  if (step == 0) {
-    RDyLogDetail(rdy, "Step 0: writing XDMF HDF5 grid to %s", h5_gridname);
+  PetscBool write_grid = PETSC_FALSE;
+  if (!rdy->is_refinement_on) {
+    if (step == 0) write_grid = PETSC_TRUE;
+  } else {
+    if (rdy->last_refinement_level_outputted < rdy->num_refinements) {
+      write_grid = PETSC_TRUE;
+      rdy->last_refinement_level_outputted = rdy->num_refinements;
+    }
+  }
+
+  if (write_grid) {
+    RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 grid to %s", step, h5_gridname);
 
     PetscViewer grid_viewer;
     PetscCall(PetscViewerHDF5Open(rdy->comm, h5_gridname, FILE_MODE_WRITE, &grid_viewer));

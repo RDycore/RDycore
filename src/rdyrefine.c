@@ -485,6 +485,12 @@ static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDySetRefinementOn(RDy rdy) {
+  PetscFunctionBeginUser;
+  rdy->is_refinement_on = PETSC_TRUE;
+  rdy->last_refinement_level_outputted = -1;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 PetscErrorCode RDyRefine(RDy rdy) {
   AppCtx   user;

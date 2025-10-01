@@ -165,7 +165,9 @@ struct _p_RDy {
   PetscBool mesh_was_refined;
 
   // number of times the mesh has been refined
-  PetscInt num_refinements;
+  int num_refinements;
+  int last_refinement_level_outputted;
+  PetscBool is_refinement_on;
 
   //--------------------------
   // Restart

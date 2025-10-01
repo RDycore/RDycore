@@ -175,6 +175,9 @@ int main(int argc, char *argv[]) {
     PetscCall(RDyCreate(comm, argv[1], &rdy));
     PetscCall(RDySetup(rdy));
 
+    // enable refinement
+    PetscCall(RDySetRefinementOn(rdy));
+
     RefinementDataset refinement_dataset;
     PetscCall(ParseRefinementDataOptions(&refinement_dataset));
 
