@@ -7,25 +7,6 @@
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
-typedef struct {
-  PetscInt  adapt;  /* Flag for adaptation of the surface mesh */
-  PetscBool metric; /* Flag to use metric adaptation, instead of tagging */
-} AppCtx;
-
-static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options) {
-  PetscMPIInt size;
-
-  PetscFunctionBeginUser;
-  options->adapt  = 1;
-  options->metric = PETSC_FALSE;
-  PetscCallMPI(MPI_Comm_size(comm, &size));
-
-  PetscOptionsBegin(comm, "", "Meshing Interpolation Test Options", "DMPLEX");
-  PetscCall(PetscOptionsInt("-adapt", "Number of adaptation steps mesh", "ex10.c", options->adapt, &options->adapt, NULL));
-  PetscCall(PetscOptionsBool("-metric", "Flag for metric refinement", "ex41.c", options->metric, &options->metric, NULL));
-  PetscOptionsEnd();
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
   /* PetscMPIInt rank; */
@@ -178,7 +159,7 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFineMatNDof, Mat Fi
 }
 
 static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof, Mat *CoarseToFineMat1Dof,
-                                Mat *FineToCoarseMat1Dof, AppCtx *ctx) {
+                                Mat *FineToCoarseMat1Dof) {
   PetscFunctionBeginUser;
 
   DM       dm = rdy->dm;
@@ -493,7 +474,6 @@ PetscErrorCode RDySetRefinementOn(RDy rdy) {
 }
 
 PetscErrorCode RDyRefine(RDy rdy) {
-  AppCtx   user;
   Mat      CoarseToFineMatNDof, FineToCoarseMatNDof;
   Mat      CoarseToFineMat1Dof, FineToCoarseMat1Dof;
   DM       dm_fine;
@@ -501,10 +481,9 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscInt ndof_coarse;
   PetscFunctionBeginUser;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
-  PetscCall(ProcessOptions(PETSC_COMM_WORLD, &user));
 
   /* Adapt */
-  PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof, &user));
+  PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
