@@ -102,7 +102,7 @@ static PetscErrorCode MarkLocalCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   }
   PetscCall(VecRestoreArray(global, &global_ptr));
 
-  PetscCall(RDyMarkLocalCellsForRefinement(rdy, ncells_local, refine_cell));
+  PetscCall(RDyMarkLocalCellsForAMR(rdy, ncells_local, refine_cell));
 
   // free up memory
   PetscFree(refine_cell);
@@ -141,7 +141,7 @@ PetscErrorCode MarkLocalCellsForRefinement(RDy rdy) {
     }
   }
 
-  PetscCall(RDyMarkLocalCellsForRefinement(rdy, ncells_local, refine_cell));
+  PetscCall(RDyMarkLocalCellsForAMR(rdy, ncells_local, refine_cell));
 
   // free up memory
   PetscFree(xc_local);
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetup(rdy));
 
     // enable refinement
-    PetscCall(RDySetRefinementOn(rdy));
+    PetscCall(RDyEnableAMROn(rdy));
 
     RefinementDataset refinement_dataset;
     PetscCall(ParseRefinementDataOptions(&refinement_dataset));
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
 
       PetscCall(MarkLocalCellsForRefinementBasedOnDataset(rdy, global));
       PetscCall(VecDestroy(&global));
-      PetscCall(RDyRefine(rdy));
+      PetscCall(RDyPerformAMR(rdy));
     }
 
     PetscCall(RDyAdvance(rdy));
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
         PetscCall(MarkLocalCellsForRefinement(rdy));
       }
 
-      PetscCall(RDyRefine(rdy));
+      PetscCall(RDyPerformAMR(rdy));
       PetscCall(RDyAdvance(rdy));
     }
 

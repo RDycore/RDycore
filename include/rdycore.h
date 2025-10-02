@@ -42,9 +42,9 @@ PETSC_EXTERN PetscErrorCode RDyMMSEstimateConvergenceRates(RDy, PetscReal *, Pet
 PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
 
 // RDycore support for AMR
-PETSC_EXTERN PetscErrorCode RDySetRefinementOn(RDy);
-PETSC_EXTERN PetscErrorCode RDyRefine(RDy);
-PETSC_EXTERN PetscErrorCode RDyMarkLocalCellsForRefinement(RDy, const PetscInt, const PetscBool *);
+PETSC_EXTERN PetscErrorCode RDyEnableAMROn(RDy);
+PETSC_EXTERN PetscErrorCode RDyPerformAMR(RDy);
+PETSC_EXTERN PetscErrorCode RDyMarkLocalCellsForAMR(RDy, const PetscInt, const PetscBool *);
 
 // time integration
 PETSC_EXTERN PetscErrorCode DestroyOutputViewer(RDy);

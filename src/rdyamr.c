@@ -43,7 +43,7 @@ static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
 /// @param size        The number of local cells
 /// @param refine_cell True/False array indicating if the cell should be refined
 /// @return PETSC_SUCESS on success
-PetscErrorCode RDyMarkLocalCellsForRefinement(RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
+PetscErrorCode RDyMarkLocalCellsForAMR(RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
   PetscFunctionBegin;
 
   rdy->amr.cells_marked_for_refinement = PETSC_TRUE;
@@ -61,7 +61,7 @@ PetscErrorCode RDyMarkLocalCellsForRefinement(RDy rdy, const PetscInt size, cons
 }
 
 /// @brief Creates a label to refine cells based on the data previously provided by call
-///        to RDyMarkLocalCellsForRefinement
+///        to RDyMarkLocalCellsForAMR
 /// @param rdy        RDy struct
 /// @param adaptLabel A DMLabel marks appropriate locally cells for refinement
 /// @return PETSC_SUCESS on success
@@ -466,14 +466,14 @@ static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetRefinementOn(RDy rdy) {
+PetscErrorCode RDyEnableAMROn(RDy rdy) {
   PetscFunctionBeginUser;
   rdy->amr.is_refinement_on                = PETSC_TRUE;
   rdy->amr.last_refinement_level_outputted = -1;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyRefine(RDy rdy) {
+PetscErrorCode RDyPerformAMR(RDy rdy) {
   Mat      CoarseToFineMatNDof, FineToCoarseMatNDof;
   Mat      CoarseToFineMat1Dof, FineToCoarseMat1Dof;
   DM       dm_fine;
