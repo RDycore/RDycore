@@ -189,8 +189,8 @@ PetscErrorCode CreateDM(RDy rdy) {
 PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_diags, &rdy->dm_diags));
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_1dof, &rdy->dm_1dof));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_diags, &rdy->dm_diags));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_1dof, &rdy->dm_1dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -209,7 +209,7 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
     snprintf(rdy->sediment_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
   }
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->sediment_fields, &rdy->sediment_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->sediment_fields, &rdy->sediment_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -226,7 +226,7 @@ PetscErrorCode CreateFlowDM(RDy rdy) {
   snprintf(rdy->flow_fields.field_component_names[0][1], MAX_NAME_LEN, "MomentumX");
   snprintf(rdy->flow_fields.field_component_names[0][2], MAX_NAME_LEN, "MomentumY");
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->flow_fields, &rdy->flow_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->flow_fields, &rdy->flow_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

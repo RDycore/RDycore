@@ -46,15 +46,15 @@ static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
 PetscErrorCode RDyMarkLocalCellsForRefinement(RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
   PetscFunctionBegin;
 
-  rdy->cells_marked_for_refinement = PETSC_TRUE;
+  rdy->amr.cells_marked_for_refinement = PETSC_TRUE;
 
   // check if the size of the array is equal to the number of local cells
   PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
 
   // copy the data
-  PetscCalloc1(size, &rdy->refine_cell);
+  PetscCalloc1(size, &rdy->amr.refine_cell);
   for (PetscInt icell = 0; icell < size; ++icell) {
-    rdy->refine_cell[icell] = refine_cell[icell];
+    rdy->amr.refine_cell[icell] = refine_cell[icell];
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -79,7 +79,7 @@ static PetscErrorCode CreateAdaptLabelFromMarkedCells(RDy rdy, DMLabel *adaptLab
   RDyCells *cells = &mesh->cells;
 
   for (PetscInt c = 0; c < mesh->num_owned_cells; ++c) {
-    if (rdy->refine_cell[c]) {
+    if (rdy->amr.refine_cell[c]) {
       PetscInt idx = cells->owned_to_local[c] + cStart;
       PetscCall(DMLabelSetValue(label, idx, DM_ADAPT_REFINE));
     }
@@ -170,12 +170,12 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
 
   PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
-  if (!rdy->cells_marked_for_refinement) {
+  if (!rdy->amr.cells_marked_for_refinement) {
     PetscCall(CreateAdaptLabelInternal(rdy, &adaptLabel));
   } else {
     PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
-    rdy->cells_marked_for_refinement = PETSC_FALSE;
-    PetscFree(rdy->refine_cell);
+    rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
+    PetscFree(rdy->amr.refine_cell);
   }
 
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
@@ -468,8 +468,8 @@ static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
 
 PetscErrorCode RDySetRefinementOn(RDy rdy) {
   PetscFunctionBeginUser;
-  rdy->is_refinement_on                = PETSC_TRUE;
-  rdy->last_refinement_level_outputted = -1;
+  rdy->amr.is_refinement_on                = PETSC_TRUE;
+  rdy->amr.last_refinement_level_outputted = -1;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -594,14 +594,14 @@ PetscErrorCode RDyRefine(RDy rdy) {
   PetscCall(RDyDestroyVectors(&rdy));
 
   // keep a copy of base DMs, otherwise destroy the coarse DMs
-  if (!rdy->num_refinements) {
-    rdy->dm_amr_base      = rdy->dm;
-    rdy->dm_1dof_amr_base = rdy->dm_1dof;
+  if (!rdy->amr.num_refinements) {
+    rdy->amr.dm_base      = rdy->dm;
+    rdy->amr.dm_1dof_base = rdy->dm_1dof;
 
-    PetscCall(MatDuplicate(CoarseToFineMatNDof, MAT_COPY_VALUES, &rdy->BaseToCurrentMatNDof));
-    PetscCall(MatDuplicate(FineToCoarseMatNDof, MAT_COPY_VALUES, &rdy->CurrentToBaseMatNDof));
-    PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->BaseToCurrentMat1Dof));
-    PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->CurrentToBaseMat1Dof));
+    PetscCall(MatDuplicate(CoarseToFineMatNDof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMatNDof));
+    PetscCall(MatDuplicate(FineToCoarseMatNDof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMatNDof));
+    PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMat1Dof));
+    PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMat1Dof));
 
   } else {
     // destroy the coarse DM
@@ -609,10 +609,10 @@ PetscErrorCode RDyRefine(RDy rdy) {
     PetscCall(DMDestroy(&rdy->dm_diags));
     PetscCall(DMDestroy(&rdy->dm_1dof));
 
-    PetscCall(MatMultResuse(&CoarseToFineMatNDof, &rdy->BaseToCurrentMatNDof, PETSC_TRUE));
-    PetscCall(MatMultResuse(&rdy->CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
-    PetscCall(MatMultResuse(&CoarseToFineMat1Dof, &rdy->BaseToCurrentMat1Dof, PETSC_TRUE));
-    PetscCall(MatMultResuse(&rdy->CurrentToBaseMat1Dof, &FineToCoarseMat1Dof, PETSC_FALSE));
+    PetscCall(MatMultResuse(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof, PETSC_TRUE));
+    PetscCall(MatMultResuse(&rdy->amr.CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
+    PetscCall(MatMultResuse(&CoarseToFineMat1Dof, &rdy->amr.BaseToCurrentMat1Dof, PETSC_TRUE));
+    PetscCall(MatMultResuse(&rdy->amr.CurrentToBaseMat1Dof, &FineToCoarseMat1Dof, PETSC_FALSE));
   }
 
   // set the DM to be the refined DM
@@ -636,12 +636,12 @@ PetscErrorCode RDyRefine(RDy rdy) {
   rdy->regions     = refined_regions;
 
   // mark the mesh was refined
-  rdy->mesh_was_refined = PETSC_TRUE;
-  rdy->num_refinements++;
+  rdy->amr.mesh_was_refined = PETSC_TRUE;
+  rdy->amr.num_refinements++;
 
   // destroy and recreate mesh
   PetscCall(RDyMeshDestroy(rdy->mesh));
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->num_refinements, &rdy->mesh));
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &rdy->mesh));
 
   // initialize the refined solution from existing previous solution
   PetscCall(MatMult(CoarseToFineMatNDof, U_coarse_local, rdy->u_local));

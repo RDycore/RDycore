@@ -635,16 +635,16 @@ PetscErrorCode RDyReadOneDOFBaseGlobalVecFromBinaryFile(RDy rdy, const char file
   // create a naturally-ordered vector with a stride equal to the number of
   Vec natural;
 
-  PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof_amr_base, &natural));
-  PetscCall(DMCreateGlobalVector(rdy->dm_1dof_amr_base, global));
+  PetscCall(DMPlexCreateNaturalVector(rdy->amr.dm_1dof_base, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->amr.dm_1dof_base, global));
 
   // load the properties into the vector and copy them into place
   PetscCall(VecLoad(natural, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
 
   // scatter natural-to-global
-  PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof_amr_base, natural, *global));
-  PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof_amr_base, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->amr.dm_1dof_base, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->amr.dm_1dof_base, natural, *global));
 
   PetscCall(VecDestroy(&natural));
 
@@ -655,14 +655,14 @@ PetscErrorCode RDyMapOneDOFGlobalBaseVecToCurrentGlobalVec(RDy rdy, Vec global_b
   PetscFunctionBegin;
 
   Vec local_base;
-  PetscCall(DMCreateLocalVector(rdy->dm_1dof_amr_base, &local_base));
+  PetscCall(DMCreateLocalVector(rdy->amr.dm_1dof_base, &local_base));
 
-  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof_amr_base, global_base, INSERT_VALUES, local_base));
-  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof_amr_base, global_base, INSERT_VALUES, local_base));
+  PetscCall(DMGlobalToLocalBegin(rdy->amr.dm_1dof_base, global_base, INSERT_VALUES, local_base));
+  PetscCall(DMGlobalToLocalEnd(rdy->amr.dm_1dof_base, global_base, INSERT_VALUES, local_base));
 
   Vec local_current;
   PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local_current));
-  PetscCall(MatMult(rdy->BaseToCurrentMat1Dof, local_base, local_current));
+  PetscCall(MatMult(rdy->amr.BaseToCurrentMat1Dof, local_base, local_current));
 
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, global_current));
   PetscCall(DMLocalToGlobalBegin(rdy->dm_1dof, local_current, INSERT_VALUES, *global_current));

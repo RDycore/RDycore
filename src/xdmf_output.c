@@ -94,10 +94,10 @@ static PetscErrorCode DetermineGridFile(RDy rdy, char *filename) {
   char prefix[PETSC_MAX_PATH_LEN], output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
   PetscCall(GetOutputDirectory(rdy, output_dir));
-  if (!rdy->is_refinement_on) {
+  if (!rdy->amr.is_refinement_on) {
     snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
   } else {
-    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.r%d.h5", output_dir, prefix, rdy->num_refinements);
+    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.r%d.h5", output_dir, prefix, rdy->amr.num_refinements);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -213,20 +213,20 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
   char group_name[PETSC_MAX_PATH_LEN];
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->num_refinements));
+  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->amr.num_refinements));
   if (rdy->field_diags.num_fields > 0) {  // diagnostics are written only by request
-    PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->num_refinements));
+    PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->amr.num_refinements));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // on the first step ONLY, write the grid to its own file
   PetscBool write_grid = PETSC_FALSE;
-  if (!rdy->is_refinement_on) {
+  if (!rdy->amr.is_refinement_on) {
     if (step == 0) write_grid = PETSC_TRUE;
   } else {
-    if (rdy->last_refinement_level_outputted < rdy->num_refinements) {
-      write_grid                           = PETSC_TRUE;
-      rdy->last_refinement_level_outputted = rdy->num_refinements;
+    if (rdy->amr.last_refinement_level_outputted < rdy->amr.num_refinements) {
+      write_grid                               = PETSC_TRUE;
+      rdy->amr.last_refinement_level_outputted = rdy->amr.num_refinements;
     }
   }
 

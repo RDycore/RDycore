@@ -62,6 +62,32 @@ typedef struct {
   } observations;
 } RDyTimeSeriesData;
 
+typedef struct {
+  // base mesh before any refinements
+  DM dm_base;
+  DM dm_1dof_base;
+
+  // for marking cells for refinement
+  PetscBool  cells_marked_for_refinement;
+  PetscBool *refine_cell;
+
+  // for mapping data between base and current meshes
+  Mat BaseToCurrentMatNDof, CurrentToBaseMatNDof;
+  Mat BaseToCurrentMat1Dof, CurrentToBaseMat1Dof;
+
+  // identifies if the mesh has been refined and the model has not taken a step
+  PetscBool mesh_was_refined;
+
+  // number of times the mesh has been refined
+  int num_refinements;
+
+  // last refined mesh that was outputted
+  int last_refinement_level_outputted;
+
+  // is refinement on or off
+  PetscBool is_refinement_on;
+} RDyAMR;
+
 // This type serves as a "virtual table" containing function pointers that
 // define the behavior of the dycore.
 typedef struct _RDyOps *RDyOps;
@@ -152,22 +178,7 @@ struct _p_RDy {
   // Refinements
   //--------------------------
 
-  DM dm_amr_base;
-  DM dm_1dof_amr_base;
-
-  PetscBool  cells_marked_for_refinement;
-  PetscBool *refine_cell;
-
-  Mat BaseToCurrentMatNDof, CurrentToBaseMatNDof;
-  Mat BaseToCurrentMat1Dof, CurrentToBaseMat1Dof;
-
-  // identifies if the mesh has been refined and the model has not taken a step
-  PetscBool mesh_was_refined;
-
-  // number of times the mesh has been refined
-  int       num_refinements;
-  int       last_refinement_level_outputted;
-  PetscBool is_refinement_on;
+  RDyAMR amr;
 
   //--------------------------
   // Restart

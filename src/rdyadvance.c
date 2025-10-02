@@ -283,11 +283,11 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(CreateOutputViewer(rdy));
   }
 
-  if (rdy->mesh_was_refined) {
+  if (rdy->amr.mesh_was_refined) {
     // create a viewer with the proper format for visualization output
     PetscCall(CreateOutputViewer(rdy));
 
-    rdy->mesh_was_refined = PETSC_FALSE;
+    rdy->amr.mesh_was_refined = PETSC_FALSE;
   }
 
   PetscReal time;
