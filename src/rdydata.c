@@ -626,7 +626,7 @@ PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char filename[
 }
 
 // reads data for a single DOF from a binary file into a global Vec
-PetscErrorCode RDyReadOneDOFBaseGlobalVecFromBinaryFile(RDy rdy, const char filename[], Vec *global) {
+PetscErrorCode RDyReadAMRScalarGlobalVecLevel0FromBinary(RDy rdy, const char filename[], Vec *global) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -651,7 +651,9 @@ PetscErrorCode RDyReadOneDOFBaseGlobalVecFromBinaryFile(RDy rdy, const char file
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyMapOneDOFGlobalBaseVecToCurrentGlobalVec(RDy rdy, Vec global_base, Vec *global_current) {
+// maps a single-DOF global vector defined on the level-0 mesh to a single-DOF
+// global vector defined on the current mesh
+PetscErrorCode RDyMapAMRScalarGlobalVecLevel0ToCurrentLevel(RDy rdy, Vec global_base, Vec *global_current) {
   PetscFunctionBegin;
 
   Vec local_base;

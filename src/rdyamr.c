@@ -466,7 +466,7 @@ static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyEnableAMROn(RDy rdy) {
+PetscErrorCode RDyEnableAMR(RDy rdy) {
   PetscFunctionBeginUser;
   rdy->amr.is_refinement_on                = PETSC_TRUE;
   rdy->amr.last_refinement_level_outputted = -1;
