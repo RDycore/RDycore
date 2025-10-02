@@ -468,6 +468,12 @@ static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
 
 PetscErrorCode RDyEnableAMR(RDy rdy) {
   PetscFunctionBeginUser;
+
+  PetscInt nstep;
+  PetscCall(RDyGetStep(rdy, &nstep));
+  PetscAssert(nstep == 0, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ,
+              "It seems the model has already taken few time steps. AMR cannot be enabled only during initialization.");
+
   rdy->amr.is_refinement_on                = PETSC_TRUE;
   rdy->amr.last_refinement_level_outputted = -1;
   PetscFunctionReturn(PETSC_SUCCESS);
