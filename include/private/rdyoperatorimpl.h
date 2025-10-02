@@ -63,9 +63,13 @@ PETSC_INTERN PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields, const ch
 // This operator type has a context that stores physics-specific data and two
 // operations:
 //
-// 1. apply(context, dt, u, F), which updates the global right-hand-side vector
-//    F by applying the operator to the local vector u over the timestep dt
-// 2. destroy(context), which deallocates all resources related to the context
+// 1. F(context, dt, u, udot, F), which computes the function F representing the the left-hand side
+//    of the equation F(t, u, udot) = G(t, u)
+// 2. G(context, dt, u, G), which computes the global right-hand-side vector
+//    G by applying the operator to the local vector u over the timestep dt
+// 3. dF(context, dt, u, dF), which computes the Jacobian of F
+// 4. dG(context, dt, u, dF), which computes the Jacobian of G
+// 5. destroy(context), which deallocates all resources related to the context
 //
 // The PetscOperator resembles the CeedOperator type, which allows us to
 // structure our PETSc-backed physics similarly to CEED-backed physics. Because
@@ -77,7 +81,7 @@ struct _p_PetscOperator {
   void               *context;
   PetscOperatorFields fields;
   PetscBool           is_composite;
-  PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec);
+  PetscErrorCode (*rhs)(void *, PetscOperatorFields, PetscReal, Vec, Vec);
   PetscErrorCode (*destroy)(void *);
 };
 
@@ -93,11 +97,22 @@ PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOpe
 // Operator
 //----------
 
-// This type and its related functions define an interface for creating a
-// nonlinear operator F that computes the time derivative du/dt of a local
-// solution vector u at time t:
+// This type and its related functions define an interface for solving a nonlinear equation for a
+// time-dependent solution u(t) for which the equation
 //
-// F(u, t) -> du/dt
+// F(t, u, du/dt) = G(t, u)
+//
+// holds, where F is in general a differential-algebraic expression involving u and its time
+// derivative, and G is a "right-hand side function".
+//
+// In the case of explicit time integration, F(t, u, du/dt) reduces to du/dt itself, and the
+// nonlinear system becomes a system of ordinary differential equations:
+//
+// du/dt = G(t, u),
+//
+// evaluated at appropriate quadrature points.
+//
+// These two parts are then evaluated according to the selected time integration method.
 //
 // There are two families of operator implementations:
 // 1. CEED implementation: a composite CeedOperator with interior and boundary
@@ -179,8 +194,10 @@ PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt,
                                            Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
-// operator timestepping function
-PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
+// operator functions for interacting with PETSc's TS solver (RDy passed as context)
+PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void*);
+PETSC_INTERN PetscErrorCode OperatorRHSFunction(TS, PetscReal, Vec, Vec, void*);
+PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void*);
 
 //--------------------------------------------------
 // CEED/PETSc Flux and Source Operator Constructors

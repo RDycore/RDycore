@@ -407,19 +407,139 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Evaluates the right-hand-side of the operator, usable with TS via TSSetRHSFunction.
+/// @param [in]    ts  the solver
+/// @param [in]    t   the simulation time [seconds]
+/// @param [in]    U   the global solution vector at time t
+/// @param [out]   F   the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx a pointer to the operator representing the system being solved
+PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy       rdy = ctx;
+  DM        dm  = rdy->dm;
+  Operator *op  = rdy->operator;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(VecZeroEntries(F));
+
+  // populate the local U vector
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+
+  PetscCall(ResetOperatorDiagnostics(op));
+
+  // compute the right hand side
+  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
+  if (0) {
+    PetscInt nstep;
+    PetscCall(TSGetStepNumber(ts, &nstep));
+
+    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
+    char        file[PETSC_MAX_PATH_LEN];
+    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
+    PetscCall(VecView(F, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
+
+  // if debug-level logging is enabled, find the latest global maximum Courant number
+  // and log it.
+  if (rdy->config.logging.level >= LOG_DEBUG) {
+    PetscCall(UpdateOperatorDiagnostics(op));
+    OperatorDiagnostics diagnostics;
+    PetscCall(GetOperatorDiagnostics(op, &diagnostics));
+
+    PetscReal time;
+    PetscInt  stepnum;
+    PetscCall(TSGetTime(ts, &time));
+    PetscCall(TSGetStepNumber(ts, &stepnum));
+    const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
+                diagnostics.courant_number.max_courant_num);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Applies the operator to a local solution vector, storing the result in the
 /// given global vector.
 /// @param [inout] op       the operator to be applied to the solution vector
 /// @param [dt]    dt       the time step over which the operator is applied
 /// @param [in]    u_local  the local solution vector to which the operator is applied
 /// @param [inout] f_global the global vector storing the result of the application
-PetscErrorCode ApplyOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
   if (CeedEnabled()) {
     PetscCall(ApplyCeedOperator(op, dt, u_local, f_global));
   } else {
     PetscCall(ApplyPetscOperator(op, dt, u_local, f_global));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Evaluates the right-hand-side of the operator, usable with TS via TSSetRHSFunction.
+/// @param [in]    ts  the solver
+/// @param [in]    t   the simulation time [seconds]
+/// @param [in]    U   the global solution vector at time t
+/// @param [out]   F   the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx a pointer to the operator representing the system being solved
+PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy       rdy = ctx;
+  DM        dm  = rdy->dm;
+  Operator *op  = rdy->operator;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(VecZeroEntries(F));
+
+  // populate the local U vector
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+
+  PetscCall(ResetOperatorDiagnostics(op));
+
+  // compute the right hand side
+  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
+  if (0) {
+    PetscInt nstep;
+    PetscCall(TSGetStepNumber(ts, &nstep));
+
+    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
+    char        file[PETSC_MAX_PATH_LEN];
+    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
+    PetscCall(VecView(F, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
+
+  // if debug-level logging is enabled, find the latest global maximum Courant number
+  // and log it.
+  if (rdy->config.logging.level >= LOG_DEBUG) {
+    PetscCall(UpdateOperatorDiagnostics(op));
+    OperatorDiagnostics diagnostics;
+    PetscCall(GetOperatorDiagnostics(op, &diagnostics));
+
+    PetscReal time;
+    PetscInt  stepnum;
+    PetscCall(TSGetTime(ts, &time));
+    PetscCall(TSGetStepNumber(ts, &stepnum));
+    const char *units = TimeUnitAsString(rdy->config.time.unit);
+
+    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
+                diagnostics.courant_number.max_courant_num);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
