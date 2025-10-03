@@ -125,7 +125,7 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, c
       qL.hci[j] = q_L[flow_ndof + j][i];
       qR.hci[j] = q_R[flow_ndof + j][i];
     }
-    if (qL.h > tiny_h) {
+    if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[MAX_NUM_FIELD_COMPONENTS], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
