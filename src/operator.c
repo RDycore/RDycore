@@ -154,9 +154,9 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 
     // add this vector to all source sub-operators
     CeedInt num_source_suboperators;
-    PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source, &num_source_suboperators));
+    PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.G.source, &num_source_suboperators));
     CeedOperator *source_suboperators;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
+    PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.source, &source_suboperators));
     for (CeedInt i = 0; i < num_source_suboperators; ++i) {
       PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_NONE, op->ceed.flux_divergence));
     }
@@ -164,7 +164,7 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
     // clean up (the suboperators keep references to restrictions and vectors)
     PetscCallCEED(CeedElemRestrictionDestroy(&flux_div_restriction));
   } else {
-    PetscCall(PetscOperatorSetField(op->petsc.source, "riemannf", op->flux_divergence));
+    PetscCall(PetscOperatorSetField(op->petsc.G.source, "riemannf", op->flux_divergence));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -220,14 +220,14 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     }
 
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                     (*operator)->boundary_conditions, &(*operator)->ceed.flux));
-    PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
+                                     (*operator)->boundary_conditions, &(*operator)->ceed.G.flux));
+    PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.G.source));
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
-                                      (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.flux));
+                                      (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.G.flux));
     PetscCall(CreatePetscSourceOperator((*operator)->config, (*operator)->mesh, (*operator)->petsc.external_sources,
-                                        (*operator)->petsc.material_properties, &(*operator)->petsc.source));
+                                        (*operator)->petsc.material_properties, &(*operator)->petsc.G.source));
   }
 
   // set up our flux divergence vector(s)
@@ -250,8 +250,8 @@ PetscErrorCode DestroyOperator(Operator **op) {
   PetscBool ceed_enabled = CeedEnabled();
 
   if (ceed_enabled) {
-    PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.flux)));
-    PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.source)));
+    PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.G.flux)));
+    PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.G.source)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
@@ -269,8 +269,8 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscFree((*op)->petsc.boundary_fluxes_accum);
     PetscCall(VecDestroy(&(*op)->petsc.external_sources));
     PetscCall(VecDestroy(&(*op)->petsc.material_properties));
-    PetscCall(PetscOperatorDestroy(&(*op)->petsc.flux));
-    PetscCall(PetscOperatorDestroy(&(*op)->petsc.source));
+    PetscCall(PetscOperatorDestroy(&(*op)->petsc.G.flux));
+    PetscCall(PetscOperatorDestroy(&(*op)->petsc.G.source));
   }
   if ((*op)->flux_divergence) {
     PetscCall(VecDestroy(&(*op)->flux_divergence));
@@ -296,10 +296,10 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     op->ceed.dt = dt;
 
     CeedContextFieldLabel label;
-    PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.flux, "time step", &label));
-    PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.flux, label, &op->ceed.dt));
-    PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.source, "time step", &label));
-    PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.source, label, &op->ceed.dt));
+    PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.G.flux, "time step", &label));
+    PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.G.flux, label, &op->ceed.dt));
+    PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.G.source, "time step", &label));
+    PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.G.source, label, &op->ceed.dt));
   }
 
   //------------------
@@ -323,7 +323,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // apply the flux operator, computing flux divergences
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApply(op->ceed.G.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -368,7 +368,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // apply the source operator(s)
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.source, op->ceed.u_local, op->ceed.sources, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApply(op->ceed.G.source, op->ceed.u_local, op->ceed.sources, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -396,24 +396,57 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
   PetscFunctionBegin;
 
   // apply the composite PETSc flux operators
-  PetscCall(PetscOperatorApply(op->petsc.flux, dt, u_local, f_global));
+  PetscCall(PetscOperatorApply(op->petsc.G.flux, dt, u_local, f_global));
 
   // copy the flux divergences out of f_global for use with the source operator
   PetscCall(VecCopy(f_global, op->flux_divergence));
 
   // apply the composite PETSc source operators
-  PetscCall(PetscOperatorApply(op->petsc.source, dt, u_local, f_global));
+  PetscCall(PetscOperatorApply(op->petsc.G.source, dt, u_local, f_global));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Evaluates the right-hand-side of the operator, usable with TS via TSSetRHSFunction.
+/// Evaluates the left hand side of the operator F(t, u, du/dt). Use with TS via TSSetIFunction.
+/// @param [in]    ts   the solver
+/// @param [in]    t    the simulation time [seconds]
+/// @param [in]    u    the global solution vector at time t
+/// @param [in]    dudt the time derivative of the global solution vector at time t
+/// @param [out]   F    the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx the RDy instance for the operator
+PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Evaluates the jacobian of the left hand side of the operator, dF(t, u, du/dt). Use with TS via
+/// TSSetIJacobian.
+/// @param [in]    ts    the solver
+/// @param [in]    t     the simulation time [seconds]
+/// @param [in]    u     the global solution vector at time t
+/// @param [in]    dudt  the time derivative of the global solution vector at time t
+/// @param [in]    sigma the "shift" coefficient preceding the time derivative term of the jacobian
+/// @param [out]   dF  the matrix that stores the jacobian of the left hand side
+/// @param [out]   P   the matrix from which to construct the preconditioner (usually same as dF)
+/// @param [inout] ctx the RDy instance for the operator
+PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat dG, Mat P, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Evaluates the right hand side of the operator G(t, u). Use with TS via TSSetRHSFunction.
 /// @param [in]    ts  the solver
 /// @param [in]    t   the simulation time [seconds]
-/// @param [in]    U   the global solution vector at time t
-/// @param [out]   F   the global right hand side vector to be evaluated at time t
-/// @param [inout] ctx a pointer to the operator representing the system being solved
-PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+/// @param [in]    u   the global solution vector at time t
+/// @param [out]   G   the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx the RDy instance for the operator
+PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) {
   PetscFunctionBegin;
 
   RDy       rdy = ctx;
@@ -423,105 +456,32 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) 
   PetscScalar dt;
   PetscCall(TSGetTimeStep(ts, &dt));
 
-  PetscCall(VecZeroEntries(F));
+  PetscCall(VecZeroEntries(G));
 
-  // populate the local U vector
-  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
-  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+  // populate the local u vector
+  PetscCall(DMGlobalToLocalBegin(dm, u, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, u, INSERT_VALUES, rdy->u_local));
 
   PetscCall(ResetOperatorDiagnostics(op));
 
   // compute the right hand side
-  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
-  if (0) {
-    PetscInt nstep;
-    PetscCall(TSGetStepNumber(ts, &nstep));
-
-    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
-    char        file[PETSC_MAX_PATH_LEN];
-    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
-
-    PetscViewer viewer;
-    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
-    PetscCall(VecView(F, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-  }
-
-  // if debug-level logging is enabled, find the latest global maximum Courant number
-  // and log it.
-  if (rdy->config.logging.level >= LOG_DEBUG) {
-    PetscCall(UpdateOperatorDiagnostics(op));
-    OperatorDiagnostics diagnostics;
-    PetscCall(GetOperatorDiagnostics(op, &diagnostics));
-
-    PetscReal time;
-    PetscInt  stepnum;
-    PetscCall(TSGetTime(ts, &time));
-    PetscCall(TSGetStepNumber(ts, &stepnum));
-    const char *units = TimeUnitAsString(rdy->config.time.unit);
-
-    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
-                diagnostics.courant_number.max_courant_num);
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Applies the operator to a local solution vector, storing the result in the
-/// given global vector.
-/// @param [inout] op       the operator to be applied to the solution vector
-/// @param [dt]    dt       the time step over which the operator is applied
-/// @param [in]    u_local  the local solution vector to which the operator is applied
-/// @param [inout] f_global the global vector storing the result of the application
-static PetscErrorCode ApplyOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
-  PetscFunctionBegin;
-
   if (CeedEnabled()) {
-    PetscCall(ApplyCeedOperator(op, dt, u_local, f_global));
+    PetscCall(ApplyCeedOperator(op, dt, rdy->u_local, G));
   } else {
-    PetscCall(ApplyPetscOperator(op, dt, u_local, f_global));
+    PetscCall(ApplyPetscOperator(op, dt, rdy->u_local, G));
   }
 
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Evaluates the right-hand-side of the operator, usable with TS via TSSetRHSFunction.
-/// @param [in]    ts  the solver
-/// @param [in]    t   the simulation time [seconds]
-/// @param [in]    U   the global solution vector at time t
-/// @param [out]   F   the global right hand side vector to be evaluated at time t
-/// @param [inout] ctx a pointer to the operator representing the system being solved
-PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
-  PetscFunctionBegin;
-
-  RDy       rdy = ctx;
-  DM        dm  = rdy->dm;
-  Operator *op  = rdy->operator;
-
-  PetscScalar dt;
-  PetscCall(TSGetTimeStep(ts, &dt));
-
-  PetscCall(VecZeroEntries(F));
-
-  // populate the local U vector
-  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
-  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
-
-  PetscCall(ResetOperatorDiagnostics(op));
-
-  // compute the right hand side
-  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
   if (0) {
     PetscInt nstep;
     PetscCall(TSGetStepNumber(ts, &nstep));
 
     const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
     char        file[PETSC_MAX_PATH_LEN];
-    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
+    snprintf(file, PETSC_MAX_PATH_LEN, "G_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
 
     PetscViewer viewer;
     PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
-    PetscCall(VecView(F, viewer));
+    PetscCall(VecView(G, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   }
 
@@ -541,6 +501,22 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) 
     RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
                 diagnostics.courant_number.max_courant_num);
   }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Evaluates the jacobian of the right hand side of the operator, dG(t, u). Use with TS via
+/// TSSetRHSJacobian.
+/// @param [in]    ts  the solver
+/// @param [in]    t   the simulation time [seconds]
+/// @param [in]    u   the global solution vector at time t
+/// @param [out]   dG  the matrix that stores the jacobian of the right hand side
+/// @param [out]   P   the matrix from which to construct the preconditioner (usually same as dG)
+/// @param [inout] ctx the RDy instance for the operator
+PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal dt, Vec u, Mat dG, Mat P, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -728,7 +704,7 @@ static PetscErrorCode UpdateCeedCourantNumberDiagnostics(Operator *op) {
   if (CeedEnabled()) {
     // we need to extract the maximum courant number from the operator in the
     // CEED case; in the PETSc case it's already set for this process
-    PetscCall(CeedFindMaxCourantNumber(op->ceed.flux, op->mesh, op->num_boundaries, op->boundaries, comm, courant_num_diags));
+    PetscCall(CeedFindMaxCourantNumber(op->ceed.G.flux, op->mesh, op->num_boundaries, op->boundaries, comm, courant_num_diags));
   }
 
   // reduce the courant diagnostics across all processes
@@ -803,7 +779,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.flux, &sub_ops));
   CeedOperator sub_op = sub_ops[1 + boundary.index];
 
   // fetch the relevant vector
@@ -830,7 +806,7 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.flux, &sub_ops));
   CeedOperator sub_op = sub_ops[1 + boundary.index];
 
   // copy the data in
@@ -995,7 +971,7 @@ static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion re
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // fetch the relevant vector
@@ -1022,7 +998,7 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
@@ -1191,7 +1167,7 @@ static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // fetch the relevant vector
@@ -1217,7 +1193,7 @@ static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const ch
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.G.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // copy the data into place

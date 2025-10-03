@@ -63,13 +63,9 @@ PETSC_INTERN PetscErrorCode PetscOperatorFieldsGet(PetscOperatorFields, const ch
 // This operator type has a context that stores physics-specific data and two
 // operations:
 //
-// 1. F(context, dt, u, udot, F), which computes the function F representing the the left-hand side
-//    of the equation F(t, u, udot) = G(t, u)
-// 2. G(context, dt, u, G), which computes the global right-hand-side vector
-//    G by applying the operator to the local vector u over the timestep dt
-// 3. dF(context, dt, u, dF), which computes the Jacobian of F
-// 4. dG(context, dt, u, dF), which computes the Jacobian of G
-// 5. destroy(context), which deallocates all resources related to the context
+// 1. apply(context, dt, u, F), which updates the global right-hand-side vector
+//    F by applying the operator to the local vector u over the timestep dt
+// 2. destroy(context), which deallocates all resources related to the context
 //
 // The PetscOperator resembles the CeedOperator type, which allows us to
 // structure our PETSc-backed physics similarly to CEED-backed physics. Because
@@ -81,7 +77,7 @@ struct _p_PetscOperator {
   void               *context;
   PetscOperatorFields fields;
   PetscBool           is_composite;
-  PetscErrorCode (*rhs)(void *, PetscOperatorFields, PetscReal, Vec, Vec);
+  PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec);
   PetscErrorCode (*destroy)(void *);
 };
 
@@ -143,9 +139,14 @@ typedef struct Operator {
   // CEED/PETSc backends
   union {
     struct {
-      // CEED flux and source operators (each composed of sub-operators, see
-      // CreateOperator in src/operator.c)
-      CeedOperator flux, source;
+      // CEED operator for F(t, u, du/dt) -- reduces to du/dt for explicit time integration
+      CeedOperator F;
+
+      // CEED flux and source operators for the function G(t, u), each composed of sub-operators.
+      // See CreateOperator in src/operator.c.
+      struct {
+        CeedOperator flux, source;
+      } G;
 
       // timestep last set on operators
       PetscReal dt;
@@ -159,9 +160,14 @@ typedef struct Operator {
 
     // PETSc operator data
     struct {
-      // PETSc composite operators with sub-operators identical in structure to
-      // the CEED composite operators above
-      PetscOperator flux, source;
+      // PETsc operator for F(t, u, du/dt) -- reduces to du/dt for explicit time integration
+      PetscOperator F;
+
+      // PETsc flux and source operators for the function G(t, u), each composed of sub-operators.
+      // See CreateOperator in src/operator.c.
+      struct {
+        PetscOperator flux, source;
+      } G;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
       Vec *boundary_values;
@@ -195,9 +201,10 @@ PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt,
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
 // operator functions for interacting with PETSc's TS solver (RDy passed as context)
-PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void*);
-PETSC_INTERN PetscErrorCode OperatorRHSFunction(TS, PetscReal, Vec, Vec, void*);
-PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void*);
+PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void *);
+PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void *);
+PETSC_INTERN PetscErrorCode OperatorRHSFunction(TS, PetscReal, Vec, Vec, void *);
+PETSC_INTERN PetscErrorCode OperatorRHSJacobian(TS, PetscReal, Vec, Mat, Mat, void *);
 
 //--------------------------------------------------
 // CEED/PETSc Flux and Source Operator Constructors
