@@ -138,15 +138,18 @@ typedef struct Operator {
 
   // CEED/PETSc backends
   union {
+    // CEED
     struct {
-      // CEED operator for F(t, u, du/dt) -- reduces to du/dt for explicit time integration
-      CeedOperator F;
+      // Operators for F(t, u, du/dt) and its Jacobian dF. F reduces to du/dt for explicit time
+      // integration.
+      CeedOperator F, dF;
 
-      // CEED flux and source operators for the function G(t, u), each composed of sub-operators.
-      // See CreateOperator in src/operator.c.
+      // Flux and source operators for the function G(t, u) and its Jacobian dG. Each is composed of
+      // sub-operators.
       struct {
         CeedOperator flux, source;
       } G;
+      CeedOperator dG;
 
       // timestep last set on operators
       PetscReal dt;
@@ -160,14 +163,16 @@ typedef struct Operator {
 
     // PETSc operator data
     struct {
-      // PETsc operator for F(t, u, du/dt) -- reduces to du/dt for explicit time integration
-      PetscOperator F;
+      // Operators for F(t, u, du/dt) and its Jacobian dF. F reduces to du/dt for explicit time
+      // integration.
+      PetscOperator F, dF;
 
-      // PETsc flux and source operators for the function G(t, u), each composed of sub-operators.
-      // See CreateOperator in src/operator.c.
+      // Flux and source operators for the function G(t, u) and its Jacobian dG. Each is composed of
+      // sub-operators.
       struct {
         PetscOperator flux, source;
       } G;
+      PetscOperator dG;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
       Vec *boundary_values;
@@ -204,7 +209,6 @@ PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void *);
 PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void *);
 PETSC_INTERN PetscErrorCode OperatorRHSFunction(TS, PetscReal, Vec, Vec, void *);
-PETSC_INTERN PetscErrorCode OperatorRHSJacobian(TS, PetscReal, Vec, Mat, Mat, void *);
 
 //--------------------------------------------------
 // CEED/PETSc Flux and Source Operator Constructors
@@ -212,9 +216,13 @@ PETSC_INTERN PetscErrorCode OperatorRHSJacobian(TS, PetscReal, Vec, Mat, Mat, vo
 
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedIOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedIJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
-                                                    OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSourceOperator(RDyConfig *, RDyMesh *, Vec, Vec, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscIOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscIJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
 
 //----------------------
 // Operator Data Access

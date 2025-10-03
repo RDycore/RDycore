@@ -235,3 +235,37 @@ PetscErrorCode CreatePetscSourceOperator(RDyConfig *config, RDyMesh *mesh, Vec e
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// Creates a PETSc "identity" operator appropriate for the given configuration.
+/// @param [in]    config              the configuration defining the physics and numerics for the new operator
+/// @param [in]    mesh                a mesh containing geometric and topological information for the domain
+/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
+/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
+/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
+/// @param [out]   identity_op         the newly created operator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreatePetscIOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
+                                    PetscOperator *identity_op) {
+  PetscFunctionBegin;
+
+  // TODO: implement this! Create an input field for du/dt
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a PETSc "identity jacobian" operator appropriate for the given configuration.
+/// @param [in]    config              the configuration defining the physics and numerics for the new operator
+/// @param [in]    mesh                a mesh containing geometric and topological information for the domain
+/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
+/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
+/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
+/// @param [out]   jacobian_op         the newly created operator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreatePetscIJacobian(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
+                                    PetscOperator *jacobian_op) {
+  PetscFunctionBegin;
+
+  // TODO: implement this! Create an output field for nonzero values
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

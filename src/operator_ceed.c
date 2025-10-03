@@ -697,5 +697,49 @@ PetscErrorCode CreateCeedSourceOperator(RDyConfig *config, RDyMesh *mesh, CeedOp
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// Creates a CEED "identity" operator appropriate for the given configuration.
+/// @param [in]    config              the configuration defining the physics and numerics for the new operator
+/// @param [in]    mesh                a mesh containing geometric and topological information for the domain
+/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
+/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
+/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
+/// @param [out]   identity_op         the newly created operator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCeedIOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
+                                   CeedOperator *identity_op) {
+  PetscFunctionBegin;
+
+  // TODO: implement this! Create an input field large enought to store u and du/dt
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a CEED "identity jacobian" operator appropriate for the given configuration.
+/// @param [in]    config              the configuration defining the physics and numerics for the new operator
+/// @param [in]    mesh                a mesh containing geometric and topological information for the domain
+/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
+/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
+/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
+/// @param [out]   jacobian_op         the newly created operator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCeedIJacobian(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
+                                   CeedOperator *jacobian_op) {
+  PetscFunctionBegin;
+
+  // TODO: implement this! Create an output field for nonzero values
+
+  /*
+  // ...
+
+  CeedInt *rows, *columns;
+  PetscCall(CeedOperatorLinearAssembleSymbolic(*jacobian_op, jacobian_nnz, &rows, &columns));
+  PetscFree(rows);
+  PetscFree(columns);
+  */
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
