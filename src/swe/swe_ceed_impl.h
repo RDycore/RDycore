@@ -116,7 +116,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
-    if (qL.h > tiny_h) {
+    if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
