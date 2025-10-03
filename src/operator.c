@@ -436,6 +436,38 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
 PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, void *ctx) {
   PetscFunctionBegin;
 
+  RDy rdy = ctx;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Evaluates the jacobian of the left hand side of the operator, dF(t, u, du/dt). Use with TS via
+/// TSSetIJacobian.
+/// @param [in]    ts    the solver
+/// @param [in]    t     the simulation time [seconds]
+/// @param [in]    u     the global solution vector at time t
+/// @param [in]    dudt  the time derivative of the global solution vector at time t
+/// @param [in]    sigma the "shift" coefficient preceding the time derivative term of the jacobian
+/// @param [out]   dF  the matrix that stores the jacobian of the left hand side
+/// @param [out]   P   the matrix from which to construct the preconditioner (usually same as dF)
+/// @param [inout] ctx the RDy instance for the operator
+PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat dG, Mat P, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Evaluates the right hand side of the operator G(t, u). Use with TS via TSSetRHSFunction.
+/// @param [in]    ts  the solver
+/// @param [in]    t   the simulation time [seconds]
+/// @param [in]    u   the global solution vector at time t
+/// @param [out]   G   the global right hand side vector to be evaluated at time t
+/// @param [inout] ctx the RDy instance for the operator
+PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) {
+  PetscFunctionBegin;
+
   RDy       rdy = ctx;
   DM        dm  = rdy->dm;
   Operator *op  = rdy->operator;
@@ -443,7 +475,7 @@ PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, voi
   PetscScalar dt;
   PetscCall(TSGetTimeStep(ts, &dt));
 
-  PetscCall(VecZeroEntries(F));
+  PetscCall(VecZeroEntries(G));
 
   // populate the local u vector
   PetscCall(DMGlobalToLocalBegin(dm, u, INSERT_VALUES, rdy->u_local));
@@ -591,7 +623,7 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) 
 /// @param [in]    t   the simulation time [seconds]
 /// @param [in]    u   the global solution vector at time t
 /// @param [out]   dG  the matrix that stores the jacobian of the right hand side
-/// @param [in]    P   the matrix from which to construct the preconditioner (usually same as dG)
+/// @param [out]   P   the matrix from which to construct the preconditioner (usually same as dG)
 /// @param [inout] ctx the RDy instance for the operator
 PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal dt, Vec u, Mat dG, Mat P, void *ctx) {
   PetscFunctionBegin;
