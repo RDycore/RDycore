@@ -436,7 +436,41 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
 PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, void *ctx) {
   PetscFunctionBegin;
 
-  RDy rdy = ctx;
+  RDy       rdy = ctx;
+  DM        dm  = rdy->dm;
+  Operator *op  = rdy->operator;
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  PetscCall(VecZeroEntries(F));
+
+  // populate the local u vector
+  PetscCall(DMGlobalToLocalBegin(dm, u, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, u, INSERT_VALUES, rdy->u_local));
+
+  // populate the du/dt vector field on the operator and compute the left hand side
+  if (CeedEnabled()) {
+    // TODO: set du/dt field on operator
+    PetscCall(ApplyCeedOperator(op, dt, rdy->u_local, F));
+  } else {
+    // TODO: set du/dt field on operator
+    PetscCall(ApplyPetscOperator(op, dt, rdy->u_local, F));
+  }
+
+  if (0) {
+    PetscInt nstep;
+    PetscCall(TSGetStepNumber(ts, &nstep));
+
+    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
+    char        file[PETSC_MAX_PATH_LEN];
+    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
+
+    PetscViewer viewer;
+    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
+    PetscCall(VecView(F, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -448,13 +482,40 @@ PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, voi
 /// @param [in]    u     the global solution vector at time t
 /// @param [in]    dudt  the time derivative of the global solution vector at time t
 /// @param [in]    sigma the "shift" coefficient preceding the time derivative term of the jacobian
-/// @param [out]   dF  the matrix that stores the jacobian of the left hand side
-/// @param [out]   P   the matrix from which to construct the preconditioner (usually same as dF)
-/// @param [inout] ctx the RDy instance for the operator
-PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat dG, Mat P, void *ctx) {
+/// @param [out]   dF    the matrix that stores the jacobian of the left hand side
+/// @param [in]    P     the matrix from which to construct the preconditioner (usually same as dF)
+/// @param [inout] ctx   the RDy instance for the operator
+PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat dF, Mat P, void *ctx) {
   PetscFunctionBegin;
 
-  RDy rdy = ctx;
+  RDy       rdy = ctx;
+  Operator *op  = rdy->operator;
+
+  if (CeedEnabled()) {
+    // copy the nonzeros into the matrix dF in COO format
+    CeedOperatorField nonzeros_field;
+    PetscCallCEED(CeedOperatorGetFieldByName(op->ceed.dF, "nonzeros", &nonzeros_field));
+    CeedVector nonzeros;
+    PetscCallCEED(CeedOperatorFieldGetVector(nonzeros_field, &nonzeros));
+
+    const CeedScalar *nz;
+    PetscCall(CeedVectorGetArrayRead(nonzeros, CEED_MEM_DEVICE, &nz));
+    PetscCall(MatSetValuesCOO(dF, nz, INSERT_VALUES));
+    PetscCall(MatAssemblyBegin(dF, MAT_FLUSH_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(dF, MAT_FLUSH_ASSEMBLY));
+    PetscCall(CeedVectorRestoreArrayRead(nonzeros, &nz));
+  } else {
+    // copy the nonzeros into the matrix dF in COO format
+    Vec nonzeros;
+    PetscCall(PetscOperatorFieldsGet(op->petsc.dF->fields, "nonzeros", &nonzeros));
+
+    const PetscReal *nz;
+    PetscCall(VecGetArrayRead(nonzeros, &nz));
+    PetscCall(MatSetValuesCOO(dF, nz, INSERT_VALUES));
+    PetscCall(MatAssemblyBegin(dF, MAT_FLUSH_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(dF, MAT_FLUSH_ASSEMBLY));
+    PetscCall(VecRestoreArrayRead(nonzeros, &nz));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -623,7 +684,7 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) 
 /// @param [in]    t   the simulation time [seconds]
 /// @param [in]    u   the global solution vector at time t
 /// @param [out]   dG  the matrix that stores the jacobian of the right hand side
-/// @param [out]   P   the matrix from which to construct the preconditioner (usually same as dG)
+/// @param [in]    P   the matrix from which to construct the preconditioner (usually same as dG)
 /// @param [inout] ctx the RDy instance for the operator
 PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal dt, Vec u, Mat dG, Mat P, void *ctx) {
   PetscFunctionBegin;
