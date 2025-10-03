@@ -115,14 +115,29 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
 
   // parallel refinement phase
+  PetscInt  pStart, pEnd, pStartNew, pEndNew;
+  PetscBool refined;
+  PetscCall(DMPlexGetChart(rdy->dm, &pStart, &pEnd));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_"));
-  PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
   PetscCall(DMSetFromOptions(rdy->dm));
   PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+  PetscCall(DMPlexGetChart(rdy->dm, &pStartNew, &pEndNew));
+  refined = (pStart == pStartNew) && (pEnd == pEndNew) ? PETSC_FALSE : PETSC_TRUE;
+
+  // distribution phase
+  if (refined) {
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, "ref_dist_"));
+    PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_TRUE));
+    PetscCall(DMSetFromOptions(rdy->dm));
+    PetscCall(DMViewFromOptions(rdy->dm, NULL, "-dm_view"));
+    PetscCall(DMPlexDistributeSetDefault(rdy->dm, PETSC_FALSE));
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)rdy->dm, NULL));
+  }
 
   // Overlap meshes after refinement
   if (size > 1) {
@@ -148,7 +163,7 @@ PetscErrorCode CreateDM(RDy rdy) {
   }
 
   // create parallel section and global-to-natural mapping
-  if (size > 1) {
+  if (size > 1 && !refined) {
     PetscSF sfMigration, sfNatural;
 
     PetscCall(DMPlexGetMigrationSF(rdy->dm, &sfMigration));
@@ -174,8 +189,8 @@ PetscErrorCode CreateDM(RDy rdy) {
 PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_diags, &rdy->dm_diags));
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->field_1dof, &rdy->dm_1dof));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_diags, &rdy->dm_diags));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_1dof, &rdy->dm_1dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -194,7 +209,7 @@ PetscErrorCode CreateSedimentDM(RDy rdy) {
     snprintf(rdy->sediment_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
   }
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->sediment_fields, &rdy->sediment_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->sediment_fields, &rdy->sediment_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -211,7 +226,7 @@ PetscErrorCode CreateFlowDM(RDy rdy) {
   snprintf(rdy->flow_fields.field_component_names[0][1], MAX_NAME_LEN, "MomentumX");
   snprintf(rdy->flow_fields.field_component_names[0][2], MAX_NAME_LEN, "MomentumY");
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->num_refinements, rdy->flow_fields, &rdy->flow_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->flow_fields, &rdy->flow_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

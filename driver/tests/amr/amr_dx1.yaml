@@ -8,17 +8,17 @@ numerics:
   riemann: roe
 
 logging:
-  level: debug
+  level: detail
 
 time:
-  stop: 0.05
+  stop: 4
   unit: seconds
-  time_step : 0.005
-  coupling_interval: 0.01
+  time_step : 0.001
+  coupling_interval: 1
 
-#output:
-#  format: xdmf
-#  output_interval: 100
+output:
+  format: xdmf
+  output_interval: 500
 
 grid:
   file: mms_triangles_dx1.exo

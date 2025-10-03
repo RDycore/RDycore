@@ -22,7 +22,6 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, RDyOutputSection out
     // global vector instead
     PetscCall(VecDuplicate(global_vec, &data_vec));
     PetscCall(VecCopy(global_vec, data_vec));
-    PetscCall(PetscObjectReference((PetscObject)data_vec));
   }
 
   // fetch our section to extract names of components
@@ -88,14 +87,18 @@ static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, RDyOutputSection out
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DetermineGridFile(RDy rdy, PetscInt step, PetscReal time, char *filename) {
+static PetscErrorCode DetermineGridFile(RDy rdy, char *filename) {
   PetscFunctionBegin;
 
   // the grid is stored in its own file
   char prefix[PETSC_MAX_PATH_LEN], output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
   PetscCall(GetOutputDirectory(rdy, output_dir));
-  snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
+  if (!rdy->amr.is_refinement_on) {
+    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.h5", output_dir, prefix);
+  } else {
+    snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-grid.r%d.h5", output_dir, prefix, rdy->amr.num_refinements);
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -186,7 +189,7 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
 
 // Writes a XDMF "heavy data" to an HDF5 file. The time is expressed in the
 // units given in the configuration file.
-static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) {
+static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, char *h5_gridname) {
   PetscFunctionBegin;
 
   // Determine the output file name.
@@ -210,17 +213,25 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time) 
   char group_name[PETSC_MAX_PATH_LEN];
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->num_refinements));
+  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->amr.num_refinements));
   if (rdy->field_diags.num_fields > 0) {  // diagnostics are written only by request
-    PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->num_refinements));
+    PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->amr.num_refinements));
   }
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // on the first step ONLY, write the grid to its own file
-  if (step == 0) {
-    char h5_gridname[PETSC_MAX_PATH_LEN];
-    PetscCall(DetermineGridFile(rdy, step, time, h5_gridname));
-    RDyLogDetail(rdy, "Step 0: writing XDMF HDF5 grid to %s", h5_gridname);
+  PetscBool write_grid = PETSC_FALSE;
+  if (!rdy->amr.is_refinement_on) {
+    if (step == 0) write_grid = PETSC_TRUE;
+  } else {
+    if (rdy->amr.last_refinement_level_outputted < rdy->amr.num_refinements) {
+      write_grid                               = PETSC_TRUE;
+      rdy->amr.last_refinement_level_outputted = rdy->amr.num_refinements;
+    }
+  }
+
+  if (write_grid) {
+    RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing XDMF HDF5 grid to %s", step, h5_gridname);
 
     PetscViewer grid_viewer;
     PetscCall(PetscViewerHDF5Open(rdy->comm, h5_gridname, FILE_MODE_WRITE, &grid_viewer));
@@ -270,7 +281,7 @@ static PetscErrorCode WriteFieldMetadata(MPI_Comm comm, RDyOutputSection output,
 
 /// Generates an XMDF "light data" file (.xmf) for the given step and time. The
 /// time is expressed in the units specified in the .yaml input file.
-static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
+static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, char *gridname) {
   PetscFunctionBegin;
 
   // mesh metadata
@@ -298,8 +309,6 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time) {
   char       *last_slash  = strrchr(h5_name, '/');
   const char *h5_basename = last_slash ? &last_slash[1] : h5_name;
 
-  char gridname[PETSC_MAX_PATH_LEN];
-  PetscCall(DetermineGridFile(rdy, step, time, gridname));
   last_slash              = strrchr(gridname, '/');
   const char *h5_gridname = last_slash ? &last_slash[1] : gridname;
 
@@ -393,8 +402,10 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
 
       PetscReal t = ConvertTimeFromSeconds(time, rdy->config.time.unit);
       if (output->format == OUTPUT_XDMF) {
-        PetscCall(WriteXDMFHDF5Data(rdy, step, t));
-        PetscCall(WriteXDMFXMFData(rdy, step, t));
+        char h5_gridname[PETSC_MAX_PATH_LEN];
+        PetscCall(DetermineGridFile(rdy, h5_gridname));
+        PetscCall(WriteXDMFHDF5Data(rdy, step, t, h5_gridname));
+        PetscCall(WriteXDMFXMFData(rdy, step, t, h5_gridname));
       }
     }
   }

@@ -8,7 +8,7 @@ set(RDYCORE_C_SOURCE_FILES
   rdydm.c
   rdymesh.c
   rdymms.c
-  rdyrefine.c
+  rdyamr.c
   rdysetup.c
   operator.c
   operator_ceed.c
