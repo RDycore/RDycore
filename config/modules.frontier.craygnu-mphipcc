@@ -1,31 +1,6 @@
-module purge
-module load  craype-x86-trento                
-module load  libfabric/1.22.0                 
-module load  craype-network-ofi               
-module load  xpmem/2.10.6-1.2_gfaa90a94be64   
-module load  Core/24.07         
-module load  tmux/3.4           
-module load  hsi/default        
-module load  lfs-wrapper/0.0.1  
-module load  DefApps              
-module load  PrgEnv-gnu/8.6.0     
-module load  cray-dsmml/0.3.0     
-module load  cray-libsci/24.11.0  
-module load  cray-mpich/8.1.31  
-module load  cray-pmi/6.1.15    
-module load  craype/2.7.33      
-module load  gcc-native/13.2    
-module load  perftools-base/24.11.0  
-module load  cpe/24.11               
-module load  libunwind/1.8.1         
-module load  cray-python/3.11.7      
-module load  subversion/1.14.2            
-module load  git/2.47.0
-module load  cmake/3.30.5
-module load  cray-hdf5-parallel/1.14.3.3  
-module load  cray-netcdf-hdf5parallel/4.9.0.15
-module load  cray-parallel-netcdf/1.12.3.15
-module load  craype-accel-amd-gfx90a
-module load  rocm/6.2.4
+module reset
+module load Core/25.03 PrgEnv-gnu cpe/24.11 libunwind/1.8.1 cray-python/3.11.7 subversion git cmake cray-hdf5-parallel/1.14.3.3 cray-netcdf-hdf5parallel/4.9.0.15 cray-parallel-netcdf/1.12.3.15
+module unload darshan-runtime
+module load craype-accel-amd-gfx90a rocm/6.2.4
 module load  ninja/1.12.1
 
