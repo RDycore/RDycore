@@ -1177,17 +1177,20 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.area));
   } else {
     PetscCall(VecDuplicate(global_vec, &natural_vec));
     PetscCall(VecDuplicate(global_vec, &mesh->output.xc));
     PetscCall(VecDuplicate(global_vec, &mesh->output.yc));
     PetscCall(VecDuplicate(global_vec, &mesh->output.zc));
+    PetscCall(VecDuplicate(global_vec, &mesh->output.area));
   }
 
   // set names to the Vecs
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.yc, "YC")));
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.zc, "ZC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.area, "Area")));
 
   RDyCells *cells = &mesh->cells;
 
@@ -1222,6 +1225,28 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
         PetscCall(VecCopy(natural_vec, mesh->output.zc));
         break;
     }
+  }
+
+  {
+    // populate the Vec for area
+    PetscScalar *vec_ptr;
+    PetscCall(VecGetArray(global_vec, &vec_ptr));
+
+    // pack up the idim-th coordinates in global order
+    for (PetscInt c = 0; c < mesh->num_owned_cells; c++) {
+      PetscInt icell = cells->owned_to_local[c];
+      vec_ptr[c]     = cells->areas[icell];
+    }
+    PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+
+    // scatter the data from global to natural order
+    if (useNatural) {
+      PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+      PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+    } else {
+      PetscCall(VecCopy(global_vec, natural_vec));
+    }
+    PetscCall(VecCopy(natural_vec, mesh->output.area));
   }
 
   PetscCall(VecDestroy(&global_vec));
@@ -1376,6 +1401,7 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(VecDestroy(&mesh.output.xc));
   PetscCall(VecDestroy(&mesh.output.yc));
   PetscCall(VecDestroy(&mesh.output.zc));
+  PetscCall(VecDestroy(&mesh.output.area));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

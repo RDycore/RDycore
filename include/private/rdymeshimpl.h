@@ -195,8 +195,8 @@ typedef struct RDyMesh {
     Vec vertices_xyz_norder;
     // for output: connections of vertices forming the cells (in cell natural order)
     Vec cell_conns_norder;
-    // for output: cell centroids (in cell natural order)
-    Vec xc, yc, zc;
+    // for output: cell centroids and area (in cell natural order)
+    Vec xc, yc, zc, area;
   } output;
 
 } RDyMesh;
