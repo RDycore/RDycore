@@ -358,12 +358,12 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
                            grid_coord_names[f], mesh->num_cells_global, h5_gridname, grid_coord_names[f]));
   }
   PetscCall(PetscFPrintf(rdy->comm, fp,
-                          "      <Attribute Name=\"Area\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
-                          "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                          "          %s:/fields/Area\n"
-                          "        </DataItem>\n"
-                          "      </Attribute>\n",
-                          mesh->num_cells_global, h5_gridname));
+                         "      <Attribute Name=\"Area\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
+                         "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
+                         "          %s:/fields/Area\n"
+                         "        </DataItem>\n"
+                         "      </Attribute>\n",
+                         mesh->num_cells_global, h5_gridname));
 
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm_diags, &rdy->mesh));
