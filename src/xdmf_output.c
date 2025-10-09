@@ -113,6 +113,7 @@ static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer
   PetscCall(VecView(mesh->output.xc, viewer));
   PetscCall(VecView(mesh->output.yc, viewer));
   PetscCall(VecView(mesh->output.zc, viewer));
+  PetscCall(VecView(mesh->output.area, viewer));
 
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
@@ -351,11 +352,18 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                           "          %s:/Domain/%s\n"
+                           "          %s:/fields/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
                            grid_coord_names[f], mesh->num_cells_global, h5_gridname, grid_coord_names[f]));
   }
+  PetscCall(PetscFPrintf(rdy->comm, fp,
+                         "      <Attribute Name=\"Area\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
+                         "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
+                         "          %s:/fields/Area\n"
+                         "        </DataItem>\n"
+                         "      </Attribute>\n",
+                         mesh->num_cells_global, h5_gridname));
 
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm_diags, &rdy->mesh));

@@ -195,13 +195,17 @@ typedef struct RDyMesh {
     Vec vertices_xyz_norder;
     // for output: connections of vertices forming the cells (in cell natural order)
     Vec cell_conns_norder;
-    // for output: cell centroids (in cell natural order)
-    Vec xc, yc, zc;
+    // for output: cell centroids and area (in cell natural order)
+    Vec xc, yc, zc, area;
   } output;
 
 } RDyMesh;
 
 PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, PetscInt, RDyMesh *);
 PETSC_INTERN PetscErrorCode RDyMeshDestroy(RDyMesh);
+PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellXCentroids(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellYCentroids(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellZCentroids(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellAreas(RDyMesh *, const PetscInt, PetscReal *);
 
 #endif

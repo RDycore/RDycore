@@ -3,6 +3,11 @@
 #include <private/rdymathimpl.h>
 #include <private/rdymeshimpl.h>
 
+#define CELL_XC 0
+#define CELL_YC 1
+#define CELL_ZC 2
+#define CELL_AREA 3
+
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
 
@@ -1015,6 +1020,17 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CopyGlobalVecToNaturalVec(PetscBool useNatural, DM local_dm, Vec global_vec, Vec natural_vec) {
+  PetscFunctionBegin;
+  if (useNatural) {
+    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+  } else {
+    PetscCall(VecCopy(global_vec, natural_vec));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates a 1D PETSc Vec (mesh->output.cell_conns_norder) that saves information about
 /// cell connection for XDMF output.
 /// @param [in] dm A PETSc DM object
@@ -1065,12 +1081,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
-  if (useNatural) {
-    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
-  } else {
-    PetscCall(VecCopy(global_vec, natural_vec));
-  }
+  PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
 
   if (0) {
     PetscCall(VecView(global_vec, PETSC_VIEWER_STDOUT_WORLD));
@@ -1147,6 +1158,102 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CheckNumLocalCells(RDyMesh *mesh, const PetscInt size) {
+  PetscFunctionBegin;
+  PetscAssert(mesh->num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyMeshGetIDimCentroidOfLocalCell(RDyMesh *mesh, PetscInt idim, PetscInt size, PetscReal *x) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(mesh, size));
+
+  RDyCells *cells = &mesh->cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < mesh->num_cells; ++icell) {
+    if (cells->is_owned[icell]) {
+      x[count++] = cells->centroids[icell].X[idim];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellXCentroids(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscInt idim = 0;  // x-dim
+  PetscCall(RDyMeshGetIDimCentroidOfLocalCell(mesh, idim, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellYCentroids(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscInt idim = 1;  // y-dim
+  PetscCall(RDyMeshGetIDimCentroidOfLocalCell(mesh, idim, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellZCentroids(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscInt idim = 2;  // z-dim
+  PetscCall(RDyMeshGetIDimCentroidOfLocalCell(mesh, idim, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellAreas(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(mesh, size));
+
+  RDyCells *cells = &mesh->cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < mesh->num_cells; ++icell) {
+    if (cells->is_owned[icell]) {
+      values[count++] = cells->areas[icell];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PopulateCellAttributesInANaturalVec(PetscInt cell_attribute_id, DM local_dm, PetscBool useNatural, RDyMesh *mesh,
+                                                          Vec natural_vec) {
+  PetscFunctionBegin;
+
+  Vec global_vec;
+  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
+
+  PetscInt size = mesh->num_owned_cells;
+
+  PetscScalar *vec_ptr;
+
+  // save the coordinate in a global Vec
+  PetscCall(VecGetArray(global_vec, &vec_ptr));
+  switch (cell_attribute_id) {
+    case CELL_XC:
+      PetscCall(RDyMeshGetLocalCellXCentroids(mesh, size, vec_ptr));
+      break;
+    case CELL_YC:
+      PetscCall(RDyMeshGetLocalCellYCentroids(mesh, size, vec_ptr));
+      break;
+    case CELL_ZC:
+      PetscCall(RDyMeshGetLocalCellZCentroids(mesh, size, vec_ptr));
+      break;
+    case CELL_AREA:
+      PetscCall(RDyMeshGetLocalCellAreas(mesh, size, vec_ptr));
+      break;
+  }
+  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+
+  // scatter the data from global to natural order
+  PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
+
+  PetscCall(VecDestroy(&global_vec));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates three PETSc Vec that saves x,y,z at cell centroid. These vectors are
 /// use for output.
 /// @param [in] dm A PETSc DM object
@@ -1165,67 +1272,32 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
 
   PetscCall(CreateCellCenteredDMFromDM(dm, mesh->refine_level, local_spec, &local_dm));
 
-  Vec global_vec, natural_vec;
-  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
-
   PetscBool useNatural;
   PetscCall(DMGetUseNatural(dm, &useNatural));
   if (useNatural) {
-    PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
-
     // create the Vec for storing coordinates in nautral order
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
+    PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.area));
   } else {
-    PetscCall(VecDuplicate(global_vec, &natural_vec));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.xc));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.yc));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.zc));
+    PetscCall(DMCreateGlobalVector(local_dm, &mesh->output.xc));
+    PetscCall(VecDuplicate(mesh->output.xc, &mesh->output.yc));
+    PetscCall(VecDuplicate(mesh->output.xc, &mesh->output.zc));
+    PetscCall(VecDuplicate(mesh->output.xc, &mesh->output.area));
   }
 
   // set names to the Vecs
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.xc, "XC")));
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.yc, "YC")));
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.zc, "ZC")));
+  PetscCall((PetscObjectSetName((PetscObject)mesh->output.area, "Area")));
 
-  RDyCells *cells = &mesh->cells;
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_XC, local_dm, useNatural, mesh, mesh->output.xc));
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_YC, local_dm, useNatural, mesh, mesh->output.yc));
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_ZC, local_dm, useNatural, mesh, mesh->output.zc));
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_AREA, local_dm, useNatural, mesh, mesh->output.area));
 
-  for (PetscInt idim = 0; idim < 3; idim++) {
-    PetscScalar *vec_ptr;
-    PetscCall(VecGetArray(global_vec, &vec_ptr));
-
-    // pack up the idim-th coordinates in global order
-    for (PetscInt c = 0; c < mesh->num_owned_cells; c++) {
-      PetscInt icell = cells->owned_to_local[c];
-      vec_ptr[c]     = cells->centroids[icell].X[idim];
-    }
-    PetscCall(VecRestoreArray(global_vec, &vec_ptr));
-
-    // scatter the data from global to natural order
-    if (useNatural) {
-      PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-      PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
-    } else {
-      PetscCall(VecCopy(global_vec, natural_vec));
-    }
-
-    // save the coordinate in appropriate Vec
-    switch (idim) {
-      case 0:
-        PetscCall(VecCopy(natural_vec, mesh->output.xc));
-        break;
-      case 1:
-        PetscCall(VecCopy(natural_vec, mesh->output.yc));
-        break;
-      case 2:
-        PetscCall(VecCopy(natural_vec, mesh->output.zc));
-        break;
-    }
-  }
-
-  PetscCall(VecDestroy(&global_vec));
-  PetscCall(VecDestroy(&natural_vec));
   PetscCall(DMDestroy(&local_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1376,6 +1448,7 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
   PetscCall(VecDestroy(&mesh.output.xc));
   PetscCall(VecDestroy(&mesh.output.yc));
   PetscCall(VecDestroy(&mesh.output.zc));
+  PetscCall(VecDestroy(&mesh.output.area));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

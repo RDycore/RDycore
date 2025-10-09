@@ -339,55 +339,27 @@ PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *va
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscInt size, PetscReal *x) {
-  PetscFunctionBegin;
-
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  RDyCells *cells = &rdy->mesh.cells;
-
-  PetscInt count = 0;
-  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_owned[icell]) {
-      x[count++] = cells->centroids[icell].X[idim];
-    }
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscInt idim = 0;  // x-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
+  PetscCall(RDyMeshGetLocalCellXCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscInt idim = 1;  // y-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
+  PetscCall(RDyMeshGetLocalCellYCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscInt idim = 2;  // z-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
+  PetscCall(RDyMeshGetLocalCellZCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  RDyCells *cells = &rdy->mesh.cells;
-
-  PetscInt count = 0;
-  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_owned[icell]) {
-      values[count++] = cells->areas[icell];
-    }
-  }
+  PetscCall(RDyMeshGetLocalCellAreas(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

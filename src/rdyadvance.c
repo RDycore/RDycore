@@ -83,7 +83,7 @@ PetscErrorCode GenerateTimestampedFilename(const char *directory, const char *pr
   PetscFunctionBegin;
   struct tm date;
   localtime_r(&t, &date);
-  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%04d-%02d-%02d-%02d:%02d:%02d.%s", directory, prefix, date.tm_year, date.tm_mon, date.tm_mday,
+  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.%04d-%02d-%02d.%02d.%02d.%02d.%s", directory, prefix, date.tm_year, date.tm_mon, date.tm_mday,
            date.tm_hour, date.tm_min, date.tm_sec, suffix);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
