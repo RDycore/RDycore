@@ -1147,6 +1147,65 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CheckNumLocalCells(RDyMesh *mesh, const PetscInt size) {
+  PetscFunctionBegin;
+  PetscAssert(mesh->num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode RDyMeshGetIDimCentroidOfLocalCell(RDyMesh *mesh, PetscInt idim, PetscInt size, PetscReal *x) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(mesh, size));
+
+  RDyCells *cells = &mesh->cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < mesh->num_cells; ++icell) {
+    if (cells->is_owned[icell]) {
+      x[count++] = cells->centroids[icell].X[idim];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellXCentroids(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscInt idim = 0;  // x-dim
+  PetscCall(RDyMeshGetIDimCentroidOfLocalCell(mesh, idim, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellYCentroids(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscInt idim = 1;  // y-dim
+  PetscCall(RDyMeshGetIDimCentroidOfLocalCell(mesh, idim, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellZCentroids(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+  PetscInt idim = 2;  // z-dim
+  PetscCall(RDyMeshGetIDimCentroidOfLocalCell(mesh, idim, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyMeshGetLocalCellAreas(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscCall(CheckNumLocalCells(mesh, size));
+
+  RDyCells *cells = &mesh->cells;
+
+  PetscInt count = 0;
+  for (PetscInt icell = 0; icell < mesh->num_cells; ++icell) {
+    if (cells->is_owned[icell]) {
+      values[count++] = cells->areas[icell];
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates three PETSc Vec that saves x,y,z at cell centroid. These vectors are
 /// use for output.
 /// @param [in] dm A PETSc DM object
