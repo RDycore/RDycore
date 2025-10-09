@@ -3,6 +3,11 @@
 #include <private/rdymathimpl.h>
 #include <private/rdymeshimpl.h>
 
+#define CELL_XC 0
+#define CELL_YC 1
+#define CELL_ZC 2
+#define CELL_AREA 3
+
 // Returns true iff start <= closure < end.
 static PetscBool IsClosureWithinBounds(PetscInt closure, PetscInt start, PetscInt end) { return (closure >= start) && (closure < end); }
 
@@ -1026,7 +1031,6 @@ static PetscErrorCode CopyGlobalVecToNaturalVec(PetscBool useNatural, DM local_d
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-
 /// Creates a 1D PETSc Vec (mesh->output.cell_conns_norder) that saves information about
 /// cell connection for XDMF output.
 /// @param [in] dm A PETSc DM object
@@ -1213,6 +1217,43 @@ PetscErrorCode RDyMeshGetLocalCellAreas(RDyMesh *mesh, const PetscInt size, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode PopulateCellAttributesInANaturalVec(PetscInt cell_attribute_id, DM local_dm, PetscBool useNatural, RDyMesh *mesh,
+                                                          Vec natural_vec) {
+  PetscFunctionBegin;
+
+  Vec global_vec;
+  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
+
+  PetscInt size = mesh->num_owned_cells;
+
+  PetscScalar *vec_ptr;
+
+  // save the coordinate in a global Vec
+  PetscCall(VecGetArray(global_vec, &vec_ptr));
+  switch (cell_attribute_id) {
+    case CELL_XC:
+      PetscCall(RDyMeshGetLocalCellXCentroids(mesh, size, vec_ptr));
+      break;
+    case CELL_YC:
+      PetscCall(RDyMeshGetLocalCellYCentroids(mesh, size, vec_ptr));
+      break;
+    case CELL_ZC:
+      PetscCall(RDyMeshGetLocalCellZCentroids(mesh, size, vec_ptr));
+      break;
+    case CELL_AREA:
+      PetscCall(RDyMeshGetLocalCellAreas(mesh, size, vec_ptr));
+      break;
+  }
+  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+
+  // scatter the data from global to natural order
+  PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
+
+  PetscCall(VecDestroy(&global_vec));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates three PETSc Vec that saves x,y,z at cell centroid. These vectors are
 /// use for output.
 /// @param [in] dm A PETSc DM object
@@ -1231,25 +1272,19 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
 
   PetscCall(CreateCellCenteredDMFromDM(dm, mesh->refine_level, local_spec, &local_dm));
 
-  Vec global_vec, natural_vec;
-  PetscCall(DMCreateGlobalVector(local_dm, &global_vec));
-
   PetscBool useNatural;
   PetscCall(DMGetUseNatural(dm, &useNatural));
   if (useNatural) {
-    PetscCall(DMPlexCreateNaturalVector(local_dm, &natural_vec));
-
     // create the Vec for storing coordinates in nautral order
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.xc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.yc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.zc));
     PetscCall(DMPlexCreateNaturalVector(local_dm, &mesh->output.area));
   } else {
-    PetscCall(VecDuplicate(global_vec, &natural_vec));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.xc));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.yc));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.zc));
-    PetscCall(VecDuplicate(global_vec, &mesh->output.area));
+    PetscCall(DMCreateGlobalVector(local_dm, &mesh->output.xc));
+    PetscCall(VecDuplicate(mesh->output.xc, &mesh->output.yc));
+    PetscCall(VecDuplicate(mesh->output.xc, &mesh->output.zc));
+    PetscCall(VecDuplicate(mesh->output.xc, &mesh->output.area));
   }
 
   // set names to the Vecs
@@ -1258,57 +1293,11 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.zc, "ZC")));
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.area, "Area")));
 
-  PetscInt size = mesh->num_owned_cells;
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_XC, local_dm, useNatural, mesh, mesh->output.xc));
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_YC, local_dm, useNatural, mesh, mesh->output.yc));
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_ZC, local_dm, useNatural, mesh, mesh->output.zc));
+  PetscCall(PopulateCellAttributesInANaturalVec(CELL_AREA, local_dm, useNatural, mesh, mesh->output.area));
 
-  for (PetscInt idim = 0; idim < 3; idim++) {
-    PetscScalar *vec_ptr;
-
-    // save the coordinate in a global Vec
-    PetscCall(VecGetArray(global_vec, &vec_ptr));
-    switch (idim) {
-      case 0:
-        PetscCall(RDyMeshGetLocalCellXCentroids(mesh, size, vec_ptr));
-        break;
-      case 1:
-        PetscCall(RDyMeshGetLocalCellYCentroids(mesh, size, vec_ptr));
-        break;
-      case 2:
-        PetscCall(RDyMeshGetLocalCellZCentroids(mesh, size, vec_ptr));
-        break;
-    }
-    PetscCall(VecRestoreArray(global_vec, &vec_ptr));
-
-    // scatter the data from global to natural order
-    PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
-
-    // save the coordinate in appropriate natural Vec
-    switch (idim) {
-      case 0:
-        PetscCall(VecCopy(natural_vec, mesh->output.xc));
-        break;
-      case 1:
-        PetscCall(VecCopy(natural_vec, mesh->output.yc));
-        break;
-      case 2:
-        PetscCall(VecCopy(natural_vec, mesh->output.zc));
-        break;
-    }
-  }
-
-  // populate the Vec for area
-  PetscScalar *vec_ptr;
-  PetscCall(VecGetArray(global_vec, &vec_ptr));
-  PetscCall(RDyMeshGetLocalCellAreas(mesh, size, vec_ptr));
-  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
-
-  // scatter the data from global to natural order
-  PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
-
-  // save the area in the natural Vec
-  PetscCall(VecCopy(natural_vec, mesh->output.area));
-
-  PetscCall(VecDestroy(&global_vec));
-  PetscCall(VecDestroy(&natural_vec));
   PetscCall(DMDestroy(&local_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
