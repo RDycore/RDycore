@@ -1258,23 +1258,30 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.zc, "ZC")));
   PetscCall((PetscObjectSetName((PetscObject)mesh->output.area, "Area")));
 
-  RDyCells *cells = &mesh->cells;
+  PetscInt size = mesh->num_owned_cells;
 
   for (PetscInt idim = 0; idim < 3; idim++) {
     PetscScalar *vec_ptr;
-    PetscCall(VecGetArray(global_vec, &vec_ptr));
 
-    // pack up the idim-th coordinates in global order
-    for (PetscInt c = 0; c < mesh->num_owned_cells; c++) {
-      PetscInt icell = cells->owned_to_local[c];
-      vec_ptr[c]     = cells->centroids[icell].X[idim];
+    // save the coordinate in a global Vec
+    PetscCall(VecGetArray(global_vec, &vec_ptr));
+    switch (idim) {
+      case 0:
+        PetscCall(RDyMeshGetLocalCellXCentroids(mesh, size, vec_ptr));
+        break;
+      case 1:
+        PetscCall(RDyMeshGetLocalCellYCentroids(mesh, size, vec_ptr));
+        break;
+      case 2:
+        PetscCall(RDyMeshGetLocalCellZCentroids(mesh, size, vec_ptr));
+        break;
     }
     PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
     // scatter the data from global to natural order
     PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
 
-    // save the coordinate in appropriate Vec
+    // save the coordinate in appropriate natural Vec
     switch (idim) {
       case 0:
         PetscCall(VecCopy(natural_vec, mesh->output.xc));
@@ -1288,23 +1295,17 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     }
   }
 
-  {
-    // populate the Vec for area
-    PetscScalar *vec_ptr;
-    PetscCall(VecGetArray(global_vec, &vec_ptr));
+  // populate the Vec for area
+  PetscScalar *vec_ptr;
+  PetscCall(VecGetArray(global_vec, &vec_ptr));
+  PetscCall(RDyMeshGetLocalCellAreas(mesh, size, vec_ptr));
+  PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
-    // pack up the idim-th coordinates in global order
-    for (PetscInt c = 0; c < mesh->num_owned_cells; c++) {
-      PetscInt icell = cells->owned_to_local[c];
-      vec_ptr[c]     = cells->areas[icell];
-    }
-    PetscCall(VecRestoreArray(global_vec, &vec_ptr));
+  // scatter the data from global to natural order
+  PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
 
-    // scatter the data from global to natural order
-    PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
-
-    PetscCall(VecCopy(natural_vec, mesh->output.area));
-  }
+  // save the area in the natural Vec
+  PetscCall(VecCopy(natural_vec, mesh->output.area));
 
   PetscCall(VecDestroy(&global_vec));
   PetscCall(VecDestroy(&natural_vec));
