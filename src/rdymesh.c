@@ -1015,6 +1015,18 @@ static PetscErrorCode CreateCoordinatesVectorInNaturalOrder(MPI_Comm comm, RDyMe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CopyGlobalVecToNaturalVec(PetscBool useNatural, DM local_dm, Vec global_vec, Vec natural_vec) {
+  PetscFunctionBegin;
+  if (useNatural) {
+    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
+  } else {
+    PetscCall(VecCopy(global_vec, natural_vec));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
 /// Creates a 1D PETSc Vec (mesh->output.cell_conns_norder) that saves information about
 /// cell connection for XDMF output.
 /// @param [in] dm A PETSc DM object
@@ -1065,12 +1077,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
   PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
-  if (useNatural) {
-    PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-    PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
-  } else {
-    PetscCall(VecCopy(global_vec, natural_vec));
-  }
+  PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
 
   if (0) {
     PetscCall(VecView(global_vec, PETSC_VIEWER_STDOUT_WORLD));
@@ -1265,12 +1272,7 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
     // scatter the data from global to natural order
-    if (useNatural) {
-      PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-      PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
-    } else {
-      PetscCall(VecCopy(global_vec, natural_vec));
-    }
+    PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
 
     // save the coordinate in appropriate Vec
     switch (idim) {
@@ -1299,12 +1301,8 @@ static PetscErrorCode CreateCellCentroidVectors(DM dm, RDyMesh *mesh) {
     PetscCall(VecRestoreArray(global_vec, &vec_ptr));
 
     // scatter the data from global to natural order
-    if (useNatural) {
-      PetscCall(DMPlexGlobalToNaturalBegin(local_dm, global_vec, natural_vec));
-      PetscCall(DMPlexGlobalToNaturalEnd(local_dm, global_vec, natural_vec));
-    } else {
-      PetscCall(VecCopy(global_vec, natural_vec));
-    }
+    PetscCall(CopyGlobalVecToNaturalVec(useNatural, local_dm, global_vec, natural_vec));
+
     PetscCall(VecCopy(natural_vec, mesh->output.area));
   }
 
