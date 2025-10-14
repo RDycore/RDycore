@@ -44,7 +44,7 @@ PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
 // RDycore support for AMR
 PETSC_EXTERN PetscErrorCode RDyEnableAMR(RDy);
 PETSC_EXTERN PetscErrorCode RDyPerformAMR(RDy);
-PETSC_EXTERN PetscErrorCode RDyMarkLocalCellsForAMR(RDy, const PetscInt, const PetscBool *);
+PETSC_EXTERN PetscErrorCode RDyMarkOwnedCellsForAMR(RDy, const PetscInt, const PetscBool *);
 
 // time integration
 PETSC_EXTERN PetscErrorCode DestroyOutputViewer(RDy);
@@ -66,7 +66,7 @@ PETSC_EXTERN PetscErrorCode RDyGetCouplingInterval(RDy, RDyTimeUnit, PetscReal *
 PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, RDyTimeUnit, PetscReal);
 
 PETSC_EXTERN PetscErrorCode RDyGetNumGlobalCells(RDy, PetscInt *);
-PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt *);
+PETSC_EXTERN PetscErrorCode RDyGetNumOwnedCells(RDy, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, const PetscInt, PetscInt *);

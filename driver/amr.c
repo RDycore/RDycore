@@ -73,7 +73,7 @@ PetscErrorCode ParseRefinementDataOptions(RefinementDataset *refinement_dataset)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode MarkLocalCellsForRefinementBasedOnDataset(RDy rdy, Vec global) {
+static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec global) {
   PetscFunctionBegin;
 
   PetscInt     ncells_local;
@@ -82,7 +82,7 @@ static PetscErrorCode MarkLocalCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscScalar *global_ptr;
 
   // determine the number of local cells
-  PetscCall(RDyGetNumLocalCells(rdy, &ncells_local));
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   // allocate memory
   PetscCalloc1(ncells_local, &refine_cell);
@@ -102,7 +102,7 @@ static PetscErrorCode MarkLocalCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   }
   PetscCall(VecRestoreArray(global, &global_ptr));
 
-  PetscCall(RDyMarkLocalCellsForAMR(rdy, ncells_local, refine_cell));
+  PetscCall(RDyMarkOwnedCellsForAMR(rdy, ncells_local, refine_cell));
 
   // free up memory
   PetscFree(refine_cell);
@@ -111,7 +111,7 @@ static PetscErrorCode MarkLocalCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode MarkLocalCellsForRefinement(RDy rdy) {
+PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscFunctionBegin;
 
   PetscInt   ncells_local;
@@ -119,7 +119,7 @@ PetscErrorCode MarkLocalCellsForRefinement(RDy rdy) {
   PetscBool *refine_cell;
 
   // determine the number of local cells
-  PetscCall(RDyGetNumLocalCells(rdy, &ncells_local));
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   // allocate memory
   PetscCalloc1(ncells_local, &xc_local);
@@ -141,7 +141,7 @@ PetscErrorCode MarkLocalCellsForRefinement(RDy rdy) {
     }
   }
 
-  PetscCall(RDyMarkLocalCellsForAMR(rdy, ncells_local, refine_cell));
+  PetscCall(RDyMarkOwnedCellsForAMR(rdy, ncells_local, refine_cell));
 
   // free up memory
   PetscFree(xc_local);
@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
       Vec global;
       PetscCall(RDyReadAMRScalarGlobalVecLevel0FromBinary(rdy, refinement_dataset.file, &global));
 
-      PetscCall(MarkLocalCellsForRefinementBasedOnDataset(rdy, global));
+      PetscCall(MarkOwnedCellsForRefinementBasedOnDataset(rdy, global));
       PetscCall(VecDestroy(&global));
       PetscCall(RDyPerformAMR(rdy));
     }
@@ -214,12 +214,12 @@ int main(int argc, char *argv[]) {
         Vec global_base, global_current;
         PetscCall(RDyReadAMRScalarGlobalVecLevel0FromBinary(rdy, refinement_dataset.file, &global_base));
         PetscCall(RDyMapAMRScalarGlobalVecLevel0ToCurrentLevel(rdy, global_base, &global_current));
-        PetscCall(MarkLocalCellsForRefinementBasedOnDataset(rdy, global_current));
+        PetscCall(MarkOwnedCellsForRefinementBasedOnDataset(rdy, global_current));
 
         PetscCall(VecDestroy(&global_base));
         PetscCall(VecDestroy(&global_current));
       } else {
-        PetscCall(MarkLocalCellsForRefinement(rdy));
+        PetscCall(MarkOwnedCellsForRefinement(rdy));
       }
 
       PetscCall(RDyPerformAMR(rdy));

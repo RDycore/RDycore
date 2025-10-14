@@ -43,7 +43,7 @@ static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
 /// @param size        The number of local cells
 /// @param refine_cell True/False array indicating if the cell should be refined
 /// @return PETSC_SUCESS on success
-PetscErrorCode RDyMarkLocalCellsForAMR(RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
+PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
   PetscFunctionBegin;
 
   rdy->amr.cells_marked_for_refinement = PETSC_TRUE;
@@ -61,7 +61,7 @@ PetscErrorCode RDyMarkLocalCellsForAMR(RDy rdy, const PetscInt size, const Petsc
 }
 
 /// @brief Creates a label to refine cells based on the data previously provided by call
-///        to RDyMarkLocalCellsForAMR
+///        to RDyMarkOwnedCellsForAMR
 /// @param rdy        RDy struct
 /// @param adaptLabel A DMLabel marks appropriate locally cells for refinement
 /// @return PETSC_SUCESS on success

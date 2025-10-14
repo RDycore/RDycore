@@ -1158,7 +1158,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CheckNumLocalCells(RDyMesh *mesh, const PetscInt size) {
+static PetscErrorCode CheckNumOwnedCells(RDyMesh *mesh, const PetscInt size) {
   PetscFunctionBegin;
   PetscAssert(mesh->num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1167,7 +1167,7 @@ static PetscErrorCode CheckNumLocalCells(RDyMesh *mesh, const PetscInt size) {
 static PetscErrorCode RDyMeshGetIDimCentroidOfLocalCell(RDyMesh *mesh, PetscInt idim, PetscInt size, PetscReal *x) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(mesh, size));
+  PetscCall(CheckNumOwnedCells(mesh, size));
 
   RDyCells *cells = &mesh->cells;
 
@@ -1204,7 +1204,7 @@ PetscErrorCode RDyMeshGetLocalCellZCentroids(RDyMesh *mesh, const PetscInt size,
 PetscErrorCode RDyMeshGetLocalCellAreas(RDyMesh *mesh, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(mesh, size));
+  PetscCall(CheckNumOwnedCells(mesh, size));
 
   RDyCells *cells = &mesh->cells;
 

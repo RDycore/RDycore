@@ -15,7 +15,7 @@ module rdycore
             RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
             RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, &
             RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, RDyMMSRun, &
-            RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
+            RDyGetNumGlobalCells, RDyGetNumOwnedCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetFlowDirichletBoundaryValues, &
             RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
@@ -149,7 +149,7 @@ module rdycore
       PetscInt,           intent(out) :: num_cells_global
     end function
 
-    integer(c_int) function rdygetnumlocalcells_(rdy, num_cells) bind(c, name="RDyGetNumLocalCells")
+    integer(c_int) function rdygetnumownedcells_(rdy, num_cells) bind(c, name="RDyGetNumOwnedCells")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,           intent(out) :: num_cells
@@ -593,11 +593,11 @@ contains
     ierr = rdygetnumglobalcells_(rdy_%c_rdy, num_cells_global)
   end subroutine
 
-  subroutine RDyGetNumLocalCells(rdy_, num_cells, ierr)
+  subroutine RDyGetNumOwnedCells(rdy_, num_cells, ierr)
     type(RDy), intent(inout) :: rdy_
     PetscInt,  intent(out)   :: num_cells
     integer,   intent(out)   :: ierr
-    ierr = rdygetnumlocalcells_(rdy_%c_rdy, num_cells)
+    ierr = rdygetnumownedcells_(rdy_%c_rdy, num_cells)
   end subroutine
 
   subroutine RDyGetNumBoundaryConditions(rdy_, num_bnd_conds, ierr)

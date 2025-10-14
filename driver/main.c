@@ -653,7 +653,7 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, Unstruc
   static char debug_file[PETSC_MAX_PATH_LEN] = {0};
 
   // get the x/y coordinates of local cells from RDycore
-  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_nelements));
+  PetscCall(RDyGetNumOwnedCells(rdy, &data->mesh_nelements));
   PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, data->mesh_nelements, &data->mesh_xc, &data->mesh_yc));
 
   // read the coordinates of dataset
@@ -980,7 +980,7 @@ static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RasterDataset
     }
   }
 
-  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_ncells_local));
+  PetscCall(RDyGetNumOwnedCells(rdy, &data->mesh_ncells_local));
   PetscCalloc1(data->mesh_ncells_local, &data->mesh_xc);
   PetscCalloc1(data->mesh_ncells_local, &data->mesh_yc);
   PetscCalloc1(data->mesh_ncells_local, &data->data2mesh_idx);
@@ -1690,7 +1690,7 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetup(rdy));
 
     PetscInt n;
-    PetscCall(RDyGetNumLocalCells(rdy, &n));
+    PetscCall(RDyGetNumOwnedCells(rdy, &n));
 
     // create rainfall and boundary condition datasets
     PetscCall(CreateRainfallDataset(rdy, n, &rain_dataset));

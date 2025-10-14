@@ -9,7 +9,7 @@ PetscErrorCode RDyGetNumGlobalCells(RDy rdy, PetscInt *num_cells_global) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
+PetscErrorCode RDyGetNumOwnedCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
   *num_cells = rdy->mesh.num_owned_cells;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -51,7 +51,7 @@ static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
+static PetscErrorCode CheckNumOwnedCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
   PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -159,21 +159,21 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
 
 PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckNumOwnedCells(rdy, size));
   PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 0, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckNumOwnedCells(rdy, size));
   PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 1, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckNumOwnedCells(rdy, size));
   PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 2, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -366,7 +366,7 @@ PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal *val
 PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckNumOwnedCells(rdy, size));
 
   RDyCells *cells = &rdy->mesh.cells;
 
