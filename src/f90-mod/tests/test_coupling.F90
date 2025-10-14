@@ -63,10 +63,10 @@ contains
     PetscCallA(RDySetup(rdy_, ierr))
 
     ! allocate memory for grid-level rain data
-    PetscCallA(RDyGetNumLocalCells(rdy_, num_cells_owned, ierr))
+    PetscCallA(RDyGetNumOwnedCells(rdy_, num_cells_owned, ierr))
     allocate(rain_data(num_cells_owned))
 
-    PetscCallA(RDyGetNumLocalCells(rdy_, num_cells_global, ierr))
+    PetscCallA(RDyGetNumOwnedCells(rdy_, num_cells_global, ierr))
 
   end subroutine rdycore_init
 

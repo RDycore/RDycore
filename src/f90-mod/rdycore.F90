@@ -15,14 +15,14 @@ module rdycore
             RDyMMSSetup, RDyMMSComputeSolution, RDyMMSEnforceBoundaryConditions, &
             RDyMMSComputeSourceTerms, RDyMMSUpdateMaterialProperties, &
             RDyMMSComputeErrorNorms, RDyMMSEstimateConvergenceRates, RDyMMSRun, &
-            RDyGetNumGlobalCells, RDyGetNumLocalCells, RDyGetNumBoundaryConditions, &
+            RDyGetNumGlobalCells, RDyGetNumOwnedCells, RDyGetNumBoundaryConditions, &
             RDyGetNumBoundaryEdges, RDyGetBoundaryConditionFlowType, &
             RDySetFlowDirichletBoundaryValues, &
             RDyGetTimeUnit, RDyGetTime, RDyGetTimeStep, RDyConvertTime, &
             RDyGetStep, RDyGetCouplingInterval, RDySetCouplingInterval, &
-            RDyGetLocalCellHeights, RDyGetLocalCellXMomenta, RDyGetLocalCellYMomenta, &
-            RDyGetLocalCellXCentroids, RDyGetLocalCellYCentroids, RDyGetLocalCellZCentroids, &
-            RDyGetLocalCellAreas, RDyGetLocalCellNaturalIDs, &
+            RDyGetOwnedCellHeights, RDyGetOwnedCellXMomenta, RDyGetOwnedCellYMomenta, &
+            RDyGetOwnedCellXCentroids, RDyGetOwnedCellYCentroids, RDyGetOwnedCellZCentroids, &
+            RDyGetOwnedCellAreas, RDyGetOwnedCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
             RDyGetBoundaryCellNaturalIDs, &
             RDySetDomainWaterSource, RDySetRegionalWaterSource, RDySetDomainXMomentumSource, &
@@ -149,7 +149,7 @@ module rdycore
       PetscInt,           intent(out) :: num_cells_global
     end function
 
-    integer(c_int) function rdygetnumlocalcells_(rdy, num_cells) bind(c, name="RDyGetNumLocalCells")
+    integer(c_int) function rdygetnumownedcells_(rdy, num_cells) bind(c, name="RDyGetNumOwnedCells")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,           intent(out) :: num_cells
@@ -232,56 +232,56 @@ module rdycore
       real(c_double), value, intent(in) :: interval
     end function
 
-    integer(c_int) function rdygetlocalcellheights_(rdy, size, h) bind(c, name="RDyGetLocalCellHeights")
+    integer(c_int) function rdygetlocalcellheights_(rdy, size, h) bind(c, name="RDyGetOwnedCellHeights")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: h
     end function
 
-    integer(c_int) function rdygetlocaclellxmomenta_(rdy, size, hu) bind(c, name="RDyGetLocalCellXMomenta")
+    integer(c_int) function rdygetlocaclellxmomenta_(rdy, size, hu) bind(c, name="RDyGetOwnedCellXMomenta")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hu
     end function
 
-    integer(c_int) function rdygetlocaclellymomenta_(rdy, size, hv) bind(c, name="RDyGetLocalCellYMomenta")
+    integer(c_int) function rdygetlocaclellymomenta_(rdy, size, hv) bind(c, name="RDyGetOwnedCellYMomenta")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hv
     end function
 
-    integer(c_int) function rdygetlocalcellxcentroids_(rdy, size, values) bind(c, name="RDyGetLocalCellXCentroids")
+    integer(c_int) function rdygetlocalcellxcentroids_(rdy, size, values) bind(c, name="RDyGetOwnedCellXCentroids")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
-    integer(c_int) function rdygetlocalcellycentroids_(rdy, size, values) bind(c, name="RDyGetLocalCellYCentroids")
+    integer(c_int) function rdygetlocalcellycentroids_(rdy, size, values) bind(c, name="RDyGetOwnedCellYCentroids")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
-    integer(c_int) function rdygetlocalcellzcentroids_(rdy, size, values) bind(c, name="RDyGetLocalCellZCentroids")
+    integer(c_int) function rdygetlocalcellzcentroids_(rdy, size, values) bind(c, name="RDyGetOwnedCellZCentroids")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
-    integer(c_int) function rdygetlocalcellareas_(rdy, size, values) bind(c, name="RDyGetLocalCellAreas")
+    integer(c_int) function rdygetlocalcellareas_(rdy, size, values) bind(c, name="RDyGetOwnedCellAreas")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
-    integer(c_int) function rdygetlocalcellnaturalids_(rdy, size, values) bind(c, name="RDyGetLocalCellNaturalIDs")
+    integer(c_int) function rdygetlocalcellnaturalids_(rdy, size, values) bind(c, name="RDyGetOwnedCellNaturalIDs")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
@@ -593,11 +593,11 @@ contains
     ierr = rdygetnumglobalcells_(rdy_%c_rdy, num_cells_global)
   end subroutine
 
-  subroutine RDyGetNumLocalCells(rdy_, num_cells, ierr)
+  subroutine RDyGetNumOwnedCells(rdy_, num_cells, ierr)
     type(RDy), intent(inout) :: rdy_
     PetscInt,  intent(out)   :: num_cells
     integer,   intent(out)   :: ierr
-    ierr = rdygetnumlocalcells_(rdy_%c_rdy, num_cells)
+    ierr = rdygetnumownedcells_(rdy_%c_rdy, num_cells)
   end subroutine
 
   subroutine RDyGetNumBoundaryConditions(rdy_, num_bnd_conds, ierr)
@@ -688,7 +688,7 @@ contains
     ierr = rdygetstep_(rdy_%c_rdy, step)
   end subroutine
 
-  subroutine RDyGetLocalCellHeights(rdy_, size, h, ierr)
+  subroutine RDyGetOwnedCellHeights(rdy_, size, h, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: h(:)
@@ -696,7 +696,7 @@ contains
     ierr = rdygetlocalcellheights_(rdy_%c_rdy, size, c_loc(h))
   end subroutine
 
-  subroutine RDyGetLocalCellXMomenta(rdy_, size, hu, ierr)
+  subroutine RDyGetOwnedCellXMomenta(rdy_, size, hu, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hu(:)
@@ -704,7 +704,7 @@ contains
     ierr = rdygetlocaclellxmomenta_(rdy_%c_rdy, size, c_loc(hu))
   end subroutine
 
-  subroutine RDyGetLocalCellYMomenta(rdy_, size, hv, ierr)
+  subroutine RDyGetOwnedCellYMomenta(rdy_, size, hv, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: hv(:)
@@ -712,7 +712,7 @@ contains
     ierr = rdygetlocaclellymomenta_(rdy_%c_rdy, size, c_loc(hv))
   end subroutine
 
-  subroutine RDyGetLocalCellXCentroids(rdy_, size, values, ierr)
+  subroutine RDyGetOwnedCellXCentroids(rdy_, size, values, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
@@ -720,7 +720,7 @@ contains
     ierr = rdygetlocalcellxcentroids_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
-  subroutine RDyGetLocalCellYCentroids(rdy_, size, values, ierr)
+  subroutine RDyGetOwnedCellYCentroids(rdy_, size, values, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
@@ -728,7 +728,7 @@ contains
     ierr = rdygetlocalcellycentroids_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
-  subroutine RDyGetLocalCellZCentroids(rdy_, size, values, ierr)
+  subroutine RDyGetOwnedCellZCentroids(rdy_, size, values, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
@@ -736,7 +736,7 @@ contains
     ierr = rdygetlocalcellzcentroids_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
-  subroutine RDyGetLocalCellAreas(rdy_, size, values, ierr)
+  subroutine RDyGetOwnedCellAreas(rdy_, size, values, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     real(RDyDouble), pointer, intent(inout) :: values(:)
@@ -744,7 +744,7 @@ contains
     ierr = rdygetlocalcellareas_(rdy_%c_rdy, size, c_loc(values))
   end subroutine
 
-  subroutine RDyGetLocalCellNaturalIDs(rdy_, size, values, ierr)
+  subroutine RDyGetOwnedCellNaturalIDs(rdy_, size, values, ierr)
     type(RDy),       intent(inout)          :: rdy_
     PetscInt,        intent(in)             :: size
     PetscInt,        pointer, intent(inout) :: values(:)

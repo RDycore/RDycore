@@ -9,7 +9,7 @@ PetscErrorCode RDyGetNumGlobalCells(RDy rdy, PetscInt *num_cells_global) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
+PetscErrorCode RDyGetNumOwnedCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
   *num_cells = rdy->mesh.num_owned_cells;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -51,9 +51,9 @@ static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
+static PetscErrorCode CheckNumOwnedCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
-  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -142,7 +142,7 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof, PetscReal *values) {
+static PetscErrorCode RDyGetPrognosticVariableOfOwnedCell(RDy rdy, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscReal *u;
@@ -157,24 +157,24 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
 // The following functions retrieve single-component solution data on local
 // cells, placing them into the values array (of length size)
 
-PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 0, values));
+  PetscCall(CheckNumOwnedCells(rdy, size));
+  PetscCall(RDyGetPrognosticVariableOfOwnedCell(rdy, 0, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 1, values));
+  PetscCall(CheckNumOwnedCells(rdy, size));
+  PetscCall(RDyGetPrognosticVariableOfOwnedCell(rdy, 1, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 2, values));
+  PetscCall(CheckNumOwnedCells(rdy, size));
+  PetscCall(RDyGetPrognosticVariableOfOwnedCell(rdy, 2, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -339,34 +339,34 @@ PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *va
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(RDyMeshGetLocalCellXCentroids(&rdy->mesh, size, values));
+  PetscCall(RDyMeshGetOwnedCellXCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(RDyMeshGetLocalCellYCentroids(&rdy->mesh, size, values));
+  PetscCall(RDyMeshGetOwnedCellYCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellZCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(RDyMeshGetLocalCellZCentroids(&rdy->mesh, size, values));
+  PetscCall(RDyMeshGetOwnedCellZCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellAreas(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(RDyMeshGetLocalCellAreas(&rdy->mesh, size, values));
+  PetscCall(RDyMeshGetOwnedCellAreas(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values) {
+PetscErrorCode RDyGetOwnedCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckNumOwnedCells(rdy, size));
 
   RDyCells *cells = &rdy->mesh.cells;
 

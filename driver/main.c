@@ -434,11 +434,11 @@ static PetscErrorCode WriteMappingForDebugging(char *filename, PetscInt ncells, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Allocates memory and extracts the x,y coordiantes of local cells in the RDycore's mesh
+/// @brief Allocates memory and extracts the x,y coordiantes of owned cells in the RDycore's mesh
 /// @param rdy A pointer to RDy struct
-/// @param n   Number of local cells
-/// @param *xc Holds cell centeroid x coordinate value for local cells
-/// @param *yc Holds cell centeroid y coordinate value for local cells
+/// @param n   Number of owned cells
+/// @param *xc Holds cell centeroid x coordinate value for owned cells
+/// @param *yc Holds cell centeroid y coordinate value for owned cells
 /// @return PETSC_SUCESS on success
 static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscReal **xc, PetscReal **yc) {
   PetscFunctionBegin;
@@ -447,8 +447,8 @@ static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, Petsc
   PetscCalloc1(n, xc);
   PetscCalloc1(n, yc);
 
-  PetscCall(RDyGetLocalCellXCentroids(rdy, n, *xc));
-  PetscCall(RDyGetLocalCellYCentroids(rdy, n, *yc));
+  PetscCall(RDyGetOwnedCellXCentroids(rdy, n, *xc));
+  PetscCall(RDyGetOwnedCellYCentroids(rdy, n, *yc));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -652,14 +652,14 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, Unstruc
 
   static char debug_file[PETSC_MAX_PATH_LEN] = {0};
 
-  // get the x/y coordinates of local cells from RDycore
-  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_nelements));
+  // get the x/y coordinates of owned cells from RDycore
+  PetscCall(RDyGetNumOwnedCells(rdy, &data->mesh_nelements));
   PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, data->mesh_nelements, &data->mesh_xc, &data->mesh_yc));
 
   // read the coordinates of dataset
   PetscCall(ReadUnstructuredDatasetCoordinates(data));
 
-  // read or create the mapping between the dataset and local cells
+  // read or create the mapping between the dataset and owned cells
   if (data->read_map) {
     PetscCall(ReadRainfallDatasetMap(rdy, data->map_file, data->mesh_nelements, &data->data2mesh_idx));
   } else {
@@ -980,7 +980,7 @@ static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RasterDataset
     }
   }
 
-  PetscCall(RDyGetNumLocalCells(rdy, &data->mesh_ncells_local));
+  PetscCall(RDyGetNumOwnedCells(rdy, &data->mesh_ncells_local));
   PetscCalloc1(data->mesh_ncells_local, &data->mesh_xc);
   PetscCalloc1(data->mesh_ncells_local, &data->mesh_yc);
   PetscCalloc1(data->mesh_ncells_local, &data->data2mesh_idx);
@@ -1690,7 +1690,7 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetup(rdy));
 
     PetscInt n;
-    PetscCall(RDyGetNumLocalCells(rdy, &n));
+    PetscCall(RDyGetNumOwnedCells(rdy, &n));
 
     // create rainfall and boundary condition datasets
     PetscCall(CreateRainfallDataset(rdy, n, &rain_dataset));
@@ -1742,9 +1742,9 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetStep(rdy, &step));
       PetscCheck(step > 0, comm, PETSC_ERR_USER, "Non-positive step index!");
 
-      PetscCall(RDyGetLocalCellHeights(rdy, n, h));
-      PetscCall(RDyGetLocalCellXMomenta(rdy, n, hu));
-      PetscCall(RDyGetLocalCellYMomenta(rdy, n, hv));
+      PetscCall(RDyGetOwnedCellHeights(rdy, n, h));
+      PetscCall(RDyGetOwnedCellXMomenta(rdy, n, hu));
+      PetscCall(RDyGetOwnedCellYMomenta(rdy, n, hv));
     }
 
     // clean up
