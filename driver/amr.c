@@ -88,7 +88,7 @@ static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscCalloc1(ncells_local, &refine_cell);
   PetscCalloc1(ncells_local, &area_local);
 
-  PetscCall(RDyGetLocalCellAreas(rdy, ncells_local, area_local));
+  PetscCall(RDyGetOwnedCellAreas(rdy, ncells_local, area_local));
 
   PetscReal area_threshold = 1.0 / 4.0 / 2.0;  // m^2
 
@@ -127,8 +127,8 @@ PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscCalloc1(ncells_local, &refine_cell);
 
   // get the x and y coordinates of the local cells
-  PetscCall(RDyGetLocalCellXCentroids(rdy, ncells_local, xc_local));
-  PetscCall(RDyGetLocalCellYCentroids(rdy, ncells_local, yc_local));
+  PetscCall(RDyGetOwnedCellXCentroids(rdy, ncells_local, xc_local));
+  PetscCall(RDyGetOwnedCellYCentroids(rdy, ncells_local, yc_local));
 
   for (PetscInt icell = 0; icell < ncells_local; icell++) {
     // check if the cell is inside the region of interest

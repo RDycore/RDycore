@@ -791,8 +791,8 @@ contains
     PetscReal, pointer      :: xc(:), yc(:)
     PetscErrorCode          :: ierr
 
-    PetscCallA(RDyGetLocalCellXCentroids(rdy_, n, xc, ierr))
-    PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, yc, ierr))
+    PetscCallA(RDyGetOwnedCellXCentroids(rdy_, n, xc, ierr))
+    PetscCallA(RDyGetOwnedCellYCentroids(rdy_, n, yc, ierr))
 
   end subroutine GetCellCentroidsFromRDycoreMesh
 

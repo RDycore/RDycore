@@ -203,9 +203,9 @@ typedef struct RDyMesh {
 
 PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, PetscInt, RDyMesh *);
 PETSC_INTERN PetscErrorCode RDyMeshDestroy(RDyMesh);
-PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellXCentroids(RDyMesh *, const PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellYCentroids(RDyMesh *, const PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellZCentroids(RDyMesh *, const PetscInt, PetscReal *);
-PETSC_INTERN PetscErrorCode RDyMeshGetLocalCellAreas(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellXCentroids(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellYCentroids(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellZCentroids(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellAreas(RDyMesh *, const PetscInt, PetscReal *);
 
 #endif

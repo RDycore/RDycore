@@ -447,8 +447,8 @@ static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, Petsc
   PetscCalloc1(n, xc);
   PetscCalloc1(n, yc);
 
-  PetscCall(RDyGetLocalCellXCentroids(rdy, n, *xc));
-  PetscCall(RDyGetLocalCellYCentroids(rdy, n, *yc));
+  PetscCall(RDyGetOwnedCellXCentroids(rdy, n, *xc));
+  PetscCall(RDyGetOwnedCellYCentroids(rdy, n, *yc));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1742,9 +1742,9 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetStep(rdy, &step));
       PetscCheck(step > 0, comm, PETSC_ERR_USER, "Non-positive step index!");
 
-      PetscCall(RDyGetLocalCellHeights(rdy, n, h));
-      PetscCall(RDyGetLocalCellXMomenta(rdy, n, hu));
-      PetscCall(RDyGetLocalCellYMomenta(rdy, n, hv));
+      PetscCall(RDyGetOwnedCellHeights(rdy, n, h));
+      PetscCall(RDyGetOwnedCellXMomenta(rdy, n, hu));
+      PetscCall(RDyGetOwnedCellYMomenta(rdy, n, hv));
     }
 
     // clean up
