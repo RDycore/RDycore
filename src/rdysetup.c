@@ -996,6 +996,8 @@ PetscErrorCode InitOperator(RDy rdy) {
 PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
 
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
+
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->u_global, &n_dof));
 
@@ -1010,14 +1012,19 @@ PetscErrorCode InitSolver(RDy rdy) {
       PetscCall(TSSetType(rdy->ts, TSRK));
       PetscCall(TSRKSetType(rdy->ts, TSRK4));
       break;
+    case TEMPORAL_ARK_IMEX:
+      PetscCall(TSSetType(rdy->ts, TSARKIMEX));
+      PetscCall(TSARKIMEXSetType(rdy->ts, TSARKIMEXA2));  // 2nd-order A-stable implicit method
+      PetscCall(TSSetIFunction(rdy->ts, rdy->rhs, OperatorIFunction, rdy));
+      PetscCall(TSSetIJacobian(rdy->ts, rdy->dF, OperatorIJacobian, rdy));
+      break;
     case TEMPORAL_BEULER:
       PetscCall(TSSetType(rdy->ts, TSBEULER));
+      PetscCall(TSSetRHSJacobian(rdy->ts, rdy->dG, OperatorRHSJacobian, rdy));
       break;
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
-
-  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 
   if (!rdy->config.time.adaptive.enable) {
