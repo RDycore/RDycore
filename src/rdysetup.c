@@ -1210,6 +1210,37 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+/// Writes out number of owned cells per rank to a file.
+/// @param [in] rdy  A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode OutputMeshDecomposition(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt *num_onwed_cells_per_rank;
+  RDyMesh  *mesh = &rdy->mesh;
+
+  if (rdy->rank == 0) {
+    PetscCall(PetscCalloc1(rdy->nproc, &num_onwed_cells_per_rank));
+  }
+  PetscCallMPI(MPI_Gather(&mesh->num_owned_cells, 1, MPI_INT, num_onwed_cells_per_rank, 1, MPI_INTEGER, 0, rdy->comm));
+
+  if (rdy->rank == 0) {
+    char output_dir[PETSC_MAX_PATH_LEN], prefix[PETSC_MAX_PATH_LEN], filename[PETSC_MAX_PATH_LEN];
+    PetscCall(GetOutputDirectory(rdy, output_dir));
+    PetscCall(DetermineConfigPrefix(rdy, prefix));
+    snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-mesh-decomposition.dat", output_dir, prefix);
+
+    FILE *fp = NULL;
+    PetscCall(PetscFOpen(rdy->comm, filename, "w", &fp));
+    for (PetscInt irank = 0; irank < rdy->nproc; irank++) {
+      PetscCall(PetscFPrintf(rdy->comm, fp, "%" PetscInt_FMT " %" PetscInt_FMT " \n", irank, num_onwed_cells_per_rank[irank]));
+    }
+    PetscCall(PetscFClose(rdy->comm, fp));
+    PetscCall(PetscFree(num_onwed_cells_per_rank));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file and overwriting options with command-line arguments.
@@ -1345,6 +1376,8 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
+
+  PetscCall(OutputMeshDecomposition(rdy));
 
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data
