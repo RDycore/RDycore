@@ -209,6 +209,7 @@ PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void *);
 PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void *);
 PETSC_INTERN PetscErrorCode OperatorRHSFunction(TS, PetscReal, Vec, Vec, void *);
+PETSC_INTERN PetscErrorCode OperatorRHSJacobian(TS, PetscReal, Vec, Mat, Mat, void *);
 
 //--------------------------------------------------
 // CEED/PETSc Flux and Source Operator Constructors
