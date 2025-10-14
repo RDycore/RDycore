@@ -90,7 +90,8 @@ typedef enum {
 typedef enum {
   TEMPORAL_EULER = 0,  // forward euler method
   TEMPORAL_RK4,        // 4th-order Runge-Kutta method
-  TEMPORAL_BEULER      // backward euler method
+  TEMPORAL_ARK_IMEX,   // Additive Runge Kutta implicit-explicit method
+  TEMPORAL_BEULER,     // backward euler method
 } RDyNumericsTemporal;
 
 // riemann solvers for horizontal flow

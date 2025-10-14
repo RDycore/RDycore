@@ -222,6 +222,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.G.flux));
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.G.source));
+    // if we're using implicit methods, provide F and dF
     PetscCall(CreateCeedIOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                   (*operator)->boundary_conditions, &(*operator)->ceed.F));
     PetscCall(CreateCeedIJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
@@ -232,6 +233,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
                                       (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.G.flux));
     PetscCall(CreatePetscSourceOperator((*operator)->config, (*operator)->mesh, (*operator)->petsc.external_sources,
                                         (*operator)->petsc.material_properties, &(*operator)->petsc.G.source));
+    // if we're using implicit methods, provide F and dF
     PetscCall(CreatePetscIOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                    (*operator)->boundary_conditions, &(*operator)->petsc.F));
     PetscCall(CreatePetscIJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
@@ -277,8 +279,17 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscFree((*op)->petsc.boundary_fluxes_accum);
     PetscCall(VecDestroy(&(*op)->petsc.external_sources));
     PetscCall(VecDestroy(&(*op)->petsc.material_properties));
+    if ((*op)->petsc.F) {
+      PetscCall(PetscOperatorDestroy(&(*op)->petsc.F));
+    }
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.G.flux));
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.G.source));
+    if ((*op)->petsc.dF) {
+      PetscCall(PetscOperatorDestroy(&(*op)->petsc.dF));
+    }
+    if ((*op)->petsc.dG) {
+      PetscCall(PetscOperatorDestroy(&(*op)->petsc.dG));
+    }
   }
   if ((*op)->flux_divergence) {
     PetscCall(VecDestroy(&(*op)->flux_divergence));
