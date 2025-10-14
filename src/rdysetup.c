@@ -1216,29 +1216,32 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
 static PetscErrorCode OutputPartitionStatistics(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscInt *num_onwed_cells_per_rank;
+  PetscInt *num_owned_cells_per_rank;
   RDyMesh  *mesh = &rdy->mesh;
 
   if (!rdy->rank) {
-    PetscCall(PetscCalloc1(rdy->nproc, &num_onwed_cells_per_rank));
+    PetscCall(PetscCalloc1(rdy->nproc, &num_owned_cells_per_rank));
   }
-  PetscCallMPI(MPI_Gather(&mesh->num_owned_cells, 1, MPI_INT, num_onwed_cells_per_rank, 1, MPI_INTEGER, 0, rdy->comm));
+  PetscCallMPI(MPI_Gather(&mesh->num_owned_cells, 1, MPI_INT, num_owned_cells_per_rank, 1, MPI_INTEGER, 0, rdy->comm));
 
   if (!rdy->rank) {
-    RDyLogDetail(rdy, "  Partition:                             (min,max,median,max/median)");
     PetscInt    part_owned_cells[3];
     PetscMPIInt comm_size    = rdy->nproc;
     PetscInt    median_index = comm_size % 2 ? comm_size / 2 : comm_size / 2 - 1;
 
-    PetscCall(PetscSortInt(comm_size, num_onwed_cells_per_rank));
-    part_owned_cells[0]             = num_onwed_cells_per_rank[0];              // min
-    part_owned_cells[1]             = num_onwed_cells_per_rank[comm_size - 1];  // max
-    part_owned_cells[2]             = num_onwed_cells_per_rank[median_index];   // median
+    PetscCall(PetscSortInt(comm_size, num_owned_cells_per_rank));
+    part_owned_cells[0]             = num_owned_cells_per_rank[0];              // min
+    part_owned_cells[1]             = num_owned_cells_per_rank[comm_size - 1];  // max
+    part_owned_cells[2]             = num_owned_cells_per_rank[median_index];   // median
     PetscReal part_owned_cell_ratio = (PetscReal)part_owned_cells[1] / (PetscReal)part_owned_cells[2];
-    RDyLogDetail(rdy, "    Domain Decomposition %" PetscInt_FMT "-cells          : %" PetscInt_FMT ", %" PetscInt_FMT ", %" PetscInt_FMT ", %f",
-                 mesh->num_cells_global, part_owned_cells[0], part_owned_cells[1], part_owned_cells[2], part_owned_cell_ratio);
+    RDyLogDetail(rdy, "Domain Decomposition Statistics");
+    RDyLogDetail(rdy, "  Total cells            : %" PetscInt_FMT, mesh->num_cells_global);
+    RDyLogDetail(rdy, "  Min cells on a rank    : %" PetscInt_FMT, part_owned_cells[0]);
+    RDyLogDetail(rdy, "  Max cells on a rank    : %" PetscInt_FMT, part_owned_cells[1]);
+    RDyLogDetail(rdy, "  Median cells on a rank : %" PetscInt_FMT, part_owned_cells[2]);
+    RDyLogDetail(rdy, "  Max/Median             : %f", part_owned_cell_ratio);
 
-    PetscCall(PetscFree(num_onwed_cells_per_rank));
+    PetscCall(PetscFree(num_owned_cells_per_rank));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
