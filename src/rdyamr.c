@@ -38,9 +38,9 @@ static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Saves information regarding refinement of local cells.
+/// @brief Saves information regarding refinement of owned cells.
 /// @param rdy         A RDy struct
-/// @param size        The number of local cells
+/// @param size        The number of owned cells
 /// @param refine_cell True/False array indicating if the cell should be refined
 /// @return PETSC_SUCESS on success
 PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const PetscBool *refine_cell) {
@@ -48,8 +48,8 @@ PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const Petsc
 
   rdy->amr.cells_marked_for_refinement = PETSC_TRUE;
 
-  // check if the size of the array is equal to the number of local cells
-  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  // check if the size of the array is equal to the number of owned cells
+  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
 
   // copy the data
   PetscCalloc1(size, &rdy->amr.refine_cell);
@@ -322,7 +322,7 @@ static PetscErrorCode DetermineCoarseToFineCellMapping(RDy rdy_coarse, Mat Coars
 
 /// @brief For all the regions in the coarse mesh, create the corresponding regions in the fine mesh.
 /// @param rdy_coarse       RDy struct corresponding to the coarse mesh
-/// @param numFine          Number of local cells in the fine mesh
+/// @param numFine          Number of owned cells in the fine mesh
 /// @param fineIsOwned      For all fine cells, whether the cell is owned by this rank
 /// @param coarseToFineMap  For all coarse cells, the corresponding fine cell IDs
 /// @param coarseNumFine    For all coarse cells, the number of fine cells that the coarse cell was split into
@@ -342,7 +342,7 @@ static PetscErrorCode CreateRefinedRegionsFromCoarseRDy(RDy rdy_coarse, PetscInt
 
   PetscCall(PetscCalloc1(*num_regions, regions));
 
-  // For fine cells, determine the global IDs of local cells, which depends on if a local cell
+  // For fine cells, determine the global IDs of owned cells, which depends on if a local cell
   // is owned or not.
   PetscInt *fine_LocaltoGlobalIDs, count = 0;
   PetscCall(PetscCalloc1(numFine, &fine_LocaltoGlobalIDs));

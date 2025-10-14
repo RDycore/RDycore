@@ -434,11 +434,11 @@ static PetscErrorCode WriteMappingForDebugging(char *filename, PetscInt ncells, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Allocates memory and extracts the x,y coordiantes of local cells in the RDycore's mesh
+/// @brief Allocates memory and extracts the x,y coordiantes of owned cells in the RDycore's mesh
 /// @param rdy A pointer to RDy struct
-/// @param n   Number of local cells
-/// @param *xc Holds cell centeroid x coordinate value for local cells
-/// @param *yc Holds cell centeroid y coordinate value for local cells
+/// @param n   Number of owned cells
+/// @param *xc Holds cell centeroid x coordinate value for owned cells
+/// @param *yc Holds cell centeroid y coordinate value for owned cells
 /// @return PETSC_SUCESS on success
 static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscReal **xc, PetscReal **yc) {
   PetscFunctionBegin;
@@ -652,14 +652,14 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, Unstruc
 
   static char debug_file[PETSC_MAX_PATH_LEN] = {0};
 
-  // get the x/y coordinates of local cells from RDycore
+  // get the x/y coordinates of owned cells from RDycore
   PetscCall(RDyGetNumOwnedCells(rdy, &data->mesh_nelements));
   PetscCall(GetCellCentroidsFromRDycoreMesh(rdy, data->mesh_nelements, &data->mesh_xc, &data->mesh_yc));
 
   // read the coordinates of dataset
   PetscCall(ReadUnstructuredDatasetCoordinates(data));
 
-  // read or create the mapping between the dataset and local cells
+  // read or create the mapping between the dataset and owned cells
   if (data->read_map) {
     PetscCall(ReadRainfallDatasetMap(rdy, data->map_file, data->mesh_nelements, &data->data2mesh_idx));
   } else {

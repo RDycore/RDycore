@@ -81,7 +81,7 @@ static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscReal   *area_local;
   PetscScalar *global_ptr;
 
-  // determine the number of local cells
+  // determine the number of owned cells
   PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   // allocate memory
@@ -118,7 +118,7 @@ PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscReal *xc_local, *yc_local;
   PetscBool *refine_cell;
 
-  // determine the number of local cells
+  // determine the number of owned cells
   PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   // allocate memory

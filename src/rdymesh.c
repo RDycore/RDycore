@@ -1160,7 +1160,7 @@ static PetscErrorCode CreateCellConnectionVector(DM dm, RDyMesh *mesh) {
 
 static PetscErrorCode CheckNumOwnedCells(RDyMesh *mesh, const PetscInt size) {
   PetscFunctionBegin;
-  PetscAssert(mesh->num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscAssert(mesh->num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

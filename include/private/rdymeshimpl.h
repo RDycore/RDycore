@@ -94,7 +94,7 @@ typedef struct {
 
   // offsets of first vertex cells in cell_ids
   PetscInt *cell_offsets;
-  // IDs of local cells attached to vertices
+  // IDs of owned cells attached to vertices
   PetscInt *cell_ids;
 
   // vertex positions

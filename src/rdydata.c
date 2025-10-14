@@ -53,7 +53,7 @@ static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
 
 static PetscErrorCode CheckNumOwnedCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
-  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
