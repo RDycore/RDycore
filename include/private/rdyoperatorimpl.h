@@ -137,6 +137,7 @@ typedef struct Operator {
 
       // bookkeeping vectors
       CeedVector u_local, rhs, sources;
+      CeedVector u_edge_local;
 
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;

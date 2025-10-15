@@ -33,11 +33,14 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
 
   // create bookkeeping vectors
   if (CeedEnabled()) {
-    Ceed     ceed     = CeedContext();
-    PetscInt num_comp = op->num_components;
+    Ceed     ceed            = CeedContext();
+    PetscInt num_comp        = op->num_components;
+    PetscInt cumm_edge_count = mesh->cells.cummlative_edge_count[mesh->num_cells];
+
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.u_local));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.rhs));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_owned_cells * num_comp, &op->ceed.sources));
+    PetscCallCEED(CeedVectorCreate(ceed, cumm_edge_count * num_comp, &op->ceed.u_edge_local));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
