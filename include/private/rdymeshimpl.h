@@ -50,6 +50,8 @@ typedef struct {
   PetscInt *edge_offsets;
   /// IDs of edges for cells
   PetscInt *edge_ids;
+  /// cumulative edge count for cells (used in edge reconstruction)
+  PetscInt *cummlative_edge_count;
 
   /// offsets of first neighbors in neighbor_ids for cells
   PetscInt *neighbor_offsets;

@@ -52,9 +52,11 @@ static PetscErrorCode RDyCellsCreate(PetscInt num_cells, PetscInt nvertices_per_
   PetscCall(PetscCalloc1(num_cells + 1, &cells->vertex_offsets));
   PetscCall(PetscCalloc1(num_cells + 1, &cells->edge_offsets));
   PetscCall(PetscCalloc1(num_cells + 1, &cells->neighbor_offsets));
+  PetscCall(PetscCalloc1(num_cells + 1, &cells->cummlative_edge_count));
   FILL(num_cells + 1, cells->vertex_offsets, -1);
   FILL(num_cells + 1, cells->edge_offsets, -1);
   FILL(num_cells + 1, cells->neighbor_offsets, -1);
+  FILL(num_cells + 1, cells->cummlative_edge_count, -1);
 
   PetscCall(PetscCalloc1(num_cells * nvertices_per_cell, &cells->vertex_ids));
   PetscCall(PetscCalloc1(num_cells * nedges_per_cell, &cells->edge_ids));
@@ -167,7 +169,13 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
       cells->owned_to_local[count] = icell;
       count++;
     }
+    if (icell == 0) {
+      cells->cummlative_edge_count[icell] = 0;
+    } else {
+      cells->cummlative_edge_count[icell] = cells->cummlative_edge_count[icell - 1] + cells->num_edges[icell - 1];
+    }
   }
+  cells->cummlative_edge_count[*num_cells] = cells->cummlative_edge_count[*num_cells - 1] + cells->num_edges[*num_cells -1 ];
 
   for (PetscInt icell = 0; icell < *num_cells; icell++) {
     if (!cells->is_owned[icell]) {
@@ -204,6 +212,7 @@ static PetscErrorCode RDyCellsDestroy(RDyCells cells) {
   PetscCall(PetscFree(cells.neighbor_offsets));
   PetscCall(PetscFree(cells.vertex_ids));
   PetscCall(PetscFree(cells.edge_ids));
+  PetscCall(PetscFree(cells.cummlative_edge_count));
   PetscCall(PetscFree(cells.neighbor_ids));
   PetscCall(PetscFree(cells.centroids));
   PetscCall(PetscFree(cells.areas));
