@@ -438,6 +438,8 @@ static PetscErrorCode RDyEdgesCreate(PetscInt num_edges, RDyEdges *edges) {
 
   PetscCall(PetscCalloc1(2 * num_edges, &edges->cell_ids));
   FILL(2 * num_edges, edges->cell_ids, -1);
+  PetscCall(PetscCalloc1(2 * num_edges, &edges->local_edge_id_of_cells));
+  FILL(2 * num_edges, edges->local_edge_id_of_cells, -1);
 
   PetscCall(PetscCalloc1(num_edges, &edges->centroids));
   PetscCall(PetscCalloc1(num_edges, &edges->normals));
@@ -540,6 +542,7 @@ static PetscErrorCode RDyEdgesDestroy(RDyEdges edges) {
   PetscCall(PetscFree(edges.is_owned));
   PetscCall(PetscFree(edges.vertex_ids));
   PetscCall(PetscFree(edges.cell_ids));
+  PetscCall(PetscFree(edges.local_edge_id_of_cells));
   PetscCall(PetscFree(edges.is_internal));
   PetscCall(PetscFree(edges.normals));
   PetscCall(PetscFree(edges.centroids));
@@ -686,6 +689,20 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
 
     edges->sn[iedge] = -dx / ds;
     edges->cn[iedge] = dy / ds;
+
+    // For left and right cell, find out which local edge corresponds to this edge.
+    // The local edge id is beteen 0 and cell->num_edges[cell_id]-1.
+    for (PetscInt side = 0; side < 2; side++) {
+      PetscInt cell_id = edges->cell_ids[2 * iedge + side];
+      PetscInt offset  = cells->edge_offsets[cell_id];
+      for (PetscInt ineigbhor = 0; ineigbhor < cells->num_edges[cell_id]; ineigbhor++) {
+        PetscInt e_id = cells->edge_ids[offset + ineigbhor];
+        if (e_id == iedge) {
+          edges->local_edge_id_of_cells[2 * iedge + side] = ineigbhor;
+          break;
+        }
+      }
+    }
   }
   PetscCall(PetscFree(leaf_owner));
 

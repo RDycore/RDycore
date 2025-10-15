@@ -120,6 +120,7 @@ typedef struct {
   // * cell_ids[2*i]   is the first cell attached to edge i
   // * cell_ids[2*i+1] is the second cell attached to edge i (-1 if none)
   PetscInt *cell_ids;
+  PetscInt *local_edge_id_of_cells;
 
   // false if the edge is on the domain boundary
   PetscBool *is_internal;
