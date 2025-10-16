@@ -175,7 +175,7 @@ static PetscErrorCode RDyCellsCreateFromDM(DM dm, PetscInt nvertices_per_cell, P
       cells->cummlative_edge_count[icell] = cells->cummlative_edge_count[icell - 1] + cells->num_edges[icell - 1];
     }
   }
-  cells->cummlative_edge_count[*num_cells] = cells->cummlative_edge_count[*num_cells - 1] + cells->num_edges[*num_cells -1 ];
+  cells->cummlative_edge_count[*num_cells] = cells->cummlative_edge_count[*num_cells - 1] + cells->num_edges[*num_cells - 1];
 
   for (PetscInt icell = 0; icell < *num_cells; icell++) {
     if (!cells->is_owned[icell]) {

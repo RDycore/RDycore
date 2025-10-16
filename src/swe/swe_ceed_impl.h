@@ -98,9 +98,9 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
 }
 
 CEED_QFUNCTION(SWEEdgeReconstruction_Default)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  const CeedScalar(*eta_threshold)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
-  const CeedScalar(*q_cell)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  CeedScalar(*q_celledge)[CEED_Q_VLA]           = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const CeedScalar(*eta_threshold)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
+  const CeedScalar(*q_cell)[CEED_Q_VLA]        = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  CeedScalar(*q_celledge)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[0];
 
   for (CeedInt i = 0; i < Q; i++) {
     if (q_cell[0][i] > eta_threshold[0][i]) {
