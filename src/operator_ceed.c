@@ -107,16 +107,16 @@ static PetscErrorCode CreateCeedEdgeReconstructionDefaultOperator(const RDyConfi
     CeedInt count = 0;
     for (CeedInt c = 0; c < num_cells; ++c) {
       for (CeedInt n = 0; n < cells->num_edges[c]; ++n) {
-        q_cell_offsets[count] = c * num_comp;
+        q_cell_offsets[count]     = c * num_comp;
         q_celledge_offsets[count] = count * num_comp;
         count++;
       }
     }
 
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_cumm_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_cell_offsets,
-                                            &restrict_qcell));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_cumm_edges, 1, num_comp, 1, num_cumm_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_celledge_offsets,
-                                            &restrict_qcelledge));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_cumm_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                            q_cell_offsets, &restrict_qcell));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_cumm_edges, 1, num_comp, 1, num_cumm_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                            q_celledge_offsets, &restrict_qcelledge));
 
     PetscCall(PetscFree2(q_cell_offsets, q_celledge_offsets));
     if (0) {
@@ -244,32 +244,75 @@ static PetscErrorCode CreateCeedInteriorFluxOperator(const RDyConfig config, RDy
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
     PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
 
-    // create element restrictions for (active) left and right input/output states
-    CeedInt *q_offset_l, *q_offset_r, *c_offset_l, *c_offset_r;
-    PetscCall(PetscMalloc2(num_edges, &q_offset_l, num_edges, &q_offset_r));
+    CeedInt *c_offset_l, *c_offset_r;
+    CeedInt *q_offset_l, *q_offset_r;
     PetscCall(PetscMalloc2(num_edges, &c_offset_l, num_edges, &c_offset_r));
+    PetscCall(PetscMalloc2(num_edges, &q_offset_l, num_edges, &q_offset_r));
+
+    // is edge reconstruction enabled?
+    PetscBool edge_recon_enabled = config.numerics.edge_reconstruction.enable;
+
+    // create element restrictions for (active) left and right input states
+    if (!edge_recon_enabled) {
+      // without edge reconstruction, the solution Vec is cell-centered with owned and ghost cells
+      for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
+        CeedInt iedge = edges->internal_edge_ids[e];
+        if (!edges->is_owned[iedge]) continue;
+        CeedInt l              = edges->cell_ids[2 * iedge];
+        CeedInt r              = edges->cell_ids[2 * iedge + 1];
+        q_offset_l[owned_edge] = l * num_comp;
+        q_offset_r[owned_edge] = r * num_comp;
+        owned_edge++;
+      }
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                              q_offset_l, &q_restrict_l));
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                              q_offset_r, &q_restrict_r));
+    } else {
+      // with edge reconstruction, the solution Vec is to celledge based that corresponds to owned and ghost cells
+      CeedInt num_cells      = mesh->num_cells;
+      CeedInt num_cumm_edges = cells->cummlative_edge_count[num_cells];
+
+      for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
+        CeedInt iedge = edges->internal_edge_ids[e];
+        if (!edges->is_owned[iedge]) continue;
+        CeedInt l               = edges->cell_ids[2 * iedge];
+        CeedInt r               = edges->cell_ids[2 * iedge + 1];
+        CeedInt l_local_edge_id = edges->local_edge_id_of_cells[2 * iedge];
+        CeedInt r_local_edge_id = edges->local_edge_id_of_cells[2 * iedge + 1];
+        CeedInt l_offset        = cells->edge_offsets[l];
+        CeedInt r_offset        = cells->edge_offsets[r];
+
+        q_offset_l[owned_edge] = (l_offset + l_local_edge_id) * num_comp;
+        q_offset_r[owned_edge] = (r_offset + r_local_edge_id) * num_comp;
+        owned_edge++;
+      }
+
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, num_cumm_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,
+                                              &q_restrict_l));
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, num_cumm_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_r,
+                                              &q_restrict_r));
+    }
+
+    // create element restrictions for (active) left and right output states
     for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
       CeedInt iedge = edges->internal_edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
       CeedInt l              = edges->cell_ids[2 * iedge];
       CeedInt r              = edges->cell_ids[2 * iedge + 1];
-      q_offset_l[owned_edge] = l * num_comp;
-      q_offset_r[owned_edge] = r * num_comp;
       c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
       c_offset_r[owned_edge] = cells->local_to_owned[r] * num_comp;
       owned_edge++;
     }
-
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,
-                                            &q_restrict_l));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_r,
-                                            &q_restrict_r));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_l,
                                             &c_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_r,
                                             &c_restrict_r));
-    PetscCall(PetscFree2(q_offset_l, q_offset_r));
+
+    // clean up
     PetscCall(PetscFree2(c_offset_l, c_offset_r));
+    PetscCall(PetscFree2(q_offset_l, q_offset_r));
+
     if (0) {
       PetscCallCEED(CeedElemRestrictionView(q_restrict_l, stdout));
       PetscCallCEED(CeedElemRestrictionView(q_restrict_r, stdout));
@@ -469,12 +512,50 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
     PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
 
-    // create an element restriction for the (active) "left" (interior) input/output states
+    // is edge reconstruction enabled?
+    PetscBool edge_recon_enabled = config.numerics.edge_reconstruction.enable;
+
+    // create an element restriction for the (active) "left" (interior) input states
+    if (!edge_recon_enabled) {
+      // without edge reconstruction, the solution Vec is cell-centered with owned and ghost cells
+      for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
+        CeedInt iedge = boundary.edge_ids[e];
+        if (!edges->is_owned[iedge]) continue;
+        CeedInt l              = edges->cell_ids[2 * iedge];
+        q_offset_l[owned_edge] = l * num_comp;
+        if (offset_dirichlet) {  // Dirichlet boundary values
+          offset_dirichlet[owned_edge] = e * num_comp;
+        }
+        owned_edge++;
+      }
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                              q_offset_l, &q_restrict_l));
+    } else {
+      // with edge reconstruction, the solution Vec is to celledge based that corresponds to owned and ghost cells
+      CeedInt num_cells      = mesh->num_cells;
+      CeedInt num_cumm_edges = cells->cummlative_edge_count[num_cells];
+
+      for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
+        CeedInt iedge = boundary.edge_ids[e];
+        if (!edges->is_owned[iedge]) continue;
+        CeedInt l               = edges->cell_ids[2 * iedge];
+        CeedInt l_local_edge_id = edges->local_edge_id_of_cells[2 * iedge];
+        CeedInt l_offset        = cells->edge_offsets[l];
+        q_offset_l[owned_edge]  = (l_offset + l_local_edge_id) * num_comp;
+        if (offset_dirichlet) {  // Dirichlet boundary values
+          offset_dirichlet[owned_edge] = e * num_comp;
+        }
+        owned_edge++;
+      }
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, num_cumm_edges * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                              q_offset_l, &q_restrict_l));
+    }
+
+    // create an element restriction for the (active) "left" (interior) output states
     for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
       CeedInt iedge = boundary.edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
       CeedInt l              = edges->cell_ids[2 * iedge];
-      q_offset_l[owned_edge] = l * num_comp;
       c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
         offset_dirichlet[owned_edge] = e * num_comp;
@@ -482,9 +563,8 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
       owned_edge++;
     }
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                            q_offset_l, &q_restrict_l));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             c_offset_l, &c_restrict_l));
+
     PetscCall(PetscFree(q_offset_l));
     PetscCall(PetscFree(c_offset_l));
     if (0) {
@@ -529,7 +609,7 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
 }
 
 PetscErrorCode CreateCeedEdgeReconstructionOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
-                                      RDyCondition *boundary_conditions, CeedOperator *edge_reconstruction_op) {
+                                                    RDyCondition *boundary_conditions, CeedOperator *edge_reconstruction_op) {
   PetscFunctionBegin;
 
   Ceed ceed = CeedContext();
@@ -544,7 +624,7 @@ PetscErrorCode CreateCeedEdgeReconstructionOperator(RDyConfig *config, RDyMesh *
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-  /// Creates a CEED flux operator appropriate for the given configuration.
+/// Creates a CEED flux operator appropriate for the given configuration.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
 /// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
