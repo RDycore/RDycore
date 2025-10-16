@@ -97,6 +97,25 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
   return SWEFlux(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
 
+CEED_QFUNCTION(SWEEdgeReconstruction_Default)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*eta_threshold)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
+  const CeedScalar(*q_cell)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  CeedScalar(*q_celledge)[CEED_Q_VLA]           = (CeedScalar(*)[CEED_Q_VLA])out[0];
+
+  for (CeedInt i = 0; i < Q; i++) {
+    if (q_cell[0][i] > eta_threshold[0][i]) {
+      for (CeedInt j = 0; j < 3; j++) {
+        q_celledge[j][i] = q_cell[j][i];
+      }
+    } else {
+      for (CeedInt j = 0; j < 3; j++) {
+        q_celledge[j][i] = 0.0;
+      }
+    }
+  }
+  return 0;
+}
+
 // SWE boundary flux operator Q-function (Dirichlet condition)
 CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
                                                     RiemannFluxType flux_type) {
