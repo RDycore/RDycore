@@ -2,7 +2,6 @@ set(RDYCORE_C_SOURCE_FILES
   ceed.c
   checkpoint.c
   ensemble.c
-  mat-ceed.c # from HONEE
   rdyadvance.c
   rdycore.c
   rdydata.c
