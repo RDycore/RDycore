@@ -69,6 +69,22 @@ install(
   DESTINATION lib
 )
 
+#----------------------------------------------------------------------------
+# Build mat-ceed, a supplement to libceed that adds support for COO matrices
+#----------------------------------------------------------------------------
+add_library(mat_ceed STATIC
+  mat-ceed/src/mat-ceed.c
+)
+target_include_directories(mat_ceed PUBLIC
+  ${CMAKE_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/mat-ceed/include
+  ${PETSC_DIR}/${PETSC_ARCH}/externalpackages/git.libceed/include
+)
+install(
+  TARGETS mat_ceed
+  DESTINATION lib
+)
+
 if (ENABLE_TESTS)
   #----------------------------------------
   # Build cmocka, a C unit testing library.
