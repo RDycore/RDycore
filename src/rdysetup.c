@@ -1012,15 +1012,17 @@ PetscErrorCode InitSolver(RDy rdy) {
       PetscCall(TSSetType(rdy->ts, TSRK));
       PetscCall(TSRKSetType(rdy->ts, TSRK4));
       break;
-    case TEMPORAL_ARK_IMEX:
+    case TEMPORAL_ARK_IMEX: // implicit treatment of stiff source terms
       PetscCall(TSSetType(rdy->ts, TSARKIMEX));
       PetscCall(TSARKIMEXSetType(rdy->ts, TSARKIMEXA2));  // 2nd-order A-stable implicit method
       PetscCall(TSSetIFunction(rdy->ts, rdy->rhs, OperatorIFunction, rdy));
-      PetscCall(TSSetIJacobian(rdy->ts, rdy->dF, OperatorIJacobian, rdy));
+      PetscCall(OperatorCreateJacobianMatrix(rdy->operator, &rdy->J));
+      PetscCall(TSSetIJacobian(rdy->ts, rdy->J, rdy->J, OperatorIJacobian, rdy));
       break;
-    case TEMPORAL_BEULER:
+    case TEMPORAL_BEULER: // fully implicit treatment
       PetscCall(TSSetType(rdy->ts, TSBEULER));
-      PetscCall(TSSetRHSJacobian(rdy->ts, rdy->dG, OperatorRHSJacobian, rdy));
+      PetscCall(OperatorCreateJacobianMatrix(rdy->operator, &rdy->J));
+      PetscCall(TSSetRHSJacobian(rdy->ts, rdy->J, rdy->J, OperatorRHSJacobian, rdy));
       break;
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));

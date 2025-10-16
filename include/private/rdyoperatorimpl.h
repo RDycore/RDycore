@@ -205,6 +205,9 @@ PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt,
                                            Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
+// creates and preallocates a matrix from the operator based on its configuration
+PETSC_INTERN PetscErrorCode OperatorCreateJacobianMatrix(Operator *op, Mat *jacobian);
+
 // operator functions for interacting with PETSc's TS solver (RDy passed as context)
 PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void *);
 PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void *);

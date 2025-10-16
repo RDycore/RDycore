@@ -202,8 +202,11 @@ struct _p_RDy {
   // host right-hand-side (residual) vector
   Vec rhs;
 
-  // operator representing the system of equations
+  // operator representing the system of equations F(t, u, du/dt) = G(t, u)
   Operator *operator;
+
+  // jacobian matrix for F or G, depending on selected (implicit) solver
+  Mat J;
 
   // time series bookkeeping
   RDyTimeSeriesData time_series;

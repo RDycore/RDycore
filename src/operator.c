@@ -301,6 +301,27 @@ PetscErrorCode DestroyOperator(Operator **op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+//-----------------------------------
+// Operator (Global) Jacobian Matrix
+//-----------------------------------
+
+PetscErrorCode OperatorCreateJacobianMatrix(Operator *op, Mat *J) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  PetscCall(MatCreate(comm, J));
+  PetscCall(MatSetType(*J, MATMPIAIJ));
+
+  // build lists of row and column indices (i, j) with which to express the nonzero structure
+  PetscInt nnz, *rows, *columns;
+
+  PetscCall(MatSetPreallocationCOO(J, nnz, rows, columns));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 //----------------------
 // Operator Application
 //----------------------
