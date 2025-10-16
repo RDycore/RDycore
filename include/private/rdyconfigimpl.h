@@ -86,6 +86,10 @@ typedef enum {
   SPATIAL_FE       // finite element method
 } RDyNumericsSpatial;
 
+typedef struct {
+  PetscBool enable;  // true = use edge reconstruction
+} RDyEdgeReconstructionSection;
+
 // temporal discretization methods
 typedef enum {
   TEMPORAL_EULER = 0,  // forward euler method
@@ -101,9 +105,10 @@ typedef enum {
 
 // all numerics parmeters
 typedef struct {
-  RDyNumericsSpatial  spatial;
-  RDyNumericsTemporal temporal;
-  RDyNumericsRiemann  riemann;
+  RDyNumericsSpatial           spatial;
+  RDyNumericsTemporal          temporal;
+  RDyNumericsRiemann           riemann;
+  RDyEdgeReconstructionSection edge_reconstruction;
 } RDyNumericsSection;
 
 // ------------

@@ -118,11 +118,22 @@ static const cyaml_strval_t numerics_riemann_types[] = {
     {"hllc", RIEMANN_HLLC},
 };
 
+static const cyaml_strval_t enable_units[] = {
+    {"true", PETSC_TRUE},
+    {"false", PETSC_FALSE},
+};
+
+static const cyaml_schema_field_t edgereconstruction_fields_schema[] = {
+    CYAML_FIELD_ENUM("enable", CYAML_FLAG_DEFAULT, RDyEdgeReconstructionSection, enable, enable_units, CYAML_ARRAY_LEN(enable_units)),
+    CYAML_FIELD_END
+};
+
 // mapping of numerics fields to members of RDyNumericsSection
 static const cyaml_schema_field_t numerics_fields_schema[] = {
     CYAML_FIELD_ENUM("spatial", CYAML_FLAG_DEFAULT, RDyNumericsSection, spatial, numerics_spatial_types, CYAML_ARRAY_LEN(numerics_spatial_types)),
     CYAML_FIELD_ENUM("temporal", CYAML_FLAG_DEFAULT, RDyNumericsSection, temporal, numerics_temporal_types, CYAML_ARRAY_LEN(numerics_temporal_types)),
     CYAML_FIELD_ENUM("riemann", CYAML_FLAG_DEFAULT, RDyNumericsSection, riemann, numerics_riemann_types, CYAML_ARRAY_LEN(numerics_riemann_types)),
+    CYAML_FIELD_MAPPING("edge_reconstruction", CYAML_FLAG_OPTIONAL, RDyNumericsSection, edge_reconstruction, edgereconstruction_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -146,12 +157,7 @@ static const cyaml_strval_t time_units[] = {
     {"years",   RDY_TIME_YEARS  },
 };
 
-static const cyaml_strval_t enable_units[] = {
-    {"true", PETSC_TRUE},
-    {"false", PETSC_FALSE},
-};
-
-static const cyaml_schema_field_t adaptive_fields_schema[] = {
+  static const cyaml_schema_field_t adaptive_fields_schema[] = {
     CYAML_FIELD_ENUM("enable", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, enable, enable_units, CYAML_ARRAY_LEN(enable_units)),
     CYAML_FIELD_FLOAT("target_courant_number", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, target_courant_number),
     CYAML_FIELD_FLOAT("max_increase_factor", CYAML_FLAG_DEFAULT, RDyTimeAdaptiveSection, max_increase_factor),
