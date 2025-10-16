@@ -219,8 +219,11 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply_));
       first_time = PETSC_FALSE;
     }
-    PetscCall(CreateCeedEdgeReconstructionOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                     (*operator)->boundary_conditions, &(*operator)->ceed.edge_reconstruction));
+
+    if (config->numerics.edge_reconstruction.enable) {
+      PetscCall(CreateCeedEdgeReconstructionOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
+                                                     (*operator)->boundary_conditions, &(*operator)->ceed.edge_reconstruction));
+    }
 
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.flux));
@@ -307,7 +310,8 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   //------------------
   // Edge reconstruction
   //------------------
-  {
+  RDyConfig *config = op->config;
+  if (config->numerics.edge_reconstruction.enable) {
     // point our CEED solution vector at our PETSc solution vector
     PetscMemType mem_type;
     PetscScalar *u_local_ptr;
