@@ -703,12 +703,14 @@ static PetscErrorCode ComputeAdditionalEdgeAttributes(DM dm, RDyMesh *mesh) {
     // The local edge id is beteen 0 and cell->num_edges[cell_id]-1.
     for (PetscInt side = 0; side < 2; side++) {
       PetscInt cell_id = edges->cell_ids[2 * iedge + side];
-      PetscInt offset  = cells->edge_offsets[cell_id];
-      for (PetscInt ineigbhor = 0; ineigbhor < cells->num_edges[cell_id]; ineigbhor++) {
-        PetscInt e_id = cells->edge_ids[offset + ineigbhor];
-        if (e_id == iedge) {
-          edges->local_edge_id_of_cells[2 * iedge + side] = ineigbhor;
-          break;
+      if (cell_id > -1) {
+        PetscInt offset = cells->edge_offsets[cell_id];
+        for (PetscInt ineigbhor = 0; ineigbhor < cells->num_edges[cell_id]; ineigbhor++) {
+          PetscInt e_id = cells->edge_ids[offset + ineigbhor];
+          if (e_id == iedge) {
+            edges->local_edge_id_of_cells[2 * iedge + side] = ineigbhor;
+            break;
+          }
         }
       }
     }
