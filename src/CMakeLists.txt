@@ -34,7 +34,7 @@ foreach(physics swe;sediment)
 endforeach()
 
 add_library(rdycore_c ${RDYCORE_C_SOURCE_FILES})
-target_link_libraries(rdycore_c cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
+target_link_libraries(rdycore_c cyaml yaml muparser hdf5 mat_ceed ceed ${SYSTEM_LIBRARIES})
 add_dependencies(rdycore_c cyaml yaml)
 
 install(
