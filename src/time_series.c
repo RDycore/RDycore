@@ -474,6 +474,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
       PetscCall(GetOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
       PetscCall(AccumulateBoundaryFluxes(rdy, boundary, boundary_fluxes));
       PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
+      PetscCall(ZeroOperatorBoundaryFluxes(rdy->operator, boundary));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
     rdy->time_series.boundary_fluxes.last_step = step;
