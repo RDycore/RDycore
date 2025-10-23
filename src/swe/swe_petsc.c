@@ -436,6 +436,8 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
   // restore vectors
   PetscCall(VecRestoreArray(u_local, &u_ptr));
   PetscCall(VecRestoreArray(f_global, &f_ptr));
+  PetscCall(VecRestoreArray(boundary_values, &boundary_values_ptr));
+  PetscCall(VecRestoreArray(boundary_fluxes, &boundary_fluxes_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
