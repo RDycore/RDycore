@@ -279,9 +279,12 @@ static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, Op
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
           // FIXME: this is specific to the shallow water equations
-          time_series->boundary_fluxes.fluxes[n].water_mass = edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].water_mass;
-          time_series->boundary_fluxes.fluxes[n].x_momentum = edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].x_momentum;
-          time_series->boundary_fluxes.fluxes[n].y_momentum = edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].y_momentum;
+          time_series->boundary_fluxes.fluxes[n].water_mass =
+              edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].water_mass;
+          time_series->boundary_fluxes.fluxes[n].x_momentum =
+              edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].x_momentum;
+          time_series->boundary_fluxes.fluxes[n].y_momentum =
+              edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].y_momentum;
           ++n;
         }
       }

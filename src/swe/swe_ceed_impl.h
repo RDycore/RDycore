@@ -125,8 +125,8 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = flux[j] * geom[2][i];
-        inst_flux[j][i]  = flux[j];
+        cell_L[j][i]    = flux[j] * geom[2][i];
+        inst_flux[j][i] = flux[j];
         accum_flux[j][i] += flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
@@ -221,8 +221,8 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = flux[j] * geom[2][i];
-        inst_flux[j][i]  = flux[j];
+        cell_L[j][i]    = flux[j] * geom[2][i];
+        inst_flux[j][i] = flux[j];
         accum_flux[j][i] += flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
