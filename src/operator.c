@@ -818,7 +818,7 @@ PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Ope
   PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
+    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
   } else {  // petsc
     PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
   }
@@ -840,7 +840,7 @@ PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary,
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
+    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
   } else {
     PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
   }
