@@ -861,6 +861,8 @@ PetscErrorCode ZeroOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary) {
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
   if (CeedEnabled()) {
+    // Can't zero out "flux_accumulated" field in the Ceed suboperator. So, when writing out
+    // the accumulated fluxes, we will substract the previous value.
   } else {
     PetscCallCEED(VecZeroEntries(op->petsc.boundary_fluxes_accum[boundary.index]));
   }
