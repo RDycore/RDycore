@@ -849,27 +849,6 @@ PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Resets the operator's accumulated boundary fluxes for a given boundary.
-/// @param [in]  op the operator for which data access is released
-/// @param [in]  boundary the boundary for which access to flux data is released
-/// @param [out] boundary_flux_data the array data for which access is released
-PetscErrorCode ZeroOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
-
-  if (CeedEnabled()) {
-    // Can't zero out "flux_accumulated" field in the Ceed suboperator. So, when writing out
-    // the accumulated fluxes, we will substract the previous value.
-  } else {
-    PetscCallCEED(VecZeroEntries(op->petsc.boundary_fluxes_accum[boundary.index]));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 //----------------------------------------
 // Regional (Cell-Centered) Operator Data
 //----------------------------------------

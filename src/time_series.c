@@ -380,18 +380,6 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   }
   PetscCall(PetscFree(local_flux_data));
 
-  // zero the boundary fluxes so they can begin reaccumulating
-  // NOTE that there are 3 fluxes (and not 5)
-  if (!CeedEnabled()){
-    if (rdy->time_series.boundary_fluxes.fluxes) {
-      for (PetscInt e = 0; e < rdy->time_series.boundary_fluxes.offsets[rdy->num_boundaries]; e++) {
-        rdy->time_series.boundary_fluxes.fluxes[e].water_mass = 0.0;
-        rdy->time_series.boundary_fluxes.fluxes[e].x_momentum = 0.0;
-        rdy->time_series.boundary_fluxes.fluxes[e].y_momentum = 0.0;
-      }
-    }
-  }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -476,7 +464,6 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
       PetscCall(GetOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
       PetscCall(AccumulateBoundaryFluxes(rdy, boundary, boundary_fluxes));
       PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
-      PetscCall(ZeroOperatorBoundaryFluxes(rdy->operator, boundary));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
     rdy->time_series.boundary_fluxes.last_step = step;

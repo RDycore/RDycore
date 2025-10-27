@@ -208,7 +208,6 @@ PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryValues(Operator *, RDyBoundar
 
 PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *, RDyBoundary, OperatorData *);
-PETSC_INTERN PetscErrorCode ZeroOperatorBoundaryFluxes(Operator *, RDyBoundary);
 
 PETSC_INTERN PetscErrorCode GetOperatorRegionalExternalSource(Operator *, RDyRegion, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *, RDyRegion, OperatorData *);
