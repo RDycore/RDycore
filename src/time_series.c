@@ -279,9 +279,12 @@ static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, Op
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
           // FIXME: this is specific to the shallow water equations
-          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * boundary_fluxes.values[0][e];
-          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * boundary_fluxes.values[1][e];
-          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * boundary_fluxes.values[2][e];
+          time_series->boundary_fluxes.fluxes[n].water_mass =
+              edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].water_mass;
+          time_series->boundary_fluxes.fluxes[n].x_momentum =
+              edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].x_momentum;
+          time_series->boundary_fluxes.fluxes[n].y_momentum =
+              edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].y_momentum;
           ++n;
         }
       }
@@ -379,16 +382,6 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     PetscCallMPI(MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm));
   }
   PetscCall(PetscFree(local_flux_data));
-
-  // zero the boundary fluxes so they can begin reaccumulating
-  // NOTE that there are 3 fluxes (and not 5)
-  if (rdy->time_series.boundary_fluxes.fluxes) {
-    for (PetscInt e = 0; e < rdy->time_series.boundary_fluxes.offsets[rdy->num_boundaries]; e++) {
-      rdy->time_series.boundary_fluxes.fluxes[e].water_mass = 0.0;
-      rdy->time_series.boundary_fluxes.fluxes[e].x_momentum = 0.0;
-      rdy->time_series.boundary_fluxes.fluxes[e].y_momentum = 0.0;
-    }
-  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
