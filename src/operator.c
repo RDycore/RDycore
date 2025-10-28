@@ -33,11 +33,14 @@ static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
 
   // create bookkeeping vectors
   if (CeedEnabled()) {
-    Ceed     ceed     = CeedContext();
-    PetscInt num_comp = op->num_components;
+    Ceed     ceed            = CeedContext();
+    PetscInt num_comp        = op->num_components;
+    PetscInt cumm_edge_count = mesh->cells.cummlative_edge_count[mesh->num_cells];
+
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.u_local));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_cells * num_comp, &op->ceed.rhs));
     PetscCallCEED(CeedVectorCreate(ceed, mesh->num_owned_cells * num_comp, &op->ceed.sources));
+    PetscCallCEED(CeedVectorCreate(ceed, cumm_edge_count * num_comp, &op->ceed.u_celledge_local));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -219,6 +222,11 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       first_time = PETSC_FALSE;
     }
 
+    if (config->numerics.edge_reconstruction.enable) {
+      PetscCall(CreateCeedEdgeReconstructionOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
+                                                     (*operator)->boundary_conditions, &(*operator)->ceed.edge_reconstruction));
+    }
+
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.flux));
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
@@ -255,6 +263,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
+    PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_celledge_local)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }
@@ -303,6 +312,25 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   }
 
   //------------------
+  // Edge reconstruction
+  //------------------
+  RDyConfig *config = op->config;
+  if (config->numerics.edge_reconstruction.enable) {
+    // point our CEED solution vector at our PETSc solution vector
+    PetscMemType mem_type;
+    PetscScalar *u_local_ptr;
+    PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(op->ceed.u_local, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
+
+    // apply the edge reconstruction operator
+    PetscCallCEED(CeedOperatorApply(op->ceed.edge_reconstruction, op->ceed.u_local, op->ceed.u_celledge_local, CEED_REQUEST_IMMEDIATE));
+
+    // reset memory pointers
+    PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
+    PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
+  }
+
+  //------------------
   // Flux Calculation
   //------------------
 
@@ -310,8 +338,10 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // point our CEED solution vector at our PETSc solution vector
     PetscMemType mem_type;
     PetscScalar *u_local_ptr;
-    PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
-    PetscCallCEED(CeedVectorSetArray(op->ceed.u_local, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
+    if (!config->numerics.edge_reconstruction.enable) {
+      PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
+      PetscCallCEED(CeedVectorSetArray(op->ceed.u_local, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
+    }
 
     // point our CEED right-hand side vector at a PETSc right-hand side vector
     Vec f_local;
@@ -323,7 +353,11 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // apply the flux operator, computing flux divergences
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    if (!config->numerics.edge_reconstruction.enable) {
+      PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    } else {
+      PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_celledge_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    }
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -333,10 +367,12 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.rhs, MemTypeP2C(mem_type), &f_local_ptr));
-    PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
+    if (!config->numerics.edge_reconstruction.enable) {
+      PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
+      PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
+    }
 
     PetscCall(VecRestoreArrayAndMemType(f_local, &f_local_ptr));
-    PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
 
     PetscCall(DMRestoreLocalVector(op->dm, &f_local));
   }

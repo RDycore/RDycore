@@ -50,6 +50,8 @@ typedef struct {
   PetscInt *edge_offsets;
   /// IDs of edges for cells
   PetscInt *edge_ids;
+  /// cumulative edge count for cells (used in edge reconstruction)
+  PetscInt *cummlative_edge_count;
 
   /// offsets of first neighbors in neighbor_ids for cells
   PetscInt *neighbor_offsets;
@@ -120,6 +122,7 @@ typedef struct {
   // * cell_ids[2*i]   is the first cell attached to edge i
   // * cell_ids[2*i+1] is the second cell attached to edge i (-1 if none)
   PetscInt *cell_ids;
+  PetscInt *local_edge_id_of_cells;
 
   // false if the edge is on the domain boundary
   PetscBool *is_internal;

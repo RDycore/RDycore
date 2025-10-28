@@ -131,12 +131,14 @@ typedef struct Operator {
       // CEED flux and source operators (each composed of sub-operators, see
       // CreateOperator in src/operator.c)
       CeedOperator flux, source;
+      CeedOperator edge_reconstruction;
 
       // timestep last set on operators
       PetscReal dt;
 
       // bookkeeping vectors
       CeedVector u_local, rhs, sources;
+      CeedVector u_celledge_local;
 
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;
@@ -186,6 +188,7 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 // CEED/PETSc Flux and Source Operator Constructors
 //--------------------------------------------------
 
+PETSC_INTERN PetscErrorCode CreateCeedEdgeReconstructionOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
