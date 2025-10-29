@@ -245,12 +245,14 @@ The RDycore team supports installation of the model at following DOE machines:
 First, run the following shell script to set PETSc-related environmental variables and load appropriate modules.
 
 ```bash
-`source config/set_petsc_settings.sh --mach <machine_name> --config <configuration>`,
+source config/set_petsc_settings.sh \
+--mach <machine_name> \
+--config <configuration>
 ```
 
 Multiple configurations of PETSc have been pre-installed on these supported machines
 under RDycore's project directories. Information about the available PETSc configurations
-can be obtained via `./config/set_petsc_settings.sh`.
+can be obtained via `./config/set_petsc_settings.sh -h`.
 
 The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
 RDycore needs to be build separately for each type of compute node. The CPU-only nodes
@@ -263,8 +265,6 @@ Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of t
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.
 
-**NOTE: Replace `make -j4` with `ninja` below to use Ninja instead of Make.**
-
 ### Example: Building and running RDycore on Perlmutter CPU nodes
 
 ```bash
@@ -274,9 +274,12 @@ cd /path/to/RDycore
 source config/set_petsc_settings.sh --mach pm-cpu --config 1
 
 # Build RDycore
-cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cmake -S . -B build-$PETSC_ARCH \
+-DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH \
+-G Ninja
+
 cd build-$PETSC_ARCH
-make -j4 install
+ninja -j4 install
 
 # Use an interactive job queue
 salloc --nodes 1 --qos interactive --time 00:30:00 --constraint cpu \
@@ -298,9 +301,12 @@ cd /path/to/RDycore
 source config/set_petsc_settings.sh --mach pm-gpu --config 1
 
 # Build RDycore
-cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cmake -S . -B build-$PETSC_ARCH \
+-DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH \
+-G Ninja
+
 cd build-$PETSC_ARCH
-make -j4 install
+ninja -j4 install
 
 # Use an interactive job queue
 salloc --nodes 1 --qos interactive --time 00:30:00 --constraint gpu \
@@ -323,9 +329,12 @@ cd /path/to/RDycore
 source config/set_petsc_settings.sh --mach frontier --config 1
 
 # Build RDycore
-cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cmake -S . -B build-$PETSC_ARCH \
+-DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH \
+-G Ninja
+
 cd build-$PETSC_ARCH
-make -j4 install
+ninja -j4 install
 
 # Use an interactive job queue
 salloc -N 1 -A <project-id> -t 0:30:00 -p batch
