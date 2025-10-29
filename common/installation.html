@@ -1868,11 +1868,13 @@ always build from the top of the build tree.</p>
 <li><a href="https://docs.olcf.ornl.gov/systems/frontier_user_guide.html">Frontier</a> at OLCF</li>
 </ol>
 <p>First, run the following shell script to set PETSc-related environmental variables and load appropriate modules.</p>
-<div class="highlight"><pre><span></span><code><span class="sb">`</span><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>&lt;machine_name&gt;<span class="w"> </span>--config<span class="w"> </span>&lt;configuration&gt;<span class="sb">`</span>,
+<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span><span class="se">\</span>
+--mach<span class="w"> </span>&lt;machine_name&gt;<span class="w"> </span><span class="se">\</span>
+--config<span class="w"> </span>&lt;configuration&gt;
 </code></pre></div>
 <p>Multiple configurations of PETSc have been pre-installed on these supported machines
 under RDycore's project directories. Information about the available PETSc configurations
-can be obtained via <code>./config/set_petsc_settings.sh</code>.</p>
+can be obtained via <code>./config/set_petsc_settings.sh -h</code>.</p>
 <p>The Perlmutter system has two types of compute nodes: CPU-only and CPU-GPU nodes, and
 RDycore needs to be build separately for each type of compute node. The CPU-only nodes
 have 128 cores (2 x 64-core AMD EPYC CPUs), while the CPU-GPU nodes have
@@ -1882,7 +1884,6 @@ of CUDA to run on Perlmutter GPUs.</p>
 Each GPU has 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node. Of the 64-cores,
 only 56 are allocatable cores instead of 64 cores. RDycore uses PETSc's and libCEED's
 support of HIP to run on AMD GPUs.</p>
-<p><strong>NOTE: Replace <code>make -j4</code> with <code>ninja</code> below to use Ninja instead of Make.</strong></p>
 <h3 id="example-building-and-running-rdycore-on-perlmutter-cpu-nodes">Example: Building and running RDycore on Perlmutter CPU nodes</h3>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/RDycore
 
@@ -1890,9 +1891,12 @@ support of HIP to run on AMD GPUs.</p>
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>pm-cpu<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
-cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-G<span class="w"> </span>Ninja
+
 <span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
-make<span class="w"> </span>-j4<span class="w"> </span>install
+ninja<span class="w"> </span>-j4<span class="w"> </span>install
 
 <span class="c1"># Use an interactive job queue</span>
 salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>cpu<span class="w"> </span><span class="se">\</span>
@@ -1911,9 +1915,12 @@ srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><s
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>pm-gpu<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
-cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-G<span class="w"> </span>Ninja
+
 <span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
-make<span class="w"> </span>-j4<span class="w"> </span>install
+ninja<span class="w"> </span>-j4<span class="w"> </span>install
 
 <span class="c1"># Use an interactive job queue</span>
 salloc<span class="w"> </span>--nodes<span class="w"> </span><span class="m">1</span><span class="w"> </span>--qos<span class="w"> </span>interactive<span class="w"> </span>--time<span class="w"> </span><span class="m">00</span>:30:00<span class="w"> </span>--constraint<span class="w"> </span>gpu<span class="w"> </span><span class="se">\</span>
@@ -1933,9 +1940,12 @@ srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><s
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
-cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-G<span class="w"> </span>Ninja
+
 <span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
-make<span class="w"> </span>-j4<span class="w"> </span>install
+ninja<span class="w"> </span>-j4<span class="w"> </span>install
 
 <span class="c1"># Use an interactive job queue</span>
 salloc<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span>-A<span class="w"> </span>&lt;project-id&gt;<span class="w"> </span>-t<span class="w"> </span><span class="m">0</span>:30:00<span class="w"> </span>-p<span class="w"> </span>batch
