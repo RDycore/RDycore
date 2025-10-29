@@ -252,7 +252,12 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
 
           if (cells->is_owned[right_local_cell_id]) {
             PetscInt right_owned_cell_id = cells->local_to_owned[right_local_cell_id];
+            if ((left_local_cell_id == 2691 || right_local_cell_id == 2691) && i_dof == n_dof - 1) {
+              printf("e = %d Edge %d between cells %d (h=%e) and %d (h=%e); len/area_l = %e; len/area_r = %e; f_ptr = %+e; flux_vec_int = %+e ",
+                e,edge_id,left_local_cell_id,hl,right_local_cell_id,hr,edge_len / areal, edge_len / arear, f_ptr[n_dof * right_owned_cell_id + i_dof],flux_vec_int[n_dof * e + i_dof]);
+            }
             f_ptr[n_dof * right_owned_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (edge_len / arear);
+            if ((left_local_cell_id == 2691 || right_local_cell_id == 2691) && i_dof == n_dof - 1) printf(" after update f_ptr = %+e\n",f_ptr[n_dof * right_owned_cell_id + i_dof]);
           }
         }
       }
@@ -660,6 +665,14 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
 
       PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
       PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
+      if (c == 2691 || c == 2493 || c == 2686 || c == 2688) {
+        printf("++++++++++++++\n");
+        printf("Cell %d: h = %e; hu = %e (u = %e); hv = %e (v = %e); hc = %e (c = %e)\n", c, h, hu, hu/h, hv, hv/h, u_ptr[n_dof * c + 3], u_ptr[n_dof * c + 3]/h);
+        printf("Cell %d: Flux_h  = %+e \n", c, flux_div_ptr[n_dof * owned_cell_id + 0]);
+        printf("Cell %d: Flux_hu = %+e \n", c, flux_div_ptr[n_dof * owned_cell_id + 1]);
+        printf("Cell %d: Flux_hv = %+e \n", c, flux_div_ptr[n_dof * owned_cell_id + 2]);
+        printf("Cell %d: Flux_hc = %+e \n", c, flux_div_ptr[n_dof * owned_cell_id + 3]);
+      }
 
       PetscReal tbx = 0.0, tby = 0.0;
 
@@ -686,7 +699,11 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
-          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + 3 + s];
+          //f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + 3 + s];
+          f_ptr[n_dof * owned_cell_id + 3 + s] += source_ptr[n_dof * owned_cell_id + 3 + s];
+          if (source_ptr[n_dof * owned_cell_id + 3 + s] < 0.0) {
+            printf("Warning: Negative sediment source term encountered in cell %d = %f\n",cells->global_ids[c], source_ptr[n_dof * owned_cell_id + 3 + s]);
+          }
         }
       }
 
