@@ -274,7 +274,10 @@ cd /path/to/RDycore
 source config/set_petsc_settings.sh --mach pm-cpu --config 1
 
 # Build RDycore
-cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cmake -S . -B build-$PETSC_ARCH \
+-DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH \
+-G Ninja
+
 cd build-$PETSC_ARCH
 ninja -j4 install
 
@@ -298,7 +301,10 @@ cd /path/to/RDycore
 source config/set_petsc_settings.sh --mach pm-gpu --config 1
 
 # Build RDycore
-cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cmake -S . -B build-$PETSC_ARCH \
+-DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH \
+-G Ninja
+
 cd build-$PETSC_ARCH
 ninja -j4 install
 
@@ -323,7 +329,10 @@ cd /path/to/RDycore
 source config/set_petsc_settings.sh --mach frontier --config 1
 
 # Build RDycore
-cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH
+cmake -S . -B build-$PETSC_ARCH \
+-DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH \
+-G Ninja
+
 cd build-$PETSC_ARCH
 ninja -j4 install
 
