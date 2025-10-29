@@ -1891,7 +1891,10 @@ support of HIP to run on AMD GPUs.</p>
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>pm-cpu<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
-cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-G<span class="w"> </span>Ninja
+
 <span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
 ninja<span class="w"> </span>-j4<span class="w"> </span>install
 
@@ -1912,7 +1915,10 @@ srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><s
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>pm-gpu<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
-cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-G<span class="w"> </span>Ninja
+
 <span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
 ninja<span class="w"> </span>-j4<span class="w"> </span>install
 
@@ -1934,7 +1940,10 @@ srun<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><s
 <span class="nb">source</span><span class="w"> </span>config/set_petsc_settings.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--config<span class="w"> </span><span class="m">1</span>
 
 <span class="c1"># Build RDycore</span>
-cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span>
+cmake<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span>-B<span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$PWD</span>/build-<span class="nv">$PETSC_ARCH</span><span class="w"> </span><span class="se">\</span>
+-G<span class="w"> </span>Ninja
+
 <span class="nb">cd</span><span class="w"> </span>build-<span class="nv">$PETSC_ARCH</span>
 ninja<span class="w"> </span>-j4<span class="w"> </span>install
 
