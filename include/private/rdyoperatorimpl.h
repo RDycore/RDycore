@@ -93,11 +93,22 @@ PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOpe
 // Operator
 //----------
 
-// This type and its related functions define an interface for creating a
-// nonlinear operator F that computes the time derivative du/dt of a local
-// solution vector u at time t:
+// This type and its related functions define an interface for solving a nonlinear equation for a
+// time-dependent solution u(t) for which the equation
 //
-// F(u, t) -> du/dt
+// F(t, u, du/dt) = G(t, u)
+//
+// holds, where F is in general a differential-algebraic expression involving u and its time
+// derivative, and G is a "right-hand side function".
+//
+// In the case of explicit time integration, F(t, u, du/dt) reduces to du/dt itself, and the
+// nonlinear system becomes a system of ordinary differential equations:
+//
+// du/dt = G(t, u),
+//
+// evaluated at appropriate quadrature points.
+//
+// These two parts are then evaluated according to the selected time integration method.
 //
 // There are two families of operator implementations:
 // 1. CEED implementation: a composite CeedOperator with interior and boundary
@@ -127,10 +138,18 @@ typedef struct Operator {
 
   // CEED/PETSc backends
   union {
+    // CEED
     struct {
-      // CEED flux and source operators (each composed of sub-operators, see
-      // CreateOperator in src/operator.c)
-      CeedOperator flux, source;
+      // Operators for F(t, u, du/dt) and its Jacobian dF. F reduces to du/dt for explicit time
+      // integration.
+      CeedOperator F, dF;
+
+      // Flux and source operators for the function G(t, u) and its Jacobian dG. Each is composed of
+      // sub-operators.
+      struct {
+        CeedOperator flux, source;
+      } G;
+      CeedOperator dG;
 
       // timestep last set on operators
       PetscReal dt;
@@ -144,9 +163,16 @@ typedef struct Operator {
 
     // PETSc operator data
     struct {
-      // PETSc composite operators with sub-operators identical in structure to
-      // the CEED composite operators above
-      PetscOperator flux, source;
+      // Operators for F(t, u, du/dt) and its Jacobian dF. F reduces to du/dt for explicit time
+      // integration.
+      PetscOperator F, dF;
+
+      // Flux and source operators for the function G(t, u) and its Jacobian dG. Each is composed of
+      // sub-operators.
+      struct {
+        PetscOperator flux, source;
+      } G;
+      PetscOperator dG;
 
       // array of Dirichlet boundary value vectors, indexed by boundary
       Vec *boundary_values;
@@ -179,8 +205,11 @@ PETSC_INTERN PetscErrorCode CreateOperator(RDyConfig *, DM, RDyMesh *, PetscInt,
                                            Operator **);
 PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
-// operator timestepping function
-PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
+// operator functions for interacting with PETSc's TS solver (RDy passed as context)
+PETSC_INTERN PetscErrorCode OperatorIFunction(TS, PetscReal, Vec, Vec, Vec, void *);
+PETSC_INTERN PetscErrorCode OperatorIJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void *);
+PETSC_INTERN PetscErrorCode OperatorRHSFunction(TS, PetscReal, Vec, Vec, void *);
+PETSC_INTERN PetscErrorCode OperatorRHSJacobian(TS, PetscReal, Vec, Mat, Mat, void *);
 
 //--------------------------------------------------
 // CEED/PETSc Flux and Source Operator Constructors
@@ -188,9 +217,15 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedIOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedIJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedRHSJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
+
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
-                                                    OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSourceOperator(RDyConfig *, RDyMesh *, Vec, Vec, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscIOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscIJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscRHSJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
 
 //----------------------
 // Operator Data Access
