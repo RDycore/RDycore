@@ -209,6 +209,15 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   // (e.g. sequential vectors for PETSc operator)
   PetscCall(SetOperatorRegions(*operator, num_regions, regions));
 
+  PetscBool explicit;
+  switch (config->numerics.temporal) {
+    case TEMPORAL_EULER, TEMPORAL_RK4:
+      explicit = true;
+      break;
+    default:
+      explicit = false;
+  }
+
   // construct CEED or PETSc versions of the flux/sources operators based on
   // our configuration
   if (CeedEnabled()) {
@@ -220,24 +229,22 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     }
 
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                     (*operator)->boundary_conditions, &(*operator)->ceed.G.flux));
-    PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.G.source));
-    // if we're using implicit methods, provide F and dF
-    PetscCall(CreateCeedIOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                  (*operator)->boundary_conditions, &(*operator)->ceed.F));
-    PetscCall(CreateCeedIJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                  (*operator)->boundary_conditions, &(*operator)->ceed.dF));
+                                     (*operator)->boundary_conditions, &(*operator)->ceed.flux));
+    PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
+    if (!explicit) {
+      PetscCall(CreateCeedJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
+                                   (*operator)->boundary_conditions, &(*operator)->ceed.jacobian));
+    }
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
                                       (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.G.flux));
     PetscCall(CreatePetscSourceOperator((*operator)->config, (*operator)->mesh, (*operator)->petsc.external_sources,
                                         (*operator)->petsc.material_properties, &(*operator)->petsc.G.source));
-    // if we're using implicit methods, provide F and dF
-    PetscCall(CreatePetscIOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                   (*operator)->boundary_conditions, &(*operator)->petsc.F));
-    PetscCall(CreatePetscIJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                   (*operator)->boundary_conditions, &(*operator)->petsc.dF));
+    if (!explicit) {
+      PetscCall(CreatePetscJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
+                                    (*operator)->boundary_conditions, &(*operator)->petsc.jacobian));
+    }
   }
 
   // set up our flux divergence vector(s)
@@ -284,8 +291,8 @@ PetscErrorCode DestroyOperator(Operator **op) {
     }
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.G.flux));
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.G.source));
-    if ((*op)->petsc.dF) {
-      PetscCall(PetscOperatorDestroy(&(*op)->petsc.dF));
+    if ((*op)->petsc.jacobian) {
+      PetscCall(PetscOperatorDestroy(&(*op)->petsc.jacobian));
     }
     if ((*op)->petsc.dG) {
       PetscCall(PetscOperatorDestroy(&(*op)->petsc.dG));
@@ -447,7 +454,8 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Evaluates the left hand side of the operator F(t, u, du/dt). Use with TS via TSSetIFunction.
+/// Evaluates the left hand side of the operator F(t, u, du/dt). Use with TS via TSSetIFunction,
+/// for implicit-explicit (IMEX) discretizations only.
 /// @param [in]    ts   the solver
 /// @param [in]    t    the simulation time [seconds]
 /// @param [in]    u    the global solution vector at time t
@@ -496,52 +504,50 @@ PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, voi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Evaluates the jacobian of the left hand side of the operator, dF(t, u, du/dt). Use with TS via
-/// TSSetIJacobian.
+/// Evaluates the jacobian dF/du of the left hand side operator F. Use with TS via
+/// TSSetIJacobian for implicit-explicit (IMEX) discretizations only.
 /// @param [in]    ts    the solver
 /// @param [in]    t     the simulation time [seconds]
 /// @param [in]    u     the global solution vector at time t
 /// @param [in]    dudt  the time derivative of the global solution vector at time t
 /// @param [in]    sigma the "shift" coefficient preceding the time derivative term of the jacobian
-/// @param [out]   dF    the matrix that stores the jacobian of the left hand side
-/// @param [in]    P     the matrix from which to construct the preconditioner (usually same as dF)
+/// @param [out]   J     the matrix that stores the jacobian of the left hand side
+/// @param [in]    P     the matrix from which to construct the preconditioner (usually same as J)
 /// @param [inout] ctx   the RDy instance for the operator
-PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat dF, Mat P, void *ctx) {
+PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat J, Mat P, void *ctx) {
   PetscFunctionBegin;
 
   RDy       rdy = ctx;
   Operator *op  = rdy->operator;
 
   if (CeedEnabled()) {
-    // copy the nonzeros into the matrix dF in COO format
-    CeedOperatorField nonzeros_field;
-    PetscCallCEED(CeedOperatorGetFieldByName(op->ceed.dF, "nonzeros", &nonzeros_field));
-    CeedVector nonzeros;
-    PetscCallCEED(CeedOperatorFieldGetVector(nonzeros_field, &nonzeros));
+    PetscBool J_is_matceed, J_is_mffd, P_is_matceed, P_is_mffd;
+    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATMFFD, &J_is_mffd));
+    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATCEED, &J_is_matceed));
+    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATMFFD, &P_is_mffd));
+    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATCEED, &P_is_matceed));
 
-    const CeedScalar *nz;
-    PetscCall(CeedVectorGetArrayRead(nonzeros, CEED_MEM_DEVICE, &nz));
-    PetscCall(MatSetValuesCOO(dF, nz, INSERT_VALUES));
-    PetscCall(MatAssemblyBegin(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(CeedVectorRestoreArrayRead(nonzeros, &nz));
+    PetscCall(MatCeedSetContextReal(rdy->ceed.jacobian, "ijacobian time shift", shift));
+
+    if (J_is_matceed || J_is_mffd) {
+      PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
+    } else PetscCall(MatCeedAssembleCOO(rdy->ceed.jacobian, J));
+
+    if (P_is_matceed && J != P) {
+      PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
+    } else if (!P_is_matceed && !P_is_mffd && J != P) {
+      PetscCall(MatCeedAssembleCOO(rdy->ceed.jacobian, P));
+    }
   } else {
-    // copy the nonzeros into the matrix dF in COO format
-    Vec nonzeros;
-    PetscCall(PetscOperatorFieldsGet(op->petsc.dF->fields, "nonzeros", &nonzeros));
-
-    const PetscReal *nz;
-    PetscCall(VecGetArrayRead(nonzeros, &nz));
-    PetscCall(MatSetValuesCOO(dF, nz, INSERT_VALUES));
-    PetscCall(MatAssemblyBegin(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(VecRestoreArrayRead(nonzeros, &nz));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Evaluates the right hand side of the operator G(t, u). Use with TS via TSSetRHSFunction.
+/// Evaluates the right hand side of the operator G(t, u). Use with TS via TSSetRHSFunction for
+/// fully explicit and fully implicit discretizations.
 /// @param [in]    ts  the solver
 /// @param [in]    t   the simulation time [seconds]
 /// @param [in]    u   the global solution vector at time t
@@ -589,46 +595,39 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Evaluates the jacobian of the left hand side of the operator, dF(t, u, du/dt). Use with TS via
-/// TSSetIJacobian.
+/// Evaluates the jacobian dG/du of the right hand side operator G. Use with TS via TSSetRHSJacobian
+/// for fully implicit discretizations only.
 /// @param [in]    ts    the solver
 /// @param [in]    t     the simulation time [seconds]
 /// @param [in]    u     the global solution vector at time t
-/// @param [in]    dudt  the time derivative of the global solution vector at time t
-/// @param [in]    sigma the "shift" coefficient preceding the time derivative term of the jacobian
-/// @param [out]   dF    the matrix that stores the jacobian of the left hand side
-/// @param [in]    P     the matrix from which to construct the preconditioner (usually same as dF)
+/// @param [out]   J    the matrix that stores the jacobian of the left hand side
+/// @param [in]    P     the matrix from which to construct the preconditioner (usually same as J)
 /// @param [inout] ctx   the RDy instance for the operator
-PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat dF, Mat P, void *ctx) {
+PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal dt, Vec u, Mat J, Mat P, void *ctx) {
   PetscFunctionBegin;
 
   RDy       rdy = ctx;
   Operator *op  = rdy->operator;
 
   if (CeedEnabled()) {
-    // copy the nonzeros into the matrix dF in COO format
-    CeedOperatorField nonzeros_field;
-    PetscCallCEED(CeedOperatorGetFieldByName(op->ceed.dF, "nonzeros", &nonzeros_field));
-    CeedVector nonzeros;
-    PetscCallCEED(CeedOperatorFieldGetVector(nonzeros_field, &nonzeros));
+    PetscBool J_is_matceed, J_is_mffd, P_is_matceed, P_is_mffd;
+    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATMFFD, &J_is_mffd));
+    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATCEED, &J_is_matceed));
+    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATMFFD, &P_is_mffd));
+    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATCEED, &P_is_matceed));
 
-    const CeedScalar *nz;
-    PetscCall(CeedVectorGetArrayRead(nonzeros, CEED_MEM_DEVICE, &nz));
-    PetscCall(MatSetValuesCOO(dF, nz, INSERT_VALUES));
-    PetscCall(MatAssemblyBegin(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(CeedVectorRestoreArrayRead(nonzeros, &nz));
+    if (J_is_matceed || J_is_mffd) {
+      PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
+    } else PetscCall(MatCeedAssembleCOO(rdy->ceed.jacobian, J));
+
+    if (P_is_matceed && J != P) {
+      PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
+    } else if (!P_is_matceed && !P_is_mffd && J != P) {
+      PetscCall(MatCeedAssembleCOO(rdy->ceed.jacobian, P));
+    }
   } else {
-    // copy the nonzeros into the matrix dF in COO format
-    Vec nonzeros;
-    PetscCall(PetscOperatorFieldsGet(op->petsc.dF->fields, "nonzeros", &nonzeros));
-
-    const PetscReal *nz;
-    PetscCall(VecGetArrayRead(nonzeros, &nz));
-    PetscCall(MatSetValuesCOO(dF, nz, INSERT_VALUES));
-    PetscCall(MatAssemblyBegin(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(dF, MAT_FLUSH_ASSEMBLY));
-    PetscCall(VecRestoreArrayRead(nonzeros, &nz));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -729,7 +728,7 @@ PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal dt, Vec u, Mat dG, Mat P, vo
   } else {
     // copy the nonzeros into the matrix dG in COO format
     Vec nonzeros;
-    PetscCall(PetscOperatorFieldsGet(op->petsc.dF->fields, "nonzeros", &nonzeros));
+    PetscCall(PetscOperatorFieldsGet(op->petsc.jacobian->fields, "nonzeros", &nonzeros));
 
     const PetscReal *nz;
     PetscCall(VecGetArrayRead(nonzeros, &nz));

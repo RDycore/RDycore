@@ -236,7 +236,10 @@ PetscErrorCode CreatePetscSourceOperator(RDyConfig *config, RDyMesh *mesh, Vec e
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a PETSc "identity" operator appropriate for the given configuration.
+/// Creates a PETSc "identity" operator appropriate for the given configuration. For the
+/// TEMPORAL_ARK_IMEX discretization, this operator incorporates stiff source terms to be integrated
+/// implicity, treating fluxes explicitly. For all other temporal discretizations, this function
+/// does nothing, since the identity operator is not used.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
 /// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
@@ -253,7 +256,10 @@ PetscErrorCode CreatePetscIOperator(RDyConfig *config, RDyMesh *mesh, PetscInt n
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a PETSc "identity jacobian" operator appropriate for the given configuration.
+/// Creates a PETSc "identity jacobian" operator appropriate for the given configuration. For the
+/// TEMPORAL_ARK_IMEX discretization, this operator incorporates stiff source terms to be integrated
+/// implicity, treating fluxes explicitly. For all other temporal discretizations, this function
+/// does nothing, since the identity operator is not used.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
 /// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
@@ -267,5 +273,22 @@ PetscErrorCode CreatePetscIJacobian(RDyConfig *config, RDyMesh *mesh, PetscInt n
 
   // TODO: implement this! Create an output field for nonzero values
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a PETSc jacobian operator for the right-hand-side appropriate for the given
+/// configuration. For the TEMPORAL_BEULER discretization, this operator computes the jacobian of
+/// flux and source terms, allowing them to be integrated fully implicitly. For all other temporal
+/// discretizations, this function does nothing, since the identity operator is not used.
+/// @param [in]    config              the configuration defining the physics and numerics for the new operator
+/// @param [in]    mesh                a mesh containing geometric and topological information for the domain
+/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
+/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
+/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
+/// @param [out]   jacobian_op         the newly created operator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreatePetscRHSJacobian(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
+                                      PetscOperator *jacobian_op) {
+  PetscFunctionBegin;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
