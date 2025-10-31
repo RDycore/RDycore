@@ -37,6 +37,9 @@ typedef struct {
       PetscReal water_mass;
       PetscReal x_momentum;
       PetscReal y_momentum;
+      PetscReal water_mass_prev;
+      PetscReal x_momentum_prev;
+      PetscReal y_momentum_prev;
     } * fluxes;
 
     // last step for which boundary flux time series data was written
