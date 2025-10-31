@@ -252,12 +252,12 @@ static PetscErrorCode ApplySedimentInteriorFlux(void *context, PetscOperatorFiel
 
           if (cells->is_owned[right_local_cell_id]) {
             PetscInt right_owned_cell_id = cells->local_to_owned[right_local_cell_id];
-            if ((left_local_cell_id == 2691 || right_local_cell_id == 2691) && i_dof == n_dof - 1) {
+            if ((left_local_cell_id == 3 || right_local_cell_id == 3) && i_dof == n_dof - 1) {
               printf("e = %d Edge %d between cells %d (h=%e) and %d (h=%e); len/area_l = %e; len/area_r = %e; f_ptr = %+e; flux_vec_int = %+e ",
                 e,edge_id,left_local_cell_id,hl,right_local_cell_id,hr,edge_len / areal, edge_len / arear, f_ptr[n_dof * right_owned_cell_id + i_dof],flux_vec_int[n_dof * e + i_dof]);
             }
             f_ptr[n_dof * right_owned_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (edge_len / arear);
-            if ((left_local_cell_id == 2691 || right_local_cell_id == 2691) && i_dof == n_dof - 1) printf(" after update f_ptr = %+e\n",f_ptr[n_dof * right_owned_cell_id + i_dof]);
+            if ((left_local_cell_id == 3 || right_local_cell_id == 3) && i_dof == n_dof - 1) printf(" after update f_ptr = %+e\n",f_ptr[n_dof * right_owned_cell_id + i_dof]);
           }
         }
       }
@@ -665,7 +665,7 @@ static PetscErrorCode ApplySedimentSourceSemiImplicit(void *context, PetscOperat
 
       PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
       PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
-      if (c == 2691 || c == 2493 || c == 2686 || c == 2688) {
+      if (c == 3 || c == 0 || c == 1 || c == 2) {
         printf("++++++++++++++\n");
         printf("Cell %d: h = %e; hu = %e (u = %e); hv = %e (v = %e); hc = %e (c = %e)\n", c, h, hu, hu/h, hv, hv/h, u_ptr[n_dof * c + 3], u_ptr[n_dof * c + 3]/h);
         printf("Cell %d: Flux_h  = %+e \n", c, flux_div_ptr[n_dof * owned_cell_id + 0]);
