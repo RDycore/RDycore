@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <errno.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -23,7 +24,7 @@ PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
       snprintf(output_dir, PETSC_MAX_PATH_LEN - 1, "%s", rdy->config.output.directory);
     }
   }
-  strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);
+  snprintf(dir, PETSC_MAX_PATH_LEN, "%s", output_dir);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -78,9 +79,19 @@ PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// generates a filename in the given directory in the format <prefix>-YYYY-MM-DD-hh:mm:ss.<suffix>
+PetscErrorCode GenerateTimestampedFilename(const char *directory, const char *prefix, time_t t, const char *suffix, char *filename) {
+  PetscFunctionBegin;
+  struct tm date;
+  localtime_r(&t, &date);
+  snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.%04d-%02d-%02d.%02d.%02d.%02d.%s", directory, prefix, date.tm_year, date.tm_mon, date.tm_mday,
+           date.tm_hour, date.tm_min, date.tm_sec, suffix);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Determines the appropriate output file name based on
 /// * the desired file format as specified by rdy->config.output_format
-/// * the time step index and simulation time
+/// * the simulation time
 /// * the specified suffix
 PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
   PetscFunctionBegin;
@@ -88,30 +99,45 @@ PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const
   char prefix[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
 
+  // determine the current Gregorian time
+  struct tm current_time = rdy->config.time.date;
+  current_time.tm_sec += (time_t)time;
+  time_t t = mktime(&current_time);
+
   // encode specific information into the filename based on its format
   char output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(GetOutputDirectory(rdy, output_dir));
   if (rdy->config.output.format == OUTPUT_BINARY) {  // PETSc native binary format
-    PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
+    if (rdy->config.time.date_string[0]) {
+      PetscCall(GenerateTimestampedFilename(output_dir, prefix, t, suffix, filename));
+    } else {
+      PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
+    }
   } else if (rdy->config.output.format == OUTPUT_XDMF) {
     if (!strcasecmp(suffix, "h5")) {  // XDMF "heavy" data
       if (rdy->config.output.batch_size == 1) {
         // output from each step gets its own HDF5 file
-        snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s-%" PetscInt_FMT ".%s", output_dir, prefix, step, suffix);
+        if (rdy->config.time.date_string[0]) {
+          PetscCall(GenerateTimestampedFilename(output_dir, prefix, t, suffix, filename));
+        } else {
+          PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
+        }
       } else {
         // output data is grouped into batches of a fixed number of time steps
         PetscInt batch_size      = rdy->config.output.batch_size;
         PetscInt output_interval = rdy->config.output.output_interval;
         PetscInt batch           = step / output_interval / batch_size;
-        PetscInt max_batch       = rdy->config.time.max_step / output_interval / batch_size;
+        PetscInt max_batch       = rdy->config.time.stop_n / output_interval / batch_size;
         if (max_batch < 1) max_batch = 1;
         PetscCall(GenerateIndexedFilename(output_dir, prefix, batch, max_batch, suffix, filename));
       }
     } else if (!strcasecmp(suffix, "xmf")) {  // XDMF "light" data
       PetscCheck(!strcasecmp(suffix, "xmf"), rdy->comm, PETSC_ERR_USER, "Invalid suffix for XDMF output: %s", suffix);
-      // encode the step into the filename with zero-padding based on the
-      // maximum step number
-      PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.max_step, suffix, filename));
+      if (rdy->config.time.date_string[0]) {
+        PetscCall(GenerateTimestampedFilename(output_dir, prefix, t, suffix, filename));
+      } else {
+        PetscCall(GenerateIndexedFilename(output_dir, prefix, step, rdy->config.time.stop_n, suffix, filename));
+      }
     } else {
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported file suffix: %s", suffix);
     }
@@ -172,11 +198,13 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
         break;
       case OUTPUT_XDMF:
         // we don't actually use this viewer, so maybe this doesn't matter?
+        if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
         PetscCall(PetscViewerCreate(rdy->comm, &rdy->output_viewer));
         PetscCall(PetscViewerSetType(rdy->output_viewer, PETSCVIEWERHDF5));
         format = PETSC_VIEWER_HDF5_XDMF;
         break;
       case OUTPUT_BINARY:
+        if (rdy->output_viewer) PetscCall(PetscViewerDestroy(&rdy->output_viewer));
         PetscCall(PetscViewerCreate(rdy->comm, &rdy->output_viewer));
         PetscCall(PetscViewerSetType(rdy->output_viewer, PETSCVIEWERBINARY));
     }
@@ -184,6 +212,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
     // apply any command-line option overrides
     if (rdy->output_viewer) {
       PetscCall(PetscViewerSetFromOptions(rdy->output_viewer));
+      if (rdy->output_vf) PetscCall(PetscViewerAndFormatDestroy(&rdy->output_vf));
       PetscCall(PetscViewerAndFormatCreate(rdy->output_viewer, format, &rdy->output_vf));
     }
 
@@ -248,11 +277,18 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     RDyLogDebug(rdy, "Running simulation...");
   }
 
-  if (rdy->mesh_was_refined) {
+  if (rdy->is_a_restart_run && rdy->restart_step == step) {
+    PetscCall(CreateOutputDirectory(rdy));
+
+    // create a viewer with the proper format for visualization output
+    PetscCall(CreateOutputViewer(rdy));
+  }
+
+  if (rdy->amr.mesh_was_refined) {
     // create a viewer with the proper format for visualization output
     PetscCall(CreateOutputViewer(rdy));
 
-    rdy->mesh_was_refined = PETSC_FALSE;
+    rdy->amr.mesh_was_refined = PETSC_FALSE;
   }
 
   PetscReal time;
@@ -335,7 +371,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
   // are we finished?
   PetscCall(TSGetTime(rdy->ts, &time));
-  PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit);
+  PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.stop, rdy->config.time.unit);
   if (time >= final_time) {
     // clean up
     PetscCall(DestroyOutputViewer(rdy));
@@ -355,7 +391,7 @@ PetscBool RDyFinished(RDy rdy) {
   PetscReal time_in_unit = ConvertTimeFromSeconds(time, rdy->config.time.unit);
   PetscInt  step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
-  if (rdy->config.time.final_time - time_in_unit < 1e-13) {  // FIXME: can we do better than this?
+  if (rdy->config.time.stop - time_in_unit < 1e-13) {  // FIXME: can we do better than this?
     finished = PETSC_TRUE;
   }
   PetscFunctionReturn(finished);

@@ -154,6 +154,9 @@ typedef struct Operator {
       // array of boundary flux vectors, indexed by boundary
       Vec *boundary_fluxes;
 
+      // array of boundary flux vectors, indexed by boundary
+      Vec *boundary_fluxes_accum;
+
       // domain-wide external source vector
       Vec external_sources;
 
@@ -185,7 +188,7 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *,
+PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
                                                     OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSourceOperator(RDyConfig *, RDyMesh *, Vec, Vec, PetscOperator *);
 

@@ -14,9 +14,9 @@ logging:
   level: detail
 
 time:
-  final_time       : 0.005
+  stop             : 0.005
   unit             : seconds
-  max_step         : 10
+  stop_n           : 10
   coupling_interval: 0.005
 
 output:

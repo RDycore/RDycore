@@ -22,8 +22,6 @@ PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {
-  // last step for which time series data was written
-  PetscInt last_step;
   // fluxes on boundary edges
   struct {
     // per-process numbers of local boundary edges on which fluxes are accumulated
@@ -40,8 +38,55 @@ typedef struct {
       PetscReal x_momentum;
       PetscReal y_momentum;
     } * fluxes;
+
+    // last step for which boundary flux time series data was written
+    PetscInt last_step;
   } boundary_fluxes;
+
+  // observations recorded at specific sites
+  struct {
+    struct {
+      // global indices corresponding to observation site natural cell indices in input
+      PetscInt *global_indices;
+      // fixed x, y, z coordinates of observation sites
+      PetscReal *x, *y, *z;
+      // serial vector containing data for all observation sites on process 0
+      Vec u;
+    } sites;
+    // VecScatter governing observation site vector scatter
+    VecScatter scatter_u;
+    // accumulation vector for averaged observations or for instantaneous values
+    Vec accum_u;
+    // last step for which observations data was written
+    PetscInt last_step;
+  } observations;
 } RDyTimeSeriesData;
+
+typedef struct {
+  // base mesh before any refinements
+  DM dm_base;
+  DM dm_1dof_base;
+
+  // for marking cells for refinement
+  PetscBool  cells_marked_for_refinement;
+  PetscBool *refine_cell;
+
+  // for mapping data between base and current meshes
+  Mat BaseToCurrentMatNDof, CurrentToBaseMatNDof;
+  Mat BaseToCurrentMat1Dof, CurrentToBaseMat1Dof;
+
+  // identifies if the mesh has been refined and the model has not taken a step
+  PetscBool mesh_was_refined;
+
+  // number of times the mesh has been refined
+  int num_refinements;
+
+  // last refined mesh that was outputted
+  int last_refinement_level_outputted;
+
+  // is refinement on or off
+  PetscBool is_refinement_on;
+} RDyAMR;
 
 // This type serves as a "virtual table" containing function pointers that
 // define the behavior of the dycore.
@@ -85,9 +130,13 @@ struct _p_RDy {
   PetscBool        refine;
 
   // auxiliary DM for diagnostics
-  DM               aux_dm;
-  SectionFieldSpec diag_fields;
-  Vec              diags_vec;
+  DM               dm_diags;
+  SectionFieldSpec field_diags;
+  Vec              vec_diags;
+
+  DM               dm_1dof;
+  SectionFieldSpec field_1dof;
+  Vec              vec_1dof;
 
   // DM for sediment dynamics
   DM               sediment_dm;
@@ -129,11 +178,13 @@ struct _p_RDy {
   // Refinements
   //--------------------------
 
-  // identifies if the mesh has been refined and the model has not taken a step
-  PetscBool mesh_was_refined;
+  RDyAMR amr;
 
-  // number of times the mesh has been refined
-  PetscInt num_refinements;
+  //--------------------------
+  // Restart
+  //--------------------------
+  PetscBool is_a_restart_run;  // is this a restart run?
+  PetscInt  restart_step;
 
   //--------------------------
   // Solver and solution data

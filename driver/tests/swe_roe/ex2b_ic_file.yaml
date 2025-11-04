@@ -14,13 +14,19 @@ logging:
   level: detail
 
 time:
-  final_time: 0.005
+  stop: 0.005
   unit: hours
-  max_step: 1000
+  stop_n: 1000
 
 output:
   format: xdmf
   output_interval: 100
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+    - WaterSource
+    - MomentumXSource
 
 grid:
   file: DamBreak_grid5x10.exo

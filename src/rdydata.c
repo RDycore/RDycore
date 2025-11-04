@@ -9,7 +9,7 @@ PetscErrorCode RDyGetNumGlobalCells(RDy rdy, PetscInt *num_cells_global) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
+PetscErrorCode RDyGetNumOwnedCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionBegin;
   *num_cells = rdy->mesh.num_owned_cells;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -51,9 +51,9 @@ static PetscErrorCode CheckRegionIndex(RDy rdy, const PetscInt region_index) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode CheckNumLocalCells(RDy rdy, const PetscInt size) {
+static PetscErrorCode CheckNumOwnedCells(RDy rdy, const PetscInt size) {
   PetscFunctionBegin;
-  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of local cells");
+  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -142,7 +142,7 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof, PetscReal *values) {
+static PetscErrorCode RDyGetPrognosticVariableOfOwnedCell(RDy rdy, PetscInt idof, PetscReal *values) {
   PetscFunctionBegin;
 
   PetscReal *u;
@@ -157,24 +157,24 @@ static PetscErrorCode RDyGetPrognosticVariableOfLocalCell(RDy rdy, PetscInt idof
 // The following functions retrieve single-component solution data on local
 // cells, placing them into the values array (of length size)
 
-PetscErrorCode RDyGetLocalCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellHeights(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 0, values));
+  PetscCall(CheckNumOwnedCells(rdy, size));
+  PetscCall(RDyGetPrognosticVariableOfOwnedCell(rdy, 0, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellXMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 1, values));
+  PetscCall(CheckNumOwnedCells(rdy, size));
+  PetscCall(RDyGetPrognosticVariableOfOwnedCell(rdy, 1, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellYMomenta(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-  PetscCall(RDyGetPrognosticVariableOfLocalCell(rdy, 2, values));
+  PetscCall(CheckNumOwnedCells(rdy, size));
+  PetscCall(RDyGetPrognosticVariableOfOwnedCell(rdy, 2, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -339,62 +339,34 @@ PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, PetscReal *va
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RDyGetIDimCentroidOfLocalCell(RDy rdy, PetscInt idim, PetscInt size, PetscReal *x) {
+PetscErrorCode RDyGetOwnedCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  RDyCells *cells = &rdy->mesh.cells;
-
-  PetscInt count = 0;
-  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_owned[icell]) {
-      x[count++] = cells->centroids[icell].X[idim];
-    }
-  }
+  PetscCall(RDyMeshGetOwnedCellXCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellXCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscInt idim = 0;  // x-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
+  PetscCall(RDyMeshGetOwnedCellYCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellZCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscInt idim = 1;  // y-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
+  PetscCall(RDyMeshGetOwnedCellZCentroids(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellZCentroids(RDy rdy, const PetscInt size, PetscReal *values) {
+PetscErrorCode RDyGetOwnedCellAreas(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
-  PetscInt idim = 2;  // z-dim
-  PetscCall(RDyGetIDimCentroidOfLocalCell(rdy, idim, size, values));
+  PetscCall(RDyMeshGetOwnedCellAreas(&rdy->mesh, size, values));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyGetLocalCellAreas(RDy rdy, const PetscInt size, PetscReal *values) {
-  PetscFunctionBegin;
-  PetscCall(CheckNumLocalCells(rdy, size));
-
-  RDyCells *cells = &rdy->mesh.cells;
-
-  PetscInt count = 0;
-  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (cells->is_owned[icell]) {
-      values[count++] = cells->areas[icell];
-    }
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode RDyGetLocalCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values) {
+PetscErrorCode RDyGetOwnedCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values) {
   PetscFunctionBegin;
 
-  PetscCall(CheckNumLocalCells(rdy, size));
+  PetscCall(CheckNumOwnedCells(rdy, size));
 
   RDyCells *cells = &rdy->mesh.cells;
 
@@ -554,7 +526,7 @@ PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
 
 PetscErrorCode RDyCreateOneDOFGlobalVec(RDy rdy, Vec *global) {
   PetscFunctionBegin;
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, global));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -563,11 +535,11 @@ PetscErrorCode RDyWriteOneDOFGlobalVecToBinaryFile(RDy rdy, const char filename[
 
   // create a naturally-ordered vector with a stride equal to the number of
   Vec natural;
-  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
+  PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
 
   // scatter global-to-natural
-  PetscCall(DMPlexGlobalToNaturalBegin(rdy->aux_dm, *global, natural));
-  PetscCall(DMPlexGlobalToNaturalEnd(rdy->aux_dm, *global, natural));
+  PetscCall(DMPlexGlobalToNaturalBegin(rdy->dm_1dof, *global, natural));
+  PetscCall(DMPlexGlobalToNaturalEnd(rdy->dm_1dof, *global, natural));
 
   // write the data to file
   PetscViewer viewer;
@@ -591,16 +563,16 @@ PetscErrorCode RDyReadOneDOFGlobalVecFromBinaryFile(RDy rdy, const char filename
   // create a naturally-ordered vector with a stride equal to the number of
   Vec natural;
 
-  PetscCall(DMPlexCreateNaturalVector(rdy->aux_dm, &natural));
-  PetscCall(DMCreateGlobalVector(rdy->aux_dm, global));
+  PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, global));
 
   // load the properties into the vector and copy them into place
   PetscCall(VecLoad(natural, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
 
   // scatter natural-to-global
-  PetscCall(DMPlexNaturalToGlobalBegin(rdy->aux_dm, natural, *global));
-  PetscCall(DMPlexNaturalToGlobalEnd(rdy->aux_dm, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, *global));
 
   PetscCall(VecDestroy(&natural));
 
@@ -614,13 +586,64 @@ PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char filename[
   Vec global;
   PetscCall(RDyReadOneDOFGlobalVecFromBinaryFile(rdy, filename, &global));
 
-  PetscCall(DMCreateLocalVector(rdy->aux_dm, local));
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, local));
 
   // scatter global-to-local
-  PetscCall(DMGlobalToLocalBegin(rdy->aux_dm, global, INSERT_VALUES, *local));
-  PetscCall(DMGlobalToLocalEnd(rdy->aux_dm, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, *local));
 
   PetscCall(VecDestroy(&global));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// reads data for a single DOF from a binary file into a global Vec
+PetscErrorCode RDyReadAMRScalarGlobalVecLevel0FromBinary(RDy rdy, const char filename[], Vec *global) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+
+  // create a naturally-ordered vector with a stride equal to the number of
+  Vec natural;
+
+  PetscCall(DMPlexCreateNaturalVector(rdy->amr.dm_1dof_base, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->amr.dm_1dof_base, global));
+
+  // load the properties into the vector and copy them into place
+  PetscCall(VecLoad(natural, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  // scatter natural-to-global
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->amr.dm_1dof_base, natural, *global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->amr.dm_1dof_base, natural, *global));
+
+  PetscCall(VecDestroy(&natural));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// maps a single-DOF global vector defined on the level-0 mesh to a single-DOF
+// global vector defined on the current mesh
+PetscErrorCode RDyMapAMRScalarGlobalVecLevel0ToCurrentLevel(RDy rdy, Vec global_base, Vec *global_current) {
+  PetscFunctionBegin;
+
+  Vec local_base;
+  PetscCall(DMCreateLocalVector(rdy->amr.dm_1dof_base, &local_base));
+
+  PetscCall(DMGlobalToLocalBegin(rdy->amr.dm_1dof_base, global_base, INSERT_VALUES, local_base));
+  PetscCall(DMGlobalToLocalEnd(rdy->amr.dm_1dof_base, global_base, INSERT_VALUES, local_base));
+
+  Vec local_current;
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local_current));
+  PetscCall(MatMult(rdy->amr.BaseToCurrentMat1Dof, local_base, local_current));
+
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, global_current));
+  PetscCall(DMLocalToGlobalBegin(rdy->dm_1dof, local_current, INSERT_VALUES, *global_current));
+  PetscCall(DMLocalToGlobalEnd(rdy->dm_1dof, local_current, INSERT_VALUES, *global_current));
+
+  PetscCall(VecDestroy(&local_base));
+  PetscCall(VecDestroy(&local_current));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

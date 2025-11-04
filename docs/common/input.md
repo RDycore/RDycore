@@ -411,7 +411,12 @@ output:
   batch_size: 1
   time_series:
     boundary_fluxes: 10
-  separate_grid_file: true
+    observations:
+      interval: 10
+      sites:
+        cells: [0, 1, 2, 3, 4, 5, 6]
+      time_sampling:
+        instantaneous: true
 ```
 
 The `output` section controls simulation output, including visualization and
@@ -437,8 +442,8 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
 * `format`: the format of the output written. Available options are
     * `none`: no output is written. This is the default value.
     * `binary`: output is written using PETSc's binary data format
-    * `xdmf`: output is written to the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
-    * `cgns`: output is written to the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
+    * `xdmf`: output is written in the [XDMF](https://xdmf.org/index.php/XDMF_Model_and_Format) format
+    * `cgns`: output is written in the [CFD General Notation System (CGNS)](https://cgns.github.io/) format
 * `output_interval`: the number of time steps between output dumps. Default value: 0 (no output)
 * `time_interval`: the temporal frequency between output dumps. The is an integer with a minimum value of 1 second. Default value: 0 (no output)
 * `time_unit`: units of temporal frequency output.
@@ -446,13 +451,35 @@ time series data (**but excluding checkpoint data**). Relevant parameters are
   single file. For example, a batch size of 10 specifies that each individual
   output file stores data for 10 time steps. Default value: 1
 * `time_series`: this subsection controls time series simulation output, which
-  is useful for inspection and possibly even coupling. Currently, this subsection
-  has only one parameter:
+  is useful for inspection and possibly even coupling. Parameters:
     * `boundary_fluxes`: the interval (number of timesteps) at which boundary
       flux data is appended to a tab-delimited text file
-* `separate_grid_file`: this optional parameter specifies whether the grid is
-  written to its own file, which saves space in very large simulations. Currently,
-  this option is only supported for `xdmf` output.
+    * `observations`: allows the specification of **observation sites**--points in space at which
+      the components of the solution vector are sampled and possibly averaged. When using the
+      RDycore driver, observations are written to a tab-delimited text file. Parameters include:
+        * `interval`: the number of steps between recorded observations
+        * `sites`: the mechanism by which observation sites are specified. There are two ways to
+          specify observation sites:
+            * `cells`: accepts a list of **natural cell IDs** within the mesh, defining an
+              observation site at the center of each given cell.
+            * `file`: accepts a text file specifying **natural cell IDs** in the line-oriented
+              format described below.
+        * `sampling`: the method by which each component is sampled at each observation site.
+            * `instantaneous` (`false` by default) can be set to `true` to sample instantaneous
+              values at each site.
+            * Time averaging is not yet supported, but we plan to add an `averaged` parameter in
+              the future.
+
+When specifying observation sites in a text file, use the following format:
+
+```
+number_of_observation_cells
+<natural_cell_id_0>
+<natural_cell_id_1>
+<natural_cell_id_2>
+...
+<natural_cell_id_N>
+```
 
 ## `physics`
 
@@ -663,35 +690,47 @@ materials is necessarily 1:1.
 
 ```yaml
 time:
-  final_time: 1
-    unit: years
-    max_step: 1000
-    time_step: 0.001
-    coupling_interval: 0.01
+  date: 2025-02-01-11:10:02
+  stop: 1
+  unit: years
+  stop_n: 1000
+  coupling_interval: 0.01
 ```
 
 The `time` section determines the time-stepping strategy used by RDycore using
 the following parameters:
 
-* `units`: the units in which time is expressed in the input file. Available
+* `date`: a timestamp in the format `YYYY-MM-DD-hh:mm:ss` OR `YYYY-MM-DD`, where
+    * `YYYY` is a 4-digit year
+    * `MM` is a 2-digit month index
+    * `DD` is a 2-digit calendar day
+    * `hh` is a 2-digit hour (00-23, 00 if omitted)
+    * `mm` is a 2-digit minute (00-59, 00 if omitted)
+    * `ss` is a 2-digit second (00-59, 00 if omitted)
+* `stop`: the length of time after which the simulation stops (expressed in `unit`)
+* `unit`: the unit of measure in which `duration` is expressed. Available
   options are `seconds`, `minutes`, `hours`, `days`, `months`, and `years`.
-  This parameter is required and has no default value.
-* `final_time`: the time at which the simulation ends (in the desired units)
-* `max_step`: the number of steps after which the simulation ends
+  This parameter is required if `stop` is used.
+* `stop_n`: the number of steps after which the simulation ends
 * `time_step`: a fixed size used for the time step in the desired units.
-* `coupling_inverval`: the time interval (in the desired units) at which
+* `coupling_inverval`: the time interval (expressed in `unit`) at which
   RDycore advances without coupling to E3SM. By default, RDycore runs a single
   time step without coupling to E3SM.
 
-Exactly two of `final_time`, `max_step`, and `time_step` must be specified.
-The missing parameter is then computed from those parameters given.
+The `unit` parameter is required. If the `date` parameter is given, output filenames
+are timestamped relative to the start date; otherwise, they are indexed by time step.
 
-Additionally, RDycore can increase or decrease time step to meet a target Courant
-number via `adaptive` sub-block within the `time` block as shown below.
+If fixed timesteps are desired, exactly two of `stop`, `stop_n`, and `time_step`
+must be specified. The third of these parameters is then computed from the two given.
+
+RDycore supports adaptive timestepping, in which the time step is increased or
+decreased as necessary to meet a target Courant number. This behavior is enabled with
+the `adaptive` subsection within the `time` section:
 
 ```yaml
 time:
-  final_time        : 0.005
+  date              : 2025-02-01-11:10:02
+  stop              : 0.005
   coupling_interval : 0.001
   unit              : hours
   adaptive:

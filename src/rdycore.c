@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -6,6 +7,60 @@
 
 static PetscBool initialized_ = PETSC_FALSE;
 PetscClassId     RDY_CLASSID;
+
+/// Fetches RDycore version information.
+PETSC_EXTERN PetscErrorCode RDyGetVersion(int *major, int *minor, int *patch, PetscBool *release) {
+  PetscFunctionBegin;
+  *major   = RDYCORE_MAJOR_VERSION;
+  *minor   = RDYCORE_MINOR_VERSION;
+  *patch   = RDYCORE_PATCH_VERSION;
+  *release = !strcmp("unknown", RDYCORE_GIT_HASH);  // for now, "unknown" git hash implies release
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Constructs a multi-line string describing detailed build information
+PETSC_EXTERN PetscErrorCode RDyGetBuildConfiguration(const char **build_config) {
+  PetscFunctionBegin;
+#define BUILD_STR_LEN 1024
+  static char build_str[BUILD_STR_LEN] = {0};
+  if (!build_str[0]) {
+    // RDycore version
+    int       rdy_major, rdy_minor, rdy_patch;
+    PetscBool rdy_release;
+    PetscCall(RDyGetVersion(&rdy_major, &rdy_minor, &rdy_patch, &rdy_release));
+
+    // PETSc version
+    PetscInt petsc_major, petsc_minor, petsc_patch, petsc_release;
+    PetscCall(PetscGetVersionNumber(&petsc_major, &petsc_minor, &petsc_patch, &petsc_release));
+
+    // CEED version
+    // FIXME: CeedGetGitVersion() and CeedGetBuildConfiguration() are not available in the
+    // FIXME: version we're currently using, so we can't yet include this information.
+    int  ceed_major, ceed_minor, ceed_patch;
+    bool ceed_release;
+    PetscCallCEED(CeedGetVersion(&ceed_major, &ceed_minor, &ceed_patch, &ceed_release));
+
+    snprintf(build_str, BUILD_STR_LEN,
+             "RDycore version %d.%d.%d (git hash %s)\n"
+             "Petsc version %" PetscInt_FMT ".%" PetscInt_FMT ".%" PetscInt_FMT
+             " (%s)\n"
+             "Ceed version %d.%d.%d (%s)\n",
+             rdy_major, rdy_minor, rdy_patch, RDYCORE_GIT_HASH, petsc_major, petsc_minor, petsc_patch, (petsc_release) ? "release" : "development",
+             ceed_major, ceed_minor, ceed_patch, (ceed_release) ? "release" : "development");
+  }
+  *build_config = build_str;
+#undef BUILD_STR_LEN
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// This allows the Fortran driver to extract build information
+PETSC_EXTERN PetscErrorCode RDyGetBuildConfigurationF90(char build_config[1024]) {
+  PetscFunctionBegin;
+  const char *c_build_config;
+  PetscCall(RDyGetBuildConfiguration(&c_build_config));
+  strncpy(build_config, c_build_config, 1024);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
@@ -78,9 +133,7 @@ PetscErrorCode RDyOnFinalize(void (*shutdown_func)(void)) {
 
 /// Shuts down a process in which RDyInit or RDyInitNotArguments was called.
 /// (Has no effect otherwise.)
-PetscErrorCode RDyFinalize(void) {
-  PetscFunctionBegin;
-
+PetscInt RDyFinalize(void) {
   // Call shutdown functions in reverse order, and destroy the list.
   if (shutdown_funcs_ != NULL) {
     for (int i = num_shutdown_funcs_ - 1; i >= 0; --i) {
@@ -92,7 +145,7 @@ PetscErrorCode RDyFinalize(void) {
   PetscFinalize();
 
   initialized_ = PETSC_FALSE;
-  PetscFunctionReturn(PETSC_SUCCESS);
+  return 0;
 }
 
 /// Returns PETSC_TRUE if the RDyCore library has been initialized, PETSC_FALSE
@@ -115,7 +168,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   MPI_Comm_dup((*rdy)->global_comm, &((*rdy)->comm));
 
   // set the config file
-  strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
+  snprintf((*rdy)->config_file, PETSC_MAX_PATH_LEN, "%s", config_file);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -142,7 +195,8 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
-  if ((*rdy)->diags_vec) PetscCall(VecDestroy(&(*rdy)->diags_vec));
+  if ((*rdy)->vec_diags) PetscCall(VecDestroy(&(*rdy)->vec_diags));
+  if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -215,8 +269,19 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscCall(DestroyTimeSeries(*rdy));
 
   // destroy DMs
-  if ((*rdy)->aux_dm) DMDestroy(&((*rdy)->aux_dm));
+  if ((*rdy)->dm_diags) DMDestroy(&((*rdy)->dm_diags));
+  if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
+
+  if ((*rdy)->amr.num_refinements) {
+    if ((*rdy)->amr.dm_base) DMDestroy(&((*rdy)->amr.dm_base));
+    if ((*rdy)->amr.dm_1dof_base) DMDestroy(&((*rdy)->amr.dm_1dof_base));
+
+    if ((*rdy)->amr.BaseToCurrentMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMatNDof));
+    if ((*rdy)->amr.CurrentToBaseMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMatNDof));
+    if ((*rdy)->amr.BaseToCurrentMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMat1Dof));
+    if ((*rdy)->amr.CurrentToBaseMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMat1Dof));
+  }
 
   // destroy config data
   PetscCall(DestroyConfig((*rdy)));

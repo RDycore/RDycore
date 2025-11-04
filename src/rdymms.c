@@ -202,15 +202,15 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which contains error fields for each of the solution fields
-  rdy->diag_fields = (SectionFieldSpec){
+  rdy->field_diags = (SectionFieldSpec){
       .num_fields           = 1,
       .num_field_components = {rdy->soln_fields.num_field_components[0]},
       .field_names          = {"Error"},
   };
-  for (PetscInt c = 0; c < rdy->diag_fields.num_field_components[0]; ++c) {
-    snprintf(rdy->diag_fields.field_component_names[0][c], MAX_NAME_LEN, "%s error", rdy->soln_fields.field_component_names[0][c]);
+  for (PetscInt c = 0; c < rdy->field_diags.num_field_components[0]; ++c) {
+    snprintf(rdy->field_diags.field_component_names[0][c], MAX_NAME_LEN, "%s error", rdy->soln_fields.field_component_names[0][c]);
   }
-  PetscCall(CreateAuxiliaryDM(rdy));
+  PetscCall(CreateAuxiliaryDMs(rdy));
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));
@@ -358,7 +358,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
   RDyCells *cells = &mesh->cells;
 
   PetscInt N;
-  PetscCall(RDyGetNumLocalCells(rdy, &N));
+  PetscCall(RDyGetNumOwnedCells(rdy, &N));
   PetscReal *cell_x, *cell_y;
   PetscCall(PetscCalloc1(N, &cell_x));
   PetscCall(PetscCalloc1(N, &cell_y));
@@ -718,7 +718,7 @@ static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_com
 PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates, PetscReal *L2_conv_rates, PetscReal *Linf_conv_rates) {
   PetscFunctionBegin;
 
-  PetscReal final_time = rdy->config.time.final_time;
+  PetscReal final_time = rdy->config.time.stop;
 
   PetscInt dim;
   PetscCall(DMGetDimension(rdy->dm, &dim));
@@ -748,9 +748,9 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates,
 
     // override timestepping info (no good way to do this currently)
     rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step;
-    rdys[r]->config.time.max_step  = rdys[r - 1]->config.time.max_step;
+    rdys[r]->config.time.stop_n    = rdys[r - 1]->config.time.stop_n;
     TSSetTimeStep(rdys[r]->ts, rdys[r]->config.time.time_step);
-    TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.max_step);
+    TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.stop_n);
   }
 
   for (PetscInt r = 0; r <= num_refinements; ++r) {

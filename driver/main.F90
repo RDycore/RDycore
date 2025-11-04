@@ -791,8 +791,8 @@ contains
     PetscReal, pointer      :: xc(:), yc(:)
     PetscErrorCode          :: ierr
 
-    PetscCallA(RDyGetLocalCellXCentroids(rdy_, n, xc, ierr))
-    PetscCallA(RDyGetLocalCellYCentroids(rdy_, n, yc, ierr))
+    PetscCallA(RDyGetOwnedCellXCentroids(rdy_, n, xc, ierr))
+    PetscCallA(RDyGetOwnedCellYCentroids(rdy_, n, yc, ierr))
 
   end subroutine GetCellCentroidsFromRDycoreMesh
 
@@ -1005,7 +1005,7 @@ contains
       enddo
     enddo
 
-    PetscCallA(RDyGetNumLocalCells(rdy_, data%mesh_ncells_local, ierr))
+    PetscCallA(RDyGetNumOwnedCells(rdy_, data%mesh_ncells_local, ierr))
     allocate(data%mesh_xc(data%mesh_ncells_local))
     allocate(data%mesh_yc(data%mesh_ncells_local))
     allocate(data%data2mesh_idx(data%mesh_ncells_local))
@@ -1041,7 +1041,7 @@ contains
     !
     PetscErrorCode            :: ierr
 
-    PetscCallA(RDyGetNumLocalCells(rdy_, data%mesh_nelements, ierr))
+    PetscCallA(RDyGetNumOwnedCells(rdy_, data%mesh_nelements, ierr))
     allocate(data%mesh_xc(data%mesh_nelements))
     allocate(data%mesh_yc(data%mesh_nelements))
     allocate(data%data2mesh_idx(data%mesh_nelements))
@@ -1463,6 +1463,7 @@ program rdycore_f90
 
   implicit none
 
+  character(len=1024)  :: rdy_build_config;
   character(len=1024)  :: config_file
   type(RDy)            :: rdy_
   PetscErrorCode       :: ierr
@@ -1486,6 +1487,10 @@ program rdycore_f90
   type(SourceSink)        :: rain_dataset
   type(BoundaryCondition) :: bc_dataset
   PetscInt, parameter  :: ndof = 3
+
+  ! print out our version information
+  PetscCallA(RDyGetBuildConfiguration(rdy_build_config, ierr));
+  write(*,'(A)') trim(rdy_build_config)
 
   if (command_argument_count() < 1) then
     call usage()
@@ -1517,7 +1522,7 @@ program rdycore_f90
       PetscCallA(RDySetup(rdy_, ierr))
 
       ! allocate arrays for inspecting simulation data
-      PetscCallA(RDyGetNumLocalCells(rdy_, n, ierr))
+      PetscCallA(RDyGetNumOwnedCells(rdy_, n, ierr))
       allocate(rain(n), values(n))
 
       call CreateRainfallConditionDataset(rdy_, n, rain_dataset)
