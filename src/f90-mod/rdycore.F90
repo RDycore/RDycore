@@ -351,14 +351,6 @@ module rdycore
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
-    integer(c_int) function rdysetregionalwatersource_(rdy, region_idx, size, watsrc) bind(c, name="RDySetRegionalWaterSource")
-      use iso_c_binding, only: c_int, c_ptr
-      type(c_ptr), value, intent(in) :: rdy
-      PetscInt   , value, intent(in) :: region_idx
-      PetscInt   , value, intent(in) :: size
-      type(c_ptr), value, intent(in) :: watsrc
-    end function
-
     integer(c_int) function rdysetdomainxmomentumsource_(rdy, size, xmomsrc) bind(c, name="RDySetDomainXMomentumSource")
       use iso_c_binding, only: c_int, c_ptr
       type(c_ptr), value, intent(in) :: rdy
@@ -394,13 +386,6 @@ module rdycore
       PetscFortranAddr,   intent(out) :: prog_vec
     end function
 
-    integer(c_int) function rdycreateonedofglobalvec_(rdy, global_vec) bind(c, name="RDyCreateOneDOFGlobalVec")
-      use iso_c_binding, only: c_int, c_ptr
-      use petscvec
-      type(c_ptr), value, intent(in)  :: rdy
-      PetscFortranAddr,   intent(out) :: global_vec
-    end function
-
     integer(c_int) function rdyreadonedoflocalvecfrombinaryfile_(rdy, filename, local_vec) bind(c, name="RDyReadOneDOFLocalVecFromBinaryFile")
       use iso_c_binding, only: c_int, c_ptr
       use petscvec
@@ -410,6 +395,14 @@ module rdycore
     end function
 
     integer(c_int) function rdyreadonedofglobalvecfrombinaryfile_(rdy, filename, global_vec) bind(c, name="RDyReadOneDOFGlobalVecFromBinaryFile")
+      use iso_c_binding, only: c_int, c_ptr
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      type(c_ptr), value, intent(in)  :: filename
+      PetscFortranAddr,   intent(out) :: global_vec
+    end function
+
+    integer(c_int) function rdywriteonedofglobalvectobinaryfile_(rdy, filename, global_vec) bind(c, name="RDyWriteOneDOFGlobalVecToBinaryFile")
       use iso_c_binding, only: c_int, c_ptr
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
@@ -823,15 +816,6 @@ contains
     ierr = rdysetdomainwatersource_(rdy_%c_rdy, size, c_loc(watsrc))
   end subroutine
 
-  subroutine RDySetRegionalWaterSource(rdy_, region_idx, size, watsrc, ierr)
-    type(RDy),       intent(inout)       :: rdy_
-    PetscInt,        intent(in)          :: region_idx
-    PetscInt,        intent(in)          :: size
-    real(RDyDouble), pointer, intent(in) :: watsrc(:)
-    integer,         intent(out)         :: ierr
-    ierr = rdysetregionalwatersource_(rdy_%c_rdy, region_idx, size, c_loc(watsrc))
-  end subroutine
-
   subroutine RDySetDomainXMomentumSource(rdy_, size, xmomsrc, ierr)
     type(RDy),       intent(inout)       :: rdy_
     PetscInt,        intent(in)          :: size
@@ -870,14 +854,6 @@ contains
     type(tVec), intent(inout) :: prog_vec  ! Vec
     integer,    intent(out)   :: ierr
     ierr = rdycreateprognosticvec_(rdy_%c_rdy, prog_vec%v)
-  end subroutine
-
-  subroutine RDyCreateOneDOFGlobalVec(rdy_, global_vec, ierr)
-    use petscvec
-    type(RDy),  intent(inout) :: rdy_
-    type(tVec), intent(inout) :: global_vec  ! Vec
-    integer,    intent(out)   :: ierr
-    ierr = rdycreateonedofglobalvec_(rdy_%c_rdy, global_vec%v)
   end subroutine
 
   subroutine RDyReadOneDOFLocalVecFromBinaryFile(rdy_, filename, local_vec, ierr)

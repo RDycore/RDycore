@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <errno.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -23,7 +24,7 @@ PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
       snprintf(output_dir, PETSC_MAX_PATH_LEN - 1, "%s", rdy->config.output.directory);
     }
   }
-  strncpy(dir, output_dir, PETSC_MAX_PATH_LEN - 1);
+  snprintf(dir, PETSC_MAX_PATH_LEN, "%s", output_dir);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -32,7 +32,9 @@ struct SedimentState_ {
 };
 typedef struct SedimentState_ SedimentState;
 
+
 #include "sediment_roe_ceed_impl.h"
+
 
 // The following Q functions use C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
@@ -71,10 +73,34 @@ CEED_QFUNCTION_HELPER int SedimentFlux(void *ctx, CeedInt Q, const CeedScalar *c
     CeedScalar flux[MAX_NUM_FIELD_COMPONENTS], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
       switch (flux_type) {
-        case RIEMANN_FLUX_ROE:
-          SedimentRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, sed_ndof, flux, &amax);
-          break;
-      }
+  case RIEMANN_FLUX_ROE:
+    SedimentRiemannFlux_Roe(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  case RIEMANN_FLUX_HLL:
+    SedimentRiemannFlux_HLL(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  case RIEMANN_FLUX_HLLC:
+    SedimentRiemannFlux_HLLC(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  default:
+    SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_SUP, "No sediment Riemann solver for flux type");
+}
+
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         cell_R[j][i]     = flux[j] * geom[3][i];
@@ -94,9 +120,22 @@ CEED_QFUNCTION_HELPER int SedimentFlux(void *ctx, CeedInt Q, const CeedScalar *c
   }
   return 0;
 }
-
-CEED_QFUNCTION(SedimentFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(SedimentFlux_Roe)(void *ctx, CeedInt Q,
+                                 const CeedScalar *const in[],
+                                 CeedScalar *const out[]) {
   return SedimentFlux(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
+CEED_QFUNCTION(SedimentFlux_HLL)(void *ctx, CeedInt Q,
+                                 const CeedScalar *const in[],
+                                 CeedScalar *const out[]) {
+  return SedimentFlux(ctx, Q, in, out, RIEMANN_FLUX_HLL);
+}
+
+CEED_QFUNCTION(SedimentFlux_HLLC)(void *ctx, CeedInt Q,
+                                  const CeedScalar *const in[],
+                                  CeedScalar *const out[]) {
+  return SedimentFlux(ctx, Q, in, out, RIEMANN_FLUX_HLLC);
 }
 
 // flow and sediment flux operator Q-function for boundary edges on which dirichlet condition is applied
@@ -128,10 +167,40 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, c
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[MAX_NUM_FIELD_COMPONENTS], amax;
       switch (flux_type) {
-        case RIEMANN_FLUX_ROE:
-          SedimentRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, sed_ndof, flux, &amax);
-          break;
-      }
+  case RIEMANN_FLUX_ROE:
+    SedimentRiemannFlux_Roe(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  case RIEMANN_FLUX_HLL:
+    SedimentRiemannFlux_HLL(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  case RIEMANN_FLUX_HLLC:
+    SedimentRiemannFlux_HLLC(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  default:
+    SedimentRiemannFlux_Roe(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+}
+
+
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         accum_flux[j][i] = flux[j];
@@ -152,6 +221,14 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, c
 CEED_QFUNCTION(SedimentBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return SedimentBoundaryFlux_Dirichlet(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
+CEED_QFUNCTION(SedimentBoundaryFlux_Dirichlet_HLL)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SedimentBoundaryFlux_Dirichlet(ctx, Q, in, out, RIEMANN_FLUX_HLL);
+}
+
+CEED_QFUNCTION(SedimentBoundaryFlux_Dirichlet_HLLC)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SedimentBoundaryFlux_Dirichlet(ctx, Q, in, out, RIEMANN_FLUX_HLLC);
+}
+
 
 // flow and sediment flux operator Q-function for boundary edges on which reflecting wall condition is applied
 CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
@@ -185,10 +262,39 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Reflecting(void *ctx, CeedInt Q, 
       }
       CeedScalar flux[MAX_NUM_FIELD_COMPONENTS], amax;
       switch (flux_type) {
-        case RIEMANN_FLUX_ROE:
-          SedimentRiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flow_ndof, sed_ndof, flux, &amax);
-          break;
-      }
+  case RIEMANN_FLUX_ROE:
+    SedimentRiemannFlux_Roe(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  case RIEMANN_FLUX_HLL:
+    SedimentRiemannFlux_HLL(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  case RIEMANN_FLUX_HLLC:
+    SedimentRiemannFlux_HLLC(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+
+  default:
+    SedimentRiemannFlux_Roe(
+        gravity, tiny_h, qL, qR,
+        geom[0][i], geom[1][i],
+        flow_ndof, sed_ndof,
+        flux, &amax);
+    break;
+}
+
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
       }
@@ -206,6 +312,14 @@ CEED_QFUNCTION_HELPER int SedimentBoundaryFlux_Reflecting(void *ctx, CeedInt Q, 
 CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return SedimentBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
+CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_HLL)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SedimentBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_HLL);
+}
+
+CEED_QFUNCTION(SedimentBoundaryFlux_Reflecting_HLLC)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SedimentBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_HLLC);
+}
+
 
 // flow and sediment regional source operator Q-function
 CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
@@ -279,8 +393,8 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
   return 0;
 }
 
-#pragma GCC diagnostic   pop
-#pragma GCC diagnostic   pop
+#pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
 #pragma clang diagnostic pop
 #pragma clang diagnostic pop
 

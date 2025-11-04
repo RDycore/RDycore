@@ -116,6 +116,7 @@ static const cyaml_strval_t numerics_temporal_types[] = {
 static const cyaml_strval_t numerics_riemann_types[] = {
     {"roe",  RIEMANN_ROE },
     {"hllc", RIEMANN_HLLC},
+    {"hll",  RIEMANN_HLL},
 };
 
 // mapping of numerics fields to members of RDyNumericsSection
@@ -1342,7 +1343,14 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
   rewind(file);
   char *raw_content;
   PetscCall(PetscCalloc1(raw_size + 1, &raw_content));
-  fread(raw_content, sizeof(char), raw_size, file);
+size_t __nread = fread(raw_content, 1, raw_size, file);
+if (__nread != raw_size) {
+  if (ferror(file)) {
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "Error reading config file");
+  }
+  /* EOF/short read: null-terminate what we got */
+  raw_content[__nread] = '0';
+}
   PetscCall(PetscFClose(comm, file));
   raw_content[raw_size] = 0;  // null termination for C string
 

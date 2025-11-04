@@ -1161,7 +1161,7 @@ static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 /// @param [in]    log_file the name of the log file written by RDycore
 PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionBegin;
-  strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
+  snprintf(overridden_logfile_, PETSC_MAX_PATH_LEN, "%s", filename);
   overridden_logfile_[PETSC_MAX_PATH_LEN - 1] = '\0';
   PetscFunctionReturn(PETSC_SUCCESS);
 }

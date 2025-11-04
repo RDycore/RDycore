@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 
@@ -56,7 +57,7 @@ PetscErrorCode SetCeedResource(char *resource) {
   }
   if (resource && resource[0]) {
     PetscCallCEED(CeedInit(resource, &ceed_context));
-    strncpy(ceed_resource, resource, PETSC_MAX_PATH_LEN);
+    snprintf(ceed_resource, PETSC_MAX_PATH_LEN, "%s", resource);
 
     static bool firstTime = true;
     if (firstTime) {

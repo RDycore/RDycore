@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -167,7 +168,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
   MPI_Comm_dup((*rdy)->global_comm, &((*rdy)->comm));
 
   // set the config file
-  strncpy((*rdy)->config_file, config_file, PETSC_MAX_PATH_LEN);
+  snprintf((*rdy)->config_file, PETSC_MAX_PATH_LEN, "%s", config_file);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
