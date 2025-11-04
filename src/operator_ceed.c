@@ -53,13 +53,38 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
 
   CeedQFunctionContext qf_context;
-  if (num_sediment_comp == 0) {  // flow only, and SWE is it!
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
-    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  if (num_sediment_comp == 0) {  
+    switch (config.numerics.riemann) {  
+     case RIEMANN_ROE:  
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
+      break; 
+     case RIEMANN_HLL: 
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HLL, SWEFlux_HLL_loc, qf)); 
+      break; 
+     case RIEMANN_HLLC: 
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HLLC, SWEFlux_HLLC_loc, qf)); 
+    default:
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE,
+              "Unknown Riemann solver type for SWE");
+      }
+      PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
   } else {
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentFlux_Roe, SedimentFlux_Roe_loc, qf));
-    PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
+    switch (config.numerics.riemann) {
+    case RIEMANN_ROE:
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentFlux_Roe, SedimentFlux_Roe_loc, qf));
+      break;
+    case RIEMANN_HLL:
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentFlux_HLL, SedimentFlux_HLL_loc, qf));
+      break;
+    case RIEMANN_HLLC:
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentFlux_HLLC, SedimentFlux_HLLC_loc, qf));
+      break;
+    default:
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE,
+              "Unknown Riemann solver type for sediment");
   }
+  PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
+}
 
   // add the context to the Q function
   if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
@@ -210,13 +235,13 @@ static PetscErrorCode CreateCeedInteriorFluxOperator(const RDyConfig config, RDy
 
   // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_right", q_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_right", c_restrict_r, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_right", q_restrict_r, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_right", c_restrict_r, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_NONE, flux));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
@@ -247,7 +272,23 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentBoundaryFlux_Dirichlet_Roe, SedimentBoundaryFlux_Dirichlet_Roe_loc, qf));
+        switch (config.numerics.riemann) {
+  case RIEMANN_ROE:
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1,
+      SedimentBoundaryFlux_Dirichlet_Roe, SedimentBoundaryFlux_Dirichlet_Roe_loc, qf));
+    break;
+  case RIEMANN_HLL:
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1,
+      SedimentBoundaryFlux_Dirichlet_HLL, SedimentBoundaryFlux_Dirichlet_HLL_loc, qf));
+    break;
+  case RIEMANN_HLLC:
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1,
+      SedimentBoundaryFlux_Dirichlet_HLLC, SedimentBoundaryFlux_Dirichlet_HLLC_loc, qf));
+    break;
+  default:
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE,
+            "Unknown Riemann solver type for sediment Dirichlet boundary");
+}
         PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
       }
       break;
@@ -256,7 +297,23 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentBoundaryFlux_Reflecting_Roe, SedimentBoundaryFlux_Reflecting_Roe_loc, qf));
+      switch (config.numerics.riemann) {
+  case RIEMANN_ROE:
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1,
+      SedimentBoundaryFlux_Reflecting_Roe, SedimentBoundaryFlux_Reflecting_Roe_loc, qf));
+    break;
+  case RIEMANN_HLL:
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1,
+      SedimentBoundaryFlux_Reflecting_HLL, SedimentBoundaryFlux_Reflecting_HLL_loc, qf));
+    break;
+  case RIEMANN_HLLC:
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1,
+      SedimentBoundaryFlux_Reflecting_HLLC, SedimentBoundaryFlux_Reflecting_HLLC_loc, qf));
+    break;
+  default:
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_ARG_UNKNOWN_TYPE,
+            "Unknown Riemann solver type for sediment reflecting boundary");
+}
         PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
       }
       break;
@@ -435,14 +492,14 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
 
   // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_left", q_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
-    PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_COLLOCATED, dirichlet));
+    PetscCallCEED(CeedOperatorSetField(*ceed_op, "q_dirichlet", restrict_dirichlet, CEED_BASIS_NONE, dirichlet));
   }
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_COLLOCATED, flux));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_COLLOCATED, cnum));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell_left", c_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "flux", restrict_flux, CEED_BASIS_NONE, flux));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
@@ -472,7 +529,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
 
   Ceed ceed = CeedContext();
 
-  PetscCall(CeedCompositeOperatorCreate(ceed, flux_op));
+  PetscCall(CeedOperatorCreateComposite(ceed, flux_op));
 
   if (config->physics.flow.mode != FLOW_SWE) {
     PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
@@ -482,7 +539,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
 
   CeedOperator interior_flux_op;
   PetscCall(CreateCeedInteriorFluxOperator(*config, mesh, &interior_flux_op));
-  PetscCall(CeedCompositeOperatorAddSub(*flux_op, interior_flux_op));
+  PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < num_boundaries; ++b) {
@@ -490,7 +547,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
     RDyBoundary  boundary  = boundaries[b];
     RDyCondition condition = boundary_conditions[b];
     PetscCall(CreateCeedBoundaryFluxOperator(*config, mesh, boundary, condition, &boundary_flux_op));
-    PetscCall(CeedCompositeOperatorAddSub(*flux_op, boundary_flux_op));
+    PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -654,11 +711,11 @@ static PetscErrorCode CreateCeedSource0Operator(const RDyConfig config, RDyMesh 
 
   // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, ceed_op));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_COLLOCATED, geom));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "ext_src", restrict_ext_src, CEED_BASIS_COLLOCATED, ext_src));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mat_props", restrict_mat_props, CEED_BASIS_COLLOCATED, mat_props));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q", restrict_q, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell", restrict_c, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "geom", restrict_geom, CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "ext_src", restrict_ext_src, CEED_BASIS_NONE, ext_src));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "mat_props", restrict_mat_props, CEED_BASIS_NONE, mat_props));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "q", restrict_q, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*ceed_op, "cell", restrict_c, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
 
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_ext_src));
@@ -684,11 +741,11 @@ PetscErrorCode CreateCeedSourceOperator(RDyConfig *config, RDyMesh *mesh, CeedOp
 
   Ceed ceed = CeedContext();
 
-  PetscCall(CeedCompositeOperatorCreate(ceed, source_op));
+  PetscCall(CeedOperatorCreateComposite(ceed, source_op));
 
   CeedOperator source_0;
   PetscCall(CreateCeedSource0Operator(*config, mesh, &source_0));
-  PetscCall(CeedCompositeOperatorAddSub(*source_op, source_0));
+  PetscCall(CeedOperatorCompositeAddSub(*source_op, source_0));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

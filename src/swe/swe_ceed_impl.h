@@ -1,7 +1,13 @@
+
+
 #ifndef SWE_OPERATORS_IMPL_H
 #define SWE_OPERATORS_IMPL_H
 
 #include "swe_ceed.h"
+#include "math.h"
+#ifndef RDY_TINY
+#define RDY_TINY ((CeedScalar)1e-12)
+#endif
 
 #ifndef Square
 #define Square(x) ((x) * (x))
@@ -34,9 +40,14 @@ struct SWEState_ {
 typedef struct SWEState_ SWEState;
 
 // supported Riemann solver types
+#include "swe_hll_ceed_impl.h"
+#include "swe_hllc_ceed_impl.h"
 #include "swe_roe_ceed_impl.h"
+
 typedef enum {
   RIEMANN_FLUX_ROE,
+  RIEMANN_FLUX_HLL,
+  RIEMANN_FLUX_HLLC,
 } RiemannFluxType;
 
 // The following Q functions use C99 VLA features for shaping multidimensional
@@ -53,12 +64,14 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -72,7 +85,17 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
         case RIEMANN_FLUX_ROE:
           SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
           break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
       }
+
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         cell_R[j][i]     = flux[j] * geom[3][i];
@@ -96,11 +119,15 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // Dirichlet boundary values
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  (void)accum_flux;
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  (void)courant_num;
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -114,12 +141,16 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
         case RIEMANN_FLUX_ROE:
           SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
           break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
       }
-      for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = flux[j] * geom[2][i];
-        accum_flux[j][i] = flux[j];
-      }
-      courant_num[0][i] = -amax * geom[2][i] * dt;
     }
   }
   return 0;
@@ -135,10 +166,13 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  (void)courant_num;
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -153,7 +187,16 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
@@ -175,11 +218,15 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  (void)cell_L;
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  (void)accum_flux;
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  (void)courant_num;
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -195,9 +242,19 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLL:
+          SWERiemannFlux_HLL(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        case RIEMANN_FLUX_HLLC:
+          SWERiemannFlux_HLLC(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          break;
+        default:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
           break;
       }
+
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
         accum_flux[j][i] = flux[j];
@@ -223,6 +280,7 @@ CEED_QFUNCTION(SWESourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar
   const SWEContext context                 = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar h_anuga = context->h_anuga_regular;
   const CeedScalar gravity = context->gravity;
@@ -282,6 +340,7 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
   const SWEContext context                 = (SWEContext)ctx;
 
   const CeedScalar dt               = context->dtime;
+  (void)dt;
   const CeedScalar tiny_h           = context->tiny_h;
   const CeedScalar gravity          = context->gravity;
   const CeedScalar xq2018_threshold = context->xq2018_threshold;
@@ -338,8 +397,15 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
   }
   return 0;
 }
+CEED_QFUNCTION(SWEFlux_HLL)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFlux(ctx, Q, in, out, RIEMANN_FLUX_HLL);
+}
 
-#pragma GCC diagnostic   pop
+CEED_QFUNCTION(SWEFlux_HLLC)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFlux(ctx, Q, in, out, RIEMANN_FLUX_HLLC);
+}
+
+#pragma GCC diagnostic pop
 #pragma clang diagnostic pop
 
 #endif

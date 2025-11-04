@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <errno.h>
 #include <petscviewerhdf5.h>
 #include <private/rdycoreimpl.h>
@@ -20,7 +21,7 @@ static PetscErrorCode GetCheckpointDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LE
       strcpy(checkpoint_dir, "checkpoints");
     }
   }
-  strncpy(dir, checkpoint_dir, PETSC_MAX_PATH_LEN - 1);
+  snprintf(dir, PETSC_MAX_PATH_LEN, "%s", checkpoint_dir);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -84,9 +85,11 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
   rdy->dt    = metadata->dt;
   if (rdy->config.restart.reinitialize) {
     PetscCall(TSSetTime(rdy->ts, 0.0));
+    rdy->restart_step = 0;
   } else {
     PetscCall(TSSetTime(rdy->ts, metadata->t));
     PetscCall(TSSetStepNumber(rdy->ts, metadata->step));
+    rdy->restart_step = metadata->step;
   }
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
 
@@ -118,6 +121,7 @@ static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
   PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "nproc", PETSC_INT, NULL, &rdy->nproc));
   if (rdy->config.restart.reinitialize) {
     PetscCall(TSSetTime(rdy->ts, 0.0));
+    rdy->restart_step = 0;
   } else {
     PetscReal t;
     PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "t", PETSC_DOUBLE, NULL, &t));
@@ -125,6 +129,7 @@ static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
     PetscInt step;
     PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "step", PETSC_INT, NULL, &step));
     PetscCall(TSSetStepNumber(rdy->ts, step));
+    rdy->restart_step = step;
   }
   PetscCall(PetscViewerHDF5ReadAttribute(viewer, NULL, "dt", PETSC_DOUBLE, NULL, &rdy->dt));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
@@ -152,7 +157,7 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     // determine an appropriate prefix for checkpoint files
     char prefix[PETSC_MAX_PATH_LEN], filename[PETSC_MAX_PATH_LEN];
     if (rdy->config.checkpoint.prefix[0]) {
-      strncpy(prefix, rdy->config.checkpoint.prefix, PETSC_MAX_PATH_LEN);
+      snprintf(prefix, PETSC_MAX_PATH_LEN, "%s", rdy->config.checkpoint.prefix);
     } else {
       PetscCall(DetermineConfigPrefix(rdy, prefix));
     }
@@ -162,10 +167,10 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     char                    checkpoint_dir[PETSC_MAX_PATH_LEN];
     PetscCall(GetCheckpointDirectory(rdy, checkpoint_dir));
     if (format == PETSC_VIEWER_NATIVE) {  // binary
-      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "bin", filename));
+      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "bin", filename));
       PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
     } else {  // HDF5
-      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.max_step, "h5", filename));
+      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "h5", filename));
       PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
     }
 

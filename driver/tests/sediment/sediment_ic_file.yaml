@@ -16,7 +16,7 @@ logging:
   level: debug
 
 time:
-  final_time: 1.00
+  stop: 1.00
   time_step : 0.01
   unit: seconds
 

@@ -44,7 +44,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
       n_recv_counts[p]     = num_md * rdy->time_series.boundary_fluxes.num_local_edges[p];
       n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
-    MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm));
     PetscCall(PetscCalloc1(num_md * num_global_edges, &rdy->time_series.boundary_fluxes.global_flux_md));
     for (PetscInt i = 0; i < num_md * num_global_edges; ++i) {
       rdy->time_series.boundary_fluxes.global_flux_md[i] = (PetscInt)global_flux_md[i];
@@ -54,7 +54,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
     PetscCall(PetscFree(n_recv_displs));
   } else {
     // send the root proc the local flux metadata
-    MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, NULL, NULL, NULL, MPI_INT, 0, rdy->comm));
   }
 
   PetscCall(PetscFree(local_flux_md));
@@ -64,6 +64,8 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
+
+  rdy->time_series.boundary_fluxes.last_step = -1;
 
   // allocate per-boundary flux offsets
   PetscCall(PetscCalloc1(rdy->num_boundaries + 1, &(rdy->time_series.boundary_fluxes.offsets)));
@@ -113,13 +115,149 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Initializes time series data storage.
+static PetscErrorCode CreateRank0VecAndVecScatter(PetscInt rank, Vec v_global, PetscInt num_sites, const PetscInt *all_sites, Vec *v_rank0,
+                                                  VecScatter *scatter) {
+  PetscFunctionBegin;
+
+  PetscInt num_comp;
+  PetscCall(VecGetBlockSize(v_global, &num_comp));
+
+  // index spaces for creating the VecScatter
+  IS is_from, is_to;
+
+  if (rank == 0) {
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, num_comp * num_sites, v_rank0));
+    PetscCall(VecSetBlockSize(*v_rank0, num_comp));
+
+    // create an IS based on the natural IDs (of the observation sites) from the global vector from which data will be scattered
+    PetscInt *int_array;
+    PetscCall(PetscCalloc1(num_sites, &int_array));
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      int_array[i] = all_sites[i];
+    }
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_from));
+
+    // create an IS for the rank 0 sequential Vec storing the selected data
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      int_array[i] = i;
+    }
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, num_sites, int_array, PETSC_COPY_VALUES, &is_to));
+
+    PetscCall(PetscFree(int_array));
+  } else {
+    PetscCall(VecCreateSeq(PETSC_COMM_SELF, 0, v_rank0));
+    PetscInt *int_array;
+    PetscCall(PetscCalloc1(0, &int_array));
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_from));
+    PetscCall(ISCreateBlock(PETSC_COMM_SELF, num_comp, 0, int_array, PETSC_COPY_VALUES, &is_to));
+    PetscCall(PetscFree(int_array));
+  }
+
+  PetscCall(VecScatterCreate(v_global, is_from, *v_rank0, is_to, scatter));
+
+  PetscCall(ISDestroy(&is_from));
+  PetscCall(ISDestroy(&is_to));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode InitObservations(RDy rdy) {
+  PetscFunctionBegin;
+
+  rdy->time_series.observations.last_step = -1;
+
+  // create an accumulation vector for storing instantaneous or time-averaged solution data
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->time_series.observations.accum_u));
+
+  // determine which sites are local to this process and record their global and local ids
+  PetscInt  num_sites = rdy->config.output.time_series.observations.sites.cells_count;
+  PetscInt *all_sites = rdy->config.output.time_series.observations.sites.cells;
+
+  PetscCall(CreateRank0VecAndVecScatter(rdy->rank, rdy->u_global, num_sites, all_sites, &rdy->time_series.observations.sites.u,
+                                        &rdy->time_series.observations.scatter_u));
+
+  // set up storage on rank 0 for observations and populate the global site indices and the
+  // coordinate arrays, both of which are fixed for the duration of the simulation
+  {
+    if (rdy->rank == 0) {
+      PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.x));
+      PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
+      PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
+    }
+
+    // now get x/y/z coordinates of the sites on the rank 0
+    RDyMesh  *mesh  = &rdy->mesh;
+    RDyCells *cells = &mesh->cells;
+
+    Vec        coord_rank0, coord_global;
+    VecScatter scatter_1dof;
+
+    // create a 1-DOF Vec and a Vec and VecScatter on rank 0 to exchange coordinates one at a time
+    PetscCall(RDyCreateOneDOFGlobalVec(rdy, &coord_global));
+    PetscCall(CreateRank0VecAndVecScatter(rdy->rank, coord_global, num_sites, all_sites, &coord_rank0, &scatter_1dof));
+
+    // now loop over the coordinates and gather them one at a time
+    for (PetscInt icoord = 0; icoord < 3; ++icoord) {
+      PetscReal *coord_ptr;
+      PetscCall(VecGetArray(coord_global, &coord_ptr));
+      PetscInt count = 0;
+
+      // only put coordinates of owned cells
+      for (PetscInt i = 0; i < mesh->num_cells; ++i) {
+        if (cells->is_owned[i]) {
+          if (icoord == 0) {
+            coord_ptr[count] = cells->centroids[i].X[0];
+          } else if (icoord == 1) {
+            coord_ptr[count] = cells->centroids[i].X[1];
+          } else {
+            coord_ptr[count] = cells->centroids[i].X[2];
+          }
+          count++;
+        }
+      }
+
+      PetscCall(VecRestoreArray(coord_global, &coord_ptr));
+
+      // scatter the coordinates to rank 0
+      PetscCall(VecScatterBegin(scatter_1dof, coord_global, coord_rank0, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(scatter_1dof, coord_global, coord_rank0, INSERT_VALUES, SCATTER_FORWARD));
+
+      // now copy the coordinates to the observation sites
+      if (rdy->rank == 0) {
+        PetscCall(VecGetArray(coord_rank0, &coord_ptr));
+        for (PetscInt i = 0; i < num_sites; ++i) {
+          if (icoord == 0) {
+            rdy->time_series.observations.sites.x[i] = coord_ptr[i];
+          } else if (icoord == 1) {
+            rdy->time_series.observations.sites.y[i] = coord_ptr[i];
+          } else {
+            rdy->time_series.observations.sites.z[i] = coord_ptr[i];
+          }
+        }
+        PetscCall(VecRestoreArray(coord_rank0, &coord_ptr));
+      }
+    }
+
+    // clean up
+    PetscCall(VecDestroy(&coord_global));
+    PetscCall(VecDestroy(&coord_rank0));
+    PetscCall(VecScatterDestroy(&scatter_1dof));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// initializes time series data storage
 PetscErrorCode InitTimeSeries(RDy rdy) {
   PetscFunctionBegin;
-  rdy->time_series           = (RDyTimeSeriesData){0};
-  rdy->time_series.last_step = -1;
+  rdy->time_series = (RDyTimeSeriesData){0};
   if (rdy->config.output.time_series.boundary_fluxes > 0) {
     InitBoundaryFluxes(rdy);
+  }
+  if (rdy->config.output.time_series.observations.interval > 0) {
+    InitObservations(rdy);
+  }
+  if (rdy->config.output.time_series.boundary_fluxes > 0 || rdy->config.output.time_series.observations.interval > 0) {
     PetscCall(TSMonitorSet(rdy->ts, WriteTimeSeries, rdy, NULL));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -203,7 +341,8 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     }
     PetscReal *global_flux_data;
     PetscCall(PetscCalloc1(num_data * num_global_edges, &global_flux_data));
-    MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, global_flux_data, n_recv_counts, n_recv_displs, MPI_DOUBLE, 0,
+                             rdy->comm));
     PetscCall(PetscFree(n_recv_counts));
     PetscCall(PetscFree(n_recv_displs));
 
@@ -237,7 +376,7 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
     PetscCall(PetscFClose(rdy->comm, fp));
   } else {
     // send the root proc the local flux data
-    MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm);
+    PetscCallMPI(MPI_Gatherv(local_flux_data, num_data * num_local_edges, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, 0, rdy->comm));
   }
   PetscCall(PetscFree(local_flux_data));
 
@@ -254,12 +393,80 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) {
+  PetscFunctionBegin;
+
+  // scatter the accumulation vector to the sites vector on rank 0
+  PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+                            INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+                          INSERT_VALUES, SCATTER_FORWARD));
+
+  if (rdy->rank == 0) {
+    // open the file in the appropriate writing mode
+    char output_dir[PETSC_MAX_PATH_LEN], prefix[PETSC_MAX_PATH_LEN], path[PETSC_MAX_PATH_LEN];
+    PetscCall(GetOutputDirectory(rdy, output_dir));
+    PetscCall(DetermineConfigPrefix(rdy, prefix));
+    snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/%s-observations.dat", output_dir, prefix);
+
+    FILE *fp = NULL;
+    if (step == 0) {  // write a header on the first step
+      PetscCall(PetscFOpen(rdy->comm, path, "w", &fp));
+      PetscCall(PetscFPrintf(rdy->comm, fp, "# time      \tx        \ty       \tz          \tname       \tvalue\n"));
+    } else {
+      PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));
+    }
+
+    PetscInt num_sites, num_comp;
+    PetscCall(VecGetBlockSize(rdy->time_series.observations.sites.u, &num_comp));
+    PetscCall(VecGetSize(rdy->time_series.observations.sites.u, &num_sites));
+    num_sites /= num_comp;
+
+    // retrieve the names of the solution vector components
+    const char  *component_names[MAX_NUM_FIELD_COMPONENTS];
+    PetscSection section;
+    PetscCall(DMGetLocalSection(rdy->dm, &section));
+    for (PetscInt c = 0; c < num_comp; ++c) {
+      PetscCall(PetscSectionGetComponentName(section, 0, c, &component_names[c]));
+    }
+
+    const PetscReal *values;
+    PetscCall(VecGetArrayRead(rdy->time_series.observations.sites.u, &values));
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      PetscReal x = rdy->time_series.observations.sites.x[i];
+      PetscReal y = rdy->time_series.observations.sites.y[i];
+      PetscReal z = rdy->time_series.observations.sites.z[i];
+      for (PetscInt c = 0; c < num_comp; ++c) {
+        PetscReal value = values[num_comp * i + c];
+        PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%f\t%f\t%f\t%s  \t%e\n", time, x, y, z, component_names[c], value));
+      }
+    }
+    PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
+    PetscCall(PetscFClose(rdy->comm, fp));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This monitoring function writes out all requested time series data.
 PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
 
   RDy rdy = ctx;
-  if ((step % rdy->config.output.time_series.boundary_fluxes == 0) && (step > rdy->time_series.last_step)) {
+
+  // observations
+  int observations_interval = rdy->config.output.time_series.observations.interval;
+  if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series.observations.last_step)) {
+    // FIXME: This VecCopy is only appropriate for instantaneous observations; we haven't figured out
+    // FIXME: how to articulate the time averaged values (and their windows) yet. We should revisit this
+    // FIXME: when we want averaged values.
+    PetscCall(VecCopy(rdy->u_global, rdy->time_series.observations.accum_u));
+    PetscCall(WriteObservations(rdy, step, time));
+  }
+
+  // boundary fluxes
+  int boundary_flux_interval = rdy->config.output.time_series.boundary_fluxes;
+  if ((step % boundary_flux_interval == 0) && (step > rdy->time_series.boundary_fluxes.last_step)) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       RDyBoundary boundary = rdy->boundaries[b];
 
@@ -269,7 +476,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
       PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
-    rdy->time_series.last_step = step;
+    rdy->time_series.boundary_fluxes.last_step = step;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -283,6 +490,13 @@ PetscErrorCode DestroyTimeSeries(RDy rdy) {
     PetscFree(rdy->time_series.boundary_fluxes.global_flux_md);
     PetscFree(rdy->time_series.boundary_fluxes.offsets);
     PetscFree(rdy->time_series.boundary_fluxes.fluxes);
+  }
+  if (rdy->time_series.observations.sites.x) {
+    PetscFree(rdy->time_series.observations.sites.x);
+    PetscFree(rdy->time_series.observations.sites.y);
+    PetscFree(rdy->time_series.observations.sites.z);
+    PetscCall(VecDestroy(&rdy->time_series.observations.sites.u));
+    PetscCall(VecScatterDestroy(&rdy->time_series.observations.scatter_u));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

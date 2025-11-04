@@ -3,21 +3,21 @@ add_executable(rdycore_exe
   main.c
 )
 set_target_properties(rdycore_exe PROPERTIES OUTPUT_NAME rdycore)
-target_link_libraries(rdycore_exe PRIVATE rdycore)
+target_link_libraries(rdycore_exe PRIVATE rdycore_c)
 
 # MMS C driver
 add_executable(rdycore_mms
   mms.c
 )
 set_target_properties(rdycore_mms PROPERTIES OUTPUT_NAME rdycore_mms)
-target_link_libraries(rdycore_mms PRIVATE rdycore)
+target_link_libraries(rdycore_mms PRIVATE rdycore_c)
 
 # AMR C driver
 add_executable(rdycore_amr
   amr.c
 )
 set_target_properties(rdycore_amr PROPERTIES OUTPUT_NAME rdycore_amr)
-target_link_libraries(rdycore_amr PRIVATE rdycore)
+target_link_libraries(rdycore_amr PRIVATE rdycore_c)
 
 install(
   TARGETS rdycore_exe rdycore_mms rdycore_amr

@@ -104,7 +104,7 @@ PetscErrorCode OverrideParameters(RDy rdy) {
 
   if (rdy->dt <= 0.0) {
     // ѕet a default timestep if needed
-    rdy->dt = ConvertTimeToSeconds(rdy->config.time.final_time, rdy->config.time.unit) / rdy->config.time.max_step;
+    rdy->dt = ConvertTimeToSeconds(rdy->config.time.stop, rdy->config.time.unit) / rdy->config.time.stop_n;
   } else {
     // convert dt to seconds in any case
     rdy->dt = ConvertTimeToSeconds(rdy->dt, rdy->config.time.unit);
@@ -946,7 +946,7 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
   PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
   PetscCall(VecGetBlockSize(rdy->sediment_u_global, &sediment_ndof));
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
-  PetscCall(VecGetBlockSize(rdy->diags_vec, &diags_ndof));
+  PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
 
   PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
              "Blocksize of flow (=%" PetscInt_FMT ") and sediment (=%" PetscInt_FMT ") Vec do not sum to blocksize of solution (=%" PetscInt_FMT
@@ -955,14 +955,14 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
 
   // first, copy flow Vec into solution Vec
   for (PetscInt i = 0; i < flow_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->diags_vec, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->diags_vec, i, rdy->u_global, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_1dof, i, rdy->u_global, INSERT_VALUES));
   }
 
   // next, copy sediment Vec into solution Vec
   for (PetscInt i = 0; i < sediment_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->diags_vec, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->diags_vec, flow_ndof + i, rdy->u_global, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_1dof, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1081,7 +1081,7 @@ PetscErrorCode InitSolver(RDy rdy) {
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 
   if (!rdy->config.time.adaptive.enable) {
-    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.max_step));
+    PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.stop_n));
   }
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
   PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
@@ -1161,7 +1161,7 @@ static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 /// @param [in]    log_file the name of the log file written by RDycore
 PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
   PetscFunctionBegin;
-  strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
+  snprintf(overridden_logfile_, PETSC_MAX_PATH_LEN, "%s", filename);
   overridden_logfile_[PETSC_MAX_PATH_LEN - 1] = '\0';
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1177,9 +1177,9 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
     PetscBool pause = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-pause", &pause, NULL));
     if (pause) {
-      pid_t pid          = getpid();  // local process ID
-      char  hostname[65] = {0};       // local hostname (64 characters + null terminator)
-      gethostname(hostname, 64);
+      pid_t pid                        = getpid();  // local process ID
+      char  hostname[MAX_NAME_LEN + 1] = {0};       // local hostname
+      gethostname(hostname, MAX_NAME_LEN);
       PetscFPrintf(rdy->comm, stderr, "Pausing... press Enter to resume.\n");
       if (rdy->nproc > 1) {
         pid_t *pids;
@@ -1210,6 +1210,42 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+/// Outputs statistics about mesh partition.
+/// @param [in] rdy  A RDy struct
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode OutputPartitionStatistics(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt *num_owned_cells_per_rank;
+  RDyMesh  *mesh = &rdy->mesh;
+
+  if (!rdy->rank) {
+    PetscCall(PetscCalloc1(rdy->nproc, &num_owned_cells_per_rank));
+  }
+  PetscCallMPI(MPI_Gather(&mesh->num_owned_cells, 1, MPI_INT, num_owned_cells_per_rank, 1, MPI_INTEGER, 0, rdy->comm));
+
+  if (!rdy->rank) {
+    PetscInt    part_owned_cells[3];
+    PetscMPIInt comm_size    = rdy->nproc;
+    PetscInt    median_index = comm_size % 2 ? comm_size / 2 : comm_size / 2 - 1;
+
+    PetscCall(PetscSortInt(comm_size, num_owned_cells_per_rank));
+    part_owned_cells[0]             = num_owned_cells_per_rank[0];              // min
+    part_owned_cells[1]             = num_owned_cells_per_rank[comm_size - 1];  // max
+    part_owned_cells[2]             = num_owned_cells_per_rank[median_index];   // median
+    PetscReal part_owned_cell_ratio = (PetscReal)part_owned_cells[1] / (PetscReal)part_owned_cells[2];
+    RDyLogDetail(rdy, "Domain Decomposition Statistics");
+    RDyLogDetail(rdy, "  Total cells            : %" PetscInt_FMT, mesh->num_cells_global);
+    RDyLogDetail(rdy, "  Min cells on a rank    : %" PetscInt_FMT, part_owned_cells[0]);
+    RDyLogDetail(rdy, "  Max cells on a rank    : %" PetscInt_FMT, part_owned_cells[1]);
+    RDyLogDetail(rdy, "  Median cells on a rank : %" PetscInt_FMT, part_owned_cells[2]);
+    RDyLogDetail(rdy, "  Max/Median             : %f", part_owned_cell_ratio);
+
+    PetscCall(PetscFree(num_owned_cells_per_rank));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file and overwriting options with command-line arguments.
@@ -1234,8 +1270,9 @@ PetscErrorCode RDySetup(RDy rdy) {
     rdy->log = stdout;
   }
 
-  rdy->mesh_was_refined = PETSC_FALSE;
-  rdy->num_refinements  = 0;
+  rdy->amr.mesh_was_refined = PETSC_FALSE;
+  rdy->amr.num_refinements  = 0;
+  rdy->amr.is_refinement_on = PETSC_FALSE;
 
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
@@ -1264,7 +1301,8 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // create the auxiliary DM, which handles requested diagnostics and I/O
   if (rdy->config.output.fields_count > 0) {
-    rdy->diag_fields = (SectionFieldSpec){0};
+    rdy->field_diags            = (SectionFieldSpec){0};
+    rdy->field_diags.num_fields = 0;
     for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
       // a diagnostic field is a requested output field that doesn't belong
       // to the solution vector
@@ -1276,23 +1314,27 @@ PetscErrorCode RDySetup(RDy rdy) {
         }
       }
       if (is_diag_field) {
-        if (!rdy->diag_fields.num_fields) {
-          rdy->diag_fields.num_fields = 1;
-          strcpy(rdy->diag_fields.field_names[0], "Diagnostics");
-          rdy->diag_fields.num_field_components[0] = 0;
+        if (!rdy->field_diags.num_fields) {
+          rdy->field_diags.num_fields = 1;
+          strcpy(rdy->field_diags.field_names[0], "Diagnostics");
+          rdy->field_diags.num_field_components[0] = 0;
         }
-        strcpy(rdy->diag_fields.field_component_names[0][rdy->diag_fields.num_field_components[0]], rdy->config.output.fields[i]);
-        ++rdy->diag_fields.num_field_components[0];
+        strcpy(rdy->field_diags.field_component_names[0][rdy->field_diags.num_field_components[0]], rdy->config.output.fields[i]);
+        ++rdy->field_diags.num_field_components[0];
       }
     }
-  } else {  // default diagnostics
-    rdy->diag_fields = (SectionFieldSpec){
-        .num_fields           = 1,
-        .num_field_components = {1},
-        .field_names          = {"Parameter"},
-    };
   }
-  PetscCall(CreateAuxiliaryDM(rdy));
+
+  rdy->field_1dof = (SectionFieldSpec){
+      .num_fields           = 1,
+      .num_field_components = {1},
+      .field_names          = {"Parameter"},
+  };
+
+  PetscCall(CreateAuxiliaryDMs(rdy));
+
+  rdy->amr.dm_base      = rdy->dm;
+  rdy->amr.dm_1dof_base = rdy->dm_1dof;
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));
@@ -1307,6 +1349,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
+  PetscCall(OutputPartitionStatistics(rdy));
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
@@ -1343,7 +1386,11 @@ PetscErrorCode RDySetup(RDy rdy) {
   // if a restart has been requested, read the specified checkpoint file
   // and overwrite the necessary data
   if (rdy->config.restart.file[0]) {
+    rdy->is_a_restart_run = PETSC_TRUE;
     PetscCall(ReadCheckpointFile(rdy, rdy->config.restart.file));
+  } else {
+    rdy->is_a_restart_run = PETSC_FALSE;
+    rdy->restart_step     = -1;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
