@@ -103,6 +103,14 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
       courant_num[1][i] = amax * geom[3][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i]     = 0.0;
+        cell_R[j][i]     = 0.0;
+        accum_flux[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
+      courant_num[1][i] = 0.0;
     }
   }
   return 0;
@@ -135,7 +143,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
-    if (qL.h > tiny_h) {
+    if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
@@ -203,6 +211,11 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
         cell_L[j][i] = flux[j] * geom[2][i];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
     }
   }
   return 0;
@@ -256,10 +269,17 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
       }
 
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = flux[j] * geom[2][i];
-        accum_flux[j][i] = flux[j];
+        cell_L[j][i]    = flux[j] * geom[2][i];
+        inst_flux[j][i] = flux[j];
+        accum_flux[j][i] += flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i]    = 0.0;
+        inst_flux[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
     }
   }
   return 0;

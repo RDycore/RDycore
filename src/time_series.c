@@ -279,9 +279,12 @@ static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, Op
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
           // FIXME: this is specific to the shallow water equations
-          time_series->boundary_fluxes.fluxes[n].water_mass += edge_len * boundary_fluxes.values[0][e];
-          time_series->boundary_fluxes.fluxes[n].x_momentum += edge_len * boundary_fluxes.values[1][e];
-          time_series->boundary_fluxes.fluxes[n].y_momentum += edge_len * boundary_fluxes.values[2][e];
+          time_series->boundary_fluxes.fluxes[n].water_mass =
+              edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].water_mass;
+          time_series->boundary_fluxes.fluxes[n].x_momentum =
+              edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].x_momentum;
+          time_series->boundary_fluxes.fluxes[n].y_momentum =
+              edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].y_momentum;
           ++n;
         }
       }
@@ -380,14 +383,59 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   }
   PetscCall(PetscFree(local_flux_data));
 
-  // zero the boundary fluxes so they can begin reaccumulating
-  // NOTE that there are 3 fluxes (and not 5)
-  if (rdy->time_series.boundary_fluxes.fluxes) {
-    for (PetscInt e = 0; e < rdy->time_series.boundary_fluxes.offsets[rdy->num_boundaries]; e++) {
-      rdy->time_series.boundary_fluxes.fluxes[e].water_mass = 0.0;
-      rdy->time_series.boundary_fluxes.fluxes[e].x_momentum = 0.0;
-      rdy->time_series.boundary_fluxes.fluxes[e].y_momentum = 0.0;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) {
+  PetscFunctionBegin;
+
+  // scatter the accumulation vector to the sites vector on rank 0
+  PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+                            INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+                          INSERT_VALUES, SCATTER_FORWARD));
+
+  if (rdy->rank == 0) {
+    // open the file in the appropriate writing mode
+    char output_dir[PETSC_MAX_PATH_LEN], prefix[PETSC_MAX_PATH_LEN], path[PETSC_MAX_PATH_LEN];
+    PetscCall(GetOutputDirectory(rdy, output_dir));
+    PetscCall(DetermineConfigPrefix(rdy, prefix));
+    snprintf(path, PETSC_MAX_PATH_LEN - 1, "%s/%s-observations.dat", output_dir, prefix);
+
+    FILE *fp = NULL;
+    if (step == 0) {  // write a header on the first step
+      PetscCall(PetscFOpen(rdy->comm, path, "w", &fp));
+      PetscCall(PetscFPrintf(rdy->comm, fp, "# time      \tx        \ty       \tz          \tname       \tvalue\n"));
+    } else {
+      PetscCall(PetscFOpen(rdy->comm, path, "a", &fp));
     }
+
+    PetscInt num_sites, num_comp;
+    PetscCall(VecGetBlockSize(rdy->time_series.observations.sites.u, &num_comp));
+    PetscCall(VecGetSize(rdy->time_series.observations.sites.u, &num_sites));
+    num_sites /= num_comp;
+
+    // retrieve the names of the solution vector components
+    const char  *component_names[MAX_NUM_FIELD_COMPONENTS];
+    PetscSection section;
+    PetscCall(DMGetLocalSection(rdy->dm, &section));
+    for (PetscInt c = 0; c < num_comp; ++c) {
+      PetscCall(PetscSectionGetComponentName(section, 0, c, &component_names[c]));
+    }
+
+    const PetscReal *values;
+    PetscCall(VecGetArrayRead(rdy->time_series.observations.sites.u, &values));
+    for (PetscInt i = 0; i < num_sites; ++i) {
+      PetscReal x = rdy->time_series.observations.sites.x[i];
+      PetscReal y = rdy->time_series.observations.sites.y[i];
+      PetscReal z = rdy->time_series.observations.sites.z[i];
+      for (PetscInt c = 0; c < num_comp; ++c) {
+        PetscReal value = values[num_comp * i + c];
+        PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%f\t%f\t%f\t%s  \t%e\n", time, x, y, z, component_names[c], value));
+      }
+    }
+    PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
+    PetscCall(PetscFClose(rdy->comm, fp));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

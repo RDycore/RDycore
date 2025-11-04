@@ -115,13 +115,15 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   if (!CeedEnabled()) {
     // in the PETSc case, allocate sequential vectors for storing boundary values
     // and fluxes, similar to how restrictions are used in CEED
-    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));  // NOLINT(bugprone-sizeof-expression)
-    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes));  // NOLINT(bugprone-sizeof-expression)
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_values));        // NOLINT(bugprone-sizeof-expression)
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes));        // NOLINT(bugprone-sizeof-expression)
+    PetscCall(PetscCalloc1(num_boundaries, &op->petsc.boundary_fluxes_accum));  // NOLINT(bugprone-sizeof-expression)
 
     for (PetscInt b = 0; b < num_boundaries; ++b) {
       PetscInt num_edges = boundaries[b].num_edges;
       PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, op->num_components, &op->petsc.boundary_values[b]));
       PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, op->num_components, &op->petsc.boundary_fluxes[b]));
+      PetscCall(CreateSequentialVector(comm, op->num_components * num_edges, op->num_components, &op->petsc.boundary_fluxes_accum[b]));
     }
   }
 
@@ -223,7 +225,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
-                                      &(*operator)->diagnostics, &(*operator)->petsc.flux));
+                                      (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.flux));
     PetscCall(CreatePetscSourceOperator((*operator)->config, (*operator)->mesh, (*operator)->petsc.external_sources,
                                         (*operator)->petsc.material_properties, &(*operator)->petsc.source));
   }
@@ -260,9 +262,11 @@ PetscErrorCode DestroyOperator(Operator **op) {
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
       PetscCall(VecDestroy(&(*op)->petsc.boundary_values[b]));
       PetscCall(VecDestroy(&(*op)->petsc.boundary_fluxes[b]));
+      PetscCall(VecDestroy(&(*op)->petsc.boundary_fluxes_accum[b]));
     }
     PetscFree((*op)->petsc.boundary_values);
     PetscFree((*op)->petsc.boundary_fluxes);
+    PetscFree((*op)->petsc.boundary_fluxes_accum);
     PetscCall(VecDestroy(&(*op)->petsc.external_sources));
     PetscCall(VecDestroy(&(*op)->petsc.material_properties));
     PetscCall(PetscOperatorDestroy(&(*op)->petsc.flux));
@@ -814,9 +818,9 @@ PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Ope
   PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
+    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_flux_data));
+    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -836,9 +840,9 @@ PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary,
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux", boundary_flux_data));
+    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
   } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes[boundary.index], boundary_flux_data));
+    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
   }
   DestroyOperatorData(boundary_flux_data);
 

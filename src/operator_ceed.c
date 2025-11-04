@@ -405,11 +405,12 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
     PetscCallCEED(CeedQFunctionAddInput(qf, "q_dirichlet", num_comp, CEED_EVAL_NONE));
   }
   PetscCallCEED(CeedQFunctionAddOutput(qf, "flux", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "flux_accumulated", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "courant_number", num_comp_cnum, CEED_EVAL_NONE));
 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum;
-  CeedVector          geom, flux, dirichlet, cnum;
+  CeedVector          geom, flux, flux_accumulated, dirichlet, cnum;
   {
     CeedInt num_edges = boundary.num_edges;
 
@@ -448,7 +449,9 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux_accumulated, NULL));
     PetscCallCEED(CeedVectorSetValue(flux, 0.0));
+    PetscCallCEED(CeedVectorSetValue(flux_accumulated, 0.0));
 
     // create a vector to store the courant number for each edge
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
@@ -509,6 +512,7 @@ PetscErrorCode CreateCeedBoundaryFluxOperator(const RDyConfig config, RDyMesh *m
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
+  PetscCallCEED(CeedVectorDestroy(&flux_accumulated));
   PetscCallCEED(CeedVectorDestroy(&cnum));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
 
