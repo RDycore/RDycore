@@ -504,6 +504,44 @@ PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, voi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// forms the Jacobian matrix J used by the nonlinear solver
+static PetscErrorCode OperatorSNESJacobian(SNES snes, Vec u, Mat J, Mat P, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy       rdy = ctx;
+  Operator *op  = rdy->operator;
+
+  if (CeedEnabled()) {
+    if (J_pre != op->jacobian_pre) {
+      PetscCall(MatGetType(J_pre, &mat_type));
+      if (!strcmp(mat_type, MATSHELL)) {
+        PetscCall(MatCeedCopy(op->jacobian_pre, J_pre));
+      } else if (strcmp(mat_type, MATCEED)) {
+        PetscCall(MatCeedAssembleCOO(op->jacobian_pre, J_pre));
+      }
+    }
+    if (J != op->jacobian) {
+      PetscCall(MatGetType(J, &mat_type));
+      if (!strcmp(mat_type, MATSHELL)) {
+        PetscCall(MatCeedCopy(op->jacobian, J));
+      } else if (strcmp(mat_type, MATCEED) && J != J_pre) {
+        PetscCall(MatCeedAssembleCOO(op->jacobian, J));
+      }
+    }
+  } else {
+    // FIXME: PETSc mat stuff goes here
+  }
+
+  PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
+  if (J != J_pre) {
+    PetscCall(MatAssemblyBegin(J_pre, MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(J_pre, MAT_FINAL_ASSEMBLY));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Evaluates the jacobian dF/du of the left hand side operator F. Use with TS via
 /// TSSetIJacobian for implicit-explicit (IMEX) discretizations only.
 /// @param [in]    ts    the solver
@@ -514,34 +552,31 @@ PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec u, Vec dudt, Vec F, voi
 /// @param [out]   J     the matrix that stores the jacobian of the left hand side
 /// @param [in]    P     the matrix from which to construct the preconditioner (usually same as J)
 /// @param [inout] ctx   the RDy instance for the operator
-PetscErrorCode OperatorIJacobian(TS ts, PetscReal dt, Vec u, Vec dudt, PetscReal sigma, Mat J, Mat P, void *ctx) {
+PetscErrorCode OperatorIJacobian(TS ts, PetscReal t, Vec u, Vec dudt, PetscReal sigma, Mat J, Mat P, void *ctx) {
   PetscFunctionBegin;
 
   RDy       rdy = ctx;
   Operator *op  = rdy->operator;
 
   if (CeedEnabled()) {
-    PetscBool J_is_matceed, J_is_mffd, P_is_matceed, P_is_mffd;
-    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATMFFD, &J_is_mffd));
-    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATCEED, &J_is_matceed));
-    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATMFFD, &P_is_mffd));
-    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATCEED, &P_is_matceed));
-
-    PetscCall(MatCeedSetContextReal(rdy->ceed.jacobian, "ijacobian time shift", shift));
-
-    if (J_is_matceed || J_is_mffd) {
-      PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
-    } else PetscCall(MatCeedAssembleCOO(rdy->ceed.jacobian, J));
-
-    if (P_is_matceed && J != P) {
-      PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
-    } else if (!P_is_matceed && !P_is_mffd && J != P) {
-      PetscCall(MatCeedAssembleCOO(rdy->ceed.jacobian, P));
+    // update time and shift
+    PetscCall(MatCeedSetTime(op->jacobian, t));
+    PetscCall(MatCeedSetShifts(op->jacobian, sigma, 0.0));
+    PetscCall(MatCeedSetTime(op->jacobian_pre, t));
+    PetscCall(MatCeedSetShifts(op->jacobian_pre, sigma, 0.0));
+    {
+      PetscReal dt;
+      PetscCall(TSGetTimeStep(ts, &dt));
+      PetscCall(MatCeedSetDt(op->jacobian, dt));
+      PetscCall(MatCeedSetDt(op->jacobian_pre, dt));
     }
   } else {
+    // FIXME: PETSc stuff here
   }
+
+  SNES snes;
+  PetscCall(TSGetSNES(ts, &snes));
+  PetscCall(OperatorSNESJacobian(snes, u, J, P, ctx));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -603,7 +638,7 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) 
 /// @param [out]   J    the matrix that stores the jacobian of the left hand side
 /// @param [in]    P     the matrix from which to construct the preconditioner (usually same as J)
 /// @param [inout] ctx   the RDy instance for the operator
-PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal dt, Vec u, Mat J, Mat P, void *ctx) {
+PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal t, Vec u, Mat J, Mat P, void *ctx) {
   PetscFunctionBegin;
 
   RDy       rdy = ctx;

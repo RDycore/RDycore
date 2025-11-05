@@ -188,9 +188,11 @@ typedef struct Operator {
     } petsc;
   };
 
-  // the Jacobian matrix for the operator, which depends on the configuration; used only for
-  // implicit and implicit-explicit time discretizations
-  Mat jacobian;
+  // The Jacobian matrix for the operator and its preconditioner. In the case of CEED, this matrix
+  // is a MatCeed shell that can assemble a matrix with an equivalent non-zero structure; in the
+  // case of PETSc, it's just a matrix. In any case, this is used only in implicit and
+  // implicit-explicit time discretizations
+  Mat jacobian, jacobian_pre;
 
   // domain-wide flux divergence data
   Vec flux_divergence;
