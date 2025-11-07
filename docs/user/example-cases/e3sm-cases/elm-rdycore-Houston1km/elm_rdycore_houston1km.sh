@@ -93,29 +93,8 @@ start_date="2011-08-26"
 # Start creating and building the case
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# 1. Let's build RDycore
+# 1. Create an E3SM case
 src_dir=${e3sm_dir}
-rdycore_dir=$e3sm_dir/externals/rdycore/
-
-cd $rdycore_dir
-
-source config/set_petsc_settings.sh --mach $mach --config 3
-
-if [ ! -d "$rdycore_dir/build-$PETSC_ARCH" ]
-then
-  echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-  echo "The following expected RDycore build directory not found:$rdycore_dir/build-$PETSC_ARCH "
-  echo "So, attempting to build RDycore."
-  echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-
-  cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH -G Ninja
-fi
-
-# Build 
-cd build-$PETSC_ARCH
-ninja -j4 install
-
-# 2. Create an E3SM case
 
 cd $src_dir
 git_hash=`git log -n 1 --format=%h`
@@ -162,13 +141,6 @@ EOF
 
 ./case.setup --disable-git
 
-# Modify Macros file
-cp ${macros_file_in} cmake_macros/${macros_file_out}
-
-sed -i "s/PLACEHOLDER_E3SM_DIR/${e3sm_dir//\//\\/}/g" cmake_macros/${macros_file_out}
-sed -i "s/PLACEHOLDER_PETSC_DIR/${PETSC_DIR//\//\\/}/g" cmake_macros/${macros_file_out}
-sed -i "s/PLACEHOLDER_PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${macros_file_out}
-
 if [ "$mach" == "pm-cpu" ]; then
   ./xmlchange run_exe="\${EXEROOT}/e3sm.exe -ceed /cpu/self -log_view"
 elif [ "$mach" == "pm-gpu" ]; then
@@ -198,5 +170,5 @@ ln -s $rdycore_data_dir/$rdycore_mesh_file .
 
 
 cd ${case_dir}/${case_name}
-./case.build
+./case.build --ninja
 
