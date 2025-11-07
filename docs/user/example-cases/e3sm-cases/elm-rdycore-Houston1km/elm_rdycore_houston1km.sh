@@ -56,7 +56,7 @@ rdycore_file=Houston1km_with_z_updated.nc
 l2r_map_file=map.Houston1km.ELM_to_RDycore.nc
 r2l_map_file=map.Houston1km.RDycore_to_ELM.nc
 
-rdycore_yaml_file=Houston1km.CriticalBC.updated.yaml
+rdycore_yaml_file=$PWD/Houston1km.CriticalBC.updated.yaml
 rdycore_ic_file=Houston1km.IC.dat
 rdycore_mesh_file=Houston1km_with_z_updated.exo
 
@@ -64,16 +64,12 @@ if [ "$mach" == "pm-cpu" ]; then
 
   data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey/Houston1km
   device="cpu"
-  macros_file_in=${PWD}/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-13-2-1-95934b0d393
-  macros_file_out=gnu_pm-cpu.cmake
   compiler=gnu
 
 elif [ "$mach" == "pm-gpu" ]; then
 
   data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey/Houston1km
   device="gpu"
-  macros_file_in=${PWD}/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-13-2-1-95934b0d393
-  macros_file_out=gnugpu_pm-gpu.cmake
   compiler=gnugpu
 
 else
@@ -164,7 +160,7 @@ rundir=`./xmlquery RUNDIR --value`
 
 cd $rundir
 
-cp $rdycore_data_dir/$rdycore_yaml_file rdycore.yaml
+cp $rdycore_yaml_file rdycore.yaml
 ln -s $rdycore_data_dir/$rdycore_ic_file  .
 ln -s $rdycore_data_dir/$rdycore_mesh_file .
 
