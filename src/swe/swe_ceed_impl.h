@@ -368,6 +368,51 @@ CEED_QFUNCTION(SWESourceTermImplicitXQ2018)(void *ctx, CeedInt Q, const CeedScal
   return 0;
 }
 
+// IJacobian Q function for implicit treatment of bed friction source term sf
+CEED_QFUNCTION(SWEIJacobian_IMEX)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  // inputs
+  const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // material properties
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // solution
+
+  // outputs (recall arrays are stored in column-major order!)
+  CeedScalar(*dsfdu)[3][CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];  // partial derivatives of sf
+
+  const SWEContext context = (SWEContext)ctx;
+
+  const CeedScalar dt      = context->dtime;
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
+  const CeedScalar gravity = context->gravity;
+
+  const CeedScalar mannings_n = mat_props[MATERIAL_PROPERTY_MANNINGS][i];
+  const CeedScalar n2         = Square(mannings_n);
+
+  for (CeedInt i = 0; i < Q; i++) {
+    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    const CeedScalar h     = state.h;
+    const CeedScalar hu    = state.hu;
+    const CeedScalar hv    = state.hv;
+
+    // bed friction source term has no h component
+    dsfdu[0][0][i] = 0.0;
+    dsfdu[1][0][i] = 0.0;
+    dsfdu[2][0][i] = 0.0;
+
+    // velocity magnitude
+    CeedScalar vel_mag = sqrt(Square(u) + Square(v));
+
+    // u-component derivatives
+    dsfdu[0][1][i] = -1.0 / 3.0 * gravity * n2 * pow(h, -4.0 / 3.0) * u * vel_mag;  // d/dh
+    dsfdu[1][1][i] = gravity * n2 * pow(h, -1.0 / 3.0) * (vel_mag + u / vel_mag);   // d/du
+    dsfdu[2][1][i] = gravity * n2 * pow(h, -1.0 / 3.0) * u * v / vel_mag;           // d/dv
+
+    // v-component derivatives
+    dsfdu[0][2][i] = -1.0 / 3.0 * gravity * n2 * pow(h, -4.0 / 3.0) * v * vel_mag;  // d/dh
+    dsfdu[1][2][i] = gravity * n2 * pow(h, -1.0 / 3.0) * u * v / vel_mag;           // d/du
+    dsfdu[2][2][i] = gravity * n2 * pow(h, -1.0 / 3.0) * (vel_mag + v / vel_mag);   // d/dv
+  }
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
 

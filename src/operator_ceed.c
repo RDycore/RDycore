@@ -715,6 +715,42 @@ PetscErrorCode CreateCeedIOperator(RDyConfig *config, RDyMesh *mesh, PetscInt nu
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode CreateIJacobianQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
+  PetscFunctionBeginUser;
+  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
+
+  CeedQFunctionContext qf_context;
+  switch (config.physics.flow.source.method) {
+    case SOURCE_SEMI_IMPLICIT:
+      if (num_sediment_comp == 0) {  // flow only
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermSemiImplicit, SWESourceTermSemiImplicit_loc, qf));
+        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+      } else {
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentSourceTermSemiImplicit, SedimentSourceTermSemiImplicit_loc, qf));
+        PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
+      }
+      break;
+    case SOURCE_IMPLICIT_XQ2018:
+      if (num_sediment_comp == 0) {  // flow only
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourceTermImplicitXQ2018, SWESourceTermImplicitXQ2018_loc, qf));
+        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+      } else {
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SOURCE_IMPLICIT_XQ2018 is not supported in sediment CEED version");
+      }
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only semi_implicit source-term is supported in the CEED version");
+      break;
+  }
+
+  // add the context to the Q function
+  if (0) PetscCallCEED(CeedQFunctionContextView(qf_context, stdout));
+  PetscCallCEED(CeedQFunctionSetContext(*qf, qf_context));
+  PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates a CEED "identity jacobian" operator appropriate for the given configuration.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
@@ -727,16 +763,7 @@ PetscErrorCode CreateCeedIJacobian(RDyConfig *config, RDyMesh *mesh, PetscInt nu
                                    CeedOperator *jacobian_op) {
   PetscFunctionBegin;
 
-  // TODO: implement this! Create an output field for nonzero values
-
-  /*
-  // ...
-
-  CeedInt *rows, *columns;
-  PetscCall(CeedOperatorLinearAssembleSymbolic(*jacobian_op, jacobian_nnz, &rows, &columns));
-  PetscFree(rows);
-  PetscFree(columns);
-  */
+  PetscCheck(rdy->config.numerics.temporal == TEMPORAL_ARK_IMEX, PETSC_COMM_WORLD, "Requested creation of IJacobian for invalid time integrator");
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

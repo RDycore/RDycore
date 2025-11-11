@@ -111,11 +111,11 @@ PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOpe
 //
 // For implicit-explicit time integration (e.g. ARK-IMEX), F(t, u, du/dt) incorporates stiff source
 // terms, subtracting them from G, which retains only the explicitly-evaluated flux terms. In this
-// case, the "Jacobian" of the operator is dF/du.
+// case, the jacobian of the operator is dF/du.
 //
 // For fully-implicit time integration (e.g. BEULER), F again reduces to du/dt and G and its
-// Jacobian (consisting of flux and source terms) are used in the integration of the system. In this
-// case, the "Jacobian" of the operator is dG/du.
+// jacobian (consisting of flux and source terms) are used in the integration of the system. In this
+// case, the jacobian of the operator is dG/du.
 //
 // There are two families of operator implementations:
 // 1. CEED implementation: a composite CeedOperator with interior and boundary
@@ -188,11 +188,11 @@ typedef struct Operator {
     } petsc;
   };
 
-  // The Jacobian matrix for the operator and its preconditioner. In the case of CEED, this matrix
+  // The jacobian matrix for the operator and its preconditioner. In the case of CEED, this matrix
   // is a MatCeed shell that can assemble a matrix with an equivalent non-zero structure; in the
   // case of PETSc, it's just a matrix. In any case, this is used only in implicit and
   // implicit-explicit time discretizations
-  Mat jacobian, jacobian_pre;
+  Mat mat_jacobian, mat_jacobian_pre;
 
   // domain-wide flux divergence data
   Vec flux_divergence;
