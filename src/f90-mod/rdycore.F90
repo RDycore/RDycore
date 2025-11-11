@@ -5,7 +5,7 @@
 
 module rdycore
 
-  use iso_c_binding, only: c_ptr, c_int, c_int64_t, c_loc
+  use iso_c_binding
   use petscsys
 
   implicit none
@@ -50,53 +50,53 @@ module rdycore
 
   interface
     integer(c_int) function rdygetversion_(major, minor, patch, release) bind(c, name="RDyGetVersion")
-      use iso_c_binding, only: c_int
+      use iso_c_binding
       PetscInt,  intent(out) :: major, minor, patch
       PetscBool, intent(out) :: release
     end function
 
     integer(c_int) function rdygetbuildconfiguration_(c_build_config) bind(c, name="RDyGetBuildConfigurationF90")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value :: c_build_config
     end function
 
     integer(c_int) function rdyinitfortran_() bind(c, name="RDyInitFortran")
-      use iso_c_binding, only: c_int
+      use iso_c_binding
     end function
 
     logical(c_bool) function rdyinitialized_() bind(c, name="RDyInitialized")
-      use iso_c_binding, only: c_bool
+      use iso_c_binding
     end function
 
     integer(c_int) function rdyfinalize_() bind(c, name="RDyFinalize")
-      use iso_c_binding, only: c_int
+      use iso_c_binding
     end function
 
     integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name="RDyCreateF90")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       integer,            intent(in)  :: comm
       type(c_ptr), value, intent(in)  :: filename
       type(c_ptr),        intent(out) :: rdy
     end function
 
     integer(c_int) function rdysetlogfile_(rdy, filename) bind(c, name="RDySetLogFile")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       type(c_ptr), value, intent(in) :: filename
     end function
 
     integer(c_int) function rdysetup_(rdy) bind(c, name="RDySetup")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
     end function
 
     integer(c_int) function rdymmssetup_(rdy) bind(c, name="RDyMMSSetup")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
     end function
 
     integer(c_int) function rdymmscomputesolution_(rdy, time, soln) bind(c, name="RDyMMSComputeSolution")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr),    value, intent(in)   :: rdy
       real(c_double), value, intent(in)   :: time
@@ -104,25 +104,25 @@ module rdycore
     end function
 
     integer(c_int) function rdymmsenforceboundaryconditions_(rdy, time) bind(c, name="RDyMMSEnforceBoundaryConditions")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in)   :: rdy
       real(c_double), value, intent(in)   :: time
     end function
 
     integer(c_int) function rdymmscomputesourceterms_(rdy, time) bind(c, name="RDyMMSComputeSourceTerms")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in)   :: rdy
       real(c_double), value, intent(in)   :: time
     end function
 
     integer(c_int) function rdymmsupdatematerialproperties_(rdy) bind(c, name="RDyMMSUpdateMaterialProperties")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
     end function
 
     integer(c_int) function rdymmscomputeerrornorms_(rdy, time, l1_norms, l2_norms, linf_norms, &
                                                      num_global_cells, global_area) bind(c, name="RDyMMSComputeErrorNorms")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in)  :: rdy
       real(c_double), value, intent(in)  :: time
       type(c_ptr),    value, intent(in)  :: l1_norms, l2_norms, linf_norms
@@ -132,44 +132,44 @@ module rdycore
 
     integer(c_int) function rdymmsestimateconvergencerates_(rdy, num_refinements, l1_rates, l2_rates, linf_rates) &
                             bind(c, name="RDyMMSEstimateConvergenceRates")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,    value, intent(in)  :: num_refinements
       type(c_ptr), value, intent(in)  :: l1_rates, l2_rates, linf_rates
     end function
 
     integer(c_int) function rdymmsrun_(rdy) bind(c, name="RDyMMSRun")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
     end function
 
     integer(c_int) function rdygetnumglobalcells_(rdy, num_cells_global) bind(c, name="RDyGetNumGlobalCells")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,           intent(out) :: num_cells_global
     end function
 
     integer(c_int) function rdygetnumownedcells_(rdy, num_cells) bind(c, name="RDyGetNumOwnedCells")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,           intent(out) :: num_cells
     end function
 
     integer(c_int) function rdygetnumboundaryconditions_(rdy, num_bnd_conds) bind(c, name="RDyGetNumBoundaryConditions")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,           intent(out) :: num_bnd_conds
     end function
 
     integer(c_int) function rdygetnumboundaryedges_(rdy, boundary_id, num_edges) bind(c, name="RDyGetNumBoundaryEdges")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt,    value, intent(in) :: boundary_id
       PetscInt,    intent(out)       :: num_edges
     end function
 
     integer(c_int) function RDySetFlowDirichletBoundaryValues_(rdy, boundary_id, num_edges, ndof, bc_values) bind(c, name="RDySetFlowDirichletBoundaryValues")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,    value, intent(in)  :: boundary_id
       PetscInt,    value, intent(in)  :: num_edges
@@ -178,34 +178,34 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundaryconditionflowtype_(rdy, boundary_id, bnd_cond_type) bind(c, name="RDyGetBoundaryConditionFlowType")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr),    value, intent(in)  :: rdy
       PetscInt, value, intent(in)  :: boundary_id
       PetscInt,        intent(out) :: bnd_cond_type
     end function
 
     integer(c_int) function rdygettimeunit_(rdy, time_unit) bind(c, name="RDyGetTimeUnit")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in) :: rdy
       integer(c_int), intent(out)       :: time_unit
     end function
 
     integer(c_int) function rdygettime_(rdy, time_unit, time) bind(c, name="RDyGetTime")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in)  :: rdy
       integer(c_int), value, intent(in)  :: time_unit
       real(c_double),        intent(out) :: time
     end function
 
     integer(c_int) function rdygettimestep_(rdy, time_unit, dt) bind(c, name="RDyGetTimeStep")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in)  :: rdy
       integer(c_int), value, intent(in)  :: time_unit
       real(c_double),        intent(out) :: dt
     end function
 
     integer(c_int) function rdyconverttime_(unit_from, t_from, unit_to, t_to) bind(c, name="RDyConvertTime")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       integer(c_int), value, intent(in)  :: unit_from
       real(c_double), value, intent(in)  :: t_from
       integer(c_int), value, intent(in)  :: unit_to
@@ -213,83 +213,83 @@ module rdycore
     end function
 
     integer(c_int) function rdygetstep_(rdy, step) bind(c, name="RDyGetStep")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in)  :: rdy
       PetscInt,           intent(out) :: step
     end function
 
     integer(c_int) function rdygetcouplinginterval_(rdy, time_unit, interval) bind(c, name="RDyGetCouplingInterval")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in) :: rdy
       integer(c_int), value, intent(in) :: time_unit
       real(c_double), intent(out)       :: interval
     end function
 
     integer(c_int) function rdysetcouplinginterval_(rdy, time_unit, interval) bind(c, name="RDySetCouplingInterval")
-      use iso_c_binding, only: c_int, c_ptr, c_double
+      use iso_c_binding
       type(c_ptr),    value, intent(in) :: rdy
       integer(c_int), value, intent(in) :: time_unit
       real(c_double), value, intent(in) :: interval
     end function
 
     integer(c_int) function rdygetlocalcellheights_(rdy, size, h) bind(c, name="RDyGetOwnedCellHeights")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: h
     end function
 
     integer(c_int) function rdygetlocaclellxmomenta_(rdy, size, hu) bind(c, name="RDyGetOwnedCellXMomenta")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hu
     end function
 
     integer(c_int) function rdygetlocaclellymomenta_(rdy, size, hv) bind(c, name="RDyGetOwnedCellYMomenta")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt, value,    intent(in) :: size
       type(c_ptr), value, intent(in) :: hv
     end function
 
     integer(c_int) function rdygetlocalcellxcentroids_(rdy, size, values) bind(c, name="RDyGetOwnedCellXCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
     integer(c_int) function rdygetlocalcellycentroids_(rdy, size, values) bind(c, name="RDyGetOwnedCellYCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
     integer(c_int) function rdygetlocalcellzcentroids_(rdy, size, values) bind(c, name="RDyGetOwnedCellZCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
     integer(c_int) function rdygetlocalcellareas_(rdy, size, values) bind(c, name="RDyGetOwnedCellAreas")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
     integer(c_int) function rdygetlocalcellnaturalids_(rdy, size, values) bind(c, name="RDyGetOwnedCellNaturalIDs")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: values
     end function
 
     integer(c_int) function rdygetboundaryedgexcentroids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryEdgeXCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -297,7 +297,7 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundaryedgeycentroids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryEdgeYCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -305,7 +305,7 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundaryedgezcentroids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryEdgeZCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -313,7 +313,7 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundarycellxcentroids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryCellXCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -321,7 +321,7 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundarycellycentroids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryCellYCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -329,7 +329,7 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundarycellzcentroids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryCellZCentroids")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -337,7 +337,7 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundarycellnaturalids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryCellNaturalIDs")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
       PetscInt   , value, intent(in) :: size
@@ -345,14 +345,14 @@ module rdycore
     end function
 
     integer(c_int) function rdysetdomainwatersource_(rdy, size, watsrc) bind(c, name="RDySetDomainWaterSource")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: watsrc
     end function
 
     integer(c_int) function rdysetregionalwatersource_(rdy, region_idx, size, watsrc) bind(c, name="RDySetRegionalWaterSource")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: region_idx
       PetscInt   , value, intent(in) :: size
@@ -360,49 +360,49 @@ module rdycore
     end function
 
     integer(c_int) function rdysetdomainxmomentumsource_(rdy, size, xmomsrc) bind(c, name="RDySetDomainXMomentumSource")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: xmomsrc
     end function
 
     integer(c_int) function rdysetdomainymomentumsource_(rdy, size, ymomsrc) bind(c, name="RDySetDomainYMomentumSource")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: ymomsrc
     end function
 
     integer(c_int) function rdysetdomainmanningsn_(rdy, size, n) bind(c, name="RDySetDomainManningsN")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: size
       type(c_ptr), value, intent(in) :: n
     end function
 
     integer(c_int) function rdysetinitialconditions_(rdy, ic) bind(c, name="RDySetInitialConditions")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr),      value, intent(in) :: rdy
       PetscFortranAddr, value, intent(in) :: ic
     end function
 
     integer(c_int) function rdycreateprognosticvec_(rdy, prog_vec) bind(c, name="RDyCreatePrognosticVec")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       PetscFortranAddr,   intent(out) :: prog_vec
     end function
 
     integer(c_int) function rdycreateonedofglobalvec_(rdy, global_vec) bind(c, name="RDyCreateOneDOFGlobalVec")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       PetscFortranAddr,   intent(out) :: global_vec
     end function
 
     integer(c_int) function rdyreadonedoflocalvecfrombinaryfile_(rdy, filename, local_vec) bind(c, name="RDyReadOneDOFLocalVecFromBinaryFile")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       type(c_ptr), value, intent(in)  :: filename
@@ -410,7 +410,7 @@ module rdycore
     end function
 
     integer(c_int) function rdyreadonedofglobalvecfrombinaryfile_(rdy, filename, global_vec) bind(c, name="RDyReadOneDOFGlobalVecFromBinaryFile")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       type(c_ptr), value, intent(in)  :: filename
@@ -418,7 +418,7 @@ module rdycore
     end function
 
     integer(c_int) function rdywriteonedofglobalvectobinaryfile_(rdy, filename, global_vec) bind(c, name="RDyWriteOneDOFGlobalVecToBinaryFile")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       use petscvec
       type(c_ptr), value, intent(in)  :: rdy
       type(c_ptr), value, intent(in)  :: filename
@@ -426,22 +426,22 @@ module rdycore
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
     end function
 
     logical(c_bool) function rdyfinished_(rdy) bind(c, name="RDyFinished")
-      use iso_c_binding, only: c_bool, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
     end function
 
     logical(c_bool) function rdyrestarted_(rdy) bind(c, name="RDyRestarted")
-      use iso_c_binding, only: c_bool, c_ptr
+      use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
     end function
 
     integer(c_int) function rdydestroy_(rdy) bind(c, name="RDyDestroy")
-      use iso_c_binding, only: c_int, c_ptr
+      use iso_c_binding
       type(c_ptr), intent(inout) :: rdy
     end function
 
@@ -483,7 +483,7 @@ contains
   end function
 
   subroutine RDyCreate(comm, filename, rdy_, ierr)
-    use iso_c_binding, only: c_null_char
+    use iso_c_binding
     character(len=1024), intent(in) :: filename
     integer,   intent(in)  :: comm
     type(RDy), intent(out) :: rdy_
@@ -501,7 +501,7 @@ contains
   end subroutine
 
   subroutine RDySetLogFile(rdy_, filename, ierr)
-    use iso_c_binding, only: c_null_char
+    use iso_c_binding
     character(len=1024), intent(in)  :: filename
     type(RDy),           intent(out) :: rdy_
     integer,             intent(out) :: ierr

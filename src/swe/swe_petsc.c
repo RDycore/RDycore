@@ -1,7 +1,7 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "swe_roe_petsc_impl.h"
+#include "swe_roe_flux_petsc.h"
 
 static PetscErrorCode CreateRiemannStateData(PetscInt num_states, RiemannStateData *data) {
   PetscFunctionBegin;

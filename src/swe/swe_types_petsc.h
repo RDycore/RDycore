@@ -1,5 +1,5 @@
-#ifndef SWE_PETSC_IMPL_H
-#define SWE_PETSC_IMPL_H
+#ifndef SWE_TYPES_PETSC_H
+#define SWE_TYPES_PETSC_H
 
 #include <petscsys.h>
 
@@ -24,4 +24,4 @@ typedef struct {
   PetscReal *amax;       // courant number on edges
 } RiemannEdgeData;
 
-#endif  // SWE_PETSC_IMPL_H
+#endif  // SWE_TYPES_PETSC_H

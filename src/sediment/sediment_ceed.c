@@ -10,7 +10,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
 
-#include "sediment_ceed_impl.h"
+#include "sediment_types_ceed.h"
 
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop

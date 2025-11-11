@@ -5,8 +5,10 @@
 #include <private/rdysedimentimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "sediment/sediment_ceed_impl.h"
-#include "swe/swe_ceed_impl.h"
+#include "sediment/sediment_fluxes_ceed.h"
+#include "sediment/sediment_sources_ceed.h"
+#include "swe/swe_fluxes_ceed.h"
+#include "swe/swe_sources_ceed.h"
 
 //-----------------------------
 // CEED sub-operators overview
