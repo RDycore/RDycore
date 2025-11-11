@@ -1,7 +1,7 @@
-#ifndef SEDIMENT_ROE_CEED_IMPL_H
-#define SEDIMENT_ROE_CEED_IMPL_H
+#ifndef SEDIMENT_ROE_FLUX_CEED_H
+#define SEDIMENT_ROE_FLUX_CEED_H
 
-#include "../swe/swe_ceed_impl.h"
+#include "../swe/swe_fluxes_ceed.h"
 
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler

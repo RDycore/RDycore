@@ -1,5 +1,5 @@
-#ifndef SWE_ROE_CEED_IMPL_H
-#define SWE_ROE_CEED_IMPL_H
+#ifndef SWE_ROE_FLUX_CEED_H
+#define SWE_ROE_FLUX_CEED_H
 
 #include <ceed/types.h>
 

@@ -10,7 +10,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
 
-#include "swe_ceed_impl.h"
+#include "swe_types_ceed.h"
 
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop

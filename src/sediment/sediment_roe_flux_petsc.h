@@ -1,10 +1,10 @@
-#ifndef SEDIMENT_ROE_PETSC_IMPL_H
-#define SEDIMENT_ROE_PETSC_IMPL_H
+#ifndef SEDIMENT_ROE_FLUX_PETSC_H
+#define SEDIMENT_ROE_FLUX_PETSC_H
 
 #include <rdycore.h>
 
-#include "../swe/swe_roe_petsc_impl.h"
-#include "sediment_petsc_impl.h"
+#include "../swe/swe_roe_flux_petsc.h"
+#include "sediment_types_petsc.h"
 
 /// @brief Computes the flux for SWE and sediments across the edge using Roe's approximate Riemann solve
 /// @param [in] *datal A SedimentRiemannStateData for values left of the edges

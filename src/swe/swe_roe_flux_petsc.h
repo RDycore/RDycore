@@ -1,7 +1,7 @@
-#ifndef SWE_ROE_PETSC_IMPL_H
-#define SWE_ROE_PETSC_IMPL_H
+#ifndef SWE_ROE_FLUX_PETSC_H
+#define SWE_ROE_FLUX_PETSC_H
 
-#include "swe_petsc_impl.h"
+#include "swe_types_petsc.h"
 
 // silence unused function warnings
 #pragma GCC diagnostic push
@@ -133,4 +133,4 @@ static PetscErrorCode ComputeSWERoeFlux(RiemannStateData *datal, RiemannStateDat
 
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
-#endif  // SWE_ROE_PETSC_IMPL_H
+#endif  // SWE_ROE_FLUX_PETSC_H

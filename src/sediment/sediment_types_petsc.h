@@ -1,5 +1,5 @@
-#ifndef SEDIMENT_PETSC_IMPL_H
-#define SEDIMENT_PETSC_IMPL_H
+#ifndef SEDIMENT_TYPES_PETSC_H
+#define SEDIMENT_TYPES_PETSC_H
 
 #include <petscsys.h>
 
@@ -25,4 +25,4 @@ typedef struct {
   PetscReal *amax;               // courant number on edges
 } SedimentRiemannEdgeData;
 
-#endif  // SEDIMENT_PETSC_IMPL_H
+#endif  // SEDIMENT_PETSC_TYPES_H

@@ -5,7 +5,7 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "sediment_roe_petsc_impl.h"
+#include "sediment_roe_flux_petsc.h"
 
 /// @brief Allocates memory for prognostic (h/hu/hv/hci) and diagnostic (u/v/ci) variables stored at
 ///        cell centers for sediment dynamics
