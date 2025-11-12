@@ -700,23 +700,6 @@ PetscErrorCode CreateCeedSourceOperator(RDyConfig *config, RDyMesh *mesh, CeedOp
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a CEED "identity" operator appropriate for the given configuration.
-/// @param [in]    config              the configuration defining the physics and numerics for the new operator
-/// @param [in]    mesh                a mesh containing geometric and topological information for the domain
-/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
-/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
-/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
-/// @param [out]   identity_op         the newly created operator
-/// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateCeedIOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
-                                   CeedOperator *identity_op) {
-  PetscFunctionBegin;
-
-  // TODO: implement this! Create an input field large enought to store u and du/dt
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 static PetscErrorCode CreateIJacobianQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
   PetscFunctionBeginUser;
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
@@ -753,20 +736,18 @@ static PetscErrorCode CreateIJacobianQFunction(Ceed ceed, const RDyConfig config
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Creates a CEED "identity jacobian" operator appropriate for the given configuration.
+/// Creates a CEED Jacobian operator appropriate for the selected time discretization. Specifically:
+/// * If using ARK-IMEX time discretization, this operator represents an "IJacobian."
+/// * If using the backward euler time discretization, this operator represents an "RHSJacobian."
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
-/// @param [in]    num_boundaries      the number of distinct boundaries bounding the computational domain
-/// @param [in]    boundaries          an array of distinct boundaries bounding the computational domain
-/// @param [in]    boundary_conditions an array of boundary conditions corresponding to the domain boundaries
 /// @param [out]   jacobian_op         the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateCeedIJacobian(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *conditions,
-                                   CeedOperator *jacobian_op) {
+PetscErrorCode CreateCeedJacobianOperator(RDyConfig *config, RDyMesh *mesh, CeedOperator *jacobian_op) {
   PetscFunctionBegin;
 
-  PetscCheck(config->numerics.temporal == TEMPORAL_ARK_IMEX, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "Requested creation of IJacobian for invalid time integrator");
+  PetscCheck(config->numerics.temporal == TEMPORAL_ARK_IMEX || config->numerics.temporal == TEMPORAL_BEULER, PETSC_COMM_WORLD, PETSC_ERR_USER,
+             "Requested creation of Jacobian operator for invalid time integrator");
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

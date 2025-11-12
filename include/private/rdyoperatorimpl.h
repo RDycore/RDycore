@@ -223,12 +223,12 @@ PETSC_INTERN PetscErrorCode OperatorRHSJacobian(TS, PetscReal, Vec, Mat, Mat, vo
 
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateCeedJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedJacobianOperator(RDyConfig *, RDyMesh *, CeedOperator *);
 
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
                                                     OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSourceOperator(RDyConfig *, RDyMesh *, Vec, Vec, PetscOperator *);
-PETSC_INTERN PetscErrorCode CreatePetscJacobian(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscJacobianOperator(RDyConfig *, RDyMesh *, PetscOperator *);
 
 //----------------------
 // Operator Data Access
