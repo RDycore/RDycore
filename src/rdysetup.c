@@ -993,68 +993,10 @@ PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This is the right-hand-side function used by our timestepping solver.
-/// @param [in]    ts  the solver
-/// @param [in]    t   the simulation time [seconds]
-/// @param [in]    U   the global solution vector at time t
-/// @param [out]   F   the global right hand side vector to be evaluated at time t
-/// @param [inout] ctx a pointer to the operator representing the system being solved
-static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
-  PetscFunctionBegin;
-
-  RDy       rdy = ctx;
-  DM        dm  = rdy->dm;
-  Operator *op  = rdy->operator;
-
-  PetscScalar dt;
-  PetscCall(TSGetTimeStep(ts, &dt));
-
-  PetscCall(VecZeroEntries(F));
-
-  // populate the local U vector
-  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
-  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
-
-  PetscCall(ResetOperatorDiagnostics(op));
-
-  // compute the right hand side
-  PetscCall(ApplyOperator(op, dt, rdy->u_local, F));
-  if (0) {
-    PetscInt nstep;
-    PetscCall(TSGetStepNumber(ts, &nstep));
-
-    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
-    char        file[PETSC_MAX_PATH_LEN];
-    snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
-
-    PetscViewer viewer;
-    PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD, file, &viewer));
-    PetscCall(VecView(F, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-  }
-
-  // if debug-level logging is enabled, find the latest global maximum Courant number
-  // and log it.
-  if (rdy->config.logging.level >= LOG_DEBUG) {
-    PetscCall(UpdateOperatorDiagnostics(op));
-    OperatorDiagnostics diagnostics;
-    PetscCall(GetOperatorDiagnostics(op, &diagnostics));
-
-    PetscReal time;
-    PetscInt  stepnum;
-    PetscCall(TSGetTime(ts, &time));
-    PetscCall(TSGetStepNumber(ts, &stepnum));
-    const char *units = TimeUnitAsString(rdy->config.time.unit);
-
-    RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
-                diagnostics.courant_number.max_courant_num);
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
+
+  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
 
   PetscInt n_dof;
   PetscCall(VecGetSize(rdy->u_global, &n_dof));
@@ -1070,14 +1012,21 @@ PetscErrorCode InitSolver(RDy rdy) {
       PetscCall(TSSetType(rdy->ts, TSRK));
       PetscCall(TSRKSetType(rdy->ts, TSRK4));
       break;
-    case TEMPORAL_BEULER:
+    case TEMPORAL_ARK_IMEX:  // implicit treatment of stiff source terms
+      PetscCall(TSSetType(rdy->ts, TSARKIMEX));
+      PetscCall(TSARKIMEXSetType(rdy->ts, TSARKIMEXA2));  // 2nd-order A-stable method
+      PetscCall(TSSetIFunction(rdy->ts, rdy->rhs, OperatorIFunction, rdy));
+      PetscCall(OperatorCreateJacobianMatrix(rdy->operator, & rdy->J));
+      PetscCall(TSSetIJacobian(rdy->ts, rdy->J, rdy->J, OperatorIJacobian, rdy));
+      break;
+    case TEMPORAL_BEULER:  // fully implicit treatment
       PetscCall(TSSetType(rdy->ts, TSBEULER));
+      PetscCall(OperatorCreateJacobianMatrix(rdy->operator, & rdy->J));
+      PetscCall(TSSetRHSJacobian(rdy->ts, rdy->J, rdy->J, OperatorRHSJacobian, rdy));
       break;
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
-
-  PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 
   if (!rdy->config.time.adaptive.enable) {

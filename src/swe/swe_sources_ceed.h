@@ -164,6 +164,61 @@ CEED_QFUNCTION(SWESourcesWithSemiImplicitBedFriction)(void *ctx, CeedInt Q, cons
 
 CEED_QFUNCTION(SWESourcesWithImplicitBedFrictionXQ2018)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return SWESources(ctx, Q, in, out, SWE_BED_FRICTION_IMPLICIT_XQ2018);
+
+// IJacobian Q function for implicit treatment of bed friction source term sf
+CEED_QFUNCTION(SWEIJacobian_IMEX)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  // inputs
+  const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // material properties
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // solution
+
+  // outputs (recall arrays are stored in column-major order!)
+  CeedScalar(*J)[3][CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];  // 3x3 block jacobian
+
+  const SWEContext context = (SWEContext)ctx;
+
+  const CeedScalar dt      = context->dtime;
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
+  const CeedScalar gravity = context->gravity;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    const CeedScalar h     = state.h;
+    const CeedScalar denom = Square(h) + Square(h_anuga);
+
+    const CeedScalar u = SafeDiv(state.hu * h, denom, h, tiny_h);
+    const CeedScalar v = SafeDiv(state.hv * h, denom, h, tiny_h);
+
+    const CeedScalar mannings_n = mat_props[MATERIAL_PROPERTY_MANNINGS][i];
+    const CeedScalar n2         = Square(mannings_n);
+
+    // velocity magnitude
+    CeedScalar velocity = sqrt(Square(u) + Square(v));
+
+    // bed friction partial derivatives
+    CeedScalar dsfdu[3][3] = {0};
+
+    // u-component derivatives
+    dsfdu[0][1] = -1.0 / 3.0 * gravity * n2 * pow(h, -4.0 / 3.0) * u * velocity;  // d/dh
+    dsfdu[1][1] = gravity * n2 * pow(h, -1.0 / 3.0) * (velocity + u / velocity);  // d/du
+    dsfdu[2][1] = gravity * n2 * pow(h, -1.0 / 3.0) * u * v / velocity;           // d/dv
+
+    // v-component derivatives
+    dsfdu[0][2] = -1.0 / 3.0 * gravity * n2 * pow(h, -4.0 / 3.0) * v * velocity;  // d/dh
+    dsfdu[1][2] = gravity * n2 * pow(h, -1.0 / 3.0) * u * v / velocity;           // d/du
+    dsfdu[2][2] = gravity * n2 * pow(h, -1.0 / 3.0) * (velocity + v / velocity);  // d/dv
+
+    // jacobian
+    for (int j = 0; j < 3; ++j) {
+      for (int k = 0; k < 3; ++k) {
+        J[j][k][i] = -dt * dsfdu[j][k];
+      }
+    }
+    J[0][0][i] += 1.0;
+    J[1][1][i] += 1.0;
+    J[2][2][i] += 1.0;
+  }
+  return 0;
 }
 
 #pragma GCC diagnostic   pop

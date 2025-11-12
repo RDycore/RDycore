@@ -259,6 +259,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
   PetscCall(RDyDestroyVectors(rdy));
+  if ((*rdy)->J) PetscCall(MatDestroy(&((*rdy)->J)));
 
   if ((*rdy)->operator) {
     PetscCall(DestroyOperator(&(*rdy)->operator));
