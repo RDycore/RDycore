@@ -479,7 +479,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
 
   Ceed ceed = CeedContext();
 
-  PetscCall(CeedCompositeOperatorCreate(ceed, flux_op));
+  PetscCall(CeedOperatorCreateComposite(ceed, flux_op));
 
   if (config->physics.flow.mode != FLOW_SWE) {
     PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
@@ -489,7 +489,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
 
   CeedOperator interior_flux_op;
   PetscCall(CreateCeedInteriorFluxOperator(*config, mesh, &interior_flux_op));
-  PetscCall(CeedCompositeOperatorAddSub(*flux_op, interior_flux_op));
+  PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < num_boundaries; ++b) {
@@ -497,7 +497,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
     RDyBoundary  boundary  = boundaries[b];
     RDyCondition condition = boundary_conditions[b];
     PetscCall(CreateCeedBoundaryFluxOperator(*config, mesh, boundary, condition, &boundary_flux_op));
-    PetscCall(CeedCompositeOperatorAddSub(*flux_op, boundary_flux_op));
+    PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -691,11 +691,11 @@ PetscErrorCode CreateCeedSourceOperator(RDyConfig *config, RDyMesh *mesh, CeedOp
 
   Ceed ceed = CeedContext();
 
-  PetscCall(CeedCompositeOperatorCreate(ceed, source_op));
+  PetscCall(CeedOperatorCreateComposite(ceed, source_op));
 
   CeedOperator source_0;
   PetscCall(CreateCeedSource0Operator(*config, mesh, &source_0));
-  PetscCall(CeedCompositeOperatorAddSub(*source_op, source_0));
+  PetscCall(CeedOperatorCompositeAddSub(*source_op, source_0));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
