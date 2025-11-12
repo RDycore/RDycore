@@ -220,7 +220,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       explicit = false;
   }
 
-  // construct CEED or PETSc versions of the flux/sources operators based on
+  // construct CEED or PETSc versions of the flux/source/jacobian operators based on
   // our configuration
   if (CeedEnabled()) {
     // register a logging event for applying our CEED operator
@@ -230,23 +230,37 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       first_time = PETSC_FALSE;
     }
 
+    // flux and source operators
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.flux_op));
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source_op));
+
     if (!explicit) {
-      PetscCall(CreateCeedJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                   (*operator)->boundary_conditions, &(*operator)->ceed.jacobian_op));
+      PetscCall(CreateCeedJacobianOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.jacobian_op));
+      // NOTE: we don't support transpose operations
+      PetscCall(MatCreateCeed(domain_dm, NULL, (*operator)->ceed.jacobian_op, NULL, &(*operator)->jacobian));
+      // PetscCall(MatCeedSetLogEvents((*operator)->jacobian, RDY_CeedJacobianMatMult, NULL));
+      // PetscCall(MatCeedSetOperatorLogEvents((*operator)->jacobian, RDY_CeedJacobianOpMatMult, NULL));
     }
   } else {
+    // flux and source operators
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
                                       (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.flux_op));
     PetscCall(CreatePetscSourceOperator((*operator)->config, (*operator)->mesh, (*operator)->petsc.external_sources,
                                         (*operator)->petsc.material_properties, &(*operator)->petsc.source_op));
+
     if (!explicit) {
-      PetscCall(CreatePetscJacobian((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                    (*operator)->boundary_conditions, &(*operator)->petsc.jacobian_op));
+      PetscCall(CreatePetscJacobianOperator((*operator)->config, (*operator)->mesh, &(*operator)->petsc.jacobian_op));
+      PetscCall(MatCreate(comm, &(*operator)->jacobian));
+      PetscCall(MatSetType((*operator)->jacobian, MATMPIAIJ));
     }
+  }
+
+  // NOTE: Jacobian preconditioner is just the jacobian itself
+  if ((*operator)->petsc.jacobian_op) {
+    (*operator)->jacobian_pre = (*operator)->jacobian;
+    PetscCall(PetscObjectReference((PetscObject)(*operator)->jacobian));
   }
 
   // set up our flux divergence vector(s)
@@ -317,13 +331,17 @@ PetscErrorCode OperatorCreateJacobianMatrix(Operator *op, Mat *J) {
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
 
-  PetscCall(MatCreate(comm, J));
-  PetscCall(MatSetType(*J, MATMPIAIJ));
+  PetscBool ceed_enabled = CeedEnabled();
 
-  // build lists of row and column indices (i, j) with which to express the nonzero structure
-  PetscInt nnz, *rows, *columns;
-
-  PetscCall(MatSetPreallocationCOO(*J, nnz, rows, columns));
+  if (ceed_enabled) {
+    // NOTE: J is a COO matrix associated with the operator's MatCeed matrix
+    PetscCall(MatCeedCreateMatCOO(op->jacobian, J));
+    PetscCall(MatCeedAssembleCOO(op->jacobian, *J));
+  } else {
+    // NOTE: J is just a reference to the operator's matrix
+    *J = op->jacobian;
+    PetscCall(PetscObjectReference((PetscObject)op->jacobian));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -559,16 +577,27 @@ PetscErrorCode OperatorIJacobian(TS ts, PetscReal t, Vec u, Vec dudt, PetscReal 
   Operator *op  = rdy->operator;
 
   if (CeedEnabled()) {
-    // update time and shift
+    // update time, shift, timestep
     PetscCall(MatCeedSetTime(op->jacobian, t));
     PetscCall(MatCeedSetShifts(op->jacobian, sigma, 0.0));
-    PetscCall(MatCeedSetTime(op->jacobian_pre, t));
-    PetscCall(MatCeedSetShifts(op->jacobian_pre, sigma, 0.0));
-    {
-      PetscReal dt;
-      PetscCall(TSGetTimeStep(ts, &dt));
-      PetscCall(MatCeedSetDt(op->jacobian, dt));
+    if (op->jacobian_pre != op->jacobian) {
+      PetscCall(MatCeedSetTime(op->jacobian_pre, t));
+      PetscCall(MatCeedSetShifts(op->jacobian_pre, sigma, 0.0));
+    }
+
+    PetscReal dt;
+    PetscCall(TSGetTimeStep(ts, &dt));
+    PetscCall(MatCeedSetDt(op->jacobian, dt));
+    if (op->jacobian_pre != op->jacobian) {
       PetscCall(MatCeedSetDt(op->jacobian_pre, dt));
+    }
+
+    // assemble into proper matrix
+    PetscCall(MatCeedCopy(op->jacobian, J));  // FIXME: needed?
+    PetscCall(MatCeedAssembleCOO(op->jacobian, J));
+    if (op->jacobian_pre != op->jacobian) {
+      PetscCall(MatCeedCopy(op->jacobian_pre, J));  // FIXME: needed?
+      PetscCall(MatCeedAssembleCOO(op->jacobian_pre, J));
     }
   } else {
     // FIXME: PETSc stuff here
@@ -606,10 +635,8 @@ PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec u, Vec G, void *ctx) 
 
   // populate the du/dt vector field on the operator and compute the left hand side
   if (CeedEnabled()) {
-    // TODO: set du/dt field on operator
     PetscCall(ApplyCeedOperator(op, dt, rdy->u_local, G));
   } else {
-    // TODO: set du/dt field on operator
     PetscCall(ApplyPetscOperator(op, dt, rdy->u_local, G));
   }
 
@@ -645,22 +672,17 @@ PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal t, Vec u, Mat J, Mat P, void
   Operator *op  = rdy->operator;
 
   if (CeedEnabled()) {
-    PetscBool J_is_matceed, J_is_mffd, P_is_matceed, P_is_mffd;
-    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATMFFD, &J_is_mffd));
-    PetscCall(PetscObjectTypeCompare((PetscObject)J, MATCEED, &J_is_matceed));
-    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATMFFD, &P_is_mffd));
-    PetscCall(PetscObjectTypeCompare((PetscObject)P, MATCEED, &P_is_matceed));
+    PetscCall(MatCeedSetTime(op->jacobian, t));
+    if (op->jacobian_pre != op->jacobian) {
+      PetscCall(MatCeedSetTime(op->jacobian_pre, t));
+    }
 
-    if (J_is_matceed || J_is_mffd) {
-      PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
-    } else PetscCall(MatCeedAssembleCOO(op->jacobian, J));
-
-    if (P_is_matceed && J != P) {
-      PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
-    } else if (!P_is_matceed && !P_is_mffd && J != P) {
-      PetscCall(MatCeedAssembleCOO(op->jacobian, P));
+    // assemble into proper matrix
+    PetscCall(MatCeedCopy(op->jacobian, J));  // FIXME: needed?
+    PetscCall(MatCeedAssembleCOO(op->jacobian, J));
+    if (op->jacobian_pre != op->jacobian) {
+      PetscCall(MatCeedCopy(op->jacobian_pre, J));  // FIXME: needed?
+      PetscCall(MatCeedAssembleCOO(op->jacobian_pre, J));
     }
   } else {
     // FIXME: PETSc stuff goes here
