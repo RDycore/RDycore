@@ -60,7 +60,7 @@ RUN \
     --download-fblaslapack \
     --download-hdf5 \
     --download-cgns \
-    --download-libceed \
+    --download-libceed=https://github.com/CEED/libCEED/archive/refs/heads/main.zip \
     --download-metis \
     --download-muparser \
     --download-netcdf \
