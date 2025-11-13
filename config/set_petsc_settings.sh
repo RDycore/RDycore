@@ -72,14 +72,14 @@ if [ "$mach" = "pm-cpu" ]; then
 elif [ "$mach" = "pm-gpu" ]; then
 
     MODULE_FILE=$DIR/modules.pm-gpu.gnugpu
-    export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_v3.23.0/
+    export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_v3.24.1/
 
     if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-13-2-1-95934b0d393
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-13-2-1-b522cb8c110
     elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-13-2-1-95934b0d393
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-13-2-1-b522cb8c110
     elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=pm-gpu-opt-32bit-gcc-13-2-1-95934b0d393
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-32bit-gcc-13-2-1-b522cb8c110
     else
       echo "Unsupported --config $config "
       display_help 
