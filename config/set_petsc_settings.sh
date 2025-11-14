@@ -88,14 +88,14 @@ elif [ "$mach" = "pm-gpu" ]; then
 elif [ "$mach" = "frontier"  ]; then
 
   MODULE_FILE=$DIR/modules.frontier.craygnu-mphipcc
-  export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc_v3.23.0
+  export PETSC_DIR=/lustre/orion/cli192/proj-shared/petsc_v3.24.1
 
   if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=craygnu-mphipcc-opt-64bit-gcc-13-3-0-95934b0d393
+      export PETSC_ARCH=craygnu-mphipcc-opt-64bit-gcc-13-3-0-b522cb8c110
   elif [ "$config" -eq 2 ]; then
-      export PETSC_ARCH=craygnu-mphipcc-debug-64bit-gcc-13-3-0-95934b0d393
+      export PETSC_ARCH=craygnu-mphipcc-debug-64bit-gcc-13-3-0-b522cb8c110
   elif [ "$config" -eq 3 ]; then
-      export PETSC_ARCH=craygnu-mphipcc-opt-32bit-gcc-13-3-0-95934b0d393
+      export PETSC_ARCH=craygnu-mphipcc-opt-32bit-gcc-13-3-0-b522cb8c110
   fi
 
 #elif [ "$mach" = "aurora"  ]; then
@@ -142,19 +142,19 @@ echo ""
 echo "  source $MODULE_FILE"
 echo "  export PETSC_DIR=$PETSC_DIR"
 echo "  export PETSC_ARCH=$PETSC_ARCH"
-if [ "$mach" = "frontier" ]; then
-echo "  "
-echo "  # Additionally, updating PKG_CONFIG_PATH on Frontier via:"
-echo "  export PKG_CONFIG_PATH=\$PETSC_DIR/\$PETSC_ARCH/lib/pkgconfig:\$PKG_CONFIG_PATH"
-echo "  "
-fi
+#if [ "$mach" = "frontier" ]; then
+#echo "  "
+#echo "  # Additionally, updating PKG_CONFIG_PATH on Frontier via:"
+#echo "  export PKG_CONFIG_PATH=\$PETSC_DIR/\$PETSC_ARCH/lib/pkgconfig:\$PKG_CONFIG_PATH"
+#echo "  "
+#fi
 echo ""
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 source $MODULE_FILE
 export PETSC_DIR=$PETSC_DIR
 export PETSC_ARCH=$PETSC_ARCH
 
-if [ "$mach" = "frontier" ]; then
-  export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"
-fi
+#if [ "$mach" = "frontier" ]; then
+#  export PKG_CONFIG_PATH="$PETSC_DIR/$PETSC_ARCH/lib/pkgconfig:$PKG_CONFIG_PATH"
+#fi
 
