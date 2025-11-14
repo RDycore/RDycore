@@ -56,7 +56,7 @@ rdycore_file=Houston1km_with_z_updated.nc
 l2r_map_file=map.Houston1km.ELM_to_RDycore.nc
 r2l_map_file=map.Houston1km.RDycore_to_ELM.nc
 
-rdycore_yaml_file=Houston1km.CriticalBC.updated.yaml
+rdycore_yaml_file=$PWD/Houston1km.CriticalBC.updated.yaml
 rdycore_ic_file=Houston1km.IC.dat
 rdycore_mesh_file=Houston1km_with_z_updated.exo
 
@@ -64,16 +64,12 @@ if [ "$mach" == "pm-cpu" ]; then
 
   data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey/Houston1km
   device="cpu"
-  macros_file_in=${PWD}/gnu_pm-cpu.cmake.pm-cpu-opt-32bit-gcc-13-2-1-95934b0d393
-  macros_file_out=gnu_pm-cpu.cmake
   compiler=gnu
 
 elif [ "$mach" == "pm-gpu" ]; then
 
   data_dir=/global/cfs/projectdirs/m4267/shared/data/harvey/Houston1km
   device="gpu"
-  macros_file_in=${PWD}/gnugpu_pm-gpu.cmake.pm-gpu-opt-32bit-gcc-13-2-1-95934b0d393
-  macros_file_out=gnugpu_pm-gpu.cmake
   compiler=gnugpu
 
 else
@@ -93,29 +89,8 @@ start_date="2011-08-26"
 # Start creating and building the case
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# 1. Let's build RDycore
+# 1. Create an E3SM case
 src_dir=${e3sm_dir}
-rdycore_dir=$e3sm_dir/externals/rdycore/
-
-cd $rdycore_dir
-
-source config/set_petsc_settings.sh --mach $mach --config 3
-
-if [ ! -d "$rdycore_dir/build-$PETSC_ARCH" ]
-then
-  echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-  echo "The following expected RDycore build directory not found:$rdycore_dir/build-$PETSC_ARCH "
-  echo "So, attempting to build RDycore."
-  echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-
-  cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH -G Ninja
-fi
-
-# Build 
-cd build-$PETSC_ARCH
-ninja -j4 install
-
-# 2. Create an E3SM case
 
 cd $src_dir
 git_hash=`git log -n 1 --format=%h`
@@ -162,13 +137,6 @@ EOF
 
 ./case.setup --disable-git
 
-# Modify Macros file
-cp ${macros_file_in} cmake_macros/${macros_file_out}
-
-sed -i "s/PLACEHOLDER_E3SM_DIR/${e3sm_dir//\//\\/}/g" cmake_macros/${macros_file_out}
-sed -i "s/PLACEHOLDER_PETSC_DIR/${PETSC_DIR//\//\\/}/g" cmake_macros/${macros_file_out}
-sed -i "s/PLACEHOLDER_PETSC_ARCH/${PETSC_ARCH}/g" cmake_macros/${macros_file_out}
-
 if [ "$mach" == "pm-cpu" ]; then
   ./xmlchange run_exe="\${EXEROOT}/e3sm.exe -ceed /cpu/self -log_view"
 elif [ "$mach" == "pm-gpu" ]; then
@@ -192,11 +160,11 @@ rundir=`./xmlquery RUNDIR --value`
 
 cd $rundir
 
-cp $rdycore_data_dir/$rdycore_yaml_file rdycore.yaml
+cp $rdycore_yaml_file rdycore.yaml
 ln -s $rdycore_data_dir/$rdycore_ic_file  .
 ln -s $rdycore_data_dir/$rdycore_mesh_file .
 
 
 cd ${case_dir}/${case_name}
-./case.build
+./case.build --ninja
 
