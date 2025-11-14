@@ -11,8 +11,11 @@ set(RDYCORE_C_SOURCE_FILES
   rdyamr.c
   rdysetup.c
   operator.c
-  operator_ceed.c
-  operator_petsc.c
+  operator_fluxes_ceed.c
+  operator_fluxes_petsc.c
+  operator_sources_ceed.c
+  operator_sources_petsc.c
+  petsc_operator.c
   swe/swe_ceed.c
   swe/swe_petsc.c
   sediment/sediment_ceed.c

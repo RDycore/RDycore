@@ -469,7 +469,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   // flux suboperator 0: fluxes between interior cells
 
   CeedOperator interior_flux_op;
-  PetscCall(CreateCeedInteriorFluxOperator(*config, mesh, &interior_flux_op));
+  PetscCall(CreateCeedInteriorFluxSuboperator(*config, mesh, &interior_flux_op));
   PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
@@ -477,7 +477,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
     CeedOperator boundary_flux_op;
     RDyBoundary  boundary  = boundaries[b];
     RDyCondition condition = boundary_conditions[b];
-    PetscCall(CreateCeedBoundaryFluxOperator(*config, mesh, boundary, condition, &boundary_flux_op));
+    PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, boundary, condition, &boundary_flux_op));
     PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
