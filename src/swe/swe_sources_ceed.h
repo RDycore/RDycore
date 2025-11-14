@@ -146,7 +146,7 @@ CEED_QFUNCTION_HELPER int SWESources(void *ctx, CeedInt Q, const CeedScalar *con
       }
     }
 
-    sources[0][i] = riemannf[0][i];
+    sources[0][i] = riemannf[0][i] + ext_src[0][i];
     sources[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
     sources[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
   }

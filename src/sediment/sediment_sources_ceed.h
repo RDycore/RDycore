@@ -133,10 +133,6 @@ CEED_QFUNCTION(SedimentSourcesWithSemiImplicitBedFriction)(void *ctx, CeedInt Q,
   return SedimentSources(ctx, Q, in, out, SEDIMENT_BED_FRICTION_SEMI_IMPLICIT);
 }
 
-CEED_QFUNCTION(SedimentSourcesWithImplicitBedFrictionXQ2018)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  return SedimentSources(ctx, Q, in, out, SEDIMENT_BED_FRICTION_IMPLICIT_XQ2018);
-}
-
 #pragma GCC diagnostic   pop
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
