@@ -19,12 +19,85 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-// flow and sediment regional source operator Q-function
-CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(SedimentFluxDivergenceSourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*riemannf)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SedimentContext context            = (SedimentContext)ctx;
+
+  const CeedInt flow_ndof = context->flow_ndof;
+
+  const CeedScalar tiny_h                  = context->tiny_h;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    const CeedScalar h  = q[0][i];
+
+    if (h > tiny_h) {
+      for (CeedInt j = 0; j < context->sed_ndof; ++j) {
+        cell[flow_ndof + j][i] += riemannf[flow_ndof + j][i];
+      }
+    }
+
+    cell[0][i] += riemannf[0][i];
+    cell[1][i] += riemannf[1][i];
+    cell[2][i] += riemannf[2][i];
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SedimentExternalSourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*geom)[CEED_Q_VLA]      = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
   const CeedScalar(*ext_src)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
   const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // material properties
   const CeedScalar(*riemannf)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[3];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SedimentContext context            = (SedimentContext)ctx;
+
+  const CeedInt flow_ndof = context->flow_ndof;
+  const CeedScalar tiny_h = context->tiny_h;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    const CeedScalar h  = q[0][i];
+
+    if (h > tiny_h) {
+      for (CeedInt j = 0; j < context->sed_ndof; ++j) {
+        cell[flow_ndof + j][i] += ext_src[flow_ndof + j][i];
+      }
+    }
+
+    cell[0][i] += ext_src[0][i];
+    cell[1][i] += ext_src[1][i];
+    cell[2][i] += ext_src[2][i];
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SWEBedElevationSlopeSourceTerm)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*geom)[CEED_Q_VLA]      = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
+  const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  const SedimentContext context            = (SedimentContext)ctx;
+
+  const CeedScalar gravity                 = context->gravity;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    const CeedScalar h  = q[0][i];
+
+    const CeedScalar dz_dx = geom[0][i];
+    const CeedScalar dz_dy = geom[1][i];
+
+    const CeedScalar bedx = dz_dx * gravity * h;
+    const CeedScalar bedy = dz_dy * gravity * h;
+
+    cell[1][i] -= bedx;
+    cell[2][i] -= bedy;
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SedimentBedFrictionRoughnessSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // material properties
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
   CeedScalar(*cell)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
   const SedimentContext context            = (SedimentContext)ctx;
@@ -52,15 +125,6 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
     const CeedScalar u = SafeDiv(state.hu, h, h, tiny_h);
     const CeedScalar v = SafeDiv(state.hv, h, h, tiny_h);
 
-    const CeedScalar dz_dx = geom[0][i];
-    const CeedScalar dz_dy = geom[1][i];
-
-    const CeedScalar bedx = dz_dx * gravity * h;
-    const CeedScalar bedy = dz_dy * gravity * h;
-
-    const CeedScalar Fsum_x = riemannf[1][i];
-    const CeedScalar Fsum_y = riemannf[2][i];
-
     CeedScalar tbx = 0.0, tby = 0.0;
     if (h > tiny_h) {
       const CeedScalar mannings_n = mat_props[MATERIAL_PROPERTY_MANNINGS][i];
@@ -72,21 +136,24 @@ CEED_QFUNCTION(SedimentSourceTermSemiImplicit)(void *ctx, CeedInt Q, const CeedS
 
       const CeedScalar factor = tb / (1.0 + dt * tb);
 
-      tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
-      tby = (hv + dt * Fsum_y - dt * bedy) * factor;
+      // gather other source contributions, since we're the last term
+      const CeedScalar dsxdt = cell[1][i];
+      const CeedScalar dsydt = cell[2][i];
+
+      tbx = (hu + dt * dsxdt) * factor;
+      tby = (hv + dt * dsydt) * factor;
 
       for (CeedInt j = 0; j < context->sed_ndof; ++j) {
         const CeedScalar ci    = SafeDiv(state.hci[j], h, h, tiny_h);
         CeedScalar       tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
         CeedScalar       ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
         CeedScalar       di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
-        cell[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (ei - di) + ext_src[flow_ndof + j][i];
+        cell[flow_ndof + j][i] += (ei - di); // FIXME: is this where this term belongs?
       }
     }
 
-    cell[0][i] = riemannf[0][i] + ext_src[0][i];
-    cell[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
-    cell[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
+    cell[1][i] -= tbx;
+    cell[2][i] -= tby;
   }
   return 0;
 }
