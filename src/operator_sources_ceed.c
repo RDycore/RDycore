@@ -47,7 +47,6 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
       } else {
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentSourcesWithoutBedFriction, SedimentSourcesWithoutBedFriction_loc, qf));
         PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
-        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SOURCE_IMPLICIT_XQ2018 is not supported in sediment CEED version");
       }
       break;
     default:
@@ -97,7 +96,7 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
 /// @param [in]  mesh    mesh defining the computational domain of the operator
 /// @param [out] ceed_op a CeedOperator that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode CreateCeedSource0Operator(const RDyConfig config, RDyMesh *mesh, CeedOperator *ceed_op) {
+static PetscErrorCode CreateCeedSourceSuboperator(const RDyConfig config, RDyMesh *mesh, CeedOperator *ceed_op) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -219,7 +218,7 @@ PetscErrorCode CreateCeedSourceOperator(RDyConfig *config, RDyMesh *mesh, CeedOp
   PetscCall(CeedOperatorCreateComposite(ceed, source_op));
 
   CeedOperator source_0;
-  PetscCall(CreateCeedSource0Operator(*config, mesh, &source_0));
+  PetscCall(CreateCeedSourceSuboperator(*config, mesh, &source_0));
   PetscCall(CeedOperatorCompositeAddSub(*source_op, source_0));
 
   PetscFunctionReturn(PETSC_SUCCESS);
