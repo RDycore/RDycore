@@ -817,7 +817,11 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
 
   SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
   SET_MISSING_PARAMETER(config->physics.flow.h_anuga_regular, 0.0);
-  SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_SEMI_IMPLICIT);
+  if (config->numerics.temporal == TEMPORAL_ARK_IMEX) {
+    SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_ARK_IMEX);
+  } else {
+    SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_SEMI_IMPLICIT);
+  }
   if (config->physics.flow.source.method == SOURCE_IMPLICIT_XQ2018) {
     SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
   }
@@ -866,6 +870,10 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // check flow settings
   if ((config->physics.flow.source.xq2018_threshold > 0.0) && (config->physics.flow.source.method != SOURCE_IMPLICIT_XQ2018)) {
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Erroneously set XQ2018 threshold: %g", config->physics.flow.source.xq2018_threshold);
+  }
+  if ((config->physics.flow.source.method != SOURCE_ARK_IMEX) && (config->numerics.temporal == TEMPORAL_ARK_IMEX)) {
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid source method for ARK-IMEX temporal discretization");
   }
 
   // check sediment dynamics settings
@@ -877,8 +885,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if (config->numerics.spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
   }
-  if (config->numerics.temporal != TEMPORAL_EULER) {
-    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the forward euler temporal method (EULER) is currently implemented.");
+  if (config->numerics.temporal == TEMPORAL_BEULER) {
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented.");
   }
   if (config->numerics.riemann != RIEMANN_ROE) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) is currently implemented.");
