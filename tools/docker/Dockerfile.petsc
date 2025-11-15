@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   git \
   gmsh \
   gpg \
+  hdf5-tools \
   lcov \
   liblapack-dev \
   libmpich-dev \
@@ -60,7 +61,7 @@ RUN \
     --download-fblaslapack \
     --download-hdf5 \
     --download-cgns \
-    --download-libceed \
+    --download-libceed=https://github.com/CEED/libCEED/archive/refs/heads/main.zip \
     --download-metis \
     --download-muparser \
     --download-netcdf \

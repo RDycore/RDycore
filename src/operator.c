@@ -154,9 +154,9 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 
     // add this vector to all source sub-operators
     CeedInt num_source_suboperators;
-    PetscCallCEED(CeedCompositeOperatorGetNumSub(op->ceed.source, &num_source_suboperators));
+    PetscCallCEED(CeedOperatorCompositeGetNumSub(op->ceed.source, &num_source_suboperators));
     CeedOperator *source_suboperators;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &source_suboperators));
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &source_suboperators));
     for (CeedInt i = 0; i < num_source_suboperators; ++i) {
       PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "riemannf", flux_div_restriction, CEED_BASIS_NONE, op->ceed.flux_divergence));
     }
@@ -513,7 +513,7 @@ static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edge
 
   // get the relevant interior sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op_edges, &sub_ops));
   CeedOperator interior_flux_op = sub_ops[0];
 
   // fetch the field
@@ -552,7 +552,7 @@ static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edge
 
     // get the relevant boundary sub-operator
     CeedOperator *sub_ops;
-    PetscCallCEED(CeedCompositeOperatorGetSubList(op_edges, &sub_ops));
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op_edges, &sub_ops));
     CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
 
     // fetch the field
@@ -683,7 +683,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
   CeedOperator sub_op = sub_ops[1 + boundary.index];
 
   // fetch the relevant vector
@@ -710,7 +710,7 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
 
   // get the relevant boundary sub-operator
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.flux, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
   CeedOperator sub_op = sub_ops[1 + boundary.index];
 
   // copy the data in
@@ -875,7 +875,7 @@ static PetscErrorCode GetCeedSourceOperatorRegionData(Operator *op, RDyRegion re
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // fetch the relevant vector
@@ -902,7 +902,7 @@ static PetscErrorCode RestoreCeedSourceOperatorRegionData(Operator *op, RDyRegio
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
@@ -1071,7 +1071,7 @@ static PetscErrorCode GetCeedSourceOperatorDomainData(Operator *op, const char *
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // fetch the relevant vector
@@ -1097,7 +1097,7 @@ static PetscErrorCode RestoreCeedSourceOperatorDomainData(Operator *op, const ch
   PetscFunctionBegin;
 
   CeedOperator *sub_ops;
-  PetscCallCEED(CeedCompositeOperatorGetSubList(op->ceed.source, &sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &sub_ops));
   CeedOperator source_op = sub_ops[0];
 
   // copy the data into place
