@@ -1024,6 +1024,8 @@ PetscErrorCode InitSolver(RDy rdy) {
       PetscCall(OperatorCreateJacobianMatrix(rdy->operator, & rdy->J));
       PetscCall(TSSetRHSJacobian(rdy->ts, rdy->J, rdy->J, OperatorRHSJacobian, rdy));
       break;
+    default:
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported time discretization");
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
