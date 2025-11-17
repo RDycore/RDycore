@@ -110,6 +110,7 @@ static const cyaml_strval_t numerics_spatial_types[] = {
 static const cyaml_strval_t numerics_temporal_types[] = {
     {"euler",  TEMPORAL_EULER },
     {"rk4",    TEMPORAL_RK4   },
+    {"ark_imex", TEMPORAL_ARK_IMEX},
     {"beuler", TEMPORAL_BEULER},
 };
 

@@ -9,6 +9,8 @@
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
 #include <unistd.h>     // for getpid() and gethostname()
+#include <private/rdymathimpl.h>
+#include "swe/swe_roe_flux_petsc.h"
 
 // time conversion factors
 static const PetscReal secs_in_min = 60.0;
@@ -1053,6 +1055,75 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+  DM  dm  = rdy->dm;
+
+  PetscCall(DMGlobalToLocalBegin(dm, Udot, INSERT_VALUES, rdy->udot_local));
+  PetscCall(DMGlobalToLocalEnd(dm, Udot, INSERT_VALUES, rdy->udot_local));
+  PetscCall(DMGlobalToLocalBegin(dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(dm, U, INSERT_VALUES, rdy->u_local));
+
+  Vec mat_props_vec = rdy->operator->petsc.material_properties;
+
+  PetscScalar *mat_props_ptr, *u_ptr, *udot_ptr, *f_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
+  PetscCall(VecGetArray(rdy->udot_local, &udot_ptr));
+  PetscCall(VecGetArray(F, &f_ptr));
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));
+
+  PetscInt n_dof = 3;
+  PetscInt num_mat_props = NUM_MATERIAL_PROPERTIES;
+  PetscReal tiny_h =  rdy->config.physics.flow.tiny_h;
+
+  RDyMesh *mesh = &rdy->mesh;
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (mesh->cells.is_owned[c]) {
+      PetscInt owned_cell = mesh->cells.local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+
+      if (h >= tiny_h) {
+
+        PetscReal hu = u_ptr[n_dof * c + 1];
+        PetscReal hv = u_ptr[n_dof * c + 2];
+        PetscReal u = hu / h;
+        PetscReal v = hv / h;
+
+        // Manning's coefficient
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell + MATERIAL_PROPERTY_MANNINGS];
+
+        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
+
+        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+
+        PetscReal h_dot  = udot_ptr[n_dof * c + 0];
+        PetscReal hu_dot = udot_ptr[n_dof * c + 1];
+        PetscReal hv_dot = udot_ptr[n_dof * c + 2];
+
+        f_ptr[n_dof * owned_cell + 0] = h_dot;
+        f_ptr[n_dof * owned_cell + 1] = hu_dot + Cd * hu / h * velocity;
+        f_ptr[n_dof * owned_cell + 2] = hv_dot + Cd * hv / h * velocity;;
+
+      } else {
+
+        f_ptr[n_dof * owned_cell + 0] = 0.0;
+        f_ptr[n_dof * owned_cell + 1] = 0.0;
+        f_ptr[n_dof * owned_cell + 2] = 0.0;
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->udot_local, &udot_ptr));
+  PetscCall(VecRestoreArray(F, &f_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
 
@@ -1065,6 +1136,9 @@ PetscErrorCode InitSolver(RDy rdy) {
   switch (rdy->config.numerics.temporal) {
     case TEMPORAL_EULER:
       PetscCall(TSSetType(rdy->ts, TSEULER));
+      break;
+    case TEMPORAL_ARK_IMEX:
+      PetscCall(TSSetType(rdy->ts, TSARKIMEX));
       break;
     case TEMPORAL_RK4:
       PetscCall(TSSetType(rdy->ts, TSRK));
@@ -1081,6 +1155,10 @@ PetscErrorCode InitSolver(RDy rdy) {
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
+
+  if (rdy->config.numerics.temporal == TEMPORAL_ARK_IMEX) {
+    PetscCall(TSSetIFunction(rdy->ts, rdy->rhs, OperatorIFunction, rdy));
+  }
 
   if (!rdy->config.time.adaptive.enable) {
     PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.stop_n));

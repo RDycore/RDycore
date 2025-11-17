@@ -240,6 +240,10 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->udot_global));
+  PetscCall(VecDuplicate(rdy->u_local, &rdy->udot_local));
+  PetscCall(DMCreateMatrix(rdy->dm, &rdy->ijacobian));
+
   // diagnostics are all piled into a single vector whose block size is the
   // total number of field components
   PetscCall(DMCreateGlobalVector(rdy->dm_diags, &rdy->vec_diags));
