@@ -1073,6 +1073,8 @@ PetscErrorCode InitSolver(RDy rdy) {
     case TEMPORAL_BEULER:
       PetscCall(TSSetType(rdy->ts, TSBEULER));
       break;
+    default:
+      PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported time discretization");
   }
   PetscCall(TSSetDM(rdy->ts, rdy->dm));
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));

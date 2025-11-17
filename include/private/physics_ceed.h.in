@@ -18,4 +18,14 @@
 // sediment dynamics
 #define MAX_NUM_SEDIMENT_CLASSES   @MAX_NUM_SEDIMENT_CLASSES@
 
+// convenience macros
+
+#ifndef Square
+#define Square(x) ((x) * (x))
+#endif
+
+#ifndef SafeDiv
+#define SafeDiv(a, b, c, tiny) ((c) > (tiny) ? (a) / (b) : 0.0)
+#endif
+
 #endif
