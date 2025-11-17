@@ -59,6 +59,7 @@ static const cyaml_strval_t physics_flow_modes[] = {
 static const cyaml_strval_t source_time_methods[] = {
     {"semi_implicit",   SOURCE_SEMI_IMPLICIT  },
     {"implicit_xq2018", SOURCE_IMPLICIT_XQ2018},
+    {"ark_imex",        SOURCE_ARK_IMEX},
 };
 
 // mapping of treatment of "source" fields to members

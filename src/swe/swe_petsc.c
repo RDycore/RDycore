@@ -715,6 +715,73 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// adds source terms to the right hand side vector F
+static PetscErrorCode ApplySourceNoFriction(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBeginUser;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
+
+  SourceOperator *source_op     = context;
+  Vec             source_vec    = source_op->external_sources;
+  Vec             mat_props_vec = source_op->material_properties;
+  RDyMesh        *mesh          = source_op->mesh;
+  RDyCells       *cells         = &mesh->cells;
+  PetscReal       tiny_h        = source_op->tiny_h;
+
+  // access Vec data
+  PetscScalar *source_ptr, *mat_props_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));        // sequential vector
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));                // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));               // domain global vector (indexed by owned cells)
+
+  // access previously-computed flux divergence data
+  Vec flux_div;
+  PetscCall(PetscOperatorFieldsGet(fields, "riemannf", &flux_div));
+  PetscCheck(flux_div, comm, PETSC_ERR_USER, "No 'riemannf' field found in source operator!");
+  PetscScalar *flux_div_ptr;
+  PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
+
+  PetscInt size;
+  PetscCall(VecGetSize(source_vec, &size));
+  PetscInt n_dof = size / mesh->num_owned_cells;
+  PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) {
+      PetscInt owned_cell_id = cells->local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+
+      PetscReal dz_dx = cells->dz_dx[c];
+      PetscReal dz_dy = cells->dz_dy[c];
+
+      PetscReal bedx = 0.0;
+      PetscReal bedy = 0.0;
+
+      if (h > tiny_h) {
+        // wet conditions
+        bedx = dz_dx * GRAVITY * h;
+        bedy = dz_dy * GRAVITY * h;
+      }
+
+      // add gravity term and rainfall/momentum source term
+      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+      f_ptr[n_dof * owned_cell_id + 1] += -bedx + source_ptr[n_dof * owned_cell_id + 1];
+      f_ptr[n_dof * owned_cell_id + 2] += -bedy + source_ptr[n_dof * owned_cell_id + 2];
+    }
+  }
+
+  // restore vectors
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+  PetscCall(VecRestoreArray(source_vec, &source_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DestroySource(void *context) {
   PetscFunctionBegin;
   SourceOperator *source_op = context;
@@ -751,6 +818,9 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, const RDyConfig confi
       break;
     case SOURCE_IMPLICIT_XQ2018:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
+      break;
+    case SOURCE_ARK_IMEX:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceNoFriction, DestroySource, petsc_op));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
