@@ -1120,6 +1120,85 @@ static PetscErrorCode OperatorIFunction(TS ts, PetscReal t, Vec U, Vec Udot, Vec
   PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
   PetscCall(VecRestoreArray(rdy->udot_local, &udot_ptr));
   PetscCall(VecRestoreArray(F, &f_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode OperatorIJacobian(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat Jpre, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+
+  Vec mat_props_vec = rdy->operator->petsc.material_properties;
+
+  PetscScalar *mat_props_ptr, *u_ptr, *udot_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
+  PetscCall(VecGetArray(rdy->udot_local, &udot_ptr));
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));
+
+  PetscInt n_dof = 3;
+  PetscInt num_mat_props = NUM_MATERIAL_PROPERTIES;
+  PetscReal tiny_h =  rdy->config.physics.flow.tiny_h;
+
+  RDyMesh *mesh = &rdy->mesh;
+  PetscCall(MatZeroEntries(Jpre));
+
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (mesh->cells.is_owned[c]) {
+      PetscInt owned_cell = mesh->cells.local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+
+      PetscReal Jac[9] = {0}; // assuming 3 DOFs for SWE
+
+      if (h >= tiny_h) {
+        Jac[0] = shift; // jacobinan for "shift * (h)_t"
+        Jac[4] = shift; // jacobinan for "shift * (hu)_t"
+        Jac[8] = shift; // jacobinan for "shift * (hv)_t"
+
+        PetscReal hu = u_ptr[n_dof * c + 1];
+        PetscReal hv = u_ptr[n_dof * c + 2];
+        PetscReal u = hu / h;
+        PetscReal v = hv / h;
+
+        // Manning's coefficient
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell + MATERIAL_PROPERTY_MANNINGS];
+
+        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+        PetscReal sqr_root_inv_velocity = PetscPowReal(velocity, -1.0/2.0);
+        PetscReal h_pow_seven_thirds = PetscPowReal(h, 7.0/3.0);
+        PetscReal h_pow_ten_thirds = PetscPowReal(h, 10.0/3.0);
+
+        PetscReal gn2 = GRAVITY * Square(N_mannings);
+        PetscReal hu_2 = hu * hu;
+        PetscReal hv_2 = hv * hv;
+        PetscReal hu_2_plus_hv_2 = hu_2 + hv_2;
+
+        if (velocity > 1.e-12) {
+          Jac[3] += gn2 * (-4.0 * hu * hu_2_plus_hv_2) / (3.0 * h_pow_ten_thirds) * sqr_root_inv_velocity; // dF2/dh
+          Jac[4] += gn2 * (2.0 * hu_2 + hv_2) / (h_pow_seven_thirds) * sqr_root_inv_velocity; // dF2/d(hu)
+          Jac[5] += gn2 * (hu * hv) / (h_pow_seven_thirds) * sqr_root_inv_velocity; // dF2/d(hv)
+
+          Jac[6] += gn2 * (-4.0 * hv * hu_2_plus_hv_2) / (3.0 * h_pow_ten_thirds) * sqr_root_inv_velocity; // dF3/dh
+          Jac[7] += gn2 * (hu * hv) / (h_pow_seven_thirds) * sqr_root_inv_velocity; // dF3/d(hu)
+          Jac[8] += gn2 * (hu_2 + 2.0 * hv_2) / (h_pow_seven_thirds) * sqr_root_inv_velocity; // dF3/d(hv)
+        }
+      } else{  // put identity on the diagonal to avoid singularities
+          Jac[0] = 1.0;
+          Jac[4] = 1.0;
+          Jac[8] = 1.0;
+      }
+      PetscCall(MatSetValuesBlockedLocal(Jpre, 1, &owned_cell, 1, &owned_cell, Jac, ADD_VALUES));
+    }
+  }
+
+  PetscCall(MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(Jpre, MAT_FINAL_ASSEMBLY));
+
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->udot_local, &udot_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1157,7 +1236,8 @@ PetscErrorCode InitSolver(RDy rdy) {
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 
   if (rdy->config.numerics.temporal == TEMPORAL_ARK_IMEX) {
-    PetscCall(TSSetIFunction(rdy->ts, rdy->rhs, OperatorIFunction, rdy));
+    PetscCall(TSSetIFunction(rdy->ts, rdy->udot_global, OperatorIFunction, rdy));
+    PetscCall(TSSetIJacobian(rdy->ts, rdy->ijacobian, rdy->ijacobian, OperatorIJacobian, rdy));
   }
 
   if (!rdy->config.time.adaptive.enable) {
