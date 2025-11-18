@@ -202,6 +202,10 @@ struct _p_RDy {
   // host right-hand-side (residual) vector
   Vec rhs;
 
+  // for imex methods
+  Vec udot_global, udot_local;
+  Mat ijacobian;
+
   // operator representing the system of equations
   Operator *operator;
 

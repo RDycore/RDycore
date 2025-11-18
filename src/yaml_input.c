@@ -59,6 +59,7 @@ static const cyaml_strval_t physics_flow_modes[] = {
 static const cyaml_strval_t source_time_methods[] = {
     {"semi_implicit",   SOURCE_SEMI_IMPLICIT  },
     {"implicit_xq2018", SOURCE_IMPLICIT_XQ2018},
+    {"ark_imex",        SOURCE_ARK_IMEX},
 };
 
 // mapping of treatment of "source" fields to members
@@ -109,6 +110,7 @@ static const cyaml_strval_t numerics_spatial_types[] = {
 static const cyaml_strval_t numerics_temporal_types[] = {
     {"euler",  TEMPORAL_EULER },
     {"rk4",    TEMPORAL_RK4   },
+    {"ark_imex", TEMPORAL_ARK_IMEX},
     {"beuler", TEMPORAL_BEULER},
 };
 
