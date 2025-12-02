@@ -131,6 +131,55 @@ static PetscErrorCode ComputeSWERoeFlux(RiemannStateData *datal, RiemannStateDat
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode JacobianOfScalarFlux(const PetscReal h, const PetscReal u, const PetscReal v, PetscReal sn, PetscReal cn, PetscReal J[3][3]) {
+  PetscFunctionBeginUser;
+
+  PetscReal q1 = h;
+  PetscReal q2 = h * u;
+  PetscReal q3 = h * v;
+
+  PetscReal q1_pow2 = pow(q1, 2.0);
+
+  J[0][0] = 0.0;
+  J[0][1] = cn;
+  J[0][2] = sn;
+
+  J[1][0] = (-pow(q2, 2.0) * cn - q2 * q3 * sn ) / q1_pow2 +  GRAVITY * q1 * cn;
+  J[1][1] = 2.0 * q2 * cn / q1 + q3 * sn / q1;
+  J[1][2] = q2 * sn / q1;
+
+  J[2][0] = (-q2 * q3 * cn - pow(q3, 2.0) * sn ) / q1_pow2 + GRAVITY * q1 * sn;
+  J[2][1] = q3 * cn / q1;
+  J[2][2] = q2 * cn / q1 + 2.0 * q3 * sn / q1;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ComputeSWERoeFluxJacobian(RiemannStateData *datal, RiemannStateData *datar, const PetscReal *sn, const PetscReal *cn, PetscReal *jup, PetscReal *jdn){
+
+  PetscFunctionBeginUser;
+
+  PetscReal *hl = datal->h;
+  PetscReal *ul = datal->u;
+  PetscReal *vl = datal->v;
+
+  PetscReal *hr = datar->h;
+  PetscReal *ur = datar->u;
+  PetscReal *vr = datar->v;
+
+  PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
+
+  PetscInt num_states = datal->num_states;
+  for (PetscInt i = 0; i < num_states; ++i) {
+
+    PetscReal Jperp_l[3][3], Jperp_r[3][3];
+    PetscCall(JacobianOfScalarFlux(hl[i], ul[i], vl[i], sn[i], cn[i], Jperp_l));
+    PetscCall(JacobianOfScalarFlux(hr[i], ur[i], vr[i], sn[i], cn[i], Jperp_r));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
 #endif  // SWE_ROE_FLUX_PETSC_H
