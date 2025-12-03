@@ -469,6 +469,15 @@ static PetscErrorCode ComputeSWERoeFluxJacobian(RiemannStateData *datal, Riemann
     PetscCall(JacobianOfScalarFlux(hl[i], ul[i], vl[i], sn[i], cn[i], JperpL));
     PetscCall(JacobianOfScalarFlux(hr[i], ur[i], vr[i], sn[i], cn[i], JperpR));
     PetscCall(JacobianOfDissipiationTerm(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], JdissL, JdissR));
+
+    // save the jacobians left and right of the edge
+    PetscInt offset = 9 * i;
+    for (PetscInt r = 0; r < 3; ++r) {
+      for (PetscInt c = 0; c < 3; ++c) {
+        jup[offset + r * 3 + c] = 0.5 * (JperpL[r][c] - JdissL[r][c]);
+        jdn[offset + r * 3 + c] = 0.5 * (JperpR[r][c] + JdissR[r][c]);
+      }
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
