@@ -311,22 +311,22 @@ static PetscErrorCode JacobianOfDissipiationTerm(const PetscReal hl, const Petsc
     PetscReal dHatH_dQrl[3] = {pow(q1R / q1L, 0.5) * 0.5, 0.0, 0.0};
     PetscReal dHatH_dQrr[3] = {pow(q1L / q1R, 0.5) * 0.5, 0.0, 0.0};
 
-    PetscReal dh = q1R - q1L;
-    PetscReal dh_dQl[3] = { -1.0, 0.0, 0.0};
-    PetscReal dh_dQr[3] = { 1.0, 0.0, 0.0};
+    PetscReal dH = q1R - q1L;
+    PetscReal dH_dQl[3] = { -1.0, 0.0, 0.0};
+    PetscReal dH_dQr[3] = { 1.0, 0.0, 0.0};
 
-    dV[0] = 0.5 * (dh - HatH * dUperp / HatA);
+    dV[0] = 0.5 * (dH - HatH * dUperp / HatA);
     dV[1] = HatH * dupar;
-    dV[2] = 0.5 * (dh + HatH * dUperp / HatA);
+    dV[2] = 0.5 * (dH + HatH * dUperp / HatA);
 
     for (PetscInt k = 0; k < 3; ++k) {
-      dV_dQl[0][k] = 0.5 * (dh_dQl[k] - (dHatH_dQrl[k] * dUperp + HatH * ddUperp_dQl[k]) / HatA + HatH * dUperp * dHatA_dQl[k] / (HatA * HatA));
+      dV_dQl[0][k] = 0.5 * (dH_dQl[k] - (dHatH_dQrl[k] * dUperp + HatH * ddUperp_dQl[k]) / HatA + HatH * dUperp * dHatA_dQl[k] / (HatA * HatA));
       dV_dQl[1][k] = dHatH_dQrl[k] * dupar + HatH * ddupar_dQl[k];
-      dV_dQl[2][k] = 0.5 * (dh_dQl[k] + (dHatH_dQrl[k] * dUperp + HatH * ddUperp_dQl[k]) / HatA - HatH * dUperp * dHatA_dQl[k] / (HatA * HatA));
+      dV_dQl[2][k] = 0.5 * (dH_dQl[k] + (dHatH_dQrl[k] * dUperp + HatH * ddUperp_dQl[k]) / HatA - HatH * dUperp * dHatA_dQl[k] / (HatA * HatA));
 
-      dV_dQr[0][k] = 0.5 * (dh_dQr[k] - (dHatH_dQrr[k] * dUperp + HatH * ddUperp_dQr[k]) / HatA + HatH * dUperp * dHatA_dQr[k] / (HatA * HatA));
+      dV_dQr[0][k] = 0.5 * (dH_dQr[k] - (dHatH_dQrr[k] * dUperp + HatH * ddUperp_dQr[k]) / HatA + HatH * dUperp * dHatA_dQr[k] / (HatA * HatA));
       dV_dQr[1][k] = dHatH_dQrr[k] * dupar + HatH * ddupar_dQr[k];
-      dV_dQr[2][k] = 0.5 * (dh_dQr[k] + (dHatH_dQrr[k] * dUperp + HatH * ddUperp_dQr[k]) / HatA - HatH * dUperp * dHatA_dQr[k] / (HatA * HatA));
+      dV_dQr[2][k] = 0.5 * (dH_dQr[k] + (dHatH_dQrr[k] * dUperp + HatH * ddUperp_dQr[k]) / HatA - HatH * dUperp * dHatA_dQr[k] / (HatA * HatA));
     }
   }
 
