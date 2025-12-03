@@ -196,6 +196,9 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
   if ((*rdy)->vec_diags) PetscCall(VecDestroy(&(*rdy)->vec_diags));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
+  if ((*rdy)->udot_global) PetscCall(VecDestroy(&((*rdy)->udot_global)));
+  if ((*rdy)->udot_local) PetscCall(VecDestroy(&((*rdy)->udot_local)));
+  if ((*rdy)->ijacobian) PetscCall(MatDestroy(&((*rdy)->ijacobian)));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
