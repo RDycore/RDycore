@@ -374,14 +374,12 @@ static PetscErrorCode JacobianOfDissipiationTerm(const PetscReal hl, const Petsc
     {vhat - ahat * sn,  cn,        vhat + ahat * sn}
   };
 
-  PetscReal dR_dql[3][3][3], dR_dqr[3][3][3], G_l[3][3][3], G_r[3][3][3], H_l[3][3][3], H_r[3][3][3];
+  PetscReal G_l[3][3][3], G_r[3][3][3], H_l[3][3][3], H_r[3][3][3];
 
   // initialize derivatives of R to zero
   for (PetscInt i = 0; i < 3; ++i) {
     for (PetscInt j = 0; j < 3; ++j) {
       for (PetscInt k = 0; k < 3; ++k) {
-        dR_dql[i][j][k] = 0.0;
-        dR_dqr[i][j][k] = 0.0;
         G_l[i][j][k] = 0.0;
         G_r[i][j][k] = 0.0;
         H_l[i][j][k] = 0.0;
@@ -392,11 +390,11 @@ static PetscErrorCode JacobianOfDissipiationTerm(const PetscReal hl, const Petsc
 
   // only fill diagonals since others will be multiplied by zero later
   for (PetscInt k = 0; k < 3; k++) {
-    dR_dql[2][2][k] = dvhat_dql[k] + dahat_dql[k] * sn;
-    dR_dqr[2][2][k] = dvhat_dqr[k] + dahat_dqr[k] * sn;
+    PetscReal dR_dql = dvhat_dql[k] + dahat_dql[k] * sn;
+    PetscReal dR_dqr = dvhat_dqr[k] + dahat_dqr[k] * sn;
 
-    G_l[2][2][k] = dR_dql[2][2][k] * lambda3star;
-    G_r[2][2][k] = dR_dqr[2][2][k] * lambda3star;
+    G_l[2][2][k] = dR_dql * lambda3star;
+    G_r[2][2][k] = dR_dqr * lambda3star;
 
     H_l[0][0][k] = R[0][0] * dlambda1star_dql[k];
     H_l[1][1][k] = R[1][1] * dlambda2star_dql[k];
