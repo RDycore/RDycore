@@ -155,6 +155,301 @@ static PetscErrorCode JacobianOfScalarFlux(const PetscReal h, const PetscReal u,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ComputeLambdaAndDerivative (const PetscReal q1_l, const PetscReal q2_l, const PetscReal q3_l,
+                                           const PetscReal q1_r, const PetscReal q2_r, const PetscReal q3_r,
+                                           const PetscReal sn, const PetscReal cn,
+                                           const PetscReal uhatperp, const PetscReal ahat,
+                                           const PetscReal duhatperp_dql[3], const PetscReal dahat_dql[3],
+                                           const PetscReal duhatperp_dqr[3], const PetscReal dahat_dqr[3],
+                                           const PetscBool compute_Lambda1,
+                                           PetscReal *lambdastar,
+                                           PetscReal dlambdastar_dql[3],
+                                           PetscReal dlambdastar_dqr[3]) {
+
+  PetscFunctionBeginUser;
+
+  PetscReal factor = (compute_Lambda1) ? -1 : 1;
+
+  // compute lambda and its derivatives
+  PetscReal uperp_l = q2_l / q1_l * cn + q3_l / q1_l * sn;
+  PetscReal uperp_r = q2_r / q1_r * cn + q3_r / q1_r * sn;
+
+  PetscReal lambda_l = uperp_l + factor * pow(GRAVITY * q1_l, 0.5);
+  PetscReal lambda_r = uperp_r + factor * pow(GRAVITY * q1_r, 0.5);
+
+  PetscReal lambda_l_dql[3] = { (-q2_l * cn - q3_l * sn) / (q1_l * q1_l) + factor * 0.5 * pow(GRAVITY / q1_l, 0.5),
+                                 cn / q1_l,
+                                 sn / q1_l};
+  PetscReal lambda_r_dqr[3] = { (-q2_r * cn - q3_r * sn) / (q1_r * q1_r) + factor * 0.5 * pow(GRAVITY / q1_r, 0.5),
+                                 cn / q1_r,
+                                 sn / q1_r};
+
+  // compute delta lambda and its derivatives
+  PetscReal dellambda = 4.0 * (lambda_r - lambda_l);
+  PetscReal ddellambda_dql[3] = { -4.0 * lambda_l_dql[0],
+                                    -4.0 * lambda_l_dql[1],
+                                    -4.0 * lambda_l_dql[2]};
+  PetscReal ddellambda_dqr[3] = { 4.0 * lambda_r_dqr[0],
+                                    4.0 * lambda_r_dqr[1],
+                                    4.0 * lambda_r_dqr[2]};
+
+
+  // compute lambdahat and its derivatives
+  PetscReal lambdahat = (uhatperp - ahat);
+  PetscReal dlambdahat_dql[3] = { duhatperp_dql[0] - dahat_dql[0],
+                                   duhatperp_dql[1] - dahat_dql[1],
+                                   duhatperp_dql[2] - dahat_dql[2]};
+  PetscReal dlambdahat_dqr[3] = { duhatperp_dqr[0] - dahat_dqr[0],
+                                   duhatperp_dqr[1] - dahat_dqr[1],
+                                   duhatperp_dqr[2] - dahat_dqr[2]};
+
+  if (fabs(lambdahat) < 0.5 * fabs(dellambda) ) {
+    PetscReal factor = (lambdahat > 0.0) ? 1.0 : -1.0;
+
+    // apply correction
+    *lambdastar = factor * (lambdahat * lambdahat) / dellambda + dellambda / 4.0;
+
+    dlambdastar_dql[0] = factor * ( (2.0 * lambdahat * dlambdahat_dql[0] * dellambda - lambdahat * lambdahat * ddellambda_dql[0]) / (dellambda * dellambda) + 0.25 * ddellambda_dql[0]);
+    dlambdastar_dql[1] = factor * ( (2.0 * lambdahat * dlambdahat_dql[1] * dellambda - lambdahat * lambdahat * ddellambda_dql[1]) / (dellambda * dellambda) + 0.25 * ddellambda_dql[1]);
+    dlambdastar_dql[2] = factor * ( (2.0 * lambdahat * dlambdahat_dql[2] * dellambda - lambdahat * lambdahat * ddellambda_dql[2]) / (dellambda * dellambda) + 0.25 * ddellambda_dql[2]);
+
+    dlambdastar_dqr[0] = factor * ( (2.0 * lambdahat * dlambdahat_dqr[0] * dellambda - lambdahat * lambdahat * ddellambda_dqr[0]) / (dellambda * dellambda) + 0.25 * ddellambda_dqr[0]);
+    dlambdastar_dqr[1] = factor * ( (2.0 * lambdahat * dlambdahat_dqr[1] * dellambda - lambdahat * lambdahat * ddellambda_dqr[1]) / (dellambda * dellambda) + 0.25 * ddellambda_dqr[1]);
+    dlambdastar_dqr[2] = factor * ( (2.0 * lambdahat * dlambdahat_dqr[2] * dellambda - lambdahat * lambdahat * ddellambda_dqr[2]) / (dellambda * dellambda) + 0.25 * ddellambda_dqr[2]);
+
+  } else {
+
+    PetscReal factor = (lambdahat > 0.0) ? 1.0 : -1.0;
+
+    // no correction
+    *lambdastar = factor * lambdahat;
+
+    dlambdastar_dql[0] = factor * dlambdahat_dql[0];
+    dlambdastar_dql[1] = factor * dlambdahat_dql[1];
+    dlambdastar_dql[2] = factor * dlambdahat_dql[2];
+
+    dlambdastar_dqr[0] = factor * dlambdahat_dqr[0];
+    dlambdastar_dqr[1] = factor * dlambdahat_dqr[1];
+    dlambdastar_dqr[2] = factor * dlambdahat_dqr[2];
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode JacobianOfDissipiationTerm(const PetscReal hl, const PetscReal ul, const PetscReal vl, const PetscReal hr, const PetscReal ur,
+                                                 const PetscReal vr, PetscReal sn, PetscReal cn, PetscReal Jl[3][3],PetscReal Jr[3][3]) {
+  PetscFunctionBeginUser;
+
+  PetscReal q1_l = hl;
+  PetscReal q2_l = hl * ul;
+  PetscReal q3_l = hl * vl;
+
+  PetscReal q1_r = hr;
+  PetscReal q2_r = hr * ur;
+  PetscReal q3_r = hr * vr;
+
+  PetscReal q1_l_sqrt = pow(q1_l, 0.5);
+  PetscReal q1_r_sqrt = pow(q1_r, 0.5);
+
+  // compute Roe averages: uhat and derivatives
+  PetscReal uhat = ( q2_l / q1_l_sqrt + q2_r / q1_r_sqrt) / (q1_l_sqrt + q1_r_sqrt);
+  PetscReal common_denom = 2.0 * q1_l_sqrt * q1_r_sqrt * pow(q1_l_sqrt + q1_r_sqrt, 2.0);
+  PetscReal duhat_dql[3] = { - (q1_l * q2_r + 2.0 * q2_l * q1_l_sqrt * q1_r_sqrt + q2_l * q1_r) / (q1_l * common_denom),
+                             1.0 / (q1_l_sqrt * (q1_l_sqrt + q1_r_sqrt)),
+                             0.0};
+  PetscReal duhat_dqr[3] = { - (q1_r * q2_l + 2.0 * q2_r * q1_l_sqrt * q1_r_sqrt + q2_r * q1_l) / (q1_r * common_denom),
+                             1.0 / (q1_r_sqrt * (q1_l_sqrt + q1_r_sqrt)),
+                             0.0};
+
+    // compute Roe averages: vhat and its derivatives
+  PetscReal vhat = ( q3_l / q1_l_sqrt + q3_r / q1_r_sqrt) / (q1_l_sqrt + q1_r_sqrt);
+  PetscReal dvhat_dql[3] = { - (q1_l * q3_r + 2.0 * q3_l * q1_l_sqrt * q1_r_sqrt + q3_l * q1_r) / (q1_l * common_denom),
+                             0.0,
+                             1.0 / (q1_l_sqrt * (q1_l_sqrt + q1_r_sqrt))};
+  PetscReal dvhat_dqr[3] = { - (q1_r * q3_l + 2.0 * q3_r * q1_l_sqrt * q1_r_sqrt + q3_r * q1_l) / (q1_r * common_denom),
+                             0.0,
+                             1.0 / (q1_r_sqrt * (q1_l_sqrt + q1_r_sqrt))};
+
+  // compute ahat and its derivatives
+  PetscReal ahat  = pow(0.5 * GRAVITY * (q1_l + q1_r), 0.5);
+  PetscReal dahat_dql[3] = {0.25 * GRAVITY / ahat, 0.0, 0.0};
+  PetscReal dahat_dqr[3] = {0.25 * GRAVITY / ahat, 0.0, 0.0};
+
+
+  // compute duperp and its derivatives
+  PetscReal duperp = (q2_r / q1_r - q2_l / q1_l) * cn + (q3_r / q1_r - q3_l / q1_l) * sn;
+  PetscReal dduperp_dql[3] = { (q2_l * cn + q3_l * sn) / (q1_l * q1_l),
+                               - cn / q1_l,
+                               - sn / q1_l};
+  PetscReal dduperp_dqr[3] = { -(q2_r * cn + q3_r * sn) / (q1_r * q1_r),
+                               cn / q1_r,
+                               sn / q1_r};
+
+  // compute dupar and its derivatives
+  PetscReal dupar = -(q2_r / q1_r - q2_l / q1_l) * sn + (q3_r / q1_r - q3_l / q1_l) * cn;
+  PetscReal ddupar_dql[3] = { -(q2_l * sn + q3_l * cn) / (q1_l * q1_l),
+                               sn / q1_l,
+                               cn / q1_l};
+  PetscReal ddupar_dqr[3] = { (q2_r * sn + q3_r * cn) / (q1_r * q1_r),
+                               -sn / q1_r,
+                               -cn / q1_r};
+
+  // compute uhatperp and its derivatives
+  PetscReal uhatperp = uhat * cn + vhat * sn;
+  PetscReal duhatperp_dql[3] = { duhat_dql[0] * cn + dvhat_dql[0] * sn,
+                                 duhat_dql[1] * cn + dvhat_dql[1] * sn,
+                                 duhat_dql[2] * cn + dvhat_dql[2] * sn};
+  PetscReal duhatperp_dqr[3] = { duhat_dqr[0] * cn + dvhat_dqr[0] * sn,
+                                 duhat_dqr[1] * cn + dvhat_dqr[1] * sn,
+                                 duhat_dqr[2] * cn + dvhat_dqr[2] * sn};
+
+  // compute dV and its derivatives
+  PetscReal dV[3], dV_dql[3][3], dV_dqr[3][3];
+  {
+    // compute Roe averages: hhat and its derivatives
+    PetscReal hhat  = pow(q1_l * q1_r, 0.5);
+    PetscReal dhat_dql[3] = {pow(q1_r / q1_l, 0.5) * 0.5, 0.0, 0.0};
+    PetscReal dhat_dqr[3] = {pow(q1_l / q1_r, 0.5) * 0.5, 0.0, 0.0};
+
+    PetscReal dh = q1_r - q1_l;
+    PetscReal dh_dql[3] = { -1.0, 0.0, 0.0};
+    PetscReal dh_dqr[3] = { 1.0, 0.0, 0.0};
+
+    dV[0] = 0.5 * (dh - hhat * duperp / ahat);
+    dV[1] = hhat * dupar;
+    dV[2] = 0.5 * (dh + hhat * duperp / ahat);
+
+    for (PetscInt k = 0; k < 3; ++k) {
+      dV_dql[0][k] = 0.5 * (dh_dql[k] - (dhat_dql[k] * duperp + hhat * dduperp_dql[k]) / ahat + hhat * duperp * dahat_dql[k] / (ahat * ahat));
+      dV_dql[1][k] = dhat_dql[k] * dupar + hhat * ddupar_dql[k];
+      dV_dql[2][k] = 0.5 * (dh_dql[k] + (dhat_dql[k] * duperp + hhat * dduperp_dql[k]) / ahat - hhat * duperp * dahat_dql[k] / (ahat * ahat));
+
+      dV_dqr[0][k] = 0.5 * (dh_dqr[k] - (dhat_dqr[k] * duperp + hhat * dduperp_dqr[k]) / ahat + hhat * duperp * dahat_dqr[k] / (ahat * ahat));
+      dV_dqr[1][k] = dhat_dqr[k] * dupar + hhat * ddupar_dqr[k];
+      dV_dqr[2][k] = 0.5 * (dh_dqr[k] + (dhat_dqr[k] * duperp + hhat * dduperp_dqr[k]) / ahat - hhat * duperp * dahat_dqr[k] / (ahat * ahat));
+    }
+  }
+
+  // compute lambda_star and its derivatives
+  PetscBool compute_Lambda1;
+
+  PetscReal lambda1star, dlambda1star_dql[3], dlambda1star_dqr[3];
+  compute_Lambda1 = PETSC_FALSE;
+  PetscCall(ComputeLambdaAndDerivative (q1_l, q2_l, q3_l,
+                                q1_r, q2_r, q3_r,
+                                sn, cn,
+                                uhatperp, ahat,
+                                duhatperp_dql, dahat_dql,
+                                duhatperp_dqr, dahat_dqr,
+                                compute_Lambda1,
+                                &lambda1star,
+                                dlambda1star_dql, dlambda1star_dqr));
+
+  PetscReal lambda3star, dlambda3star_dql[3], dlambda3star_dqr[3];
+  compute_Lambda1 = PETSC_FALSE;
+  PetscCall(ComputeLambdaAndDerivative (q1_l, q2_l, q3_l,
+                                q1_r, q2_r, q3_r,
+                                sn, cn,
+                                uhatperp, ahat,
+                                duhatperp_dql, dahat_dql,
+                                duhatperp_dqr, dahat_dqr,
+                                compute_Lambda1,
+                                &lambda3star,
+                                dlambda3star_dql, dlambda3star_dqr));
+
+  PetscReal lambda2star, dlambda2star_dql[3], dlambda2star_dqr[3];
+  PetscReal factor = (uhatperp > 0.0) ? 1.0 : -1.0;
+  lambda2star = factor * uhatperp;
+  dlambda2star_dql[0] = factor * duhatperp_dql[0];
+  dlambda2star_dql[1] = factor * duhatperp_dql[1];
+  dlambda2star_dql[2] = factor * duhatperp_dql[2];
+
+  dlambda2star_dqr[0] = factor * duhatperp_dqr[0];
+  dlambda2star_dqr[1] = factor * duhatperp_dqr[1];
+  dlambda2star_dqr[2] = factor * duhatperp_dqr[2];
+
+  PetscReal R[3][3] = {
+    {1.0,          0.0,           1.0},
+    {uhat - ahat * cn, -sn,        uhat + ahat * cn},
+    {vhat - ahat * sn,  cn,        vhat + ahat * sn}
+  };
+
+  PetscReal dR_dql[3][3][3], dR_dqr[3][3][3], G_l[3][3][3], G_r[3][3][3], H_l[3][3][3], H_r[3][3][3];
+
+  // initialize derivatives of R to zero
+  for (PetscInt i = 0; i < 3; ++i) {
+    for (PetscInt j = 0; j < 3; ++j) {
+      for (PetscInt k = 0; k < 3; ++k) {
+        dR_dql[i][j][k] = 0.0;
+        dR_dqr[i][j][k] = 0.0;
+        G_l[i][j][k] = 0.0;
+        G_r[i][j][k] = 0.0;
+        H_l[i][j][k] = 0.0;
+        H_r[i][j][k] = 0.0;
+      }
+    }
+  }
+
+  // only fill diagonals since others will be multiplied by zero later
+  for (PetscInt k = 0; k < 3; k++) {
+    dR_dql[2][2][k] = dvhat_dql[k] + dahat_dql[k] * sn;
+    dR_dqr[2][2][k] = dvhat_dqr[k] + dahat_dqr[k] * sn;
+
+    G_l[2][2][k] = dR_dql[2][2][k] * lambda3star;
+    G_r[2][2][k] = dR_dqr[2][2][k] * lambda3star;
+
+    H_l[0][0][k] = R[0][0] * dlambda1star_dql[k];
+    H_l[1][1][k] = R[1][1] * dlambda2star_dql[k];
+    H_l[2][2][k] = R[2][2] * dlambda3star_dql[k];
+  }
+
+  // initialize Jacobians to zero
+  for (PetscInt i = 0; i < 3; ++i) {
+    for (PetscInt j = 0; j < 3; ++j) {
+      for (PetscInt k = 0; k < 3; ++k) {
+        Jl[i][j] = 0.0;
+        Jr[i][j] = 0.0;
+      }
+    }
+  }
+
+  for (PetscInt k = 0; k < 3; ++k) {
+    for (PetscInt i = 0; i < 3; ++i) {
+      PetscReal tmp_l = 0.0, tmp_r = 0.0;
+      for (PetscInt j = 0; j < 3; ++j) {
+        tmp_l += G_l[i][j][k] * dV[k];
+        tmp_r += G_r[i][j][k] * dV[k];
+
+        tmp_l += H_l[i][j][k] * dV[k];
+        tmp_r += H_r[i][j][k] * dV[k];
+      }
+      Jl[i][k] += tmp_l;
+      Jr[i][k] += tmp_r;
+    }
+  }
+
+  PetscReal RL[3][3];
+  for (PetscInt i = 0; i < 3; ++i) {
+    RL[i][0] = R[i][0] * lambda1star;
+    RL[i][1] = R[i][1] * lambda2star;
+    RL[i][2] = R[i][2] * lambda3star;
+  }
+
+  for (PetscInt i = 0; i < 3; ++i) {
+    for (PetscInt k = 0; k < 3; ++k) {
+      PetscReal tmp_l = 0.0, tmp_r = 0.0;
+      for (PetscInt j = 0; j < 3; ++j) {
+        tmp_l += RL[i][j] * dV_dql[j][k];
+        tmp_r += RL[i][j] * dV_dqr[j][k];
+      }
+      Jl[i][k] += tmp_l;
+      Jr[i][k] += tmp_r;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ComputeSWERoeFluxJacobian(RiemannStateData *datal, RiemannStateData *datar, const PetscReal *sn, const PetscReal *cn, PetscReal *jup, PetscReal *jdn){
 
   PetscFunctionBeginUser;
@@ -172,9 +467,10 @@ static PetscErrorCode ComputeSWERoeFluxJacobian(RiemannStateData *datal, Riemann
   PetscInt num_states = datal->num_states;
   for (PetscInt i = 0; i < num_states; ++i) {
 
-    PetscReal Jperp_l[3][3], Jperp_r[3][3];
+    PetscReal Jperp_l[3][3], Jperp_r[3][3], Jdiss_l[3][3], Jdiss_r[3][3];
     PetscCall(JacobianOfScalarFlux(hl[i], ul[i], vl[i], sn[i], cn[i], Jperp_l));
     PetscCall(JacobianOfScalarFlux(hr[i], ur[i], vr[i], sn[i], cn[i], Jperp_r));
+    PetscCall(JacobianOfDissipiationTerm(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], Jdiss_l, Jdiss_r));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
