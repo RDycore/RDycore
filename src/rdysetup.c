@@ -1203,7 +1203,70 @@ static PetscErrorCode OperatorIJacobian(TS ts, PetscReal t, Vec U, Vec Udot, Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode InitSolver(RDy rdy) {
+static PetscErrorCode OperatorIFunctionFull(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+
+  // The SWE PDE is written as:
+  //   udot = -sum(fluxes) + S_{rain} + S_{frction} + S_{bed}
+  //
+  // Rearranging gives:
+  //      udot + sum(fluxes) - S_{rain} - S_{frction} - S_{bed} = 0
+
+  // 1) In F, add contribution of `udot - S_{frction}`
+  PetscCall(OperatorIFunction(ts, t, U, Udot, F, ctx));
+
+  PetscScalar *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
+  PetscCall(VecGetArray(F, &f_ptr));
+
+  PetscInt n_dof = 3;
+  PetscReal tiny_h =  rdy->config.physics.flow.tiny_h;
+
+  // 2) add contribution of - S_{bed} (i.e., the bed slope source term)
+  RDyMesh *mesh = &rdy->mesh;
+  RDyCells *cells         = &mesh->cells;
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (mesh->cells.is_owned[c]) {
+      PetscInt owned_cell = mesh->cells.local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal dz_dx = cells->dz_dx[c];
+      PetscReal dz_dy = cells->dz_dy[c];
+
+      if (h >= tiny_h) {
+        f_ptr[n_dof * owned_cell + 1] -= dz_dx * GRAVITY * h ;
+        f_ptr[n_dof * owned_cell + 2] -= dz_dy * GRAVITY * h ;
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
+  PetscCall(VecRestoreArray(F, &f_ptr));
+
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
+  // Get a temporary vector to hold fluxes through internal and boundary edges
+  Vec Ftmp;
+  PetscCall(DMGetGlobalVector(rdy->dm, &Ftmp));
+
+  Operator *op  = rdy->operator;
+  PetscCall(PetscOperatorApply(op->petsc.flux, dt, rdy->u_local, Ftmp));
+
+  // Add flux contributions to F. We need to flip the sign here since
+  // ApplyOperator computes contribution for RHSFunction and we need to
+  // bring it to the LHS.
+  PetscCall(VecAXPY(F, -1.0, Ftmp));
+
+  // restore temporary vector
+  PetscCall(DMRestoreGlobalVector(rdy->dm, &Ftmp));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+  PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
 
   PetscInt n_dof;
@@ -1233,11 +1296,18 @@ PetscErrorCode InitSolver(RDy rdy) {
   PetscCall(TSSetApplicationContext(rdy->ts, rdy));
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
-  PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
+  if (rdy->config.numerics.temporal == TEMPORAL_BEULER) {
+    PetscCheck(rdy->config.physics.flow.tiny_h > 0.0, rdy->comm, PETSC_ERR_USER,
+               "When using backward Euler time discretization, tiny_h must be positive to ensure numerical stability.");
+    PetscCall(TSSetIFunction(rdy->ts, rdy->udot_global, OperatorIFunctionFull, rdy));
+    //PetscCall(TSSetIJacobian(rdy->ts, rdy->ijacobian, rdy->ijacobian, OperatorIJacobianFull, rdy));
+  } else {
+    PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 
-  if (rdy->config.numerics.temporal == TEMPORAL_ARK_IMEX) {
-    PetscCall(TSSetIFunction(rdy->ts, rdy->udot_global, OperatorIFunction, rdy));
-    PetscCall(TSSetIJacobian(rdy->ts, rdy->ijacobian, rdy->ijacobian, OperatorIJacobian, rdy));
+    if (rdy->config.numerics.temporal == TEMPORAL_ARK_IMEX) {
+      PetscCall(TSSetIFunction(rdy->ts, rdy->udot_global, OperatorIFunction, rdy));
+      PetscCall(TSSetIJacobian(rdy->ts, rdy->ijacobian, rdy->ijacobian, OperatorIJacobian, rdy));
+    }
   }
 
   if (!rdy->config.time.adaptive.enable) {

@@ -887,8 +887,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if (config->numerics.spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
   }
-  if (config->numerics.temporal == TEMPORAL_BEULER) {
-    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented.");
+  if (config->numerics.temporal == TEMPORAL_BEULER && config->physics.sediment.num_classes > 0) {
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented for sediments.");
   }
   if (config->numerics.riemann != RIEMANN_ROE) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) is currently implemented.");
