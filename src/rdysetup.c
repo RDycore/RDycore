@@ -1266,6 +1266,47 @@ static PetscErrorCode OperatorIFunctionFull(TS ts, PetscReal t, Vec U, Vec Udot,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode OperatorIJacobianFull(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat Jpre, void *ctx) {
+  PetscFunctionBegin;
+
+  RDy rdy = ctx;
+
+  // 1) Jacobian of `udot - S_{frction}`
+  PetscCall(OperatorIJacobian(ts, t, U, Udot, shift, J, Jpre, ctx));
+
+  // 2) Jacobian of `-S_{bed}`
+  PetscScalar *u_ptr;
+  PetscCall(VecGetArray(rdy->u_local, &u_ptr));
+
+  PetscInt n_dof = 3;
+  PetscReal tiny_h =  rdy->config.physics.flow.tiny_h;
+
+  RDyMesh *mesh = &rdy->mesh;
+  RDyCells *cells         = &mesh->cells;
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (mesh->cells.is_owned[c]) {
+      PetscInt owned_cell = mesh->cells.local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal dz_dx = cells->dz_dx[c];
+      PetscReal dz_dy = cells->dz_dy[c];
+      PetscReal Jac[9] = {0}; // assuming 3 DOFs for SWE
+
+      if (h >= tiny_h) {
+        //f_ptr[n_dof * owned_cell + 1] -= dz_dx * GRAVITY * h ;
+        //f_ptr[n_dof * owned_cell + 2] -= dz_dy * GRAVITY * h ;
+        Jac[3] = -dz_dx * GRAVITY; // dF2/dh
+        Jac[6] = -dz_dy * GRAVITY; // dF3/dh
+        PetscCall(MatSetValuesBlockedLocal(Jpre, 1, &owned_cell, 1, &owned_cell, Jac, ADD_VALUES));
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
   PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
 
