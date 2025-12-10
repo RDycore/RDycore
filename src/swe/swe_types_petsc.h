@@ -22,6 +22,7 @@ typedef struct {
   PetscReal *cn, *sn;    // cosine and sine of the angle between edges and y-axis
   PetscReal *fluxes;     // fluxes through the edge
   PetscReal *amax;       // courant number on edges
+  PetscReal *jacl, *jacr;// jacobians of fluxes on edges w.r.t. left and right states
 } RiemannEdgeData;
 
 #endif  // SWE_TYPES_PETSC_H

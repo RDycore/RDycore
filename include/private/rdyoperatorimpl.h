@@ -79,12 +79,15 @@ struct _p_PetscOperator {
   PetscBool           is_composite;
   PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec);
   PetscErrorCode (*destroy)(void *);
+  PetscErrorCode (*applyJacobian)(void *, PetscReal, Mat);
 };
 
 PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void *, PetscOperatorFields, PetscReal, Vec, Vec),
+                                                PetscErrorCode (*)(void *, PetscReal, Mat),
                                                 PetscErrorCode (*)(void *), PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscOperatorDestroy(PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscOperatorApply(PetscOperator, PetscReal, Vec, Vec);
+PETSC_INTERN PetscErrorCode PetscOperatorApplyJacobian(PetscOperator, PetscReal, Mat);
 PETSC_INTERN PetscErrorCode PetscOperatorSetField(PetscOperator, const char *, Vec);
 PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);

@@ -322,7 +322,7 @@ PetscErrorCode CreateSedimentPetscInteriorFluxOperator(RDyMesh *mesh, const RDyC
   }
 
   // create the interior operator
-  PetscCall(PetscOperatorCreate(interior_flux_op, ApplySedimentInteriorFlux, DestroySedimentInteriorFlux, petsc_op));
+  PetscCall(PetscOperatorCreate(interior_flux_op, ApplySedimentInteriorFlux, NULL, DestroySedimentInteriorFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -578,7 +578,7 @@ PetscErrorCode CreateSedimentPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyC
   }
 
   // create the boundary operator
-  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplySedimentBoundaryFlux, DestroySedimentBoundaryFlux, petsc_op));
+  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplySedimentBoundaryFlux, NULL, DestroySedimentBoundaryFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -746,7 +746,7 @@ PetscErrorCode CreateSedimentPetscSourceOperator(RDyMesh *mesh, const RDyConfig 
 
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
-      PetscCall(PetscOperatorCreate(source_op, ApplySedimentSourceSemiImplicit, DestroySedimentSource, petsc_op));
+      PetscCall(PetscOperatorCreate(source_op, ApplySedimentSourceSemiImplicit, NULL, DestroySedimentSource, petsc_op));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");

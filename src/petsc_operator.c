@@ -9,6 +9,7 @@
 /// @param [in]  destroy the function called by PetscOperatorDestroy
 /// @param [out] op      the PetscOperator created by this call
 PetscErrorCode PetscOperatorCreate(void *context, PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec),
+                                   PetscErrorCode (*applyJacobian)(void *, PetscReal, Mat),
                                    PetscErrorCode (*destroy)(void *), PetscOperator *op) {
   PetscFunctionBegin;
   PetscCall(PetscCalloc1(1, op));
@@ -16,6 +17,7 @@ PetscErrorCode PetscOperatorCreate(void *context, PetscErrorCode (*apply)(void *
   (*op)->is_composite = PETSC_FALSE;
   (*op)->context      = context;
   (*op)->apply        = apply;
+  (*op)->applyJacobian = applyJacobian;
   (*op)->destroy      = destroy;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -45,6 +47,12 @@ PetscErrorCode PetscOperatorApply(PetscOperator op, PetscReal dt, Vec u_local, V
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode PetscOperatorApplyJacobian(PetscOperator op, PetscReal dt, Mat Jac) {
+  PetscFunctionBegin;
+  PetscCall(op->applyJacobian(op->context, dt, Jac));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 typedef struct {
   PetscInt       num_suboperators, capacity;
   PetscOperator *suboperators;
@@ -55,6 +63,15 @@ static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscOperatorFi
   PetscCompositeOperator *composite = context;
   for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
     PetscCall(PetscOperatorApply(composite->suboperators[i], dt, u_local, f_global));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PetscCompositeOperatorApplyJacobian(void *context, PetscReal dt, Mat Jac) {
+  PetscFunctionBegin;
+  PetscCompositeOperator *composite = context;
+  for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
+    PetscCall(PetscOperatorApplyJacobian(composite->suboperators[i], dt, Jac));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -77,7 +94,7 @@ PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
   PetscCompositeOperator *composite;
   PetscCall(PetscCalloc1(1, &composite));
   *composite = (PetscCompositeOperator){0};
-  PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
+  PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorApplyJacobian, PetscCompositeOperatorDestroy, op));
   (*op)->is_composite = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }

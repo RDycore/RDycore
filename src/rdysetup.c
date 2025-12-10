@@ -1304,6 +1304,15 @@ static PetscErrorCode OperatorIJacobianFull(TS ts, PetscReal t, Vec U, Vec Udot,
 
   PetscCall(VecRestoreArray(rdy->u_local, &u_ptr));
 
+  // 3) Jacobian of flux through internal
+  Operator *op  = rdy->operator;
+  PetscScalar dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+  PetscCall(PetscOperatorApplyJacobian(op->petsc.flux, dt, Jpre));
+
+  PetscCall(MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(Jpre, MAT_FINAL_ASSEMBLY));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1341,7 +1350,7 @@ static PetscErrorCode OperatorIJacobianFull(TS ts, PetscReal t, Vec U, Vec Udot,
     PetscCheck(rdy->config.physics.flow.tiny_h > 0.0, rdy->comm, PETSC_ERR_USER,
                "When using backward Euler time discretization, tiny_h must be positive to ensure numerical stability.");
     PetscCall(TSSetIFunction(rdy->ts, rdy->udot_global, OperatorIFunctionFull, rdy));
-    //PetscCall(TSSetIJacobian(rdy->ts, rdy->ijacobian, rdy->ijacobian, OperatorIJacobianFull, rdy));
+    PetscCall(TSSetIJacobian(rdy->ts, rdy->ijacobian, rdy->ijacobian, OperatorIJacobianFull, rdy));
   } else {
     PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
 

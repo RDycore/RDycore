@@ -37,6 +37,8 @@ static PetscErrorCode CreateRiemannEdgeData(PetscInt num_edges, PetscInt num_com
   PetscCall(PetscCalloc1(num_edges, &data->sn));
   PetscCall(PetscCalloc1(num_edges * num_comp, &data->fluxes));
   PetscCall(PetscCalloc1(num_edges, &data->amax));
+  PetscCall(PetscCalloc1(num_edges * num_comp * num_comp, &data->jacl));
+  PetscCall(PetscCalloc1(num_edges * num_comp * num_comp, &data->jacr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -49,6 +51,8 @@ static PetscErrorCode DestroyRiemannEdgeData(RiemannEdgeData data) {
   PetscCall(PetscFree(data.sn));
   PetscCall(PetscFree(data.fluxes));
   PetscCall(PetscFree(data.amax));
+  PetscCall(PetscFree(data.jacl));
+  PetscCall(PetscFree(data.jacr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -203,6 +207,81 @@ static PetscErrorCode DestroyInteriorFlux(void *context) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ApplyInteriorFluxJacobian(void *context, PetscReal dt, Mat Jac) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)Jac, &comm));
+
+  InteriorFluxOperator *interior_flux_op = context;
+
+  RDyMesh  *mesh  = interior_flux_op->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscInt n_dof = 3;
+  const PetscReal tiny_h       = interior_flux_op->tiny_h;
+  RiemannStateData *datal      = &interior_flux_op->left_states;
+  RiemannStateData *datar      = &interior_flux_op->right_states;
+  RiemannEdgeData  *data_edge  = &interior_flux_op->edges;
+  PetscReal        *sn_vec_int = data_edge->sn;
+  PetscReal        *cn_vec_int = data_edge->cn;
+  PetscReal        *jacl       = data_edge->jacl;
+  PetscReal        *jacr       = data_edge->jacr;
+
+  // call jacobian of the Riemann solver
+  switch (interior_flux_op->riemann) {
+    case RIEMANN_ROE:
+      PetscCall(ComputeSWERoeFluxJacobian(datal, datar, sn_vec_int, cn_vec_int, jacl, jacr));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+  }
+
+  // accummulate the flux values in the global flux vector
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id             = edges->internal_edge_ids[e];
+    PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
+    PetscInt right_local_cell_id = edges->cell_ids[2 * edge_id + 1];
+
+    if (right_local_cell_id != -1) {  // internal edge
+      PetscReal edge_len = edges->lengths[edge_id];
+
+      PetscReal hl = datal->h[e];
+      PetscReal hr = datar->h[e];
+
+      if (!(hr < tiny_h && hl < tiny_h)) {  // either cell is "wet"
+        PetscReal areal = cells->areas[left_local_cell_id];
+        PetscReal arear = cells->areas[right_local_cell_id];
+        PetscInt left_owned_cell_id = cells->local_to_owned[left_local_cell_id];
+        PetscInt right_owned_cell_id = cells->local_to_owned[right_local_cell_id];
+
+        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+          if (cells->is_owned[left_local_cell_id]) {
+            //f_ptr[n_dof * left_owned_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (-edge_len / areal);
+            PetscReal jac_values[9] = {0};
+            for (PetscInt k = 0; k < n_dof * n_dof; k++) {
+              jac_values[k] = -jacl[n_dof * n_dof * e + k] * (-edge_len / areal);
+            }
+            PetscCall(MatSetValuesBlockedLocal(Jac, 1, &left_owned_cell_id, 1, &right_owned_cell_id, jac_values, ADD_VALUES));
+          }
+
+          if (cells->is_owned[right_local_cell_id]) {
+            //f_ptr[n_dof * right_owned_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (edge_len / arear);
+            PetscReal jac_values[9] = {0};
+            for (PetscInt k = 0; k < n_dof * n_dof; k++) {
+              jac_values[k] = -jacr[n_dof * n_dof * e + k] * (edge_len / arear);
+            }
+            PetscCall(MatSetValuesBlockedLocal(Jac, 1, &right_owned_cell_id, 1, &left_owned_cell_id, jac_values, ADD_VALUES));
+          }
+        }
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates a PetscOperator that computes fluxes between pairs of cells on the
 /// domain's interior, suitable for the shallow water equations.
 /// @param [in]    mesh        mesh defining the computational domain of the operator
@@ -241,7 +320,7 @@ PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, const RDyConfig
     }
   }
 
-  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyInteriorFlux, DestroyInteriorFlux, petsc_op));
+  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyInteriorFlux, ApplyInteriorFluxJacobian, DestroyInteriorFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -447,6 +526,67 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// application of boundary flux operator for its specific boundary
+static PetscErrorCode ApplyBoundaryFluxJacobian(void *context, PetscReal dt, Mat Jac) {
+  PetscFunctionBeginUser;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)Jac, &comm));
+
+  BoundaryFluxOperator *boundary_flux_op = context;
+  RDyBoundary  boundary = boundary_flux_op->boundary;
+  const PetscReal tiny_h  = boundary_flux_op->tiny_h;
+  PetscInt n_dof = 3;
+
+  // apply boundary conditions
+  RiemannStateData *datal     = &boundary_flux_op->left_states;
+  RiemannStateData *datar     = &boundary_flux_op->right_states;
+  RiemannEdgeData  *data_edge = &boundary_flux_op->edges;
+  PetscReal        *sn_vec_int = data_edge->sn;
+  PetscReal        *cn_vec_int = data_edge->cn;
+  PetscReal        *jacl       = data_edge->jacl;
+  PetscReal        *jacr       = data_edge->jacr;
+
+  // solve the Riemann problem
+  switch (boundary_flux_op->riemann) {
+    case RIEMANN_ROE:
+      PetscCall(ComputeSWERoeFluxJacobian(datal, datar, sn_vec_int, cn_vec_int, jacl, jacr));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+  }
+
+  // accumulate the flux values in f_global
+  RDyCells                 *cells             = &boundary_flux_op->mesh->cells;
+  RDyEdges                 *edges             = &boundary_flux_op->mesh->edges;
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt  edge_id       = boundary.edge_ids[e];
+    PetscReal edge_len      = edges->lengths[edge_id];
+    PetscInt  local_cell_id = edges->cell_ids[2 * edge_id];
+
+    if (cells->is_owned[local_cell_id]) {
+      PetscReal cell_area = cells->areas[local_cell_id];
+      PetscReal hl        = datal->h[e];
+      PetscReal hr        = datar->h[e];
+
+      if (!(hl < tiny_h && hr < tiny_h)) {
+
+        PetscInt owned_cell_id = cells->local_to_owned[local_cell_id];
+        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+          //f_ptr[n_dof * owned_cell_id + i_dof] += boundary_fluxes_ptr[n_dof * e + i_dof] * (-edge_len / cell_area);
+          PetscReal jac_values[9] = {0};
+          for (PetscInt k = 0; k < n_dof * n_dof; k++) {
+            jac_values[k] = -jacl[n_dof * n_dof * e + k] * (-edge_len / cell_area);
+          }
+          PetscCall(MatSetValuesBlockedLocal(Jac, 1, &owned_cell_id, 1, &owned_cell_id, jac_values, ADD_VALUES));
+        }
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DestroyBoundaryFlux(void *context) {
   PetscFunctionBegin;
   BoundaryFluxOperator *boundary_flux_op = context;
@@ -499,7 +639,7 @@ PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig
     boundary_flux_op->edges.cn[e] = edges->cn[edge_id];
     boundary_flux_op->edges.sn[e] = edges->sn[edge_id];
   }
-  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplyBoundaryFlux, DestroyBoundaryFlux, petsc_op));
+  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplyBoundaryFlux, ApplyBoundaryFluxJacobian, DestroyBoundaryFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -814,13 +954,13 @@ PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, const RDyConfig confi
 
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
-      PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, NULL, DestroySource, petsc_op));
       break;
     case SOURCE_IMPLICIT_XQ2018:
-      PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, NULL, DestroySource, petsc_op));
       break;
     case SOURCE_ARK_IMEX:
-      PetscCall(PetscOperatorCreate(source_op, ApplySourceNoFriction, DestroySource, petsc_op));
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceNoFriction, NULL, DestroySource, petsc_op));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
