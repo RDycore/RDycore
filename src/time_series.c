@@ -111,6 +111,10 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 
   // allocate (local) boundary flux storage
   PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
+  for (PetscInt n = 0; n < num_boundary_edges; ++n) {
+    rdy->time_series.boundary_fluxes.fluxes[n].current  = (TimeSeriesBoundaryFlux){0.0, 0.0, 0.0};
+    rdy->time_series.boundary_fluxes.fluxes[n].previous = (TimeSeriesBoundaryFlux){0.0, 0.0, 0.0};
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -279,12 +283,18 @@ static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, Op
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
           // FIXME: this is specific to the shallow water equations
-          time_series->boundary_fluxes.fluxes[n].water_mass =
-              edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].water_mass;
-          time_series->boundary_fluxes.fluxes[n].x_momentum =
-              edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].x_momentum;
-          time_series->boundary_fluxes.fluxes[n].y_momentum =
-              edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].y_momentum;
+
+          // subtract the previous accumulated values to get the increment
+          time_series->boundary_fluxes.fluxes[n].current.water_mass =
+              edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].previous.water_mass;
+          time_series->boundary_fluxes.fluxes[n].current.x_momentum =
+              edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].previous.x_momentum;
+          time_series->boundary_fluxes.fluxes[n].current.y_momentum =
+              edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].previous.y_momentum;
+          // store the values for the next accumulation
+          time_series->boundary_fluxes.fluxes[n].previous.water_mass = edge_len * boundary_fluxes.values[0][e];
+          time_series->boundary_fluxes.fluxes[n].previous.x_momentum = edge_len * boundary_fluxes.values[1][e];
+          time_series->boundary_fluxes.fluxes[n].previous.y_momentum = edge_len * boundary_fluxes.values[2][e];
           ++n;
         }
       }
@@ -306,6 +316,10 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscReal *local_flux_data;
   PetscCall(PetscCalloc1(num_data * num_local_edges + 1, &local_flux_data));
 
+  PetscInt step_interval;
+  if (rdy->time_series.boundary_fluxes.last_step == -1) step_interval = 1.0;
+  else step_interval = step - rdy->time_series.boundary_fluxes.last_step;
+
   // gather local data
   PetscInt n = 0;
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -316,9 +330,9 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
         PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
-          local_flux_data[num_data * n]     = rdy->time_series.boundary_fluxes.fluxes[n].water_mass;
-          local_flux_data[num_data * n + 1] = rdy->time_series.boundary_fluxes.fluxes[n].x_momentum;
-          local_flux_data[num_data * n + 2] = rdy->time_series.boundary_fluxes.fluxes[n].y_momentum;
+          local_flux_data[num_data * n]     = rdy->time_series.boundary_fluxes.fluxes[n].current.water_mass / step_interval;
+          local_flux_data[num_data * n + 1] = rdy->time_series.boundary_fluxes.fluxes[n].current.x_momentum / step_interval;
+          local_flux_data[num_data * n + 2] = rdy->time_series.boundary_fluxes.fluxes[n].current.y_momentum / step_interval;
           RDyVector edge_normal             = rdy->mesh.edges.normals[edge_id];
           local_flux_data[num_data * n + 3] = edge_normal.V[0];
           local_flux_data[num_data * n + 4] = edge_normal.V[1];
