@@ -187,8 +187,23 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
     }
 #endif
-    PetscCall(PetscObjectSetName((PetscObject)X, "solution"));
-    PetscCall(VecView(X, viewer));
+
+    Vec nat_vec;
+    DM dm = rdy->dm;
+
+    if (!rdy->amr.num_refinements) {
+      PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
+      PetscCall(DMPlexGlobalToNaturalBegin(dm, X, nat_vec));
+      PetscCall(DMPlexGlobalToNaturalEnd(dm, X, nat_vec));
+    } else {
+      PetscCall(VecDuplicate(X, &nat_vec));
+      PetscCall(VecCopy(X, nat_vec));
+    }
+
+    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
+    PetscCall(VecView(nat_vec, viewer));
+
+    PetscCall(VecDestroy(&nat_vec));
 
     PetscCall(PetscViewerDestroy(&viewer));
     RDyLogInfo(rdy, "Finished writing checkpoint file.");
