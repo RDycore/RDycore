@@ -262,9 +262,18 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
   }
 #endif
-  PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "solution"));
-  PetscCall(VecLoad(rdy->u_global, viewer));
+  Vec nat_vec;
+  DM  dm = rdy->dm;
+
+  PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
+  PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
+  PetscCall(VecLoad(nat_vec, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscCall(DMPlexNaturalToGlobalBegin(dm, nat_vec, rdy->u_global));
+  PetscCall(DMPlexNaturalToGlobalEnd(dm, nat_vec, rdy->u_global));
+  PetscCall(VecDestroy(&nat_vec));
+
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
 
   // read the newly loaded solution vector into the timestepper
