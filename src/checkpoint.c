@@ -200,6 +200,9 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
       PetscCall(VecCopy(X, nat_vec));
     }
 
+    // disable the bundling of all checkpoints into a single group
+    PetscCall(DMSetOutputSequenceNumber(rdy->dm, -1, 0.0));
+
     PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
     PetscCall(VecView(nat_vec, viewer));
 
