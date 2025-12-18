@@ -165,12 +165,17 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
     const PetscViewerFormat format = rdy->config.checkpoint.format;
     char                    checkpoint_dir[PETSC_MAX_PATH_LEN];
     PetscCall(GetCheckpointDirectory(rdy, checkpoint_dir));
-    if (format == PETSC_VIEWER_NATIVE) {  // binary
-      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "bin", filename));
-      PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
-    } else {  // HDF5
-      PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "h5", filename));
-      PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+    switch (format) {
+      case PETSC_VIEWER_NATIVE: // binary
+        PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "bin", filename));
+        PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+        break;
+      case PETSC_VIEWER_HDF5_PETSC:
+        PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "h5", filename));
+        PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Checkpoint format = %" PetscInt_FMT" unsupported\n",format);
     }
 
     RDyLogInfo(rdy, "Writing checkpoint file %s...", filename);
