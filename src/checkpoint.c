@@ -137,15 +137,74 @@ static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
 #endif
 
 // this generates the ancient-looking checkpoing filename expected by E3SM
-static PetscErrorCode GenerateE3SMCheckpointFilename(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val,
-                                                     const char *suffix, char *filename) {
+static PetscErrorCode GenerateE3SMCheckpointFilenameBase(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val,
+                                                         char *filename) {
   PetscFunctionBegin;
   int  num_digits = (int)(log10((double)max_index_val)) + 1;
   char fmt[16]    = {0};
-  snprintf(fmt, 15, ".%%0%dd.%%s", num_digits);
+  snprintf(fmt, 15, ".%%0%dd", num_digits);
   char ending[PETSC_MAX_PATH_LEN];
-  snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index, suffix);
+  snprintf(ending, PETSC_MAX_PATH_LEN - 1, fmt, index);
   snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s/%s.rdycore.r%s", directory, prefix, ending);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode WriteCheckpointFile(RDy rdy, Vec X, const char *filename_base, PetscInt format) {
+  PetscFunctionBegin;
+
+  char        filename[PETSC_MAX_PATH_LEN];
+  PetscViewer viewer;
+  switch (format) {
+    case PETSC_VIEWER_NATIVE:  // binary
+      snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s.bin", filename_base);
+      PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+      break;
+    case PETSC_VIEWER_HDF5_PETSC:
+      snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s.h5", filename_base);
+      PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Checkpoint format = %" PetscInt_FMT " unsupported\n", format);
+  }
+
+  RDyLogInfo(rdy, "Writing checkpoint file %s...", filename);
+
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+  if (format == PETSC_VIEWER_HDF5_PETSC) {
+    PetscCall(WriteHDF5Metadata(rdy, viewer));
+  } else {
+#endif
+    PetscBag bag;
+    PetscCall(CreateMetadata(rdy, &bag));
+    PetscCall(PetscBagView(bag, viewer));
+    PetscCall(PetscBagDestroy(&bag));
+#if PETSCBAG_DOESNT_SUPPORT_HDF5
+  }
+#endif
+
+  Vec nat_vec;
+  DM  dm = rdy->dm;
+
+  if (!rdy->amr.num_refinements) {
+    PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
+    PetscCall(DMPlexGlobalToNaturalBegin(dm, X, nat_vec));
+    PetscCall(DMPlexGlobalToNaturalEnd(dm, X, nat_vec));
+  } else {
+    PetscCall(VecDuplicate(X, &nat_vec));
+    PetscCall(VecCopy(X, nat_vec));
+  }
+
+  // disable the bundling of all checkpoints into a single group
+  PetscCall(DMSetOutputSequenceNumber(rdy->dm, -1, 0.0));
+
+  PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
+  PetscCall(VecView(nat_vec, viewer));
+
+  PetscCall(VecDestroy(&nat_vec));
+
+  PetscCall(PetscViewerDestroy(&viewer));
+  RDyLogInfo(rdy, "Finished writing checkpoint file.");
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -154,69 +213,26 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
   RDy rdy = ctx;
   if (step % rdy->config.checkpoint.interval == 0) {
     // determine an appropriate prefix for checkpoint files
-    char prefix[PETSC_MAX_PATH_LEN], filename[PETSC_MAX_PATH_LEN];
+    char prefix[PETSC_MAX_PATH_LEN], filename_base[PETSC_MAX_PATH_LEN];
     if (rdy->config.checkpoint.prefix[0]) {
       strncpy(prefix, rdy->config.checkpoint.prefix, PETSC_MAX_PATH_LEN);
     } else {
       PetscCall(DetermineConfigPrefix(rdy, prefix));
     }
 
-    PetscViewer             viewer;
     const PetscViewerFormat format = rdy->config.checkpoint.format;
     char                    checkpoint_dir[PETSC_MAX_PATH_LEN];
     PetscCall(GetCheckpointDirectory(rdy, checkpoint_dir));
-    switch (format) {
-      case PETSC_VIEWER_NATIVE: // binary
-        PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "bin", filename));
-        PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
-        break;
-      case PETSC_VIEWER_HDF5_PETSC:
-        PetscCall(GenerateE3SMCheckpointFilename(checkpoint_dir, prefix, step, rdy->config.time.stop_n, "h5", filename));
-        PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
-        break;
-      default:
-        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Checkpoint format = %" PetscInt_FMT" unsupported\n",format);
-    }
-
-    RDyLogInfo(rdy, "Writing checkpoint file %s...", filename);
-
-#if PETSCBAG_DOESNT_SUPPORT_HDF5
-    if (format == PETSC_VIEWER_HDF5_PETSC) {
-      PetscCall(WriteHDF5Metadata(rdy, viewer));
-    } else {
-#endif
-      PetscBag bag;
-      PetscCall(CreateMetadata(rdy, &bag));
-      PetscCall(PetscBagView(bag, viewer));
-      PetscCall(PetscBagDestroy(&bag));
-#if PETSCBAG_DOESNT_SUPPORT_HDF5
-    }
-#endif
-
-    Vec nat_vec;
-    DM  dm = rdy->dm;
-
-    if (!rdy->amr.num_refinements) {
-      PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
-      PetscCall(DMPlexGlobalToNaturalBegin(dm, X, nat_vec));
-      PetscCall(DMPlexGlobalToNaturalEnd(dm, X, nat_vec));
-    } else {
-      PetscCall(VecDuplicate(X, &nat_vec));
-      PetscCall(VecCopy(X, nat_vec));
-    }
-
-    // disable the bundling of all checkpoints into a single group
-    PetscCall(DMSetOutputSequenceNumber(rdy->dm, -1, 0.0));
-
-    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
-    PetscCall(VecView(nat_vec, viewer));
-
-    PetscCall(VecDestroy(&nat_vec));
-
-    PetscCall(PetscViewerDestroy(&viewer));
-    RDyLogInfo(rdy, "Finished writing checkpoint file.");
+    PetscCall(GenerateE3SMCheckpointFilenameBase(checkpoint_dir, prefix, step, rdy->config.time.stop_n, filename_base));
+    PetscCall(WriteCheckpointFile(rdy, X, filename_base, format));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyWriteHDF5CheckpointFile(RDy rdy, char *filename_base) {
+  PetscFunctionBegin;
+  PetscCall(WriteCheckpointFile(rdy, rdy->u_global, filename_base, PETSC_VIEWER_HDF5_PETSC));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
