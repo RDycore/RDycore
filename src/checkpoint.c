@@ -189,7 +189,7 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
 #endif
 
     Vec nat_vec;
-    DM dm = rdy->dm;
+    DM  dm = rdy->dm;
 
     if (!rdy->amr.num_refinements) {
       PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
