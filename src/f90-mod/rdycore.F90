@@ -28,7 +28,8 @@ module rdycore
             RDySetDomainWaterSource, RDySetRegionalWaterSource, RDySetDomainXMomentumSource, &
             RDySetDomainYMomentumSource, RDySetDomainManningsN, RDySetInitialConditions, &
             RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile, &
-            RDyCreateOneDOFGlobalVec, RDyWriteOneDOFGlobalVecToBinaryFile
+            RDyCreateOneDOFGlobalVec, RDyWriteOneDOFGlobalVecToBinaryFile, &
+            RDyWriteHDF5CheckpointFile, RDyReadHDF5CheckpointFile
 
   ! RDycore uses double-precision floating point numbers
   integer, parameter :: RDyDouble = selected_real_kind(12)
@@ -423,6 +424,20 @@ module rdycore
       type(c_ptr), value, intent(in)  :: rdy
       type(c_ptr), value, intent(in)  :: filename
       PetscFortranAddr,   intent(out) :: global_vec
+    end function
+
+    integer(c_int) function rdywritehdf5checkpointfile_(rdy, filename_base) bind(c, name="RDyWriteHDF5CheckpointFile")
+      use iso_c_binding
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      type(c_ptr), value, intent(in)  :: filename_base
+    end function
+
+    integer(c_int) function rdyreadhdf5checkpointfile_(rdy, filename) bind(c, name="RDyReadHDF5CheckpointFile")
+      use iso_c_binding
+      use petscvec
+      type(c_ptr), value, intent(in)  :: rdy
+      type(c_ptr), value, intent(in)  :: filename
     end function
 
     integer(c_int) function rdyadvance_(rdy) bind(c, name="RDyAdvance")
@@ -932,6 +947,40 @@ contains
     binary_file(n+1:n+1) = c_null_char
     ierr = rdywriteonedofglobalvectobinaryfile_(rdy_%c_rdy, c_loc(binary_file), global_vec%v)
     deallocate(binary_file)
+  end subroutine
+
+  subroutine RDyWriteHDF5CheckpointFile(rdy_, filename_base, ierr)
+    use petscvec
+    type(RDy),  intent(inout) :: rdy_
+    character(len=1024), intent(in) :: filename_base
+    integer,    intent(out)   :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: checkpoint_filename_base
+
+    n = len_trim(filename_base)
+    allocate(checkpoint_filename_base)
+    checkpoint_filename_base(1:n) = filename_base(1:n)
+    checkpoint_filename_base(n+1:n+1) = c_null_char
+    ierr = rdywritehdf5checkpointfile_(rdy_%c_rdy, c_loc(checkpoint_filename_base))
+    deallocate(checkpoint_filename_base)
+  end subroutine
+
+  subroutine RDyReadHDF5CheckpointFile(rdy_, filename, ierr)
+    use petscvec
+    type(RDy),  intent(inout) :: rdy_
+    character(len=1024), intent(in) :: filename
+    integer,    intent(out)   :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: checkpoint_filename
+
+    n = len_trim(filename)
+    allocate(checkpoint_filename)
+    checkpoint_filename(1:n) = filename(1:n)
+    checkpoint_filename(n+1:n+1) = c_null_char
+    ierr = rdyreadhdf5checkpointfile_(rdy_%c_rdy, c_loc(checkpoint_filename))
+    deallocate(checkpoint_filename)
   end subroutine
 
   subroutine RDyAdvance(rdy_, ierr)

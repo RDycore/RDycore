@@ -230,7 +230,7 @@ static PetscErrorCode WriteCheckpoint(TS ts, PetscInt step, PetscReal time, Vec 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDyWriteHDF5CheckpointFile(RDy rdy, char *filename_base) {
+PetscErrorCode RDyWriteHDF5CheckpointFile(RDy rdy, const char *filename_base) {
   PetscFunctionBegin;
   PetscCall(WriteCheckpointFile(rdy, rdy->u_global, filename_base, PETSC_VIEWER_HDF5_PETSC));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -300,5 +300,11 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
   // read the newly loaded solution vector into the timestepper
   PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyReadHDF5CheckpointFile(RDy rdy, const char *filename) {
+  PetscFunctionBegin;
+  PetscCall(ReadCheckpointFile(rdy, filename));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

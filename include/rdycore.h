@@ -123,6 +123,9 @@ PETSC_EXTERN PetscErrorCode RDyMapAMRScalarGlobalVecLevel0ToCurrentLevel(RDy rdy
 PETSC_EXTERN PetscErrorCode RDyWriteOneDOFGlobalVecToBinaryFile(RDy rdy, const char *, Vec *global);
 PETSC_EXTERN PetscErrorCode RDyCreateOneDOFGlobalVec(RDy rdy, Vec *global);
 
+PETSC_EXTERN PetscErrorCode RDyWriteHDF5CheckpointFile(RDy, const char *);
+PETSC_EXTERN PetscErrorCode RDyReadHDF5CheckpointFile(RDy, const char *);
+
 // "kinds" of initial/boundary/source conditions applied to regions/boundaries
 typedef enum {
   CONDITION_DIRICHLET = 0,     // Dirichlet condition (value is specified)
