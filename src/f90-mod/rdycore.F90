@@ -958,7 +958,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: checkpoint_filename_base
 
-    n = len_trim(filename_base)
+    n = min(1023, len_trim(filename_base))
     allocate(checkpoint_filename_base)
     checkpoint_filename_base(1:n) = filename_base(1:n)
     checkpoint_filename_base(n+1:n+1) = c_null_char
@@ -975,7 +975,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: checkpoint_filename
 
-    n = len_trim(filename)
+    n = min(1023, len_trim(filename))
     allocate(checkpoint_filename)
     checkpoint_filename(1:n) = filename(1:n)
     checkpoint_filename(n+1:n+1) = c_null_char
