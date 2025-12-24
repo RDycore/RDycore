@@ -507,7 +507,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: config_file
 
-    n = len_trim(filename)
+    n = min(1023, len_trim(filename))
     allocate(config_file)
     config_file(1:n) = filename(1:n)
     config_file(n+1:n+1) = c_null_char
@@ -524,7 +524,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: log_file
 
-    n = min(len_trim(filename), 1024)
+    n = min(1023, len_trim(filename))
     allocate(log_file)
     log_file(1:n) = filename(1:n)
     log_file(n+1:n+1) = c_null_char
@@ -905,7 +905,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: binary_file
 
-    n = len_trim(filename)
+    n = min(1023, len_trim(filename))
     allocate(binary_file)
     binary_file(1:n) = filename(1:n)
     binary_file(n+1:n+1) = c_null_char
@@ -923,7 +923,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: binary_file
 
-    n = len_trim(filename)
+    n = min(1023, len_trim(filename))
     allocate(binary_file)
     binary_file(1:n) = filename(1:n)
     binary_file(n+1:n+1) = c_null_char
@@ -941,7 +941,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: binary_file
 
-    n = len_trim(filename)
+    n = min(1023, len_trim(filename))
     allocate(binary_file)
     binary_file(1:n) = filename(1:n)
     binary_file(n+1:n+1) = c_null_char
@@ -958,7 +958,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: checkpoint_filename_base
 
-    n = len_trim(filename_base)
+    n = min(1023, len_trim(filename_base))
     allocate(checkpoint_filename_base)
     checkpoint_filename_base(1:n) = filename_base(1:n)
     checkpoint_filename_base(n+1:n+1) = c_null_char
@@ -975,7 +975,7 @@ contains
     integer                      :: n
     character(len=1024), pointer :: checkpoint_filename
 
-    n = len_trim(filename)
+    n = min(1023, len_trim(filename))
     allocate(checkpoint_filename)
     checkpoint_filename(1:n) = filename(1:n)
     checkpoint_filename(n+1:n+1) = c_null_char
