@@ -136,7 +136,7 @@ static PetscErrorCode ReadHDF5Metadata(RDy rdy, PetscViewer viewer) {
 }
 #endif
 
-// this generates the ancient-looking checkpoing filename expected by E3SM
+// this generates the ancient-looking checkpoint filename expected by E3SM
 static PetscErrorCode GenerateE3SMCheckpointFilenameBase(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val,
                                                          char *filename) {
   PetscFunctionBegin;
@@ -283,17 +283,26 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
   }
 #endif
-  Vec nat_vec;
-  DM  dm = rdy->dm;
+  DM dm = rdy->dm;
 
-  PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
-  PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
-  PetscCall(VecLoad(nat_vec, viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
+  if (rdy->amr.num_refinements > 0) {
+    // With AMR active, the checkpointed solution is stored directly in global ordering.
+    PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "solution"));
+    PetscCall(VecLoad(rdy->u_global, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
+  } else {
+    // Without AMR, the checkpointed solution is stored in natural ordering and
+    // must be converted to the global ordering.
+    Vec nat_vec;
+    PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
+    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
+    PetscCall(VecLoad(nat_vec, viewer));
+    PetscCall(PetscViewerDestroy(&viewer));
 
-  PetscCall(DMPlexNaturalToGlobalBegin(dm, nat_vec, rdy->u_global));
-  PetscCall(DMPlexNaturalToGlobalEnd(dm, nat_vec, rdy->u_global));
-  PetscCall(VecDestroy(&nat_vec));
+    PetscCall(DMPlexNaturalToGlobalBegin(dm, nat_vec, rdy->u_global));
+    PetscCall(DMPlexNaturalToGlobalEnd(dm, nat_vec, rdy->u_global));
+    PetscCall(VecDestroy(&nat_vec));
+  }
 
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
 
