@@ -284,10 +284,11 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
   }
 #endif
   DM dm = rdy->dm;
+  PetscCall(DMSetOutputSequenceNumber(rdy->dm, -1, 0.0));
 
   if (rdy->amr.num_refinements > 0) {
     // With AMR active, the checkpointed solution is stored directly in global ordering.
-    PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "solution"));
+    PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "fields/solution"));
     PetscCall(VecLoad(rdy->u_global, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
   } else {
@@ -295,7 +296,7 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
     // must be converted to the global ordering.
     Vec nat_vec;
     PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
-    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
+    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "fields/solution"));
     PetscCall(VecLoad(nat_vec, viewer));
     PetscCall(PetscViewerDestroy(&viewer));
 
