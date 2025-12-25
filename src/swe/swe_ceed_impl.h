@@ -1,5 +1,3 @@
-
-
 #ifndef SWE_OPERATORS_IMPL_H
 #define SWE_OPERATORS_IMPL_H
 
@@ -38,6 +36,33 @@ struct SWEState_ {
   CeedScalar h, hu, hv;
 };
 typedef struct SWEState_ SWEState;
+
+CEED_QFUNCTION_HELPER inline void SWEPhysicalNormalFlux(
+    CeedScalar g, const SWEState q, CeedScalar sn, CeedScalar cn, CeedScalar Fn[3]) {
+  // NOTE: sn = n_y, cn = n_x (from operator_ceed.c packing)
+  const CeedScalar nx = cn, ny = sn;
+
+  const CeedScalar h  = q.h;
+  const CeedScalar hu = q.hu;
+  const CeedScalar hv = q.hv;
+
+  const CeedScalar u = SafeDiv(hu, h, fabs(h), RDY_TINY);
+  const CeedScalar v = SafeDiv(hv, h, fabs(h), RDY_TINY);
+
+  // E and G flux vectors
+  const CeedScalar E0 = hu;
+  const CeedScalar E1 = hu * u + 0.5 * g * h * h;
+  const CeedScalar E2 = hu * v;
+
+  const CeedScalar G0 = hv;
+  const CeedScalar G1 = hv * u;
+  const CeedScalar G2 = hv * v + 0.5 * g * h * h;
+
+  // Normal flux: F·n = E*n_x + G*n_y
+  Fn[0] = E0 * nx + G0 * ny;
+  Fn[1] = E1 * nx + G1 * ny;
+  Fn[2] = E2 * nx + G2 * ny;
+}
 
 // supported Riemann solver types
 #include "swe_hll_ceed_impl.h"
