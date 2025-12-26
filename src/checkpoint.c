@@ -162,6 +162,7 @@ static PetscErrorCode WriteCheckpointFile(RDy rdy, Vec X, const char *filename_b
     case PETSC_VIEWER_HDF5_PETSC:
       snprintf(filename, PETSC_MAX_PATH_LEN - 1, "%s.h5", filename_base);
       PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+      PetscCall(PetscViewerHDF5PushGroup(viewer, "fields"));
       break;
     default:
       PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Checkpoint format = %" PetscInt_FMT " unsupported\n", format);
@@ -202,6 +203,7 @@ static PetscErrorCode WriteCheckpointFile(RDy rdy, Vec X, const char *filename_b
 
   PetscCall(VecDestroy(&nat_vec));
 
+  if (format == PETSC_VIEWER_HDF5_PETSC) PetscCall(PetscViewerHDF5PopGroup(viewer));
   PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished writing checkpoint file.");
 
@@ -266,6 +268,7 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
     PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
   } else if (strstr(filename, ".h5")) {  // HDF5
     PetscCall(PetscViewerHDF5Open(rdy->comm, filename, FILE_MODE_READ, &viewer));
+    PetscCall(PetscViewerHDF5PushGroup(viewer, "fields"));
   } else {
     PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Invalid checkpoint file: %s", filename);
   }
@@ -287,23 +290,23 @@ PetscErrorCode ReadCheckpointFile(RDy rdy, const char *filename) {
 
   if (rdy->amr.num_refinements > 0) {
     // With AMR active, the checkpointed solution is stored directly in global ordering.
-    PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "fields/solution"));
+    PetscCall(PetscObjectSetName((PetscObject)rdy->u_global, "solution"));
     PetscCall(VecLoad(rdy->u_global, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
   } else {
     // Without AMR, the checkpointed solution is stored in natural ordering and
     // must be converted to the global ordering.
     Vec nat_vec;
     PetscCall(DMPlexCreateNaturalVector(dm, &nat_vec));
-    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "fields/solution"));
+    PetscCall(PetscObjectSetName((PetscObject)nat_vec, "solution"));
     PetscCall(VecLoad(nat_vec, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
 
     PetscCall(DMPlexNaturalToGlobalBegin(dm, nat_vec, rdy->u_global));
     PetscCall(DMPlexNaturalToGlobalEnd(dm, nat_vec, rdy->u_global));
     PetscCall(VecDestroy(&nat_vec));
   }
 
+  if (strstr(filename, ".h5")) PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
   RDyLogInfo(rdy, "Finished reading checkpoint file.");
 
   // read the newly loaded solution vector into the timestepper
