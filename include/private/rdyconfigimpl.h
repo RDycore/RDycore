@@ -53,6 +53,11 @@ typedef enum {
   SOURCE_ARK_IMEX,           // fully implicit treatment via ARK-IMEX method
 } RDyFlowSourceMethod;
 
+typedef enum {
+  WELL_BALANCE_NONE = 0,  // no well-balancing
+  WELL_BALANCE_BS2002,    // Bradford and Sanders (2002) well-balancing
+} RDyWellBalanceMethod;
+
 typedef struct {
   RDyFlowSourceMethod method;            // temporal discretization method for source term
   PetscReal           xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
@@ -60,10 +65,11 @@ typedef struct {
 
 // physics flow parameters
 typedef struct {
-  RDyPhysicsFlowMode mode;             // flow mode
-  PetscReal          tiny_h;           // depth below which no flow occurs
-  PetscReal          h_anuga_regular;  // ANUGA height parameter used for velocity regularization.
-  RDyFlowSource      source;
+  RDyPhysicsFlowMode   mode;             // flow mode
+  PetscReal            tiny_h;           // depth below which no flow occurs
+  PetscReal            h_anuga_regular;  // ANUGA height parameter used for velocity regularization.
+  RDyFlowSource        source;
+  RDyWellBalanceMethod well_balance;  // well-balancing method
 } RDyPhysicsFlow;
 
 typedef struct {

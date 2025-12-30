@@ -68,12 +68,18 @@ static const cyaml_schema_field_t source_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_strval_t well_balance_methods[] = {
+    {"none",                  WELL_BALANCE_NONE   },
+    {"bradford_sanders_2002", WELL_BALANCE_BS2002 },
+};
+
 // mapping of physics.flow fields to members of RDyPhysicsFlow
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
     CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
     CYAML_FIELD_FLOAT("h_anuga_reg_parameter", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, h_anuga_regular),
     CYAML_FIELD_MAPPING("source", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source, source_fields_schema),
+    CYAML_FIELD_ENUM("well_balance", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, well_balance, well_balance_methods, CYAML_ARRAY_LEN(well_balance_methods)),
     CYAML_FIELD_END
 };
 
@@ -825,6 +831,8 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
   if (config->physics.flow.source.method == SOURCE_IMPLICIT_XQ2018) {
     SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
   }
+
+  SET_MISSING_PARAMETER(config->physics.flow.well_balance, WELL_BALANCE_NONE);
 
   SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
 
