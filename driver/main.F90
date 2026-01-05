@@ -84,7 +84,8 @@ module rdy_driver
     PetscInt           :: mesh_nelements         ! number of cells or boundary edges in RDycore mesh
     PetscInt, pointer  :: data2mesh_idx(:)       ! for each RDycore element (cells or boundary edges), the index of the data in the unstructured dataset
     PetscReal, pointer :: data_xc(:), data_yc(:) ! x and y coordinates of data
-    PetscReal, pointer :: mesh_xc(:), mesh_yc(:) ! x and y coordinates of RDycore elments
+    PetscReal, pointer :: mesh_xc(:), mesh_yc(:) ! x and y coordinates of RDycore elements
+    PetscReal, pointer :: mesh_zc(:)             !  z elevation of RDycore elements
 
     PetscBool :: write_map_for_debugging         ! if true, write the mapping between the RDycore cells and the dataset for debugging
     PetscBool :: write_map                       ! if true, write the map between the RDycore cells and the dataset
@@ -767,7 +768,7 @@ contains
     if (bc_dataset%ndata > 0) then
       bc_dataset%unstructured%mesh_nelements = num_edges_dirc_bc
 
-      call GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset%unstructured%mesh_xc, bc_dataset%unstructured%mesh_yc)
+      call GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, num_edges_dirc_bc, global_dirc_bc_idx, bc_dataset%unstructured%mesh_xc, bc_dataset%unstructured%mesh_yc, bc_dataset%unstructured%mesh_zc)
 
       call ReadUnstructuredDatasetCoordinates(bc_dataset%unstructured)
 
@@ -797,7 +798,7 @@ contains
   end subroutine GetCellCentroidsFromRDycoreMesh
 
   ! Extracts the edge centroids from the RDycore mesh
-  subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, n, idx, xc, yc)
+  subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy_, n, idx, xc, yc, zc)
     !
     use rdycore
     use petsc
@@ -806,11 +807,12 @@ contains
     !
     type(RDy)               :: rdy_
     PetscInt                :: n, idx
-    PetscReal, pointer      :: xc(:), yc(:)
+    PetscReal, pointer      :: xc(:), yc(:), zc(:)
     PetscErrorCode          :: ierr
 
     PetscCallA(RDyGetBoundaryEdgeXCentroids(rdy_, idx, n, xc, ierr))
     PetscCallA(RDyGetBoundaryEdgeYCentroids(rdy_, idx, n, yc, ierr))
+    PetscCallA(RDyGetBoundaryEdgeZCentroids(rdy_, idx, n, zc, ierr))
 
   end subroutine GetBoundaryEdgeCentroidsFromRDycoreMesh
 
@@ -1415,6 +1417,34 @@ contains
 
   end subroutine SetUnstructuredData
 
+  ! Remove mesh elevation from spatially varying BC conditions from an unstructured dataset
+  subroutine RemoveMeshZfromUnstructuredBC(data, num_values, data_for_rdycore)
+    !
+    use rdycore
+    use petsc
+    !
+    implicit none
+    !
+    type(UnstructuredDataset) :: data
+    PetscInt                  :: num_values
+    PetscScalar, pointer      :: data_for_rdycore(:)
+    !
+    PetscInt                 :: ii, icell, idx, ndata_file, stride
+
+    stride = data%stride
+
+    do icell = 1, num_values
+      idx = (data%data2mesh_idx(icell) - 1) * stride
+      do ii = 1, stride
+        data_for_rdycore((icell - 1) * stride + ii) = data_for_rdycore((icell - 1) * stride + ii) - data%mesh_zc(icell)
+        if (data_for_rdycore((icell - 1) * stride + ii) < 0.0) then
+          data_for_rdycore((icell - 1) * stride + ii) = 0.0
+        endif
+      enddo
+    enddo
+
+  end subroutine RemoveMeshZfromUnstructuredBC
+  
   ! Apply boundary condition to the RDycore object
   subroutine ApplyBoundaryCondition(rdy_, cur_time, bc_dataset)
 #include <petsc/finclude/petsc.h>
@@ -1443,6 +1473,7 @@ contains
     case (DATASET_UNSTRUCTURED)
       if (bc_dataset%ndata > 0) then
         call SetUnstructuredData(bc_dataset%unstructured, cur_time, bc_dataset%ndata / ndof, bc_dataset%data_for_rdycore)
+        call RemoveMeshZfromUnstructuredBC(bc_dataset%unstructured, bc_dataset%ndata / ndof, bc_dataset%data_for_rdycore)
         PetscCallA(RDySetFlowDirichletBoundaryValues(rdy_, bc_dataset%dirichlet_bc_idx, bc_dataset%ndata / ndof, ndof, bc_dataset%data_for_rdycore, ierr))
       endif
     case default

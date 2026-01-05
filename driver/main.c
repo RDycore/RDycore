@@ -79,7 +79,8 @@ typedef struct {
   PetscInt   mesh_nelements;     // number of cells or boundary edges in RDycore mesh
   PetscInt  *data2mesh_idx;      // for each RDycore element (cells or boundary edges), the index of the data in the unstructured dataset
   PetscReal *data_xc, *data_yc;  // x and y coordinates of data
-  PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore elments
+  PetscReal *mesh_xc, *mesh_yc;  // x and y coordinates of RDycore elements
+  PetscReal *mesh_zc;            // z elevation of RDycore elements
 
   PetscBool write_map_for_debugging;  // if true, write the mapping between the RDycore cells and the dataset for debugging
   PetscBool write_map;                // if true, write the map between the RDycore cells and the dataset
@@ -460,16 +461,18 @@ static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, Petsc
 /// @param *xc   Holds cell centeroid x coordinate value for local cells
 /// @param *yc   Holds cell centeroid y coordinate value for local cells
 /// @return PETSC_SUCESS on success
-static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscInt bc_id, PetscReal **xc, PetscReal **yc) {
+static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscInt bc_id, PetscReal **xc, PetscReal **yc, PetscReal **zc) {
   PetscFunctionBegin;
 
   // allocate memory
   PetscCalloc1(n, xc);
   PetscCalloc1(n, yc);
+  PetscCalloc1(n, xc);
 
   // get the x/y coordinates of the boundary edges from RDycore
   PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_id, n, *xc));
   PetscCall(RDyGetBoundaryEdgeYCentroids(rdy, bc_id, n, *yc));
+  PetscCall(RDyGetBoundaryEdgeZCentroids(rdy, bc_id, n, *zc));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -709,9 +712,9 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, Bound
   if ((num_edges_dirc_bc > 0)) {
     bc_dataset->unstructured.mesh_nelements = num_edges_dirc_bc;
 
-    // get the x/y coordinates of the boundary edges from RDycore
+    // get the x/y coordinates and z elevation of the boundary edges from RDycore
     PetscCall(GetBoundaryEdgeCentroidsFromRDycoreMesh(rdy, num_edges_dirc_bc, global_dirc_bc_idx, &bc_dataset->unstructured.mesh_xc,
-                                                      &bc_dataset->unstructured.mesh_yc));
+                                                      &bc_dataset->unstructured.mesh_yc, &bc_dataset->unstructured.mesh_zc));
 
     // read the coordinates of dataset
     PetscCall(ReadUnstructuredDatasetCoordinates(&bc_dataset->unstructured));
@@ -853,6 +856,7 @@ static PetscErrorCode DestroyUnstructuredDataset(UnstructuredDataset *data) {
   if (data->mesh_nelements) {
     PetscCall(PetscFree(data->mesh_xc));
     PetscCall(PetscFree(data->mesh_yc));
+    PetscCall(PetscFree(data->mesh_zc));
     PetscCall(PetscFree(data->data2mesh_idx));
   }
 
@@ -880,6 +884,27 @@ PetscErrorCode SetUnstructuredData(UnstructuredDataset *data, PetscReal cur_time
 
     for (PetscInt ii = 0; ii < stride; ii++) {
       data_values[icell * stride + ii] = data->data_ptr[idx + ii + offset];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Set spatially varying BC conditions from an unstructured dataset
+/// @param data        [in]  Pointer to a UnstructuredDataset struct
+/// @param data_values [out] BC values for boundary cells
+/// @return PETSC_SUCESS on success
+PetscErrorCode RemoveMeshZfromUnstructuredBC(UnstructuredDataset *data, PetscReal *data_values) {
+  PetscFunctionBegin;
+
+  PetscInt stride = data->stride;
+
+  for (PetscInt icell = 0; icell < data->mesh_nelements; icell++) {
+    for (PetscInt ii = 0; ii < stride; ii++) {
+      data_values[icell * stride + ii] -= data->mesh_zc[icell];
+      if (data_values[icell * stride + ii] < 0.0) {
+        data_values[icell * stride + ii] = 0.0;
+      }
     }
   }
 
@@ -1593,6 +1618,7 @@ PetscErrorCode ApplyBoundaryCondition(RDy rdy, PetscReal time, BoundaryCondition
     case UNSTRUCTURED:
       if (bc_dataset->ndata) {
         PetscCall(SetUnstructuredData(&bc_dataset->unstructured, time, bc_dataset->data_for_rdycore));
+        PetscCall(RemoveMeshZfromUnstructuredBC(&bc_dataset->unstructured, bc_dataset->data_for_rdycore));
         PetscCall(RDySetFlowDirichletBoundaryValues(rdy, bc_dataset->dirichlet_bc_idx, bc_dataset->ndata / 3, 3, bc_dataset->data_for_rdycore));
       }
       break;
