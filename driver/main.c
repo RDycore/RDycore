@@ -467,7 +467,7 @@ static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt 
   // allocate memory
   PetscCalloc1(n, xc);
   PetscCalloc1(n, yc);
-  PetscCalloc1(n, xc);
+  PetscCalloc1(n, zc);
 
   // get the x/y coordinates of the boundary edges from RDycore
   PetscCall(RDyGetBoundaryEdgeXCentroids(rdy, bc_id, n, *xc));
