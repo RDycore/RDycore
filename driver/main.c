@@ -460,6 +460,7 @@ static PetscErrorCode GetCellCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, Petsc
 /// @param bc_id ID of the boundary condition
 /// @param *xc   Holds cell centeroid x coordinate value for local cells
 /// @param *yc   Holds cell centeroid y coordinate value for local cells
+/// @param *zc   Holds cell centeroid z coordinate value for local cells
 /// @return PETSC_SUCESS on success
 static PetscErrorCode GetBoundaryEdgeCentroidsFromRDycoreMesh(RDy rdy, PetscInt n, PetscInt bc_id, PetscReal **xc, PetscReal **yc, PetscReal **zc) {
   PetscFunctionBegin;
@@ -856,7 +857,6 @@ static PetscErrorCode DestroyUnstructuredDataset(UnstructuredDataset *data) {
   if (data->mesh_nelements) {
     PetscCall(PetscFree(data->mesh_xc));
     PetscCall(PetscFree(data->mesh_yc));
-    PetscCall(PetscFree(data->mesh_zc));
     PetscCall(PetscFree(data->data2mesh_idx));
   }
 
@@ -881,7 +881,6 @@ PetscErrorCode SetUnstructuredData(UnstructuredDataset *data, PetscReal cur_time
 
   for (PetscInt icell = 0; icell < data->mesh_nelements; icell++) {
     PetscInt idx = data->data2mesh_idx[icell] * stride;
-
     for (PetscInt ii = 0; ii < stride; ii++) {
       data_values[icell * stride + ii] = data->data_ptr[idx + ii + offset];
     }
@@ -1662,6 +1661,7 @@ PetscErrorCode DestroyBoundaryConditionDataset(BoundaryCondition *bc_dataset) {
       break;
     case UNSTRUCTURED:
       PetscCall(DestroyUnstructuredDataset(&bc_dataset->unstructured));
+      PetscCall(PetscFree(bc_dataset->unstructured.mesh_zc));
       break;
     case MULTI_HOMOGENEOUS:
       for (PetscInt idata = 0; idata < bc_dataset->multihomogeneous.ndata; idata++) {
