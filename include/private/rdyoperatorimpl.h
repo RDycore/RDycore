@@ -138,6 +138,10 @@ typedef struct Operator {
       // bookkeeping vectors
       CeedVector u_local, rhs, sources;
 
+      // for well balancing
+      CeedVector eta_vertices;
+      CeedOperator eta_vertices_operator;
+
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;
     } ceed;
@@ -188,6 +192,7 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *, RDyMesh *, CeedVector*, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
                                                     OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSourceOperator(RDyConfig *, RDyMesh *, Vec, Vec, PetscOperator *);

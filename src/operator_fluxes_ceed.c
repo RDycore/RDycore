@@ -7,6 +7,7 @@
 
 #include "sediment/sediment_fluxes_ceed.h"
 #include "swe/swe_fluxes_ceed.h"
+#include "swe/swe_well_balance.h"
 
 // The CEED flux operator consists of the following sub-operators:
 //
@@ -480,6 +481,190 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
     PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, boundary, condition, &boundary_flux_op));
     PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Sorts three CeedScalar values in ascending order. after function call,
+///        *data1 <= *data2 <= *data3
+/// @param data1 [inout] pointer to the first value
+/// @param data2 [inout] pointer to the second value
+/// @param data3 [inout] pointer to the third value
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode sort3(CeedScalar *data1, CeedScalar *data2, CeedScalar *data3) {
+  PetscFunctionBegin;
+
+  CeedScalar tmp;
+  if (*data1 > *data2) {
+    tmp    = *data1;
+    *data1 = *data2;
+    *data2 = tmp;
+  }
+  if (*data2 > *data3) {
+    tmp    = *data2;
+    *data2 = *data3;
+    *data3 = tmp;
+  }
+  if (*data1 > *data2) {
+    tmp    = *data1;
+    *data1 = *data2;
+    *data2 = tmp;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Creates a CEED operator for computing vertex-averaged water surface elevation (eta)
+///
+/// This operator computes eta at mesh vertices by averaging the eta values from all
+/// cells surrounding each vertex. It implements a **scatter-gather-reduce pattern** where
+/// cell-centered data is scattered to vertex-cell connection points, transformed, and then
+/// gathered (with accumulation) to produce vertex-centered results.
+///
+/// Key Concept:
+///   The operator uses three restriction spaces of different sizes:
+///   - Input from cell space (lsize = num_cells)
+///   - Processing in vertex-cell connection space (nelem = total_vertex_cell_conns)
+///   - Output to vertex space (lsize = num_vertices)
+///
+/// Algorithm:
+///   For each vertex v:
+///     For each cell c connected to v:
+///       1. Scatter: read q[c] (cell-centered state)
+///       2. Compute: calculate eta from q[c] and geometric factors
+///       3. Gather: accumulate (1/num_cells_at_v) * eta into eta_vertices[v]
+///     Result: eta_vertices[v] = average of eta over all neighboring cells
+///
+/// Restriction Space Details:
+///   * Input q: lsize = num_cells * num_comp
+///     - Indexed by cell IDs
+///     - Contains cell-centered flow state
+///
+///   * Input geom: lsize = total_vertex_cell_conns * num_comp_geom (strided)
+///     - One entry per (vertex, cell) pair
+///     - Contains [z1, z2, z3, weight] where weight = 1/num_cells_at_vertex
+///     - Enables weighted averaging during the gather phase
+///
+///   * Output eta: lsize = num_vertices * num_comp_eta
+///     - Indexed by vertex IDs
+///     - Accumulates weighted eta contributions from all connected cells
+///
+/// @param [in]  config       RDycore's configuration
+/// @param [in]  mesh         mesh defining vertices, cells, and their connectivity
+/// @param [out] eta_vertices CeedVector for vertex-centered eta values
+/// @param [out] op           the newly created CeedOperator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *config, RDyMesh *mesh, CeedVector *eta_vertices, CeedOperator *op) {
+  PetscFunctionBegin;
+  Ceed ceed = CeedContext();
+
+  PetscCall(CeedOperatorCreateComposite(ceed, op));
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+
+  CeedInt num_sediment_comp = config->physics.sediment.num_classes;
+  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+  CeedInt num_comp_geom     = 4;
+  CeedInt num_comp_eta      = 1;  // only for water surface elevation
+
+  CeedInt num_vertices = mesh->num_vertices;
+
+  // create QFunction
+  CeedQFunction        qf;
+  CeedQFunctionContext qf_context;
+  PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEEtaVertex, SWEEtaVertex_loc, &qf));
+  PetscCall(CreateSWEQFunctionContext(ceed, *config, &qf_context));
+  PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
+  PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
+
+  PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "eta", num_comp_eta, CEED_EVAL_NONE));
+
+  // count the total number of vertex-cell connections
+  CeedInt total_vertex_cell_conns = 0;
+  for (CeedInt v = 0; v < num_vertices; v++) {
+    total_vertex_cell_conns += vertices->num_cells[v];
+  }
+
+  // allocate offsets array for the unknowns
+  CeedInt *q_offset, *eta_offset;
+  PetscCall(PetscMalloc1(total_vertex_cell_conns, &q_offset));
+  PetscCall(PetscMalloc1(total_vertex_cell_conns, &eta_offset));
+
+  // create a vector of geometric factors that transform fluxes to cell states
+  CeedElemRestriction geom_restrict;
+  CeedVector          geom;
+  CeedInt             g_strides[] = {num_comp_geom, 1, num_comp_geom};
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, total_vertex_cell_conns, 1, num_comp_geom, total_vertex_cell_conns * num_comp_geom, g_strides,
+                                                 &geom_restrict));
+  if (0) CeedElemRestrictionView(geom_restrict, stdout);
+  PetscCallCEED(CeedElemRestrictionCreateVector(geom_restrict, &geom, NULL));
+  PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+  CeedScalar(*g)[4];
+  PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+
+  CeedInt conn_id = 0;
+  for (CeedInt v = 0; v < num_vertices; v++) {
+    CeedInt offset_for_cell_id = vertices->cell_offsets[v];
+
+    for (CeedInt i = 0; i < vertices->num_cells[v]; i++) {
+      CeedInt icell = vertices->cell_ids[offset_for_cell_id + i];
+
+      CeedInt offset_for_vertex_ids = cells->vertex_offsets[icell];
+
+      CeedInt iv1 = cells->vertex_ids[offset_for_vertex_ids];
+      CeedInt iv2 = cells->vertex_ids[offset_for_vertex_ids + 1];
+      CeedInt iv3 = cells->vertex_ids[offset_for_vertex_ids + 2];
+
+      CeedScalar z1 = vertices->points[iv1].X[2];
+      CeedScalar z2 = vertices->points[iv2].X[2];
+      CeedScalar z3 = vertices->points[iv3].X[2];
+
+      PetscCall(sort3(&z1, &z2, &z3));
+
+      g[conn_id][0] = z1;
+      g[conn_id][1] = z2;
+      g[conn_id][2] = z3;
+      g[conn_id][3] = 1.0 / vertices->num_cells[v];
+
+      q_offset[conn_id] = icell * num_comp;
+
+      eta_offset[conn_id] = v * num_comp_eta;
+      conn_id++;
+    }
+  }
+
+  PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+
+  CeedElemRestriction q_restrict;
+  PetscCallCEED(CeedElemRestrictionCreate(ceed, total_vertex_cell_conns, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                          q_offset, &q_restrict));
+  if (0) CeedElemRestrictionView(q_restrict, stdout);
+  PetscCall(PetscFree(q_offset));
+
+  // output: create vector and restriction for eta at vertices
+  CeedElemRestriction eta_restrict;
+  PetscCallCEED(CeedElemRestrictionCreate(ceed, total_vertex_cell_conns, 1, num_comp_eta, 1, num_vertices * num_comp_eta, CEED_MEM_HOST,
+                                          CEED_COPY_VALUES, eta_offset, &eta_restrict));
+  PetscCall(PetscFree(eta_offset));
+  if (0) CeedElemRestrictionView(eta_restrict, stdout);
+  PetscCallCEED(CeedElemRestrictionCreateVector(eta_restrict, eta_vertices, NULL));
+
+  // create the operator itself and assign its active/passive inputs/outputs
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
+  PetscCallCEED(CeedOperatorSetField(*op, "geom", geom_restrict, CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*op, "q", q_restrict, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*op, "eta", eta_restrict, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+
+  // clean up
+  PetscCallCEED(CeedElemRestrictionDestroy(&geom_restrict));
+  PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict));
+  PetscCallCEED(CeedElemRestrictionDestroy(&eta_restrict));
+  PetscCallCEED(CeedVectorDestroy(&geom));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
