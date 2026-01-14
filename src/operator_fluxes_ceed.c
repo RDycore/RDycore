@@ -7,6 +7,7 @@
 
 #include "sediment/sediment_fluxes_ceed.h"
 #include "swe/swe_fluxes_ceed.h"
+#include "swe/swe_well_balance.h"
 
 // The CEED flux operator consists of the following sub-operators:
 //
@@ -480,6 +481,130 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
     PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, boundary, condition, &boundary_flux_op));
     PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Sorts three CeedScalar values in ascending order. after function call,
+///        *data1 <= *data2 <= *data3
+/// @param data1 [inout] pointer to the first value
+/// @param data2 [inout] pointer to the second value
+/// @param data3 [inout] pointer to the third value
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode sort3(CeedScalar *data1, CeedScalar *data2, CeedScalar *data3) {
+  PetscFunctionBegin;
+
+  CeedScalar tmp;
+  if (*data1 > *data2) {
+    tmp    = *data1;
+    *data1 = *data2;
+    *data2 = tmp;
+  }
+  if (*data2 > *data3) {
+    tmp    = *data2;
+    *data2 = *data3;
+    *data3 = tmp;
+  }
+  if (*data1 > *data2) {
+    tmp    = *data1;
+    *data1 = *data2;
+    *data2 = tmp;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Creates a CEED operator for computing the water surface elevation + elevation (eta) at cell centers
+/// @param [in]  config             RDycore's configuration
+/// @param [in]  mesh               mesh defining the computational domain of the operator
+/// @param [out] *eta_cell          a CeedVector for the water surface elevation + elevation (eta) at cell centers
+/// @param [out] *op                the newly create CeedOperator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCeedEtaOperator(RDyConfig *config, RDyMesh *mesh, CeedVector *eta_cell, CeedOperator *op) {
+  PetscFunctionBegin;
+
+  Ceed ceed = CeedContext();
+
+  PetscCall(CeedOperatorCreateComposite(ceed, op));
+
+  // create vector and restriction for eta at cell centers
+  CeedElemRestriction eta_restrict;
+  CeedInt             num_comp_eta  = 1;  // only for water surface elevation
+  CeedInt             eta_strides[] = {num_comp_eta, 1, num_comp_eta};
+  PetscInt            num_cells     = mesh->num_cells;
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_cells, 1, num_comp_eta, num_cells * num_comp_eta, eta_strides, &eta_restrict));
+  PetscCallCEED(CeedElemRestrictionCreateVector(eta_restrict, eta_cell, NULL));
+
+  // create QFunction
+  CeedQFunction        qf;
+  CeedQFunctionContext qf_context;
+  PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEEta, SWEEta_loc, &qf));
+  PetscCall(CreateSWEQFunctionContext(ceed, *config, &qf_context));
+  PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
+  PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
+
+  CeedInt num_sediment_comp = config->physics.sediment.num_classes;
+  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+  CeedInt num_comp_geom     = 3;  // for z-coordinates of triangle vertices
+
+  PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "eta", num_comp_eta, CEED_EVAL_NONE));
+
+  CeedElemRestriction geom_restrict;
+  CeedVector          geom;
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+
+  // create a vector of geometric factors that transform fluxes to cell states
+  CeedInt g_strides[] = {num_comp_geom, 1, num_comp_geom};
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_cells, 1, num_comp_geom, num_cells * num_comp_geom, g_strides, &geom_restrict));
+  PetscCallCEED(CeedElemRestrictionCreateVector(geom_restrict, &geom, NULL));
+  PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+  CeedScalar(*g)[3];
+  PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+
+  for (CeedInt icell = 0; icell < mesh->num_cells; icell++) {
+    PetscCheck(cells->num_vertices[icell] == 3, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only triangular cells are supported in CreateCeedEtaOperator");
+
+    CeedInt offset = cells->vertex_offsets[icell];
+
+    CeedInt iv1 = cells->vertex_ids[offset];
+    CeedInt iv2 = cells->vertex_ids[offset + 1];
+    CeedInt iv3 = cells->vertex_ids[offset + 2];
+
+    CeedScalar z1 = vertices->points[iv1].X[2];
+    CeedScalar z2 = vertices->points[iv2].X[2];
+    CeedScalar z3 = vertices->points[iv3].X[2];
+
+    PetscCall(sort3(&z1, &z2, &z3));
+
+    g[icell][0] = z1;
+    g[icell][1] = z2;
+    g[icell][2] = z3;
+  }
+  PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+
+  // create element restriction for (active) input state
+  CeedElemRestriction q_restrict;
+  CeedInt             q_strides[] = {num_comp, 1, num_comp};
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_cells, 1, num_comp, num_cells * num_comp, q_strides, &q_restrict));
+  PetscCallCEED(CeedElemRestrictionView(q_restrict, stdout));
+
+  // create the operator itself and assign its active/passive inputs/outputs
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
+  PetscCallCEED(CeedOperatorSetField(*op, "geom", geom_restrict, CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*op, "q", q_restrict, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*op, "eta", eta_restrict, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+
+  // clean up
+  PetscCallCEED(CeedElemRestrictionDestroy(&geom_restrict));
+  PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict));
+  PetscCallCEED(CeedElemRestrictionDestroy(&eta_restrict));
+  PetscCallCEED(CeedVectorDestroy(&geom));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
