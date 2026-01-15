@@ -21,7 +21,7 @@
 /// @brief Computes eta all cell centers, which is equal to water height + bed elevation if water height > tiny_h,
 ///        or just bed elevation otherwise.
 /// @param ctx [in] SWE context
-/// @param Q [in] number of quadrature points 
+/// @param Q [in] number of quadrature points
 /// @param in  [in] array of input fields
 ///             - in[0]: geom[num_cells][3] - an array associating the z1, z2, z3 of cell vertices with each cell
 ///             - in[1]: q[num_cells][3] - an array associating a 3-DOF solution input state with each cell
@@ -39,10 +39,10 @@ CEED_QFUNCTION(SWEEta)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedS
   const CeedScalar tiny_h  = context->tiny_h;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState state = {q[0][i], q[1][i], q[2][i]};
-    CeedScalar z1 = geom[0][i];
-    CeedScalar z2 = geom[1][i];
-    CeedScalar z3 = geom[2][i];
+    SWEState   state = {q[0][i], q[1][i], q[2][i]};
+    CeedScalar z1    = geom[0][i];
+    CeedScalar z2    = geom[1][i];
+    CeedScalar z3    = geom[2][i];
 
     if (state.h > tiny_h) {
       etacell[0][i] = (z1 + z2 + z3) / 3.0 + state.h;
@@ -56,7 +56,7 @@ CEED_QFUNCTION(SWEEta)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedS
 
 CEED_QFUNCTION(SWEDelHAlongEdge)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   // inputs
-  const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // z values at begin and end of edge
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // z values at begin and end of edge
   const CeedScalar(*eta_vertices)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // eta at cell vertices
 
   // outputs
