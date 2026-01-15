@@ -21,15 +21,16 @@ PetscLogEvent RDY_CeedOperatorApply_;
 //-------------------------------------
 
 // defines the computational domain for the operator
-static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, RDyMesh *mesh) {
+static PetscErrorCode SetOperatorDomain(Operator *op, DM dm, DM dm_1dof, RDyMesh *mesh) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
   PetscCheck(mesh, comm, PETSC_ERR_USER, "Operator mesh must be non-NULL");
 
-  op->dm   = dm;
-  op->mesh = mesh;
+  op->dm      = dm;
+  op->dm_1dof = dm_1dof;
+  op->mesh    = mesh;
 
   // create bookkeeping vectors
   if (CeedEnabled()) {
@@ -175,6 +176,7 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 /// given configuration.
 /// @param [in]  config              the configuration defining the physics and numerics for the new operator
 /// @param [in]  domain_dm           a DM representing the computational domain on which the operator is defined
+/// @param [in]  domain_dm_1dof      a DM representing the computational domain with 1 degree of freedom per node
 /// @param [in]  domain_mesh         a mesh containing geometric and topological information for the domain
 /// @param [in]  num_regions         the number of disjoint regions partitioning the computational domain
 /// @param [in]  regions             an array of disjoint regions paratitioning the computational domain
@@ -183,7 +185,7 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 /// @param [in]  boundary_conditions an array of boundary conditions corresponding to the domain boundaries
 /// @param [out] op                  the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_mesh, PetscInt num_comp, PetscInt num_regions, RDyRegion *regions,
+PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof, RDyMesh *domain_mesh, PetscInt num_comp, PetscInt num_regions, RDyRegion *regions,
                               PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions, Operator **operator) {
   PetscFunctionBegin;
 
@@ -199,7 +201,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   (*operator)->config         = config;
   (*operator)->num_components = num_comp;
 
-  PetscCall(SetOperatorDomain(*operator, domain_dm, domain_mesh));
+  PetscCall(SetOperatorDomain(*operator, domain_dm, domain_dm_1dof, domain_mesh));
   if (num_boundaries > 0) {
     // set up boundaries for the operator, allocating any necessary storage
     // (e.g. sequential vectors for PETSc operator)
@@ -225,6 +227,8 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
     if ((*operator)->config->physics.flow.well_balance != WELL_BALANCE_NONE) {
       PetscCall(CreateCeedEtaOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_cell, &(*operator)->ceed.eta_cell_operator));
+      PetscCall(CreateCellToVertexMat((*operator)->config, (*operator)->mesh, &(*operator)->ceed.CellToVert));
+      PetscCall(CreateEtaVecs((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices, &(*operator)->eta_vertices));
     }
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
@@ -313,11 +317,23 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   // Eta Calculation
   //------------------
   if (op->config->physics.flow.well_balance == WELL_BALANCE_BS2002) {
+
+    // 1. Compute eta at cell centers using the CEED operator
+
     // point our CEED solution vector at our PETSc solution vector
     PetscMemType mem_type;
     PetscScalar *u_local_ptr;
     PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(op->ceed.u_local, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
+
+    // get a temporary local vector (eta_cell_local) from the DM (dm_1dof) to hold eta at cell centers
+    Vec eta_cell_local;
+    PetscCall(DMGetLocalVector(op->dm_1dof, &eta_cell_local));
+
+    // point the CEED eta_cell vector to the temporary eta_cell_local vector
+    PetscScalar *eta_cell_local_ptr;
+    PetscCall(VecGetArrayAndMemType(eta_cell_local, &eta_cell_local_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(op->ceed.eta_cell, MemTypeP2C(mem_type), CEED_USE_POINTER, eta_cell_local_ptr));
 
     // apply the eta operator
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
@@ -328,7 +344,18 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
+    PetscCallCEED(CeedVectorTakeArray(op->ceed.eta_cell, MemTypeP2C(mem_type), &eta_cell_local_ptr));
     PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
+    PetscCall(VecRestoreArrayAndMemType(eta_cell_local, &eta_cell_local_ptr));
+
+    // 2. Map eta at cell centers to eta at vertices using the CellToVert matrix
+
+    PetscCall(MatMult(op->ceed.CellToVert, eta_cell_local, op->eta_vertices));
+    if (0) {
+      VecView(op->eta_vertices, PETSC_VIEWER_STDOUT_WORLD); // Debugging line to view eta_vertices
+    }
+
+    PetscCall(DMRestoreLocalVector(op->dm_1dof, &eta_cell_local));
   }
 
   //------------------

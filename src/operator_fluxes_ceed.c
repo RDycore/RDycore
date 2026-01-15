@@ -608,5 +608,69 @@ PetscErrorCode CreateCeedEtaOperator(RDyConfig *config, RDyMesh *mesh, CeedVecto
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Creates a PETSc Mat that maps cell-centered values to vertex-centered values by averaging the values of all cells sharing a vertex.
+/// @param config [in]
+/// @param mesh [in]
+/// @param cell_to_vertex_mat [out] a PETSc Mat mapping cell-centered values to vertex-centered values
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCellToVertexMat(RDyConfig *config, RDyMesh *mesh, Mat *cell_to_vertex_mat) {
+  PetscFunctionBegin;
+
+  PetscInt num_cells    = mesh->num_cells;
+  PetscInt num_vertices = mesh->num_vertices;
+
+  RDyVertices *vertices         = &mesh->vertices;
+  PetscInt     max_shared_cells = 0;
+  for (PetscInt i = 0; i < num_vertices; i++) {
+    if (vertices->num_cells[i] > max_shared_cells) {
+      max_shared_cells = vertices->num_cells[i];
+    }
+  }
+
+  PetscInt counts[2]  = {num_vertices, num_cells};
+  PetscInt offsets[2] = {0, 0};
+  MPI_Exscan(counts, offsets, 2, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  PetscInt row_offset = offsets[0];
+  PetscInt col_offset = offsets[1];
+
+  PetscCall(
+      MatCreateAIJ(PETSC_COMM_WORLD, num_vertices, num_cells, PETSC_DETERMINE, PETSC_DETERMINE, max_shared_cells, NULL, 0, NULL, cell_to_vertex_mat));
+  for (PetscInt v = 0; v < num_vertices; v++) {
+    for (PetscInt c = 0; c < vertices->num_cells[v]; c++) {
+      PetscInt cell_id = vertices->cell_ids[v * max_shared_cells + c];
+      PetscCall(MatSetValue(*cell_to_vertex_mat, v + row_offset, cell_id + col_offset, 1.0 / vertices->num_cells[v], INSERT_VALUES));
+    }
+  }
+  PetscCall(MatAssemblyBegin(*cell_to_vertex_mat, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(*cell_to_vertex_mat, MAT_FINAL_ASSEMBLY));
+  if (0) {
+    PetscCall(MatView(*cell_to_vertex_mat, PETSC_VIEWER_STDOUT_WORLD));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode CreateEtaVecs(RDyConfig *config, RDyMesh *mesh, CeedVector *eta_vertices_ceed, Vec *eta_vertices_petsc) {
+  PetscFunctionBegin;
+
+  Ceed ceed = CeedContext();
+
+  // number of vertices
+  PetscInt num_vertices = mesh->num_vertices;
+
+  // create the CeedVector
+  CeedElemRestriction eta_restrict;
+  CeedInt             num_comp_eta  = 1;  // only for water surface elevation
+  CeedInt             eta_strides[] = {num_comp_eta, 1, num_comp_eta};
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_vertices, 1, num_comp_eta, num_vertices * num_comp_eta, eta_strides, &eta_restrict));
+  PetscCallCEED(CeedElemRestrictionCreateVector(eta_restrict, eta_vertices_ceed, NULL));
+  PetscCallCEED(CeedElemRestrictionDestroy(&eta_restrict));
+
+  // create the PETSc Vec
+  PetscCall(VecCreateMPI(PETSC_COMM_WORLD, num_vertices, PETSC_DECIDE, eta_vertices_petsc));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
