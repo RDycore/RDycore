@@ -987,8 +987,8 @@ PetscErrorCode InitOperator(RDy rdy) {
   PetscInt ndof;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof));
 
-  PetscCall(CreateOperator(&rdy->config, rdy->dm, rdy->dm_1dof, &rdy->mesh, ndof, rdy->num_regions, rdy->regions, rdy->num_boundaries, rdy->boundaries,
-                           rdy->boundary_conditions, &rdy->operator));
+  PetscCall(CreateOperator(&rdy->config, rdy->dm, rdy->dm_1dof, &rdy->mesh, ndof, rdy->num_regions, rdy->regions, rdy->num_boundaries,
+                           rdy->boundaries, rdy->boundary_conditions, &rdy->operator));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

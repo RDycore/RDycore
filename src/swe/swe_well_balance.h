@@ -54,6 +54,33 @@ CEED_QFUNCTION(SWEEta)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedS
   return 0;
 }
 
+CEED_QFUNCTION(SWEDelHAlongEdge)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  // inputs
+  const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // z values at begin and end of edge
+  const CeedScalar(*eta_vertices)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // eta at cell vertices
+
+  // outputs
+  CeedScalar(*delH_along_edge)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
+
+  for (CeedInt i = 0; i < Q; i++) {
+    CeedScalar zbeg = geom[0][i];
+    CeedScalar zend = geom[1][i];
+
+    CeedScalar eta_beg = eta_vertices[0][i];
+    CeedScalar eta_end = eta_vertices[1][i];
+
+    CeedScalar h1 = eta_beg - zbeg;
+    CeedScalar h2 = eta_end - zend;
+
+    if (h1 < 0.0) h1 = 0.0;
+    if (h2 < 0.0) h2 = 0.0;
+
+    delH_along_edge[0][i] = h2 - h1;
+  }
+
+  return 0;
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
 

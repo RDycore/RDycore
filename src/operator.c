@@ -185,8 +185,9 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
 /// @param [in]  boundary_conditions an array of boundary conditions corresponding to the domain boundaries
 /// @param [out] op                  the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof, RDyMesh *domain_mesh, PetscInt num_comp, PetscInt num_regions, RDyRegion *regions,
-                              PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions, Operator **operator) {
+PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof, RDyMesh *domain_mesh, PetscInt num_comp, PetscInt num_regions,
+                              RDyRegion *regions, PetscInt num_boundaries, RDyBoundary *boundaries, RDyCondition *boundary_conditions,
+                              Operator **operator) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -229,6 +230,8 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof
       PetscCall(CreateCeedEtaOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_cell, &(*operator)->ceed.eta_cell_operator));
       PetscCall(CreateCellToVertexMat((*operator)->config, (*operator)->mesh, &(*operator)->ceed.CellToVert));
       PetscCall(CreateEtaVecs((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices, &(*operator)->eta_vertices));
+      PetscCall(CereateCeedDelHAlongEdgeOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.delH_along_edge,
+                                                 &(*operator)->ceed.delHAlongEdge_operator));
     }
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
@@ -317,7 +320,6 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   // Eta Calculation
   //------------------
   if (op->config->physics.flow.well_balance == WELL_BALANCE_BS2002) {
-
     // 1. Compute eta at cell centers using the CEED operator
 
     // point our CEED solution vector at our PETSc solution vector
@@ -336,12 +338,11 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCallCEED(CeedVectorSetArray(op->ceed.eta_cell, MemTypeP2C(mem_type), CEED_USE_POINTER, eta_cell_local_ptr));
 
     // apply the eta operator
-    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, 0, 0, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
     PetscCallCEED(CeedOperatorApply(op->ceed.eta_cell_operator, op->ceed.u_local, op->ceed.eta_cell, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
-    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
-
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, 0, 0, 0, 0));
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
     PetscCallCEED(CeedVectorTakeArray(op->ceed.eta_cell, MemTypeP2C(mem_type), &eta_cell_local_ptr));
@@ -352,10 +353,25 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     PetscCall(MatMult(op->ceed.CellToVert, eta_cell_local, op->eta_vertices));
     if (0) {
-      VecView(op->eta_vertices, PETSC_VIEWER_STDOUT_WORLD); // Debugging line to view eta_vertices
+      VecView(op->eta_vertices, PETSC_VIEWER_STDOUT_WORLD);  // Debugging line to view eta_vertices
     }
 
     PetscCall(DMRestoreLocalVector(op->dm_1dof, &eta_cell_local));
+
+    // 3. Compute delH along edges using the delHAlongEdge operator
+    PetscScalar *eta_vertices_ptr;
+    PetscCall(VecGetArrayAndMemType(op->eta_vertices, &eta_vertices_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(op->ceed.eta_vertices, MemTypeP2C(mem_type), CEED_USE_POINTER, eta_vertices_ptr));
+
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, 0, 0, 0, 0));
+    PetscCall(PetscLogGpuTimeBegin());
+    PetscCallCEED(CeedOperatorApply(op->ceed.delHAlongEdge_operator, op->ceed.eta_vertices, op->ceed.delH_along_edge, CEED_REQUEST_IMMEDIATE));
+    PetscCall(PetscLogGpuTimeEnd());
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, 0, 0, 0, 0));
+
+    // reset our CeedVectors and restore our PETSc vectors
+    PetscCallCEED(CeedVectorTakeArray(op->ceed.eta_vertices, MemTypeP2C(mem_type), &eta_vertices_ptr));
+    PetscCall(VecRestoreArrayAndMemType(op->eta_vertices, &eta_vertices_ptr));
   }
 
   //------------------

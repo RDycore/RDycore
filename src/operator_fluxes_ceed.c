@@ -672,5 +672,107 @@ PetscErrorCode CreateEtaVecs(RDyConfig *config, RDyMesh *mesh, CeedVector *eta_v
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode CereateCeedDelHAlongEdgeOperator(RDyConfig *config, RDyMesh *mesh, CeedVector *delH, CeedOperator *op) {
+  PetscFunctionBegin;
+
+  Ceed ceed = CeedContext();
+
+  RDyEdges    *edges    = &mesh->edges;
+  RDyVertices *vertices = &mesh->vertices;
+
+  CeedInt num_edges    = mesh->num_internal_edges;
+  CeedInt num_vertices = mesh->num_vertices;
+
+  PetscCall(CeedOperatorCreateComposite(ceed, op));
+
+  // create QFunction
+  CeedQFunction        qf;
+  CeedQFunctionContext qf_context;
+
+  PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEDelHAlongEdge, SWEDelHAlongEdge_loc, &qf));
+  PetscCall(CreateSWEQFunctionContext(ceed, *config, &qf_context));
+  PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
+  PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
+
+  CeedInt num_comp_geom = 2, num_comp_eta = 1, num_delH = 1;
+  PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "eta_beg", num_comp_eta, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "eta_end", num_comp_eta, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "delH", num_delH, CEED_EVAL_NONE));
+
+  // "geom"
+  CeedVector          geom;
+  CeedElemRestriction restrict_geom;
+  CeedInt             g_strides[] = {num_comp_geom, 1, num_comp_geom};
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, g_strides, &restrict_geom));
+  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
+  PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+
+  // offsets forr "eta_beg" and "eta_end"
+  CeedInt *offset_eta_beg, *offset_eta_end;
+  PetscCall(PetscMalloc2(num_edges, &offset_eta_beg, num_edges, &offset_eta_end));
+
+  // get acces to "geom" CeedVector
+  CeedScalar(*g)[2];
+  PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+
+  // fill in "geom", "h_beg", and "h_end"
+  for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
+    CeedInt iedge = edges->ids[e];
+    if (!edges->is_owned[iedge]) continue;
+
+    CeedInt vid_beg = edges->vertex_ids[2 * iedge];
+    CeedInt vid_end = edges->vertex_ids[2 * iedge + 1];
+
+    offset_eta_beg[owned_edge] = vid_beg;
+    offset_eta_end[owned_edge] = vid_end;
+
+    g[owned_edge][0] = vertices->points[vid_beg].X[2];  // z value for beginning vertex
+    g[owned_edge][1] = vertices->points[vid_end].X[2];  // z value for ending vertex
+    owned_edge++;
+  }
+
+  // restore "geom" CeedVector
+  PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+
+  CeedElemRestriction restrict_eta_beg, restrict_eta_end;
+  PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                          offset_eta_beg, &restrict_eta_beg));
+  PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                          offset_eta_end, &restrict_eta_end));
+  PetscCall(PetscFree2(offset_eta_beg, offset_eta_end));
+
+  // "delH"
+  CeedInt             delH_strides[] = {num_delH, 1, num_delH};
+  CeedElemRestriction restrict_delH;
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_delH, num_edges * num_delH, delH_strides, &restrict_delH));
+  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_delH, delH, NULL));
+  PetscCallCEED(CeedVectorSetValue(*delH, 0.0));
+
+  if (0) {
+    PetscCallCEED(CeedElemRestrictionView(restrict_geom, stdout));
+    PetscCallCEED(CeedElemRestrictionView(restrict_eta_beg, stdout));
+    PetscCallCEED(CeedElemRestrictionView(restrict_eta_end, stdout));
+    PetscCallCEED(CeedElemRestrictionView(restrict_delH, stdout));
+  }
+
+  // create the operator itself and assign its active/passive inputs/outputs
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, op));
+  PetscCallCEED(CeedOperatorSetField(*op, "geom", restrict_geom, CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*op, "eta_beg", restrict_eta_beg, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*op, "eta_end", restrict_eta_end, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*op, "delH", restrict_delH, CEED_BASIS_NONE, *delH));
+
+  // clean up
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_eta_beg));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_eta_end));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_delH));
+  PetscCallCEED(CeedVectorDestroy(&geom));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
