@@ -2,6 +2,10 @@
 #include <private/rdysweimpl.h>
 
 #include "swe_roe_flux_petsc.h"
+#include "swe_roe_petsc_impl.h"
+#include "swe_hll_petsc_impl.h"
+#include "swe_hllc_petsc_impl.h"
+
 
 static PetscErrorCode CreateRiemannStateData(PetscInt num_states, RiemannStateData *data) {
   PetscFunctionBegin;
@@ -139,12 +143,19 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
 
   // call Riemann solver
   switch (interior_flux_op->riemann) {
-    case RIEMANN_ROE:
-      PetscCall(ComputeSWERoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
-  }
+  case RIEMANN_ROE:
+    PetscCall(ComputeSWERoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+    break;
+  case RIEMANN_HLL:
+    PetscCall(ComputeSWEHLLFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+    break;
+  case RIEMANN_HLLC:
+    PetscCall(ComputeSWEHLLCFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+    break;
+  default:
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+}
+
 
   // accummulate the flux values in the global flux vector
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
@@ -399,12 +410,19 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
 
   // solve the Riemann problem
   switch (boundary_flux_op->riemann) {
-    case RIEMANN_ROE:
-      PetscCall(ComputeSWERoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+  case RIEMANN_ROE:
+    PetscCall(ComputeSWERoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+    break;
+  case RIEMANN_HLL:
+    PetscCall(ComputeSWEHLLFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+    break;
+  case RIEMANN_HLLC:
+    PetscCall(ComputeSWEHLLCFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+    break;
+  default:
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
   }
+
 
   // accumulate the flux values in f_global
   RDyCells                 *cells             = &boundary_flux_op->mesh->cells;
