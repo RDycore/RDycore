@@ -230,7 +230,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof
       PetscCall(CreateCeedEtaOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_cell, &(*operator)->ceed.eta_cell_operator));
       PetscCall(CreateCellToVertexMat((*operator)->config, (*operator)->mesh, &(*operator)->ceed.CellToVert));
       PetscCall(CreateEtaVecs((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices, &(*operator)->eta_vertices));
-      PetscCall(CereateCeedDelHAlongEdgeOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.delH_along_edge,
+      PetscCall(CereateCeedDelHAlongEdgeOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.delH_along_internal_edges,
                                                  &(*operator)->ceed.delHAlongEdge_operator));
     }
   } else {
@@ -365,7 +365,8 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, 0, 0, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.delHAlongEdge_operator, op->ceed.eta_vertices, op->ceed.delH_along_edge, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(
+        CeedOperatorApply(op->ceed.delHAlongEdge_operator, op->ceed.eta_vertices, op->ceed.delH_along_internal_edges, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, 0, 0, 0, 0));
 

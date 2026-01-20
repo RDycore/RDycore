@@ -140,7 +140,7 @@ typedef struct Operator {
       CeedVector u_local, rhs, sources;
 
       // for well balancing
-      CeedVector   eta_cell, eta_vertices, delH_along_edge;
+      CeedVector   eta_cell, eta_vertices, delH_along_internal_edges;
       CeedOperator eta_cell_operator;
       CeedOperator delHAlongEdge_operator;
       Mat          CellToVert;
