@@ -1,7 +1,7 @@
 #ifndef TRACERS_FLUXES_CEED_H
 #define TRACERS_FLUXES_CEED_H
 
-#include "tracers_types_ceed.h"
+#include "tracer_types_ceed.h"
 
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
@@ -11,7 +11,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wimplicit-function-declaration"
 
-#include "tracers_roe_flux_ceed.h"
+#include "tracer_roe_flux_ceed.h"
 
 // The following Q functions use C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.

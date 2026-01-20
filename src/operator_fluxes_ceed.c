@@ -2,10 +2,10 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdysedimentimpl.h>
+#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "sediment/sediment_fluxes_ceed.h"
+#include "tracer/tracer_fluxes_ceed.h"
 #include "swe/swe_fluxes_ceed.h"
 
 // The CEED flux operator consists of the following sub-operators:
@@ -30,17 +30,23 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
+static CeedInt NumTracers(const RDyConfig config) {
+  return config.physics.sediment.num_classes +
+         ((config.physics.salinity) ? 1 : 0) + 
+         ((config.physics.heat) ? 1 : 0);
+}
+
 static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
   PetscFunctionBeginUser;
 
-  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
+  CeedInt num_tracers = NumTracers(config);
 
   CeedQFunctionContext qf_context;
-  if (num_sediment_comp == 0) {  // flow only, and SWE is it!
+  if (num_tracers == 0) {  // flow only, and SWE is it!
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
     PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
   } else {
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentFlux_Roe, SedimentFlux_Roe_loc, qf));
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
     PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
   }
 
@@ -98,9 +104,9 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
 
   Ceed ceed = CeedContext();
 
-  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
   CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
-  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+  CeedInt num_tracers = NumTracers(config);
+  CeedInt num_comp          = num_flow_comp + num_tracers;
 
   RDyCells *cells = &mesh->cells;
   RDyEdges *edges = &mesh->edges;
@@ -221,12 +227,12 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
                                                   CeedQFunction *qf) {
   PetscFunctionBeginUser;
 
-  int num_sediment_comp = config.physics.sediment.num_classes;
+  CeedInt num_tracers = NumTracers(config);
 
   CeedQFunctionContext qf_context;
   switch (boundary_condition.flow->type) {
     case CONDITION_DIRICHLET:
-      if (num_sediment_comp == 0) {  // flow only
+      if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
@@ -235,7 +241,7 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
       }
       break;
     case CONDITION_REFLECTING:
-      if (num_sediment_comp == 0) {  // flow only
+      if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
@@ -244,7 +250,7 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
       }
       break;
     case CONDITION_CRITICAL_OUTFLOW:
-      if (num_sediment_comp == 0) {  // flow only
+      if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Outflow_Roe, SWEBoundaryFlux_Outflow_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
@@ -310,9 +316,9 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 
   Ceed ceed = CeedContext();
 
-  CeedInt num_sediment_comp = config.physics.sediment.num_classes;
   CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
-  CeedInt num_comp          = num_flow_comp + num_sediment_comp;
+  CeedInt num_tracers = NumTracers(config);
+  CeedInt num_comp          = num_flow_comp + num_tracers;
 
   RDyCells *cells = &mesh->cells;
   RDyEdges *edges = &mesh->edges;

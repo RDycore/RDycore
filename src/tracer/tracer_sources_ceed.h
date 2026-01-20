@@ -1,14 +1,15 @@
-#ifndef TRACERS_SOURCES_CEED_H
-#define TRACERS_SOURCES_CEED_H
+#ifndef TRACER_SOURCES_CEED_H
+#define TRACER_SOURCES_CEED_H
 
-#include "tracers_types_ceed.h"
+#include "private/config.h"
+#include "tracer_types_ceed.h"
 
 // supported bed friction source term methods
 typedef enum {
-  TRACERS_BED_FRICTION_NONE,
-  TRACERS_BED_FRICTION_SEMI_IMPLICIT,
-  TRACERS_BED_FRICTION_IMPLICIT_XQ2018,
-} TracersBedFrictionType;
+  TRACER_BED_FRICTION_NONE,
+  TRACER_BED_FRICTION_SEMI_IMPLICIT,
+  TRACER_BED_FRICTION_IMPLICIT_XQ2018,
+} TracerBedFrictionType;
 
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
@@ -26,10 +27,10 @@ typedef enum {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-int CEED_QFUNCTION_HELPER TracersSemiImplicitBedFrictionRoughness(TracersContext context, TracersState state, CeedScalar mannings_n,
-                                                                   CeedScalar Fsum_x, CeedScalar Fsum_y, CeedScalar bedx, CeedScalar bedy,
-                                                                   CeedScalar *tbx, CeedScalar *tby, CeedScalar e[MAX_NUM_TRACERS_CLASSES],
-                                                                   CeedScalar d[MAX_NUM_TRACERS_CLASSES]) {
+int CEED_QFUNCTION_HELPER TracerSemiImplicitBedFrictionRoughness(TracerContext context, TracerState state, CeedScalar mannings_n,
+                                                                 CeedScalar Fsum_x, CeedScalar Fsum_y, CeedScalar bedx, CeedScalar bedy,
+                                                                 CeedScalar *tbx, CeedScalar *tby, CeedScalar e[MAX_NUM_SEDIMENT_CLASSES],
+                                                                 CeedScalar d[MAX_NUM_SEDIMENT_CLASSES]) {
   const CeedScalar dt                      = context->dtime;
   const CeedScalar tiny_h                  = context->tiny_h;
   const CeedScalar gravity                 = context->gravity;
@@ -66,8 +67,8 @@ int CEED_QFUNCTION_HELPER TracersSemiImplicitBedFrictionRoughness(TracersContext
   return 0;
 }
 
-CEED_QFUNCTION_HELPER int TracersSources(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
-                                          TracersBedFrictionType bed_friction_type) {
+CEED_QFUNCTION_HELPER int TracerSources(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
+                                        TracerBedFrictionType bed_friction_type) {
   // inputs
   const CeedScalar(*geom)[CEED_Q_VLA]      = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // dz/dx, dz/dy
   const CeedScalar(*ext_src)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // external source (e.g. rain rate)
@@ -78,13 +79,13 @@ CEED_QFUNCTION_HELPER int TracersSources(void *ctx, CeedInt Q, const CeedScalar 
   // outputs
   CeedScalar(*sources)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
 
-  const TracersContext context   = (TracersContext)ctx;
+  const TracerContext context   = (TracerContext)ctx;
   const CeedInt         flow_ndof = context->flow_ndof;
   const CeedScalar      tiny_h    = context->tiny_h;
   const CeedScalar      gravity   = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    TracersState state = {q[0][i], q[1][i], q[2][i]};
+    TracerState state = {q[0][i], q[1][i], q[2][i]};
     for (CeedInt j = 0; j < context->tracers_ndof; ++j) {
       state.hci[j] = q[flow_ndof + j][i];
     }
@@ -99,7 +100,7 @@ CEED_QFUNCTION_HELPER int TracersSources(void *ctx, CeedInt Q, const CeedScalar 
     CeedScalar tbx = 0.0, tby = 0.0;
 
     // detachment/deposition rates
-    CeedScalar e[MAX_NUM_TRACERS_CLASSES] = {0}, d[MAX_NUM_TRACERS_CLASSES] = {0};
+    CeedScalar e[MAX_NUM_SEDIMENT_CLASSES] = {0}, d[MAX_NUM_SEDIMENT_CLASSES] = {0};
 
     if (state.h > tiny_h) {
       const CeedScalar Fsum_x     = riemannf[1][i];
@@ -107,8 +108,8 @@ CEED_QFUNCTION_HELPER int TracersSources(void *ctx, CeedInt Q, const CeedScalar 
       const CeedScalar mannings_n = mat_props[MATERIAL_PROPERTY_MANNINGS][i];
 
       switch (bed_friction_type) {
-        case TRACERS_BED_FRICTION_SEMI_IMPLICIT:
-          TracersSemiImplicitBedFrictionRoughness(context, state, mannings_n, Fsum_x, Fsum_y, bedx, bedy, &tbx, &tby, e, d);
+        case TRACER_BED_FRICTION_SEMI_IMPLICIT:
+          TracerSemiImplicitBedFrictionRoughness(context, state, mannings_n, Fsum_x, Fsum_y, bedx, bedy, &tbx, &tby, e, d);
           break;
         default:
           break;
@@ -125,12 +126,12 @@ CEED_QFUNCTION_HELPER int TracersSources(void *ctx, CeedInt Q, const CeedScalar 
   return 0;
 }
 
-CEED_QFUNCTION(TracersSourcesWithoutBedFriction)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  return TracersSources(ctx, Q, in, out, TRACERS_BED_FRICTION_NONE);
+CEED_QFUNCTION(TracerSourcesWithoutBedFriction)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return TracerSources(ctx, Q, in, out, TRACER_BED_FRICTION_NONE);
 }
 
-CEED_QFUNCTION(TracersSourcesWithSemiImplicitBedFriction)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  return TracersSources(ctx, Q, in, out, TRACERS_BED_FRICTION_SEMI_IMPLICIT);
+CEED_QFUNCTION(TracerSourcesWithSemiImplicitBedFriction)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return TracerSources(ctx, Q, in, out, TRACER_BED_FRICTION_SEMI_IMPLICIT);
 }
 
 #pragma GCC diagnostic   pop

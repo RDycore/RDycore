@@ -9,6 +9,7 @@
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdyoperatorimpl.h>
+#include "petscstring.h"
 #include "private/config.h"
 
 static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
@@ -39,9 +40,21 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
     strncpy(analytic_sediment.classes[i].expression, rdy->config.mms.sediment.expressions.c[i], MAX_EXPRESSION_LEN);
     analytic_sediment.classes[i].value = (void *)rdy->config.mms.sediment.solutions.c[i];
   };
+  static RDySalinityCondition analytic_salinity = {
+    .name = "analytic_bc",
+    .type = CONDITION_DIRICHLET,
+  };
+  analytic_salinity.concentration = rdy->config.mms.salinity.solutions.s;
+  static RDyTemperatureCondition analytic_temperature = {
+    .name = "analytic_bc",
+    .type = CONDITION_DIRICHLET,
+  };
+  analytic_temperature.temperature = rdy->config.mms.temperature.solutions.T;
   RDyCondition analytic_bc = {
       .flow     = &analytic_flow,
       .sediment = &analytic_sediment,
+      .salinity = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
+      .temperature = (rdy->config.physics.heat ? &analytic_temperature : NULL),
   };
 
   // Assign the boundary condition to each boundary.
@@ -163,11 +176,20 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(OverrideParameters(rdy));
 
   // set names of solution components
-  strncpy(mms_comp_names[0], " h ", MAX_NAME_LEN);
-  strncpy(mms_comp_names[1], "hu ", MAX_NAME_LEN);
-  strncpy(mms_comp_names[2], "hv ", MAX_NAME_LEN);
-  for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-    snprintf(mms_comp_names[3 + i], MAX_NAME_LEN, "c%" PetscInt_FMT " ", i);
+  PetscStrncpy(mms_comp_names[0], " h ", MAX_NAME_LEN);
+  PetscStrncpy(mms_comp_names[1], "hu ", MAX_NAME_LEN);
+  PetscStrncpy(mms_comp_names[2], "hv ", MAX_NAME_LEN);
+  PetscInt index = 3;
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i, ++index) {
+    snprintf(mms_comp_names[index + i], MAX_NAME_LEN, "c%" PetscInt_FMT " ", i);
+  }
+  if (rdy->config.physics.salinity) {
+    PetscStrncpy(mms_comp_names[index], "salinity", MAX_NAME_LEN);
+    ++index;
+  }
+  if (rdy->config.physics.heat) {
+    PetscStrncpy(mms_comp_names[index], "temperature", MAX_NAME_LEN);
+    ++index;
   }
 
   // if a refinement level is not specified, set the base refinement level
@@ -211,8 +233,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   }
   PetscCall(CreateAuxiliaryDMs(rdy));
 
-  PetscInt num_tracers = rdy->config.physics.sediment.num_classes;
-  if (num_tracers) {
+  if (rdy->num_tracers) {
     PetscCall(CreateFlowDM(rdy));
     PetscCall(CreateTracerDM(rdy));
   } else {
@@ -312,35 +333,76 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
 
-      // sediment class concentrations
-      PetscReal *ci[MAX_NUM_TRACERS];
-      for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-        PetscCall(PetscCalloc1(region.num_local_cells, &ci[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.tracers.solutions.c[i], N, cell_x, cell_y, time, ci[i]));
+      {
+        PetscInt l = 0;
+        for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+          PetscInt cell_id = region.cell_local_ids[c];
+          if (ndof * cell_id < n_local) {  // skip ghost cells
+            x_ptr[ndof * cell_id]     = h[l];
+            x_ptr[ndof * cell_id + 1] = h[l] * u[l];
+            x_ptr[ndof * cell_id + 2] = h[l] * v[l];
+            ++l;
+          }
+        }
       }
 
-      // TODO: salinity concentrations
-
-      PetscInt l = 0;
-      for (PetscInt c = 0; c < region.num_local_cells; ++c) {
-        PetscInt cell_id = region.cell_local_ids[c];
-        if (ndof * cell_id < n_local) {  // skip ghost cells
-          x_ptr[ndof * cell_id]     = h[l];
-          x_ptr[ndof * cell_id + 1] = h[l] * u[l];
-          x_ptr[ndof * cell_id + 2] = h[l] * v[l];
-          for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-            x_ptr[ndof * cell_id + 3 + i] = h[l] * ci[i][l];
+      // sediment class concentrations
+      PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
+      if (num_sediment_classes > 0) {
+        PetscInt offset = 3;
+        PetscReal *ci;
+        PetscInt l = 0;
+        PetscCall(PetscCalloc1(region.num_local_cells, &ci));
+        for (PetscInt i = 0; i < num_sediment_classes; ++i) {
+          PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci));
+          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+            PetscInt cell_id = region.cell_local_ids[c];
+            if (ndof * cell_id < n_local) {  // skip ghost cells
+              x_ptr[ndof * cell_id + offset + i] = h[l] * ci[l];
+              ++l;
+            }
           }
-          ++l;
         }
+        PetscCall(PetscFree(ci));
+      }
+
+      // salinity concentration
+      if (rdy->config.physics.salinity) {
+        PetscInt offset = 3 + num_sediment_classes;
+        PetscReal *s;
+        PetscInt l = 0;
+        PetscCall(PetscCalloc1(region.num_local_cells, &s));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.salinity.solutions.s, N, cell_x, cell_y, time, s));
+        for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+          PetscInt cell_id = region.cell_local_ids[c];
+          if (ndof * cell_id < n_local) {  // skip ghost cells
+            x_ptr[ndof * cell_id + offset] = h[l] * s[l];
+            ++l;
+          }
+        }
+        PetscCall(PetscFree(s));
+      }
+
+      // temperature profile
+      if (rdy->config.physics.heat) {
+        PetscInt offset = 3 + num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0);
+        PetscReal *T;
+        PetscInt l = 0;
+        PetscCall(PetscCalloc1(region.num_local_cells, &T));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
+        for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+          PetscInt cell_id = region.cell_local_ids[c];
+          if (ndof * cell_id < n_local) {  // skip ghost cells
+            x_ptr[ndof * cell_id + offset] = h[l] * T[l];
+            ++l;
+          }
+        }
+        PetscCall(PetscFree(T));
       }
 
       PetscCall(PetscFree(h));
       PetscCall(PetscFree(u));
       PetscCall(PetscFree(v));
-      for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-        PetscCall(PetscFree(ci[i]));
-      }
     }
     PetscCall(PetscFree(cell_x));
     PetscCall(PetscFree(cell_y));
@@ -448,13 +510,13 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
     PetscCall(RDySetRegionalXMomentumSource(rdy, 1, N, hu_source));
     PetscCall(RDySetRegionalYMomentumSource(rdy, 1, N, hv_source));
 
-    PetscInt num_tracers = rdy->config.physics.sediment.num_classes;
-    if (num_tracers) {
-      PetscReal *ci[MAX_NUM_TRACERS], *dcidx[MAX_NUM_TRACERS], *dcidy[MAX_NUM_TRACERS], *dcidt[MAX_NUM_TRACERS];
+    PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
+    if (num_sediment_classes) {
+      PetscReal *ci[MAX_NUM_SEDIMENT_CLASSES], *dcidx[MAX_NUM_SEDIMENT_CLASSES], *dcidy[MAX_NUM_SEDIMENT_CLASSES], *dcidt[MAX_NUM_SEDIMENT_CLASSES];
       PetscReal *hci_source;
 
       PetscCall(PetscCalloc1(N, &hci_source));
-      for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+      for (PetscInt i = 0; i < num_sediment_classes; ++i) {
         PetscCall(PetscCalloc1(N, &ci[i]));
         PetscCall(PetscCalloc1(N, &dcidx[i]));
         PetscCall(PetscCalloc1(N, &dcidy[i]));
@@ -462,21 +524,21 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
         // NOTE: we cast to void * here because sediment solutions are stored as
         // NOTE: pointer-sensible integers so they fit into an array
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.tracers.solutions.c[i], N, cell_x, cell_y, time, ci[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.tracers.solutions.dcdx[i], N, cell_x, cell_y, time, dcidx[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.tracers.solutions.dcdy[i], N, cell_x, cell_y, time, dcidy[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.tracers.solutions.dcdt[i], N, cell_x, cell_y, time, dcidt[i]));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci[i]));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.dcdx[i], N, cell_x, cell_y, time, dcidx[i]));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.dcdy[i], N, cell_x, cell_y, time, dcidy[i]));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.dcdt[i], N, cell_x, cell_y, time, dcidt[i]));
       }
 
       // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
-      // parameterization
+      // FIXME: parameterization
       const PetscReal kp_constant             = 0.001;
       const PetscReal settling_velocity       = 0.01;
       const PetscReal tau_critical_erosion    = 0.1;
       const PetscReal tau_critical_deposition = 1000.0;
       const PetscReal rhow                    = DENSITY_OF_WATER;
 
-      for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+      for (PetscInt i = 0; i < num_sediment_classes; ++i) {
         l = 0;
         for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
           if (cells->is_owned[icell]) {
@@ -492,16 +554,56 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
             ++l;
           }
         }
-        PetscCall(RDySetRegionalTracerSource(rdy, 1, i, N, hci_source));
+        PetscCall(RDySetRegionalSedimentSource(rdy, 1, i, N, hci_source));
       }
 
-      for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+      for (PetscInt i = 0; i < num_sediment_classes; ++i) {
         PetscCall(PetscFree(ci[i]));
         PetscCall(PetscFree(dcidx[i]));
         PetscCall(PetscFree(dcidy[i]));
         PetscCall(PetscFree(dcidt[i]));
       }
       PetscCall(PetscFree(hci_source));
+    }
+
+    PetscReal *s, *dsdx, *dsdy, *dsdt;
+    if (rdy->config.physics.salinity) {
+      PetscCall(PetscCalloc1(N, &s));
+      PetscCall(PetscCalloc1(N, &dsdx));
+      PetscCall(PetscCalloc1(N, &dsdy));
+      PetscCall(PetscCalloc1(N, &dsdt));
+
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.s, N, cell_x, cell_y, time, s));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dsdx, N, cell_x, cell_y, time, dsdx));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dsdy, N, cell_x, cell_y, time, dsdy));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dsdt, N, cell_x, cell_y, time, dsdt));
+
+      // TODO: salinity logic goes here!
+
+      PetscCall(PetscFree(s));
+      PetscCall(PetscFree(dsdx));
+      PetscCall(PetscFree(dsdy));
+      PetscCall(PetscFree(dsdt));
+    }
+
+    PetscReal *T, *dTdx, *dTdy, *dTdt;
+    if (rdy->config.physics.heat) {
+      PetscCall(PetscCalloc1(N, &T));
+      PetscCall(PetscCalloc1(N, &dTdx));
+      PetscCall(PetscCalloc1(N, &dTdy));
+      PetscCall(PetscCalloc1(N, &dTdt));
+
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdx, N, cell_x, cell_y, time, dTdx));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdy, N, cell_x, cell_y, time, dTdy));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdt, N, cell_x, cell_y, time, dTdt));
+
+      // TODO: heat transfer logic goes here!
+
+      PetscCall(PetscFree(T));
+      PetscCall(PetscFree(dTdx));
+      PetscCall(PetscFree(dTdy));
+      PetscCall(PetscFree(dTdt));
     }
 
     PetscCall(PetscFree(h));

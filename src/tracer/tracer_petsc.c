@@ -1,21 +1,21 @@
-#ifndef TRACERS_PETSC_H
-#define TRACERS_PETSC_H
+#ifndef TRACER_PETSC_H
+#define TRACER_PETSC_H
 
 #include <petscsys.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "tracers_roe_flux_petsc.h"
+#include "tracer_roe_flux_petsc.h"
 
 /// @brief Allocates memory for prognostic (h/hu/hv/hci) and diagnostic (u/v/ci) variables stored at
 ///        cell centers for tracers dynamics
 /// @param [in]  num_states        number of states
 /// @param [in]  num_flow_comp     number of components for the flow equation
 /// @param [in]  num_tracers_comp number of components for the tracers dynamics equation
-/// @param [out] *data             a TracersRiemannStateData
+/// @param [out] *data             a TracerRiemannStateData
 /// @return                        0 on success, or a non-zero error code on failure
-static PetscErrorCode CreateTracersRiemannStateData(const PetscInt num_states, const PetscInt num_flow_comp, const PetscInt num_tracers_comp,
-                                                     TracersRiemannStateData *data) {
+static PetscErrorCode CreateTracerRiemannStateData(const PetscInt num_states, const PetscInt num_flow_comp, const PetscInt num_tracers_comp,
+                                                   TracerRiemannStateData *data) {
   PetscFunctionBegin;
 
   data->num_states        = num_states;
@@ -36,9 +36,9 @@ static PetscErrorCode CreateTracersRiemannStateData(const PetscInt num_states, c
 
 /// @brief Deallocates memory for a struct that stores prognostic and diagnostic variables
 ///        at cell centers
-/// @param [inout] data a TracersRiemannStateData that deallocated
+/// @param [inout] data a TracerRiemannStateData that deallocated
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode DestroyTracersRiemannStateData(TracersRiemannStateData data) {
+static PetscErrorCode DestroyTracerRiemannStateData(TracerRiemannStateData data) {
   PetscFunctionBegin;
 
   data.num_states        = 0;
@@ -57,9 +57,9 @@ static PetscErrorCode DestroyTracersRiemannStateData(TracersRiemannStateData dat
 
 /// @brief Deallocates memory for a struct that stores diagnostic variables and geometric mesh
 ///        attributes at cell edges
-/// @param [inout] data a TracersRiemannEdgeData that deallocated
+/// @param [inout] data a TracerRiemannEdgeData that deallocated
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode DestroyTracersRiemannEdgeData(TracersRiemannEdgeData data) {
+static PetscErrorCode DestroyTracerRiemannEdgeData(TracerRiemannEdgeData data) {
   PetscFunctionBegin;
 
   data.num_edges         = 0;
@@ -79,10 +79,10 @@ static PetscErrorCode DestroyTracersRiemannEdgeData(TracersRiemannEdgeData data)
 /// @param [in]  num_edges         number of edges
 /// @param [in]  num_flow_comp     number of components for the flow equation
 /// @param [in]  num_tracers_comp number of components for the tracers dynamics equation
-/// @param [out] *data             a TracersRiemannEdgeData
+/// @param [out] *data             a TracerRiemannEdgeData
 /// @return                        0 on success, or a non-zero error code on failure
-static PetscErrorCode CreateTracersRiemannEdgeData(PetscInt num_edges, PetscInt num_flow_comp, PetscInt num_tracers_comp,
-                                                    TracersRiemannEdgeData *data) {
+static PetscErrorCode CreateTracerRiemannEdgeData(PetscInt num_edges, PetscInt num_flow_comp, PetscInt num_tracers_comp,
+                                                    TracerRiemannEdgeData *data) {
   PetscFunctionBegin;
 
   data->num_edges         = num_edges;
@@ -100,9 +100,9 @@ static PetscErrorCode CreateTracersRiemannEdgeData(PetscInt num_edges, PetscInt 
 
 /// @brief Computes diagnostic variables (u/v/ci) from prognostic variables (h/hu/hv/hci)
 /// @param [in]  tiny_h  a height threshold for determining wet/dry cell
-/// @param [out] *data   a TracersRiemannStateData
+/// @param [out] *data   a TracerRiemannStateData
 /// @return              0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal tiny_h, TracersRiemannStateData *data) {
+static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal tiny_h, TracerRiemannStateData *data) {
   PetscFunctionBeginUser;
 
   PetscInt index;
@@ -135,27 +135,27 @@ typedef struct {
   RDyNumericsRiemann       riemann;       // riemann solver type
   RDyMesh                 *mesh;          // domain mesh
   PetscReal                tiny_h;        // minimum water height for wet conditions
-  TracersRiemannStateData left_states;   // "left" riemann states on interior edges
-  TracersRiemannStateData right_states;  // "right" riemann states on interior edges
-  TracersRiemannEdgeData  edges;         // riemann fluxes on interior edges
+  TracerRiemannStateData left_states;   // "left" riemann states on interior edges
+  TracerRiemannStateData right_states;  // "right" riemann states on interior edges
+  TracerRiemannEdgeData  edges;         // riemann fluxes on interior edges
   OperatorDiagnostics     *diagnostics;   // courant number, etc
-} TracersInteriorFluxOperator;
+} TracerInteriorFluxOperator;
 
 /// @brief Computes the fluxes through the interior edges of mesh locally owned and
 ///        adds contribution in f_global Vec.
-/// @param [in] context  a TracersInteriorFluxOperator
+/// @param [in] context  a TracerInteriorFluxOperator
 /// @param [in] fields   a PetscOperatorFields ! FIXME: Can possibly be deleted
 /// @param [in] dt       time step             ! FIXME: Can possibly be deleted
 /// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
 /// @param [in] f_global a Vec for storing RHS contrinution from interior edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ApplyTracersInteriorFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyTracerInteriorFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  TracersInteriorFluxOperator *interior_flux_op = context;
+  TracerInteriorFluxOperator *interior_flux_op = context;
 
   RDyMesh  *mesh  = interior_flux_op->mesh;
   RDyCells *cells = &mesh->cells;
@@ -166,9 +166,9 @@ static PetscErrorCode ApplyTracersInteriorFlux(void *context, PetscOperatorField
   PetscCall(VecGetArray(u_local, &u_ptr));
   PetscCall(VecGetArray(f_global, &f_ptr));
 
-  TracersRiemannStateData *datal        = &interior_flux_op->left_states;
-  TracersRiemannStateData *datar        = &interior_flux_op->right_states;
-  TracersRiemannEdgeData  *data_edge    = &interior_flux_op->edges;
+  TracerRiemannStateData *datal        = &interior_flux_op->left_states;
+  TracerRiemannStateData *datar        = &interior_flux_op->right_states;
+  TracerRiemannEdgeData  *data_edge    = &interior_flux_op->edges;
   PetscReal                *sn_vec_int   = data_edge->sn;
   PetscReal                *cn_vec_int   = data_edge->cn;
   PetscReal                *amax_vec_int = data_edge->amax;
@@ -213,7 +213,7 @@ static PetscErrorCode ApplyTracersInteriorFlux(void *context, PetscOperatorField
   // call Riemann solver
   switch (interior_flux_op->riemann) {
     case RIEMANN_ROE:
-      PetscCall(ComputeTracersRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+      PetscCall(ComputeTracerRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
@@ -267,16 +267,16 @@ static PetscErrorCode ApplyTracersInteriorFlux(void *context, PetscOperatorField
 }
 
 /// @brief Deallocate memory
-/// @param context a TracersInteriorFluxOperator struct
+/// @param context a TracerInteriorFluxOperator struct
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode DestroyTracersInteriorFlux(void *context) {
+static PetscErrorCode DestroyTracerInteriorFlux(void *context) {
   PetscFunctionBegin;
 
-  TracersInteriorFluxOperator *interior_flux_op = context;
+  TracerInteriorFluxOperator *interior_flux_op = context;
 
-  DestroyTracersRiemannStateData(interior_flux_op->left_states);
-  DestroyTracersRiemannStateData(interior_flux_op->right_states);
-  DestroyTracersRiemannEdgeData(interior_flux_op->edges);
+  DestroyTracerRiemannStateData(interior_flux_op->left_states);
+  DestroyTracerRiemannStateData(interior_flux_op->right_states);
+  DestroyTracerRiemannEdgeData(interior_flux_op->edges);
 
   PetscCall(PetscFree(interior_flux_op));
 
@@ -289,25 +289,25 @@ static PetscErrorCode DestroyTracersInteriorFlux(void *context) {
 /// @param [in]  diagnostics an OperatorDiagnostics struct
 /// @param [out] petsc_op    a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateTracersPetscInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics,
-                                                      PetscOperator *petsc_op) {
+PetscErrorCode CreatePetscTracerInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics,
+                                                     PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   PetscInt num_tracers_comp = config.physics.sediment.num_classes;
 
-  TracersInteriorFluxOperator *interior_flux_op;
+  TracerInteriorFluxOperator *interior_flux_op;
   PetscCall(PetscCalloc1(1, &interior_flux_op));
-  *interior_flux_op = (TracersInteriorFluxOperator){
+  *interior_flux_op = (TracerInteriorFluxOperator){
       .mesh        = mesh,
       .diagnostics = diagnostics,
       .tiny_h      = config.physics.flow.tiny_h,
   };
 
   // allocate left/right/edge Riemann data structures
-  PetscCall(CreateTracersRiemannStateData(mesh->num_internal_edges, num_flow_comp, num_tracers_comp, &interior_flux_op->left_states));
-  PetscCall(CreateTracersRiemannStateData(mesh->num_internal_edges, num_flow_comp, num_tracers_comp, &interior_flux_op->right_states));
-  PetscCall(CreateTracersRiemannEdgeData(mesh->num_internal_edges, num_flow_comp, num_tracers_comp, &interior_flux_op->edges));
+  PetscCall(CreateTracerRiemannStateData(mesh->num_internal_edges, num_flow_comp, num_tracers_comp, &interior_flux_op->left_states));
+  PetscCall(CreateTracerRiemannStateData(mesh->num_internal_edges, num_flow_comp, num_tracers_comp, &interior_flux_op->right_states));
+  PetscCall(CreateTracerRiemannEdgeData(mesh->num_internal_edges, num_flow_comp, num_tracers_comp, &interior_flux_op->edges));
 
   // copy mesh geometry data into place
   RDyEdges *edges = &mesh->edges;
@@ -322,7 +322,7 @@ PetscErrorCode CreateTracersPetscInteriorFluxOperator(RDyMesh *mesh, const RDyCo
   }
 
   // create the interior operator
-  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyTracersInteriorFlux, DestroyTracersInteriorFlux, petsc_op));
+  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyTracerInteriorFlux, DestroyTracerInteriorFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -340,23 +340,23 @@ typedef struct {
   Vec                      boundary_fluxes;     // boundary flux values vector
   OperatorDiagnostics     *diagnostics;         // courant number, boundary fluxes
   PetscReal                tiny_h;              // minimum water height for wet conditions
-  TracersRiemannStateData left_states;
-  TracersRiemannStateData right_states;
-  TracersRiemannEdgeData  edges;
+  TracerRiemannStateData left_states;
+  TracerRiemannStateData right_states;
+  TracerRiemannEdgeData  edges;
   PetscReal               *cosines, *sines;  // cosine and sine of the angle between the edge and y-axis
   PetscReal               *a_max;            // maximum courant number
-} TracersBoundaryFluxOperator;
+} TracerBoundaryFluxOperator;
 
 /// @brief Sets values for the cells on the right of an edge, datar, based on values on the left of the
 ///        edge, datal, and edge geometeric attributes for a reflective boundary condition.
 /// @param [in] mesh      a RDyMesh struct for the mesh
 /// @param [in] boundary  a RDyBoundary struct for the boundary
-/// @param [in] datal     a TracersRiemannStateData that stores values for cells left of edges
-/// @param [out] datar    a TracersRiemannStateData that stores values for cells right of edges
-/// @param [in] data_edge a TracersRiemannEdgeData that has geometeric attributes about edges
+/// @param [in] datal     a TracerRiemannStateData that stores values for cells left of edges
+/// @param [out] datar    a TracerRiemannStateData that stores values for cells right of edges
+/// @param [in] data_edge a TracerRiemannEdgeData that has geometeric attributes about edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ApplyTracersReflectingBC(RDyMesh *mesh, RDyBoundary boundary, TracersRiemannStateData *datal, TracersRiemannStateData *datar,
-                                                TracersRiemannEdgeData *data_edge) {
+static PetscErrorCode ApplyTracerReflectingBC(RDyMesh *mesh, RDyBoundary boundary, TracerRiemannStateData *datal, TracerRiemannStateData *datar,
+                                              TracerRiemannEdgeData *data_edge) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &mesh->cells;
@@ -392,19 +392,19 @@ static PetscErrorCode ApplyTracersReflectingBC(RDyMesh *mesh, RDyBoundary bounda
 
 /// @brief Computes the fluxes through the boundary edges of mesh locally owned and
 ///        adds contribution in f_global Vec.
-/// @param [in] context  a TracersInteriorFluxOperator
+/// @param [in] context  a TracerInteriorFluxOperator
 /// @param [in] fields   a PetscOperatorFields ! FIXME: Can possibly be deleted
 /// @param [in] dt       time step             ! FIXME: Can possibly be deleted
 /// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
 /// @param [in] f_global a Vec for storing RHS contrinution from interior edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ApplyTracersBoundaryFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyTracerBoundaryFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  TracersBoundaryFluxOperator *boundary_flux_op = context;
+  TracerBoundaryFluxOperator *boundary_flux_op = context;
 
   RDyBoundary  boundary           = boundary_flux_op->boundary;
   RDyCondition boundary_condition = boundary_flux_op->boundary_condition;
@@ -419,9 +419,9 @@ static PetscErrorCode ApplyTracersBoundaryFlux(void *context, PetscOperatorField
   PetscCall(VecGetArray(boundary_fluxes, &boundary_fluxes_ptr));
 
   // apply boundary conditions
-  TracersRiemannStateData *datal     = &boundary_flux_op->left_states;
-  TracersRiemannStateData *datar     = &boundary_flux_op->right_states;
-  TracersRiemannEdgeData  *data_edge = &boundary_flux_op->edges;
+  TracerRiemannStateData *datal     = &boundary_flux_op->left_states;
+  TracerRiemannStateData *datar     = &boundary_flux_op->right_states;
+  TracerRiemannEdgeData  *data_edge = &boundary_flux_op->edges;
 
   PetscInt num_flow_comp     = datal->num_flow_comp;
   PetscInt num_tracers_comp = datal->num_tracers_comp;
@@ -463,7 +463,7 @@ static PetscErrorCode ApplyTracersBoundaryFlux(void *context, PetscOperatorField
       PetscCall(ComputeRiemannVelocitiesAndConcentration(tiny_h, datar));
       break;
     case CONDITION_REFLECTING:
-      PetscCall(ApplyTracersReflectingBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
+      PetscCall(ApplyTracerReflectingBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
       break;
     case CONDITION_CRITICAL_OUTFLOW:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not supported for tracers");
@@ -475,7 +475,7 @@ static PetscErrorCode ApplyTracersBoundaryFlux(void *context, PetscOperatorField
   // call Riemann solver
   switch (boundary_flux_op->riemann) {
     case RIEMANN_ROE:
-      PetscCall(ComputeTracersRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+      PetscCall(ComputeTracerRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
@@ -518,16 +518,16 @@ static PetscErrorCode ApplyTracersBoundaryFlux(void *context, PetscOperatorField
 }
 
 /// @brief Deallocate memory
-/// @param context a DestroyTracersBoundaryFlux struct
+/// @param context a DestroyTracerBoundaryFlux struct
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode DestroyTracersBoundaryFlux(void *context) {
+static PetscErrorCode DestroyTracerBoundaryFlux(void *context) {
   PetscFunctionBegin;
 
-  TracersBoundaryFluxOperator *boundary_flux_op = context;
+  TracerBoundaryFluxOperator *boundary_flux_op = context;
 
-  DestroyTracersRiemannStateData(boundary_flux_op->left_states);
-  DestroyTracersRiemannStateData(boundary_flux_op->right_states);
-  DestroyTracersRiemannEdgeData(boundary_flux_op->edges);
+  DestroyTracerRiemannStateData(boundary_flux_op->left_states);
+  DestroyTracerRiemannStateData(boundary_flux_op->right_states);
+  DestroyTracerRiemannEdgeData(boundary_flux_op->edges);
 
   PetscCall(PetscFree(boundary_flux_op));
 
@@ -544,17 +544,17 @@ static PetscErrorCode DestroyTracersBoundaryFlux(void *context) {
 /// @param [in]  diagnostics        an OperatorDiagnostics struct
 /// @param [out] petsc_op           a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateTracersPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
-                                                       Vec boundary_values, Vec boundary_fluxes, OperatorDiagnostics *diagnostics,
-                                                       PetscOperator *petsc_op) {
+PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
+                                                     Vec boundary_values, Vec boundary_fluxes, OperatorDiagnostics *diagnostics,
+                                                     PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   PetscInt num_tracers_comp = config.physics.sediment.num_classes;
 
-  TracersBoundaryFluxOperator *boundary_flux_op;
+  TracerBoundaryFluxOperator *boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
-  *boundary_flux_op = (TracersBoundaryFluxOperator){
+  *boundary_flux_op = (TracerBoundaryFluxOperator){
       .mesh               = mesh,
       .boundary           = boundary,
       .boundary_condition = boundary_condition,
@@ -565,9 +565,9 @@ PetscErrorCode CreateTracersPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
   };
 
   // allocate left/right/edge Riemann data structures
-  PetscCall(CreateTracersRiemannStateData(boundary.num_edges, num_flow_comp, num_tracers_comp, &boundary_flux_op->left_states));
-  PetscCall(CreateTracersRiemannStateData(boundary.num_edges, num_flow_comp, num_tracers_comp, &boundary_flux_op->right_states));
-  PetscCall(CreateTracersRiemannEdgeData(boundary.num_edges, num_flow_comp, num_tracers_comp, &boundary_flux_op->edges));
+  PetscCall(CreateTracerRiemannStateData(boundary.num_edges, num_flow_comp, num_tracers_comp, &boundary_flux_op->left_states));
+  PetscCall(CreateTracerRiemannStateData(boundary.num_edges, num_flow_comp, num_tracers_comp, &boundary_flux_op->right_states));
+  PetscCall(CreateTracerRiemannEdgeData(boundary.num_edges, num_flow_comp, num_tracers_comp, &boundary_flux_op->edges));
 
   // copy mesh geometry data into place
   RDyEdges *edges = &mesh->edges;
@@ -578,7 +578,7 @@ PetscErrorCode CreateTracersPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyCo
   }
 
   // create the boundary operator
-  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplyTracersBoundaryFlux, DestroyTracersBoundaryFlux, petsc_op));
+  PetscCall(PetscOperatorCreate(boundary_flux_op, ApplyTracerBoundaryFlux, DestroyTracerBoundaryFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -595,23 +595,23 @@ typedef struct {
   Vec       mannings;           // mannings coefficient vector
   PetscReal tiny_h;             // minimum water height for wet conditions
   PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
-} TracersSourceOperator;
+} TracerSourceOperator;
 
 /// @brief Set the contribution of the source-term using the semi-implicit time integeration method
 ///        for the friction term in SWE.
-/// @param [in] context  a TracersInteriorFluxOperator
+/// @param [in] context  a TracerInteriorFluxOperator
 /// @param [in] fields   a PetscOperatorFields
 /// @param [in] dt       time step
 /// @param [in] u_local  a Vec containing values for locally-owned and ghost cells
 /// @param [in] f_global a Vec for storing RHS contrinution from interior edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ApplyTracersSourceSemiImplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  TracersSourceOperator *source_op         = context;
+  TracerSourceOperator *source_op         = context;
   Vec                     source_vec        = source_op->external_sources;
   Vec                     mannings_vec      = source_op->mannings;
   RDyMesh                *mesh              = source_op->mesh;
@@ -707,11 +707,11 @@ static PetscErrorCode ApplyTracersSourceSemiImplicit(void *context, PetscOperato
 }
 
 /// @brief Deallocate memory
-/// @param context a TracersSourceOperator struct
+/// @param context a TracerSourceOperator struct
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode DestroyTracersSource(void *context) {
+static PetscErrorCode DestroyTracerSource(void *context) {
   PetscFunctionBegin;
-  TracersSourceOperator *source_op = context;
+  TracerSourceOperator *source_op = context;
   PetscFree(source_op);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -723,15 +723,15 @@ static PetscErrorCode DestroyTracersSource(void *context) {
 /// @param [in]  mannings         a Vec containing Manning roughness coefficient for SWE
 /// @param [out] petsc_op         a PetscOperator struct that is created and returned
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateTracersPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
+PetscErrorCode CreatePetscTracerSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   PetscInt num_tracers_comp = config.physics.sediment.num_classes;
 
-  TracersSourceOperator *source_op;
+  TracerSourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
-  *source_op = (TracersSourceOperator){
+  *source_op = (TracerSourceOperator){
       .mesh              = mesh,
       .num_flow_comp     = num_flow_comp,
       .num_tracers_comp = num_tracers_comp,
@@ -746,7 +746,7 @@ PetscErrorCode CreateTracersPetscSourceOperator(RDyMesh *mesh, const RDyConfig c
 
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
-      PetscCall(PetscOperatorCreate(source_op, ApplyTracersSourceSemiImplicit, DestroyTracersSource, petsc_op));
+      PetscCall(PetscOperatorCreate(source_op, ApplyTracerSourceSemiImplicit, DestroyTracerSource, petsc_op));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");

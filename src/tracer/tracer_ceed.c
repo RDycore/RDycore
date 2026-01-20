@@ -10,7 +10,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
 
-#include "tracers_types_ceed.h"
+#include "tracer_types_ceed.h"
 
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
@@ -31,6 +31,10 @@ PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, 
   TracersContext tracers_ctx;
   PetscCall(PetscCalloc1(1, &tracers_ctx));
 
+  PetscInt num_tracers = config.physics.sediment.num_classes +
+                         (config.physics.salinity ? 1 : 0) +
+                         (config.physics.heat ? 1 : 0);
+
   tracers_ctx->dtime                   = 0.0;
   tracers_ctx->tiny_h                  = config.physics.flow.tiny_h;
   tracers_ctx->gravity                 = GRAVITY;
@@ -40,7 +44,7 @@ PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, 
   tracers_ctx->tau_critical_erosion    = 0.1;
   tracers_ctx->tau_critical_deposition = 1000.0;
   tracers_ctx->rhow                    = DENSITY_OF_WATER;
-  tracers_ctx->tracers_ndof                = config.physics.tracers.num_classes;
+  tracers_ctx->tracers_ndof            = num_tracers;
   tracers_ctx->flow_ndof               = 3;  // NOTE: SWE assumed!
 
   PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));

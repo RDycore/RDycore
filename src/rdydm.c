@@ -194,22 +194,22 @@ PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief  This function creates a DM for sediments
+/// @brief This function creates a DM for tracers
 /// @param rdy
 /// @return PETSC_SUCCESS on success
-PetscErrorCode CreateSedimentDM(RDy rdy) {
+PetscErrorCode CreateTracerDM(RDy rdy) {
   PetscFunctionBegin;
   PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
 
-  rdy->sediment_fields.num_fields              = 1;
-  rdy->sediment_fields.num_field_components[0] = num_sediment_class;
+  rdy->tracer_fields.num_fields              = 1;
+  rdy->tracer_fields.num_field_components[0] = num_sediment_class;
 
-  snprintf(rdy->sediment_fields.field_names[0], MAX_NAME_LEN, "Sediments");
+  snprintf(rdy->tracer_fields.field_names[0], MAX_NAME_LEN, "Sediments");
   for (PetscInt i = 0; i < num_sediment_class; i++) {
-    snprintf(rdy->sediment_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
+    snprintf(rdy->tracer_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
   }
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->sediment_fields, &rdy->sediment_dm));
+  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->tracer_fields, &rdy->tracer_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -247,17 +247,17 @@ PetscErrorCode CreateVectors(RDy rdy) {
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow
-    PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_u_global));
-    PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_u_local));
+    PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_global));
+    PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_local));
 
     // Vecs for sediment
-    PetscCall(DMCreateGlobalVector(rdy->sediment_dm, &rdy->sediment_u_global));
-    PetscCall(DMCreateLocalVector(rdy->sediment_dm, &rdy->sediment_u_local));
+    PetscCall(DMCreateGlobalVector(rdy->tracer_dm, &rdy->tracer_global));
+    PetscCall(DMCreateLocalVector(rdy->tracer_dm, &rdy->tracer_local));
 
   } else {
     // Point the flow Vecs to soln Vecs
-    rdy->flow_u_global = rdy->u_global;
-    rdy->flow_u_local  = rdy->u_local;
+    rdy->flow_global = rdy->u_global;
+    rdy->flow_local  = rdy->u_local;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

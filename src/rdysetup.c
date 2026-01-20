@@ -146,14 +146,46 @@ static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// retrieves the index of a tracer condition using its name
-static PetscErrorCode FindTracerCondition(RDy rdy, const char *name, PetscInt *index) {
+// retrieves the index of a sediment condition using its name
+static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
 
   // NOTE: could be optimized as above
   *index = -1;
-  for (PetscInt i = 0; i < rdy->config.num_tracer_conditions; ++i) {
-    if (!strcmp(rdy->config.tracer_conditions[i].name, name)) {
+  for (PetscInt i = 0; i < rdy->config.num_sediment_conditions; ++i) {
+    if (!strcmp(rdy->config.sediment_conditions[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// retrieves the index of a salinity condition using its name
+static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt *index) {
+  PetscFunctionBegin;
+
+  // NOTE: could be optimized as above
+  *index = -1;
+  for (PetscInt i = 0; i < rdy->config.num_salinity_conditions; ++i) {
+    if (!strcmp(rdy->config.salinity_conditions[i].name, name)) {
+      *index = i;
+      break;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// retrieves the index of a temperature condition using its name
+static PetscErrorCode FindTemperatureCondition(RDy rdy, const char *name, PetscInt *index) {
+  PetscFunctionBegin;
+
+  // NOTE: could be optimized as above
+  *index = -1;
+  for (PetscInt i = 0; i < rdy->config.num_temperature_conditions; ++i) {
+    if (!strcmp(rdy->config.temperature_conditions[i].name, name)) {
       *index = i;
       break;
     }
@@ -604,6 +636,24 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
         ic->salinity = sal_cond;
       }
     }
+
+    if (rdy->config.physics.salinity) {
+      PetscCheck(strlen(ic_spec.salinity), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial salinity condition!", region.name);
+      PetscInt sal_index;
+      PetscCall(FindSalinityCondition(rdy, ic_spec.salinity, &sal_index));
+      RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
+      PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                 "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
+      ic->salinity = sal_cond;
+    }
+
+    if (rdy->config.physics.heat) {
+      PetscCheck(strlen(ic_spec.temperature), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial heat condition!", region.name);
+      PetscInt temperature_index;
+      PetscCall(FindTemperatureCondition(rdy, ic_spec.temperature, &temperature_index));
+      RDyTemperatureCondition *temperature_cond = &rdy->config.temperature_conditions[temperature_index];
+      ic->temperature = temperature_cond;
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -648,6 +698,9 @@ static PetscErrorCode InitSources(RDy rdy) {
         }
         if (rdy->config.physics.salinity && strlen(src_spec.salinity)) {
           PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for salinity.");
+        }
+        if (rdy->config.physics.heat && strlen(src_spec.temperature)) {
+          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for heat transfer.");
         }
       }
     }
@@ -735,7 +788,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->flow_u_global));
+  PetscCall(VecZeroEntries(rdy->flow_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -746,10 +799,10 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->flow_u_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->flow_u_global, &ndof));
+  PetscCall(VecGetLocalSize(rdy->flow_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->flow_global, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->flow_u_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->flow_global, &u_ptr));
 
   // initialize flow conditions
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
@@ -823,16 +876,16 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
 
   // TODO: salinity and sediment initial conditions go here.
 
-  PetscCall(VecRestoreArray(rdy->flow_u_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->flow_global, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // initializes solution vector data
 //   unsafe for refinement if file is given with initial conditions
-static PetscErrorCode InitSedimentSolution(RDy rdy) {
+static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->sediment_u_global));
+  PetscCall(VecZeroEntries(rdy->tracer_global));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -843,19 +896,16 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->sediment_u_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->sediment_u_global, &ndof));
-  PetscCheck(ndof == rdy->config.physics.sediment.num_classes, rdy->comm, PETSC_ERR_USER,
-             "Invalid block size for sediment concentration vector (%" PetscInt_FMT ", should be %" PetscInt_FMT ")", ndof,
-             rdy->config.physics.sediment.num_classes);
+  PetscCall(VecGetLocalSize(rdy->tracer_global, &n_local));
+  PetscCall(VecGetBlockSize(rdy->tracer_global, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->sediment_u_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->tracer_global, &u_ptr));
 
   // initialize sediment conditions one size class at a time
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
     RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
     Vec                  local       = NULL;
-    for (PetscInt idof = 0; idof < rdy->num_sediment_classes; ++idof) {
+    for (PetscInt idof = 0; idof < rdy->config.sediment.num_classes; ++idof) {
       if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
         PetscViewer viewer;
         PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.classes[idof].file, FILE_MODE_READ, &viewer));
@@ -909,34 +959,34 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
     }
   }
 
-  PetscCall(VecRestoreArray(rdy->sediment_u_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->tracer_global, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscInt flow_ndof, sediment_ndof, soln_ndof, diags_ndof;
+  PetscInt flow_ndof, tracer_ndof, soln_ndof, diags_ndof;
 
-  PetscCall(VecGetBlockSize(rdy->flow_u_global, &flow_ndof));
-  PetscCall(VecGetBlockSize(rdy->sediment_u_global, &sediment_ndof));
+  PetscCall(VecGetBlockSize(rdy->flow_global, &flow_ndof));
+  PetscCall(VecGetBlockSize(rdy->tracer_global, &tracer_ndof));
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
   PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
 
-  PetscCheck(soln_ndof = flow_ndof + sediment_ndof, rdy->comm, PETSC_ERR_USER,
+  PetscCheck(soln_ndof = flow_ndof + tracer_ndof, rdy->comm, PETSC_ERR_USER,
              "Blocksize of flow (=%" PetscInt_FMT ") and sediment (=%" PetscInt_FMT ") Vec do not sum to blocksize of solution (=%" PetscInt_FMT
              ") Vec",
-             flow_ndof, sediment_ndof, soln_ndof);
+             flow_ndof, tracer_ndof, soln_ndof);
 
   // first, copy flow Vec into solution Vec
   for (PetscInt i = 0; i < flow_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->flow_u_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->flow_global, i, rdy->vec_1dof, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->vec_1dof, i, rdy->u_global, INSERT_VALUES));
   }
 
   // next, copy sediment Vec into solution Vec
-  for (PetscInt i = 0; i < sediment_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->sediment_u_global, i, rdy->vec_1dof, INSERT_VALUES));
+  for (PetscInt i = 0; i < tracer_ndof; i++) {
+    PetscCall(VecStrideGather(rdy->tracer_global, i, rdy->vec_1dof, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->vec_1dof, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
 
@@ -947,8 +997,8 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
   PetscCall(InitFlowSolution(rdy));
 
-  if (rdy->num_sediment_classes) {
-    PetscCall(InitSedimentSolution(rdy));
+  if (rdy->num_tracers) {
+    PetscCall(InitTracerSolution(rdy));
     PetscCall(InitFlowAndSedimentSolution(rdy));
   }
 
@@ -1262,7 +1312,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   // create the primary DM that stores the mesh and solution vector
   rdy->soln_fields = (SectionFieldSpec){
       .num_fields            = 1,
-      .num_field_components  = {3 + rdy->num_sediment_classes},
+      .num_field_components  = {3 + rdy->num_tracers},
       .field_names           = {"Solution"},
       .field_component_names = {{
           "Height",
@@ -1270,9 +1320,10 @@ PetscErrorCode RDySetup(RDy rdy) {
           "MomentumY",
       }},
   };
-  for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
-    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
   }
+  // TODO: salinity and heat go here
 
   PetscCall(CreateDM(rdy));
 
@@ -1315,7 +1366,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   if (rdy->config.physics.sediment.num_classes) {
     PetscCall(CreateFlowDM(rdy));
-    PetscCall(CreateSedimentDM(rdy));
+    PetscCall(CreateTracerDM(rdy));
   } else {
     rdy->flow_fields = rdy->soln_fields;
     rdy->flow_dm     = rdy->dm;

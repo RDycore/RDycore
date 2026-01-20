@@ -3,6 +3,7 @@
 
 #include <petsc/private/petscimpl.h>
 #include <private/rdyconfigimpl.h>
+#include "private/config.h"
 
 // This type defines a "condition" representing
 // * an initial condition or source/sink associated with a region
@@ -12,12 +13,12 @@ typedef struct {
   RDyFlowCondition     *flow;
   RDySedimentCondition *sediment;
   RDySalinityCondition *salinity;
+  RDyTemperatureCondition *temperature;
 
   // value(s) associated with the condition
   PetscReal value;
 
-  // was this boundary condition automatically generated and not explicitly
-  // requested in the config file?
+  // was this boundary condition automatically generated and not explicitly requested?
   PetscBool auto_generated;
 } RDyCondition;
 
