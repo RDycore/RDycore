@@ -116,6 +116,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_right", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "delH", 1, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_left", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_right", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "flux", num_comp, CEED_EVAL_NONE));
@@ -124,6 +125,8 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, q_restrict_r, c_restrict_l, c_restrict_r, restrict_geom, restrict_flux, restrict_cnum;
   CeedVector          geom, flux, cnum;
+  CeedElemRestriction restrict_delH;
+  CeedVector          delH;
   {
     CeedInt num_edges = mesh->num_owned_internal_edges;
 
@@ -146,6 +149,13 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
       owned_edge++;
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+
+    // delH
+    CeedInt num_delH = 1;
+    CeedInt delH_strides[] = {num_delH, 1, num_delH};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_delH, num_edges * num_delH, delH_strides, &restrict_delH));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_delH, &delH, NULL));
+    PetscCallCEED(CeedVectorSetValue(delH, 0.0));
 
     // create a vector to store inter-cell fluxes
     CeedInt f_strides[] = {num_comp, 1, num_comp};
@@ -197,6 +207,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedOperatorSetField(*subop, "geom", restrict_geom, CEED_BASIS_NONE, geom));
   PetscCallCEED(CeedOperatorSetField(*subop, "q_left", q_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*subop, "q_right", q_restrict_r, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*subop, "delH", restrict_delH, CEED_BASIS_NONE, delH));
   PetscCallCEED(CeedOperatorSetField(*subop, "cell_left", c_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*subop, "cell_right", c_restrict_r, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*subop, "flux", restrict_flux, CEED_BASIS_NONE, flux));
@@ -214,6 +225,8 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_delH));
+  PetscCallCEED(CeedVectorDestroy(&delH));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
@@ -726,6 +739,7 @@ PetscErrorCode CereateCeedDelHAlongEdgeOperator(RDyConfig *config, RDyMesh *mesh
 
     offset_eta_beg[owned_edge] = vid_beg;
     offset_eta_end[owned_edge] = vid_end;
+    printf("%03d %02d %02d\n", owned_edge, vid_beg, vid_end);
 
     g[owned_edge][0] = vertices->points[vid_beg].X[2];  // z value for beginning vertex
     g[owned_edge][1] = vertices->points[vid_end].X[2];  // z value for ending vertex
@@ -749,10 +763,14 @@ PetscErrorCode CereateCeedDelHAlongEdgeOperator(RDyConfig *config, RDyMesh *mesh
   PetscCallCEED(CeedElemRestrictionCreateVector(restrict_delH, delH, NULL));
   PetscCallCEED(CeedVectorSetValue(*delH, 0.0));
 
-  if (0) {
+  if (1) {
+    printf("restrict_geom:\n");
     PetscCallCEED(CeedElemRestrictionView(restrict_geom, stdout));
+    printf("restrict_eta_beg:\n");
     PetscCallCEED(CeedElemRestrictionView(restrict_eta_beg, stdout));
+    printf("restrict_eta_end:\n");
     PetscCallCEED(CeedElemRestrictionView(restrict_eta_end, stdout));
+    printf("restrict_delH:\n");
     PetscCallCEED(CeedElemRestrictionView(restrict_delH, stdout));
   }
 
@@ -770,6 +788,26 @@ PetscErrorCode CereateCeedDelHAlongEdgeOperator(RDyConfig *config, RDyMesh *mesh
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_delH));
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode CreateCeedDelHAlongEdgeVector(RDyConfig *config, RDyMesh *mesh, CeedVector *delH) {
+  PetscFunctionBegin;
+
+  Ceed ceed = CeedContext();
+
+  RDyEdges *edges = &mesh->edges;
+
+  CeedInt             num_edges      = mesh->num_internal_edges;
+  CeedInt             num_delH       = 1;
+  CeedInt             delH_strides[] = {num_delH, 1, num_delH};
+  CeedElemRestriction restrict_delH;
+
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_delH, num_edges * num_delH, delH_strides, &restrict_delH));
+  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_delH, delH, NULL));
+  PetscCallCEED(CeedVectorSetValue(*delH, 0.0));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_delH));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

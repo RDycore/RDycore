@@ -37,6 +37,7 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+//  const CeedScalar(*delH)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[3];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
@@ -51,6 +52,7 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     SWEState   qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+//    printf("%d : delH = %f\n", i, delH[0][i]);
     CeedScalar flux[3], amax;
     if (qL.h > tiny_h || qR.h > tiny_h) {
       switch (flux_type) {

@@ -199,6 +199,7 @@ PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, Petsc
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaOperator(RDyConfig *, RDyMesh *, CeedVector *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CereateCeedDelHAlongEdgeOperator(RDyConfig *, RDyMesh *, CeedVector *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedDelHAlongEdgeVector(RDyConfig *, RDyMesh *, CeedVector *);
 PETSC_INTERN PetscErrorCode CreateCellToVertexMat(RDyConfig *, RDyMesh *, Mat *);
 PETSC_INTERN PetscErrorCode CreateEtaVecs(RDyConfig *, RDyMesh *, CeedVector *, Vec *);
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,

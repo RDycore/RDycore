@@ -172,6 +172,39 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode AddOperatorDelHAlongEdgeVector(Operator *op) {
+  PetscFunctionBegin;
+
+  if (CeedEnabled()) {
+    Ceed ceed = CeedContext();
+
+    CeedInt num_flux_suboperators;
+    PetscCallCEED(CeedOperatorCompositeGetNumSub(op->ceed.flux, &num_flux_suboperators));
+    CeedOperator *flux_suboperators;
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &flux_suboperators));
+
+    CeedInt             num_edges      = op->mesh->num_internal_edges;
+    CeedInt             num_delH       = 1;
+    CeedInt             delH_strides[] = {num_delH, 1, num_delH};
+    CeedElemRestriction restrict_delH;
+
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_delH, num_edges * num_delH, delH_strides, &restrict_delH));
+    printf("In AddOperatorDelHAlongEdgeVector restrict_delH:\n");
+    PetscCallCEED(CeedElemRestrictionView(restrict_delH, stdout));
+    CeedVector tmpCeedVector;
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_delH, &tmpCeedVector, NULL));
+
+    CeedInt isubop = 0; // internal edges suboperator is first
+    //PetscCallCEED(CeedOperatorSetField(flux_suboperators[isubop], "delH", restrict_delH, CEED_BASIS_NONE, op->ceed.delH_along_internal_edges));
+    //PetscCallCEED(CeedOperatorSetField(flux_suboperators[isubop], "delH", restrict_delH, CEED_BASIS_NONE, tmpCeedVector));
+    PetscCallCEED(CeedVectorDestroy(&tmpCeedVector));
+
+    PetscCallCEED(CeedElemRestrictionDestroy(&restrict_delH));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates an operator representing the system of equations described in the
 /// given configuration.
 /// @param [in]  config              the configuration defining the physics and numerics for the new operator
@@ -226,13 +259,23 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.flux));
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
+
     if ((*operator)->config->physics.flow.well_balance != WELL_BALANCE_NONE) {
       PetscCall(CreateCeedEtaOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_cell, &(*operator)->ceed.eta_cell_operator));
       PetscCall(CreateCellToVertexMat((*operator)->config, (*operator)->mesh, &(*operator)->ceed.CellToVert));
       PetscCall(CreateEtaVecs((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices, &(*operator)->eta_vertices));
       PetscCall(CereateCeedDelHAlongEdgeOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.delH_along_internal_edges,
                                                  &(*operator)->ceed.delHAlongEdge_operator));
+    } else {
+      /*
+      (*operator)->ceed.eta_cell               = NULL;
+      (*operator)->ceed.eta_cell_operator      = NULL;
+      (*operator)->ceed.eta_vertices           = NULL;
+      (*operator)->ceed.delHAlongEdge_operator = NULL;
+      PetscCall(CreateCeedDelHAlongEdgeVector((*operator)->config, (*operator)->mesh, &(*operator)->ceed.delH_along_internal_edges));
+      */
     }
+
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
@@ -243,6 +286,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, DM domain_dm_1dof
 
   // set up our flux divergence vector(s)
   PetscCall(AddOperatorFluxDivergence(*operator));
+  //PetscCall(AddOperatorDelHAlongEdgeVector(*operator));
 
   // initialize diagnostics
   PetscCall(ResetOperatorDiagnostics(*operator));
