@@ -51,27 +51,53 @@ typedef struct {
   } solutions;
 } RDyMMSSWESolutions;
 
-// manufactured solutions for tracers
+// manufactured solutions for sediments
 typedef struct {
   struct {
-    // tracer value ci(x, y, t) and partial derivatives
+    // sediment concentration c[i](x, y, t) and partial derivatives
     MathExpression c[MAX_NUM_TRACERS], dcdx[MAX_NUM_TRACERS], dcdy[MAX_NUM_TRACERS], dcdt[MAX_NUM_TRACERS];
   } expressions;
 
   struct {
-    // tracer value ci(x, y, t) and partial derivatives
+    // sediment concentration c[i](x, y, t) and partial derivatives
     // NOTE: uintptr_t is an integer big enough to store a pointer, so we can
-    // NOTE: use it as an element of an array (unlike void)
+    // NOTE: use it as an element of an array (unlike void*)
     uintptr_t c[MAX_NUM_TRACERS], dcdx[MAX_NUM_TRACERS], dcdy[MAX_NUM_TRACERS], dcdt[MAX_NUM_TRACERS];
   } solutions;
-} RDyMMSTracerSolutions;
+} RDyMMSSedimentSolutions;
+
+// manufactured solution for salinity
+typedef struct {
+  struct {
+    // concentration c(x, y, t) and partial derivatives
+    MathExpression c, dcdx, dcdy, dcdt;
+  } expressions;
+
+  struct {
+    // salinity s(x, y, t) and partial derivatives
+    void *s, *dsdx, *dsdy, *dsdt;
+  } solutions;
+} RDyMMSSalinitySolutions;
+
+// manufactured solution for temperature
+typedef struct {
+  struct {
+    // temperature T(x, y, t) and partial derivatives
+    MathExpression T, dTdx, dTdy, dTdt;
+  } expressions;
+
+  struct {
+    // temperature T(x, y, t) and partial derivatives
+    void *T, *dTdx, *dTdy, *dTdt;
+  } solutions;
+} RDyMMSTemperatureSolutions;
 
 typedef struct {
   PetscReal L1, L2, Linf;
 } RDyMMSErrorNorms;
 
 typedef struct {
-  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_TRACERS];
+  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_TRACERS], T;
 } RDyMMSConvergenceRates;
 
 typedef struct {
@@ -82,10 +108,12 @@ typedef struct {
 
 // constants and expressions for manufactured solutions
 typedef struct {
-  RDyMMSConstants         constants;
-  RDyMMSSWESolutions      swe;
-  RDyMMSTracerSolutions   tracers;
-  RDyMMSConvergence       convergence;
+  RDyMMSConstants            constants;
+  RDyMMSSWESolutions         swe;
+  RDyMMSSedimentSolutions    sediment;
+  RDyMMSSalinitySolutions    salinity;
+  RDyMMSTemperatureSolutions temperature;
+  RDyMMSConvergence          convergence;
 } RDyMMSSection;
 
 #endif

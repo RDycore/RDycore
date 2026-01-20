@@ -86,8 +86,8 @@ PETSC_INTERN PetscErrorCode PetscOperatorCreate(void *, PetscErrorCode (*)(void 
 PETSC_INTERN PetscErrorCode PetscOperatorDestroy(PetscOperator *);
 PETSC_INTERN PetscErrorCode PetscOperatorApply(PetscOperator, PetscReal, Vec, Vec);
 PETSC_INTERN PetscErrorCode PetscOperatorSetField(PetscOperator, const char *, Vec);
-PETSC_INTERN PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *);
-PETSC_INTERN PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator, PetscOperator);
+PETSC_INTERN PetscErrorCode PetscOperatorCreateComposite(PetscOperator *);
+PETSC_INTERN PetscErrorCode PetscOperatorCompositeAddSub(PetscOperator, PetscOperator);
 
 //----------
 // Operator

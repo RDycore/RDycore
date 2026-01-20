@@ -1,6 +1,6 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdytracersimpl.h>
+#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
 
 /// Creates a PETSc flux operator appropriate for the given configuration.
@@ -19,7 +19,7 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscIn
                                        OperatorDiagnostics *diagnostics, PetscOperator *flux_op) {
   PetscFunctionBegin;
 
-  PetscCall(PetscCompositeOperatorCreate(flux_op));
+  PetscCall(PetscOperatorCreateComposite(flux_op));
 
   if (config->physics.flow.mode != FLOW_SWE) {
     PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
@@ -29,11 +29,11 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscIn
 
   PetscOperator interior_flux_op;
   if (config->physics.sediment.num_classes > 0) {
-    PetscCall(CreateTracersPetscInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
+    PetscCall(CreatePetscTracerInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
   } else {
-    PetscCall(CreateSWEPetscInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
+    PetscCall(CreatePetscSWEInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
   }
-  PetscCall(PetscCompositeOperatorAddSub(*flux_op, interior_flux_op));
+  PetscCall(PetscOperatorCompositeAddSub(*flux_op, interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < num_boundaries; ++b) {
@@ -41,13 +41,13 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscIn
     RDyBoundary   boundary  = boundaries[b];
     RDyCondition  condition = boundary_conditions[b];
     if (config->physics.sediment.num_classes > 0) {
-      PetscCall(CreateTracersPetscBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], diagnostics,
-                                                        &boundary_flux_op));
+      PetscCall(CreatePetscTracerBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], diagnostics,
+                                                      &boundary_flux_op));
     } else {
-      PetscCall(CreateSWEPetscBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b],
+      PetscCall(CreatePetscSWEBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b],
                                                    boundary_fluxes_accum[b], diagnostics, &boundary_flux_op));
     }
-    PetscCall(PetscCompositeOperatorAddSub(*flux_op, boundary_flux_op));
+    PetscCall(PetscOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -209,7 +209,7 @@ static PetscErrorCode DestroyInteriorFlux(void *context) {
 /// @param [in]    config      RDycore's configuration
 /// @param [inout] diagnostics a set of diagnostics that can be updated by the PetscOperator
 /// @param [out]   petsc_op    the newly created PetscOperator
-PetscErrorCode CreateSWEPetscInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics, PetscOperator *petsc_op) {
+PetscErrorCode CreatePetscSWEInteriorFluxOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   const PetscInt num_comp = 3;
@@ -468,7 +468,7 @@ static PetscErrorCode DestroyBoundaryFlux(void *context) {
 /// @param [inout] boundary_fluxes_accum a Vec storing accumulated fluxes for this boundary
 /// @param [inout] diagnostics           a set of diagnostics that can be updated by the PetscOperator
 /// @param [out]   petsc_op              the newly created PetscOperator
-PetscErrorCode CreateSWEPetscBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
+PetscErrorCode CreatePetscSWEBoundaryFluxOperator(RDyMesh *mesh, const RDyConfig config, RDyBoundary boundary, RDyCondition boundary_condition,
                                                   Vec boundary_values, Vec boundary_fluxes, Vec boundary_fluxes_accum,
                                                   OperatorDiagnostics *diagnostics, PetscOperator *petsc_op) {
   PetscFunctionBegin;
@@ -729,7 +729,7 @@ static PetscErrorCode DestroySource(void *context) {
 /// @param [in]  external_sources    a Vec storing external source values (if any) for the domain
 /// @param [in]  material_properties a Vec storing material properties for the domain
 /// @param [out] petsc_op            the newly created PetscOperator
-PetscErrorCode CreateSWEPetscSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec material_properties,
+PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec material_properties,
                                             PetscOperator *petsc_op) {
   PetscFunctionBegin;
   SourceOperator *source_op;

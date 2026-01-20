@@ -1,11 +1,13 @@
 #ifndef TRACERS_TYPES_CEED_H
 #define TRACERS_TYPES_CEED_H
 
-#include "tracers_ceed.h"
+#include <private/config.h>
+
+#include <ceed.h>
 
 // Q-function context with data attached
-typedef struct TracersContext_ *TracersContext;
-struct TracersContext_ {
+typedef struct TracerContext_ *TracerContext;
+struct TracerContext_ {
   CeedScalar dtime;
   CeedScalar tiny_h;
   CeedScalar gravity;
@@ -19,9 +21,9 @@ struct TracersContext_ {
   CeedInt    flow_ndof;
 };
 
-struct TracersState_ {
-  CeedScalar h, hu, hv, hci[MAX_NUM_TRACERS];
+struct TracerState_ {
+  CeedScalar h, hu, hv, hci[MAX_NUM_SEDIMENT_CLASSES], s, T;
 };
-typedef struct TracersState_ TracersState;
+typedef struct TracerState_ TracerState;
 
 #endif

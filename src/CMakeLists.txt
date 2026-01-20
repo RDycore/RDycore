@@ -18,8 +18,8 @@ set(RDYCORE_C_SOURCE_FILES
   petsc_operator.c
   swe/swe_ceed.c
   swe/swe_petsc.c
-  tracers/tracers_ceed.c
-  tracers/tracers_petsc.c
+  tracer/tracer_ceed.c
+  tracer/tracer_petsc.c
   time_series.c
   xdmf_output.c
   yaml_input.c
@@ -27,11 +27,11 @@ set(RDYCORE_C_SOURCE_FILES
 
 # generate <physics>_ceed.h headers inside each CEED operator implementation
 # directory so the JIT compilers have everything they need
-foreach(physics swe;tracers)
+foreach(physics swe;tracer)
   string(TOUPPER ${physics} PHYSICS)
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/private/physics_ceed.h.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/${physics}/${physics}_ceed.h
+    ${CMAKE_CURRENT_BINARY_DIR}/${physics}/${physics}_ceed.h
     @ONLY
   )
 endforeach()

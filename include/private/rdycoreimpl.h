@@ -146,12 +146,12 @@ struct _p_RDy {
   // DM for tracers
   DM               tracer_dm;
   SectionFieldSpec tracer_fields;
-  Vec              tracer_u_global, tracer_u_local;
+  Vec              tracer_global, tracer_local;
 
   // DM for flow
   DM               flow_dm;
   SectionFieldSpec flow_fields;
-  Vec              flow_u_global, flow_u_local;
+  Vec              flow_global, flow_local;
 
   // mesh representing simulation domain
   RDyMesh mesh;

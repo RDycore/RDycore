@@ -106,7 +106,7 @@ PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundar
 }
 
 PetscErrorCode RDySetTracerDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
-                                                     PetscReal *values) {
+                                                   PetscReal *values) {
   PetscFunctionBegin;
 
   PetscCheck(ndof == rdy->num_tracers, rdy->comm, PETSC_ERR_USER,
@@ -123,6 +123,16 @@ PetscErrorCode RDySetTracerDirichletBoundaryValues(RDy rdy, const PetscInt bound
   PetscCheck(boundary_cond.sediment->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
              "Trying to set dirichlet values for sediment on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.sediment->type);
+  if (rdy->config.physics.salinity) {
+    PetscCheck(boundary_cond.salinity->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+               "Trying to set dirichlet values for salinity on boundary %" PetscInt_FMT ", but it has a different type (%u)",
+               boundary_index, boundary_cond.salinity->type);
+  }
+  if (rdy->config.physics.heat) {
+    PetscCheck(boundary_cond.temperature->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+               "Trying to set dirichlet values for temperature on boundary %" PetscInt_FMT ", but it has a different type (%u)",
+               boundary_index, boundary_cond.temperature->type);
+  }
 
   OperatorData dirichlet;
   PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));

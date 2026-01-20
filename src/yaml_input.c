@@ -419,6 +419,7 @@ static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediment, 0),
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
+    CYAML_FIELD_STRING("temperature", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, temperature, 0),
     CYAML_FIELD_END
 };
 
@@ -694,6 +695,8 @@ static const cyaml_schema_field_t mms_convergence_rates_fields_schema[] = {
     CYAML_FIELD_MAPPING("hu", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hu, mms_error_norms_fields_schema),
     CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hv, mms_error_norms_fields_schema),
     CYAML_MMS_CONVERGENCE_RATES_SEDIMENT_FIELDS // defined in build/include/cyaml_sediment_fields.h
+    CYAML_FIELD_MAPPING("salinity", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, salinity, mms_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, temperature, mms_error_norms_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -709,6 +712,8 @@ static const cyaml_schema_field_t mms_fields_schema[] = {
     CYAML_FIELD_MAPPING("constants", CYAML_FLAG_OPTIONAL, RDyMMSSection, constants, mms_constants_fields_schema),
     CYAML_FIELD_MAPPING("swe", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_swe_fields_schema),
     CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyMMSSection, sediment, mms_sediment_fields_schema),
+    CYAML_FIELD_MAPPING("salinity", CYAML_FLAG_OPTIONAL, RDyMMSSection, salinity, mms_sediment_fields_schema),
+    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSSection, temperature, mms_sediment_fields_schema),
     CYAML_FIELD_MAPPING("convergence", CYAML_FLAG_OPTIONAL, RDyMMSSection, convergence, mms_convergence_fields_schema),
     CYAML_FIELD_END
 };
@@ -1186,6 +1191,36 @@ static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, PetscInt
     DEFINE_FUNCTION(sediment, constants, dcdy[i]);
     DEFINE_FUNCTION(sediment, constants, dcdt[i]);
   }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants,
+                                                         RDyMMSSalinitySolutions *salinity) {
+  PetscFunctionBegin;
+
+  // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
+  // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
+
+  DEFINE_FUNCTION(sediment, constants, s);
+  DEFINE_FUNCTION(sediment, constants, dsdx);
+  DEFINE_FUNCTION(sediment, constants, dsdy);
+  DEFINE_FUNCTION(sediment, constants, dsdt);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ParseTemperatureManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants,
+                                                            RDyMMSTemperatureSolutions *temperature) {
+  PetscFunctionBegin;
+
+  // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
+  // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
+
+  DEFINE_FUNCTION(temperature, constants, T);
+  DEFINE_FUNCTION(temperature, constants, dTdx);
+  DEFINE_FUNCTION(temperature, constants, dTdy);
+  DEFINE_FUNCTION(temperature, constants, dTdt);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1688,7 +1723,7 @@ static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions *swe_mm
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroySedimentManufacturedSolutions(RDyMMSSedimentSolutions *sed_mms) {
+static PetscErrorCode DestroyTracerManufacturedSolutions(RDyMMSTracerSolutions *sed_mms) {
   PetscFunctionBegin;
   for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
     if (sed_mms->expressions.c[i][0]) {
@@ -1705,7 +1740,7 @@ static PetscErrorCode DestroyManufacturedSolutions(RDyMMSSection *mms) {
     PetscCall(DestroySWEManufacturedSolutions(&mms->swe));
   }
   if (mms->sediment.expressions.c[0][0]) {
-    PetscCall(DestroySedimentManufacturedSolutions(&mms->sediment));
+    PetscCall(DestroyTracerManufacturedSolutions(&mms->sediment));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
