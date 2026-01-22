@@ -539,6 +539,58 @@ PetscErrorCode sort3(CeedScalar *data1, CeedScalar *data2, CeedScalar *data3) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Creates a CeedVector for storing eta (water surface elevation) at mesh vertices
+///
+/// Creates a CeedVector with the appropriate element restriction for storing vertex-centered
+/// eta values. The vector size is determined by the number of vertices and the connectivity
+/// between vertices and cells.
+///
+/// @param [in]  mesh         mesh defining vertices and their connectivity
+/// @param [out] eta_vertices CeedVector for vertex-centered eta values
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *mesh, CeedVector *eta_vertices) {
+  PetscFunctionBegin;
+
+  Ceed         ceed          = CeedContext();
+  CeedInt      num_comp_eta  = 1;  // only for water surface elevation
+  CeedInt      num_vertices  = mesh->num_vertices;
+  RDyVertices *vertices      = &mesh->vertices;
+
+  // count the total number of vertex-cell connections
+  CeedInt total_vertex_cell_conns = 0;
+  for (CeedInt v = 0; v < num_vertices; v++) {
+    total_vertex_cell_conns += vertices->num_cells[v];
+  }
+
+  // allocate and compute eta_offset
+  CeedInt *eta_offset;
+  PetscCall(PetscMalloc1(total_vertex_cell_conns, &eta_offset));
+
+  CeedInt conn_id = 0;
+  for (CeedInt v = 0; v < num_vertices; v++) {
+    for (CeedInt i = 0; i < vertices->num_cells[v]; i++) {
+      eta_offset[conn_id] = v * num_comp_eta;
+      conn_id++;
+    }
+  }
+
+  // create restriction for eta at vertices
+  CeedElemRestriction eta_restrict;
+  PetscCallCEED(CeedElemRestrictionCreate(ceed, total_vertex_cell_conns, 1, num_comp_eta, 1, num_vertices * num_comp_eta, CEED_MEM_HOST,
+                                          CEED_COPY_VALUES, eta_offset, &eta_restrict));
+  if (0) CeedElemRestrictionView(eta_restrict, stdout);
+
+  // create the vector
+  PetscCallCEED(CeedElemRestrictionCreateVector(eta_restrict, eta_vertices, NULL));
+  PetscCallCEED(CeedVectorSetValue(*eta_vertices, 0.0));
+
+  // clean up
+  PetscCallCEED(CeedElemRestrictionDestroy(&eta_restrict));
+  PetscCall(PetscFree(eta_offset));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Creates a CEED operator for computing vertex-averaged water surface elevation (eta)
 ///
 /// This operator computes eta at mesh vertices by averaging the eta values from all

@@ -222,6 +222,8 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     if ((*operator)->config->physics.flow.well_balance != WELL_BALANCE_NONE) {
       PetscCall(CreateCeedEtaVerticesOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices,
                                               &(*operator)->ceed.eta_vertices_operator));
+    } else {
+      PetscCall(CreateCeedEtaVerticesVector((*operator)->mesh, &(*operator)->ceed.eta_vertices));
     }
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                      (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices, &(*operator)->ceed.flux));
