@@ -95,7 +95,11 @@ PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt
 PETSC_EXTERN PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
                                                               PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
-                                                                  const PetscInt ndof, PetscReal *values);
+                                                                  const PetscInt num_classes, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
+                                                                  PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetTemperatureDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
+                                                                     PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);

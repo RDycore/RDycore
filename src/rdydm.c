@@ -3,6 +3,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <rdycore.h>
+#include "petscstring.h"
 
 static PetscErrorCode RenameDMFields(DM dm, SectionFieldSpec fields) {
   PetscFunctionBeginUser;
@@ -199,17 +200,38 @@ PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
 /// @return PETSC_SUCCESS on success
 PetscErrorCode CreateTracerDM(RDy rdy) {
   PetscFunctionBegin;
-  PetscInt num_sediment_class = rdy->config.physics.sediment.num_classes;
-
-  rdy->tracer_fields.num_fields              = 1;
-  rdy->tracer_fields.num_field_components[0] = num_sediment_class;
-
-  snprintf(rdy->tracer_fields.field_names[0], MAX_NAME_LEN, "Sediments");
-  for (PetscInt i = 0; i < num_sediment_class; i++) {
-    snprintf(rdy->tracer_fields.field_component_names[0][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
+  PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
+  PetscInt num_tracers = num_sediment_classes +
+                         (rdy->config.physics.salinity ? 1 : 0) + 
+                         (rdy->config.physics.heat ? 1 : 0);
+  if (num_tracers > 0) {
+    PetscInt num_fields = (num_sediment_classes > 0 ? 1 : 0) +
+                          (rdy->config.physics.salinity ? 1 : 0) + 
+                          (rdy->config.physics.heat ? 1 : 0);
+    rdy->tracer_fields.num_fields              = num_fields;
+    PetscInt comp = 0;
+    if (num_sediment_classes > 0) {
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Sediments", MAX_NAME_LEN));
+      rdy->tracer_fields.num_field_components[comp] = num_sediment_classes;
+      for (PetscInt i = 0; i < num_sediment_classes; i++) {
+        snprintf(rdy->tracer_fields.field_component_names[comp][i], MAX_NAME_LEN, "Class_%" PetscInt_FMT, i);
+      }
+      ++comp;
+    }
+    if (rdy->config.physics.salinity) {
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Salinity", MAX_NAME_LEN));
+      rdy->tracer_fields.num_field_components[comp] = 1;
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[0], "Concentration", MAX_NAME_LEN));
+      ++comp;
+    }
+    if (rdy->config.physics.heat) {
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Temperature", MAX_NAME_LEN));
+      rdy->tracer_fields.num_field_components[comp] = 1;
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[0], "Temperature", MAX_NAME_LEN));
+      ++comp;
+    }
+    PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->tracer_fields, &rdy->tracer_dm));
   }
-
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->tracer_fields, &rdy->tracer_dm));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

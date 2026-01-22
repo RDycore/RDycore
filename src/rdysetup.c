@@ -880,6 +880,34 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename, Vec local) {
+  PetscFunctionBegin;
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+
+  Vec natural, global;
+  PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
+  PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &global));
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local));
+
+  PetscCall(VecLoad(natural, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  // scatter natural-to-global
+  PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof, natural, global));
+  PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, global));
+
+  // scatter global-to-local
+  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, local));
+  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, local));
+
+  // free up memory
+  PetscCall(VecDestroy(&natural));
+  PetscCall(VecDestroy(&global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // initializes solution vector data
 //   unsafe for refinement if file is given with initial conditions
 static PetscErrorCode InitTracerSolution(RDy rdy) {
@@ -907,28 +935,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     Vec                  local       = NULL;
     for (PetscInt idof = 0; idof < rdy->config.sediment.num_classes; ++idof) {
       if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
-        PetscViewer viewer;
-        PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.classes[idof].file, FILE_MODE_READ, &viewer));
-
-        Vec natural, global;
-        PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
-        PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &global));
-        PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local));
-
-        PetscCall(VecLoad(natural, viewer));
-        PetscCall(PetscViewerDestroy(&viewer));
-
-        // scatter natural-to-global
-        PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof, natural, global));
-        PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, global));
-
-        // scatter global-to-local
-        PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, local));
-        PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, local));
-
-        // free up memory
-        PetscCall(VecDestroy(&natural));
-        PetscCall(VecDestroy(&global));
+        PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, local));
       }
 
       // set regional sediment as needed
@@ -953,6 +960,80 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
               PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
               u_ptr[ndof * owned_cell_id + idof] = mupEval(sediment_ic.classes[idof].value);
             }
+          }
+        }
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(rdy->tracer_global, &u_ptr));
+
+  // initialize salinity conditions
+  for (PetscInt f = 0; f < rdy->config.num_salinity_conditions; ++f) {
+    RDySalinityCondition salinity_ic = rdy->config.salinity_conditions[f];
+    Vec                  local       = NULL;
+    if (salinity_ic.file[0]) {  // read from file
+      PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, local));
+    }
+
+    // overwrite regions as needed
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyRegion    region = rdy->regions[r];
+      RDyCondition ic     = rdy->initial_conditions[r];
+      if (!strcmp(ic.salinity->name, salinity_ic.name)) {
+        if (local) {
+          PetscScalar *local_ptr;
+          PetscCall(VecGetArray(local, &local_ptr));
+          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+            PetscInt cell_local_id = region.cell_local_ids[c];
+            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+            if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
+              PetscInt idof = rdy->num_tracers;
+              u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+            }
+          }
+          PetscCall(VecRestoreArray(local, &local_ptr));
+          PetscCall(VecDestroy(&local));
+        } else {
+          for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+            PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
+            u_ptr[ndof * owned_cell_id] = mupEval(salinity_ic.concentration);
+          }
+        }
+      }
+    }
+  }
+
+  // initialize thermal conditions
+  for (PetscInt f = 0; f < rdy->config.num_temperature_conditions; ++f) {
+    RDyTemperatureCondition temperature_ic = rdy->config.temperature_conditions[f];
+    Vec                  local       = NULL;
+    if (temperature_ic.file[0]) {  // read from file
+      PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, local));
+    }
+
+    // overwrite regions as needed
+    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+      RDyRegion    region = rdy->regions[r];
+      RDyCondition ic     = rdy->initial_conditions[r];
+      if (!strcmp(ic.temperature->name, temperature_ic.name)) {
+        if (local) {
+          PetscScalar *local_ptr;
+          PetscCall(VecGetArray(local, &local_ptr));
+          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+            PetscInt cell_local_id = region.cell_local_ids[c];
+            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+            if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
+              PetscInt idof = rdy->num_tracers + (rdy->config.physics.salinity ? 1 : 0);
+              u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+            }
+          }
+          PetscCall(VecRestoreArray(local, &local_ptr));
+          PetscCall(VecDestroy(&local));
+        } else {
+          for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+            PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
+            u_ptr[ndof * owned_cell_id] = mupEval(temperature_ic.temperature);
           }
         }
       }

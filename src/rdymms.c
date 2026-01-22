@@ -671,22 +671,48 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     }
     PetscCall(RDySetFlowDirichletBoundaryValues(rdy, b, num_edges, 3, boundary_values));
 
-    // set sediment boundary values
-    if (rdy->num_tracers) {
-      PetscInt   ndof = rdy->num_tracers;
+    // set tracer boundary values
+    PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
+    if (num_sediment_classes > 0) {
       PetscReal *sediment_boundary_values, *ci;
-      PetscCall(PetscCalloc1(ndof * num_edges, &sediment_boundary_values));
+      PetscCall(PetscCalloc1(num_sediment_classes * num_edges, &sediment_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &ci));
       RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment;
-      for (PetscInt i = 0; i < ndof; ++i) {
+      for (PetscInt i = 0; i < num_sediment_classes; ++i) {
         PetscCall(EvaluateTemporalSolution(sediment_bc->classes[i].value, num_edges, x, y, time, ci));
         for (PetscInt e = 0; e < num_edges; ++e) {
-          sediment_boundary_values[ndof * e + i] = h[e] * ci[e];
+          sediment_boundary_values[num_sediment_classes * e + i] = h[e] * ci[e];
         }
       }
-      PetscCall(RDySetTracerDirichletBoundaryValues(rdy, b, num_edges, ndof, sediment_boundary_values));
+      PetscCall(RDySetSedimentDirichletBoundaryValues(rdy, b, num_edges, num_sediment_classes, sediment_boundary_values));
       PetscCall(PetscFree(sediment_boundary_values));
       PetscCall(PetscFree(ci));
+    }
+    if (rdy->config.physics.salinity) {
+      PetscReal *salinity_boundary_values, *s;
+      PetscCall(PetscCalloc1(num_edges, &salinity_boundary_values));
+      PetscCall(PetscCalloc1(num_edges, &s));
+      RDySalinityCondition *salinity_bc = rdy->boundary_conditions[b].salinity;
+      PetscCall(EvaluateTemporalSolution(salinity_bc->concentration, num_edges, x, y, time, s));
+      for (PetscInt e = 0; e < num_edges; ++e) {
+        salinity_boundary_values[e] = h[e] * s[e];
+      }
+      PetscCall(RDySetSalinityDirichletBoundaryValues(rdy, b, num_edges, salinity_boundary_values));
+      PetscCall(PetscFree(salinity_boundary_values));
+      PetscCall(PetscFree(s));
+    }
+    if (rdy->config.physics.heat) {
+      PetscReal *temperature_boundary_values, *T;
+      PetscCall(PetscCalloc1(num_edges, &temperature_boundary_values));
+      PetscCall(PetscCalloc1(num_edges, &T));
+      RDyTemperatureCondition *temperature_bc = rdy->boundary_conditions[b].temperature;
+      PetscCall(EvaluateTemporalSolution(temperature_bc->temperature, num_edges, x, y, time, T));
+      for (PetscInt e = 0; e < num_edges; ++e) {
+        temperature_boundary_values[e] = h[e] * T[e];
+      }
+      PetscCall(RDySetTemperatureDirichletBoundaryValues(rdy, b, num_edges, temperature_boundary_values));
+      PetscCall(PetscFree(temperature_boundary_values));
+      PetscCall(PetscFree(T));
     }
 
     PetscCall(PetscFree(x));
