@@ -447,10 +447,10 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
                                             q_offset_l, &q_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             c_offset_l, &c_restrict_l));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                            eta_beg_offset, &eta_beg_restrict));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                            eta_end_offset, &eta_end_restrict));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
+                                            CEED_COPY_VALUES, eta_beg_offset, &eta_beg_restrict));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
+                                            CEED_COPY_VALUES, eta_end_offset, &eta_end_restrict));
     PetscCall(PetscFree(q_offset_l));
     PetscCall(PetscFree(c_offset_l));
     PetscCall(PetscFree(eta_beg_offset));
