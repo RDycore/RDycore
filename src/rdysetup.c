@@ -874,9 +874,14 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
     }
   }
 
-  // TODO: salinity and sediment initial conditions go here.
-
   PetscCall(VecRestoreArray(rdy->flow_global, &u_ptr));
+
+  // copy flow data into the global solution vector
+  for (PetscInt i = 0; i < ndof; i++) {
+    PetscCall(VecStrideGather(rdy->flow_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideScatter(rdy->vec_1dof, i, rdy->u_global, INSERT_VALUES));
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -913,7 +918,17 @@ static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename,
 static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->tracer_global));
+  // check that our vectors are sized consistently
+  PetscInt flow_ndof, tracer_ndof, soln_ndof, diags_ndof;
+  PetscCall(VecGetBlockSize(rdy->flow_global, &flow_ndof));
+  PetscCall(VecGetBlockSize(rdy->tracer_global, &tracer_ndof));
+  PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
+  PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
+
+  PetscCheck(soln_ndof = flow_ndof + tracer_ndof, rdy->comm, PETSC_ERR_USER,
+             "Blocksizes of flow (=%" PetscInt_FMT ") and tracer (=%" PetscInt_FMT ") Vecs do not sum to blocksize of solution (=%" PetscInt_FMT
+             ") Vec",
+             flow_ndof, tracer_ndof, soln_ndof);
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -921,6 +936,8 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     RDyCondition ic     = rdy->initial_conditions[r];
     PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER, "No initial condition specified for region '%s'", region.name);
   }
+
+  PetscCall(VecZeroEntries(rdy->tracer_global));
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
@@ -1042,30 +1059,8 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
 
   PetscCall(VecRestoreArray(rdy->tracer_global, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
-}
 
-static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
-  PetscFunctionBegin;
-
-  PetscInt flow_ndof, tracer_ndof, soln_ndof, diags_ndof;
-
-  PetscCall(VecGetBlockSize(rdy->flow_global, &flow_ndof));
-  PetscCall(VecGetBlockSize(rdy->tracer_global, &tracer_ndof));
-  PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
-  PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
-
-  PetscCheck(soln_ndof = flow_ndof + tracer_ndof, rdy->comm, PETSC_ERR_USER,
-             "Blocksize of flow (=%" PetscInt_FMT ") and sediment (=%" PetscInt_FMT ") Vec do not sum to blocksize of solution (=%" PetscInt_FMT
-             ") Vec",
-             flow_ndof, tracer_ndof, soln_ndof);
-
-  // first, copy flow Vec into solution Vec
-  for (PetscInt i = 0; i < flow_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->flow_global, i, rdy->vec_1dof, INSERT_VALUES));
-    PetscCall(VecStrideScatter(rdy->vec_1dof, i, rdy->u_global, INSERT_VALUES));
-  }
-
-  // next, copy sediment Vec into solution Vec
+  // copy tracer data into the global solution vector
   for (PetscInt i = 0; i < tracer_ndof; i++) {
     PetscCall(VecStrideGather(rdy->tracer_global, i, rdy->vec_1dof, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->vec_1dof, flow_ndof + i, rdy->u_global, INSERT_VALUES));
@@ -1076,12 +1071,10 @@ static PetscErrorCode InitFlowAndSedimentSolution(RDy rdy) {
 
 static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionBegin;
-  PetscCall(InitFlowSolution(rdy));
 
-  if (rdy->num_tracers) {
-    PetscCall(InitTracerSolution(rdy));
-    PetscCall(InitFlowAndSedimentSolution(rdy));
-  }
+  // initialize the flow solution and copy it into place
+  PetscCall(InitFlowSolution(rdy));
+  PetscCall(InitTracerSolution(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -14,7 +14,7 @@ typedef struct {
   PetscInt   num_tracers_comp;  // number of tracer components
   PetscReal *h, *hu, *hv, *hci;  // prognostic variables
   PetscReal *u, *v, *ci;         // diagnostic variables
-} TracersRiemannStateData;
+} TracerRiemannStateData;
 
 typedef struct {
   PetscInt   num_edges;          // number of edges
@@ -23,6 +23,6 @@ typedef struct {
   PetscReal *cn, *sn;            // cosine and sine of the angle between edges and y-axis
   PetscReal *fluxes;             // fluxes through the edge
   PetscReal *amax;               // courant number on edges
-} TracersRiemannEdgeData;
+} TracerRiemannEdgeData;
 
 #endif  // TRACERS_PETSC_TYPES_H

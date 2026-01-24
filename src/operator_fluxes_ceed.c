@@ -236,7 +236,7 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentBoundaryFlux_Dirichlet_Roe, SedimentBoundaryFlux_Dirichlet_Roe_loc, qf));
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_Roe, TracerBoundaryFlux_Dirichlet_Roe_loc, qf));
         PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
       }
       break;
@@ -245,7 +245,7 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // sediment dynamics
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SedimentBoundaryFlux_Reflecting_Roe, SedimentBoundaryFlux_Reflecting_Roe_loc, qf));
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
         PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
       }
       break;

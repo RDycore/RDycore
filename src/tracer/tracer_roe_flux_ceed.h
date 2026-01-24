@@ -13,7 +13,7 @@
 
 /// computes the flux across an edge using Roe's approximate Riemann solver
 /// for flow and tracers transport
-CEED_QFUNCTION_HELPER void TracersRiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, TracersState qL, TracersState qR,
+CEED_QFUNCTION_HELPER void TracersRiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, TracerState qL, TracerState qR,
                                                    CeedScalar sn, CeedScalar cn, CeedInt flow_ndof, CeedInt tracers_ndof, CeedScalar flux[],
                                                    CeedScalar *amax) {
   const CeedScalar hl = qL.h, hr = qR.h;

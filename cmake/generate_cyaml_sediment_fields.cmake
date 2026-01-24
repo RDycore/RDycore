@@ -35,7 +35,7 @@ function(generate_cyaml_sediment_fields)
 
   # write our lines list to a newline-delimited string and then write the file
   string(REPLACE ";" "\n" source "${lines}")
-  set(header_file ${PROJECT_BINARY_DIR}/include/cyaml_tracers.h)
+  set(header_file ${PROJECT_BINARY_DIR}/include/cyaml_sediment_fields.h)
   message(STATUS "Generating ${header_file}")
   file(WRITE ${header_file} ${source})
 endfunction()
