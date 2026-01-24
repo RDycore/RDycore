@@ -213,6 +213,11 @@ else()
   set(SYSTEM_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)
 endif()
 
+# Gather MPI header paths to help language servers.
+include(extract_mpi_include_directories)
+extract_mpi_include_directories(mpi_dirs)
+include_directories(${mpi_dirs})
+
 if (ENABLE_TESTS)
   include(CTest)
   enable_testing()
