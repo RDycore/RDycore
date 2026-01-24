@@ -4,18 +4,18 @@
 #include <rdycore.h>
 
 #include "../swe/swe_roe_flux_petsc.h"
-#include "tracers_types_petsc.h"
+#include "tracer_types_petsc.h"
 
 /// @brief Computes the flux for SWE and tracerss across the edge using Roe's approximate Riemann solve
-/// @param [in] *datal A TracersRiemannStateData for values left of the edges
-/// @param [in] *datar A TracersRiemannStateData for values right of the edges
+/// @param [in] *datal A TracerRiemannStateData for values left of the edges
+/// @param [in] *datar A TracerRiemannStateData for values right of the edges
 /// @param [in] sn array containing sines of the angles between edges and y-axis
 /// @param [in] cn array containing cosines of the angles between edges and y-axis
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeTracersRoeFlux(TracersRiemannStateData *datal, TracersRiemannStateData *datar, const PetscReal *sn,
-                                             const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
+static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn,
+                                           const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
   PetscReal *hl  = datal->h;

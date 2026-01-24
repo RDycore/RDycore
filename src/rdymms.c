@@ -44,7 +44,8 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
     .name = "analytic_bc",
     .type = CONDITION_DIRICHLET,
   };
-  analytic_salinity.concentration = rdy->config.mms.salinity.solutions.s;
+  analytic_salinity.concentration = rdy->config.mms.salinity.solutions.S;
+
   static RDyTemperatureCondition analytic_temperature = {
     .name = "analytic_bc",
     .type = CONDITION_DIRICHLET,
@@ -372,7 +373,7 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
         PetscReal *s;
         PetscInt l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &s));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.salinity.solutions.s, N, cell_x, cell_y, time, s));
+        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.salinity.solutions.S, N, cell_x, cell_y, time, s));
         for (PetscInt c = 0; c < region.num_local_cells; ++c) {
           PetscInt cell_id = region.cell_local_ids[c];
           if (ndof * cell_id < n_local) {  // skip ghost cells
@@ -573,10 +574,10 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       PetscCall(PetscCalloc1(N, &dsdy));
       PetscCall(PetscCalloc1(N, &dsdt));
 
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.s, N, cell_x, cell_y, time, s));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dsdx, N, cell_x, cell_y, time, dsdx));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dsdy, N, cell_x, cell_y, time, dsdy));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dsdt, N, cell_x, cell_y, time, dsdt));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.S, N, cell_x, cell_y, time, s));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dSdx, N, cell_x, cell_y, time, dsdx));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dSdy, N, cell_x, cell_y, time, dsdy));
+      PetscCall(EvaluateTemporalSolution(rdy->config.mms.salinity.solutions.dSdt, N, cell_x, cell_y, time, dsdt));
 
       // TODO: salinity logic goes here!
 

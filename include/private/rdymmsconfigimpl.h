@@ -69,13 +69,13 @@ typedef struct {
 // manufactured solution for salinity
 typedef struct {
   struct {
-    // concentration c(x, y, t) and partial derivatives
-    MathExpression c, dcdx, dcdy, dcdt;
+    // concentration S(x, y, t) and partial derivatives
+    MathExpression S, dSdx, dSdy, dSdt;
   } expressions;
 
   struct {
     // salinity s(x, y, t) and partial derivatives
-    void *s, *dsdx, *dsdy, *dsdt;
+    void *S, *dSdx, *dSdy, *dSdt;
   } solutions;
 } RDyMMSSalinitySolutions;
 
@@ -97,7 +97,7 @@ typedef struct {
 } RDyMMSErrorNorms;
 
 typedef struct {
-  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_TRACERS], T;
+  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_TRACERS], S, T;
 } RDyMMSConvergenceRates;
 
 typedef struct {

@@ -28,7 +28,7 @@ static int FreeContextPetsc(void *data) {
 PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, CeedQFunctionContext *qf_context) {
   PetscFunctionBeginUser;
 
-  TracersContext tracers_ctx;
+  TracerContext tracers_ctx;
   PetscCall(PetscCalloc1(1, &tracers_ctx));
 
   PetscInt num_tracers = config.physics.sediment.num_classes +
@@ -53,33 +53,33 @@ PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, 
 
   PetscCallCEED(CeedQFunctionContextSetDataDestroy(*qf_context, CEED_MEM_HOST, FreeContextPetsc));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct TracersContext_, dtime), 1, "Time step of TS"));
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct TracerContext_, dtime), 1, "Time step of TS"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "small h value", offsetof(struct TracersContext_, tiny_h), 1,
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "small h value", offsetof(struct TracerContext_, tiny_h), 1,
                                                    "Height threshold below which dry condition is assumed"));
   PetscCallCEED(
-      CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct TracersContext_, gravity), 1, "Accelaration due to gravity"));
+      CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct TracerContext_, gravity), 1, "Accelaration due to gravity"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "xq2018_threshold", offsetof(struct TracersContext_, xq2018_threshold), 1,
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "xq2018_threshold", offsetof(struct TracerContext_, xq2018_threshold), 1,
                                                    "Threshold for the treatment of Implicit XQ2018 method"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "kp_constant", offsetof(struct TracersContext_, kp_constant), 1,
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "kp_constant", offsetof(struct TracerContext_, kp_constant), 1,
                                                    "Krone-Partheniades erosion law constant [kg/m2/s]"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "settling_velocity", offsetof(struct TracersContext_, settling_velocity), 1,
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "settling_velocity", offsetof(struct TracerContext_, settling_velocity), 1,
                                                    "settling velocity of tracers class"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "tau_critical_erosion", offsetof(struct TracersContext_, tau_critical_erosion), 1,
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "tau_critical_erosion", offsetof(struct TracerContext_, tau_critical_erosion), 1,
                                                    "critical shear stress for erosion (N/m2)"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "tau_critical_deposition", offsetof(struct TracersContext_, tau_critical_deposition),
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "tau_critical_deposition", offsetof(struct TracerContext_, tau_critical_deposition),
                                                    1, "critical shear stress for deposition (N/m2)"));
 
-  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "rhow", offsetof(struct TracersContext_, rhow), 1, "density of water"));
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "rhow", offsetof(struct TracerContext_, rhow), 1, "density of water"));
 
   PetscCallCEED(
-      CeedQFunctionContextRegisterInt32(*qf_context, "tracers_ndof", offsetof(struct TracersContext_, tracers_ndof), 1, "number of tracers classes"));
-  PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "flow_ndof", offsetof(struct TracersContext_, flow_ndof), 1, "number of flow DoF"));
+      CeedQFunctionContextRegisterInt32(*qf_context, "tracers_ndof", offsetof(struct TracerContext_, tracers_ndof), 1, "number of tracers classes"));
+  PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "flow_ndof", offsetof(struct TracerContext_, flow_ndof), 1, "number of flow DoF"));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }

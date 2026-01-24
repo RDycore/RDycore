@@ -48,20 +48,20 @@ PetscErrorCode PetscOperatorApply(PetscOperator op, PetscReal dt, Vec u_local, V
 typedef struct {
   PetscInt       num_suboperators, capacity;
   PetscOperator *suboperators;
-} PetscCompositeOperator;
+} PetscOperatorComposite;
 
-static PetscErrorCode PetscCompositeOperatorApply(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode PetscOperatorCompositeApply(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
-  PetscCompositeOperator *composite = context;
+  PetscOperatorComposite *composite = context;
   for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
     PetscCall(PetscOperatorApply(composite->suboperators[i], dt, u_local, f_global));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PetscCompositeOperatorDestroy(void *context) {
+static PetscErrorCode PetscOperatorCompositeDestroy(void *context) {
   PetscFunctionBegin;
-  PetscCompositeOperator *composite = context;
+  PetscOperatorComposite *composite = context;
   for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
     PetscCall(PetscOperatorDestroy(&composite->suboperators[i]));
   }
@@ -72,12 +72,12 @@ static PetscErrorCode PetscCompositeOperatorDestroy(void *context) {
 
 /// Creates a PetscOperator that applies sub-operators in sequence.
 /// @param [out] a pointer to the created (empty) composite operator
-PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
+PetscErrorCode PetscOperatorCreateComposite(PetscOperator *op) {
   PetscFunctionBegin;
-  PetscCompositeOperator *composite;
+  PetscOperatorComposite *composite;
   PetscCall(PetscCalloc1(1, &composite));
-  *composite = (PetscCompositeOperator){0};
-  PetscCall(PetscOperatorCreate(composite, PetscCompositeOperatorApply, PetscCompositeOperatorDestroy, op));
+  *composite = (PetscOperatorComposite){0};
+  PetscCall(PetscOperatorCreate(composite, PetscOperatorCompositeApply, PetscOperatorCompositeDestroy, op));
   (*op)->is_composite = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -85,9 +85,9 @@ PetscErrorCode PetscCompositeOperatorCreate(PetscOperator *op) {
 /// Appends a sub-operator to the given composite PetscOperator (which takes ownership).
 /// @param [inout] op     the composite operator to which a sub-operator is appended
 /// @param [in]    sub_op the suboperator to be appended to the composite operator
-PetscErrorCode PetscCompositeOperatorAddSub(PetscOperator op, PetscOperator sub_op) {
+PetscErrorCode PetscOperatorCompositeAddSub(PetscOperator op, PetscOperator sub_op) {
   PetscFunctionBegin;
-  PetscCompositeOperator *composite = op->context;
+  PetscOperatorComposite *composite = op->context;
   if (composite->num_suboperators + 1 > composite->capacity) {
     composite->capacity = (composite->capacity > 0) ? 2 * composite->capacity : 8;
     PetscCall(PetscRealloc(sizeof(PetscOperator) * composite->capacity, &composite->suboperators));
@@ -157,7 +157,7 @@ PetscErrorCode PetscOperatorSetField(PetscOperator op, const char *name, Vec vec
   }
 
   if (op->is_composite) {
-    PetscCompositeOperator *composite = op->context;
+    PetscOperatorComposite *composite = op->context;
     for (PetscInt i = 0; i < composite->num_suboperators; ++i) {
       PetscCall(PetscOperatorSetField(composite->suboperators[i], name, vec));
     }

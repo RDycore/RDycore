@@ -695,8 +695,8 @@ static const cyaml_schema_field_t mms_convergence_rates_fields_schema[] = {
     CYAML_FIELD_MAPPING("hu", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hu, mms_error_norms_fields_schema),
     CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hv, mms_error_norms_fields_schema),
     CYAML_MMS_CONVERGENCE_RATES_SEDIMENT_FIELDS // defined in build/include/cyaml_sediment_fields.h
-    CYAML_FIELD_MAPPING("salinity", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, salinity, mms_error_norms_fields_schema),
-    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, temperature, mms_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("S", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, S, mms_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("T", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, T, mms_error_norms_fields_schema),
     CYAML_FIELD_END
 };
 
@@ -1180,16 +1180,16 @@ static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstan
 }
 
 static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, PetscInt num_classes, RDyMMSConstants *constants,
-                                                         RDyMMSSedimentSolutions *sediment) {
+                                                         RDyMMSSedimentSolutions *sediments) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
   // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
   for (PetscInt i = 0; i < num_classes; ++i) {
-    DEFINE_FUNCTION(sediment, constants, c[i]);
-    DEFINE_FUNCTION(sediment, constants, dcdx[i]);
-    DEFINE_FUNCTION(sediment, constants, dcdy[i]);
-    DEFINE_FUNCTION(sediment, constants, dcdt[i]);
+    DEFINE_FUNCTION(sediments, constants, c[i]);
+    DEFINE_FUNCTION(sediments, constants, dcdx[i]);
+    DEFINE_FUNCTION(sediments, constants, dcdy[i]);
+    DEFINE_FUNCTION(sediments, constants, dcdt[i]);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1202,10 +1202,10 @@ static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSCo
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
   // NOTE: at the time of evaluation using mupDefineVar or mupDefineBulkVar.
 
-  DEFINE_FUNCTION(sediment, constants, s);
-  DEFINE_FUNCTION(sediment, constants, dsdx);
-  DEFINE_FUNCTION(sediment, constants, dsdy);
-  DEFINE_FUNCTION(sediment, constants, dsdt);
+  DEFINE_FUNCTION(salinity, constants, S);
+  DEFINE_FUNCTION(salinity, constants, dSdx);
+  DEFINE_FUNCTION(salinity, constants, dSdy);
+  DEFINE_FUNCTION(salinity, constants, dSdt);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1518,8 +1518,9 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     rdy->ensemble_member_index = -1;  // not a member of an ensemble
   }
 
-  // set number of sediment classes
-  rdy->num_sediment_classes = rdy->config.physics.sediment.num_classes;
+  rdy->num_tracers = rdy->config.physics.sediment.num_classes +
+    (rdy->config.physics.salinity ? 1 : 0) + 
+    (rdy->config.physics.heat ? 1 : 0);
 
   // parse math expressions as needed
   PetscCall(ParseMathExpressions(rdy->comm, &rdy->config));
@@ -1561,7 +1562,9 @@ PetscErrorCode ReadMMSConfigFile(RDy rdy) {
   }
 
   // set number of sediment classes
-  rdy->num_sediment_classes = rdy->config.physics.sediment.num_classes;
+  rdy->num_tracers = rdy->config.physics.sediment.num_classes +
+    (rdy->config.physics.salinity ? 1 : 0) + 
+    (rdy->config.physics.heat ? 1 : 0);
 
   // set any additional options needed in PETSc's options database
   PetscCall(SetAdditionalOptions(rdy));
@@ -1723,13 +1726,25 @@ static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions *swe_mm
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyTracerManufacturedSolutions(RDyMMSTracerSolutions *sed_mms) {
+static PetscErrorCode DestroySedimentManufacturedSolutions(RDyMMSSedimentSolutions *sed_mms) {
   PetscFunctionBegin;
   for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
     if (sed_mms->expressions.c[i][0]) {
       mupRelease((void *)sed_mms->solutions.c[i]);
     }
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroySalinityManufacturedSolutions(RDyMMSSalinitySolutions *sed_mms) {
+  PetscFunctionBegin;
+  mupRelease((void *)sed_mms->solutions.S);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroyTemperatureManufacturedSolutions(RDyMMSTemperatureSolutions *sed_mms) {
+  PetscFunctionBegin;
+  mupRelease((void *)sed_mms->solutions.T);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1740,7 +1755,13 @@ static PetscErrorCode DestroyManufacturedSolutions(RDyMMSSection *mms) {
     PetscCall(DestroySWEManufacturedSolutions(&mms->swe));
   }
   if (mms->sediment.expressions.c[0][0]) {
-    PetscCall(DestroyTracerManufacturedSolutions(&mms->sediment));
+    PetscCall(DestroySedimentManufacturedSolutions(&mms->sediment));
+  }
+  if (mms->salinity.expressions.S[0]) {
+    PetscCall(DestroySalinityManufacturedSolutions(&mms->salinity));
+  }
+  if (mms->temperature.expressions.T[0]) {
+    PetscCall(DestroyTemperatureManufacturedSolutions(&mms->temperature));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -11,6 +11,13 @@ typedef enum {
   TRACER_BED_FRICTION_IMPLICIT_XQ2018,
 } TracerBedFrictionType;
 
+#ifndef Square
+#define Square(x) ((x) * (x))
+#endif
+#ifndef SafeDiv
+#define SafeDiv(a, b, c, tiny) ((c) > (tiny) ? (a) / (b) : 0.0)
+#endif
+
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
 #pragma GCC diagnostic push

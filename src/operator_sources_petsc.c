@@ -3,8 +3,6 @@
 #include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
 
-#include "tracer/tracer_sources_ceed.h"
-
 /// Creates a PETSc source operator appropriate for the given configuration.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
@@ -23,7 +21,7 @@ PetscErrorCode CreatePetscSourceOperator(RDyConfig *config, RDyMesh *mesh, Vec e
   } else {
     PetscCall(CreatePetscSWESourceOperator(mesh, *config, external_sources, material_properties, &source_0));
   }
-  PetscCall(PetscCompositeOperatorAddSub(*source_op, source_0));
+  PetscCall(PetscOperatorCompositeAddSub(*source_op, source_0));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
