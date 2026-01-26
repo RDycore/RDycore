@@ -14,8 +14,8 @@
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn,
-                                           const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
+static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
+                                           PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
   PetscReal *hl  = datal->h;
@@ -30,10 +30,10 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
 
   PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
 
-  PetscInt num_states = datal->num_states;
-  PetscInt flow_ncomp = datal->num_flow_comp;
-  PetscInt tracers_ncomp  = datal->num_tracers_comp;
-  PetscInt soln_ncomp = flow_ncomp + tracers_ncomp;
+  PetscInt num_states    = datal->num_states;
+  PetscInt flow_ncomp    = datal->num_flow_comp;
+  PetscInt tracers_ncomp = datal->num_tracers_comp;
+  PetscInt soln_ncomp    = flow_ncomp + tracers_ncomp;
 
   PetscInt ci_index_offset;
 

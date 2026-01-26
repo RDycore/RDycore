@@ -9,6 +9,7 @@
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdyoperatorimpl.h>
+
 #include "petscstring.h"
 #include "private/config.h"
 
@@ -41,20 +42,20 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
     analytic_sediment.classes[i].value = (void *)rdy->config.mms.sediment.solutions.c[i];
   };
   static RDySalinityCondition analytic_salinity = {
-    .name = "analytic_bc",
-    .type = CONDITION_DIRICHLET,
+      .name = "analytic_bc",
+      .type = CONDITION_DIRICHLET,
   };
   analytic_salinity.concentration = rdy->config.mms.salinity.solutions.S;
 
   static RDyTemperatureCondition analytic_temperature = {
-    .name = "analytic_bc",
-    .type = CONDITION_DIRICHLET,
+      .name = "analytic_bc",
+      .type = CONDITION_DIRICHLET,
   };
   analytic_temperature.temperature = rdy->config.mms.temperature.solutions.T;
   RDyCondition analytic_bc = {
       .flow     = &analytic_flow,
       .sediment = &analytic_sediment,
-      .salinity = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
+      .salinity    = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
       .temperature = (rdy->config.physics.heat ? &analytic_temperature : NULL),
   };
 
@@ -350,9 +351,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       // sediment class concentrations
       PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
       if (num_sediment_classes > 0) {
-        PetscInt offset = 3;
+        PetscInt   offset = 3;
         PetscReal *ci;
-        PetscInt l = 0;
+        PetscInt   l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &ci));
         for (PetscInt i = 0; i < num_sediment_classes; ++i) {
           PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci));
@@ -369,9 +370,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
       // salinity concentration
       if (rdy->config.physics.salinity) {
-        PetscInt offset = 3 + num_sediment_classes;
+        PetscInt   offset = 3 + num_sediment_classes;
         PetscReal *s;
-        PetscInt l = 0;
+        PetscInt   l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &s));
         PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.salinity.solutions.S, N, cell_x, cell_y, time, s));
         for (PetscInt c = 0; c < region.num_local_cells; ++c) {
@@ -386,9 +387,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 
       // temperature profile
       if (rdy->config.physics.heat) {
-        PetscInt offset = 3 + num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0);
+        PetscInt   offset = 3 + num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0);
         PetscReal *T;
-        PetscInt l = 0;
+        PetscInt   l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &T));
         PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
         for (PetscInt c = 0; c < region.num_local_cells; ++c) {

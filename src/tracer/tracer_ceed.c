@@ -31,9 +31,7 @@ PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, 
   TracerContext tracers_ctx;
   PetscCall(PetscCalloc1(1, &tracers_ctx));
 
-  PetscInt num_tracers = config.physics.sediment.num_classes +
-                         (config.physics.salinity ? 1 : 0) +
-                         (config.physics.heat ? 1 : 0);
+  PetscInt num_tracers = config.physics.sediment.num_classes + (config.physics.salinity ? 1 : 0) + (config.physics.heat ? 1 : 0);
 
   tracers_ctx->dtime                   = 0.0;
   tracers_ctx->tiny_h                  = config.physics.flow.tiny_h;
@@ -44,7 +42,7 @@ PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, 
   tracers_ctx->tau_critical_erosion    = 0.1;
   tracers_ctx->tau_critical_deposition = 1000.0;
   tracers_ctx->rhow                    = DENSITY_OF_WATER;
-  tracers_ctx->tracers_ndof            = num_tracers;
+  tracers_ctx->tracer_ndof             = num_tracers;
   tracers_ctx->flow_ndof               = 3;  // NOTE: SWE assumed!
 
   PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
@@ -78,7 +76,7 @@ PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, 
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "rhow", offsetof(struct TracerContext_, rhow), 1, "density of water"));
 
   PetscCallCEED(
-      CeedQFunctionContextRegisterInt32(*qf_context, "tracers_ndof", offsetof(struct TracerContext_, tracers_ndof), 1, "number of tracers classes"));
+      CeedQFunctionContextRegisterInt32(*qf_context, "tracer_ndof", offsetof(struct TracerContext_, tracer_ndof), 1, "number of tracers classes"));
   PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "flow_ndof", offsetof(struct TracerContext_, flow_ndof), 1, "number of flow DoF"));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);

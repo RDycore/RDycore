@@ -1,7 +1,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
 /// Creates a new PetscOperator with behavior defined by the given arguments.
 /// @param [in]  context a pointer to a data structure used by the operator implementation

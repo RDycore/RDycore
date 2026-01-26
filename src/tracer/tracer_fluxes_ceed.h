@@ -30,20 +30,20 @@ CEED_QFUNCTION_HELPER int TracerFlux(void *ctx, CeedInt Q, const CeedScalar *con
   CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
-  const TracerContext context        = (TracerContext)ctx;
+  const TracerContext context          = (TracerContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar gravity = context->gravity;
 
-  const CeedInt flow_ndof = context->flow_ndof;
-  const CeedInt tracers_ndof  = context->tracers_ndof;
-  const CeedInt tot_ndof  = flow_ndof + tracers_ndof;
+  const CeedInt flow_ndof   = context->flow_ndof;
+  const CeedInt tracer_ndof = context->tracer_ndof;
+  const CeedInt tot_ndof    = flow_ndof + tracer_ndof;
 
   for (CeedInt i = 0; i < Q; i++) {
     TracerState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     TracerState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
-    for (CeedInt j = 0; j < tracers_ndof; ++j) {
+    for (CeedInt j = 0; j < tracer_ndof; ++j) {
       qL.hci[j] = q_L[flow_ndof + j][i];
       qR.hci[j] = q_R[flow_ndof + j][i];
     }
@@ -51,7 +51,7 @@ CEED_QFUNCTION_HELPER int TracerFlux(void *ctx, CeedInt Q, const CeedScalar *con
     if (qL.h > tiny_h || qR.h > tiny_h) {
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracers_ndof, flux, &amax);
+          TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracer_ndof, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
@@ -87,20 +87,20 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, con
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  const TracerContext context        = (TracerContext)ctx;
+  const TracerContext context          = (TracerContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar gravity = context->gravity;
 
-  const CeedInt flow_ndof = context->flow_ndof;
-  const CeedInt tracers_ndof  = context->tracers_ndof;
-  const CeedInt tot_ndof  = flow_ndof + tracers_ndof;
+  const CeedInt flow_ndof   = context->flow_ndof;
+  const CeedInt tracer_ndof = context->tracer_ndof;
+  const CeedInt tot_ndof    = flow_ndof + tracer_ndof;
 
   for (CeedInt i = 0; i < Q; i++) {
     TracerState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     TracerState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
-    for (CeedInt j = 0; j < tracers_ndof; ++j) {
+    for (CeedInt j = 0; j < tracer_ndof; ++j) {
       qL.hci[j] = q_L[flow_ndof + j][i];
       qR.hci[j] = q_R[flow_ndof + j][i];
     }
@@ -108,7 +108,7 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, con
       CeedScalar flux[MAX_NUM_FIELD_COMPONENTS], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracers_ndof, flux, &amax);
+          TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracer_ndof, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
@@ -139,33 +139,33 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Reflecting(void *ctx, CeedInt Q, co
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  const TracerContext context        = (TracerContext)ctx;
+  const TracerContext context          = (TracerContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
   const CeedScalar gravity = context->gravity;
 
-  const CeedInt flow_ndof = context->flow_ndof;
-  const CeedInt tracers_ndof  = context->tracers_ndof;
-  const CeedInt tot_ndof  = flow_ndof + tracers_ndof;
+  const CeedInt flow_ndof   = context->flow_ndof;
+  const CeedInt tracer_ndof = context->tracer_ndof;
+  const CeedInt tot_ndof    = flow_ndof + tracer_ndof;
 
   for (CeedInt i = 0; i < Q; i++) {
-    CeedScalar    sn = geom[0][i], cn = geom[1][i];
+    CeedScalar  sn = geom[0][i], cn = geom[1][i];
     TracerState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    for (CeedInt j = 0; j < tracers_ndof; ++j) {
+    for (CeedInt j = 0; j < tracer_ndof; ++j) {
       qL.hci[j] = q_L[flow_ndof + j][i];
     }
     if (qL.h > tiny_h) {
-      CeedScalar    dum1 = sn * sn - cn * cn;
-      CeedScalar    dum2 = 2.0 * sn * cn;
+      CeedScalar  dum1 = sn * sn - cn * cn;
+      CeedScalar  dum2 = 2.0 * sn * cn;
       TracerState qR   = {qL.h, qL.hu * dum1 - qL.hv * dum2, -qL.hu * dum2 - qL.hv * dum1};
-      for (CeedInt j = 0; j < tracers_ndof; ++j) {
+      for (CeedInt j = 0; j < tracer_ndof; ++j) {
         qR.hci[j] = qL.hci[j];
       }
       CeedScalar flux[MAX_NUM_FIELD_COMPONENTS], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          TracersRiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flow_ndof, tracers_ndof, flux, &amax);
+          TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flow_ndof, tracer_ndof, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
@@ -183,7 +183,7 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Reflecting(void *ctx, CeedInt Q, co
 }
 
 CEED_QFUNCTION(TracerBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
-  return TracersBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+  return TracerBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
 
 #pragma GCC diagnostic   pop

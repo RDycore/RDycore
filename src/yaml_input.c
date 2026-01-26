@@ -1195,8 +1195,7 @@ static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants,
-                                                         RDyMMSSalinitySolutions *salinity) {
+static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSalinitySolutions *salinity) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
@@ -1210,8 +1209,7 @@ static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSCo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ParseTemperatureManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants,
-                                                            RDyMMSTemperatureSolutions *temperature) {
+static PetscErrorCode ParseTemperatureManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSTemperatureSolutions *temperature) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
@@ -1518,9 +1516,7 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
     rdy->ensemble_member_index = -1;  // not a member of an ensemble
   }
 
-  rdy->num_tracers = rdy->config.physics.sediment.num_classes +
-    (rdy->config.physics.salinity ? 1 : 0) + 
-    (rdy->config.physics.heat ? 1 : 0);
+  rdy->num_tracers = rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0) + (rdy->config.physics.heat ? 1 : 0);
 
   // parse math expressions as needed
   PetscCall(ParseMathExpressions(rdy->comm, &rdy->config));
@@ -1562,9 +1558,7 @@ PetscErrorCode ReadMMSConfigFile(RDy rdy) {
   }
 
   // set number of sediment classes
-  rdy->num_tracers = rdy->config.physics.sediment.num_classes +
-    (rdy->config.physics.salinity ? 1 : 0) + 
-    (rdy->config.physics.heat ? 1 : 0);
+  rdy->num_tracers = rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0) + (rdy->config.physics.heat ? 1 : 0);
 
   // set any additional options needed in PETSc's options database
   PetscCall(SetAdditionalOptions(rdy));

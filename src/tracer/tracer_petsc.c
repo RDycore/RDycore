@@ -18,8 +18,8 @@ static PetscErrorCode CreateTracerRiemannStateData(const PetscInt num_states, co
                                                    TracerRiemannStateData *data) {
   PetscFunctionBegin;
 
-  data->num_states        = num_states;
-  data->num_flow_comp     = num_flow_comp;
+  data->num_states       = num_states;
+  data->num_flow_comp    = num_flow_comp;
   data->num_tracers_comp = num_tracers_comp;
 
   PetscCall(PetscCalloc1(num_states, &data->h));
@@ -41,8 +41,8 @@ static PetscErrorCode CreateTracerRiemannStateData(const PetscInt num_states, co
 static PetscErrorCode DestroyTracerRiemannStateData(TracerRiemannStateData data) {
   PetscFunctionBegin;
 
-  data.num_states        = 0;
-  data.num_flow_comp     = 0;
+  data.num_states       = 0;
+  data.num_flow_comp    = 0;
   data.num_tracers_comp = 0;
   PetscCall(PetscFree(data.h));
   PetscCall(PetscFree(data.hu));
@@ -62,8 +62,8 @@ static PetscErrorCode DestroyTracerRiemannStateData(TracerRiemannStateData data)
 static PetscErrorCode DestroyTracerRiemannEdgeData(TracerRiemannEdgeData data) {
   PetscFunctionBegin;
 
-  data.num_edges         = 0;
-  data.num_flow_comp     = 0;
+  data.num_edges        = 0;
+  data.num_flow_comp    = 0;
   data.num_tracers_comp = 0;
 
   PetscCall(PetscFree(data.cn));
@@ -82,11 +82,11 @@ static PetscErrorCode DestroyTracerRiemannEdgeData(TracerRiemannEdgeData data) {
 /// @param [out] *data             a TracerRiemannEdgeData
 /// @return                        0 on success, or a non-zero error code on failure
 static PetscErrorCode CreateTracerRiemannEdgeData(PetscInt num_edges, PetscInt num_flow_comp, PetscInt num_tracers_comp,
-                                                    TracerRiemannEdgeData *data) {
+                                                  TracerRiemannEdgeData *data) {
   PetscFunctionBegin;
 
-  data->num_edges         = num_edges;
-  data->num_flow_comp     = num_flow_comp;
+  data->num_edges        = num_edges;
+  data->num_flow_comp    = num_flow_comp;
   data->num_tracers_comp = num_tracers_comp;
 
   PetscCall(PetscCalloc1(num_edges, &data->cn));
@@ -132,13 +132,13 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal t
 //------------------------
 
 typedef struct {
-  RDyNumericsRiemann       riemann;       // riemann solver type
-  RDyMesh                 *mesh;          // domain mesh
-  PetscReal                tiny_h;        // minimum water height for wet conditions
+  RDyNumericsRiemann     riemann;       // riemann solver type
+  RDyMesh               *mesh;          // domain mesh
+  PetscReal              tiny_h;        // minimum water height for wet conditions
   TracerRiemannStateData left_states;   // "left" riemann states on interior edges
   TracerRiemannStateData right_states;  // "right" riemann states on interior edges
   TracerRiemannEdgeData  edges;         // riemann fluxes on interior edges
-  OperatorDiagnostics     *diagnostics;   // courant number, etc
+  OperatorDiagnostics   *diagnostics;   // courant number, etc
 } TracerInteriorFluxOperator;
 
 /// @brief Computes the fluxes through the interior edges of mesh locally owned and
@@ -169,12 +169,12 @@ static PetscErrorCode ApplyTracerInteriorFlux(void *context, PetscOperatorFields
   TracerRiemannStateData *datal        = &interior_flux_op->left_states;
   TracerRiemannStateData *datar        = &interior_flux_op->right_states;
   TracerRiemannEdgeData  *data_edge    = &interior_flux_op->edges;
-  PetscReal                *sn_vec_int   = data_edge->sn;
-  PetscReal                *cn_vec_int   = data_edge->cn;
-  PetscReal                *amax_vec_int = data_edge->amax;
-  PetscReal                *flux_vec_int = data_edge->fluxes;
+  PetscReal              *sn_vec_int   = data_edge->sn;
+  PetscReal              *cn_vec_int   = data_edge->cn;
+  PetscReal              *amax_vec_int = data_edge->amax;
+  PetscReal              *flux_vec_int = data_edge->fluxes;
 
-  PetscInt num_flow_comp     = datal->num_flow_comp;
+  PetscInt num_flow_comp    = datal->num_flow_comp;
   PetscInt num_tracers_comp = datal->num_tracers_comp;
 
   PetscInt n_dof;
@@ -293,7 +293,7 @@ PetscErrorCode CreatePetscTracerInteriorFluxOperator(RDyMesh *mesh, const RDyCon
                                                      PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
-  PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
   PetscInt num_tracers_comp = config.physics.sediment.num_classes;
 
   TracerInteriorFluxOperator *interior_flux_op;
@@ -332,19 +332,19 @@ PetscErrorCode CreatePetscTracerInteriorFluxOperator(RDyMesh *mesh, const RDyCon
 //------------------------
 
 typedef struct {
-  RDyNumericsRiemann       riemann;             // riemann solver type
-  RDyMesh                 *mesh;                // domain mesh
-  RDyBoundary              boundary;            // boundary associated with this sub-operator
-  RDyCondition             boundary_condition;  // boundary condition associated with this sub-operator
-  Vec                      boundary_values;     // Dirichlet boundary values vector
-  Vec                      boundary_fluxes;     // boundary flux values vector
-  OperatorDiagnostics     *diagnostics;         // courant number, boundary fluxes
-  PetscReal                tiny_h;              // minimum water height for wet conditions
+  RDyNumericsRiemann     riemann;             // riemann solver type
+  RDyMesh               *mesh;                // domain mesh
+  RDyBoundary            boundary;            // boundary associated with this sub-operator
+  RDyCondition           boundary_condition;  // boundary condition associated with this sub-operator
+  Vec                    boundary_values;     // Dirichlet boundary values vector
+  Vec                    boundary_fluxes;     // boundary flux values vector
+  OperatorDiagnostics   *diagnostics;         // courant number, boundary fluxes
+  PetscReal              tiny_h;              // minimum water height for wet conditions
   TracerRiemannStateData left_states;
   TracerRiemannStateData right_states;
   TracerRiemannEdgeData  edges;
-  PetscReal               *cosines, *sines;  // cosine and sine of the angle between the edge and y-axis
-  PetscReal               *a_max;            // maximum courant number
+  PetscReal             *cosines, *sines;  // cosine and sine of the angle between the edge and y-axis
+  PetscReal             *a_max;            // maximum courant number
 } TracerBoundaryFluxOperator;
 
 /// @brief Sets values for the cells on the right of an edge, datar, based on values on the left of the
@@ -423,7 +423,7 @@ static PetscErrorCode ApplyTracerBoundaryFlux(void *context, PetscOperatorFields
   TracerRiemannStateData *datar     = &boundary_flux_op->right_states;
   TracerRiemannEdgeData  *data_edge = &boundary_flux_op->edges;
 
-  PetscInt num_flow_comp     = datal->num_flow_comp;
+  PetscInt num_flow_comp    = datal->num_flow_comp;
   PetscInt num_tracers_comp = datal->num_tracers_comp;
 
   PetscInt n_dof;
@@ -549,7 +549,7 @@ PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh *mesh, const RDyCon
                                                      PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
-  PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
   PetscInt num_tracers_comp = config.physics.sediment.num_classes;
 
   TracerBoundaryFluxOperator *boundary_flux_op;
@@ -588,13 +588,13 @@ PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh *mesh, const RDyCon
 //-----------------
 
 typedef struct {
-  RDyMesh  *mesh;               // domain mesh
-  PetscInt  num_flow_comp;      // number of flow components
+  RDyMesh  *mesh;              // domain mesh
+  PetscInt  num_flow_comp;     // number of flow components
   PetscInt  num_tracers_comp;  // number of tracers components
-  Vec       external_sources;   // external source vector
-  Vec       mannings;           // mannings coefficient vector
-  PetscReal tiny_h;             // minimum water height for wet conditions
-  PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
+  Vec       external_sources;  // external source vector
+  Vec       mannings;          // mannings coefficient vector
+  PetscReal tiny_h;            // minimum water height for wet conditions
+  PetscReal xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
 } TracerSourceOperator;
 
 /// @brief Set the contribution of the source-term using the semi-implicit time integeration method
@@ -611,13 +611,13 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  TracerSourceOperator *source_op         = context;
-  Vec                     source_vec        = source_op->external_sources;
-  Vec                     mannings_vec      = source_op->mannings;
-  RDyMesh                *mesh              = source_op->mesh;
-  RDyCells               *cells             = &mesh->cells;
-  PetscReal               tiny_h            = source_op->tiny_h;
-  PetscInt                num_tracers_comp = source_op->num_tracers_comp;
+  TracerSourceOperator *source_op        = context;
+  Vec                   source_vec       = source_op->external_sources;
+  Vec                   mannings_vec     = source_op->mannings;
+  RDyMesh              *mesh             = source_op->mesh;
+  RDyCells             *cells            = &mesh->cells;
+  PetscReal             tiny_h           = source_op->tiny_h;
+  PetscInt              num_tracers_comp = source_op->num_tracers_comp;
 
   // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
   // parameterization
@@ -726,19 +726,19 @@ static PetscErrorCode DestroyTracerSource(void *context) {
 PetscErrorCode CreatePetscTracerSourceOperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
-  PetscInt num_flow_comp     = 3;  // NOTE: SWE assumed!
+  PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
   PetscInt num_tracers_comp = config.physics.sediment.num_classes;
 
   TracerSourceOperator *source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (TracerSourceOperator){
-      .mesh              = mesh,
-      .num_flow_comp     = num_flow_comp,
+      .mesh             = mesh,
+      .num_flow_comp    = num_flow_comp,
       .num_tracers_comp = num_tracers_comp,
-      .external_sources  = external_sources,
-      .mannings          = mannings,
-      .tiny_h            = config.physics.flow.tiny_h,
-      .xq2018_threshold  = config.physics.flow.source.xq2018_threshold,
+      .external_sources = external_sources,
+      .mannings         = mannings,
+      .tiny_h           = config.physics.flow.tiny_h,
+      .xq2018_threshold = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;

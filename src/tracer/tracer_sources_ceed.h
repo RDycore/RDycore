@@ -34,9 +34,9 @@ typedef enum {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-int CEED_QFUNCTION_HELPER TracerSemiImplicitBedFrictionRoughness(TracerContext context, TracerState state, CeedScalar mannings_n,
-                                                                 CeedScalar Fsum_x, CeedScalar Fsum_y, CeedScalar bedx, CeedScalar bedy,
-                                                                 CeedScalar *tbx, CeedScalar *tby, CeedScalar e[MAX_NUM_SEDIMENT_CLASSES],
+int CEED_QFUNCTION_HELPER TracerSemiImplicitBedFrictionRoughness(TracerContext context, TracerState state, CeedScalar mannings_n, CeedScalar Fsum_x,
+                                                                 CeedScalar Fsum_y, CeedScalar bedx, CeedScalar bedy, CeedScalar *tbx,
+                                                                 CeedScalar *tby, CeedScalar e[MAX_NUM_SEDIMENT_CLASSES],
                                                                  CeedScalar d[MAX_NUM_SEDIMENT_CLASSES]) {
   const CeedScalar dt                      = context->dtime;
   const CeedScalar tiny_h                  = context->tiny_h;
@@ -64,7 +64,7 @@ int CEED_QFUNCTION_HELPER TracerSemiImplicitBedFrictionRoughness(TracerContext c
   *tbx = (hu + dt * (Fsum_x - bedx)) * factor;
   *tby = (hv + dt * (Fsum_y - bedy)) * factor;
 
-  for (CeedInt j = 0; j < context->tracers_ndof; ++j) {
+  for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
     const CeedScalar ci    = SafeDiv(state.hci[j], h, h, tiny_h);
     CeedScalar       tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
     e[j]                   = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
@@ -87,13 +87,13 @@ CEED_QFUNCTION_HELPER int TracerSources(void *ctx, CeedInt Q, const CeedScalar *
   CeedScalar(*sources)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
 
   const TracerContext context   = (TracerContext)ctx;
-  const CeedInt         flow_ndof = context->flow_ndof;
-  const CeedScalar      tiny_h    = context->tiny_h;
-  const CeedScalar      gravity   = context->gravity;
+  const CeedInt       flow_ndof = context->flow_ndof;
+  const CeedScalar    tiny_h    = context->tiny_h;
+  const CeedScalar    gravity   = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
     TracerState state = {q[0][i], q[1][i], q[2][i]};
-    for (CeedInt j = 0; j < context->tracers_ndof; ++j) {
+    for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
       state.hci[j] = q[flow_ndof + j][i];
     }
 
@@ -126,7 +126,7 @@ CEED_QFUNCTION_HELPER int TracerSources(void *ctx, CeedInt Q, const CeedScalar *
     sources[0][i] = riemannf[0][i] + ext_src[0][i];
     sources[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
     sources[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
-    for (CeedInt j = 0; j < context->tracers_ndof; ++j) {
+    for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
       sources[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (e[j] - d[j]) + ext_src[flow_ndof + j][i];
     }
   }
