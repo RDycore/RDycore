@@ -652,7 +652,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       PetscInt temperature_index;
       PetscCall(FindTemperatureCondition(rdy, ic_spec.temperature, &temperature_index));
       RDyTemperatureCondition *temperature_cond = &rdy->config.temperature_conditions[temperature_index];
-      ic->temperature = temperature_cond;
+      ic->temperature                           = temperature_cond;
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);

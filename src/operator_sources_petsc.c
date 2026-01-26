@@ -1,7 +1,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
 /// Creates a PETSc source operator appropriate for the given configuration.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator

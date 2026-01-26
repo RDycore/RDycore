@@ -3,6 +3,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <rdycore.h>
+
 #include "petscstring.h"
 
 static PetscErrorCode RenameDMFields(DM dm, SectionFieldSpec fields) {
@@ -201,15 +202,11 @@ PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
 PetscErrorCode CreateTracerDM(RDy rdy) {
   PetscFunctionBegin;
   PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
-  PetscInt num_tracers = num_sediment_classes +
-                         (rdy->config.physics.salinity ? 1 : 0) + 
-                         (rdy->config.physics.heat ? 1 : 0);
+  PetscInt num_tracers          = num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0) + (rdy->config.physics.heat ? 1 : 0);
   if (num_tracers > 0) {
-    PetscInt num_fields = (num_sediment_classes > 0 ? 1 : 0) +
-                          (rdy->config.physics.salinity ? 1 : 0) + 
-                          (rdy->config.physics.heat ? 1 : 0);
-    rdy->tracer_fields.num_fields              = num_fields;
-    PetscInt comp = 0;
+    PetscInt num_fields           = (num_sediment_classes > 0 ? 1 : 0) + (rdy->config.physics.salinity ? 1 : 0) + (rdy->config.physics.heat ? 1 : 0);
+    rdy->tracer_fields.num_fields = num_fields;
+    PetscInt comp                 = 0;
     if (num_sediment_classes > 0) {
       PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Sediments", MAX_NAME_LEN));
       rdy->tracer_fields.num_field_components[comp] = num_sediment_classes;

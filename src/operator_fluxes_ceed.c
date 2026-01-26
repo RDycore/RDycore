@@ -2,11 +2,11 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
-#include "tracer/tracer_fluxes_ceed.h"
 #include "swe/swe_fluxes_ceed.h"
+#include "tracer/tracer_fluxes_ceed.h"
 
 // The CEED flux operator consists of the following sub-operators:
 //
@@ -31,9 +31,7 @@
 #pragma clang diagnostic ignored "-Wvla"
 
 static CeedInt NumTracers(const RDyConfig config) {
-  return config.physics.sediment.num_classes +
-         ((config.physics.salinity) ? 1 : 0) + 
-         ((config.physics.heat) ? 1 : 0);
+  return config.physics.sediment.num_classes + ((config.physics.salinity) ? 1 : 0) + ((config.physics.heat) ? 1 : 0);
 }
 
 static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
@@ -104,9 +102,9 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
 
   Ceed ceed = CeedContext();
 
-  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
-  CeedInt num_tracers = NumTracers(config);
-  CeedInt num_comp          = num_flow_comp + num_tracers;
+  CeedInt num_flow_comp = 3;  // NOTE: SWE assumed!
+  CeedInt num_tracers   = NumTracers(config);
+  CeedInt num_comp      = num_flow_comp + num_tracers;
 
   RDyCells *cells = &mesh->cells;
   RDyEdges *edges = &mesh->edges;
@@ -316,9 +314,9 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 
   Ceed ceed = CeedContext();
 
-  CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
-  CeedInt num_tracers = NumTracers(config);
-  CeedInt num_comp          = num_flow_comp + num_tracers;
+  CeedInt num_flow_comp = 3;  // NOTE: SWE assumed!
+  CeedInt num_tracers   = NumTracers(config);
+  CeedInt num_comp      = num_flow_comp + num_tracers;
 
   RDyCells *cells = &mesh->cells;
   RDyEdges *edges = &mesh->edges;

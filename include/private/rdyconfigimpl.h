@@ -371,16 +371,16 @@ typedef struct {
 
 // specification of an ensemble member with overridable parameters
 typedef struct {
-  char                  name[MAX_NAME_LEN + 1];
-  RDyGridSection        grid;
-  RDyMaterialSpec      *materials;
-  PetscInt              materials_count;
-  RDyFlowCondition     *flow_conditions;
-  PetscInt              flow_conditions_count;
-  RDySedimentCondition *sediment_conditions;
-  PetscInt              sediment_conditions_count;
-  RDySalinityCondition *salinity_conditions;
-  PetscInt              salinity_conditions_count;
+  char                     name[MAX_NAME_LEN + 1];
+  RDyGridSection           grid;
+  RDyMaterialSpec         *materials;
+  PetscInt                 materials_count;
+  RDyFlowCondition        *flow_conditions;
+  PetscInt                 flow_conditions_count;
+  RDySedimentCondition    *sediment_conditions;
+  PetscInt                 sediment_conditions_count;
+  RDySalinityCondition    *salinity_conditions;
+  PetscInt                 salinity_conditions_count;
   RDyTemperatureCondition *temperature_conditions;
   PetscInt                 temperature_conditions_count;
 } RDyEnsembleMember;
@@ -431,14 +431,14 @@ typedef struct {
   PetscInt                 num_boundary_conditions;
   RDyBoundaryConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 
-  PetscInt             num_flow_conditions;
-  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
-  PetscInt             num_sediment_conditions;
-  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
-  PetscInt             num_salinity_conditions;
-  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
-  PetscInt             num_temperature_conditions;
-  RDyTemperatureCondition     temperature_conditions[MAX_NUM_CONDITIONS];
+  PetscInt                num_flow_conditions;
+  RDyFlowCondition        flow_conditions[MAX_NUM_CONDITIONS];
+  PetscInt                num_sediment_conditions;
+  RDySedimentCondition    sediment_conditions[MAX_NUM_CONDITIONS];
+  PetscInt                num_salinity_conditions;
+  RDySalinityCondition    salinity_conditions[MAX_NUM_CONDITIONS];
+  PetscInt                num_temperature_conditions;
+  RDyTemperatureCondition temperature_conditions[MAX_NUM_CONDITIONS];
 
   RDyEnsembleSection ensemble;
 

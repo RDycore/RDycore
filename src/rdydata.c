@@ -93,7 +93,7 @@ PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundar
 
   PetscCheck(ndof == 3, rdy->comm, PETSC_ERR_USER, "The number of DOFs (%" PetscInt_FMT ") for the boundary condition need to be three.", ndof);
 
-  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyBoundary  boundary      = rdy->boundaries[boundary_index];
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.flow->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
              "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
@@ -116,11 +116,12 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
   PetscFunctionBegin;
 
   PetscCheck(num_classes == rdy->config.physics.sediment.num_classes, rdy->comm, PETSC_ERR_USER,
-             "Mismatch in number of sediment classes (%" PetscInt_FMT ", should be %" PetscInt_FMT ")", num_classes, rdy->config.physics.sediment.num_classes);
+             "Mismatch in number of sediment classes (%" PetscInt_FMT ", should be %" PetscInt_FMT ")", num_classes,
+             rdy->config.physics.sediment.num_classes);
 
   PetscCall(CheckBoundaryParameters(rdy, boundary_index, num_edges));
 
-  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyBoundary  boundary      = rdy->boundaries[boundary_index];
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.sediment->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
              "Trying to set dirichlet values for sediment on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
@@ -145,15 +146,14 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
 PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscCheck(rdy->config.physics.salinity, rdy->comm, PETSC_ERR_USER,
-             "Trying to set salinity dirichlet values, but salinity is disabled");
+  PetscCheck(rdy->config.physics.salinity, rdy->comm, PETSC_ERR_USER, "Trying to set salinity dirichlet values, but salinity is disabled");
   PetscCall(CheckBoundaryParameters(rdy, boundary_index, num_edges));
 
-  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyBoundary  boundary      = rdy->boundaries[boundary_index];
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.salinity->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for salinity on boundary %" PetscInt_FMT ", but it has a different type (%u)",
-             boundary_index, boundary_cond.salinity->type);
+             "Trying to set dirichlet values for salinity on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
+             boundary_cond.salinity->type);
 
   OperatorData dirichlet;
   PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
@@ -173,15 +173,14 @@ PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const PetscInt bou
 PetscErrorCode RDySetTemperatureDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscCheck(rdy->config.physics.heat, rdy->comm, PETSC_ERR_USER,
-             "Trying to set temperature dirichlet values, but heat transfer is disabled");
+  PetscCheck(rdy->config.physics.heat, rdy->comm, PETSC_ERR_USER, "Trying to set temperature dirichlet values, but heat transfer is disabled");
   PetscCall(CheckBoundaryParameters(rdy, boundary_index, num_edges));
 
-  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyBoundary  boundary      = rdy->boundaries[boundary_index];
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
   PetscCheck(boundary_cond.temperature->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for temperature on boundary %" PetscInt_FMT ", but it has a different type (%u)",
-             boundary_index, boundary_cond.temperature->type);
+             "Trying to set dirichlet values for temperature on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
+             boundary_cond.temperature->type);
 
   OperatorData dirichlet;
   PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));

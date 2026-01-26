@@ -2,11 +2,11 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
-#include "tracer/tracer_sources_ceed.h"
 #include "swe/swe_sources_ceed.h"
+#include "tracer/tracer_sources_ceed.h"
 
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
@@ -17,9 +17,7 @@
 #pragma clang diagnostic ignored "-Wvla"
 
 static CeedInt NumTracers(const RDyConfig config) {
-  return config.physics.sediment.num_classes +
-         ((config.physics.salinity) ? 1 : 0) + 
-         ((config.physics.heat) ? 1 : 0);
+  return config.physics.sediment.num_classes + ((config.physics.salinity) ? 1 : 0) + ((config.physics.heat) ? 1 : 0);
 }
 
 static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
@@ -46,7 +44,7 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SOURCE_IMPLICIT_XQ2018 is not supported in sediment CEED version");
       }
       break;
-    case SOURCE_ARK_IMEX:            // bed friction terms moved to LHS
+    case SOURCE_ARK_IMEX:      // bed friction terms moved to LHS
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesWithoutBedFriction, SWESourcesWithoutBedFriction_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
@@ -109,9 +107,7 @@ static PetscErrorCode CreateCeedSourceSuboperator(const RDyConfig config, RDyMes
 
   CeedInt num_flow_comp     = 3;  // NOTE: SWE assumed!
   CeedInt num_sediment_comp = config.physics.sediment.num_classes;
-  CeedInt num_comp          = num_flow_comp + num_sediment_comp +
-                              (config.physics.salinity ? 1 : 0) +
-                              (config.physics.heat ? 1 : 0);
+  CeedInt num_comp          = num_flow_comp + num_sediment_comp + (config.physics.salinity ? 1 : 0) + (config.physics.heat ? 1 : 0);
 
   RDyCells *cells = &mesh->cells;
 

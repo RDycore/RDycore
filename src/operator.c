@@ -2,8 +2,8 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdytracerimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.

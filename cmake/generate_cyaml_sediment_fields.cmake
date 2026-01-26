@@ -1,4 +1,4 @@
-# This CMake function generates a file named cyaml_tracers.h in the include/ folder within
+# This CMake function generates a file named cyaml_sediment_fields.h in the include/ folder within
 # your build directory. The file defines tracer fields for our YAML schema based on the build
 # parameter MAX_NUM_SEDIMENT_CLASSES. See related comments in src/yaml_input.c.
 
@@ -8,7 +8,7 @@ function(generate_cyaml_sediment_fields)
   list(APPEND lines "// PLEASE DO NOT EDIT DIRECTLY -- change MAX_NUM_SEDIMENT_CLASSES and rerun CMake.")
   list(APPEND lines "")
 
-  list(APPEND lines "// This macro is used in region_condition_spec_tracers_schema in yaml_input.c")
+  list(APPEND lines "// This macro is used in region_condition_spec_fields_schema in yaml_input.c")
   list(APPEND lines "#define CYAML_REGION_CONDITION_SPEC_SEDIMENT_FIELDS \\")
   foreach(i RANGE ${N})
     list(APPEND lines "    CYAML_FIELD_STRING(\"c${i}\", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediments[${i}], 0), \\")
