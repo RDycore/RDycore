@@ -43,9 +43,9 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
   if (num_tracers == 0) {  // flow only, and SWE is it!
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
     PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-  } else {
+  } else { // flow + tracers
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
-    PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
+    PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
   }
 
   // add the context to the Q function
@@ -233,26 +233,26 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-      } else {  // sediment dynamics
+      } else {  // flow + tracers
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_Roe, TracerBoundaryFlux_Dirichlet_Roe_loc, qf));
-        PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
+        PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }
       break;
     case CONDITION_REFLECTING:
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-      } else {  // sediment dynamics
+      } else {  // flow + tracers
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
-        PetscCall(CreateSedimentQFunctionContext(ceed, config, &qf_context));
+        PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }
       break;
     case CONDITION_CRITICAL_OUTFLOW:
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Outflow_Roe, SWEBoundaryFlux_Outflow_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-      } else {  // sediment dynamics
-        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not implemented");
+      } else {  // flow + tracers
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not implemented for tracers");
       }
       break;
     default:

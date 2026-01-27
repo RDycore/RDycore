@@ -25,7 +25,7 @@ static int FreeContextPetsc(void *data) {
 }
 
 // SWE + tracers dynamics Q function context
-PetscErrorCode CreateTracersQFunctionContext(Ceed ceed, const RDyConfig config, CeedQFunctionContext *qf_context) {
+PetscErrorCode CreateTracerQFunctionContext(Ceed ceed, const RDyConfig config, CeedQFunctionContext *qf_context) {
   PetscFunctionBeginUser;
 
   TracerContext tracers_ctx;

@@ -9,6 +9,7 @@
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
 #include <unistd.h>     // for getpid() and gethostname()
+#include "petscdm.h"
 
 #include "petscvec.h"
 
@@ -847,7 +848,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
       RDyRegion    region = rdy->regions[r];
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.flow->name, flow_ic.name)) {
-        if (local) {
+        if (local) { // reading from file
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
@@ -983,6 +984,12 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     }
   }
 
+  DM scalar_dm;
+  if (rdy->config.physics.salinity || rdy->config.physics.heat) {
+    SectionFieldSpec scalar_field = {0};
+    PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, scalar_field, &scalar_dm));
+  }
+
   PetscCall(VecRestoreArray(rdy->tracer_global, &u_ptr));
 
   // initialize salinity conditions
@@ -998,7 +1005,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
       RDyRegion    region = rdy->regions[r];
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.salinity->name, salinity_ic.name)) {
-        if (local) {
+        if (local) { // reading from file
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
