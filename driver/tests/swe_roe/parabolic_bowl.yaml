@@ -1,0 +1,53 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c.
+
+physics:
+  flow:
+    mode: swe
+    source:
+      method: implicit_xq2018
+    well_balance: bradford_sanders_2002
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  stop: 1.0
+  unit: seconds
+  time_step : 0.01
+
+output:
+  format: xdmf
+  output_interval: 100
+  batch_size: 20
+
+grid:
+  file: parabolic_bowl.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.033
+
+initial_conditions:
+  - region: domain
+    flow: ic
+
+flow_conditions:
+  - name: ic
+    type: dirichlet
+    file: parabolic_bowl.ic.${PETSC_ID_TYPE}.bin
+    format: binary
