@@ -30,20 +30,18 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   analytic_flow.x_momentum = rdy->config.mms.swe.solutions.u;  // NOTE: must multiply by h when enforcing!
   analytic_flow.y_momentum = rdy->config.mms.swe.solutions.v;  // NOTE: must multiply by h when enforcing!
 
-  RDyCondition analytic_bc = {
-      .flow = &analytic_flow,
+  static RDySedimentCondition analytic_sediment = {
+      .name = "analytic_sediment_bc",
+      .type = CONDITION_DIRICHLET,
   };
-
-  static RDySedimentCondition analytic_sediments[MAX_NUM_SEDIMENT_CLASSES] = {0};
   for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
-    analytic_sediments[i] = (RDySedimentCondition){
-        .name          = "analytic_sediment_bc",
-        .type          = CONDITION_DIRICHLET,
-        .concentration = (void *)rdy->config.mms.sediment.solutions.c[i],
-    };
-    strncpy(analytic_sediments[i].expression, rdy->config.mms.sediment.expressions.c[i], MAX_EXPRESSION_LEN);
-    analytic_bc.sediment[i] = &analytic_sediments[i];
-  }
+    strncpy(analytic_sediment.classes[i].expression, rdy->config.mms.sediment.expressions.c[i], MAX_EXPRESSION_LEN);
+    analytic_sediment.classes[i].value = (void *)rdy->config.mms.sediment.solutions.c[i];
+  };
+  RDyCondition analytic_bc = {
+      .flow     = &analytic_flow,
+      .sediment = &analytic_sediment,
+  };
 
   // Assign the boundary condition to each boundary.
   PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundary_conditions));
@@ -574,9 +572,9 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       PetscReal *sediment_boundary_values, *ci;
       PetscCall(PetscCalloc1(ndof * num_edges, &sediment_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &ci));
+      RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment;
       for (PetscInt i = 0; i < ndof; ++i) {
-        RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment[i];
-        PetscCall(EvaluateTemporalSolution(sediment_bc->concentration, num_edges, x, y, time, ci));
+        PetscCall(EvaluateTemporalSolution(sediment_bc->classes[i].value, num_edges, x, y, time, ci));
         for (PetscInt e = 0; e < num_edges; ++e) {
           sediment_boundary_values[ndof * e + i] = h[e] * ci[e];
         }

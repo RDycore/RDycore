@@ -9,6 +9,8 @@
 #include <rdycore.h>
 #include <time.h>
 
+#include "private/config.h"
+
 // The types in this file ѕerve as an intermediate representation for our input
 // configuration file:
 //
@@ -276,21 +278,31 @@ typedef struct {
 // This type defines an initial condition and/or source/sink with named
 // flow, sediment, and salinity conditions.
 typedef struct {
-  char region[MAX_NAME_LEN + 1];                              // name of associated region
-  char flow[MAX_NAME_LEN + 1];                                // name of related flow condition
-  char sediment[MAX_NUM_SEDIMENT_CLASSES][MAX_NAME_LEN + 1];  // name of related sediment condition
-  char salinity[MAX_NAME_LEN + 1];                            // name of related salinity condition
+  char region[MAX_NAME_LEN + 1];    // name of associated region
+  char flow[MAX_NAME_LEN + 1];      // name of related flow condition
+  char sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
+  char salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
 } RDyRegionConditionSpec;
 
-// This type defines a boundary condition with named flow, sediment, and
-// salinity conditions.
+// This type defines a boundary condition with named flow, sediment, and salinity conditions.
 typedef struct {
-  PetscInt num_boundaries;                                        // number of associated boundaries
-  char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];      // names of associated boundaries
-  char     flow[MAX_NAME_LEN + 1];                                // name of related flow condition
-  char     sediment[MAX_NUM_SEDIMENT_CLASSES][MAX_NAME_LEN + 1];  // name of related sediment conditions
-  char     salinity[MAX_NAME_LEN + 1];                            // name of related salinity condition
+  PetscInt num_boundaries;                                    // number of associated boundaries
+  char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];  // names of associated boundaries
+  char     flow[MAX_NAME_LEN + 1];                            // name of related flow condition
+  char     sediment[MAX_NAME_LEN + 1];                        // name of related sediment conditions
+  char     salinity[MAX_NAME_LEN + 1];                        // name of related salinity condition
 } RDyBoundaryConditionSpec;
+
+// This struct describes a condition on a single field component. There are two valid
+// configurations:
+// 1. expression and value are set, indicating that the data is interpreted from an expression
+// 2. file and format are set, indicating that the data is to be read from a file
+typedef struct {
+  MathExpression    expression;  // expression for component
+  void             *value;       // muparser-backed functional form
+  char              file[PETSC_MAX_PATH_LEN];
+  PetscViewerFormat format;
+} RDyComponentCondition;
 
 // -----------------------
 // flow_conditions section
@@ -318,12 +330,9 @@ typedef struct {
 
 // sediment-related condition data
 typedef struct {
-  char              name[MAX_NAME_LEN + 1];
-  RDyConditionType  type;
-  MathExpression    expression;     // expression for concentration
-  void             *concentration;  // muparser-backed functional form
-  char              file[PETSC_MAX_PATH_LEN];
-  PetscViewerFormat format;
+  char                  name[MAX_NAME_LEN + 1];
+  RDyConditionType      type;
+  RDyComponentCondition classes[MAX_NUM_SEDIMENT_CLASSES];
 } RDySedimentCondition;
 
 // ---------------------------
