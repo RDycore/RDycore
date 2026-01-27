@@ -53,9 +53,9 @@ CEED_QFUNCTION(SWEEtaVertex)(void *ctx, CeedInt Q, const CeedScalar *const in[],
     }
 
     CeedScalar eta_cell = 0.0;
-    if (state.h > tiny_h) {
+    if (state.h <= tiny_h) {
       // dry bed case
-      eta_cell = (z1 + z2 + z3) / 3.0 + state.h;
+      eta_cell = z1;
     } else {
       // wet bed case
       if (state.h >= h3) {
