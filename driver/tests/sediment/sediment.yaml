@@ -46,7 +46,7 @@ materials:
 initial_conditions:
   - region: domain
     flow: domain_flow_ic
-    c0: domain_sediment_ic
+    sediment: domain_sediment_ic
 
 flow_conditions:
   - name: domain_flow_ic
@@ -57,7 +57,8 @@ flow_conditions:
 sediment_conditions:
   - name: domain_sediment_ic
     type: dirichlet
-    concentration: 0.1
+    c0:
+      value: 0.1
 
 # we don't specify boundaries or boundary conditions, so all boundaries are
 # reflecting

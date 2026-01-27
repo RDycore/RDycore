@@ -48,16 +48,16 @@ broad categories:
       relevant material properties are stored
 * **Initial and boundary conditions, source terms**
     * [initial_conditions](input.md#initial_conditions): associates initial
-      conditions (as defined in `flow_conditions`, `sediment_conditions`, and/or
-      `salinity_conditions`) with specific regions defined in the `regions`
+      conditions (as defined in `flow_conditions`, `sediment_conditions`, `salinity_conditions`,
+      and/or `temperature_conditions`) with specific regions defined in the `regions`
       section
     * [sources](input.md#sources): associates source contributions
-      (as defined in `flow_conditions`, `sediment_conditions`, and/or
-      `salinity_conditions`) with specific regions defined in the `regions`
+      (as defined in `flow_conditions`, `sediment_conditions`, `salinity_conditions`,
+      and/or `temperature_conditions`) with specific regions defined in the `regions`
       section
     * [boundary_conditions](input.md#boundary_conditions): associates boundary
-      conditions (as defined in `flow_conditions`, `sediment_conditions`, and/or
-      `salinity_conditions`) with specific boundaries defined in the
+      conditions (as defined in `flow_conditions`, `sediment_conditions`, `salinity_conditions`,
+      and/or `temperature_conditions`) with specific boundaries defined in the
       `boundaries` section
     * [flow_conditions](input.md#flow_conditions): defines flow-related
       parameters that can be used to specify initial/boundary conditions and
@@ -66,6 +66,9 @@ broad categories:
       parameters that can be used to specify initial/boundary conditions and
       sources
     * [salinity_conditions](input.md#salinity_conditions): defines salinity-related
+      parameters that can be used to specify initial/boundary conditions and
+      sources
+    * [temperature_conditions](input.md#salinity_conditions): defines salinity-related
       parameters that can be used to specify initial/boundary conditions and
       sources
 * **Running Ensembles**
@@ -210,6 +213,7 @@ Sections that can be overridden in an ensemble member are:
 * [`flow_conditions`](input.md#flow_conditions)
 * [`sediment_conditions`](input.md#sediment_conditions)
 * [`salinity_conditions`](input.md#salinity_conditions)
+* [`temperature_conditions`](input.md#temperature_conditions)
 
 The example above redefines the Manning coefficient of the `smooth`
 [material](input.md#materials) defined elsewhere in the file. In plain language,
@@ -309,13 +313,13 @@ initial_conditions:
 ```
 
 The `initial_conditions` section is a sequence (list) associating `flow`,
-`sediment`, and `salinity` conditions (as defined in their respective sections)
+`sediment`, `salinity`, and `temperature` conditions (as defined in their respective sections)
 with regions (as defined in the `regions` section). A region must have exactly
 one set of initial conditions associated with it. The above example shows a valid
 configuration for a simulation in which sediments and salinity are not modeled,
 so only the `flow` parameter is required. The presence of sediment concentrations
-requires the `sediment` parameter, as the presence of salinity concentrations
-requires the `salinity` parameter.
+requires the `sediment` parameter, just as a salinity concentration or temperature require a
+`salinity` and `temperature` parameter.
 
 ## `logging`
 
@@ -572,7 +576,7 @@ simulation is restarted.
 salinity_conditions:
   - name: my-sal-condition
     type: dirichlet
-    concentration: 1
+    S: 1
 ```
 
 The `salinity_conditions` section contains a sequence of sets of parameters
@@ -599,8 +603,7 @@ providing one or more parameters. This can be done in one of two ways:
 
 2. By specifying a file from which concentration data is to be read. The
    data is read into the components of the solution vector that correspond
-   to the cells belonging to the region to which this flow condition is
-   assigned:
+   to the cells belonging to the region to which this condition is assigned:
 
    * `file`: the path for the file from which data is read, specified relative
      to the directory in which the RDycore executable was run.
@@ -613,7 +616,11 @@ providing one or more parameters. This can be done in one of two ways:
 sediment_conditions:
   - name: my-sed-condition
     type: dirichlet
-    concentration: 1
+    c0:
+      value: 1
+    c1:
+      file: sediment-class-1.bin
+      format: binary
 ```
 
 The `sediment_conditions` section contains a sequence of sets of parameters
@@ -633,10 +640,11 @@ that define a sediment condition are
       useful only for boundary conditions. Currently, only homogeneous Neumann
       conditions are supported.
 
-In the case of a Dirichlet condition, a sediment concentration is prescribed by
+Information for the `N` size classes is provided by specifying mappings `c0`, `c1`, ..., `cN`.
+In the case of a Dirichlet condition, a sediment concentration is prescribed for each size class by
 providing one or more parameters. This can be done in one of two ways:
 
-1. By specifying the concentration directly using the `concentration` parameter
+1. By specifying the concentration directly using the `value` parameter
 
 2. By specifying a file from which concentration data is to be read. The
    data is read into the components of the solution vector that correspond
@@ -647,6 +655,8 @@ providing one or more parameters. This can be done in one of two ways:
      to the directory in which the RDycore executable was run.
    * `format`: the format of the data in the file, which current must be
      `binary` (specifying PETSc's binary format).
+
+All size classes must be specified for each Dirichlet condition.
 
 ## `sources`
 
@@ -685,6 +695,10 @@ the association between the two is made clear by the `region` and `material`
 parameters in each entry. A region is understood to be completely filled with
 the material with which it is associated--the relationship between regions and
 materials is necessarily 1:1.
+
+## `temperature_conditions`
+
+**Coming soon!**
 
 ## `time`
 
