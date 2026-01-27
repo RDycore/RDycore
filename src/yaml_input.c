@@ -964,8 +964,10 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     // validate sediment size classes in regional initial conditions
     for (PetscInt r = 0; r < config->num_regions; ++r) {
-      PetscCheck(config->initial_conditions[r].sediment[0], comm, PETSC_ERR_USER, "Region '%s' has no initial condition for sediment",
-                 config->regions[r].name);
+      if (config->physics.sediment.num_classes > 0) {
+        PetscCheck(config->initial_conditions[r].sediment[0], comm, PETSC_ERR_USER, "Region '%s' has no initial condition for sediment",
+                   config->regions[r].name);
+      }
     }
 
     PetscCheck(config->num_material_assignments == config->num_regions, comm, PETSC_ERR_USER,
