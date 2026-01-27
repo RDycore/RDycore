@@ -218,13 +218,13 @@ PetscErrorCode CreateTracerDM(RDy rdy) {
     if (rdy->config.physics.salinity) {
       PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Salinity", MAX_NAME_LEN));
       rdy->tracer_fields.num_field_components[comp] = 1;
-      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[0], "Concentration", MAX_NAME_LEN));
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[comp][0], "Concentration", MAX_NAME_LEN));
       ++comp;
     }
     if (rdy->config.physics.heat) {
       PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Temperature", MAX_NAME_LEN));
       rdy->tracer_fields.num_field_components[comp] = 1;
-      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[0], "Temperature", MAX_NAME_LEN));
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[comp][0], "Temperature", MAX_NAME_LEN));
       ++comp;
     }
     PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->tracer_fields, &rdy->tracer_dm));
