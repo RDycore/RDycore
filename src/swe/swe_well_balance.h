@@ -29,7 +29,7 @@
 CEED_QFUNCTION(SWEEtaVertex)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   // inputs
   const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // z1, z2, z3 of cell vertices
-  const CeedScalar(*q)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // riemann flux
+  const CeedScalar(*q)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[1];  // DOFs per cell
 
   // outputs
   CeedScalar(*etavertex)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
