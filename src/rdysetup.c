@@ -10,6 +10,8 @@
 #include <sys/types.h>  // for getpid()
 #include <unistd.h>     // for getpid() and gethostname()
 
+#include "petscvec.h"
+
 // time conversion factors
 static const PetscReal secs_in_min = 60.0;
 static const PetscReal mins_in_hr  = 60.0;
@@ -859,10 +861,13 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
   PetscInt n_local, ndof;
   PetscCall(VecGetLocalSize(rdy->sediment_u_global, &n_local));
   PetscCall(VecGetBlockSize(rdy->sediment_u_global, &ndof));
+  PetscCheck(ndof == rdy->config.physics.sediment.num_classes, rdy->comm, PETSC_ERR_USER,
+             "Invalid block size for sediment concentration vector (%" PetscInt_FMT ", should be %" PetscInt_FMT ")", ndof,
+             rdy->config.physics.sediment.num_classes);
   PetscScalar *u_ptr;
   PetscCall(VecGetArray(rdy->sediment_u_global, &u_ptr));
 
-  // initialize sediment conditions
+  // initialize sediment conditions one size class at a time
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
     RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
     Vec                  local       = NULL;
@@ -879,22 +884,22 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
         PetscCall(VecLoad(natural, viewer));
         PetscCall(PetscViewerDestroy(&viewer));
 
-        // check the block size of the initial condition vector agrees with the block size of rdy->u_global
-        PetscInt nblocks_nat;
-        PetscCall(VecGetBlockSize(natural, &nblocks_nat));
-        PetscCheck((ndof == nblocks_nat), rdy->comm, PETSC_ERR_USER,
-                   "The block size of the initial condition ('%" PetscInt_FMT
-                   "') "
-                   "does not match with the number of DOFs ('%" PetscInt_FMT "')",
-                   nblocks_nat, ndof);
-
         // scatter natural-to-global
         PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof, natural, global));
         PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, global));
 
-        // scatter global-to-local
-        PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, local));
-        PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, local));
+        // copy data into the corresponding component
+        const PetscScalar *c_ptr;
+        PetscCall(VecGetArrayRead(global, &c_ptr));
+        for (PetscInt c = 0; c < n_local; ++c) {
+          PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[c];
+          if (rdy->mesh.cells.is_owned[c]) {  // skip ghost cells
+            for (PetscInt idof = 0; idof < ndof; idof++) {
+              u_ptr[ndof * owned_cell_id + idof] = c_ptr[c];
+            }
+          }
+        }
+        PetscCall(VecRestoreArrayRead(global, &c_ptr));
 
         // free up memory
         PetscCall(VecDestroy(&natural));
