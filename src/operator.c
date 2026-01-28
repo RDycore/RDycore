@@ -314,7 +314,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   //------------------
   // Eta Calculation
   //------------------
-  if (op->config->physics.flow.well_balance == WELL_BALANCE_BS2002) {
+  if (op->config->physics.flow.well_balance == WELL_BALANCE_BS2002 && op->config->physics.sediment.num_classes == 0) {
     // point our CEED solution vector at our PETSc solution vector
     PetscMemType mem_type;
     PetscScalar *u_local_ptr;
