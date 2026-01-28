@@ -105,10 +105,10 @@ static void TestFullSpec(void **state) {
       "initial_conditions:\n"
       "  - region: upstream\n"
       "    flow: dam_top_ic\n"
-      "    c0: dam_top_ic\n"
+      "    sediment: dam_top_ic\n"
       "  - region: downstream\n"
       "    flow: dam_bottom_ic\n\n"
-      "    c0: dam_bottom_ic\n"
+      "    sediment: dam_bottom_ic\n"
       "boundaries:\n"
       "  - name: top_wall\n"
       "    grid_boundary_id: 1\n\n"
@@ -137,17 +137,19 @@ static void TestFullSpec(void **state) {
       "sediment_conditions:\n"
       "  - name: dam_top_ic\n"
       "    type: dirichlet\n"
-      "    concentration: 0.5\n"
+      "    c0:\n"
+      "      value: 0.5\n"
       "  - name: dam_bottom_ic\n"
       "    type: dirichlet\n"
-      "    concentration: 0.25\n\n"
+      "    c0:\n"
+      "      value: 0.25\n\n"
       "salinity_conditions:\n"
       "  - name: dam_top_ic\n"
       "    type: dirichlet\n"
-      "    concentration: 0.5\n"
+      "    value: 0.5\n"
       "  - name: dam_bottom_ic\n"
       "    type: dirichlet\n"
-      "    concentration: 0.25\n\n";
+      "    value: 0.25\n\n";
 
   RDy rdy;
   assert_int_equal(0, RDyCreate(PETSC_COMM_WORLD, "full_spec", &rdy));
