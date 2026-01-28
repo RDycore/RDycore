@@ -5,7 +5,7 @@ physics:
   flow:
     mode: swe
   sediment:
-    num_classes: 1
+    num_classes: 2
 
 numerics:
   spatial: fv
@@ -60,6 +60,8 @@ sediment_conditions:
     c0:
       file: DamBreak_grid5x10_wetdownstream.sediment_ic.${PETSC_ID_TYPE}.bin
       format: binary
+    c1:
+      value: 0.5
 
 # we don't specify boundaries or boundary conditions, so all boundaries are
 # reflecting
