@@ -261,9 +261,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
-    if ((*op)->config->physics.flow.well_balance == WELL_BALANCE_BS2002) {
-      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.eta_vertices)));
-    }
+    PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.eta_vertices)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }

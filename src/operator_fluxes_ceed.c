@@ -547,13 +547,13 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Sorts three CeedScalar values in ascending order. after function call,
+/// @brief Sorts three CeedScalar values in ascending order. After function call,
 ///        *data1 <= *data2 <= *data3
 /// @param data1 [inout] pointer to the first value
 /// @param data2 [inout] pointer to the second value
 /// @param data3 [inout] pointer to the third value
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode sort3(CeedScalar *data1, CeedScalar *data2, CeedScalar *data3) {
+static PetscErrorCode sort3(CeedScalar *data1, CeedScalar *data2, CeedScalar *data3) {
   PetscFunctionBegin;
 
   CeedScalar tmp;
