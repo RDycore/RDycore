@@ -891,7 +891,7 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
         // copy data into the corresponding component
         const PetscScalar *c_ptr;
         PetscCall(VecGetArrayRead(global, &c_ptr));
-        for (PetscInt c = 0; c < n_local; ++c) {
+        for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
           PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[c];
           if (rdy->mesh.cells.is_owned[c]) {  // skip ghost cells
             for (PetscInt idof = 0; idof < ndof; idof++) {
