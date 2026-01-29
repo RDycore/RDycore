@@ -871,10 +871,10 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
     RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
     Vec                  local       = NULL;
-    for (PetscInt i = 0; i < rdy->num_sediment_classes; ++i) {
-      if (sediment_ic.classes[i].file[0]) {  // read sediment data from file
+    for (PetscInt idof = 0; idof < rdy->num_sediment_classes; ++idof) {
+      if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
         PetscViewer viewer;
-        PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.classes[i].file, FILE_MODE_READ, &viewer));
+        PetscCall(PetscViewerBinaryOpen(rdy->comm, sediment_ic.classes[idof].file, FILE_MODE_READ, &viewer));
 
         Vec natural, global;
         PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
@@ -894,9 +894,7 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
         for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
           PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[c];
           if (rdy->mesh.cells.is_owned[c]) {  // skip ghost cells
-            for (PetscInt idof = 0; idof < ndof; idof++) {
-              u_ptr[ndof * owned_cell_id + idof] = c_ptr[c];
-            }
+            u_ptr[ndof * owned_cell_id + idof] = c_ptr[c];
           }
         }
         PetscCall(VecRestoreArrayRead(global, &c_ptr));
@@ -918,17 +916,15 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
               PetscInt cell_local_id = region.cell_local_ids[c];
               PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
               if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-                for (PetscInt idof = 0; idof < ndof; idof++) {
-                  u_ptr[ndof * owned_cell_id + idof] = local_ptr[ndof * cell_local_id + idof];
-                }
+                u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
               }
             }
             PetscCall(VecRestoreArray(local, &local_ptr));
             PetscCall(VecDestroy(&local));
           } else {
             for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-              PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
-              u_ptr[ndof * owned_cell_id] = mupEval(sediment_ic.classes[i].value);
+              PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
+              u_ptr[ndof * owned_cell_id + idof] = mupEval(sediment_ic.classes[idof].value);
             }
           }
         }
