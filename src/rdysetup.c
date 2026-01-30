@@ -888,16 +888,9 @@ static PetscErrorCode InitSedimentSolution(RDy rdy) {
         PetscCall(DMPlexNaturalToGlobalBegin(rdy->dm_1dof, natural, global));
         PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, global));
 
-        // copy data into the corresponding component
-        const PetscScalar *c_ptr;
-        PetscCall(VecGetArrayRead(global, &c_ptr));
-        for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
-          PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[c];
-          if (rdy->mesh.cells.is_owned[c]) {  // skip ghost cells
-            u_ptr[ndof * owned_cell_id + idof] = c_ptr[c];
-          }
-        }
-        PetscCall(VecRestoreArrayRead(global, &c_ptr));
+        // scatter global-to-local
+        PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, local));
+        PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, local));
 
         // free up memory
         PetscCall(VecDestroy(&natural));
