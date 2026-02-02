@@ -1,11 +1,12 @@
 cmake_minimum_required (VERSION 3.14.0)
 
 # Configurable options
-option(ENABLE_DRIVER   "Enable stand-alone RDycore driver program(s)" ON)
-option(ENABLE_FORTRAN  "Enable Fortran library bindings" ON)
-option(ENABLE_TESTS    "Enable unit and driver tests" ON)
-option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
+option(ENABLE_DRIVER     "Enable stand-alone RDycore driver program(s)" ON)
+option(ENABLE_FORTRAN    "Enable Fortran library bindings" ON)
+option(ENABLE_TESTS      "Enable unit and driver tests" ON)
+option(ENABLE_COVERAGE   "Enable code coverage instrumentation" OFF)
 option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
+option(ENABLE_TIDY       "Enable clang-tidy" OFF)
 
 set(MAX_NAME_LEN              128 CACHE STRING "Maximum allowable length of field/variable names")
 set(MAX_NUM_SEDIMENT_CLASSES    5 CACHE STRING "Maximum number of sediment size classes")
@@ -111,7 +112,13 @@ if (ENABLE_SANITIZERS)
   else() # probably no sanitizers available for this compiler(?)
     message(FATAL_ERROR "The selected C compiler (${CMAKE_C_COMPILER_ID}) doesn't support sanitizers.")
   endif()
-  message(STATUS "Enabling sanitizers (${SANITIZERS})...")
+  message(STATUS "Enabling sanitizers (${SANITIZERS}).")
+endif()
+
+if (ENABLE_TIDY)
+  find_program(CLANG_TIDY clang-tidy DOC "clang-tidy diagnostic tool" REQUIRED)
+  set(CMAKE_C_CLANG_TIDY ${CLANG_TIDY} -p ${PROJECT_BINARY_DIR} -checks=-*,readability-*)
+  message(STATUS "Enabling clang-tidy.")
 endif()
 
 # Fortran settings
