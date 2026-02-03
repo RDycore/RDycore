@@ -689,7 +689,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   // fetch the relevant vector
   CeedOperatorField field;
   PetscCallCEED(CeedOperatorGetFieldByName(sub_op, field_name, &field));
-  printf("CeedOperatorGetFieldByName: field_name = %s\n",field_name);
+  if (boundary.num_edges == 208) printf("CeedOperatorGetFieldByName: field_name = %s; %d\n",field_name, boundary.num_edges);
   CeedVector vec;
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
@@ -701,7 +701,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       boundary_data->values[c][e] = values[e][c];
-      if (e <= 10 && c == 0) printf(" values[%d] = %18.16f\n",e, values[e][c]);
+      if (e <= 10 && c == 0 && boundary.num_edges == 208) printf(" values[%d] = %18.16f\n",e, values[e][c]);
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
