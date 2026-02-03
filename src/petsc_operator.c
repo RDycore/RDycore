@@ -1,6 +1,6 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
-#include <private/rdysedimentimpl.h>
+#include <private/rdytracersimpl.h>
 #include <private/rdysweimpl.h>
 
 /// Creates a new PetscOperator with behavior defined by the given arguments.

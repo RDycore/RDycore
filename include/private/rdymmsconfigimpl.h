@@ -51,27 +51,27 @@ typedef struct {
   } solutions;
 } RDyMMSSWESolutions;
 
-// manufactured solutions for sediment classes
+// manufactured solutions for tracers
 typedef struct {
   struct {
-    // sediment concentration ci(x, y, t) and partial derivatives
-    MathExpression c[MAX_NUM_SEDIMENT_CLASSES], dcdx[MAX_NUM_SEDIMENT_CLASSES], dcdy[MAX_NUM_SEDIMENT_CLASSES], dcdt[MAX_NUM_SEDIMENT_CLASSES];
+    // tracer value ci(x, y, t) and partial derivatives
+    MathExpression c[MAX_NUM_TRACERS], dcdx[MAX_NUM_TRACERS], dcdy[MAX_NUM_TRACERS], dcdt[MAX_NUM_TRACERS];
   } expressions;
 
   struct {
-    // sediment concentration ci(x, y, t) and partial derivatives
+    // tracer value ci(x, y, t) and partial derivatives
     // NOTE: uintptr_t is an integer big enough to store a pointer, so we can
     // NOTE: use it as an element of an array (unlike void)
-    uintptr_t c[MAX_NUM_SEDIMENT_CLASSES], dcdx[MAX_NUM_SEDIMENT_CLASSES], dcdy[MAX_NUM_SEDIMENT_CLASSES], dcdt[MAX_NUM_SEDIMENT_CLASSES];
+    uintptr_t c[MAX_NUM_TRACERS], dcdx[MAX_NUM_TRACERS], dcdy[MAX_NUM_TRACERS], dcdt[MAX_NUM_TRACERS];
   } solutions;
-} RDyMMSSedimentSolutions;
+} RDyMMSTracerSolutions;
 
 typedef struct {
   PetscReal L1, L2, Linf;
 } RDyMMSErrorNorms;
 
 typedef struct {
-  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_SEDIMENT_CLASSES];
+  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_TRACERS];
 } RDyMMSConvergenceRates;
 
 typedef struct {
@@ -84,7 +84,7 @@ typedef struct {
 typedef struct {
   RDyMMSConstants         constants;
   RDyMMSSWESolutions      swe;
-  RDyMMSSedimentSolutions sediment;
+  RDyMMSTracerSolutions   tracers;
   RDyMMSConvergence       convergence;
 } RDyMMSSection;
 

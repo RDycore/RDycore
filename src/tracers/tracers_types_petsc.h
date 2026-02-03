@@ -1,5 +1,5 @@
-#ifndef SEDIMENT_TYPES_PETSC_H
-#define SEDIMENT_TYPES_PETSC_H
+#ifndef TRACERS_TYPES_PETSC_H
+#define TRACERS_TYPES_PETSC_H
 
 #include <petscsys.h>
 
@@ -11,18 +11,18 @@ static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
 typedef struct {
   PetscInt   num_states;         // number of states
   PetscInt   num_flow_comp;      // number of flow components
-  PetscInt   num_sediment_comp;  // number of sediment components
+  PetscInt   num_tracers_comp;  // number of tracer components
   PetscReal *h, *hu, *hv, *hci;  // prognostic variables
   PetscReal *u, *v, *ci;         // diagnostic variables
-} SedimentRiemannStateData;
+} TracersRiemannStateData;
 
 typedef struct {
   PetscInt   num_edges;          // number of edges
   PetscInt   num_flow_comp;      // number of flow components
-  PetscInt   num_sediment_comp;  // number of sediment components
+  PetscInt   num_tracers_comp;  // number of tracer components
   PetscReal *cn, *sn;            // cosine and sine of the angle between edges and y-axis
   PetscReal *fluxes;             // fluxes through the edge
   PetscReal *amax;               // courant number on edges
-} SedimentRiemannEdgeData;
+} TracersRiemannEdgeData;
 
-#endif  // SEDIMENT_PETSC_TYPES_H
+#endif  // TRACERS_PETSC_TYPES_H

@@ -15,8 +15,8 @@
 #define MATERIAL_PROPERTY_MANNINGS @MATERIAL_PROPERTY_MANNINGS@
 #define NUM_MATERIAL_PROPERTIES    @NUM_MATERIAL_PROPERTIES@
 
-// sediment dynamics
-#define MAX_NUM_SEDIMENT_CLASSES   @MAX_NUM_SEDIMENT_CLASSES@
+// tracer transport
+#define MAX_NUM_TRACERS            @MAX_NUM_TRACERS@
 
 // convenience macros
 

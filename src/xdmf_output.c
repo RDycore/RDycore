@@ -127,7 +127,7 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   // construct a set of available source fields (with a zero-length terminus)
   // NOTE: so far, all our diagnostics are external source terms, so we can
   // NOTE: get them all using GetOperatorDomainExternalSource()
-  static char diagnostics_names[3 + MAX_NUM_SEDIMENT_CLASSES + 1][MAX_NAME_LEN] = {
+  static char diagnostics_names[3 + MAX_NUM_TRACERS + 1][MAX_NAME_LEN] = {
       "WaterSource",
       "MomentumXSource",
       "MomentumYSource",
@@ -135,7 +135,7 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   static PetscBool first_time = PETSC_TRUE;
   if (first_time) {
     for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-      snprintf(diagnostics_names[3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "Source", i);
+      snprintf(diagnostics_names[3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT "Source", i);
     }
     first_time = PETSC_FALSE;
   }
