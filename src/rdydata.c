@@ -105,12 +105,12 @@ PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundar
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
+PetscErrorCode RDySetTracerDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
                                                      PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscCheck(ndof == rdy->num_sediment_classes, rdy->comm, PETSC_ERR_USER,
-             "Mismatch in ndof (%" PetscInt_FMT ") and number of sediment classes (%" PetscInt_FMT ")", ndof, rdy->num_sediment_classes);
+  PetscCheck(ndof == rdy->num_tracers, rdy->comm, PETSC_ERR_USER,
+             "Mismatch in ndof (%" PetscInt_FMT ") and number of tracers (%" PetscInt_FMT ")", ndof, rdy->num_tracers);
 
   PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
 

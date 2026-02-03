@@ -146,30 +146,14 @@ static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// retrieves the index of a sediment condition using its name
-static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt *index) {
+// retrieves the index of a tracer condition using its name
+static PetscErrorCode FindTracerCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
 
   // NOTE: could be optimized as above
   *index = -1;
-  for (PetscInt i = 0; i < rdy->config.num_sediment_conditions; ++i) {
-    if (!strcmp(rdy->config.sediment_conditions[i].name, name)) {
-      *index = i;
-      break;
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-// retrieves the index of a salinity condition using its name
-static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt *index) {
-  PetscFunctionBegin;
-
-  // NOTE: could be optimized as above
-  *index = -1;
-  for (PetscInt i = 0; i < rdy->config.num_salinity_conditions; ++i) {
-    if (!strcmp(rdy->config.salinity_conditions[i].name, name)) {
+  for (PetscInt i = 0; i < rdy->config.num_tracer_conditions; ++i) {
+    if (!strcmp(rdy->config.tracer_conditions[i].name, name)) {
       *index = i;
       break;
     }

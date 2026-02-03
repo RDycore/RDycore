@@ -94,14 +94,14 @@ PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt
 
 PETSC_EXTERN PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
                                                               PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
-                                                                  const PetscInt ndof, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetTracerDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
+                                                                const PetscInt ndof, PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt sediment_class, PetscInt size,
-                                                         PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalTracerSource(RDy rdy, const PetscInt region_idx, PetscInt tracer_index, PetscInt size,
+                                                       PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscReal value);
 PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);

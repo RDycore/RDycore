@@ -143,10 +143,10 @@ struct _p_RDy {
   SectionFieldSpec field_1dof;
   Vec              vec_1dof;
 
-  // DM for sediment dynamics
-  DM               sediment_dm;
-  SectionFieldSpec sediment_fields;
-  Vec              sediment_u_global, sediment_u_local;
+  // DM for tracers
+  DM               tracer_dm;
+  SectionFieldSpec tracer_fields;
+  Vec              tracer_u_global, tracer_u_local;
 
   // DM for flow
   DM               flow_dm;
@@ -164,8 +164,8 @@ struct _p_RDy {
   PetscInt     num_boundaries;
   RDyBoundary *boundaries;
 
-  // sediment size classes
-  PetscInt num_sediment_classes;
+  // tracers
+  PetscInt num_tracers;
 
   // initial conditions associated with mesh regions (1 per region)
   RDyCondition *initial_conditions;

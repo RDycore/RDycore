@@ -1,11 +1,11 @@
-#ifndef SEDIMENT_TYPES_CEED_H
-#define SEDIMENT_TYPES_CEED_H
+#ifndef TRACERS_TYPES_CEED_H
+#define TRACERS_TYPES_CEED_H
 
-#include "sediment_ceed.h"
+#include "tracers_ceed.h"
 
 // Q-function context with data attached
-typedef struct SedimentContext_ *SedimentContext;
-struct SedimentContext_ {
+typedef struct TracersContext_ *TracersContext;
+struct TracersContext_ {
   CeedScalar dtime;
   CeedScalar tiny_h;
   CeedScalar gravity;
@@ -15,13 +15,13 @@ struct SedimentContext_ {
   CeedScalar tau_critical_erosion;
   CeedScalar tau_critical_deposition;
   CeedScalar rhow;
-  CeedInt    sed_ndof;
+  CeedInt    tracers_ndof;
   CeedInt    flow_ndof;
 };
 
-struct SedimentState_ {
-  CeedScalar h, hu, hv, hci[MAX_NUM_SEDIMENT_CLASSES];
+struct TracersState_ {
+  CeedScalar h, hu, hv, hci[MAX_NUM_TRACERS];
 };
-typedef struct SedimentState_ SedimentState;
+typedef struct TracersState_ TracersState;
 
 #endif

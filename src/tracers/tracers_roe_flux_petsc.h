@@ -1,20 +1,20 @@
-#ifndef SEDIMENT_ROE_FLUX_PETSC_H
-#define SEDIMENT_ROE_FLUX_PETSC_H
+#ifndef TRACERS_ROE_FLUX_PETSC_H
+#define TRACERS_ROE_FLUX_PETSC_H
 
 #include <rdycore.h>
 
 #include "../swe/swe_roe_flux_petsc.h"
-#include "sediment_types_petsc.h"
+#include "tracers_types_petsc.h"
 
-/// @brief Computes the flux for SWE and sediments across the edge using Roe's approximate Riemann solve
-/// @param [in] *datal A SedimentRiemannStateData for values left of the edges
-/// @param [in] *datar A SedimentRiemannStateData for values right of the edges
+/// @brief Computes the flux for SWE and tracerss across the edge using Roe's approximate Riemann solve
+/// @param [in] *datal A TracersRiemannStateData for values left of the edges
+/// @param [in] *datar A TracersRiemannStateData for values right of the edges
 /// @param [in] sn array containing sines of the angles between edges and y-axis
 /// @param [in] cn array containing cosines of the angles between edges and y-axis
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, SedimentRiemannStateData *datar, const PetscReal *sn,
+static PetscErrorCode ComputeTracersRoeFlux(TracersRiemannStateData *datal, TracersRiemannStateData *datar, const PetscReal *sn,
                                              const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
@@ -32,8 +32,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
 
   PetscInt num_states = datal->num_states;
   PetscInt flow_ncomp = datal->num_flow_comp;
-  PetscInt sed_ncomp  = datal->num_sediment_comp;
-  PetscInt soln_ncomp = flow_ncomp + sed_ncomp;
+  PetscInt tracers_ncomp  = datal->num_tracers_comp;
+  PetscInt soln_ncomp = flow_ncomp + tracers_ncomp;
 
   PetscInt ci_index_offset;
 
@@ -56,8 +56,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
     PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
 
-    ci_index_offset = i * sed_ncomp;
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
+    ci_index_offset = i * tracers_ncomp;
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
       cihat[j] = (duml * cil[ci_index_offset + j] + dumr * cir[ci_index_offset + j]) / (duml + dumr);
       dch[j]   = cir[ci_index_offset + j] * hr[i] - cil[ci_index_offset + j] * hl[i];
     }
@@ -67,7 +67,7 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
         R[i][j] = R_swe[i][j];
       }
     }
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
       R[j + 3][0]     = cihat[j];
       R[j + 3][2]     = cihat[j];
       R[j + 3][j + 3] = 1.0;
@@ -76,14 +76,14 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     A[0] = A_swe[0];
     A[1] = A_swe[1];
     A[2] = A_swe[2];
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
       A[j + 3] = A[1];
     }
 
     dW[0] = dW_swe[0];
     dW[1] = dW_swe[1];
     dW[2] = dW_swe[2];
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
       dW[j + 3] = dch[j] - cihat[j] * dh;
     }
 
@@ -96,8 +96,8 @@ static PetscErrorCode ComputeSedimentRoeFlux(SedimentRiemannStateData *datal, Se
     FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
     FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
 
-    ci_index_offset = i * sed_ncomp;
-    for (PetscInt j = 0; j < sed_ncomp; j++) {
+    ci_index_offset = i * tracers_ncomp;
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
       FL[j + 3] = hl[i] * uperpl * cil[ci_index_offset + j];
       FR[j + 3] = hr[i] * uperpr * cir[ci_index_offset + j];
     }

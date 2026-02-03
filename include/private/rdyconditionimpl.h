@@ -8,7 +8,7 @@
 // * an initial condition or source/sink associated with a region
 // * a boundary condition associated with a boundary
 typedef struct {
-  // flow, sediment, salinity conditions (NULL for none)
+  // flow and tracer conditions (NULL for none)
   RDyFlowCondition     *flow;
   RDySedimentCondition *sediment;
   RDySalinityCondition *salinity;

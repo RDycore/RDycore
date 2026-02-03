@@ -8,9 +8,9 @@ option(ENABLE_COVERAGE   "Enable code coverage instrumentation" OFF)
 option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
 option(ENABLE_TIDY       "Enable clang-tidy" OFF)
 
-set(MAX_NAME_LEN              128 CACHE STRING "Maximum allowable length of field/variable names")
-set(MAX_NUM_SEDIMENT_CLASSES    5 CACHE STRING "Maximum number of sediment size classes")
-set(MAX_NUM_FIELDS             10 CACHE STRING "Maximum number of fields in a model's state")
+set(MAX_NAME_LEN    128 CACHE STRING "Maximum allowable length of field/variable names")
+set(MAX_NUM_TRACERS   5 CACHE STRING "Maximum total number of tracers")
+set(MAX_NUM_FIELDS   10 CACHE STRING "Maximum number of fields in a model's state")
 
 # Material property (integer) identifiers.
 # (we generate them here to allow GPU JIT compilers to see them)
@@ -18,7 +18,7 @@ set(MATERIAL_PROPERTY_MANNINGS 0)
 set(NUM_MATERIAL_PROPERTIES    1)
 
 # options dependent upon above options
-math(EXPR MAX_NUM_FIELD_COMPONENTS "3 + ${MAX_NUM_SEDIMENT_CLASSES}")
+math(EXPR MAX_NUM_FIELD_COMPONENTS "3 + ${MAX_NUM_TRACERS}")
 
 # CMake files live in the cmake/ directory.
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -201,9 +201,9 @@ configure_file(
   @ONLY
 )
 
-# Generate a header that handles our maximum number of sediment classes
-include(generate_cyaml_sediment_fields)
-generate_cyaml_sediment_fields()
+# Generate a header that handles our maximum number of tracers
+include(generate_cyaml_tracer_fields)
+generate_cyaml_tracer_fields()
 
 # Inherit libraries from PETSc for shared or static libs.
 extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)

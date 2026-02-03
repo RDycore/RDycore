@@ -17,7 +17,7 @@ PETSC_INTERN PetscErrorCode CreateCellCenteredDMFromDM(DM, PetscInt, const Secti
 PETSC_INTERN PetscErrorCode CreateDM(RDy);
 PETSC_INTERN PetscErrorCode CreateAuxiliaryDMs(RDy);
 PETSC_INTERN PetscErrorCode CreateFlowDM(RDy);
-PETSC_INTERN PetscErrorCode CreateSedimentDM(RDy);
+PETSC_INTERN PetscErrorCode CreateTracerDM(RDy);
 PETSC_INTERN PetscErrorCode CreateVectors(RDy);
 PETSC_INTERN PetscErrorCode CreateSectionForSWE(RDy, PetscSection *);
 
