@@ -651,6 +651,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#temperature_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        temperature_conditions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#time" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1695,6 +1706,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#temperature_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        temperature_conditions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#time" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1785,16 +1807,16 @@ broad categories:</p>
 </li>
 <li><strong>Initial and boundary conditions, source terms</strong><ul>
 <li><a href="input.html#initial_conditions">initial_conditions</a>: associates initial
-  conditions (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, and/or
-  <code>salinity_conditions</code>) with specific regions defined in the <code>regions</code>
+  conditions (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, <code>salinity_conditions</code>,
+  and/or <code>temperature_conditions</code>) with specific regions defined in the <code>regions</code>
   section</li>
 <li><a href="input.html#sources">sources</a>: associates source contributions
-  (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, and/or
-  <code>salinity_conditions</code>) with specific regions defined in the <code>regions</code>
+  (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, <code>salinity_conditions</code>,
+  and/or <code>temperature_conditions</code>) with specific regions defined in the <code>regions</code>
   section</li>
 <li><a href="input.html#boundary_conditions">boundary_conditions</a>: associates boundary
-  conditions (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, and/or
-  <code>salinity_conditions</code>) with specific boundaries defined in the
+  conditions (as defined in <code>flow_conditions</code>, <code>sediment_conditions</code>, <code>salinity_conditions</code>,
+  and/or <code>temperature_conditions</code>) with specific boundaries defined in the
   <code>boundaries</code> section</li>
 <li><a href="input.html#flow_conditions">flow_conditions</a>: defines flow-related
   parameters that can be used to specify initial/boundary conditions and
@@ -1803,6 +1825,9 @@ broad categories:</p>
   parameters that can be used to specify initial/boundary conditions and
   sources</li>
 <li><a href="input.html#salinity_conditions">salinity_conditions</a>: defines salinity-related
+  parameters that can be used to specify initial/boundary conditions and
+  sources</li>
+<li><a href="input.html#salinity_conditions">temperature_conditions</a>: defines salinity-related
   parameters that can be used to specify initial/boundary conditions and
   sources</li>
 </ul>
@@ -1931,6 +1956,7 @@ Sections that can be overridden in an ensemble member are:</p>
 <li><a href="input.html#flow_conditions"><code>flow_conditions</code></a></li>
 <li><a href="input.html#sediment_conditions"><code>sediment_conditions</code></a></li>
 <li><a href="input.html#salinity_conditions"><code>salinity_conditions</code></a></li>
+<li><a href="input.html#temperature_conditions"><code>temperature_conditions</code></a></li>
 </ul>
 <p>The example above redefines the Manning coefficient of the <code>smooth</code>
 <a href="input.html#materials">material</a> defined elsewhere in the file. In plain language,
@@ -2026,13 +2052,13 @@ has only a single parameter:</p>
 <span class="w">    </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dam_bottom_ic</span>
 </code></pre></div>
 <p>The <code>initial_conditions</code> section is a sequence (list) associating <code>flow</code>,
-<code>sediment</code>, and <code>salinity</code> conditions (as defined in their respective sections)
+<code>sediment</code>, <code>salinity</code>, and <code>temperature</code> conditions (as defined in their respective sections)
 with regions (as defined in the <code>regions</code> section). A region must have exactly
 one set of initial conditions associated with it. The above example shows a valid
 configuration for a simulation in which sediments and salinity are not modeled,
 so only the <code>flow</code> parameter is required. The presence of sediment concentrations
-requires the <code>sediment</code> parameter, as the presence of salinity concentrations
-requires the <code>salinity</code> parameter.</p>
+requires the <code>sediment</code> parameter, just as a salinity concentration or temperature require a
+<code>salinity</code> and <code>temperature</code> parameter.</p>
 <h2 id="logging"><code>logging</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">logging</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rdycore.log</span>
@@ -2276,7 +2302,7 @@ simulation is restarted.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">salinity_conditions</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-sal-condition</span>
 <span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
-<span class="w">    </span><span class="nt">concentration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">S</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </code></pre></div>
 <p>The <code>salinity_conditions</code> section contains a sequence of sets of parameters
 defining the salinity concentration within a cell or cell boundary (edge).
@@ -2306,8 +2332,7 @@ providing one or more parameters. This can be done in one of two ways:</p>
 <li>
 <p>By specifying a file from which concentration data is to be read. The
    data is read into the components of the solution vector that correspond
-   to the cells belonging to the region to which this flow condition is
-   assigned:</p>
+   to the cells belonging to the region to which this condition is assigned:</p>
 </li>
 <li>
 <p><code>file</code>: the path for the file from which data is read, specified relative
@@ -2320,7 +2345,11 @@ providing one or more parameters. This can be done in one of two ways:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">sediment_conditions</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-sed-condition</span>
 <span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dirichlet</span>
-<span class="w">    </span><span class="nt">concentration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">c0</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">c1</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sediment-class-1.bin</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary</span>
 </code></pre></div>
 <p>The <code>sediment_conditions</code> section contains a sequence of sets of parameters
 defining the sediment concentration within a cell or cell boundary (edge).
@@ -2341,11 +2370,12 @@ that define a sediment condition are</p>
 </ul>
 </li>
 </ul>
-<p>In the case of a Dirichlet condition, a sediment concentration is prescribed by
+<p>Information for the <code>N</code> size classes is provided by specifying mappings <code>c0</code>, <code>c1</code>, ..., <code>cN</code>.
+In the case of a Dirichlet condition, a sediment concentration is prescribed for each size class by
 providing one or more parameters. This can be done in one of two ways:</p>
 <ol>
 <li>
-<p>By specifying the concentration directly using the <code>concentration</code> parameter</p>
+<p>By specifying the concentration directly using the <code>value</code> parameter</p>
 </li>
 <li>
 <p>By specifying a file from which concentration data is to be read. The
@@ -2360,6 +2390,7 @@ providing one or more parameters. This can be done in one of two ways:</p>
 <li><code>format</code>: the format of the data in the file, which current must be
      <code>binary</code> (specifying PETSc's binary format).</li>
 </ol>
+<p>All size classes must be specified for each Dirichlet condition.</p>
 <h2 id="sources"><code>sources</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">sources</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">upstream</span>
@@ -2390,6 +2421,8 @@ the association between the two is made clear by the <code>region</code> and <co
 parameters in each entry. A region is understood to be completely filled with
 the material with which it is associated--the relationship between regions and
 materials is necessarily 1:1.</p>
+<h2 id="temperature_conditions"><code>temperature_conditions</code></h2>
+<p><strong>Coming soon!</strong></p>
 <h2 id="time"><code>time</code></h2>
 <div class="highlight"><pre><span></span><code><span class="nt">time</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">date</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2025-02-01-11:10:02</span>
