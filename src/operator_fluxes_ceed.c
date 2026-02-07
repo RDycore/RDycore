@@ -202,10 +202,12 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
                                             &c_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_r,
                                             &c_restrict_r));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                            eta_beg_offset, &eta_beg_restrict));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
-                                            eta_end_offset, &eta_end_restrict));
+    if (config.physics.sediment.num_classes == 0) {
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                              eta_beg_offset, &eta_beg_restrict));
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                              eta_end_offset, &eta_end_restrict));
+    }
     PetscCall(PetscFree2(q_offset_l, q_offset_r));
     PetscCall(PetscFree2(c_offset_l, c_offset_r));
     PetscCall(PetscFree2(eta_beg_offset, eta_end_offset));
@@ -239,8 +241,10 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_r));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_r));
-  PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
-  PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
+  if (config.physics.sediment.num_classes == 0) {
+    PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
+    PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
+  }
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
@@ -454,10 +458,12 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
                                             q_offset_l, &q_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             c_offset_l, &c_restrict_l));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
-                                            CEED_COPY_VALUES, eta_beg_offset, &eta_beg_restrict));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
-                                            CEED_COPY_VALUES, eta_end_offset, &eta_end_restrict));
+    if (config.physics.sediment.num_classes == 0) {
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
+                                              CEED_COPY_VALUES, eta_beg_offset, &eta_beg_restrict));
+      PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
+                                              CEED_COPY_VALUES, eta_end_offset, &eta_end_restrict));
+    }
     PetscCall(PetscFree(q_offset_l));
     PetscCall(PetscFree(c_offset_l));
     PetscCall(PetscFree(eta_beg_offset));
@@ -500,8 +506,10 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
-  PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
-  PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
+  if (config.physics.sediment.num_classes == 0) {
+    PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
+    PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
+  }
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&flux_accumulated));
