@@ -226,3 +226,16 @@ foreach(np 1) # test on 1 processes
   endforeach()
 endforeach()
 
+# Test Bradford-Sanders 2002 correction
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/parabolic_bowl.yaml
+     ${MESH_DIR}/parabolic_bowl.exo
+     ${CONDITION_DIR}/parabolic_bowl.ic.${PETSC_ID_TYPE}.bin
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 2)
+  foreach(config ceed)
+    foreach(lang ${supported_languages})
+      add_test(swe_bs2002_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} parabolic_bowl.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()

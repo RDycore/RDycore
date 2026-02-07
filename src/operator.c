@@ -219,8 +219,14 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       first_time = PETSC_FALSE;
     }
 
+    if ((*operator)->config->physics.flow.well_balance != WELL_BALANCE_NONE) {
+      PetscCall(CreateCeedEtaVerticesOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices,
+                                              &(*operator)->ceed.eta_vertices_operator));
+    } else {
+      PetscCall(CreateCeedEtaVerticesVector((*operator)->mesh, &(*operator)->ceed.eta_vertices));
+    }
     PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                     (*operator)->boundary_conditions, &(*operator)->ceed.flux));
+                                     (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices, &(*operator)->ceed.flux));
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
   } else {
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
@@ -255,6 +261,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.rhs)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.sources)));
+    PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.eta_vertices)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }
@@ -300,6 +307,29 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.flux, label, &op->ceed.dt));
     PetscCallCEED(CeedOperatorGetContextFieldLabel(op->ceed.source, "time step", &label));
     PetscCallCEED(CeedOperatorSetContextDouble(op->ceed.source, label, &op->ceed.dt));
+  }
+
+  //------------------
+  // Eta Calculation
+  //------------------
+  if (op->config->physics.flow.well_balance == WELL_BALANCE_BS2002 && op->config->physics.sediment.num_classes == 0) {
+    // point our CEED solution vector at our PETSc solution vector
+    PetscMemType mem_type;
+    PetscScalar *u_local_ptr;
+    PetscCall(VecGetArrayAndMemType(u_local, &u_local_ptr, &mem_type));
+    PetscCallCEED(CeedVectorSetArray(op->ceed.u_local, MemTypeP2C(mem_type), CEED_USE_POINTER, u_local_ptr));
+
+    // apply the eta operator
+    PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+    PetscCall(PetscLogGpuTimeBegin());
+    PetscCallCEED(CeedVectorSetValue(op->ceed.eta_vertices, 0.0));  // zero eta_vertices vector before use
+    PetscCallCEED(CeedOperatorApply(op->ceed.eta_vertices_operator, op->ceed.u_local, op->ceed.eta_vertices, CEED_REQUEST_IMMEDIATE));
+    PetscCall(PetscLogGpuTimeEnd());
+    PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
+
+    // reset our CeedVectors and restore our PETSc vectors
+    PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
+    PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
   }
 
   //------------------

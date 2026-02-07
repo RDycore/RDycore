@@ -80,7 +80,7 @@ CEED_QFUNCTION_HELPER void ComputeSWEEigenspectrum_Roe(const CeedScalar hl, cons
 
 // riemann solver -- called by other Q-functions
 CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL, SWEState qR,
-                                              CeedScalar sn, CeedScalar cn, CeedScalar flux[], CeedScalar *amax) {
+                                              CeedScalar sn, CeedScalar cn, CeedScalar dhv, CeedScalar flux[], CeedScalar *amax) {
   const CeedScalar hl = qL.h, hr = qR.h;
 
   const CeedScalar denom_l = Square(hl) + Square(h_anuga);
@@ -113,6 +113,9 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_Roe(const CeedScalar gravity, const Ce
   flux[0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0] * dW[0] - R[0][1] * A[1] * dW[1] - R[0][2] * A[2] * dW[2]);
   flux[1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0] * dW[0] - R[1][1] * A[1] * dW[1] - R[1][2] * A[2] * dW[2]);
   flux[2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0] * dW[0] - R[2][1] * A[1] * dW[1] - R[2][2] * A[2] * dW[2]);
+
+  flux[1] += gravity * Square(dhv) / 24.0 * cn;
+  flux[2] += gravity * Square(dhv) / 24.0 * sn;
 }
 
 #endif
