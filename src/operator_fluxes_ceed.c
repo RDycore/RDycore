@@ -384,7 +384,8 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
     CeedInt *q_offset_l, *c_offset_l, *offset_dirichlet = NULL, *eta_beg_offset, *eta_end_offset;
     PetscCall(PetscMalloc1(num_edges, &q_offset_l));
     PetscCall(PetscMalloc1(num_edges, &c_offset_l));
-    PetscCall(PetscMalloc2(num_edges, &eta_beg_offset, num_edges, &eta_end_offset));
+    PetscCall(PetscMalloc1(num_edges, &eta_beg_offset));
+    PetscCall(PetscMalloc1(num_edges, &eta_end_offset));
     if (boundary_condition.flow->type == CONDITION_DIRICHLET) {
       PetscCall(PetscMalloc1(num_edges, &offset_dirichlet));
     }
