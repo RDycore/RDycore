@@ -22,7 +22,8 @@
 /// @param ctx [in] SWE context
 /// @param Q [in] number of quadrature points
 /// @param in  [in] array of input fields
-///             - in[0]: geom[num_cells][3] - an array associating the z1, z2, z3 of cell vertices with each cell
+///             - in[0]: geom[num_cells][4] - an array associating the z1, z2, z3 of cell vertices with each cell
+///                                           and weight associated for the given cell
 ///             - in[1]: q[num_cells][3] - an array associating a 3-DOF solution input state with each cell
 /// @param out [out] eta at cell vertices
 /// @return 0 on success, otherwise an error code
