@@ -30,7 +30,7 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesWithSemiImplicitBedFriction, SWESourcesWithSemiImplicitBedFriction_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-      } else { // flow + tracers
+      } else {  // flow + tracers
         PetscCallCEED(
             CeedQFunctionCreateInterior(ceed, 1, TracerSourcesWithSemiImplicitBedFriction, TracerSourcesWithSemiImplicitBedFriction_loc, qf));
         PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
@@ -48,7 +48,7 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesWithoutBedFriction, SWESourcesWithoutBedFriction_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-      } else { // flow + tracers
+      } else {  // flow + tracers
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerSourcesWithoutBedFriction, TracerSourcesWithoutBedFriction_loc, qf));
         PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }

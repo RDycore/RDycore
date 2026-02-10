@@ -11,9 +11,9 @@
 // * a boundary condition associated with a boundary
 typedef struct {
   // flow and tracer conditions (NULL for none)
-  RDyFlowCondition     *flow;
-  RDySedimentCondition *sediment;
-  RDySalinityCondition *salinity;
+  RDyFlowCondition        *flow;
+  RDySedimentCondition    *sediment;
+  RDySalinityCondition    *salinity;
   RDyTemperatureCondition *temperature;
 
   // value(s) associated with the condition

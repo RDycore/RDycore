@@ -43,7 +43,7 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
   if (num_tracers == 0) {  // flow only, and SWE is it!
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
     PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
-  } else { // flow + tracers
+  } else {  // flow + tracers
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
     PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
   }

@@ -52,11 +52,11 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
       .type = CONDITION_DIRICHLET,
   };
   analytic_temperature.temperature = rdy->config.mms.temperature.solutions.T;
-  RDyCondition analytic_bc = {
-      .flow     = &analytic_flow,
-      .sediment = &analytic_sediment,
-      .salinity    = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
-      .temperature = (rdy->config.physics.heat ? &analytic_temperature : NULL),
+  RDyCondition analytic_bc         = {
+              .flow        = &analytic_flow,
+              .sediment    = &analytic_sediment,
+              .salinity    = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
+              .temperature = (rdy->config.physics.heat ? &analytic_temperature : NULL),
   };
 
   // Assign the boundary condition to each boundary.

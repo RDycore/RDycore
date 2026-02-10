@@ -9,8 +9,8 @@
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
 #include <unistd.h>     // for getpid() and gethostname()
-#include "petscdm.h"
 
+#include "petscdm.h"
 #include "petscvec.h"
 
 // time conversion factors
@@ -848,7 +848,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
       RDyRegion    region = rdy->regions[r];
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.flow->name, flow_ic.name)) {
-        if (local) { // reading from file
+        if (local) {  // reading from file
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
@@ -951,7 +951,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
     RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
     Vec                  local       = NULL;
-    for (PetscInt idof = 0; idof < rdy->config.sediment.num_classes; ++idof) {
+    for (PetscInt idof = 0; idof < rdy->config.physics.sediment.num_classes; ++idof) {
       if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
         PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, local));
       }
@@ -1005,14 +1005,14 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
       RDyRegion    region = rdy->regions[r];
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.salinity->name, salinity_ic.name)) {
-        if (local) { // reading from file
+        if (local) {  // reading from file
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_local_id = region.cell_local_ids[c];
             PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
             if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-              PetscInt idof = rdy->num_tracers;
+              PetscInt idof                      = rdy->num_tracers;
               u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
             }
           }
@@ -1031,7 +1031,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
   // initialize thermal conditions
   for (PetscInt f = 0; f < rdy->config.num_temperature_conditions; ++f) {
     RDyTemperatureCondition temperature_ic = rdy->config.temperature_conditions[f];
-    Vec                  local       = NULL;
+    Vec                     local          = NULL;
     if (temperature_ic.file[0]) {  // read from file
       PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, local));
     }
@@ -1048,7 +1048,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
             PetscInt cell_local_id = region.cell_local_ids[c];
             PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
             if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-              PetscInt idof = rdy->num_tracers + (rdy->config.physics.salinity ? 1 : 0);
+              PetscInt idof                      = rdy->num_tracers + (rdy->config.physics.salinity ? 1 : 0);
               u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
             }
           }

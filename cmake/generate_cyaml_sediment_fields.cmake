@@ -15,6 +15,13 @@ function(generate_cyaml_sediment_fields)
   endforeach()
   list(APPEND lines "")
 
+  list(APPEND lines "// This macro is used in sediment_conditions_fields_schema in yaml_input.c")
+  list(APPEND lines "#define CYAML_SEDIMENT_CONDITION_COMPONENT_FIELDS \\")
+  foreach(i RANGE ${N})
+    list(APPEND lines "    CYAML_FIELD_MAPPING(\"c${i}\", CYAML_FLAG_OPTIONAL, RDySedimentCondition, classes[${i}], component_fields_schema), \\")
+  endforeach()
+  list(APPEND lines "")
+
   list(APPEND lines "// This macro is used in mms_fields_schema in yaml_input.c")
   list(APPEND lines "#define CYAML_MMS_SEDIMENT_FIELDS \\")
   foreach(i RANGE ${N})
