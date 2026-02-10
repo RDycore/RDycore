@@ -4,6 +4,7 @@
 #include <float.h>
 #include <petsc.h>
 #include <rdycore.h>
+#include "private/config.h"
 
 // The types in this file ѕerve as an intermediate representation for our MMS
 // driver's input configuration file:
@@ -55,14 +56,14 @@ typedef struct {
 typedef struct {
   struct {
     // sediment concentration c[i](x, y, t) and partial derivatives
-    MathExpression c[MAX_NUM_TRACERS], dcdx[MAX_NUM_TRACERS], dcdy[MAX_NUM_TRACERS], dcdt[MAX_NUM_TRACERS];
+    MathExpression c[MAX_NUM_SEDIMENT_CLASSES], dcdx[MAX_NUM_SEDIMENT_CLASSES], dcdy[MAX_NUM_SEDIMENT_CLASSES], dcdt[MAX_NUM_SEDIMENT_CLASSES];
   } expressions;
 
   struct {
     // sediment concentration c[i](x, y, t) and partial derivatives
     // NOTE: uintptr_t is an integer big enough to store a pointer, so we can
     // NOTE: use it as an element of an array (unlike void*)
-    uintptr_t c[MAX_NUM_TRACERS], dcdx[MAX_NUM_TRACERS], dcdy[MAX_NUM_TRACERS], dcdt[MAX_NUM_TRACERS];
+    uintptr_t c[MAX_NUM_SEDIMENT_CLASSES], dcdx[MAX_NUM_SEDIMENT_CLASSES], dcdy[MAX_NUM_SEDIMENT_CLASSES], dcdt[MAX_NUM_SEDIMENT_CLASSES];
   } solutions;
 } RDyMMSSedimentSolutions;
 
@@ -97,7 +98,7 @@ typedef struct {
 } RDyMMSErrorNorms;
 
 typedef struct {
-  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_TRACERS], S, T;
+  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_SEDIMENT_CLASSES], S, T;
 } RDyMMSConvergenceRates;
 
 typedef struct {
