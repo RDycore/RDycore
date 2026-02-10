@@ -919,6 +919,10 @@ static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename,
 static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscFunctionBegin;
 
+  if (rdy->config.physics.sediment.num_classes == 0 && !rdy->config.physics.salinity && !rdy->config.physics.heat) {  // no tracers!
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+
   // check that our vectors are sized consistently
   PetscInt flow_ndof, tracer_ndof, soln_ndof, diags_ndof;
   PetscCall(VecGetBlockSize(rdy->flow_global, &flow_ndof));
