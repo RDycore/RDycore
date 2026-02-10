@@ -181,10 +181,11 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscStrncpy(mms_comp_names[0], " h ", MAX_NAME_LEN);
   PetscStrncpy(mms_comp_names[1], "hu ", MAX_NAME_LEN);
   PetscStrncpy(mms_comp_names[2], "hv ", MAX_NAME_LEN);
-  PetscInt index = 3;
-  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i, ++index) {
+  PetscInt index = 3, num_classes = rdy->config.physics.sediment.num_classes;
+  for (PetscInt i = 0; i < num_classes; ++i) {
     snprintf(mms_comp_names[index + i], MAX_NAME_LEN, "c%" PetscInt_FMT " ", i);
   }
+  index += num_classes;
   if (rdy->config.physics.salinity) {
     PetscStrncpy(mms_comp_names[index], "salinity", MAX_NAME_LEN);
     ++index;
