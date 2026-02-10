@@ -1236,6 +1236,14 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
     PetscCall(ParseSedimentManufacturedSolutions(comm, config->physics.sediment.num_classes, &config->mms.constants, &config->mms.sediment));
   }
 
+  if (config->physics.salinity) {
+    PetscCall(ParseSalinityManufacturedSolutions(comm, &config->mms.constants, &config->mms.salinity));
+  }
+
+  if (config->physics.heat) {
+    PetscCall(ParseTemperatureManufacturedSolutions(comm, &config->mms.constants, &config->mms.temperature));
+  }
+
   // material properties
   for (PetscInt m = 0; m < config->num_materials; ++m) {
     RDyMaterialPropertiesSpec *properties = &config->materials[m].properties;
