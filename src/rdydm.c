@@ -266,17 +266,17 @@ PetscErrorCode CreateVectors(RDy rdy) {
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow
-    PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_global));
-    PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_local));
+    PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_global_vec));
+    PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_local_vec));
 
     // Vecs for sediment
-    PetscCall(DMCreateGlobalVector(rdy->tracer_dm, &rdy->tracer_global));
-    PetscCall(DMCreateLocalVector(rdy->tracer_dm, &rdy->tracer_local));
+    PetscCall(DMCreateGlobalVector(rdy->tracer_dm, &rdy->tracer_global_vec));
+    PetscCall(DMCreateLocalVector(rdy->tracer_dm, &rdy->tracer_local_vec));
 
   } else {
     // Point the flow Vecs to soln Vecs
-    rdy->flow_global = rdy->u_global;
-    rdy->flow_local  = rdy->u_local;
+    rdy->flow_global_vec = rdy->u_global;
+    rdy->flow_local_vec  = rdy->u_local;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
