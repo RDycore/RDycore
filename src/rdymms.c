@@ -354,9 +354,9 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       if (num_sediment_classes > 0) {
         PetscInt   offset = 3;
         PetscReal *ci;
-        PetscInt   l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &ci));
         for (PetscInt i = 0; i < num_sediment_classes; ++i) {
+          PetscInt l = 0;
           PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_id = region.cell_local_ids[c];
