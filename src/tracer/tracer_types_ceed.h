@@ -1,5 +1,5 @@
-#ifndef TRACERS_TYPES_CEED_H
-#define TRACERS_TYPES_CEED_H
+#ifndef TRACER_TYPES_CEED_H
+#define TRACER_TYPES_CEED_H
 
 #include <ceed.h>
 #include <private/config.h>

@@ -1,5 +1,5 @@
-#ifndef TRACERS_ROE_FLUX_PETSC_H
-#define TRACERS_ROE_FLUX_PETSC_H
+#ifndef TRACER_ROE_FLUX_PETSC_H
+#define TRACER_ROE_FLUX_PETSC_H
 
 #include <rdycore.h>
 
