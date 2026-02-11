@@ -1,5 +1,5 @@
-#ifndef TRACERS_FLUXES_CEED_H
-#define TRACERS_FLUXES_CEED_H
+#ifndef TRACER_FLUXES_CEED_H
+#define TRACER_FLUXES_CEED_H
 
 #include "tracer_types_ceed.h"
 

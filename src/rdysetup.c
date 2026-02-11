@@ -627,15 +627,6 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                  "initial sediment condition '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
       ic->sediment = sed_cond;
-      if (rdy->config.physics.salinity) {
-        PetscCheck(strlen(ic_spec.salinity), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial salinity condition!", region.name);
-        PetscInt sal_index;
-        PetscCall(FindSalinityCondition(rdy, ic_spec.salinity, &sal_index));
-        RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
-        PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-                   "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
-        ic->salinity = sal_cond;
-      }
     }
 
     if (rdy->config.physics.salinity) {
@@ -649,7 +640,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
     }
 
     if (rdy->config.physics.heat) {
-      PetscCheck(strlen(ic_spec.temperature), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial heat condition!", region.name);
+      PetscCheck(strlen(ic_spec.temperature), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial temperature condition!", region.name);
       PetscInt temperature_index;
       PetscCall(FindTemperatureCondition(rdy, ic_spec.temperature, &temperature_index));
       RDyTemperatureCondition *temperature_cond = &rdy->config.temperature_conditions[temperature_index];
@@ -930,7 +921,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
   PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
 
-  PetscCheck(soln_ndof = flow_ndof + tracer_ndof, rdy->comm, PETSC_ERR_USER,
+  PetscCheck(soln_ndof == flow_ndof + tracer_ndof, rdy->comm, PETSC_ERR_USER,
              "Blocksizes of flow (=%" PetscInt_FMT ") and tracer (=%" PetscInt_FMT ") Vecs do not sum to blocksize of solution (=%" PetscInt_FMT
              ") Vec",
              flow_ndof, tracer_ndof, soln_ndof);
@@ -952,49 +943,44 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscCall(VecGetArray(rdy->tracer_global_vec, &u_ptr));
 
   // initialize sediment conditions one size class at a time
-  for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
-    RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
-    Vec                  local       = NULL;
-    for (PetscInt idof = 0; idof < rdy->config.physics.sediment.num_classes; ++idof) {
-      if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
-        PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, local));
-      }
+  PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
+  if (num_sediment_classes > 0) {
+    for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
+      RDySedimentCondition sediment_ic = rdy->config.sediment_conditions[f];
+      Vec                  local       = NULL;
+      for (PetscInt idof = 0; idof < num_sediment_classes; ++idof) {
+        if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
+          PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, local));
+        }
 
-      // set regional sediment as needed
-      for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-        RDyRegion    region = rdy->regions[r];
-        RDyCondition ic     = rdy->initial_conditions[r];
-        if (!strcmp(ic.sediment->name, sediment_ic.name)) {
-          if (local) {
-            PetscScalar *local_ptr;
-            PetscCall(VecGetArray(local, &local_ptr));
-            for (PetscInt c = 0; c < region.num_local_cells; ++c) {
-              PetscInt cell_local_id = region.cell_local_ids[c];
-              PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
-              if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-                u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+        // set regional sediment as needed
+        for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+          RDyRegion    region = rdy->regions[r];
+          RDyCondition ic     = rdy->initial_conditions[r];
+          if (!strcmp(ic.sediment->name, sediment_ic.name)) {
+            if (local) {
+              PetscScalar *local_ptr;
+              PetscCall(VecGetArray(local, &local_ptr));
+              for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+                PetscInt cell_local_id = region.cell_local_ids[c];
+                PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+                if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
+                  u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+                }
               }
-            }
-            PetscCall(VecRestoreArray(local, &local_ptr));
-            PetscCall(VecDestroy(&local));
-          } else {
-            for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-              PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
-              u_ptr[ndof * owned_cell_id + idof] = mupEval(sediment_ic.classes[idof].value);
+              PetscCall(VecRestoreArray(local, &local_ptr));
+              PetscCall(VecDestroy(&local));
+            } else {
+              for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+                PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
+                u_ptr[ndof * owned_cell_id + idof] = mupEval(sediment_ic.classes[idof].value);
+              }
             }
           }
         }
       }
     }
   }
-
-  DM scalar_dm;
-  if (rdy->config.physics.salinity || rdy->config.physics.heat) {
-    SectionFieldSpec scalar_field = {0};
-    PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, scalar_field, &scalar_dm));
-  }
-
-  PetscCall(VecRestoreArray(rdy->tracer_global_vec, &u_ptr));
 
   // initialize salinity conditions
   for (PetscInt f = 0; f < rdy->config.num_salinity_conditions; ++f) {
@@ -1016,7 +1002,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
             PetscInt cell_local_id = region.cell_local_ids[c];
             PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
             if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-              PetscInt idof                      = rdy->num_tracers;
+              PetscInt idof                      = num_sediment_classes;
               u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
             }
           }
@@ -1052,7 +1038,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
             PetscInt cell_local_id = region.cell_local_ids[c];
             PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
             if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-              PetscInt idof                      = rdy->num_tracers + (rdy->config.physics.salinity ? 1 : 0);
+              PetscInt idof                      = num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0);
               u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
             }
           }
@@ -1068,14 +1054,13 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     }
   }
 
-  PetscCall(VecRestoreArray(rdy->tracer_global_vec, &u_ptr));
-  PetscFunctionReturn(PETSC_SUCCESS);
-
   // copy tracer data into the global solution vector
   for (PetscInt i = 0; i < tracer_ndof; i++) {
     PetscCall(VecStrideGather(rdy->tracer_global_vec, i, rdy->vec_1dof, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->vec_1dof, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
+
+  PetscCall(VecRestoreArray(rdy->tracer_global_vec, &u_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

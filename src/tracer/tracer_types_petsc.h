@@ -1,5 +1,5 @@
-#ifndef TRACERS_TYPES_PETSC_H
-#define TRACERS_TYPES_PETSC_H
+#ifndef TRACER_TYPES_PETSC_H
+#define TRACER_TYPES_PETSC_H
 
 #include <petscsys.h>
 
@@ -25,4 +25,4 @@ typedef struct {
   PetscReal *amax;              // courant number on edges
 } TracerRiemannEdgeData;
 
-#endif  // TRACERS_PETSC_TYPES_H
+#endif  // TRACER_TYPES_PETSC_H
