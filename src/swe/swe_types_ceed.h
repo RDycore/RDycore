@@ -1,7 +1,7 @@
 #ifndef SWE_TYPES_CEED_H
 #define SWE_TYPES_CEED_H
 
-#include "swe_ceed.h"
+#include <swe_ceed.h>
 
 // Q-function context with data attached
 typedef struct SWEContext_ *SWEContext;

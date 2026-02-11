@@ -789,7 +789,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(VecZeroEntries(rdy->flow_global));
+  PetscCall(VecZeroEntries(rdy->flow_global_vec));
 
   // check that each region has an initial condition
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
@@ -800,10 +800,10 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->flow_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->flow_global, &ndof));
+  PetscCall(VecGetLocalSize(rdy->flow_global_vec, &n_local));
+  PetscCall(VecGetBlockSize(rdy->flow_global_vec, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->flow_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->flow_global_vec, &u_ptr));
 
   // initialize flow conditions
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
@@ -875,11 +875,11 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
     }
   }
 
-  PetscCall(VecRestoreArray(rdy->flow_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->flow_global_vec, &u_ptr));
 
   // copy flow data into the global solution vector
   for (PetscInt i = 0; i < ndof; i++) {
-    PetscCall(VecStrideGather(rdy->flow_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->flow_global_vec, i, rdy->vec_1dof, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->vec_1dof, i, rdy->u_global, INSERT_VALUES));
   }
 
@@ -925,8 +925,8 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
 
   // check that our vectors are sized consistently
   PetscInt flow_ndof, tracer_ndof, soln_ndof, diags_ndof;
-  PetscCall(VecGetBlockSize(rdy->flow_global, &flow_ndof));
-  PetscCall(VecGetBlockSize(rdy->tracer_global, &tracer_ndof));
+  PetscCall(VecGetBlockSize(rdy->flow_global_vec, &flow_ndof));
+  PetscCall(VecGetBlockSize(rdy->tracer_global_vec, &tracer_ndof));
   PetscCall(VecGetBlockSize(rdy->u_global, &soln_ndof));
   PetscCall(VecGetBlockSize(rdy->vec_1dof, &diags_ndof));
 
@@ -942,14 +942,14 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     PetscCheck(ic.flow, rdy->comm, PETSC_ERR_USER, "No initial condition specified for region '%s'", region.name);
   }
 
-  PetscCall(VecZeroEntries(rdy->tracer_global));
+  PetscCall(VecZeroEntries(rdy->tracer_global_vec));
 
   // now initialize or override initial conditions for each region
   PetscInt n_local, ndof;
-  PetscCall(VecGetLocalSize(rdy->tracer_global, &n_local));
-  PetscCall(VecGetBlockSize(rdy->tracer_global, &ndof));
+  PetscCall(VecGetLocalSize(rdy->tracer_global_vec, &n_local));
+  PetscCall(VecGetBlockSize(rdy->tracer_global_vec, &ndof));
   PetscScalar *u_ptr;
-  PetscCall(VecGetArray(rdy->tracer_global, &u_ptr));
+  PetscCall(VecGetArray(rdy->tracer_global_vec, &u_ptr));
 
   // initialize sediment conditions one size class at a time
   for (PetscInt f = 0; f < rdy->config.num_sediment_conditions; ++f) {
@@ -994,7 +994,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, scalar_field, &scalar_dm));
   }
 
-  PetscCall(VecRestoreArray(rdy->tracer_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->tracer_global_vec, &u_ptr));
 
   // initialize salinity conditions
   for (PetscInt f = 0; f < rdy->config.num_salinity_conditions; ++f) {
@@ -1068,12 +1068,12 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     }
   }
 
-  PetscCall(VecRestoreArray(rdy->tracer_global, &u_ptr));
+  PetscCall(VecRestoreArray(rdy->tracer_global_vec, &u_ptr));
   PetscFunctionReturn(PETSC_SUCCESS);
 
   // copy tracer data into the global solution vector
   for (PetscInt i = 0; i < tracer_ndof; i++) {
-    PetscCall(VecStrideGather(rdy->tracer_global, i, rdy->vec_1dof, INSERT_VALUES));
+    PetscCall(VecStrideGather(rdy->tracer_global_vec, i, rdy->vec_1dof, INSERT_VALUES));
     PetscCall(VecStrideScatter(rdy->vec_1dof, flow_ndof + i, rdy->u_global, INSERT_VALUES));
   }
 
