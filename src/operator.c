@@ -316,6 +316,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // point our CEED right-hand side vector at a PETSc right-hand side vector
     Vec f_local;
     PetscCall(DMGetLocalVector(op->dm, &f_local));
+    PetscCall(VecZeroEntries(f_local));
     PetscScalar *f_local_ptr;
     PetscCall(VecGetArrayAndMemType(f_local, &f_local_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(op->ceed.rhs, MemTypeP2C(mem_type), CEED_USE_POINTER, f_local_ptr));
@@ -323,7 +324,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // apply the flux operator, computing flux divergences
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApplyAdd(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -368,7 +369,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // apply the source operator(s)
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.source, op->ceed.u_local, op->ceed.sources, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApplyAdd(op->ceed.source, op->ceed.u_local, op->ceed.sources, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
