@@ -46,6 +46,9 @@ typedef struct {
 
     // last step for which boundary flux time series data was written
     PetscInt last_step;
+
+    // accumulated time for computing fluxes averaged over output intervals
+    PetscReal accumulated_time;
   } boundary_fluxes;
 
   // observations recorded at specific sites
@@ -64,6 +67,8 @@ typedef struct {
     Vec accum_u;
     // last step for which observations data was written
     PetscInt last_step;
+    // accumulated time for computing fluxes averaged over output intervals
+    PetscReal accumulated_time;
   } observations;
 } RDyTimeSeriesData;
 
