@@ -803,6 +803,36 @@ PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Sets a contiguous range of components [comp_offset, comp_offset + num_comp) of the
+/// operator's Dirichlet boundary values for the given boundary, reading from the flat
+/// strided array values[num_comp * e + c]. Internally calls Get, fills data, then Restore.
+/// @param [in] op          the operator for which values are set
+/// @param [in] boundary    the boundary whose Dirichlet values are to be set
+/// @param [in] comp_offset the index of the first component to fill
+/// @param [in] num_comp    the number of components to fill
+/// @param [in] num_edges   the number of boundary edges (must equal boundary.num_edges)
+/// @param [in] values      source values in the strided layout values[num_comp * e + c]
+PetscErrorCode SetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                         PetscReal *values) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(boundary.num_edges == num_edges, comm, PETSC_ERR_USER,
+             "num_edges (% " PetscInt_FMT ") does not match boundary.num_edges (% " PetscInt_FMT ")", num_edges, boundary.num_edges);
+
+  OperatorData data;
+  PetscCall(GetOperatorBoundaryValues(op, boundary, &data));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      data.values[comp_offset + c][e] = values[num_comp * e + c];
+    }
+  }
+  PetscCall(RestoreOperatorBoundaryValues(op, boundary, &data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Provides read-write access to the operator's boundary flux array data for
 /// a given boundary.
 /// @param [in]  op the operator for which data access is provided
