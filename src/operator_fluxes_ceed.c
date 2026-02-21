@@ -380,8 +380,10 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &boundary->flux_accumulated, NULL));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &boundary->flux_accumulated_v2, NULL));
     PetscCallCEED(CeedVectorSetValue(flux, 0.0));
     PetscCallCEED(CeedVectorSetValue(boundary->flux_accumulated, 0.0));
+    PetscCallCEED(CeedVectorSetValue(boundary->flux_accumulated_v2, 0.0));
 
     // create a vector to store the courant number for each edge
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
