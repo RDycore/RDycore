@@ -269,14 +269,14 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// accumulates boundary fluxes on the given boundary from the given array of
+// records boundary fluxes on the given boundary from the given array of
 // fluxes on boundary edges
-static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, OperatorData boundary_fluxes) {
+static PetscErrorCode RecordBoundaryFluxes(RDy rdy, RDyBoundary boundary, OperatorData boundary_fluxes) {
   PetscFunctionBegin;
   RDyTimeSeriesData *time_series = &rdy->time_series;
   if (time_series->boundary_fluxes.fluxes) {
-    // if the boundary condition for this boundary is auto-generated,
-    // accumulate fluxes locally
+    // if the boundary condition for this boundary is not auto-generated,
+    // record fluxes locally
     if (!rdy->boundary_conditions[boundary.index].auto_generated) {
       PetscInt n = rdy->time_series.boundary_fluxes.offsets[boundary.index];
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
@@ -467,7 +467,7 @@ static PetscErrorCode PrintCeedVector(CeedVector vec) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode AccumulateBoundaryFluxesV2(RDy rdy) {
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
   if (CeedEnabled()){
@@ -540,16 +540,16 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   }
 
   // boundary fluxes
-  PetscCall(AccumulateBoundaryFluxesV2(rdy));
+  PetscCall(AccumulateBoundaryFluxes(rdy));
   int boundary_flux_interval = rdy->config.output.time_series.boundary_fluxes;
   if ((step % boundary_flux_interval == 0) && (step > rdy->time_series.boundary_fluxes.last_step)) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       RDyBoundary *boundary = &rdy->boundaries[b];
 
       OperatorData boundary_fluxes;
-      PetscCall(GetOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
-      PetscCall(AccumulateBoundaryFluxes(rdy, *boundary, boundary_fluxes));
-      PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
+      PetscCall(ExtractOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
+      PetscCall(RecordBoundaryFluxes(rdy, *boundary, boundary_fluxes));
+      PetscCall(DestroyOperatorData(&boundary_fluxes));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
     PetscCall(ResetAccumulatedBoundaryFluxes(rdy));

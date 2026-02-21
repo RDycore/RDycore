@@ -200,13 +200,14 @@ PETSC_INTERN PetscErrorCode CreatePetscSourceOperator(RDyConfig *, RDyMesh *, Ve
 typedef struct {
   PetscInt    num_components;  // number of data components
   PetscReal **values;          // array of values ([component][index])
-  PetscReal  *array_pointer;   // pointer to CEED/PETSc array owning data (used internally)
+  PetscReal  *array_pointer;   // pointer to CEED/PETSc array owning data (used internally for regional/domain data)
 } OperatorData;
+
+PETSC_INTERN PetscErrorCode DestroyOperatorData(OperatorData *);
 
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(Operator *, RDyBoundary, PetscInt, PetscInt, PetscInt, PetscReal *);
 
-PETSC_INTERN PetscErrorCode GetOperatorBoundaryFluxes(Operator *, RDyBoundary *, OperatorData *);
-PETSC_INTERN PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *, RDyBoundary *, OperatorData *);
+PETSC_INTERN PetscErrorCode ExtractOperatorBoundaryFluxes(Operator *, RDyBoundary *, OperatorData *);
 
 PETSC_INTERN PetscErrorCode GetOperatorRegionalExternalSource(Operator *, RDyRegion, OperatorData *);
 PETSC_INTERN PetscErrorCode RestoreOperatorRegionalExternalSource(Operator *, RDyRegion, OperatorData *);

@@ -668,7 +668,7 @@ static PetscErrorCode CreateOperatorBoundaryData(Operator *op, RDyBoundary bound
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyOperatorData(OperatorData *data) {
+PetscErrorCode DestroyOperatorData(OperatorData *data) {
   PetscFunctionBegin;
   for (PetscInt c = 0; c < data->num_components; ++c) {
     PetscCall(PetscFree(data->values[c]));
@@ -678,33 +678,30 @@ static PetscErrorCode DestroyOperatorData(OperatorData *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_data) {
+static PetscErrorCode ExtractCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
-  // copy out operator data
-  PetscInt num_comp = boundary_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(boundary->flux_accumulated, CEED_MEM_HOST, &boundary_data->array_pointer));
+  // get array pointer and copy out operator data
+  PetscInt    num_comp = boundary_data->num_components;
+  CeedScalar *array_ptr;
+  PetscCallCEED(CeedVectorGetArray(boundary->flux_accumulated, CEED_MEM_HOST, &array_ptr));
   CeedScalar(*values)[num_comp];
-  *((CeedScalar **)&values) = boundary_data->array_pointer;
+  *((CeedScalar **)&values) = array_ptr;
   for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary->num_edges; ++e) {
       boundary_data->values[c][e] = values[e][c];
     }
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode RestoreCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_data) {
-  PetscFunctionBegin;
-
-  PetscCallCEED(CeedVectorRestoreArray(boundary->flux_accumulated, &boundary_data->array_pointer));
+  // restore the array pointer immediately after copying
+  PetscCallCEED(CeedVectorRestoreArray(boundary->flux_accumulated, &array_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetPetscOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
+static PetscErrorCode ExtractPetscOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
+  // get array pointer and copy out operator data
   PetscReal *data;
   PetscCall(VecGetArray(vec, &data));
   PetscInt num_comp = boundary_data->num_components;
@@ -713,21 +710,7 @@ static PetscErrorCode GetPetscOperatorBoundaryFluxes(Operator *op, RDyBoundary b
       boundary_data->values[c][e] = data[num_comp * e + c];
     }
   }
-  boundary_data->array_pointer = data;
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode RestorePetscOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
-  PetscFunctionBegin;
-
-  PetscReal *data     = boundary_data->array_pointer;
-  PetscInt   num_comp = boundary_data->num_components;
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      data[num_comp * e + c] = boundary_data->values[c][e];
-    }
-  }
+  // restore the array pointer immediately after copying
   PetscCall(VecRestoreArray(vec, &data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -827,12 +810,13 @@ PetscErrorCode SetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, Pet
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Provides read-write access to the operator's boundary flux array data for
-/// a given boundary.
-/// @param [in]  op the operator for which data access is provided
-/// @param [in]  boundary the boundary for which access to flux data is provided
-/// @param [out] boundary_flux_data the array data to which access is provided
-PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_flux_data) {
+/// Extracts boundary flux data from the operator for a given boundary, handling
+/// memory transfers (e.g., GPU to CPU for CEED) automatically. The extracted data
+/// is copied into the provided OperatorData structure.
+/// @param [in]  op the operator from which boundary flux data is extracted
+/// @param [in]  boundary the boundary for which to extract flux data
+/// @param [out] boundary_flux_data extracted boundary flux data (allocated by this function, must be freed by caller)
+PetscErrorCode ExtractOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_flux_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
@@ -841,34 +825,12 @@ PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, Op
 
   PetscCall(CreateOperatorBoundaryData(op, *boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
+
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
+    PetscCall(ExtractCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryFluxes(op, *boundary, op->petsc.boundary_fluxes_accum[boundary->index], boundary_flux_data));
+    PetscCall(ExtractPetscOperatorBoundaryFluxes(op, *boundary, op->petsc.boundary_fluxes_accum[boundary->index], boundary_flux_data));
   }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Releases access to the operator's boundary flux array data for a boundary
-/// for which access was provided via @ref GetOperatorBoundaryFluxes. This
-/// operation can cause data to be copied between memory spaces.
-/// @param [in]  op the operator for which data access is released
-/// @param [in]  boundary the boundary for which access to flux data is released
-/// @param [out] boundary_flux_data the array data for which access is released
-PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_flux_data) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, *boundary, comm));
-
-  if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
-  } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryFluxes(op, *boundary, op->petsc.boundary_fluxes_accum[boundary->index], boundary_flux_data));
-  }
-  DestroyOperatorData(boundary_flux_data);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
