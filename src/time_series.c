@@ -459,8 +459,8 @@ static PetscErrorCode PrintCeedVector(CeedVector vec) {
   PetscCallCEED(CeedVectorGetLength(vec, &length));
   PetscReal *array;
   PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &array));
-  for (CeedInt i = 0; i < length; ++i) {
-    PetscPrintf(PETSC_COMM_SELF, "%f ", array[i]);
+  for (CeedInt i = 0; i < length/3; ++i) {
+    PetscPrintf(PETSC_COMM_SELF, "%d %f\n",i, array[i * 3]);
   }
   PetscPrintf(PETSC_COMM_SELF, "\n");
   PetscCallCEED(CeedVectorRestoreArray(vec, &array));
@@ -470,11 +470,11 @@ static PetscErrorCode PrintCeedVector(CeedVector vec) {
 PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
-  if (CeedEnabled()){
-    PetscReal dt = rdy->dt;
-    Operator *op = rdy->operator;
+  PetscReal dt = rdy->dt;
+  rdy->time_series.boundary_fluxes.accumulated_time += dt;
 
-    rdy->time_series.boundary_fluxes.accumulated_time += dt;
+  if (CeedEnabled()){
+    Operator *op = rdy->operator;
 
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       RDyBoundary *boundary = &rdy->boundaries[b];
@@ -499,7 +499,9 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
         printf("After accumulation for boundary %d:\n", (int)boundary->index);
         PetscCall(PrintCeedVector(boundary->flux_accumulated));
       }
-    }
+    } 
+  } else {
+    // For PETSc, the ApplyBoundaryFlux does the accumulation internally, so we don't need to do anything here.
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -517,6 +519,11 @@ static PetscErrorCode ResetAccumulatedBoundaryFluxes(RDy rdy) {
       RDyBoundary *boundary = &rdy->boundaries[b];
       CeedVector vec = boundary->flux_accumulated;
       PetscCallCEED(CeedVectorSetValue(vec, 0.0));
+    }
+  } else {
+    Operator *op = rdy->operator;
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      PetscCall(VecZeroEntries(op->petsc.boundary_fluxes_accum[b]));
     }
   }
 
@@ -541,6 +548,7 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
 
   // boundary fluxes
   PetscCall(AccumulateBoundaryFluxes(rdy));
+
   int boundary_flux_interval = rdy->config.output.time_series.boundary_fluxes;
   if ((step % boundary_flux_interval == 0) && (step > rdy->time_series.boundary_fluxes.last_step)) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
