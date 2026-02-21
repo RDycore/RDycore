@@ -830,48 +830,10 @@ static PetscErrorCode SetPetscOperatorBoundaryData(Operator *op, RDyBoundary bou
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Provides read-write access to the operator's boundary value array data for
-/// a given boundary.
-/// @param [in]  op the operator for which data access is provided
-/// @param [in]  boundary the boundary for which access to data is provided
-/// @param [out] boundary_value_data the array data to which access is provided
-PetscErrorCode GetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_value_data) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
-
-  PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_value_data));
-  if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
-  } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_value_data) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
-
-  if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
-  } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
-  }
-  DestroyOperatorData(boundary_value_data);
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// Sets a contiguous range of components [comp_offset, comp_offset + num_comp) of the
 /// operator's Dirichlet boundary values for the given boundary, reading from the flat
-/// strided array values[num_comp * e + c]. Internally calls Get, fills data, then Restore.
+/// strided array values[num_comp * e + c]. Writes directly into the underlying
+/// q_dirichlet (CEED) or boundary_values (PETSc) array without a full copy-out.
 /// @param [in] op          the operator for which values are set
 /// @param [in] boundary    the boundary whose Dirichlet values are to be set
 /// @param [in] comp_offset the index of the first component to fill
