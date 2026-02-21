@@ -764,6 +764,72 @@ static PetscErrorCode RestorePetscOperatorBoundaryData(Operator *op, RDyBoundary
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Writes values directly into the CEED q_dirichlet vector for the given boundary,
+///        filling components [comp_offset, comp_offset + num_comp) for each edge.
+///        The source array @p values is in strided layout values[num_comp * e + c].
+/// @param [in] op          the operator whose boundary data is set
+/// @param [in] boundary    the boundary whose Dirichlet values are to be set
+/// @param [in] comp_offset the index of the first component to fill
+/// @param [in] num_comp    the number of components to fill
+/// @param [in] num_edges   the number of boundary edges
+/// @param [in] values      source values in strided layout values[num_comp * e + c]
+static PetscErrorCode SetCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                                  PetscReal *values) {
+  PetscFunctionBegin;
+
+  // get the relevant boundary sub-operator
+  CeedOperator *sub_ops;
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+  CeedOperator sub_op = sub_ops[1 + boundary.index];
+
+  // fetch the q_dirichlet vector
+  CeedOperatorField field;
+  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "q_dirichlet", &field));
+  CeedVector vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+
+  // write directly into the target component slice
+  PetscInt    total_comp = op->num_components;
+  CeedScalar *ptr;
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &ptr));
+  CeedScalar(*arr)[total_comp];
+  *((CeedScalar **)&arr) = ptr;
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      arr[e][comp_offset + c] = values[num_comp * e + c];
+    }
+  }
+  PetscCallCEED(CeedVectorRestoreArray(vec, &ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Writes values directly into the PETSc boundary_values vector for the given boundary,
+///        filling components [comp_offset, comp_offset + num_comp) for each edge.
+///        The source array @p values is in strided layout values[num_comp * e + c].
+/// @param [in] op          the operator whose boundary data is set
+/// @param [in] boundary    the boundary whose Dirichlet values are to be set
+/// @param [in] comp_offset the index of the first component to fill
+/// @param [in] num_comp    the number of components to fill
+/// @param [in] num_edges   the number of boundary edges
+/// @param [in] values      source values in strided layout values[num_comp * e + c]
+static PetscErrorCode SetPetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                                   PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscInt   total_comp = op->num_components;
+  PetscReal *data;
+  PetscCall(VecGetArray(op->petsc.boundary_values[boundary.index], &data));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      data[total_comp * e + comp_offset + c] = values[num_comp * e + c];
+    }
+  }
+  PetscCall(VecRestoreArray(op->petsc.boundary_values[boundary.index], &data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Provides read-write access to the operator's boundary value array data for
 /// a given boundary.
 /// @param [in]  op the operator for which data access is provided
@@ -821,14 +887,11 @@ PetscErrorCode SetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, Pet
   PetscCheck(boundary.num_edges == num_edges, comm, PETSC_ERR_USER,
              "num_edges (% " PetscInt_FMT ") does not match boundary.num_edges (% " PetscInt_FMT ")", num_edges, boundary.num_edges);
 
-  OperatorData data;
-  PetscCall(GetOperatorBoundaryValues(op, boundary, &data));
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      data.values[comp_offset + c][e] = values[num_comp * e + c];
-    }
+  if (CeedEnabled()) {
+    PetscCall(SetCeedOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
+  } else {
+    PetscCall(SetPetscOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
   }
-  PetscCall(RestoreOperatorBoundaryValues(op, boundary, &data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
