@@ -455,6 +455,56 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode PrintCeedVector(CeedVector vec) {
+  PetscFunctionBegin;
+  CeedSize length;
+  PetscCallCEED(CeedVectorGetLength(vec, &length));
+  PetscReal *array;
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &array));
+  for (CeedInt i = 0; i < length; ++i) {
+    PetscPrintf(PETSC_COMM_SELF, "%f ", array[i]);
+  }
+  PetscPrintf(PETSC_COMM_SELF, "\n");
+  PetscCallCEED(CeedVectorRestoreArray(vec, &array));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode AccumulateBoundaryFluxesV2(RDy rdy) {
+  PetscFunctionBegin;
+
+  if (CeedEnabled()){
+    PetscReal dt = rdy->dt;
+    Operator *op = rdy->operator;
+
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      RDyBoundary *boundary = &rdy->boundaries[b];
+
+      // get the relevant boundary sub-operator
+      CeedOperator *sub_ops;
+      PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+      CeedOperator sub_op = sub_ops[1 + boundary->index];
+
+      // fetch the relevant vector
+      CeedOperatorField field;
+      PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "flux", &field));
+      CeedVector vec;
+      PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+
+      if (0) {
+        printf("\nBefore accumulation for boundary %d:\n", (int)boundary->index);
+        PetscCall(PrintCeedVector(boundary->flux_accumulated_v2));
+      }
+      PetscCallCEED(CeedVectorAXPY(boundary->flux_accumulated_v2, dt, vec));
+      if (0) {
+        printf("After accumulation for boundary %d:\n", (int)boundary->index);
+        PetscCall(PrintCeedVector(boundary->flux_accumulated_v2));
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This monitoring function writes out all requested time series data.
 PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;
@@ -472,15 +522,16 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
   }
 
   // boundary fluxes
+  PetscCall(AccumulateBoundaryFluxesV2(rdy));
   int boundary_flux_interval = rdy->config.output.time_series.boundary_fluxes;
   if ((step % boundary_flux_interval == 0) && (step > rdy->time_series.boundary_fluxes.last_step)) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-      RDyBoundary boundary = rdy->boundaries[b];
+      RDyBoundary *boundary = &rdy->boundaries[b];
 
       OperatorData boundary_fluxes;
-      PetscCall(GetOperatorBoundaryFluxes(rdy->operator, &boundary, &boundary_fluxes));
-      PetscCall(AccumulateBoundaryFluxes(rdy, boundary, boundary_fluxes));
-      PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, &boundary, &boundary_fluxes));
+      PetscCall(GetOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
+      PetscCall(AccumulateBoundaryFluxes(rdy, *boundary, boundary_fluxes));
+      PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
     rdy->time_series.boundary_fluxes.last_step = step;
