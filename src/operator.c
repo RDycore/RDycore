@@ -863,19 +863,19 @@ PetscErrorCode SetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, Pet
 /// @param [in]  op the operator for which data access is provided
 /// @param [in]  boundary the boundary for which access to flux data is provided
 /// @param [out] boundary_flux_data the array data to which access is provided
-PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_flux_data) {
+PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_flux_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
+  PetscCall(CheckOperatorBoundary(op, *boundary, comm));
 
-  PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_flux_data));
+  PetscCall(CreateOperatorBoundaryData(op, *boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
+    PetscCall(GetCeedOperatorBoundaryFluxes(op, *boundary, boundary_flux_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryFluxes(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
+    PetscCall(GetPetscOperatorBoundaryFluxes(op, *boundary, op->petsc.boundary_fluxes_accum[boundary->index], boundary_flux_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -887,17 +887,17 @@ PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Ope
 /// @param [in]  op the operator for which data access is released
 /// @param [in]  boundary the boundary for which access to flux data is released
 /// @param [out] boundary_flux_data the array data for which access is released
-PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_flux_data) {
+PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_flux_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
+  PetscCall(CheckOperatorBoundary(op, *boundary, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
+    PetscCallCEED(RestoreCeedOperatorBoundaryFluxes(op, *boundary, boundary_flux_data));
   } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryFluxes(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
+    PetscCallCEED(RestorePetscOperatorBoundaryFluxes(op, *boundary, op->petsc.boundary_fluxes_accum[boundary->index], boundary_flux_data));
   }
   DestroyOperatorData(boundary_flux_data);
 
