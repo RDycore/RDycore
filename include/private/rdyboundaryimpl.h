@@ -13,7 +13,6 @@ typedef struct {
   PetscInt *edge_ids;
   PetscInt  num_edges;
   CeedVector flux_accumulated;
-  CeedVector flux_accumulated_v2;  // for testing only; to be removed
 } RDyBoundary;
 
 #endif
