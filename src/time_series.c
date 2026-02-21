@@ -492,12 +492,12 @@ PetscErrorCode AccumulateBoundaryFluxesV2(RDy rdy) {
 
       if (0) {
         printf("\nBefore accumulation for boundary %d:\n", (int)boundary->index);
-        PetscCall(PrintCeedVector(boundary->flux_accumulated_v2));
+        PetscCall(PrintCeedVector(boundary->flux_accumulated));
       }
-      PetscCallCEED(CeedVectorAXPY(boundary->flux_accumulated_v2, dt, vec));
+      PetscCallCEED(CeedVectorAXPY(boundary->flux_accumulated, dt, vec));
       if (0) {
         printf("After accumulation for boundary %d:\n", (int)boundary->index);
-        PetscCall(PrintCeedVector(boundary->flux_accumulated_v2));
+        PetscCall(PrintCeedVector(boundary->flux_accumulated));
       }
     }
   }
