@@ -681,20 +681,9 @@ static PetscErrorCode DestroyOperatorData(OperatorData *data) {
 static PetscErrorCode GetCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
-  // get the relevant boundary sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  CeedOperator sub_op = sub_ops[1 + boundary->index];
-
-  // fetch the relevant vector
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "flux_accumulated", &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-
   // copy out operator data
   PetscInt num_comp = boundary_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &boundary_data->array_pointer));
+  PetscCallCEED(CeedVectorGetArray(boundary->flux_accumulated, CEED_MEM_HOST, &boundary_data->array_pointer));
   CeedScalar(*values)[num_comp];
   *((CeedScalar **)&values) = boundary_data->array_pointer;
   for (PetscInt c = 0; c < num_comp; ++c) {
@@ -708,27 +697,7 @@ static PetscErrorCode GetCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *b
 static PetscErrorCode RestoreCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
-  // get the relevant boundary sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  CeedOperator sub_op = sub_ops[1 + boundary->index];
-
-  // copy the data in
-  PetscInt num_comp = boundary_data->num_components;
-  CeedScalar(*values)[num_comp];
-  *((CeedScalar **)&values) = boundary_data->array_pointer;
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt e = 0; e < boundary->num_edges; ++e) {
-      values[e][c] = boundary_data->values[c][e];
-    }
-  }
-
-  // release the array
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "flux_accumulated", &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-  PetscCallCEED(CeedVectorRestoreArray(vec, &boundary_data->array_pointer));
+  PetscCallCEED(CeedVectorRestoreArray(boundary->flux_accumulated, &boundary_data->array_pointer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
