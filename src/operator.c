@@ -708,7 +708,7 @@ static PetscErrorCode DestroyOperatorData(OperatorData *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
+static PetscErrorCode GetCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
   // get the relevant boundary sub-operator
@@ -718,7 +718,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
 
   // fetch the relevant vector
   CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, field_name, &field));
+  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "flux_accumulated", &field));
   CeedVector vec;
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
@@ -735,7 +735,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
+static PetscErrorCode RestoreCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
   // get the relevant boundary sub-operator
@@ -755,7 +755,7 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
 
   // release the array
   CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, field_name, &field));
+  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "flux_accumulated", &field));
   CeedVector vec;
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
   PetscCallCEED(CeedVectorRestoreArray(vec, &boundary_data->array_pointer));
@@ -763,7 +763,7 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetPetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
+static PetscErrorCode GetPetscOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
   PetscReal *data;
@@ -779,7 +779,7 @@ static PetscErrorCode GetPetscOperatorBoundaryData(Operator *op, RDyBoundary bou
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode RestorePetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
+static PetscErrorCode RestorePetscOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
   PetscReal *data     = boundary_data->array_pointer;
@@ -903,9 +903,9 @@ PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Ope
   PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
+    PetscCall(GetCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
+    PetscCall(GetPetscOperatorBoundaryFluxes(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -925,9 +925,9 @@ PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary,
   PetscCall(CheckOperatorBoundary(op, boundary, comm));
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
+    PetscCallCEED(RestoreCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
   } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
+    PetscCallCEED(RestorePetscOperatorBoundaryFluxes(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
   }
   DestroyOperatorData(boundary_flux_data);
 
