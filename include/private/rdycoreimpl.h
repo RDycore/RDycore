@@ -216,7 +216,7 @@ struct _p_RDy {
   Operator *operator;
 
   // time series bookkeeping
-  RDyTimeSeriesData time_series;
+  RDyTimeSeriesData time_series_data;
 
   //-------------------
   // Simulatіon output
