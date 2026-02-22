@@ -1,14 +1,28 @@
 # This function extracts a variable named varname from the petscvariables file,
 # storing its value in the variable var. The resulting value can contain spaces,
 # and must be interpreted properly by the caller.
+# Pass QUIET as an optional third argument to issue a warning instead of a fatal error
+# when the variable is not found.
 function(extract_petsc_variable varname var)
   # read petscvariables
   file(READ "${PETSC_DIR}/${PETSC_ARCH}/lib/petsc/conf/petscvariables" petscvariables)
 
+  # check for optional QUIET argument
+  set(quiet FALSE)
+  if (${ARGC} GREATER 2 AND "${ARGV2}" STREQUAL "QUIET")
+    set(quiet TRUE)
+  endif()
+
   # find where the variable is set and remove everything preceding its value
   string(FIND ${petscvariables} "\n${varname} = " start)
   if (${start} EQUAL -1)
-    message(FATAL_ERROR "Could not extract ${var_name} from PETSc. Please set ${var_name} using -D${var_name}=...")
+    if (quiet)
+      message(WARNING "Could not extract ${varname} from PETSc petscvariables (skipping).")
+      set(${var} "" PARENT_SCOPE)
+      return()
+    else()
+      message(FATAL_ERROR "Could not extract ${varname} from PETSc. Please set ${varname} using -D${varname}=...")
+    endif()
   endif()
   string(LENGTH ${varname} varname_length)
   math(EXPR start "${start} + ${varname_length} + 4")
