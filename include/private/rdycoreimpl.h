@@ -40,9 +40,7 @@ typedef struct {
     PetscInt *offsets;
 
     // local array of boundary fluxes
-    struct {
-      TimeSeriesBoundaryFlux current, previous;
-    } * fluxes;
+    TimeSeriesBoundaryFlux *fluxes;
 
     // last step for which boundary flux time series data was written
     PetscInt last_step;

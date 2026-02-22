@@ -112,10 +112,6 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
 
   // allocate (local) boundary flux storage
   PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series_data.boundary_fluxes.fluxes)));
-  for (PetscInt n = 0; n < num_boundary_edges; ++n) {
-    rdy->time_series_data.boundary_fluxes.fluxes[n].current  = (TimeSeriesBoundaryFlux){0.0, 0.0, 0.0};
-    rdy->time_series_data.boundary_fluxes.fluxes[n].previous = (TimeSeriesBoundaryFlux){0.0, 0.0, 0.0};
-  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -288,9 +284,9 @@ static PetscErrorCode RecordBoundaryFluxes(RDy rdy, RDyBoundary boundary, Operat
           // FIXME: this is specific to the shallow water equations
 
           // multiply by the edge length
-          time_series_data->boundary_fluxes.fluxes[n].current.water_mass = edge_len * boundary_fluxes.values[0][e];
-          time_series_data->boundary_fluxes.fluxes[n].current.x_momentum = edge_len * boundary_fluxes.values[1][e];
-          time_series_data->boundary_fluxes.fluxes[n].current.y_momentum = edge_len * boundary_fluxes.values[2][e];
+          time_series_data->boundary_fluxes.fluxes[n].water_mass = edge_len * boundary_fluxes.values[0][e];
+          time_series_data->boundary_fluxes.fluxes[n].x_momentum = edge_len * boundary_fluxes.values[1][e];
+          time_series_data->boundary_fluxes.fluxes[n].y_momentum = edge_len * boundary_fluxes.values[2][e];
           ++n;
         }
       }
@@ -326,9 +322,9 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
         PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
-          local_flux_data[num_data * n]     = rdy->time_series_data.boundary_fluxes.fluxes[n].current.water_mass / accumulated_time;
-          local_flux_data[num_data * n + 1] = rdy->time_series_data.boundary_fluxes.fluxes[n].current.x_momentum / accumulated_time;
-          local_flux_data[num_data * n + 2] = rdy->time_series_data.boundary_fluxes.fluxes[n].current.y_momentum / accumulated_time;
+          local_flux_data[num_data * n]     = rdy->time_series_data.boundary_fluxes.fluxes[n].water_mass / accumulated_time;
+          local_flux_data[num_data * n + 1] = rdy->time_series_data.boundary_fluxes.fluxes[n].x_momentum / accumulated_time;
+          local_flux_data[num_data * n + 2] = rdy->time_series_data.boundary_fluxes.fluxes[n].y_momentum / accumulated_time;
           RDyVector edge_normal             = rdy->mesh.edges.normals[edge_id];
           local_flux_data[num_data * n + 3] = edge_normal.V[0];
           local_flux_data[num_data * n + 4] = edge_normal.V[1];
