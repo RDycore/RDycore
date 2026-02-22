@@ -65,7 +65,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
-  rdy->time_series.boundary_fluxes.last_step = -1;
+  rdy->time_series.boundary_fluxes.last_step        = -1;
   rdy->time_series.boundary_fluxes.accumulated_time = 0.0;
 
   // allocate per-boundary flux offsets
@@ -169,7 +169,7 @@ static PetscErrorCode CreateRank0VecAndVecScatter(PetscInt rank, Vec v_global, P
 static PetscErrorCode InitObservations(RDy rdy) {
   PetscFunctionBegin;
 
-  rdy->time_series.observations.last_step = -1;
+  rdy->time_series.observations.last_step        = -1;
   rdy->time_series.observations.accumulated_time = 0.0;
 
   // create an accumulation vector for storing instantaneous or time-averaged solution data
@@ -288,12 +288,9 @@ static PetscErrorCode RecordBoundaryFluxes(RDy rdy, RDyBoundary boundary, Operat
           // FIXME: this is specific to the shallow water equations
 
           // multiply by the edge length
-          time_series->boundary_fluxes.fluxes[n].current.water_mass =
-              edge_len * boundary_fluxes.values[0][e];
-          time_series->boundary_fluxes.fluxes[n].current.x_momentum =
-              edge_len * boundary_fluxes.values[1][e];
-          time_series->boundary_fluxes.fluxes[n].current.y_momentum =
-              edge_len * boundary_fluxes.values[2][e];
+          time_series->boundary_fluxes.fluxes[n].current.water_mass = edge_len * boundary_fluxes.values[0][e];
+          time_series->boundary_fluxes.fluxes[n].current.x_momentum = edge_len * boundary_fluxes.values[1][e];
+          time_series->boundary_fluxes.fluxes[n].current.y_momentum = edge_len * boundary_fluxes.values[2][e];
           ++n;
         }
       }
@@ -316,7 +313,8 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscCall(PetscCalloc1(num_data * num_local_edges + 1, &local_flux_data));
 
   PetscReal accumulated_time = rdy->time_series.boundary_fluxes.accumulated_time;
-  if (accumulated_time == 0.0) accumulated_time = 1.0;  // to avoid division by zero in case this is our first step or if the time interval between steps is zero for some reason
+  if (accumulated_time == 0.0)
+    accumulated_time = 1.0;  // to avoid division by zero in case this is our first step or if the time interval between steps is zero for some reason
 
   // gather local data
   PetscInt n = 0;
@@ -459,8 +457,8 @@ static PetscErrorCode PrintCeedVector(CeedVector vec) {
   PetscCallCEED(CeedVectorGetLength(vec, &length));
   PetscReal *array;
   PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &array));
-  for (CeedInt i = 0; i < length/3; ++i) {
-    PetscPrintf(PETSC_COMM_SELF, "%d %f\n",i, array[i * 3]);
+  for (CeedInt i = 0; i < length / 3; ++i) {
+    PetscPrintf(PETSC_COMM_SELF, "%d %f\n", i, array[i * 3]);
   }
   PetscPrintf(PETSC_COMM_SELF, "\n");
   PetscCallCEED(CeedVectorRestoreArray(vec, &array));
@@ -473,7 +471,7 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
   PetscReal dt = rdy->dt;
   rdy->time_series.boundary_fluxes.accumulated_time += dt;
 
-  if (CeedEnabled()){
+  if (CeedEnabled()) {
     Operator *op = rdy->operator;
 
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -499,7 +497,7 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
         printf("After accumulation for boundary %d:\n", (int)boundary->index);
         PetscCall(PrintCeedVector(boundary->flux_accumulated));
       }
-    } 
+    }
   } else {
     // For PETSc, the ApplyBoundaryFlux does the accumulation internally, so we don't need to do anything here.
   }
@@ -514,10 +512,10 @@ static PetscErrorCode ResetAccumulatedBoundaryFluxes(RDy rdy) {
 
   rdy->time_series.boundary_fluxes.accumulated_time = 0.0;
 
-  if (CeedEnabled()){
+  if (CeedEnabled()) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
       RDyBoundary *boundary = &rdy->boundaries[b];
-      CeedVector vec = boundary->flux_accumulated;
+      CeedVector   vec      = boundary->flux_accumulated;
       PetscCallCEED(CeedVectorSetValue(vec, 0.0));
     }
   } else {
