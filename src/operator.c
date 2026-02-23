@@ -524,13 +524,13 @@ static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edge
   PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
 
   CeedScalar(*courant_num_data)[2];  // values to the left/right of an edge
-  PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+  PetscCallCEED(CeedVectorGetArrayRead(courant_num_vec, CEED_MEM_HOST, (const CeedScalar **)&courant_num_data));
 
   for (PetscInt ii = 0; ii < mesh->num_owned_internal_edges; ii++) {
     CeedScalar local_max           = fmax(courant_num_data[ii][0], courant_num_data[ii][1]);
     courant_diags->max_courant_num = fmax(courant_diags->max_courant_num, local_max);
   }
-  PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+  PetscCallCEED(CeedVectorRestoreArrayRead(courant_num_vec, (const CeedScalar **)&courant_num_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -563,7 +563,7 @@ static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edge
     CeedVector courant_num_vec;
     PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
     CeedScalar(*courant_num_data)[1];
-    PetscCallCEED(CeedVectorGetArray(courant_num_vec, CEED_MEM_HOST, (CeedScalar **)&courant_num_data));
+    PetscCallCEED(CeedVectorGetArrayRead(courant_num_vec, CEED_MEM_HOST, (const CeedScalar **)&courant_num_data));
 
     // find the maximum value
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
@@ -571,7 +571,7 @@ static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edge
     }
 
     // restores the pointer
-    PetscCallCEED(CeedVectorRestoreArray(courant_num_vec, (CeedScalar **)&courant_num_data));
+    PetscCallCEED(CeedVectorRestoreArrayRead(courant_num_vec, (const CeedScalar **)&courant_num_data));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
