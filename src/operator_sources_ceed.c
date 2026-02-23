@@ -16,7 +16,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
-static CeedInt NumTracers(const RDyConfig config) {
+static inline CeedInt NumTracers(const RDyConfig config) {
   return config.physics.sediment.num_classes + ((config.physics.salinity) ? 1 : 0) + ((config.physics.heat) ? 1 : 0);
 }
 
