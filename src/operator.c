@@ -288,6 +288,9 @@ PetscErrorCode DestroyOperator(Operator **op) {
 
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
+// forward declaration (defined in the Boundary Data section below)
+static PetscErrorCode PrintBoundaryAccumulatedFlux(Operator *op, const char *field_name, const char *label);
+
 static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
@@ -305,7 +308,8 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   //------------------
   // Flux Calculation
   //------------------
-
+  PetscCall(PrintBoundaryAccumulatedFlux(op, "flux", "Before applying flux operator"));
+  PetscCall(PrintBoundaryAccumulatedFlux(op, "flux_accumulated", "Before applying flux operator"));
   {
     // point our CEED solution vector at our PETSc solution vector
     PetscMemType mem_type;
@@ -316,6 +320,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // point our CEED right-hand side vector at a PETSc right-hand side vector
     Vec f_local;
     PetscCall(DMGetLocalVector(op->dm, &f_local));
+    PetscCall(VecZeroEntries(f_local));
     PetscScalar *f_local_ptr;
     PetscCall(VecGetArrayAndMemType(f_local, &f_local_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(op->ceed.rhs, MemTypeP2C(mem_type), CEED_USE_POINTER, f_local_ptr));
@@ -323,7 +328,7 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // apply the flux operator, computing flux divergences
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    PetscCallCEED(CeedOperatorApplyAdd(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -340,6 +345,8 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     PetscCall(DMRestoreLocalVector(op->dm, &f_local));
   }
+  PetscCall(PrintBoundaryAccumulatedFlux(op, "flux", "After applying flux operator"));
+  PetscCall(PrintBoundaryAccumulatedFlux(op, "flux_accumulated", "After applying flux operator"));
 
   //--------------------
   // Source Calculation
@@ -689,6 +696,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   // fetch the relevant vector
   CeedOperatorField field;
   PetscCallCEED(CeedOperatorGetFieldByName(sub_op, field_name, &field));
+  if (boundary.num_edges == 208) printf("CeedOperatorGetFieldByName: field_name = %s; %d\n", field_name, boundary.num_edges);
   CeedVector vec;
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
 
@@ -700,6 +708,7 @@ static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   for (PetscInt c = 0; c < num_comp; ++c) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       boundary_data->values[c][e] = values[e][c];
+      if (e <= 10 && c == 0 && boundary.num_edges == 208) printf(" values[%d] = %18.16f\n", e, values[e][c]);
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -730,6 +739,34 @@ static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary 
   PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
   PetscCallCEED(CeedVectorRestoreArray(vec, &boundary_data->array_pointer));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Prints accumulated flux values for all CEED boundaries (useful for debugging
+// on GPUs). CEED_MEM_HOST triggers an implicit device-to-host copy so this
+// works with any backend including CUDA/HIP.
+// @param [in] op         the operator whose boundary fields are printed
+// @param [in] field_name the name of the CEED operator field to print
+// @param [in] label      a short label printed before the output to identify the call site
+static PetscErrorCode PrintBoundaryAccumulatedFlux(Operator *op, const char *field_name, const char *label) {
+  PetscFunctionBegin;
+  if (!CeedEnabled()) PetscFunctionReturn(PETSC_SUCCESS);
+
+  for (PetscInt b = 0; b < op->num_boundaries; ++b) {
+    RDyBoundary  boundary = op->boundaries[b];
+    OperatorData data;
+    PetscCall(CreateOperatorBoundaryData(op, boundary, &data));
+    PetscCall(GetCeedOperatorBoundaryData(op, boundary, field_name, &data));
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      if (e <= 10 && boundary.num_edges == 208) PetscCall(PetscPrintf(PETSC_COMM_SELF, "[%s] boundary[%" PetscInt_FMT "] edge[%" PetscInt_FMT "]:", label, b, e));
+      for (PetscInt c = 0; c < data.num_components; ++c) {
+        if (e <= 10 && boundary.num_edges == 208) PetscCall(PetscPrintf(PETSC_COMM_SELF, " %g", (double)data.values[c][e]));
+      }
+      if (e <= 10 && boundary.num_edges == 208) PetscCall(PetscPrintf(PETSC_COMM_SELF, "\n"));
+    }
+    PetscCall(RestoreCeedOperatorBoundaryData(op, boundary, field_name, &data));
+    PetscCall(DestroyOperatorData(&data));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
