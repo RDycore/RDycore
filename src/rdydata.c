@@ -201,11 +201,11 @@ static PetscErrorCode RDyGetPrognosticVariableOfOwnedCell(RDy rdy, PetscInt idof
   PetscFunctionBegin;
 
   PetscReal *u;
-  PetscCall(VecGetArray(rdy->u_global, &u));
+  PetscCall(VecGetArrayRead(rdy->u_global, (const PetscReal **)&u));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
     values[i] = u[3 * i + idof];
   }
-  PetscCall(VecRestoreArray(rdy->u_global, &u));
+  PetscCall(VecRestoreArrayRead(rdy->u_global, (const PetscReal **)&u));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
