@@ -114,7 +114,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
 
   // add inputs and outputs
   // NOTE: the order in which these inputs and outputs are specified determines
-  // NOTE: their indexing within the Q-function's implementation (swe_ceed_impl.h)
+  // NOTE: their indexing within the Q-function's implementation (swe_fluxes_ceed.h)
   CeedInt num_comp_geom = 4, num_comp_cnum = 2;
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE));
@@ -475,6 +475,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   CeedOperator interior_flux_op;
   PetscCall(CreateCeedInteriorFluxSuboperator(*config, mesh, &interior_flux_op));
   PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
+  PetscCall(CeedOperatorDestroy(&interior_flux_op));
 
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < num_boundaries; ++b) {
@@ -483,6 +484,7 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
     RDyCondition condition = boundary_conditions[b];
     PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, boundary, condition, &boundary_flux_op));
     PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
+    PetscCall(CeedOperatorDestroy(&boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
