@@ -224,6 +224,7 @@ PetscErrorCode CreateCeedSourceOperator(RDyConfig *config, RDyMesh *mesh, CeedOp
   CeedOperator source_0;
   PetscCall(CreateCeedSourceSuboperator(*config, mesh, &source_0));
   PetscCall(CeedOperatorCompositeAddSub(*source_op, source_0));
+  PetscCall(CeedOperatorDestroy(&source_0));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
