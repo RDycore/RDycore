@@ -18,6 +18,10 @@ else()
 endif()
 target_include_directories(rdycore_f90 PUBLIC ${PROJECT_BINARY_DIR}/include/private)
 
+# make all the C include directories available
+get_target_property(rdycore_c_include_dirs rdycore_c INCLUDE_DIRECTORIES)
+target_include_directories(rdycore_f90 PRIVATE ${rdycore_c_include_dirs})
+
 install(
   TARGETS rdycore_f90
   DESTINATION lib
