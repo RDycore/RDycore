@@ -99,14 +99,8 @@ PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundar
              "Trying to set dirichlet values for boundary with index %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.flow->type);
 
-  OperatorData dirichlet;
-  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
-  for (PetscInt comp = 0; comp < ndof; ++comp) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      dirichlet.values[comp][e] = values[ndof * e + comp];
-    }
-  }
-  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+  PetscInt comp_offset = 0;
+  PetscCall(SetOperatorBoundaryValues(rdy->operator, boundary, comp_offset, ndof, num_edges, values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -127,18 +121,9 @@ PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const PetscInt bou
              "Trying to set dirichlet values for sediment on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.sediment->type);
 
-  OperatorData dirichlet;
-  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
-
   PetscInt comp_offset = 3;
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend the code to set offset correctly");
-
-  for (PetscInt i = 0; i < num_classes; ++i) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      dirichlet.values[comp_offset + i][e] = values[num_classes * e + i];
-    }
-  }
-  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+  PetscCall(SetOperatorBoundaryValues(rdy->operator, boundary, comp_offset, num_classes, num_edges, values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -155,17 +140,10 @@ PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const PetscInt bou
              "Trying to set dirichlet values for salinity on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.salinity->type);
 
-  OperatorData dirichlet;
-  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
-
   PetscInt num_classes = rdy->config.physics.sediment.num_classes;
   PetscInt comp_offset = 3 + num_classes;
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend the code to set offset correctly");
-
-  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-    dirichlet.values[comp_offset][e] = values[e];
-  }
-  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+  PetscCall(SetOperatorBoundaryValues(rdy->operator, boundary, comp_offset, 1, num_edges, values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -182,17 +160,10 @@ PetscErrorCode RDySetTemperatureDirichletBoundaryValues(RDy rdy, const PetscInt 
              "Trying to set dirichlet values for temperature on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
              boundary_cond.temperature->type);
 
-  OperatorData dirichlet;
-  PetscCall(GetOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
-
   PetscInt num_classes = rdy->config.physics.sediment.num_classes;
   PetscInt comp_offset = 3 + num_classes + (rdy->config.physics.salinity ? 1 : 0);
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend the code to set offset correctly");
-
-  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-    dirichlet.values[comp_offset][e] = values[e];
-  }
-  PetscCall(RestoreOperatorBoundaryValues(rdy->operator, boundary, &dirichlet));
+  PetscCall(SetOperatorBoundaryValues(rdy->operator, boundary, comp_offset, 1, num_edges, values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

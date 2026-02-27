@@ -12,6 +12,7 @@ typedef struct {
   PetscInt  index;                   // index of boundary within RDycore boundary list
   PetscInt *edge_ids;
   PetscInt  num_edges;
+  CeedVector flux_accumulated;
 } RDyBoundary;
 
 #endif

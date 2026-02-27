@@ -442,7 +442,18 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
   PetscCall(VecRestoreArray(boundary_fluxes, &boundary_fluxes_ptr));
 
   // accumulate boundary fluxes
-  PetscCall(VecAYPX(boundary_fluxes_accum, 1.0, boundary_fluxes));
+  if (0) {
+    printf("dt = %f\n", dt);
+    printf("Before accumulation, boundary_fluxes_accum = \n");
+    VecView(boundary_fluxes_accum, PETSC_VIEWER_STDOUT_WORLD);
+    printf("Before accumulation, boundary_fluxes = \n");
+    VecView(boundary_fluxes, PETSC_VIEWER_STDOUT_WORLD);
+  }
+  PetscCall(VecAXPY(boundary_fluxes_accum, dt, boundary_fluxes));
+  if (0) {
+    printf("After accumulation, boundary_fluxes_accum = \n");
+    VecView(boundary_fluxes_accum, PETSC_VIEWER_STDOUT_WORLD);
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

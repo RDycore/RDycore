@@ -40,12 +40,13 @@ typedef struct {
     PetscInt *offsets;
 
     // local array of boundary fluxes
-    struct {
-      TimeSeriesBoundaryFlux current, previous;
-    } * fluxes;
+    TimeSeriesBoundaryFlux *fluxes;
 
     // last step for which boundary flux time series data was written
     PetscInt last_step;
+
+    // accumulated time for computing fluxes averaged over output intervals
+    PetscReal accumulated_time;
   } boundary_fluxes;
 
   // observations recorded at specific sites
@@ -64,6 +65,8 @@ typedef struct {
     Vec accum_u;
     // last step for which observations data was written
     PetscInt last_step;
+    // accumulated time for computing fluxes averaged over output intervals
+    PetscReal accumulated_time;
   } observations;
 } RDyTimeSeriesData;
 
@@ -211,7 +214,7 @@ struct _p_RDy {
   Operator *operator;
 
   // time series bookkeeping
-  RDyTimeSeriesData time_series;
+  RDyTimeSeriesData time_series_data;
 
   //-------------------
   // Simulatіon output

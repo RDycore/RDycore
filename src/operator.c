@@ -668,7 +668,7 @@ static PetscErrorCode CreateOperatorBoundaryData(Operator *op, RDyBoundary bound
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyOperatorData(OperatorData *data) {
+PetscErrorCode DestroyOperatorData(OperatorData *data) {
   PetscFunctionBegin;
   for (PetscInt c = 0; c < data->num_components; ++c) {
     PetscCall(PetscFree(data->values[c]));
@@ -678,64 +678,30 @@ static PetscErrorCode DestroyOperatorData(OperatorData *data) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
+static PetscErrorCode ExtractCeedOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
-  // get the relevant boundary sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  CeedOperator sub_op = sub_ops[1 + boundary.index];
-
-  // fetch the relevant vector
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, field_name, &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-
-  // copy out operator data
-  PetscInt num_comp = boundary_data->num_components;
-  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &boundary_data->array_pointer));
+  // get array pointer and copy out operator data
+  PetscInt    num_comp = boundary_data->num_components;
+  CeedScalar *array_ptr;
+  PetscCallCEED(CeedVectorGetArray(boundary->flux_accumulated, CEED_MEM_HOST, &array_ptr));
   CeedScalar(*values)[num_comp];
-  *((CeedScalar **)&values) = boundary_data->array_pointer;
+  *((CeedScalar **)&values) = array_ptr;
   for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    for (PetscInt e = 0; e < boundary->num_edges; ++e) {
       boundary_data->values[c][e] = values[e][c];
     }
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode RestoreCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, const char *field_name, OperatorData *boundary_data) {
-  PetscFunctionBegin;
-
-  // get the relevant boundary sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  CeedOperator sub_op = sub_ops[1 + boundary.index];
-
-  // copy the data in
-  PetscInt num_comp = boundary_data->num_components;
-  CeedScalar(*values)[num_comp];
-  *((CeedScalar **)&values) = boundary_data->array_pointer;
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      values[e][c] = boundary_data->values[c][e];
-    }
-  }
-
-  // release the array
-  CeedOperatorField field;
-  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, field_name, &field));
-  CeedVector vec;
-  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
-  PetscCallCEED(CeedVectorRestoreArray(vec, &boundary_data->array_pointer));
+  // restore the array pointer immediately after copying
+  PetscCallCEED(CeedVectorRestoreArray(boundary->flux_accumulated, &array_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode GetPetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
+static PetscErrorCode ExtractPetscOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
   PetscFunctionBegin;
 
+  // get array pointer and copy out operator data
   PetscReal *data;
   PetscCall(VecGetArray(vec, &data));
   PetscInt num_comp = boundary_data->num_components;
@@ -744,107 +710,127 @@ static PetscErrorCode GetPetscOperatorBoundaryData(Operator *op, RDyBoundary bou
       boundary_data->values[c][e] = data[num_comp * e + c];
     }
   }
-  boundary_data->array_pointer = data;
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode RestorePetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, Vec vec, OperatorData *boundary_data) {
-  PetscFunctionBegin;
-
-  PetscReal *data     = boundary_data->array_pointer;
-  PetscInt   num_comp = boundary_data->num_components;
-  for (PetscInt c = 0; c < num_comp; ++c) {
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      data[num_comp * e + c] = boundary_data->values[c][e];
-    }
-  }
+  // restore the array pointer immediately after copying
   PetscCall(VecRestoreArray(vec, &data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Provides read-write access to the operator's boundary value array data for
-/// a given boundary.
-/// @param [in]  op the operator for which data access is provided
-/// @param [in]  boundary the boundary for which access to data is provided
-/// @param [out] boundary_value_data the array data to which access is provided
-PetscErrorCode GetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_value_data) {
+/// @brief Writes values directly into the CEED q_dirichlet vector for the given boundary,
+///        filling components [comp_offset, comp_offset + num_comp) for each edge.
+///        The source array @p values is in strided layout values[num_comp * e + c].
+/// @param [in] op          the operator whose boundary data is set
+/// @param [in] boundary    the boundary whose Dirichlet values are to be set
+/// @param [in] comp_offset the index of the first component to fill
+/// @param [in] num_comp    the number of components to fill
+/// @param [in] num_edges   the number of boundary edges
+/// @param [in] values      source values in strided layout values[num_comp * e + c]
+static PetscErrorCode SetCeedOperatorBoundaryData(Operator *op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                                  PetscReal *values) {
   PetscFunctionBegin;
 
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
+  // get the relevant boundary sub-operator
+  CeedOperator *sub_ops;
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+  CeedOperator sub_op = sub_ops[1 + boundary.index];
 
-  PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_value_data));
-  if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
-  } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
+  // fetch the q_dirichlet vector
+  CeedOperatorField field;
+  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "q_dirichlet", &field));
+  CeedVector vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+
+  // write directly into the target component slice
+  PetscInt    total_comp = op->num_components;
+  CeedScalar *ptr;
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &ptr));
+  CeedScalar(*arr)[total_comp];
+  *((CeedScalar **)&arr) = ptr;
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      arr[e][comp_offset + c] = values[num_comp * e + c];
+    }
   }
+  PetscCallCEED(CeedVectorRestoreArray(vec, &ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RestoreOperatorBoundaryValues(Operator *op, RDyBoundary boundary, OperatorData *boundary_value_data) {
+/// @brief Writes values directly into the PETSc boundary_values vector for the given boundary,
+///        filling components [comp_offset, comp_offset + num_comp) for each edge.
+///        The source array @p values is in strided layout values[num_comp * e + c].
+/// @param [in] op          the operator whose boundary data is set
+/// @param [in] boundary    the boundary whose Dirichlet values are to be set
+/// @param [in] comp_offset the index of the first component to fill
+/// @param [in] num_comp    the number of components to fill
+/// @param [in] num_edges   the number of boundary edges
+/// @param [in] values      source values in strided layout values[num_comp * e + c]
+static PetscErrorCode SetPetscOperatorBoundaryData(Operator *op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                                   PetscReal *values) {
+  PetscFunctionBegin;
+
+  PetscInt   total_comp = op->num_components;
+  PetscReal *data;
+  PetscCall(VecGetArray(op->petsc.boundary_values[boundary.index], &data));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      data[total_comp * e + comp_offset + c] = values[num_comp * e + c];
+    }
+  }
+  PetscCall(VecRestoreArray(op->petsc.boundary_values[boundary.index], &data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets a contiguous range of components [comp_offset, comp_offset + num_comp) of the
+/// operator's Dirichlet boundary values for the given boundary, reading from the flat
+/// strided array values[num_comp * e + c]. Writes directly into the underlying
+/// q_dirichlet (CEED) or boundary_values (PETSc) array without a full copy-out.
+/// @param [in] op          the operator for which values are set
+/// @param [in] boundary    the boundary whose Dirichlet values are to be set
+/// @param [in] comp_offset the index of the first component to fill
+/// @param [in] num_comp    the number of components to fill
+/// @param [in] num_edges   the number of boundary edges (must equal boundary.num_edges)
+/// @param [in] values      source values in the strided layout values[num_comp * e + c]
+PetscErrorCode SetOperatorBoundaryValues(Operator *op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                         PetscReal *values) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
+  PetscCheck(boundary.num_edges == num_edges, comm, PETSC_ERR_USER,
+             "num_edges (% " PetscInt_FMT ") does not match boundary.num_edges (% " PetscInt_FMT ")", num_edges, boundary.num_edges);
 
   if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "q_dirichlet", boundary_value_data));
+    PetscCall(SetCeedOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
   } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_values[boundary.index], boundary_value_data));
+    PetscCall(SetPetscOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
   }
-  DestroyOperatorData(boundary_value_data);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Provides read-write access to the operator's boundary flux array data for
-/// a given boundary.
-/// @param [in]  op the operator for which data access is provided
-/// @param [in]  boundary the boundary for which access to flux data is provided
-/// @param [out] boundary_flux_data the array data to which access is provided
-PetscErrorCode GetOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_flux_data) {
+/// Extracts boundary flux data from the operator for a given boundary, handling
+/// memory transfers (e.g., GPU to CPU for CEED) automatically. The extracted data
+/// is copied into the provided OperatorData structure.
+/// @param [in]  op the operator from which boundary flux data is extracted
+/// @param [in]  boundary the boundary for which to extract flux data
+/// @param [out] boundary_flux_data extracted boundary flux data (allocated by this function, must be freed by caller)
+PetscErrorCode ExtractOperatorBoundaryFluxes(Operator *op, RDyBoundary *boundary, OperatorData *boundary_flux_data) {
   PetscFunctionBegin;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
+  PetscCall(CheckOperatorBoundary(op, *boundary, comm));
 
-  PetscCall(CreateOperatorBoundaryData(op, boundary, boundary_flux_data));
+  PetscCall(CreateOperatorBoundaryData(op, *boundary, boundary_flux_data));
   boundary_flux_data->num_components = op->num_components;
+
   if (CeedEnabled()) {
-    PetscCall(GetCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
+    PetscCall(ExtractCeedOperatorBoundaryFluxes(op, boundary, boundary_flux_data));
   } else {  // petsc
-    PetscCall(GetPetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
+    PetscCall(ExtractPetscOperatorBoundaryFluxes(op, *boundary, op->petsc.boundary_fluxes_accum[boundary->index], boundary_flux_data));
   }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Releases access to the operator's boundary flux array data for a boundary
-/// for which access was provided via @ref GetOperatorBoundaryFluxes. This
-/// operation can cause data to be copied between memory spaces.
-/// @param [in]  op the operator for which data access is released
-/// @param [in]  boundary the boundary for which access to flux data is released
-/// @param [out] boundary_flux_data the array data for which access is released
-PetscErrorCode RestoreOperatorBoundaryFluxes(Operator *op, RDyBoundary boundary, OperatorData *boundary_flux_data) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
-  PetscCall(CheckOperatorBoundary(op, boundary, comm));
-
-  if (CeedEnabled()) {
-    PetscCallCEED(RestoreCeedOperatorBoundaryData(op, boundary, "flux_accumulated", boundary_flux_data));
-  } else {
-    PetscCallCEED(RestorePetscOperatorBoundaryData(op, boundary, op->petsc.boundary_fluxes_accum[boundary.index], boundary_flux_data));
-  }
-  DestroyOperatorData(boundary_flux_data);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
