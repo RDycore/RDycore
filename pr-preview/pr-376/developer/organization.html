@@ -1,0 +1,2262 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="development.html">
+      
+      
+        <link rel="next" href="style.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Code Structure and Organization - RDycore: A River / Flooding dynamical core for E3SM</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rdycore-code-structure-and-organization" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RDycore: A River / Flooding dynamical core for E3SM
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Code Structure and Organization
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RDycore: A River / Flooding dynamical core for E3SM
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/input.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Input Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/mms.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MMS Driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDycore Example Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RDycore Example Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/dam-break/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idealized dam break problem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5_3" id="__nav_2_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hurricane Harvey
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hurricane Harvey
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    With MRMS rainfall and outflow BC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    With average rainfall and ocean BC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E3SM-RDycore Example Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    E3SM-RDycore Example Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hurricane Harvey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="development.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Structure and Organization
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="organization.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Structure and Organization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#a-brief-tour-of-rdycores-source-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Brief Tour of RDycore's Source Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-rdycore-object-and-its-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The RDycore Object and its Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#computational-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Computational Domain
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Computational Domain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shallow-water-equations-swe-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shallow Water Equations (SWE) operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sediment-dynamics-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sediment Dynamics operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostics-time-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostics: time series
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoints-and-restarts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpoints and Restarts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-ensembles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Ensembles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running Ensembles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ensemble-member-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ensemble member configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support-for-fortran" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support for Fortran
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Support for Fortran">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#special-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="style.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Style Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ceed.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SWE implementation using libCEED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Theory Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/swe.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shallow Water Equations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../theory/sediment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sediment Transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#a-brief-tour-of-rdycores-source-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Brief Tour of RDycore's Source Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-rdycore-object-and-its-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The RDycore Object and its Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#computational-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Computational Domain
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Computational Domain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shallow-water-equations-swe-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shallow Water Equations (SWE) operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sediment-dynamics-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sediment Dynamics operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visualization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostics-time-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostics: time series
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoints-and-restarts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpoints and Restarts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-ensembles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Ensembles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running Ensembles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ensemble-member-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ensemble member configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#support-for-fortran" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Support for Fortran
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Support for Fortran">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#special-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="rdycore-code-structure-and-organization">RDycore Code Structure and Organization</h1>
+<p>In this section, we describe the organization of RDycore's source files. We have
+attempted to group functions and data types together into subsystems that can
+be easily understood separately from one another.</p>
+<p>Because RDycore's behavior is determined entirely by input parameters specified
+in the <a href="../common/input.html">YAML input format</a>, it's a good idea to familiarize
+yourself with this format as you read this section.</p>
+<h2 id="a-brief-tour-of-rdycores-source-tree">A Brief Tour of RDycore's Source Tree</h2>
+<p>The root level of the <a href="https://github.com/RDycore/RDycore">RDycore</a> source tree
+contains a <code>README.md</code> file, a <code>CMakeLists.txt</code> file that defines the build
+system, and some configuration files for documentation and tooling.</p>
+<p>There are several folders at the root of the source tree:</p>
+<div class="highlight"><pre><span></span><code>+ RDyore +- .github/workflows
+         |
+         +- cmake
+         |
+         +- config
+         |
+         +- docs
+         |
+         +- driver
+         |
+         +- external
+         |
+         +- include
+         |
+         +- share
+         |
+         +- src
+         |
+         +- tools
+</code></pre></div>
+<ul>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/.github/workflows"><code>.github/workflows</code></a>: workflows
+  that support our <a href="development.html#GitHub-Continuous-Integration-Environment">GitHub Continuous Integration
+  Environment</a></li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/cmake"><code>cmake</code></a>: CMake scripts
+  that support the build system, testing, etc.</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/config"><code>config</code></a>: shell scripts
+  to help with running RDycore on our target platforms</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/docs"><code>docs</code></a>: Markdown source
+  files for our <a href="https://squidfunk.github.io/mkdocs-material/">mkdocs</a>-based
+  documentation</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/driver"><code>driver</code></a>: C and Fortran
+  driver programs, including the standalone RDycore drivers and a few other
+  development tools</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/external"><code>external</code></a>: third-
+  party libraries used by RDycore that aren't provided by PETSc</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/include"><code>include</code></a>: the
+  <code>rdycore.h.in</code> template that generates the <code>rdycore.h</code> API header file, and
+  all private header files (located within the <code>private</code> subfolder)</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/share"><code>share</code></a>: data files for
+  initial conditions, material properties, and unstructured grids (used mainly
+  for testing)</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/src"><code>src</code></a>: the source code for
+  RDycore</li>
+<li><a href="https://github.com/RDycore/RDycore/tree/main/src"><code>tools</code></a>: miscellaneous
+  tools and scripts for building and deploying Docker images</li>
+</ul>
+<p>Take a look at each of these folders to familiarize yourself with their
+contents. In particular, the <code>src</code> folder has a few important subfolders:</p>
+<ul>
+<li><code>src/f90-mod</code>: the RDycore Fortran module that mirrors the C library's
+  capabilities</li>
+<li><code>src/swe</code>: functions and data structures specific to the solution of the
+  2D shallow water equations</li>
+<li><code>src/sediment</code>: functions and data structure specific to the solution of
+  the 2D shallow water equations coupled with diffusion-diffusion equation
+  for sediment dynamics</li>
+<li><code>src/tests</code>: unit tests for subsystems within RDycore</li>
+</ul>
+<p>The private headers in the <code>include</code> folder contain definitions of opaque types
+and functions that are helpful throughout RDycore but are not part of the API.</p>
+<p>The <code>driver</code> folder also has its own <code>tests</code> subfolder that defines tests
+that run the standalone drivers and perform convergence tests for selected
+problems.</p>
+<h2 id="the-rdycore-object-and-its-lifecycle">The RDycore Object and its Lifecycle</h2>
+<p>RDycore (the "river dynamical core") is represented in code by a data structure
+called <code>RDy</code>, declared as an opaque type in <a href="https://github.com/RDycore/RDycore/tree/main/include/rdycore.h">include/rdycore.h</a>.
+It is defined in <a href="https://github.com/RDycore/RDycore/tree/main/include/private/rdycoreimpl.h">include/private/rdycoreimpl.h</a>.
+In this section, we describe how to manipulate <code>RDy</code> to set up and run
+simulations. It may be helpful to refer to the <a href="https://github.com/RDycore/RDycore/tree/main/driver/main.c">standalone C driver</a>
+(and or the corresponding <a href="https://github.com/RDycore/RDycore/tree/main/driver/main.F90">Fortran driver</a>)
+as you read this section.</p>
+<ol>
+<li><strong>Initialization</strong></li>
+</ol>
+<p>Before RDycore can be used in any program, the supporting systems must be
+initialized with a call to <code>RDyInit</code>:</p>
+<div class="highlight"><pre><span></span><code>  // initialize RDycore subsystems
+  PetscCall(RDyInit(argc, argv, helpString));
+</code></pre></div>
+<p>This function accepts the <code>argc</code> and <code>argv</code> command line argument parameters
+accepted by any C program, plus a string printed to display help/usage
+information.</p>
+<p>Next, create an <code>RDy</code> object, passing it an MPI communicator, the path to a
+<a href="../common/input.html">YAML input file</a>, and the pointer to the desired <code>RDy</code>
+object:</p>
+<div class="highlight"><pre><span></span><code>  // create an RDy on the given communicator with the given input
+  RDy rdy;
+  PetscCall(RDyCreate(MPI_COMM_WORLD, &quot;my-input.yaml&quot;, &amp;rdy));
+</code></pre></div>
+<p>This only creates the object--it does not read input or allocate any resources
+for the problem described within the input.</p>
+<ol>
+<li><strong>Setup</strong></li>
+</ol>
+<p>To read the input file and ready your <code>RDy</code> object to run the simulation
+defined therein, call <code>RDySetup</code>:</p>
+<div class="highlight"><pre><span></span><code>  // read input and set up the dycore
+  PetscCall(RDySetup(rdy));
+</code></pre></div>
+<p>After this call, you're ready to run a simulation. You can also all any query
+or utility functions on your <code>RDy</code> object to do whatever you need for your own
+simulation. For example, you might need information about the unstructured grid,
+or perhaps you are specifying specific boundary values for a Dirichlet boundary
+condition. See the API header file for all the possibilities.</p>
+<ol>
+<li><strong>Timestepping</strong></li>
+</ol>
+<p>The simplest way to start running your simulation after setup is to run
+<code>RDyAdvance</code> (which takes a single step) within a <code>while</code> loop that uses
+<code>RDyFinished</code> as termination condition:</p>
+<div class="highlight"><pre><span></span><code>  // run the simulation to completion
+  while (!RDyFinished(rdy)) {
+    // ... pre-step logic here ...
+
+    // advance the simulation by a single step
+    PetscCall(RDyAdvance(rdy));
+
+    // ... post-step logic here ...
+  }
+</code></pre></div>
+<p>If you look in the standalone C driver, you can see various pre- and post-step
+logic to accommodate data transfer, restarts, etc.</p>
+<ol>
+<li><strong>Finalization</strong></li>
+</ol>
+<p>At the end of an RDycore-enabled program, you must destroy the <code>RDy</code> object with
+a call to <code>RDyDestroy</code>:</p>
+<div class="highlight"><pre><span></span><code>  // destroy the dycore
+  PetscCall(RDyDestroy(&amp;rdy));
+</code></pre></div>
+<p>Finally, call <code>RDyFinalize</code> to reclaim all resources used by RDycore and its
+subsystems:</p>
+<div class="highlight"><pre><span></span><code>  // clean up
+  PetscCall(RDyFinalize());
+</code></pre></div>
+<h2 id="computational-domain">Computational Domain</h2>
+<p>RDycore solves equations on a topologically-two-dimensional domain with
+topography represented by an elevation coordinate <span class="arithmatex">\(z(x, y)\)</span>.</p>
+<p>RDycore uses two objects to represent the computional domain:</p>
+<ul>
+<li><a href="https://petsc.org/release/manual/dmplex/">DMPlex</a>: a PETSc data structure
+  that stores the minimum set of information needed to define an unstructured
+  grid</li>
+<li><a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdymeshimpl.h">RDyMesh</a>:
+  An RDycore-specific data structure (implementation <a href="https://github.com/RDycore/RDycore/blob/main/src/rdymesh.c">here</a>)
+  that stores data for cells, edges, and vertices, constructed using the
+  <code>DMPlex</code> object</li>
+</ul>
+<p>Both of these objects are created by a call to <a href="https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c">RDySetup</a>.
+The <code>RDyMesh</code> object is a simple container with</p>
+<ul>
+<li>metadata like numbers of cells, edges, vertices</li>
+<li>a <code>cells</code> field that stores cell data in an <code>RDyCells</code> data structure</li>
+<li>an <code>edges</code> field that stores edge data in an <code>RDyEdges</code> data structure</li>
+<li>a <code>vertices</code> field that stores vertex data in an <code>RDyVertices</code> data structure</li>
+<li>metadata useful for output/visualization</li>
+</ul>
+<p>The domain is partitioned into disjoint <em>regions</em>, each of which consists of a
+set of contiguous <em>cells</em>, usually triangles or quads. Additionally, the domain
+is bounded by one or more <em>boundaries</em>, each of which consists of a set of
+edges (which can be thought of as two-dimensional "faces"). We describe how
+regions and boundaries work below.</p>
+<h3 id="regions">Regions</h3>
+<p>When a mesh file is read to create a <code>DMPlex</code> object during <a href="https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c">RDySetup</a>,
+<a href="https://petsc.org/release/manualpages/DMLabel/">DMLabel</a> objects are created
+that represent disjoint sets of cells. Each cell set represents a region. From
+each label/cell set, RDycore constructs an <a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdycoreimpl.h#L20">RDyRegion</a>,
+which is basically a named array of local cell IDs.</p>
+<p>RDycore then uses information in the <a href="../common/input.html">YAML input file</a> to
+associate initial condition and source data with each region by name. This
+process is implemented in the <code>InitRegions</code> function (https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L182).</p>
+<h3 id="boundaries">Boundaries</h3>
+<p>Similarly to regions, the <code>DMPlex</code> object created during <a href="https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c">RDySetup</a>
+constructs <code>DMLabel</code> objects represents disjoint sets of edges, each of which
+represents a boundary. From each label/edge set, RDycore constructs an
+<a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdycoreimpl.h#L29">RDyBoundary</a>,
+a named array of local edge IDs.</p>
+<p>RDycore then uses information in the <a href="../common/input.html">YAML input file</a> to
+associate boundary condition data with each boundary by name. This process is
+implemented in the <code>InitBoundaries</code> function, which is called in <code>RDySetup</code>.</p>
+<h2 id="operators">Operators</h2>
+<p>For purposes of our discussion, an "operator" is a mathematical construct for
+computing interior and boundary fluxes and source terms. Each operator is
+represented by a specific data structure associated with functions that
+implement its operations.</p>
+<h3 id="overview">Overview</h3>
+<p>RDycore uses two different but numerically equivalent technical approaches for solving its governing equations:</p>
+<ol>
+<li>A CPU-only version that uses PETSc. We refer to this version as the <em>PETSc version</em>.</li>
+<li>A CPU and GPU supported version that uses PETSc and CEED. We refer to this version as the <em>CEED version</em>.</li>
+</ol>
+<p>The PETSc version is mainly used to troubleshoot our CEED version. Both of the RDycore versions are
+in wrapped in a C struct called <code>Operator</code> defined in the <a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdyoperatorimpl.h">rdyoperatorimpl.h</a>.</p>
+<p>The CEED version of the operator code has two parts:</p>
+<ul>
+<li>"host" code that runs on the CPU and dispatches calls to the "device" (a CPU
+  or GPU, depending on your runtime configuration) to create, update,
+  manipulate, and destroy the operator</li>
+<li>"device" code that performs the mathematical operators associated with the
+  operator using the <a href="https://ceed.exascaleproject.org/libceed/">libceed</a>
+  exascale library.</li>
+</ul>
+<p>To make the PETSc version of the code be similar to the CEED version, the PETSc operator
+also has two parts that are similar to the CEED version. However, the PETSc version
+of the operator code only runs on a CPU.</p>
+<p>The <code>AddPhysicsOperators()</code> in <a href="https://github.com/RDycore/RDycore/blob/main/src/operator.c"><code>operator.c</code></a>
+sets up the operators for the PETSc or CEED version of the RDycore. Furthermore, each version of operators
+sets up physcis-specific (i.e., SWE or sediment dynamics) operators.</p>
+<p><em><strong>NOTE</strong>: at the time of writing, the physics in RDycore's operators supports the following configurations:</em>
+<em>(1) SWE: PETSc and CEED version and (2) Sediment Dynamics: PETSc version.</em></p>
+<h3 id="shallow-water-equations-swe-operators">Shallow Water Equations (SWE) operators</h3>
+<p>All shallow-water-equations-specific code lives within the <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/">swe source subfolder</a>.
+The SWE operators are created and configured by <code>AddPetscFlowOperators</code> and <code>AddCeedFlowOperators</code> functions for
+PETSc and CEED, respecitively. These two functions live in <a href="https://github.com/RDycore/RDycore/blob/main/src/operator.c"><code>operator.c</code></a>.
+The interface for the "SWE operator" is visible in the private header
+<a href="https://github.com/RDycore/RDycore/blob/main/include/private/rdysweimpl.h">rdysweimpl.h</a>. Few details about the the PETSc and CEED
+version is as follows:</p>
+<ol>
+<li>
+<p>PETSc version: The creation of operators and the physics implementation lives in <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_petsc.c"><code>swe/swe_petsc.c</code></a></p>
+</li>
+<li>
+<p>CEED version: The creation of operators and the physics implementation lives in two separate files.
+The creation operators is defined within <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed.c"><code>swe/swe_ceed.c</code></a>, while
+the header file <a href="https://github.com/RDycore/RDycore/blob/main/src/swe/swe_ceed_impl.h"><code>swe/swe_ceed_impl.h</code></a> defines the physics implementation.
+The header file defines inline <a href="https://libceed.org/en/latest/api/CeedQFunction/#ceedqfunction"><code>CeedQFunction</code></a>s
+that run on the device.</p>
+</li>
+</ol>
+<p>For both PETSc and CEED version, we implement the following SWE operators:</p>
+<ul>
+<li>
+<p><strong>Riemann Flux operator</strong>: computes finite-volume fluxes between interior
+  cells and on the boundaries, according to specified boundary conditions.
+  In the CEED implementation, these two operators (for interior and boundary fluxes)
+  are combined into a <a href="https://libceed.org/en/latest/api/CeedOperator/#c.CeedCompositeOperatorCreate">composite operator</a>
+  that is called using in-place device data. In the PETSc version, these operators
+  are implemented by CPU code that is applied sequentially to relevant data.</p>
+</li>
+<li>
+<p><strong>Source operator</strong>: computes the source term for the shallow water equations</p>
+</li>
+</ul>
+<h3 id="sediment-dynamics-operators">Sediment Dynamics operators</h3>
+<p>The sediment dynamics-specific code, which comparises of SWE coupled with advection-diffusion equation, lives within the
+<a href="https://github.com/RDycore/RDycore/blob/main/src/sediment/">sediment source subfolder</a>.
+Presently, only the PETSc version of the operator is implemented via <code>AddPetscSedimentOperators</code> that lives
+in <a href="https://github.com/RDycore/RDycore/blob/main/src/operator.c"><code>operator.c</code></a>.</p>
+<h2 id="input">Input</h2>
+<p>The parsing of input is dispatched from <a href="https://github.com/RDycore/RDycore/blob/main/src/rdysetup.c#L244">RDySetup</a>
+and implemented in <a href="https://github.com/RDycore/RDycore/blob/main/src/yaml_input.c#L1173">ReadConfigFile</a>.
+At the top of <code>yaml_input.c</code>, several structs are defined that represent a YAML
+"schema". In this "schema," each struct represents a YAML mapping object, with
+fields in the mapping corresponding to fields in the struct. Accordinglhy, YAML
+arrays within mappings are represented by array fields.</p>
+<p>For a more detailed explanation of how this YAML schema is parsed, see the
+<a href="https://github.com/tlsa/libcyaml/blob/main/docs/guide.md">libcyaml documentation</a>.</p>
+<h2 id="output">Output</h2>
+<p>RDycore can produce output for visualization, as well as diagnostic output
+helpful for troubleshooting and debugging.</p>
+<h3 id="visualization">Visualization</h3>
+<p>RDycore supports two visualizable output formats:</p>
+<ul>
+<li><a href="https://www.xdmf.org/index.php/Main_Page">XDMF</a>: an ancient,
+  marginally-supported format, popular in the earth science community, that
+  stores data in HDF5 files and metadata in XML files</li>
+<li><a href="https://cgns.github.io/">CFD General Notational System (CGNS)</a>: a standard
+  format with lots of traction in the CFD community but less visibility within
+  the earth science community</li>
+<li>PETSc's binary output format, which is better than nothing but probably not
+  very full-featured.</li>
+</ul>
+<p>The writing of XDMF files is implemented in <a href="https://github.com/RDycore/RDycore/blob/main/src/xdmf_output.c"><code>xdmf_output.c</code></a>
+in the <code>WriteXDMFOutput</code> function. CGNS and binary output are handled mostly by
+PETSc's built-in output machinery.</p>
+<p>All output functions are registered using PETSc's
+<a href="https://petsc.org/release/manualpages/TS/TSMonitor">TSMonitor</a> feature and
+called in <code>RDyAdvance</code> (within <a href="https://github.com/RDycore/RDycore/blob/main/src/rdyadvance.c">rdyadvance.c</a>)
+at the frequency specified in the YAML input file.</p>
+<h3 id="diagnostics-time-series">Diagnostics: time series</h3>
+<p>RDycore can write out time series data useful for debugging simulations.
+Currently, the only quantity that can be recorded as a time series is the
+"boundary flux"--the total flux through the domain boundary, which is needed to
+account for mass non-conservation in simulations with open boundaries.</p>
+<p>Time series data are accumulated and written by logic in <a href="https://github.com/RDycore/RDycore/blob/main/src/time_series.c"><code>time_series.c</code></a>.
+The function <code>InitTimeSeries</code> initializes this subsystem, and is called in
+<code>RDyAdvance</code>.</p>
+<p>These time series diagnostics are invasive, and can negatively affect simulation
+performance, particularly when using GPUs. Therefore they are intended only for
+debugging and troubleshooting.</p>
+<h2 id="checkpoints-and-restarts">Checkpoints and Restarts</h2>
+<p>The writing of <em>checkpoint files</em> (which store all state data necessary to
+restart a simulation) and the process of restarting a previously-running
+simulation are largely handled by PETSc:</p>
+<ul>
+<li><code>InitCheckpoints</code> (defined in <a href="https://github.com/RDycore/RDycore/blob/main/src/checkpoint.c">checkpoint.c</a>
+  sets up a <a href="https://petsc.org/release/manualpages/TS/TSMonitor">TSMonitor</a> that
+  calls the <code>WriteCheckpoint</code> function at an interval specified in the YAML
+  input file. This function is called in <code>RDySetup</code>.</li>
+<li><code>ReadCheckpointFile</code> (also defined in <code>checkpoint.c</code>) reads the checkpoint
+  file (in a format specified within the YAML input. This function is called
+  in <code>RDySetup</code> if the input file specifieѕ that a simulation should be
+  restarted.</li>
+</ul>
+<h2 id="running-ensembles">Running Ensembles</h2>
+<p>RDycore can run <em>ensembles</em>, which are sets of concurrently-running simulations
+("ensemble members") with variations in selected input parameters. RDycore uses
+an extremely simple mechanism to run these simulations within a single MPI job:</p>
+<ul>
+<li>on initialization, RDycore splits its "world" communicator into a number of
+  smaller, communicators of equal size</li>
+<li>each of these smaller communicators is assigned to a single ensemble member</li>
+<li>each ensemble member is configured according to the ensemble specification
+  in the <a href="../common/input.html">YAML input file</a></li>
+<li>all ensemble members are run concurrently to completion</li>
+</ul>
+<p>Currently, ensemble calculations only run ensemble members, possibly generating
+member-specific output. No post-processing or analysis has been implemented,
+though it would likely be simple to do so.</p>
+<h3 id="ensemble-member-configuration">Ensemble member configuration</h3>
+<p>The data for each ensemble member is listed explicitly in the <a href="../common/input.html#ensemble">ensemble section</a>
+of the YAML input specification. All parameters for ensemble members override
+the corresponding parameters in other sections of the file. This logic is
+implemented in the <code>ConfigEnsembleMember</code> function within <a href="https://github.com/RDycore/RDycore/blob/main/src/ensemble.c">ensemble.c</a>.</p>
+<h2 id="support-for-fortran">Support for Fortran</h2>
+<p>A Fortran version of the public C interface is available in an <a href="https://github.com/RDycore/RDycore/blob/main/src/f90-mod/rdycore.F90"><code>rdycore</code> Fortran module</a>
+in the <code>src/f90-mod</code> directory. This module is hand-written and uses the
+<a href="https://fortranwiki.org/fortran/show/iso_c_binding">Fortran 2003 <code>iso_c_binding</code></a>
+standard intrinsic module to map C functions to equivalent Fortran subroutines
+and functions, and defines appropriate data types.</p>
+<p>The mapping from a C function to a Fortran subroutine (or function) is
+accomplished in two parts:</p>
+<ol>
+<li>
+<p>A C function is made available to Fortran by defining a Fortran function
+   within an <code>interface</code> block that uses a <code>bind(C)</code> annotation specifying the
+   case-sensitive name of the C function. All data types in this Fortran
+   function must correspond to supported C data types via the <code>iso_c_binding</code>
+   module. The function returns an integer corresponding to the <code>PetscErrorCode</code>
+   return type of the C function. We refer to such a function as a "C-bound
+   Fortran function".</p>
+</li>
+<li>
+<p>A Fortran "wrapper" subroutine is defined that calls the C-bound Fortran
+   function defined in item 1. This subroutine follows the PETSc convention in
+   which the last argument (<code>ierr</code>) gets the return value of the C-bound Fortran
+   function.</p>
+</li>
+</ol>
+<p>For example, let's take a look at the Fortran function for <code>RDyCreate</code>, which
+calls the C function <code>RDyCreateF90</code>. This separate C function is required
+because <code>RDyCreate</code> accepts an <code>MPI_Comm</code> input parameter, and Fortran uses
+integers for MPI communicators.</p>
+<p>First, we create a C-bound Fortran function <code>rdycreate_</code> and associate it with
+the C function <code>RDyCreateF90</code> within the <code>interface</code> block near the top of
+<a href="https://github.com/RDycore/RDycore/blob/main/src/f90-mod/rdycore.F90"><code>f90-mod/rdycore.F90</code></a>:</p>
+<div class="highlight"><pre><span></span><code>  interface
+    ...
+    integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name=&quot;RDyCreateF90&quot;)
+      use iso_c_binding, only: c_int, c_ptr
+      integer,            intent(in)  :: comm
+      type(c_ptr), value, intent(in)  :: filename
+      type(c_ptr),        intent(out) :: rdy
+    end function
+    ...
+  end interface
+</code></pre></div>
+<p>Then we define a subroutine <code>RDyCreate</code> that calls <code>rdycreate_</code> and sets <code>ierr</code>
+to its return value:</p>
+<div class="highlight"><pre><span></span><code>  subroutine RDyCreate(comm, filename, rdy_, ierr)
+    use iso_c_binding, only: c_null_char
+    character(len=1024), intent(in) :: filename
+    integer,   intent(in)  :: comm
+    type(RDy), intent(out) :: rdy_
+    integer,   intent(out) :: ierr
+
+    integer                      :: n
+    character(len=1024), pointer :: config_file
+
+    n = len_trim(filename)
+    allocate(config_file)
+    config_file(1:n) = filename(1:n)
+    config_file(n+1:n+1) = c_null_char
+    ierr = rdycreate_(comm, c_loc(config_file), rdy_%c_rdy)
+    deallocate(config_file)
+  end subroutine
+</code></pre></div>
+<p>Notice that we have to do some things to construct a NULL-terminated C string
+for the filename with a character array and <code>c_null_char</code>, and then pass a
+pointer to this array with <code>c_loc</code>. This is how things are done with Fortran's
+<code>iso_c_binding</code> module, which you can learn about in the link at the top of this
+section.</p>
+<p>Whenever a new C function is added to the public interface in <code>rdycore.h</code>, these
+two corresponding Fortran items must be added to the <a href="https://github.com/RDycore/RDycore/blob/main/include/rdycore.h.in">template from which it is generated</a>
+to support its use in Fortran.</p>
+<h3 id="special-considerations">Special considerations</h3>
+<ul>
+<li><strong>C pointers</strong>: Perhaps counterintuitively, C pointers must be passed by value
+  to Fortran-bound C functions. In other words, any argument of type <code>type(c_ptr)</code>
+  must have the <code>value</code> attribute and <code>intent(in)</code>. You can think of a pointer
+  as a memory location, which is morally equivalent to an integer of the
+  appropriate size. The <code>intent(in)</code> expresses that the pointer itself remains
+  unchanged even if the data it points to is modified by the function.
+  <strong>NOTE</strong>: an <code>RDy</code> C object is expressed as a C pointer in the Fortran module.</li>
+<li><strong>C primitives</strong>: Because C passes arguments to functions by value and Fortran
+  by reference, it is necessary to add the <code>value</code> attribute to any parameter
+  in a C-bound Fortran function that has a non-pointer C type. This includes
+  most <code>intent(in)</code> primitive parameters in C-bound Fortran functions. Note
+  that <code>intent(out)</code> parameters in these functions must necessarily be pointers
+  in C functions, so they must not have the <code>value</code> attribute.</li>
+<li><strong>Enumerated types</strong>: An enumerated type in C can be mapped to Fortran as a
+  set of related integer parameters. See, for example, the way <a href="https://github.com/RDycore/RDycore/blob/main/src/f90-mod/rdycore.F90#L35">time units</a>
+  are expressed in the <code>rdycore</code> Fortran module.</li>
+<li><strong>PETSc types</strong>: PETSc types like <code>Vec</code> are passed to C-bound Fortran
+  functions as <code>PetscFortranAddr</code> with the <code>value</code> attribute and <code>intent(in)</code>.
+  This is very similar to the way we treat C pointers, with some magic PETSc
+  pixie dust sprinkled on it to satisfy conditions required by PETSc.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascript/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
