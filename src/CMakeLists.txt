@@ -25,22 +25,20 @@ set(RDYCORE_C_SOURCE_FILES
   yaml_input.c
 )
 
-add_library(rdycore_c ${RDYCORE_C_SOURCE_FILES})
-target_link_libraries(rdycore_c cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
-add_dependencies(rdycore_c cyaml yaml)
-
 # generate <physics>_ceed.h headers inside each CEED operator implementation
 # directory so the JIT compilers have everything they need
 foreach(physics swe;tracer)
   string(TOUPPER ${physics} PHYSICS)
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/private/physics_ceed.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/${physics}/${physics}_ceed.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/${physics}/${physics}_ceed.h
     @ONLY
   )
-  target_include_directories(rdycore_c PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/${physics}
-)
 endforeach()
+
+add_library(rdycore_c ${RDYCORE_C_SOURCE_FILES})
+target_link_libraries(rdycore_c cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
+add_dependencies(rdycore_c cyaml yaml)
 
 install(
   TARGETS rdycore_c

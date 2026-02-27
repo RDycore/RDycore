@@ -7,3 +7,7 @@ compile_commands.json
 site/
 *.cgns
 .clangd
+
+# These files must be generated in the source directory so CEED's JIT compiler can find them.
+src/swe/swe_ceed.h
+src/tracer/tracer_ceed.h
