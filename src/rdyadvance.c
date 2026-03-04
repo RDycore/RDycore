@@ -264,7 +264,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   // if we're at the start of the simulation, set up monitoring
   PetscInt step;
   PetscCall(TSGetStepNumber(rdy->ts, &step));
-  if (step == 0) {
+  if (step == 0 || (step > 0 && rdy->is_a_restart_run)) {
     PetscCall(CreateOutputDirectory(rdy));
 
     // create a viewer with the proper format for visualization output
