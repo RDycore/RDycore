@@ -31,6 +31,15 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
+#ifndef SWAP
+#define SWAP(a, b)             \
+  do {                         \
+    CeedScalar _swap_tmp = (a); \
+    (a)                  = (b); \
+    (b)                  = _swap_tmp; \
+  } while (0)
+#endif
+
 static inline CeedInt NumTracers(const RDyConfig config) {
   return config.physics.sediment.num_classes + ((config.physics.salinity) ? 1 : 0) + ((config.physics.heat) ? 1 : 0);
 }
@@ -573,22 +582,9 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
 static PetscErrorCode sort3(CeedScalar *data1, CeedScalar *data2, CeedScalar *data3) {
   PetscFunctionBegin;
 
-  CeedScalar tmp;
-  if (*data1 > *data2) {
-    tmp    = *data1;
-    *data1 = *data2;
-    *data2 = tmp;
-  }
-  if (*data2 > *data3) {
-    tmp    = *data2;
-    *data2 = *data3;
-    *data3 = tmp;
-  }
-  if (*data1 > *data2) {
-    tmp    = *data1;
-    *data1 = *data2;
-    *data2 = tmp;
-  }
+  if (*data1 > *data2) SWAP(*data1, *data2);
+  if (*data2 > *data3) SWAP(*data2, *data3);
+  if (*data1 > *data2) SWAP(*data1, *data2);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
