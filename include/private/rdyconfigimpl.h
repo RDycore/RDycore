@@ -56,8 +56,8 @@ typedef enum {
 } RDyFlowSourceMethod;
 
 typedef enum {
-  WELL_BALANCE_NONE = 0,  // no well-balancing
-  WELL_BALANCE_BS2002,    // Bradford and Sanders (2002) well-balancing
+  WELL_BALANCING_NONE = 0,  // no well-balancing
+  WELL_BALANCING_BS2002,    // Bradford and Sanders (2002) well-balancing
 } RDyWellBalanceMethod;
 
 typedef struct {
@@ -71,7 +71,7 @@ typedef struct {
   PetscReal            tiny_h;           // depth below which no flow occurs
   PetscReal            h_anuga_regular;  // ANUGA height parameter used for velocity regularization.
   RDyFlowSource        source;
-  RDyWellBalanceMethod well_balance;  // well-balancing method
+  RDyWellBalanceMethod well_balancing;  // well-balancing method
 } RDyPhysicsFlow;
 
 typedef struct {

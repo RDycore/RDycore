@@ -1,5 +1,5 @@
-#ifndef SWE_WELL_BALANCE_H
-#define SWE_WELL_BALANCE_H
+#ifndef SWE_WELL_BALANCING_H
+#define SWE_WELL_BALANCING_H
 #include "swe_types_ceed.h"
 
 // we disable compiler warnings for implicitly-declared math functions known to
@@ -82,4 +82,4 @@ CEED_QFUNCTION(SWEEtaVertex)(void *ctx, CeedInt Q, const CeedScalar *const in[],
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
 
-#endif  // SWE_WELL_BALANCE_H
+#endif  // SWE_WELL_BALANCING_H

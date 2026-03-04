@@ -7,7 +7,7 @@
 
 #include "swe/swe_fluxes_ceed.h"
 #include "tracer/tracer_fluxes_ceed.h"
-#include "swe/swe_well_balance.h"
+#include "swe/swe_well_balancing.h"
 
 // The CEED flux operator consists of the following sub-operators:
 //

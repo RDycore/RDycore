@@ -5,7 +5,7 @@ physics:
     mode: swe
     source:
       method: implicit_xq2018
-    well_balance: bradford_sanders_2002
+    well_balancing: bradford_sanders_2002
 
 numerics:
   spatial: fv
