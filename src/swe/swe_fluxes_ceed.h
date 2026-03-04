@@ -10,6 +10,14 @@
 #define SafeDiv(a, b, c, tiny) ((c) > (tiny) ? (a) / (b) : 0.0)
 #endif
 
+// computes the change in water depth along an edge given bed elevations at its
+// two vertices (zv_beg, zv_end) and the water surface elevations there (eta_beg, eta_end)
+CEED_QFUNCTION_HELPER CeedScalar ComputeDhv(CeedScalar zv_beg, CeedScalar zv_end, CeedScalar eta_beg, CeedScalar eta_end) {
+  CeedScalar hv_beg = fmax(eta_beg - zv_beg, 0.0);
+  CeedScalar hv_end = fmax(eta_end - zv_end, 0.0);
+  return hv_end - hv_beg;
+}
+
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
 #pragma GCC diagnostic push
@@ -55,10 +63,7 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
     SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
 
     // compute change in water depth along the edge
-    CeedScalar zv_beg = geom[4][i], zv_end = geom[5][i];
-    CeedScalar hv_beg = fmax(eta_vert_beg[0][i] - zv_beg, 0.0);
-    CeedScalar hv_end = fmax(eta_vert_end[0][i] - zv_end, 0.0);
-    CeedScalar dhv    = hv_end - hv_beg;
+    CeedScalar dhv = ComputeDhv(geom[4][i], geom[5][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
 
     CeedScalar flux[3], amax;
 
@@ -116,10 +121,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
     SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
 
     // compute change in water depth along the edge
-    CeedScalar zv_beg = geom[3][i], zv_end = geom[4][i];
-    CeedScalar hv_beg = fmax(eta_vert_beg[0][i] - zv_beg, 0.0);
-    CeedScalar hv_end = fmax(eta_vert_end[0][i] - zv_end, 0.0);
-    CeedScalar dhv    = hv_end - hv_beg;
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
 
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
@@ -170,10 +172,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
     SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
 
     // compute change in water depth along the edge
-    CeedScalar zv_beg = geom[3][i], zv_end = geom[4][i];
-    CeedScalar hv_beg = fmax(eta_vert_beg[0][i] - zv_beg, 0.0);
-    CeedScalar hv_end = fmax(eta_vert_end[0][i] - zv_end, 0.0);
-    CeedScalar dhv    = hv_end - hv_beg;
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
 
     if (qL.h > tiny_h) {
       CeedScalar dum1 = sn * sn - cn * cn;
@@ -230,10 +229,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
     SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
 
     // compute change in water depth along the edge
-    CeedScalar zv_beg = geom[3][i], zv_end = geom[4][i];
-    CeedScalar hv_beg = fmax(eta_vert_beg[0][i] - zv_beg, 0.0);
-    CeedScalar hv_end = fmax(eta_vert_end[0][i] - zv_end, 0.0);
-    CeedScalar dhv    = hv_end - hv_beg;
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
 
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
