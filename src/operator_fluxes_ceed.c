@@ -94,9 +94,10 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 ///    * `small h value` - the water height below which dry conditions are assumed
 ///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
-/// @param [in]  config  RDycore's configuration
-/// @param [in]  mesh    mesh defining the computational domain of the operator
-/// @param [out] subop   the CeedOperator representing the newly created suboperator
+/// @param [in]  config        RDycore's configuration
+/// @param [in]  mesh          mesh defining the computational domain of the operator
+/// @param [out] eta_vertices  a CeedVector containing the eta values at vertices, used for well-balancing
+/// @param [out] subop         the CeedOperator representing the newly created suboperator
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices, CeedOperator *subop) {
   PetscFunctionBeginUser;
