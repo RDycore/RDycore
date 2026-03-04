@@ -6,8 +6,8 @@
 #include <private/rdytracerimpl.h>
 
 #include "swe/swe_fluxes_ceed.h"
-#include "tracer/tracer_fluxes_ceed.h"
 #include "swe/swe_well_balancing.h"
+#include "tracer/tracer_fluxes_ceed.h"
 
 // The CEED flux operator consists of the following sub-operators:
 //
@@ -32,10 +32,10 @@
 #pragma clang diagnostic ignored "-Wvla"
 
 #ifndef SWAP
-#define SWAP(a, b)             \
-  do {                         \
-    CeedScalar _swap_tmp = (a); \
-    (a)                  = (b); \
+#define SWAP(a, b)                    \
+  do {                                \
+    CeedScalar _swap_tmp = (a);       \
+    (a)                  = (b);       \
     (b)                  = _swap_tmp; \
   } while (0)
 #endif

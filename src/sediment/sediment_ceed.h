@@ -9,14 +9,14 @@
 
 #include <ceed/types.h>
 
-#define MAX_NUM_FIELD_COMPONENTS   8
+#define MAX_NUM_FIELD_COMPONENTS 8
 
 // material properties
 #define MATERIAL_PROPERTY_MANNINGS 0
-#define NUM_MATERIAL_PROPERTIES    1
+#define NUM_MATERIAL_PROPERTIES 1
 
 // sediment dynamics
-#define MAX_NUM_SEDIMENT_CLASSES   5
+#define MAX_NUM_SEDIMENT_CLASSES 5
 
 // convenience macros
 

@@ -898,7 +898,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if (config->physics.flow.well_balancing == WELL_BALANCING_BS2002) {
     if (config->physics.sediment.num_classes > 0) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
-                "The BS2002 well balancing method is only implemented for the case without sediment transport (sediment.num_classes = 0)");
+                 "The BS2002 well balancing method is only implemented for the case without sediment transport (sediment.num_classes = 0)");
     }
     if (CeedEnabled()) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
