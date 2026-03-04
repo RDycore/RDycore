@@ -895,6 +895,16 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if ((config->physics.flow.source.method != SOURCE_ARK_IMEX) && (config->numerics.temporal == TEMPORAL_ARK_IMEX)) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid source method for ARK-IMEX temporal discretization");
   }
+  if (config->physics.flow.well_balancing == WELL_BALANCING_BS2002) {
+    if (config->physics.sediment.num_classes > 0) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                "The BS2002 well balancing method is only implemented for the case without sediment transport (sediment.num_classes = 0)");
+    }
+    if (CeedEnabled()) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                 "The BS2002 well balancing method is not currently implemented for the PETSc version of the code.");
+    }
+  }
 
   // check sediment dynamics settings
   PetscCheck(config->physics.sediment.num_classes <= MAX_NUM_SEDIMENT_CLASSES, comm, PETSC_ERR_USER,
