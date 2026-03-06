@@ -7,7 +7,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 
   // allocate storage for local metadata
   PetscInt  num_md          = 3;
-  PetscInt  num_local_edges = rdy->time_series.boundary_fluxes.num_local_edges[rdy->rank];
+  PetscInt  num_local_edges = rdy->time_series_data.boundary_fluxes.num_local_edges[rdy->rank];
   PetscInt *local_flux_md;
   PetscCall(PetscCalloc1(num_md * num_local_edges + 1, &local_flux_md));
 
@@ -33,7 +33,7 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
   // gather it on the root process (rank 0)
   if (rdy->rank == 0) {
     PetscMPIInt *global_flux_md, *n_recv_counts, *n_recv_displs;
-    PetscInt     num_global_edges = rdy->time_series.boundary_fluxes.num_global_edges;
+    PetscInt     num_global_edges = rdy->time_series_data.boundary_fluxes.num_global_edges;
     PetscCall(PetscCalloc1(num_md * num_global_edges, &global_flux_md));
     PetscCall(PetscCalloc1(rdy->nproc, &n_recv_counts));
     PetscCall(PetscCalloc1(rdy->nproc + 1, &n_recv_displs));
@@ -41,13 +41,13 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
     // local -> global flux metadata
     n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
-      n_recv_counts[p]     = num_md * rdy->time_series.boundary_fluxes.num_local_edges[p];
+      n_recv_counts[p]     = num_md * rdy->time_series_data.boundary_fluxes.num_local_edges[p];
       n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
     PetscCallMPI(MPI_Gatherv(local_flux_md, num_md * num_local_edges, MPI_INT, global_flux_md, n_recv_counts, n_recv_displs, MPI_INT, 0, rdy->comm));
-    PetscCall(PetscCalloc1(num_md * num_global_edges, &rdy->time_series.boundary_fluxes.global_flux_md));
+    PetscCall(PetscCalloc1(num_md * num_global_edges, &rdy->time_series_data.boundary_fluxes.global_flux_md));
     for (PetscInt i = 0; i < num_md * num_global_edges; ++i) {
-      rdy->time_series.boundary_fluxes.global_flux_md[i] = (PetscInt)global_flux_md[i];
+      rdy->time_series_data.boundary_fluxes.global_flux_md[i] = (PetscInt)global_flux_md[i];
     }
     PetscCall(PetscFree(global_flux_md));
     PetscCall(PetscFree(n_recv_counts));
@@ -65,10 +65,11 @@ static PetscErrorCode GatherBoundaryFluxMetadata(RDy rdy) {
 static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
   PetscFunctionBegin;
 
-  rdy->time_series.boundary_fluxes.last_step = -1;
+  rdy->time_series_data.boundary_fluxes.last_step        = -1;
+  rdy->time_series_data.boundary_fluxes.accumulated_time = 0.0;
 
   // allocate per-boundary flux offsets
-  PetscCall(PetscCalloc1(rdy->num_boundaries + 1, &(rdy->time_series.boundary_fluxes.offsets)));
+  PetscCall(PetscCalloc1(rdy->num_boundaries + 1, &(rdy->time_series_data.boundary_fluxes.offsets)));
 
   // make sure the number of degrees of freedom is the same as the number of
   // boundary fluxes
@@ -90,31 +91,27 @@ static PetscErrorCode InitBoundaryFluxes(RDy rdy) {
         if (rdy->mesh.cells.is_owned[cell_id]) ++num_boundary_edges;
       }
     }
-    rdy->time_series.boundary_fluxes.offsets[b + 1] = num_boundary_edges;
+    rdy->time_series_data.boundary_fluxes.offsets[b + 1] = num_boundary_edges;
   }
 
   // gather per-process numbers of local boundary edges
   PetscMPIInt *num_local_edges;
   PetscCall(PetscCalloc1(rdy->nproc, &num_local_edges));
   MPI_Allgather(&num_boundary_edges, 1, MPI_INT, num_local_edges, 1, MPI_INT, rdy->comm);
-  PetscCall(PetscCalloc1(rdy->nproc, &rdy->time_series.boundary_fluxes.num_local_edges));
+  PetscCall(PetscCalloc1(rdy->nproc, &rdy->time_series_data.boundary_fluxes.num_local_edges));
   for (PetscInt p = 0; p < rdy->nproc; ++p) {
-    rdy->time_series.boundary_fluxes.num_local_edges[p] = (PetscInt)num_local_edges[p];
+    rdy->time_series_data.boundary_fluxes.num_local_edges[p] = (PetscInt)num_local_edges[p];
   }
   PetscCall(PetscFree(num_local_edges));
 
   // determine the global number of boundary edges
-  MPI_Allreduce(&num_boundary_edges, &rdy->time_series.boundary_fluxes.num_global_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
+  MPI_Allreduce(&num_boundary_edges, &rdy->time_series_data.boundary_fluxes.num_global_edges, 1, MPI_INT, MPI_SUM, rdy->comm);
 
   // determine global flux metadata on rank 0
   PetscCall(GatherBoundaryFluxMetadata(rdy));
 
   // allocate (local) boundary flux storage
-  PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series.boundary_fluxes.fluxes)));
-  for (PetscInt n = 0; n < num_boundary_edges; ++n) {
-    rdy->time_series.boundary_fluxes.fluxes[n].current  = (TimeSeriesBoundaryFlux){0.0, 0.0, 0.0};
-    rdy->time_series.boundary_fluxes.fluxes[n].previous = (TimeSeriesBoundaryFlux){0.0, 0.0, 0.0};
-  }
+  PetscCall(PetscCalloc1(num_boundary_edges, &(rdy->time_series_data.boundary_fluxes.fluxes)));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -168,25 +165,26 @@ static PetscErrorCode CreateRank0VecAndVecScatter(PetscInt rank, Vec v_global, P
 static PetscErrorCode InitObservations(RDy rdy) {
   PetscFunctionBegin;
 
-  rdy->time_series.observations.last_step = -1;
+  rdy->time_series_data.observations.last_step        = -1;
+  rdy->time_series_data.observations.accumulated_time = 0.0;
 
   // create an accumulation vector for storing instantaneous or time-averaged solution data
-  PetscCall(VecDuplicate(rdy->u_global, &rdy->time_series.observations.accum_u));
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->time_series_data.observations.accum_u));
 
   // determine which sites are local to this process and record their global and local ids
   PetscInt  num_sites = rdy->config.output.time_series.observations.sites.cells_count;
   PetscInt *all_sites = rdy->config.output.time_series.observations.sites.cells;
 
-  PetscCall(CreateRank0VecAndVecScatter(rdy->rank, rdy->u_global, num_sites, all_sites, &rdy->time_series.observations.sites.u,
-                                        &rdy->time_series.observations.scatter_u));
+  PetscCall(CreateRank0VecAndVecScatter(rdy->rank, rdy->u_global, num_sites, all_sites, &rdy->time_series_data.observations.sites.u,
+                                        &rdy->time_series_data.observations.scatter_u));
 
   // set up storage on rank 0 for observations and populate the global site indices and the
   // coordinate arrays, both of which are fixed for the duration of the simulation
   {
     if (rdy->rank == 0) {
-      PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.x));
-      PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.y));
-      PetscCall(PetscCalloc1(num_sites, &rdy->time_series.observations.sites.z));
+      PetscCall(PetscCalloc1(num_sites, &rdy->time_series_data.observations.sites.x));
+      PetscCall(PetscCalloc1(num_sites, &rdy->time_series_data.observations.sites.y));
+      PetscCall(PetscCalloc1(num_sites, &rdy->time_series_data.observations.sites.z));
     }
 
     // now get x/y/z coordinates of the sites on the rank 0
@@ -231,11 +229,11 @@ static PetscErrorCode InitObservations(RDy rdy) {
         PetscCall(VecGetArray(coord_rank0, &coord_ptr));
         for (PetscInt i = 0; i < num_sites; ++i) {
           if (icoord == 0) {
-            rdy->time_series.observations.sites.x[i] = coord_ptr[i];
+            rdy->time_series_data.observations.sites.x[i] = coord_ptr[i];
           } else if (icoord == 1) {
-            rdy->time_series.observations.sites.y[i] = coord_ptr[i];
+            rdy->time_series_data.observations.sites.y[i] = coord_ptr[i];
           } else {
-            rdy->time_series.observations.sites.z[i] = coord_ptr[i];
+            rdy->time_series_data.observations.sites.z[i] = coord_ptr[i];
           }
         }
         PetscCall(VecRestoreArray(coord_rank0, &coord_ptr));
@@ -254,7 +252,7 @@ static PetscErrorCode InitObservations(RDy rdy) {
 // initializes time series data storage
 PetscErrorCode InitTimeSeries(RDy rdy) {
   PetscFunctionBegin;
-  rdy->time_series = (RDyTimeSeriesData){0};
+  rdy->time_series_data = (RDyTimeSeriesData){0};
   if (rdy->config.output.time_series.boundary_fluxes > 0) {
     InitBoundaryFluxes(rdy);
   }
@@ -267,34 +265,28 @@ PetscErrorCode InitTimeSeries(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// accumulates boundary fluxes on the given boundary from the given array of
+// records boundary fluxes on the given boundary from the given array of
 // fluxes on boundary edges
-static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, OperatorData boundary_fluxes) {
+static PetscErrorCode RecordBoundaryFluxes(RDy rdy, RDyBoundary boundary, OperatorData boundary_fluxes) {
   PetscFunctionBegin;
-  RDyTimeSeriesData *time_series = &rdy->time_series;
-  if (time_series->boundary_fluxes.fluxes) {
-    // if the boundary condition for this boundary is auto-generated,
-    // accumulate fluxes locally
+  RDyTimeSeriesData *time_series_data = &rdy->time_series_data;
+  if (time_series_data->boundary_fluxes.fluxes) {
+    // if the boundary condition for this boundary is not auto-generated,
+    // record fluxes locally
     if (!rdy->boundary_conditions[boundary.index].auto_generated) {
-      PetscInt n = rdy->time_series.boundary_fluxes.offsets[boundary.index];
+      PetscInt n = rdy->time_series_data.boundary_fluxes.offsets[boundary.index];
       for (PetscInt e = 0; e < boundary.num_edges; ++e) {
         PetscInt  edge_id  = boundary.edge_ids[e];
         PetscInt  cell_id  = rdy->mesh.edges.cell_ids[2 * edge_id];
         PetscReal edge_len = rdy->mesh.edges.lengths[edge_id];
+
         if (rdy->mesh.cells.is_owned[cell_id]) {
           // FIXME: this is specific to the shallow water equations
 
-          // subtract the previous accumulated values to get the increment
-          time_series->boundary_fluxes.fluxes[n].current.water_mass =
-              edge_len * boundary_fluxes.values[0][e] - time_series->boundary_fluxes.fluxes[n].previous.water_mass;
-          time_series->boundary_fluxes.fluxes[n].current.x_momentum =
-              edge_len * boundary_fluxes.values[1][e] - time_series->boundary_fluxes.fluxes[n].previous.x_momentum;
-          time_series->boundary_fluxes.fluxes[n].current.y_momentum =
-              edge_len * boundary_fluxes.values[2][e] - time_series->boundary_fluxes.fluxes[n].previous.y_momentum;
-          // store the values for the next accumulation
-          time_series->boundary_fluxes.fluxes[n].previous.water_mass = edge_len * boundary_fluxes.values[0][e];
-          time_series->boundary_fluxes.fluxes[n].previous.x_momentum = edge_len * boundary_fluxes.values[1][e];
-          time_series->boundary_fluxes.fluxes[n].previous.y_momentum = edge_len * boundary_fluxes.values[2][e];
+          // multiply by the edge length
+          time_series_data->boundary_fluxes.fluxes[n].water_mass = edge_len * boundary_fluxes.values[0][e];
+          time_series_data->boundary_fluxes.fluxes[n].x_momentum = edge_len * boundary_fluxes.values[1][e];
+          time_series_data->boundary_fluxes.fluxes[n].y_momentum = edge_len * boundary_fluxes.values[2][e];
           ++n;
         }
       }
@@ -306,8 +298,8 @@ static PetscErrorCode AccumulateBoundaryFluxes(RDy rdy, RDyBoundary boundary, Op
 static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
-  PetscInt num_local_edges  = rdy->time_series.boundary_fluxes.num_local_edges[rdy->rank];
-  PetscInt num_global_edges = rdy->time_series.boundary_fluxes.num_global_edges;
+  PetscInt num_local_edges  = rdy->time_series_data.boundary_fluxes.num_local_edges[rdy->rank];
+  PetscInt num_global_edges = rdy->time_series_data.boundary_fluxes.num_global_edges;
 
   // flux data itself (mass, x-momentum, y-momentum, edge x normal, edge y normal)
   // (add a padding byte to the end to prevent a 0-length VLA in case we don't
@@ -316,9 +308,9 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   PetscReal *local_flux_data;
   PetscCall(PetscCalloc1(num_data * num_local_edges + 1, &local_flux_data));
 
-  PetscInt step_interval;
-  if (rdy->time_series.boundary_fluxes.last_step == -1) step_interval = 1.0;
-  else step_interval = step - rdy->time_series.boundary_fluxes.last_step;
+  PetscReal accumulated_time = rdy->time_series_data.boundary_fluxes.accumulated_time;
+  if (accumulated_time == 0.0)
+    accumulated_time = 1.0;  // to avoid division by zero in case this is our first step or if the time interval between steps is zero for some reason
 
   // gather local data
   PetscInt n = 0;
@@ -330,9 +322,9 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
         PetscInt edge_id = boundary.edge_ids[e];
         PetscInt cell_id = rdy->mesh.edges.cell_ids[2 * edge_id];
         if (rdy->mesh.cells.is_owned[cell_id]) {
-          local_flux_data[num_data * n]     = rdy->time_series.boundary_fluxes.fluxes[n].current.water_mass / step_interval;
-          local_flux_data[num_data * n + 1] = rdy->time_series.boundary_fluxes.fluxes[n].current.x_momentum / step_interval;
-          local_flux_data[num_data * n + 2] = rdy->time_series.boundary_fluxes.fluxes[n].current.y_momentum / step_interval;
+          local_flux_data[num_data * n]     = rdy->time_series_data.boundary_fluxes.fluxes[n].water_mass / accumulated_time;
+          local_flux_data[num_data * n + 1] = rdy->time_series_data.boundary_fluxes.fluxes[n].x_momentum / accumulated_time;
+          local_flux_data[num_data * n + 2] = rdy->time_series_data.boundary_fluxes.fluxes[n].y_momentum / accumulated_time;
           RDyVector edge_normal             = rdy->mesh.edges.normals[edge_id];
           local_flux_data[num_data * n + 3] = edge_normal.V[0];
           local_flux_data[num_data * n + 4] = edge_normal.V[1];
@@ -346,14 +338,14 @@ static PetscErrorCode WriteBoundaryFluxes(RDy rdy, PetscInt step, PetscReal time
   // write them out
   if (rdy->rank == 0) {
     int          num_md         = 3;
-    PetscInt    *global_flux_md = rdy->time_series.boundary_fluxes.global_flux_md;
+    PetscInt    *global_flux_md = rdy->time_series_data.boundary_fluxes.global_flux_md;
     PetscMPIInt *n_recv_counts, *n_recv_displs;
     PetscCall(PetscCalloc1(rdy->nproc, &n_recv_counts));
     PetscCall(PetscCalloc1(rdy->nproc + 1, &n_recv_displs));
 
     n_recv_displs[0] = 0;
     for (PetscInt p = 0; p < rdy->nproc; ++p) {
-      n_recv_counts[p]     = num_data * rdy->time_series.boundary_fluxes.num_local_edges[p];
+      n_recv_counts[p]     = num_data * rdy->time_series_data.boundary_fluxes.num_local_edges[p];
       n_recv_displs[p + 1] = n_recv_displs[p] + n_recv_counts[p];
     }
     PetscReal *global_flux_data;
@@ -404,9 +396,9 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
   PetscFunctionBegin;
 
   // scatter the accumulation vector to the sites vector on rank 0
-  PetscCall(VecScatterBegin(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+  PetscCall(VecScatterBegin(rdy->time_series_data.observations.scatter_u, rdy->time_series_data.observations.accum_u, rdy->time_series_data.observations.sites.u,
                             INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(rdy->time_series.observations.scatter_u, rdy->time_series.observations.accum_u, rdy->time_series.observations.sites.u,
+  PetscCall(VecScatterEnd(rdy->time_series_data.observations.scatter_u, rdy->time_series_data.observations.accum_u, rdy->time_series_data.observations.sites.u,
                           INSERT_VALUES, SCATTER_FORWARD));
 
   if (rdy->rank == 0) {
@@ -425,8 +417,8 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
     }
 
     PetscInt num_sites, num_comp;
-    PetscCall(VecGetBlockSize(rdy->time_series.observations.sites.u, &num_comp));
-    PetscCall(VecGetSize(rdy->time_series.observations.sites.u, &num_sites));
+    PetscCall(VecGetBlockSize(rdy->time_series_data.observations.sites.u, &num_comp));
+    PetscCall(VecGetSize(rdy->time_series_data.observations.sites.u, &num_sites));
     num_sites /= num_comp;
 
     // retrieve the names of the solution vector components
@@ -438,18 +430,95 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
     }
 
     const PetscReal *values;
-    PetscCall(VecGetArrayRead(rdy->time_series.observations.sites.u, &values));
+    PetscCall(VecGetArrayRead(rdy->time_series_data.observations.sites.u, &values));
     for (PetscInt i = 0; i < num_sites; ++i) {
-      PetscReal x = rdy->time_series.observations.sites.x[i];
-      PetscReal y = rdy->time_series.observations.sites.y[i];
-      PetscReal z = rdy->time_series.observations.sites.z[i];
+      PetscReal x = rdy->time_series_data.observations.sites.x[i];
+      PetscReal y = rdy->time_series_data.observations.sites.y[i];
+      PetscReal z = rdy->time_series_data.observations.sites.z[i];
       for (PetscInt c = 0; c < num_comp; ++c) {
         PetscReal value = values[num_comp * i + c];
         PetscCall(PetscFPrintf(rdy->comm, fp, "%e\t%f\t%f\t%f\t%s  \t%e\n", time, x, y, z, component_names[c], value));
       }
     }
-    PetscCall(VecRestoreArrayRead(rdy->time_series.observations.sites.u, &values));
+    PetscCall(VecRestoreArrayRead(rdy->time_series_data.observations.sites.u, &values));
     PetscCall(PetscFClose(rdy->comm, fp));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode PrintCeedVector(CeedVector vec) {
+  PetscFunctionBegin;
+  CeedSize length;
+  PetscCallCEED(CeedVectorGetLength(vec, &length));
+  PetscReal *array;
+  PetscCallCEED(CeedVectorGetArray(vec, CEED_MEM_HOST, &array));
+  for (CeedInt i = 0; i < length / 3; ++i) {
+    PetscPrintf(PETSC_COMM_SELF, "%d %f\n", i, array[i * 3]);
+  }
+  PetscPrintf(PETSC_COMM_SELF, "\n");
+  PetscCallCEED(CeedVectorRestoreArray(vec, &array));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscReal dt = rdy->dt;
+  rdy->time_series_data.boundary_fluxes.accumulated_time += dt;
+
+  if (CeedEnabled()) {
+    Operator *op = rdy->operator;
+
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      RDyBoundary *boundary = &rdy->boundaries[b];
+
+      // get the relevant boundary sub-operator
+      CeedOperator *sub_ops;
+      PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+      CeedOperator sub_op = sub_ops[1 + boundary->index];
+
+      // fetch the relevant vector
+      CeedOperatorField field;
+      PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "flux", &field));
+      CeedVector vec;
+      PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+
+      if (0) {
+        printf("\nBefore accumulation for boundary %d:\n", (int)boundary->index);
+        PetscCall(PrintCeedVector(boundary->flux_accumulated));
+      }
+      PetscCallCEED(CeedVectorAXPY(boundary->flux_accumulated, dt, vec));
+      if (0) {
+        printf("After accumulation for boundary %d:\n", (int)boundary->index);
+        PetscCall(PrintCeedVector(boundary->flux_accumulated));
+      }
+    }
+  } else {
+    // For PETSc, the ApplyBoundaryFlux does the accumulation internally, so we don't need to do anything here.
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Resets accumulated boundary flux data to zero after writing time series output.
+// This clears both the accumulated time counter and the CEED flux accumulation vectors.
+static PetscErrorCode ResetAccumulatedBoundaryFluxes(RDy rdy) {
+  PetscFunctionBegin;
+
+  rdy->time_series_data.boundary_fluxes.accumulated_time = 0.0;
+
+  if (CeedEnabled()) {
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      RDyBoundary *boundary = &rdy->boundaries[b];
+      CeedVector   vec      = boundary->flux_accumulated;
+      PetscCallCEED(CeedVectorSetValue(vec, 0.0));
+    }
+  } else {
+    Operator *op = rdy->operator;
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      PetscCall(VecZeroEntries(op->petsc.boundary_fluxes_accum[b]));
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -463,27 +532,30 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
 
   // observations
   int observations_interval = rdy->config.output.time_series.observations.interval;
-  if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series.observations.last_step)) {
+  if (observations_interval && (step % observations_interval == 0) && (step > rdy->time_series_data.observations.last_step)) {
     // FIXME: This VecCopy is only appropriate for instantaneous observations; we haven't figured out
     // FIXME: how to articulate the time averaged values (and their windows) yet. We should revisit this
     // FIXME: when we want averaged values.
-    PetscCall(VecCopy(rdy->u_global, rdy->time_series.observations.accum_u));
+    PetscCall(VecCopy(rdy->u_global, rdy->time_series_data.observations.accum_u));
     PetscCall(WriteObservations(rdy, step, time));
   }
 
   // boundary fluxes
+  PetscCall(AccumulateBoundaryFluxes(rdy));
+
   int boundary_flux_interval = rdy->config.output.time_series.boundary_fluxes;
-  if ((step % boundary_flux_interval == 0) && (step > rdy->time_series.boundary_fluxes.last_step)) {
+  if ((step % boundary_flux_interval == 0) && (step > rdy->time_series_data.boundary_fluxes.last_step)) {
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-      RDyBoundary boundary = rdy->boundaries[b];
+      RDyBoundary *boundary = &rdy->boundaries[b];
 
       OperatorData boundary_fluxes;
-      PetscCall(GetOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
-      PetscCall(AccumulateBoundaryFluxes(rdy, boundary, boundary_fluxes));
-      PetscCall(RestoreOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
+      PetscCall(ExtractOperatorBoundaryFluxes(rdy->operator, boundary, &boundary_fluxes));
+      PetscCall(RecordBoundaryFluxes(rdy, *boundary, boundary_fluxes));
+      PetscCall(DestroyOperatorData(&boundary_fluxes));
     }
     PetscCall(WriteBoundaryFluxes(rdy, step, time));
-    rdy->time_series.boundary_fluxes.last_step = step;
+    PetscCall(ResetAccumulatedBoundaryFluxes(rdy));
+    rdy->time_series_data.boundary_fluxes.last_step = step;
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -492,18 +564,18 @@ PetscErrorCode WriteTimeSeries(TS ts, PetscInt step, PetscReal time, Vec X, void
 // Free resources allocated to time series.
 PetscErrorCode DestroyTimeSeries(RDy rdy) {
   PetscFunctionBegin;
-  if (rdy->time_series.boundary_fluxes.fluxes) {
-    PetscFree(rdy->time_series.boundary_fluxes.num_local_edges);
-    PetscFree(rdy->time_series.boundary_fluxes.global_flux_md);
-    PetscFree(rdy->time_series.boundary_fluxes.offsets);
-    PetscFree(rdy->time_series.boundary_fluxes.fluxes);
+  if (rdy->time_series_data.boundary_fluxes.fluxes) {
+    PetscFree(rdy->time_series_data.boundary_fluxes.num_local_edges);
+    PetscFree(rdy->time_series_data.boundary_fluxes.global_flux_md);
+    PetscFree(rdy->time_series_data.boundary_fluxes.offsets);
+    PetscFree(rdy->time_series_data.boundary_fluxes.fluxes);
   }
-  if (rdy->time_series.observations.sites.x) {
-    PetscFree(rdy->time_series.observations.sites.x);
-    PetscFree(rdy->time_series.observations.sites.y);
-    PetscFree(rdy->time_series.observations.sites.z);
-    PetscCall(VecDestroy(&rdy->time_series.observations.sites.u));
-    PetscCall(VecScatterDestroy(&rdy->time_series.observations.scatter_u));
+  if (rdy->time_series_data.observations.sites.x) {
+    PetscFree(rdy->time_series_data.observations.sites.x);
+    PetscFree(rdy->time_series_data.observations.sites.y);
+    PetscFree(rdy->time_series_data.observations.sites.z);
+    PetscCall(VecDestroy(&rdy->time_series_data.observations.sites.u));
+    PetscCall(VecScatterDestroy(&rdy->time_series_data.observations.scatter_u));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
