@@ -356,8 +356,8 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
 /// @param [in]  boundary_condition a RDyCondition describing the type of boundary condition
 /// @param [out] subop   the CeedOperator representing the newly created suboperator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices, RDyBoundary boundary,
-                                                 RDyCondition boundary_condition, CeedOperator *subop) {
+PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices, RDyBoundary *boundary, RDyCondition boundary_condition,
+                                                 CeedOperator *subop) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -371,7 +371,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   RDyVertices *vertices = &mesh->vertices;
 
   CeedQFunction qf;
-  PetscCall(CreateBoundaryFluxQFunction(ceed, config, boundary, boundary_condition, &qf));
+  PetscCall(CreateBoundaryFluxQFunction(ceed, config, *boundary, boundary_condition, &qf));
 
   // add inputs/outputs
   // NOTE: the order in which these inputs and outputs are specified determines
@@ -397,7 +397,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum, eta_beg_restrict, eta_end_restrict;
   CeedVector          geom, flux, flux_accumulated, dirichlet, cnum;
   {
-    CeedInt num_edges = boundary.num_edges;
+    CeedInt num_edges = boundary->num_edges;
 
     // create element restrictions for left and right input/output states
     CeedInt *q_offset_l, *c_offset_l, *offset_dirichlet = NULL, *eta_beg_offset, *eta_end_offset;
@@ -411,8 +411,8 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 
     // create a vector of geometric factors that transform fluxes to cell states
     CeedInt num_owned_edges = 0;
-    for (CeedInt e = 0; e < boundary.num_edges; e++) {
-      CeedInt iedge = boundary.edge_ids[e];
+    for (CeedInt e = 0; e < boundary->num_edges; e++) {
+      CeedInt iedge = boundary->edge_ids[e];
       if (edges->is_owned[iedge]) num_owned_edges++;
     }
     CeedInt g_strides[] = {num_comp_geom, 1, num_comp_geom};
@@ -422,7 +422,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
     CeedScalar(*g)[5];
     PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
     for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
-      CeedInt iedge = boundary.edge_ids[e];
+      CeedInt iedge = boundary->edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
       CeedInt l        = edges->cell_ids[2 * iedge];
       g[owned_edge][0] = edges->sn[iedge];
@@ -441,9 +441,9 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
     CeedInt f_strides[] = {num_comp, 1, num_comp};
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_edges, 1, num_comp, num_edges * num_comp, f_strides, &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
-    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux_accumulated, NULL));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &boundary->flux_accumulated, NULL));
     PetscCallCEED(CeedVectorSetValue(flux, 0.0));
-    PetscCallCEED(CeedVectorSetValue(flux_accumulated, 0.0));
+    PetscCallCEED(CeedVectorSetValue(boundary->flux_accumulated, 0.0));
 
     // create a vector to store the courant number for each edge
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
@@ -453,7 +453,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 
     // create an element restriction for the (active) "left" (interior) input/output states
     for (CeedInt e = 0, owned_edge = 0; e < num_edges; e++) {
-      CeedInt iedge = boundary.edge_ids[e];
+      CeedInt iedge = boundary->edge_ids[e];
       if (!edges->is_owned[iedge]) continue;
       CeedInt l              = edges->cell_ids[2 * iedge];
       q_offset_l[owned_edge] = l * num_comp;
@@ -512,7 +512,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   }
   PetscCallCEED(CeedOperatorSetField(*subop, "cell_left", c_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*subop, "flux", restrict_flux, CEED_BASIS_NONE, flux));
-  PetscCallCEED(CeedOperatorSetField(*subop, "flux_accumulated", restrict_flux, CEED_BASIS_NONE, flux_accumulated));
+  PetscCallCEED(CeedOperatorSetField(*subop, "flux_accumulated", restrict_flux, CEED_BASIS_NONE, boundary->flux_accumulated));
   PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
 
   // clean up
@@ -527,7 +527,6 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   }
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedVectorDestroy(&flux));
-  PetscCallCEED(CeedVectorDestroy(&flux_accumulated));
   PetscCallCEED(CeedVectorDestroy(&cnum));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
 
@@ -564,9 +563,8 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   // flux suboperators 1 to num_boundaries: fluxes on boundary edges
   for (CeedInt b = 0; b < num_boundaries; ++b) {
     CeedOperator boundary_flux_op;
-    RDyBoundary  boundary  = boundaries[b];
     RDyCondition condition = boundary_conditions[b];
-    PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, eta_vertices, boundary, condition, &boundary_flux_op));
+    PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, eta_vertices, &boundaries[b], condition, &boundary_flux_op));
     PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
     PetscCall(CeedOperatorDestroy(&boundary_flux_op));
   }
