@@ -69,12 +69,18 @@ static const cyaml_schema_field_t source_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_strval_t well_balancing_methods[] = {
+    {"none",                  WELL_BALANCING_NONE   },
+    {"bradford_sanders_2002", WELL_BALANCING_BS2002 },
+};
+
 // mapping of physics.flow fields to members of RDyPhysicsFlow
 static const cyaml_schema_field_t physics_flow_fields_schema[] = {
     CYAML_FIELD_ENUM("mode", CYAML_FLAG_DEFAULT, RDyPhysicsFlow, mode, physics_flow_modes, CYAML_ARRAY_LEN(physics_flow_modes)),
     CYAML_FIELD_FLOAT("tiny_h", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, tiny_h),
     CYAML_FIELD_FLOAT("h_anuga_reg_parameter", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, h_anuga_regular),
     CYAML_FIELD_MAPPING("source", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, source, source_fields_schema),
+    CYAML_FIELD_ENUM("well_balancing", CYAML_FLAG_OPTIONAL, RDyPhysicsFlow, well_balancing, well_balancing_methods, CYAML_ARRAY_LEN(well_balancing_methods)),
     CYAML_FIELD_END
 };
 
@@ -838,6 +844,8 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
     SET_MISSING_PARAMETER(config->physics.flow.source.xq2018_threshold, 1e-10);
   }
 
+  SET_MISSING_PARAMETER(config->physics.flow.well_balancing, WELL_BALANCING_NONE);
+
   SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
 
   SET_MISSING_PARAMETER(config->time.stop, INVALID_REAL);
@@ -886,6 +894,16 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   }
   if ((config->physics.flow.source.method != SOURCE_ARK_IMEX) && (config->numerics.temporal == TEMPORAL_ARK_IMEX)) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid source method for ARK-IMEX temporal discretization");
+  }
+  if (config->physics.flow.well_balancing == WELL_BALANCING_BS2002) {
+    if (config->physics.sediment.num_classes > 0) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                 "The BS2002 well balancing method is only implemented for the case without sediment transport (sediment.num_classes = 0)");
+    }
+    if (CeedEnabled()) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                 "The BS2002 well balancing method is not currently implemented for the PETSc version of the code.");
+    }
   }
 
   // check sediment dynamics settings

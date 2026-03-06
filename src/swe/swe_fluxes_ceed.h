@@ -10,6 +10,14 @@
 #define SafeDiv(a, b, c, tiny) ((c) > (tiny) ? (a) / (b) : 0.0)
 #endif
 
+// computes the change in water depth along an edge given bed elevations at its
+// two vertices (zv_beg, zv_end) and the water surface elevations there (eta_beg, eta_end)
+CEED_QFUNCTION_HELPER CeedScalar ComputeDhv(CeedScalar zv_beg, CeedScalar zv_end, CeedScalar eta_beg, CeedScalar eta_end) {
+  CeedScalar hv_beg = fmax(eta_beg - zv_beg, 0.0);
+  CeedScalar hv_end = fmax(eta_end - zv_end, 0.0);
+  return hv_end - hv_beg;
+}
+
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler
 #pragma GCC diagnostic push
@@ -34,14 +42,16 @@ typedef enum {
 
 // SWE interior flux operator Q-function
 CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
-  const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
-  const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
-  CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
-  const SWEContext context             = (SWEContext)ctx;
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L, weight_R
+  const CeedScalar(*q_L)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*q_R)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*cell_R)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*accum_flux)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
@@ -49,13 +59,18 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   const CeedScalar gravity = context->gravity;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    SWEState   qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+
+    // compute change in water depth along the edge
+    CeedScalar dhv = ComputeDhv(geom[4][i], geom[5][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
+
     CeedScalar flux[3], amax;
+
     if (qL.h > tiny_h || qR.h > tiny_h) {
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], dhv, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
@@ -85,14 +100,16 @@ CEED_QFUNCTION(SWEFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], 
 // SWE boundary flux operator Q-function (Dirichlet condition)
 CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
                                                     RiemannFluxType flux_type) {
-  const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
-  const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];  // Dirichlet boundary values
-  CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  CeedScalar(*inst_flux)[CEED_Q_VLA]   = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
-  const SWEContext context             = (SWEContext)ctx;
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  const CeedScalar(*q_R)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];  // Dirichlet boundary values
+  CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*inst_flux)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*accum_flux)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
@@ -102,11 +119,15 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
     SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+
+    // compute change in water depth along the edge
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
+
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], flux, &amax);
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], dhv, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
@@ -133,11 +154,13 @@ CEED_QFUNCTION(SWEBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedSc
 // SWE boundary flux operator Q-function (reflecting condition)
 CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
                                                      RiemannFluxType flux_type) {
-  const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
-  const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
-  const SWEContext context             = (SWEContext)ctx;
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
@@ -147,6 +170,10 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
     SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+
+    // compute change in water depth along the edge
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
+
     if (qL.h > tiny_h) {
       CeedScalar dum1 = sn * sn - cn * cn;
       CeedScalar dum2 = 2.0 * sn * cn;
@@ -154,7 +181,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, dhv, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
@@ -178,13 +205,15 @@ CEED_QFUNCTION(SWEBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedS
 // SWE boundary flux operator Q-function (outflow condition)
 CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
                                                   RiemannFluxType flux_type) {
-  const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
-  const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  CeedScalar(*inst_flux)[CEED_Q_VLA]   = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*accum_flux)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
-  const SWEContext context             = (SWEContext)ctx;
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*inst_flux)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*accum_flux)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
@@ -198,11 +227,15 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
     CeedScalar hR    = pow(q * q / gravity, 1.0 / 3.0);
     CeedScalar speed = sqrt(gravity * hR);
     SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
+
+    // compute change in water depth along the edge
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
+
     if (qL.h > tiny_h || qR.h > tiny_h) {
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, flux, &amax);
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, dhv, flux, &amax);
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
