@@ -73,15 +73,15 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = flux[j] * geom[2][i];
-        cell_R[j][i]     = flux[j] * geom[3][i];
+        cell_L[j][i] = flux[j] * geom[2][i];
+        cell_R[j][i] = flux[j] * geom[3][i];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
       courant_num[1][i] = amax * geom[3][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = 0.0;
-        cell_R[j][i]     = 0.0;
+        cell_L[j][i] = 0.0;
+        cell_R[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
       courant_num[1][i] = 0.0;
@@ -181,7 +181,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[2][i];
+        cell_L[j][i]    = flux[j] * geom[2][i];
         inst_flux[j][i] = flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
