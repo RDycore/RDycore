@@ -220,15 +220,17 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
     SWEState   qL    = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    CeedScalar q     = fabs(qL.hu * cn + qL.hv * sn);
-    CeedScalar hR    = pow(q * q / gravity, 1.0 / 3.0);
+    CeedScalar q     = qL.hu * cn + qL.hv * sn;
+    CeedScalar qabs  = fabs(q);
+    CeedScalar hR    = pow(qabs * qabs / gravity, 1.0 / 3.0);
     CeedScalar speed = sqrt(gravity * hR);
     SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
 
     // compute change in water depth along the edge
     CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
 
-    if (qL.h > tiny_h || qR.h > tiny_h) {
+    if ((qL.h > tiny_h || qR.h > tiny_h) && (q >= 0.0)) {
+      // only compute Riemann flux when the flow (q) is toward the boundary edge
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:

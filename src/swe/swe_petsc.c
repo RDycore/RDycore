@@ -318,13 +318,23 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDyMesh *mesh, RDyBoundary boundary
 
     if (cells->is_owned[left_local_cell_id]) {
       PetscReal uperp = datal->u[e] * cn_vec_bnd[e] + datal->v[e] * sn_vec_bnd[e];
-      PetscReal q     = datal->h[e] * fabs(uperp);
+      if (uperp < 0.0) {
+        // the flow is not towards the edge -- set dry state, so no flux leaves/enters
+        // the domain
+        datal->h[e] = 0.0;
+        datal->u[e] = 0.0;
+        datal->v[e] = 0.0;
+        datar->h[e] = 0.0;
+        datar->u[e] = 0.0;
+        datar->v[e] = 0.0;
+      } else {
+        PetscReal q = datal->h[e] * fabs(uperp);
+        datar->h[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
 
-      datar->h[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
-
-      PetscReal velocity = PetscPowReal(GRAVITY * datar->h[e], 0.5);
-      datar->u[e]        = velocity * cn_vec_bnd[e];
-      datar->v[e]        = velocity * sn_vec_bnd[e];
+        PetscReal velocity = PetscPowReal(GRAVITY * datar->h[e], 0.5);
+        datar->u[e]        = velocity * cn_vec_bnd[e];
+        datar->v[e]        = velocity * sn_vec_bnd[e];
+      }
     }
   }
 
