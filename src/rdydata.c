@@ -573,6 +573,12 @@ PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyCopySolution(RDy rdy, Vec solution) {
+  PetscFunctionBegin;
+  PetscCall(VecCopy(rdy->u_global, solution));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec) {
   PetscFunctionBegin;
   PetscCall(VecDuplicate(rdy->u_global, prog_vec));

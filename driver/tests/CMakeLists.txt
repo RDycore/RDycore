@@ -2,10 +2,12 @@
 
 # location of built driver executables
 set(rdycore_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore)
+set(rdycore_da_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_da)
 set(mms_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_mms)
 set(amr_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_amr)
 
 add_test(c_driver_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_driver})
+add_test(c_driver_da_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_da_driver})
 set(supported_languages c)
 
 if (ENABLE_FORTRAN)

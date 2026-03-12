@@ -36,6 +36,7 @@ endforeach()
 # Checkpoint/restart tests
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+add_test(swe_roe_ex2b_da_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${rdycore_da_driver} -ensemble_size 2 -obs_frequency 1 -obs_stride 8 -use_global_localization true ex2b.yaml)
 foreach(np 1 2) # test on 1, 2 processes
   foreach(config basic ceed preload)
     foreach(lang ${supported_languages})

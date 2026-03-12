@@ -157,6 +157,22 @@ PetscErrorCode DestroyOutputViewer(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyDisableOutput(RDy rdy) {
+  PetscFunctionBegin;
+
+  rdy->config.output.enable                          = PETSC_FALSE;
+  rdy->config.output.output_interval                 = 0;
+  rdy->config.output.time_interval                   = 0;
+  rdy->config.output.time_series.boundary_fluxes     = 0;
+  rdy->config.output.time_series.observations.interval = 0;
+  rdy->config.checkpoint.interval                    = 0;
+
+  PetscCall(TSMonitorCancel(rdy->ts));
+  PetscCall(DestroyOutputViewer(rdy));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // this writes a log message for output at the proper interval
 PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
   PetscFunctionBegin;

@@ -117,6 +117,8 @@ PETSC_EXTERN PetscErrorCode RDySetDomainYMomentumSource(RDy rdy, PetscInt size, 
 PETSC_EXTERN PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_idx, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetInitialConditions(RDy rdy, Vec ic);
+PETSC_EXTERN PetscErrorCode RDyCopySolution(RDy rdy, Vec solution);
+PETSC_EXTERN PetscErrorCode RDyDisableOutput(RDy rdy);
 
 PETSC_EXTERN PetscErrorCode RDyCreatePrognosticVec(RDy rdy, Vec *prog_vec);
 PETSC_EXTERN PetscErrorCode RDyReadOneDOFLocalVecFromBinaryFile(RDy rdy, const char *, Vec *local_vec);

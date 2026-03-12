@@ -5,6 +5,13 @@ add_executable(rdycore_exe
 set_target_properties(rdycore_exe PROPERTIES OUTPUT_NAME rdycore)
 target_link_libraries(rdycore_exe PRIVATE rdycore_c)
 
+# Data assimilation C driver
+add_executable(rdycore_da_exe
+  main_da.c
+)
+set_target_properties(rdycore_da_exe PROPERTIES OUTPUT_NAME rdycore_da)
+target_link_libraries(rdycore_da_exe PRIVATE rdycore_c)
+
 # MMS C driver
 add_executable(rdycore_mms
   mms.c
@@ -20,7 +27,7 @@ set_target_properties(rdycore_amr PROPERTIES OUTPUT_NAME rdycore_amr)
 target_link_libraries(rdycore_amr PRIVATE rdycore_c)
 
 install(
-  TARGETS rdycore_exe rdycore_mms rdycore_amr
+  TARGETS rdycore_exe rdycore_da_exe rdycore_mms rdycore_amr
   DESTINATION bin
 )
 
