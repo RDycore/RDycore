@@ -396,10 +396,10 @@ static PetscErrorCode WriteObservations(RDy rdy, PetscInt step, PetscReal time) 
   PetscFunctionBegin;
 
   // scatter the accumulation vector to the sites vector on rank 0
-  PetscCall(VecScatterBegin(rdy->time_series_data.observations.scatter_u, rdy->time_series_data.observations.accum_u, rdy->time_series_data.observations.sites.u,
-                            INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(rdy->time_series_data.observations.scatter_u, rdy->time_series_data.observations.accum_u, rdy->time_series_data.observations.sites.u,
-                          INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterBegin(rdy->time_series_data.observations.scatter_u, rdy->time_series_data.observations.accum_u,
+                            rdy->time_series_data.observations.sites.u, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(rdy->time_series_data.observations.scatter_u, rdy->time_series_data.observations.accum_u,
+                          rdy->time_series_data.observations.sites.u, INSERT_VALUES, SCATTER_FORWARD));
 
   if (rdy->rank == 0) {
     // open the file in the appropriate writing mode

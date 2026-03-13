@@ -356,8 +356,8 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
 /// @param [in]  boundary_condition a RDyCondition describing the type of boundary condition
 /// @param [out] subop   the CeedOperator representing the newly created suboperator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices, RDyBoundary *boundary, RDyCondition boundary_condition,
-                                                 CeedOperator *subop) {
+PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices, RDyBoundary *boundary,
+                                                 RDyCondition boundary_condition, CeedOperator *subop) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();

@@ -187,7 +187,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
       courant_num[0][i] = -amax * geom[2][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = 0.0;
+        cell_L[j][i]    = 0.0;
         inst_flux[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
