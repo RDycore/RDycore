@@ -49,8 +49,7 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
   CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*cell_R)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*accum_flux)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
   const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -74,17 +73,15 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = flux[j] * geom[2][i];
-        cell_R[j][i]     = flux[j] * geom[3][i];
-        accum_flux[j][i] = flux[j];
+        cell_L[j][i] = flux[j] * geom[2][i];
+        cell_R[j][i] = flux[j] * geom[3][i];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
       courant_num[1][i] = amax * geom[3][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]     = 0.0;
-        cell_R[j][i]     = 0.0;
-        accum_flux[j][i] = 0.0;
+        cell_L[j][i] = 0.0;
+        cell_R[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
       courant_num[1][i] = 0.0;
@@ -107,8 +104,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
   const CeedScalar(*q_R)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[4];  // Dirichlet boundary values
   CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*inst_flux)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*accum_flux)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
   const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -133,7 +129,6 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]    = flux[j] * geom[2][i];
         inst_flux[j][i] = flux[j];
-        accum_flux[j][i] += flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
     } else {
@@ -159,7 +154,8 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
   const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
   CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  CeedScalar(*inst_flux)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
   const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -185,12 +181,14 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
           break;
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[2][i];
+        cell_L[j][i]    = flux[j] * geom[2][i];
+        inst_flux[j][i] = flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = 0.0;
+        cell_L[j][i]    = 0.0;
+        inst_flux[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
     }
@@ -211,8 +209,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
   const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
   CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*inst_flux)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*accum_flux)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
   const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -223,15 +220,17 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
   for (CeedInt i = 0; i < Q; i++) {
     CeedScalar sn = geom[0][i], cn = geom[1][i];
     SWEState   qL    = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    CeedScalar q     = fabs(qL.hu * cn + qL.hv * sn);
-    CeedScalar hR    = pow(q * q / gravity, 1.0 / 3.0);
+    CeedScalar q     = qL.hu * cn + qL.hv * sn;
+    CeedScalar qabs  = fabs(q);
+    CeedScalar hR    = pow(qabs * qabs / gravity, 1.0 / 3.0);
     CeedScalar speed = sqrt(gravity * hR);
     SWEState   qR    = {hR, hR * speed * cn, hR * speed * sn};
 
     // compute change in water depth along the edge
     CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
 
-    if (qL.h > tiny_h || qR.h > tiny_h) {
+    if ((qL.h > tiny_h || qR.h > tiny_h) && (q >= 0.0)) {
+      // only compute Riemann flux when the flow (q) is toward the boundary edge
       CeedScalar flux[3], amax;
       switch (flux_type) {
         case RIEMANN_FLUX_ROE:
@@ -241,7 +240,6 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]    = flux[j] * geom[2][i];
         inst_flux[j][i] = flux[j];
-        accum_flux[j][i] += flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
     } else {
