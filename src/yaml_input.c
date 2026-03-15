@@ -70,8 +70,9 @@ static const cyaml_schema_field_t source_fields_schema[] = {
 };
 
 static const cyaml_strval_t well_balancing_methods[] = {
-    {"none",                  WELL_BALANCING_NONE   },
-    {"bradford_sanders_2002", WELL_BALANCING_BS2002 },
+    {"none",                       WELL_BALANCING_NONE   },
+    {"bradford_sanders_2002",      WELL_BALANCING_BS2002 },
+    {"hydrostatic_reconstruction", WELL_BALANCING_HR    },
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow
@@ -903,6 +904,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     if (CeedEnabled()) {
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
                  "The BS2002 well balancing method is not currently implemented for the PETSc version of the code.");
+    }
+  }
+  if (config->physics.flow.well_balancing == WELL_BALANCING_HR) {
+    if (!CeedEnabled()) {
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                 "The hydrostatic reconstruction well balancing method is not currently implemented.");
     }
   }
 

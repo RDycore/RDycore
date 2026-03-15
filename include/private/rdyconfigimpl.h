@@ -58,6 +58,7 @@ typedef enum {
 typedef enum {
   WELL_BALANCING_NONE = 0,  // no well-balancing
   WELL_BALANCING_BS2002,    // Bradford and Sanders (2002) well-balancing
+  WELL_BALANCING_HR,        // hydrostatic reconstruction well-balancing
 } RDyWellBalanceMethod;
 
 typedef struct {
