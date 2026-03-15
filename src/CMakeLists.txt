@@ -15,6 +15,7 @@ set(RDYCORE_C_SOURCE_FILES
   operator_fluxes_hydro_recon_ceed.c
   operator_fluxes_petsc.c
   operator_sources_ceed.c
+  operator_sources_hydro_recon_ceed.c
   operator_sources_petsc.c
   petsc_operator.c
   swe/swe_ceed.c
