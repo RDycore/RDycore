@@ -100,12 +100,21 @@ CEED_QFUNCTION_HELPER int SWEFlux_HydroRecon(void *ctx, CeedInt Q, const CeedSca
     SWEState qR_rec = {hR_rec, hR_rec * uR, hR_rec * vR};
 
     if (qL.h > tiny_h || qR.h > tiny_h) {
-      CeedScalar flux[3], amax;
-      CeedScalar dhv = 0.0;  // no vertex-based well-balancing correction for HR
-      switch (flux_type) {
-        case RIEMANN_FLUX_ROE:
-          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL_rec, qR_rec, geom[HR_INTERIOR_SN][i], geom[HR_INTERIOR_CN][i], dhv, flux, &amax);
-          break;
+      CeedScalar flux[3] = {0.0, 0.0, 0.0};
+      CeedScalar amax    = 0.0;
+      CeedScalar dhv     = 0.0;  // no vertex-based well-balancing correction for HR
+
+      // Guard the Riemann solver on the RECONSTRUCTED heights: HR can drive
+      // both hL_rec and hR_rec to zero even when the original h is positive
+      // (e.g. water surface below the neighbor's bed elevation).  Calling the
+      // Roe solver with both heights == 0 causes 0/0 = NaN in the Roe
+      // averages.
+      if (hL_rec > tiny_h || hR_rec > tiny_h) {
+        switch (flux_type) {
+          case RIEMANN_FLUX_ROE:
+            SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL_rec, qR_rec, geom[HR_INTERIOR_SN][i], geom[HR_INTERIOR_CN][i], dhv, flux, &amax);
+            break;
+        }
       }
 
       for (CeedInt j = 0; j < 3; j++) {
