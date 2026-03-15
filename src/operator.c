@@ -146,14 +146,25 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
       first_time = PETSC_FALSE;
     }
 
-    if (op->config->physics.flow.well_balancing != WELL_BALANCING_NONE) {
-      PetscCall(CreateCeedEtaVerticesOperator(op->config, op->mesh, &op->ceed.eta_vertices, &op->ceed.eta_vertices_operator));
-    } else {
-      PetscCall(CreateCeedEtaVerticesVector(op->mesh, &op->ceed.eta_vertices));
+    switch (op->config->physics.flow.well_balancing) {
+      case WELL_BALANCING_NONE:
+        PetscCall(CreateCeedEtaVerticesVector(op->mesh, &op->ceed.eta_vertices));
+        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                         &op->ceed.flux));
+        PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
+        break;
+      case WELL_BALANCING_BS2002:
+        PetscCall(CreateCeedEtaVerticesOperator(op->config, op->mesh, &op->ceed.eta_vertices, &op->ceed.eta_vertices_operator));
+        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                         &op->ceed.flux));
+        PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
+        break;
+      case WELL_BALANCING_HR:
+        PetscCall(CreateCeedFluxHydroReconOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                   &op->ceed.flux));
+        PetscCall(CreateCeedSourceHydroReconOperator(op->config, op->mesh, &op->ceed.source));
+        break;
     }
-    PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                     &op->ceed.flux));
-    PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
   } else {
     PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, op->petsc.boundary_values,
                                       op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics, &op->petsc.flux));
