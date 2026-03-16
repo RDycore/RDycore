@@ -1448,6 +1448,9 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
+  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
+  }
   PetscCall(OutputPartitionStatistics(rdy));
 
   RDyLogDebug(rdy, "Initializing regions...");

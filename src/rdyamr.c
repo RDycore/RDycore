@@ -648,6 +648,9 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // destroy and recreate mesh
   PetscCall(RDyMeshDestroy(rdy->mesh));
   PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &rdy->mesh));
+  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
+  }
 
   // initialize the refined solution from existing previous solution
   PetscCall(MatMult(CoarseToFineMatNDof, U_coarse_local, rdy->u_local));

@@ -202,6 +202,7 @@ typedef struct RDyMesh {
 } RDyMesh;
 
 PETSC_INTERN PetscErrorCode RDyMeshCreateFromDM(DM, PetscInt, RDyMesh *);
+PETSC_INTERN PetscErrorCode RDyMeshOverride2DProjection(RDyMesh *);
 PETSC_INTERN PetscErrorCode RDyMeshDestroy(RDyMesh);
 PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellXCentroids(RDyMesh *, const PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellYCentroids(RDyMesh *, const PetscInt, PetscReal *);
