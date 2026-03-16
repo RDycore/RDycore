@@ -533,9 +533,9 @@ typedef struct {
   RDyMesh  *mesh;  // domain mesh
   Vec       external_sources;
   Vec       material_properties;
-  PetscReal tiny_h;              // minimum water height for wet conditions
-  PetscReal xq2018_threshold;    // threshold for the XQ2018's implicit time integration of source term
-  PetscBool include_bed_slope;   // if false, bed slope is zero (HR: handled by flux pressure correction)
+  PetscReal tiny_h;             // minimum water height for wet conditions
+  PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
+  PetscBool include_bed_slope;  // if false, bed slope is zero (HR: handled by flux pressure correction)
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
@@ -795,9 +795,9 @@ typedef struct {
   RDyMesh             *mesh;
   PetscReal            tiny_h;
   PetscReal            h_anuga_regular;
-  PetscReal           *zc;              // vertex-averaged bed elevation per cell (local indexing)
-  RiemannStateData     left_states;     // reconstructed "left" states on interior edges
-  RiemannStateData     right_states;    // reconstructed "right" states on interior edges
+  PetscReal           *zc;            // vertex-averaged bed elevation per cell (local indexing)
+  RiemannStateData     left_states;   // reconstructed "left" states on interior edges
+  RiemannStateData     right_states;  // reconstructed "right" states on interior edges
   RiemannEdgeData      edges;
   OperatorDiagnostics *diagnostics;
 } InteriorFluxHROperator;
@@ -830,9 +830,9 @@ static PetscErrorCode ApplyInteriorFluxHR(void *context, PetscOperatorFields fie
   PetscReal        *amax_vec_int = data_edge->amax;
   PetscReal        *flux_vec_int = data_edge->fluxes;
 
-  const PetscReal tiny_h  = op->tiny_h;
-  const PetscReal h_anuga = op->h_anuga_regular;
-  const PetscReal *zc     = op->zc;
+  const PetscReal  tiny_h  = op->tiny_h;
+  const PetscReal  h_anuga = op->h_anuga_regular;
+  const PetscReal *zc      = op->zc;
 
   // For each internal edge, perform hydrostatic reconstruction and compute the
   // Roe flux on the reconstructed states.
@@ -862,10 +862,10 @@ static PetscErrorCode ApplyInteriorFluxHR(void *context, PetscOperatorFields fie
     // preserve velocities using ANUGA regularization
     PetscReal denom_L = Square(h_L) + Square(h_anuga);
     PetscReal denom_R = Square(h_R) + Square(h_anuga);
-    PetscReal uL = (h_L > tiny_h) ? hu_L * h_L / denom_L : 0.0;
-    PetscReal vL = (h_L > tiny_h) ? hv_L * h_L / denom_L : 0.0;
-    PetscReal uR = (h_R > tiny_h) ? hu_R * h_R / denom_R : 0.0;
-    PetscReal vR = (h_R > tiny_h) ? hv_R * h_R / denom_R : 0.0;
+    PetscReal uL      = (h_L > tiny_h) ? hu_L * h_L / denom_L : 0.0;
+    PetscReal vL      = (h_L > tiny_h) ? hv_L * h_L / denom_L : 0.0;
+    PetscReal uR      = (h_R > tiny_h) ? hu_R * h_R / denom_R : 0.0;
+    PetscReal vR      = (h_R > tiny_h) ? hv_R * h_R / denom_R : 0.0;
 
     // set reconstructed states for the Roe solver
     datal->h[e] = hL_rec;
@@ -912,7 +912,7 @@ static PetscErrorCode ApplyInteriorFluxHR(void *context, PetscOperatorFields fie
 
       // inner guard: skip if both reconstructed heights are dry
       PetscReal flux_scale_l = -edge_len / areal;
-      PetscReal flux_scale_r =  edge_len / arear;
+      PetscReal flux_scale_r = edge_len / arear;
 
       if (hL_rec > tiny_h || hR_rec > tiny_h) {
         // Courant number diagnostic

@@ -55,8 +55,7 @@ typedef enum {
 //   out[0]: cell_left[num_interior_edges][3]
 //   out[1]: cell_right[num_interior_edges][3]
 //   out[2]: courant_number[num_interior_edges][2]
-CEED_QFUNCTION_HELPER int SWEFlux_HydroRecon(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
-                                             RiemannFluxType flux_type) {
+CEED_QFUNCTION_HELPER int SWEFlux_HydroRecon(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];

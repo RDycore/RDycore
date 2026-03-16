@@ -77,8 +77,8 @@ PetscErrorCode CreatePetscFluxHROperator(RDyConfig *config, RDyMesh *mesh, Petsc
     PetscOperator boundary_flux_op;
     RDyBoundary   boundary  = boundaries[b];
     RDyCondition  condition = boundary_conditions[b];
-    PetscCall(CreatePetscSWEBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b],
-                                                 boundary_fluxes_accum[b], diagnostics, &boundary_flux_op));
+    PetscCall(CreatePetscSWEBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], boundary_fluxes_accum[b],
+                                                 diagnostics, &boundary_flux_op));
     PetscCall(PetscOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);

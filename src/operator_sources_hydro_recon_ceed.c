@@ -21,15 +21,14 @@ static PetscErrorCode CreateHRSourceQFunction(Ceed ceed, const RDyConfig config,
   switch (config.physics.flow.source.method) {
     case SOURCE_SEMI_IMPLICIT:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithSemiImplicitBedFriction,
-                                                 SWESourcesHydroReconWithSemiImplicitBedFriction_loc, qf));
+                                                SWESourcesHydroReconWithSemiImplicitBedFriction_loc, qf));
       break;
     case SOURCE_IMPLICIT_XQ2018:
       PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithImplicitBedFrictionXQ2018,
-                                                 SWESourcesHydroReconWithImplicitBedFrictionXQ2018_loc, qf));
+                                                SWESourcesHydroReconWithImplicitBedFrictionXQ2018_loc, qf));
       break;
     case SOURCE_ARK_IMEX:
-      PetscCallCEED(
-          CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithoutBedFriction, SWESourcesHydroReconWithoutBedFriction_loc, qf));
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithoutBedFriction, SWESourcesHydroReconWithoutBedFriction_loc, qf));
       break;
     default:
       PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported source-term method for HR");

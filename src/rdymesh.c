@@ -1469,21 +1469,20 @@ PetscErrorCode RDyMeshOverride2DProjection(RDyMesh *mesh) {
     PetscInt vid_1 = edges->vertex_ids[2 * iedge + 0];
     PetscInt vid_2 = edges->vertex_ids[2 * iedge + 1];
 
-    PetscReal dx = vertices->points[vid_2].X[0] - vertices->points[vid_1].X[0];
-    PetscReal dy = vertices->points[vid_2].X[1] - vertices->points[vid_1].X[1];
+    PetscReal dx          = vertices->points[vid_2].X[0] - vertices->points[vid_1].X[0];
+    PetscReal dy          = vertices->points[vid_2].X[1] - vertices->points[vid_1].X[1];
     edges->lengths[iedge] = PetscSqrtReal(Square(dx) + Square(dy));
   }
 
   // Override cell areas with 2D projected areas (shoelace formula)
   for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
-    PetscInt    nverts    = cells->num_vertices[icell];
-    PetscInt    offset    = cells->vertex_offsets[icell];
+    PetscInt    nverts     = cells->num_vertices[icell];
+    PetscInt    offset     = cells->vertex_offsets[icell];
     PetscScalar twice_area = 0.0;
     for (PetscInt k = 0; k < nverts; k++) {
       PetscInt v_cur  = cells->vertex_ids[offset + k];
       PetscInt v_next = cells->vertex_ids[offset + (k + 1) % nverts];
-      twice_area += vertices->points[v_cur].X[0] * vertices->points[v_next].X[1]
-                  - vertices->points[v_next].X[0] * vertices->points[v_cur].X[1];
+      twice_area += vertices->points[v_cur].X[0] * vertices->points[v_next].X[1] - vertices->points[v_next].X[0] * vertices->points[v_cur].X[1];
     }
     cells->areas[icell] = PetscAbsScalar(twice_area) / 2.0;
   }
