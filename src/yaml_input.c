@@ -906,12 +906,6 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
                  "The BS2002 well balancing method is not currently implemented for the PETSc version of the code.");
     }
   }
-  if (config->physics.flow.well_balancing == WELL_BALANCING_HR) {
-    if (!CeedEnabled()) {
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
-                 "The hydrostatic reconstruction well balancing method is not currently implemented.");
-    }
-  }
 
   // check sediment dynamics settings
   PetscCheck(config->physics.sediment.num_classes <= MAX_NUM_SEDIMENT_CLASSES, comm, PETSC_ERR_USER,
