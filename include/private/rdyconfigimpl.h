@@ -220,9 +220,15 @@ typedef struct {
 // grid section
 // ------------
 
+// specification for cell elevation override (e.g., pit-filled DEM)
+typedef struct {
+  char file[PETSC_MAX_PATH_LEN];  // binary file with cell-center elevations
+} RDyCellElevationSpec;
+
 // all grid parameters
 typedef struct {
-  char file[PETSC_MAX_PATH_LEN];  // grid file
+  char                 file[PETSC_MAX_PATH_LEN];  // grid file
+  RDyCellElevationSpec cell_elevation;            // optional cell elevation override
 } RDyGridSection;
 
 // ---------------------------

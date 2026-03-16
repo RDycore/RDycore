@@ -326,9 +326,16 @@ static const cyaml_schema_field_t output_fields_schema[] = {
 // grid:
 //   file: <path-to-file/grid.{msh,h5,exo}>
 
+// mapping of cell_elevation fields to members of RDyCellElevationSpec
+static const cyaml_schema_field_t cell_elevation_fields_schema[] = {
+  CYAML_FIELD_STRING("file", CYAML_FLAG_OPTIONAL, RDyCellElevationSpec, file, 0),
+  CYAML_FIELD_END
+};
+
 // mapping of grid fields to members of RDyGridSection
 static const cyaml_schema_field_t grid_fields_schema[] = {
   CYAML_FIELD_STRING("file", CYAML_FLAG_DEFAULT, RDyGridSection, file, 1),
+  CYAML_FIELD_MAPPING("cell_elevation", CYAML_FLAG_OPTIONAL, RDyGridSection, cell_elevation, cell_elevation_fields_schema),
   CYAML_FIELD_END
 };
 

@@ -651,6 +651,9 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
+  if (rdy->config.grid.cell_elevation.file[0]) {
+    PetscCall(OverrideCellElevation(rdy));
+  }
 
   // initialize the refined solution from existing previous solution
   PetscCall(MatMult(CoarseToFineMatNDof, U_coarse_local, rdy->u_local));

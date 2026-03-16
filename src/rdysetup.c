@@ -1076,6 +1076,28 @@ static PetscErrorCode InitSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// overrides cell centroid elevations with values read from a binary file
+// (e.g., a pit-filled DEM)
+PetscErrorCode OverrideCellElevation(RDy rdy) {
+  PetscFunctionBegin;
+
+  Vec local_elev;
+  PetscCall(RDyReadOneDOFLocalVecFromBinaryFile(rdy, rdy->config.grid.cell_elevation.file, &local_elev));
+
+  PetscScalar *elev_ptr;
+  PetscCall(VecGetArray(local_elev, &elev_ptr));
+
+  RDyCells *cells = &rdy->mesh.cells;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    cells->centroids[icell].X[2] = elev_ptr[icell];
+  }
+
+  PetscCall(VecRestoreArray(local_elev, &elev_ptr));
+  PetscCall(VecDestroy(&local_elev));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // initializes the operator given the information in rdy
 PetscErrorCode InitOperator(RDy rdy) {
   PetscFunctionBegin;
@@ -1450,6 +1472,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
   if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
+  }
+  if (rdy->config.grid.cell_elevation.file[0]) {
+    PetscCall(OverrideCellElevation(rdy));
   }
   PetscCall(OutputPartitionStatistics(rdy));
 

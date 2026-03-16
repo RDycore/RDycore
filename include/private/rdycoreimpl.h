@@ -229,6 +229,7 @@ PETSC_INTERN PetscErrorCode ReadConfigFile(RDy);     // for RDycore driver only!
 PETSC_INTERN PetscErrorCode ReadMMSConfigFile(RDy);  // for MMS driver only!
 PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
+PETSC_INTERN PetscErrorCode OverrideCellElevation(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);
 PETSC_INTERN PetscErrorCode DestroyConfig(RDy);
