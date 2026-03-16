@@ -166,9 +166,26 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
         break;
     }
   } else {
-    PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, op->petsc.boundary_values,
-                                      op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics, &op->petsc.flux));
-    PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+    switch (op->config->physics.flow.well_balancing) {
+      case WELL_BALANCING_NONE:
+        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, op->petsc.boundary_values,
+                                          op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics, &op->petsc.flux));
+        PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+      case WELL_BALANCING_BS2002:
+        // BS2002 well-balancing is only implemented in the CEED backend;
+        // the PETSc backend uses the standard operators.
+        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, op->petsc.boundary_values,
+                                          op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics, &op->petsc.flux));
+        PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+      case WELL_BALANCING_HR:
+        PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                            op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum,
+                                            &op->diagnostics, &op->petsc.flux));
+        PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

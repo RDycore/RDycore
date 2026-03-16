@@ -533,8 +533,9 @@ typedef struct {
   RDyMesh  *mesh;  // domain mesh
   Vec       external_sources;
   Vec       material_properties;
-  PetscReal tiny_h;            // minimum water height for wet conditions
-  PetscReal xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
+  PetscReal tiny_h;              // minimum water height for wet conditions
+  PetscReal xq2018_threshold;    // threshold for the XQ2018's implicit time integration of source term
+  PetscBool include_bed_slope;   // if false, bed slope is zero (HR: handled by flux pressure correction)
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
@@ -579,11 +580,11 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
       PetscReal hu = u_ptr[n_dof * c + 1];
       PetscReal hv = u_ptr[n_dof * c + 2];
 
-      PetscReal dz_dx = cells->dz_dx[c];
-      PetscReal dz_dy = cells->dz_dy[c];
-
-      PetscReal bedx = dz_dx * GRAVITY * h;
-      PetscReal bedy = dz_dy * GRAVITY * h;
+      PetscReal bedx = 0.0, bedy = 0.0;
+      if (source_op->include_bed_slope) {
+        bedx = cells->dz_dx[c] * GRAVITY * h;
+        bedy = cells->dz_dy[c] * GRAVITY * h;
+      }
 
       PetscReal Fsum_x = flux_div_ptr[n_dof * owned_cell_id + 1];
       PetscReal Fsum_y = flux_div_ptr[n_dof * owned_cell_id + 2];
@@ -676,11 +677,11 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
       PetscReal hu = u_ptr[n_dof * c + 1];
       PetscReal hv = u_ptr[n_dof * c + 2];
 
-      PetscReal dz_dx = cells->dz_dx[c];
-      PetscReal dz_dy = cells->dz_dy[c];
-
-      PetscReal bedx = dz_dx * GRAVITY * h;
-      PetscReal bedy = dz_dy * GRAVITY * h;
+      PetscReal bedx = 0.0, bedy = 0.0;
+      if (source_op->include_bed_slope) {
+        bedx = cells->dz_dx[c] * GRAVITY * h;
+        bedy = cells->dz_dy[c] * GRAVITY * h;
+      }
 
       PetscReal tbx = 0.0, tby = 0.0;
 
@@ -761,6 +762,285 @@ PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *mesh, const RDyConfig confi
       .material_properties = material_properties,
       .tiny_h              = config.physics.flow.tiny_h,
       .xq2018_threshold    = config.physics.flow.source.xq2018_threshold,
+      .include_bed_slope   = PETSC_TRUE,
+  };
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)external_sources, &comm));
+
+  switch (config.physics.flow.source.method) {
+    case SOURCE_SEMI_IMPLICIT:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceSemiImplicit, DestroySource, petsc_op));
+      break;
+    case SOURCE_IMPLICIT_XQ2018:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
+      break;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//=====================================================================
+// Hydrostatic Reconstruction (HR) Operators
+//=====================================================================
+
+//--------------------------------------
+// HR Interior Flux Operator
+//--------------------------------------
+
+typedef struct {
+  RDyNumericsRiemann   riemann;
+  RDyMesh             *mesh;
+  PetscReal            tiny_h;
+  PetscReal            h_anuga_regular;
+  PetscReal           *zc;              // vertex-averaged bed elevation per cell (local indexing)
+  RiemannStateData     left_states;     // reconstructed "left" states on interior edges
+  RiemannStateData     right_states;    // reconstructed "right" states on interior edges
+  RiemannEdgeData      edges;
+  OperatorDiagnostics *diagnostics;
+} InteriorFluxHROperator;
+
+static PetscErrorCode ApplyInteriorFluxHR(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
+
+  InteriorFluxHROperator *op = context;
+
+  RDyMesh  *mesh  = op->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscScalar *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(u_local, &u_ptr));
+  PetscCall(VecGetArray(f_global, &f_ptr));
+
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  RiemannStateData *datal        = &op->left_states;
+  RiemannStateData *datar        = &op->right_states;
+  RiemannEdgeData  *data_edge    = &op->edges;
+  PetscReal        *sn_vec_int   = data_edge->sn;
+  PetscReal        *cn_vec_int   = data_edge->cn;
+  PetscReal        *amax_vec_int = data_edge->amax;
+  PetscReal        *flux_vec_int = data_edge->fluxes;
+
+  const PetscReal tiny_h  = op->tiny_h;
+  const PetscReal h_anuga = op->h_anuga_regular;
+  const PetscReal *zc     = op->zc;
+
+  // For each internal edge, perform hydrostatic reconstruction and compute the
+  // Roe flux on the reconstructed states.
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l       = edges->cell_ids[2 * edge_id];
+    PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+
+    if (r == -1) continue;
+
+    PetscReal h_L  = u_ptr[n_dof * l + 0];
+    PetscReal hu_L = u_ptr[n_dof * l + 1];
+    PetscReal hv_L = u_ptr[n_dof * l + 2];
+    PetscReal h_R  = u_ptr[n_dof * r + 0];
+    PetscReal hu_R = u_ptr[n_dof * r + 1];
+    PetscReal hv_R = u_ptr[n_dof * r + 2];
+
+    // hydrostatic reconstruction
+    PetscReal zc_L   = zc[l];
+    PetscReal zc_R   = zc[r];
+    PetscReal eta_L  = h_L + zc_L;
+    PetscReal eta_R  = h_R + zc_R;
+    PetscReal z_max  = fmax(zc_L, zc_R);
+    PetscReal hL_rec = fmax(0.0, eta_L - z_max);
+    PetscReal hR_rec = fmax(0.0, eta_R - z_max);
+
+    // preserve velocities using ANUGA regularization
+    PetscReal denom_L = Square(h_L) + Square(h_anuga);
+    PetscReal denom_R = Square(h_R) + Square(h_anuga);
+    PetscReal uL = (h_L > tiny_h) ? hu_L * h_L / denom_L : 0.0;
+    PetscReal vL = (h_L > tiny_h) ? hv_L * h_L / denom_L : 0.0;
+    PetscReal uR = (h_R > tiny_h) ? hu_R * h_R / denom_R : 0.0;
+    PetscReal vR = (h_R > tiny_h) ? hv_R * h_R / denom_R : 0.0;
+
+    // set reconstructed states for the Roe solver
+    datal->h[e] = hL_rec;
+    datal->u[e] = uL;
+    datal->v[e] = vL;
+    datar->h[e] = hR_rec;
+    datar->u[e] = uR;
+    datar->v[e] = vR;
+  }
+
+  // call Riemann solver on reconstructed states
+  switch (op->riemann) {
+    case RIEMANN_ROE:
+      PetscCall(ComputeSWERoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+      break;
+    default:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
+  }
+
+  // accumulate fluxes + pressure correction
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l       = edges->cell_ids[2 * edge_id];
+    PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+
+    if (r == -1) continue;
+
+    PetscReal h_L = u_ptr[n_dof * l + 0];
+    PetscReal h_R = u_ptr[n_dof * r + 0];
+
+    if (!(h_R < tiny_h && h_L < tiny_h)) {
+      PetscReal edge_len = edges->lengths[edge_id];
+      PetscReal areal    = cells->areas[l];
+      PetscReal arear    = cells->areas[r];
+
+      // hydrostatic reconstruction (recompute for correction)
+      PetscReal zc_L   = zc[l];
+      PetscReal zc_R   = zc[r];
+      PetscReal eta_L  = h_L + zc_L;
+      PetscReal eta_R  = h_R + zc_R;
+      PetscReal z_max  = fmax(zc_L, zc_R);
+      PetscReal hL_rec = fmax(0.0, eta_L - z_max);
+      PetscReal hR_rec = fmax(0.0, eta_R - z_max);
+
+      // inner guard: skip if both reconstructed heights are dry
+      PetscReal flux_scale_l = -edge_len / areal;
+      PetscReal flux_scale_r =  edge_len / arear;
+
+      if (hL_rec > tiny_h || hR_rec > tiny_h) {
+        // Courant number diagnostic
+        PetscReal                 cnum              = amax_vec_int[e] * edge_len / fmin(areal, arear) * dt;
+        CourantNumberDiagnostics *courant_num_diags = &op->diagnostics->courant_number;
+        if (cnum > courant_num_diags->max_courant_num) {
+          courant_num_diags->max_courant_num = cnum;
+          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[l];
+          else courant_num_diags->global_cell_id = cells->global_ids[r];
+        }
+
+        // accumulate Roe fluxes
+        for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+          if (cells->is_owned[l]) {
+            PetscInt lo = cells->local_to_owned[l];
+            f_ptr[n_dof * lo + i_dof] += flux_vec_int[n_dof * e + i_dof] * flux_scale_l;
+          }
+          if (cells->is_owned[r]) {
+            PetscInt ro = cells->local_to_owned[r];
+            f_ptr[n_dof * ro + i_dof] += flux_vec_int[n_dof * e + i_dof] * flux_scale_r;
+          }
+        }
+      }
+
+      // hydrostatic pressure correction (applied even when both reconstructed
+      // heights are below tiny_h, matching the CEED implementation where it
+      // sits outside the inner guard)
+      PetscReal corr_L = 0.5 * GRAVITY * (Square(h_L) - Square(hL_rec));
+      PetscReal corr_R = 0.5 * GRAVITY * (Square(h_R) - Square(hR_rec));
+      PetscReal cn     = cn_vec_int[e];
+      PetscReal sn     = sn_vec_int[e];
+
+      if (cells->is_owned[l]) {
+        PetscInt lo = cells->local_to_owned[l];
+        f_ptr[n_dof * lo + 1] += corr_L * cn * flux_scale_l;
+        f_ptr[n_dof * lo + 2] += corr_L * sn * flux_scale_l;
+      }
+      if (cells->is_owned[r]) {
+        PetscInt ro = cells->local_to_owned[r];
+        f_ptr[n_dof * ro + 1] += corr_R * cn * flux_scale_r;
+        f_ptr[n_dof * ro + 2] += corr_R * sn * flux_scale_r;
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroyInteriorFluxHR(void *context) {
+  PetscFunctionBegin;
+  InteriorFluxHROperator *op = context;
+  PetscCall(DestroyRiemannStateData(op->left_states));
+  PetscCall(DestroyRiemannStateData(op->right_states));
+  PetscCall(DestroyRiemannEdgeData(op->edges));
+  PetscCall(PetscFree(op->zc));
+  PetscCall(PetscFree(op));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a PetscOperator that computes interior fluxes with hydrostatic
+/// reconstruction for well-balanced shallow water equations.
+PetscErrorCode CreatePetscSWEInteriorFluxHROperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics,
+                                                    PetscOperator *petsc_op) {
+  PetscFunctionBegin;
+
+  const PetscInt num_comp = 3;
+
+  InteriorFluxHROperator *op;
+  PetscCall(PetscCalloc1(1, &op));
+  *op = (InteriorFluxHROperator){
+      .riemann         = config.numerics.riemann,
+      .mesh            = mesh,
+      .diagnostics     = diagnostics,
+      .tiny_h          = config.physics.flow.tiny_h,
+      .h_anuga_regular = config.physics.flow.h_anuga_regular,
+  };
+
+  // allocate Riemann data structures
+  PetscCall(CreateRiemannStateData(mesh->num_internal_edges, &op->left_states));
+  PetscCall(CreateRiemannStateData(mesh->num_internal_edges, &op->right_states));
+  PetscCall(CreateRiemannEdgeData(mesh->num_internal_edges, num_comp, &op->edges));
+
+  // copy edge geometry
+  RDyEdges *edges = &mesh->edges;
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id       = edges->internal_edge_ids[e];
+    PetscInt right_cell_id = edges->cell_ids[2 * edge_id + 1];
+    if (right_cell_id != -1) {
+      op->edges.cn[e] = edges->cn[edge_id];
+      op->edges.sn[e] = edges->sn[edge_id];
+    }
+  }
+
+  // compute vertex-averaged bed elevation for each cell
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+  PetscCall(PetscCalloc1(mesh->num_cells, &op->zc));
+  for (PetscInt c = 0; c < mesh->num_cells; c++) {
+    PetscReal z_sum = 0.0;
+    for (PetscInt v = cells->vertex_offsets[c]; v < cells->vertex_offsets[c + 1]; v++) {
+      z_sum += vertices->points[cells->vertex_ids[v]].X[2];
+    }
+    op->zc[c] = z_sum / (PetscReal)cells->num_vertices[c];
+  }
+
+  PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxHR, DestroyInteriorFluxHR, petsc_op));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a PetscOperator that computes source terms for the HR well-balanced
+/// shallow water equations (bed slope = 0, friction only).
+PetscErrorCode CreatePetscSWESourceHROperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec material_properties,
+                                              PetscOperator *petsc_op) {
+  PetscFunctionBegin;
+  SourceOperator *source_op;
+  PetscCall(PetscCalloc1(1, &source_op));
+  *source_op = (SourceOperator){
+      .mesh                = mesh,
+      .external_sources    = external_sources,
+      .material_properties = material_properties,
+      .tiny_h              = config.physics.flow.tiny_h,
+      .xq2018_threshold    = config.physics.flow.source.xq2018_threshold,
+      .include_bed_slope   = PETSC_FALSE,  // HR: bed slope handled by flux pressure correction
   };
 
   MPI_Comm comm;
