@@ -239,3 +239,18 @@ foreach(np 2)
     endforeach()
   endforeach()
 endforeach()
+
+# Test Hydrostatic Reconstruction correction
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/levee.hr.yaml
+     ${MESH_DIR}/levee.exo
+     ${MESH_DIR}/levee_elevation.${PETSC_ID_TYPE}.bin
+     ${CONDITION_DIR}/levee_ic.${PETSC_ID_TYPE}.bin
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 2)
+  foreach(config petsc ceed)
+    foreach(lang ${supported_languages})
+      add_test(swe_hr_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} levee.hr.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
