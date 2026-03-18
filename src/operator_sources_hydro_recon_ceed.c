@@ -3,8 +3,10 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
 #include "swe/swe_sources_hydro_recon_ceed.h"
+#include "tracer/tracer_sources_hydro_recon_ceed.h"
 
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
@@ -14,28 +16,50 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
+static inline CeedInt NumTracers(const RDyConfig config) {
+  return config.physics.sediment.num_classes + ((config.physics.salinity) ? 1 : 0) + ((config.physics.heat) ? 1 : 0);
+}
+
 static PetscErrorCode CreateHRSourceQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
   PetscFunctionBeginUser;
 
-  CeedQFunctionContext qf_context;
-  switch (config.physics.flow.source.method) {
-    case SOURCE_SEMI_IMPLICIT:
-      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithSemiImplicitBedFriction,
-                                                SWESourcesHydroReconWithSemiImplicitBedFriction_loc, qf));
-      break;
-    case SOURCE_IMPLICIT_XQ2018:
-      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithImplicitBedFrictionXQ2018,
-                                                SWESourcesHydroReconWithImplicitBedFrictionXQ2018_loc, qf));
-      break;
-    case SOURCE_ARK_IMEX:
-      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithoutBedFriction, SWESourcesHydroReconWithoutBedFriction_loc, qf));
-      break;
-    default:
-      PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported source-term method for HR");
-      break;
-  }
+  CeedInt num_tracers = NumTracers(config);
 
-  PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  CeedQFunctionContext qf_context;
+  if (num_tracers == 0) {  // flow only
+    switch (config.physics.flow.source.method) {
+      case SOURCE_SEMI_IMPLICIT:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithSemiImplicitBedFriction,
+                                                  SWESourcesHydroReconWithSemiImplicitBedFriction_loc, qf));
+        break;
+      case SOURCE_IMPLICIT_XQ2018:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithImplicitBedFrictionXQ2018,
+                                                  SWESourcesHydroReconWithImplicitBedFrictionXQ2018_loc, qf));
+        break;
+      case SOURCE_ARK_IMEX:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithoutBedFriction, SWESourcesHydroReconWithoutBedFriction_loc, qf));
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported source-term method for HR");
+        break;
+    }
+    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  } else {  // flow + tracers
+    switch (config.physics.flow.source.method) {
+      case SOURCE_SEMI_IMPLICIT:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerSourcesHydroReconWithSemiImplicitBedFriction,
+                                                  TracerSourcesHydroReconWithSemiImplicitBedFriction_loc, qf));
+        break;
+      case SOURCE_ARK_IMEX:
+        PetscCallCEED(
+            CeedQFunctionCreateInterior(ceed, 1, TracerSourcesHydroReconWithoutBedFriction, TracerSourcesHydroReconWithoutBedFriction_loc, qf));
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported source-term method for tracer HR");
+        break;
+    }
+    PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
+  }
   PetscCallCEED(CeedQFunctionSetContext(*qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
@@ -60,7 +84,9 @@ static PetscErrorCode CreateCeedSourceHydroReconSuboperator(const RDyConfig conf
 
   Ceed ceed = CeedContext();
 
-  CeedInt num_comp = 3;  // SWE only, no tracer support for HR
+  CeedInt num_flow_comp = 3;  // NOTE: SWE assumed!
+  CeedInt num_tracers   = NumTracers(config);
+  CeedInt num_comp      = num_flow_comp + num_tracers;
 
   RDyCells *cells = &mesh->cells;
 

@@ -35,6 +35,7 @@ PetscErrorCode CreateTracerQFunctionContext(Ceed ceed, const RDyConfig config, C
 
   tracers_ctx->dtime                   = 0.0;
   tracers_ctx->tiny_h                  = config.physics.flow.tiny_h;
+  tracers_ctx->h_anuga_regular          = config.physics.flow.h_anuga_regular;
   tracers_ctx->gravity                 = GRAVITY;
   tracers_ctx->xq2018_threshold        = config.physics.flow.source.xq2018_threshold;
   tracers_ctx->kp_constant             = 0.001;
@@ -55,6 +56,8 @@ PetscErrorCode CreateTracerQFunctionContext(Ceed ceed, const RDyConfig config, C
 
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "small h value", offsetof(struct TracerContext_, tiny_h), 1,
                                                    "Height threshold below which dry condition is assumed"));
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "h_anuga_regular", offsetof(struct TracerContext_, h_anuga_regular), 1,
+                                                   "ANUGA height parameter for velocity regularization"));
   PetscCallCEED(
       CeedQFunctionContextRegisterDouble(*qf_context, "gravity", offsetof(struct TracerContext_, gravity), 1, "Accelaration due to gravity"));
 

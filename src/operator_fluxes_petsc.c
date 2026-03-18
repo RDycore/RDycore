@@ -69,16 +69,26 @@ PetscErrorCode CreatePetscFluxHROperator(RDyConfig *config, RDyMesh *mesh, Petsc
 
   // flux suboperator 0: HR interior fluxes
   PetscOperator interior_flux_op;
-  PetscCall(CreatePetscSWEInteriorFluxHROperator(mesh, *config, diagnostics, &interior_flux_op));
+  if (config->physics.sediment.num_classes > 0) {
+    PetscCall(CreatePetscTracerInteriorFluxHROperator(mesh, *config, diagnostics, &interior_flux_op));
+  } else {
+    PetscCall(CreatePetscSWEInteriorFluxHROperator(mesh, *config, diagnostics, &interior_flux_op));
+  }
   PetscCall(PetscOperatorCompositeAddSub(*flux_op, interior_flux_op));
 
   // flux suboperators 1..num_boundaries: standard boundary fluxes
+  // (HR is a no-op on boundaries since zc_L == zc_R for boundary cells)
   for (PetscInt b = 0; b < num_boundaries; ++b) {
     PetscOperator boundary_flux_op;
     RDyBoundary   boundary  = boundaries[b];
     RDyCondition  condition = boundary_conditions[b];
-    PetscCall(CreatePetscSWEBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], boundary_fluxes_accum[b],
-                                                 diagnostics, &boundary_flux_op));
+    if (config->physics.sediment.num_classes > 0) {
+      PetscCall(CreatePetscTracerBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b], diagnostics,
+                                                      &boundary_flux_op));
+    } else {
+      PetscCall(CreatePetscSWEBoundaryFluxOperator(mesh, *config, boundary, condition, boundary_values[b], boundary_fluxes[b],
+                                                   boundary_fluxes_accum[b], diagnostics, &boundary_flux_op));
+    }
     PetscCall(PetscOperatorCompositeAddSub(*flux_op, boundary_flux_op));
   }
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -9,6 +9,7 @@ typedef struct TracerContext_ *TracerContext;
 struct TracerContext_ {
   CeedScalar dtime;
   CeedScalar tiny_h;
+  CeedScalar h_anuga_regular;
   CeedScalar gravity;
   CeedScalar xq2018_threshold;
   CeedScalar kp_constant;

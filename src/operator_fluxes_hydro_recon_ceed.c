@@ -3,8 +3,10 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
+#include <private/rdytracerimpl.h>
 
 #include "swe/swe_fluxes_hydro_recon_ceed.h"
+#include "tracer/tracer_fluxes_hydro_recon_ceed.h"
 
 // The CEED flux operator for hydrostatic reconstruction (HR) consists of:
 //
@@ -26,13 +28,23 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
+static inline CeedInt NumTracers(const RDyConfig config) {
+  return config.physics.sediment.num_classes + ((config.physics.salinity) ? 1 : 0) + ((config.physics.heat) ? 1 : 0);
+}
+
 static PetscErrorCode CreateHRInteriorFluxQFunction(Ceed ceed, const RDyConfig config, CeedQFunction *qf) {
   PetscFunctionBeginUser;
 
-  PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HydroRecon_Roe, SWEFlux_HydroRecon_Roe_loc, qf));
+  CeedInt num_tracers = NumTracers(config);
 
   CeedQFunctionContext qf_context;
-  PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  if (num_tracers == 0) {  // flow only
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HydroRecon_Roe, SWEFlux_HydroRecon_Roe_loc, qf));
+    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  } else {  // flow + tracers
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_HydroRecon_Roe, TracerFlux_HydroRecon_Roe_loc, qf));
+    PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
+  }
   PetscCallCEED(CeedQFunctionSetContext(*qf, qf_context));
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
@@ -61,7 +73,9 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
 
   Ceed ceed = CeedContext();
 
-  CeedInt num_comp = 3;  // NOTE: SWE assumed, no tracer support for HR
+  CeedInt num_flow_comp = 3;  // NOTE: SWE assumed!
+  CeedInt num_tracers   = NumTracers(config);
+  CeedInt num_comp      = num_flow_comp + num_tracers;
 
   RDyCells    *cells    = &mesh->cells;
   RDyEdges    *edges    = &mesh->edges;
