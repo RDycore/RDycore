@@ -58,6 +58,7 @@ typedef enum {
 typedef enum {
   WELL_BALANCING_NONE = 0,  // no well-balancing
   WELL_BALANCING_BS2002,    // Bradford and Sanders (2002) well-balancing
+  WELL_BALANCING_HR,        // hydrostatic reconstruction well-balancing
 } RDyWellBalanceMethod;
 
 typedef struct {
@@ -219,9 +220,15 @@ typedef struct {
 // grid section
 // ------------
 
+// specification for cell elevation override (e.g., pit-filled DEM)
+typedef struct {
+  char file[PETSC_MAX_PATH_LEN];  // binary file with cell-center elevations
+} RDyCellElevationSpec;
+
 // all grid parameters
 typedef struct {
-  char file[PETSC_MAX_PATH_LEN];  // grid file
+  char                 file[PETSC_MAX_PATH_LEN];  // grid file
+  RDyCellElevationSpec cell_elevation;            // optional cell elevation override
 } RDyGridSection;
 
 // ---------------------------

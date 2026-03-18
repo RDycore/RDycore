@@ -130,6 +130,69 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Constructs the backend-specific (CEED or PETSc) flux and source sub-operators
+/// for the given operator, based on its configuration. Must be called after
+/// SetOperatorDomain, SetOperatorBoundaries, and SetOperatorRegions have been called.
+/// @param [inout] op the operator for which sub-operators are created
+/// @return         0 on success, or a non-zero error code on failure
+static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
+  PetscFunctionBegin;
+
+  if (CeedEnabled()) {
+    // register a logging event for applying our CEED operator
+    static PetscBool first_time = PETSC_TRUE;
+    if (first_time) {
+      PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply_));
+      first_time = PETSC_FALSE;
+    }
+
+    switch (op->config->physics.flow.well_balancing) {
+      case WELL_BALANCING_NONE:
+        PetscCall(CreateCeedEtaVerticesVector(op->mesh, &op->ceed.eta_vertices));
+        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                         &op->ceed.flux));
+        PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
+        break;
+      case WELL_BALANCING_BS2002:
+        PetscCall(CreateCeedEtaVerticesOperator(op->config, op->mesh, &op->ceed.eta_vertices, &op->ceed.eta_vertices_operator));
+        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                         &op->ceed.flux));
+        PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
+        break;
+      case WELL_BALANCING_HR:
+        PetscCall(
+            CreateCeedFluxHydroReconOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
+        PetscCall(CreateCeedSourceHydroReconOperator(op->config, op->mesh, &op->ceed.source));
+        break;
+    }
+  } else {
+    switch (op->config->physics.flow.well_balancing) {
+      case WELL_BALANCING_NONE:
+        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                          op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
+                                          &op->petsc.flux));
+        PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+      case WELL_BALANCING_BS2002:
+        // BS2002 well-balancing is only implemented in the CEED backend;
+        // the PETSc backend uses the standard operators.
+        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                          op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
+                                          &op->petsc.flux));
+        PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+      case WELL_BALANCING_HR:
+        PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                            op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
+                                            &op->petsc.flux));
+        PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // sets up a field named "riemannf" for the source operator, associating
 // it with a vector that stores flux divergences computed by the flux operator
 static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
@@ -211,30 +274,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   // construct CEED or PETSc versions of the flux/sources operators based on
   // our configuration
-  if (CeedEnabled()) {
-    // register a logging event for applying our CEED operator
-    static PetscBool first_time = PETSC_TRUE;
-    if (first_time) {
-      PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply_));
-      first_time = PETSC_FALSE;
-    }
-
-    if ((*operator)->config->physics.flow.well_balancing != WELL_BALANCING_NONE) {
-      PetscCall(CreateCeedEtaVerticesOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices,
-                                              &(*operator)->ceed.eta_vertices_operator));
-    } else {
-      PetscCall(CreateCeedEtaVerticesVector((*operator)->mesh, &(*operator)->ceed.eta_vertices));
-    }
-    PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                     (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices, &(*operator)->ceed.flux));
-    PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
-  } else {
-    PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                      (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
-                                      (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.flux));
-    PetscCall(CreatePetscSourceOperator((*operator)->config, (*operator)->mesh, (*operator)->petsc.external_sources,
-                                        (*operator)->petsc.material_properties, &(*operator)->petsc.source));
-  }
+  PetscCall(CreateOperatorSubOperators(*operator));
 
   // set up our flux divergence vector(s)
   PetscCall(AddOperatorFluxDivergence(*operator));

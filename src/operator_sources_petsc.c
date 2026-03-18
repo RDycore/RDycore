@@ -25,3 +25,21 @@ PetscErrorCode CreatePetscSourceOperator(RDyConfig *config, RDyMesh *mesh, Vec e
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// Creates a PETSc source operator for the HR well-balanced SWE (bed slope = 0).
+PetscErrorCode CreatePetscSourceHROperator(RDyConfig *config, RDyMesh *mesh, Vec external_sources, Vec material_properties,
+                                           PetscOperator *source_op) {
+  PetscFunctionBegin;
+
+  PetscCall(PetscOperatorCreateComposite(source_op));
+
+  PetscOperator source_0;
+  if (config->physics.sediment.num_classes > 0) {
+    PetscCall(CreatePetscTracerSourceHROperator(mesh, *config, external_sources, material_properties, &source_0));
+  } else {
+    PetscCall(CreatePetscSWESourceHROperator(mesh, *config, external_sources, material_properties, &source_0));
+  }
+  PetscCall(PetscOperatorCompositeAddSub(*source_op, source_0));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

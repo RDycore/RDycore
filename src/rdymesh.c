@@ -1452,3 +1452,40 @@ PetscErrorCode RDyMeshDestroy(RDyMesh mesh) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// Overrides 3D edge lengths and cell areas with their 2D (x-y plane)
+/// projections.  This is required for hydrostatic reconstruction (HR)
+/// well-balancing, where the SWE operate in the projected x-y plane.
+/// @param [inout] mesh the mesh whose edge lengths and cell areas are overridden
+PetscErrorCode RDyMeshOverride2DProjection(RDyMesh *mesh) {
+  PetscFunctionBegin;
+
+  RDyEdges    *edges    = &mesh->edges;
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+
+  // Override edge lengths with 2D projected lengths
+  for (PetscInt iedge = 0; iedge < mesh->num_edges; iedge++) {
+    PetscInt vid_1 = edges->vertex_ids[2 * iedge + 0];
+    PetscInt vid_2 = edges->vertex_ids[2 * iedge + 1];
+
+    PetscReal dx          = vertices->points[vid_2].X[0] - vertices->points[vid_1].X[0];
+    PetscReal dy          = vertices->points[vid_2].X[1] - vertices->points[vid_1].X[1];
+    edges->lengths[iedge] = PetscSqrtReal(Square(dx) + Square(dy));
+  }
+
+  // Override cell areas with 2D projected areas (shoelace formula)
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    PetscInt    nverts     = cells->num_vertices[icell];
+    PetscInt    offset     = cells->vertex_offsets[icell];
+    PetscScalar twice_area = 0.0;
+    for (PetscInt k = 0; k < nverts; k++) {
+      PetscInt v_cur  = cells->vertex_ids[offset + k];
+      PetscInt v_next = cells->vertex_ids[offset + (k + 1) % nverts];
+      twice_area += vertices->points[v_cur].X[0] * vertices->points[v_next].X[1] - vertices->points[v_next].X[0] * vertices->points[v_cur].X[1];
+    }
+    cells->areas[icell] = PetscAbsScalar(twice_area) / 2.0;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
