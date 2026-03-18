@@ -878,7 +878,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename, Vec local) {
+static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename, Vec *local) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -887,7 +887,7 @@ static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename,
   Vec natural, global;
   PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &global));
-  PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local));
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, local));
 
   PetscCall(VecLoad(natural, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
@@ -897,8 +897,8 @@ static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename,
   PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, global));
 
   // scatter global-to-local
-  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, local));
-  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, local));
+  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, *local));
 
   // free up memory
   PetscCall(VecDestroy(&natural));
@@ -951,7 +951,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
       Vec                  local       = NULL;
       for (PetscInt idof = 0; idof < num_sediment_classes; ++idof) {
         if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
-          PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, local));
+          PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, &local));
         }
 
         // set regional sediment as needed
@@ -988,7 +988,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     RDySalinityCondition salinity_ic = rdy->config.salinity_conditions[f];
     Vec                  local       = NULL;
     if (salinity_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, local));
+      PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, &local));
     }
 
     // overwrite regions as needed
@@ -1024,7 +1024,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     RDyTemperatureCondition temperature_ic = rdy->config.temperature_conditions[f];
     Vec                     local          = NULL;
     if (temperature_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, local));
+      PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, &local));
     }
 
     // overwrite regions as needed
