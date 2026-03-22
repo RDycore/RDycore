@@ -6,6 +6,7 @@ option(ENABLE_FORTRAN  "Enable Fortran library bindings" OFF)
 option(ENABLE_TESTS    "Enable unit and driver tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
 option(ENABLE_SANITIZERS "Enable available sanitizers (ASan, MSan, UBSan)" OFF)
+option(ENABLE_DA       "Enable PetscDA data assimilation support (requires PETSc with PetscDA)" OFF)
 
 set(MAX_NAME_LEN              128 CACHE STRING "Maximum allowable length of field/variable names")
 set(MAX_NUM_SEDIMENT_CLASSES    5 CACHE STRING "Maximum number of sediment size classes")
@@ -46,9 +47,18 @@ link_directories(${PETSc_LIBRARY_DIRS})
 list(APPEND CMAKE_BUILD_RPATH ${PETSC_DIR}/${PETSC_ARCH}/lib)
 list(APPEND CMAKE_INSTALL_RPATH ${PETSC_DIR}/${PETSC_ARCH}/lib)
 
-# CEED
-pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
-include_directories(${CEED_INCLUDE_DIRS})
+# CEED (optional when ENABLE_DA=ON and building only the DA driver)
+pkg_check_modules(CEED IMPORTED_TARGET ceed)
+if (CEED_FOUND)
+  message(STATUS "libCEED found: CEED acceleration enabled")
+  include_directories(${CEED_INCLUDE_DIRS})
+  set(RDYCORE_HAVE_CEED 1)
+elseif (ENABLE_DA)
+  message(STATUS "libCEED not found: building DA-only mode (no CEED acceleration)")
+  set(RDYCORE_HAVE_CEED 0)
+else()
+  message(FATAL_ERROR "libCEED (ceed) not found via pkg-config. Set PKG_CONFIG_PATH to include the directory containing ceed.pc, or use ENABLE_DA=ON for DA-only builds.")
+endif()
 
 # Determine PETSc's ID type (int32 or int64) by inspecting petscconf.h
 file(READ "${PETSC_DIR}/${PETSC_ARCH}/include/petscconf.h" petscconf_h)
@@ -59,6 +69,22 @@ if (index EQUAL -1) # PETSC_USE_64BIT_INDICES not defined
 else()
   message(STATUS "PETSc is configured with 64-bit indices")
   set(PETSC_ID_TYPE "int64")
+endif()
+
+# Check for PetscDA data assimilation support
+if (ENABLE_DA)
+  # PetscDA header is in PETSc's source include directory
+  find_file(PETSCDA_HEADER petscda.h
+    PATHS ${PETSc_INCLUDE_DIRS}
+    NO_DEFAULT_PATH)
+  if (PETSCDA_HEADER)
+    message(STATUS "PetscDA data assimilation support: ENABLED (found ${PETSCDA_HEADER})")
+    set(RDYCORE_HAVE_DA 1)
+  else()
+    message(FATAL_ERROR "ENABLE_DA is ON but petscda.h was not found in PETSc include directories: ${PETSc_INCLUDE_DIRS}")
+  endif()
+else()
+  set(RDYCORE_HAVE_DA 0)
 endif()
 
 # Determine MPIEXEC and MPIEXEC_FLAGS using PETSc's configuration.
@@ -186,10 +212,18 @@ generate_cyaml_sediment_fields()
 
 # Inherit libraries from PETSc for shared or static libs.
 extract_petsc_variable("BUILDSHAREDLIB" petsc_shared)
-if (petsc_shared STREQUAL "yes")
-  set(SYSTEM_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)
+if (RDYCORE_HAVE_CEED)
+  if (petsc_shared STREQUAL "yes")
+    set(SYSTEM_LIBRARIES ${PETSc_LIBRARIES} PkgConfig::CEED m stdc++)
+  else()
+    set(SYSTEM_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)
+  endif()
 else()
-  set(SYSTEM_LIBRARIES ${PETSc_STATIC_LIBRARIES} PkgConfig::CEED m stdc++)
+  if (petsc_shared STREQUAL "yes")
+    set(SYSTEM_LIBRARIES ${PETSc_LIBRARIES} m stdc++)
+  else()
+    set(SYSTEM_LIBRARIES ${PETSc_STATIC_LIBRARIES} m stdc++)
+  endif()
 endif()
 
 if (ENABLE_TESTS)

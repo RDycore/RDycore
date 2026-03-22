@@ -19,10 +19,22 @@ add_executable(rdycore_amr
 set_target_properties(rdycore_amr PROPERTIES OUTPUT_NAME rdycore_amr)
 target_link_libraries(rdycore_amr PRIVATE rdycore)
 
+# LETKF data assimilation driver (requires PetscDA)
+if (RDYCORE_HAVE_DA)
+  add_executable(rdycore_letkf
+    letkf_test.c
+  )
+  set_target_properties(rdycore_letkf PROPERTIES OUTPUT_NAME rdycore_letkf)
+  target_link_libraries(rdycore_letkf PRIVATE rdycore)
+endif()
+
 install(
   TARGETS rdycore_exe rdycore_mms rdycore_amr
   DESTINATION bin
 )
+if (RDYCORE_HAVE_DA)
+  install(TARGETS rdycore_letkf DESTINATION bin)
+endif()
 
 # Fortran driver
 if (ENABLE_FORTRAN)

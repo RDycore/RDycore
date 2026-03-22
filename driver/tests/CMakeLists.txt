@@ -27,3 +27,8 @@ add_subdirectory(sediment)
 
 # regression tests for bad input
 add_subdirectory(bad_input)
+
+# LETKF data assimilation tests (requires PetscDA)
+if (RDYCORE_HAVE_DA)
+  add_subdirectory(letkf)
+endif()
