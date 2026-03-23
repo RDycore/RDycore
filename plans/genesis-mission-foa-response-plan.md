@@ -13,6 +13,25 @@ performance-portable, GPU-capable river/compound flooding model built on
 AI-enhanced flood prediction capabilities that improve water availability
 forecasting for energy infrastructure resilience.
 
+The primary AI contributions are:
+
+1. **AI-enhanced ensemble data assimilation**: coupling RDycore's high-fidelity
+   SWE solver with PETSc's new `PetscDA` LETKF framework and training neural
+   networks to learn adaptive localization functions, inflation factors, and
+   model error corrections — replacing hand-tuned heuristics with data-driven
+   operators that improve with observational data.
+
+2. **AI-learned surface-groundwater coupling**: using neural operators trained
+   on paired surface-subsurface simulation data to learn exchange fluxes
+   between RDycore's surface flow and subsurface hydrology — addressing the
+   FOA's core requirement for a "coupled surface-groundwater model" without
+   requiring a full 3D groundwater solver in Phase I.
+
+3. **Foundation model components for hydrologic DA**: developing reusable,
+   transferable AI operators (localization, inflation, error correction) that
+   generalize across watersheds and can serve as building blocks for a future
+   hydrologic foundation model on the American Science Cloud.
+
 ### Key FOA Facts
 
 | Item | Detail |
@@ -65,74 +84,90 @@ The FOA states that Focus Area B (Water and Energy) seeks:
 Develop an AI-augmented compound flooding prediction framework built on RDycore
 and PETSc that:
 
-1. Creates **physics-informed AI surrogate models** trained on RDycore's
-   shallow water equation (SWE) solver to enable rapid flood scenario
-   evaluation
-2. Integrates **multi-source observational data** (streamflow gauges, remote
-   sensing, weather data) with high-fidelity RDycore simulations through
-   AI-driven data assimilation
-3. Demonstrates **transferable hybrid modeling** by coupling AI emulators with
-   process-based RDycore simulations across different regional watersheds
-4. Delivers a **use case focused on flood resilience for energy
+1. Integrates **multi-source observational data** (streamflow gauges, remote
+   sensing, weather data) with high-fidelity RDycore ensemble simulations
+   through AI-enhanced data assimilation
+2. Uses **AI-learned localization, inflation, and error correction** to
+   improve PetscDA LETKF ensemble analysis — replacing hand-tuned heuristics
+   with neural operators trained on RDycore simulation data
+3. Develops **AI-learned surface-groundwater coupling** — neural operators
+   that learn exchange fluxes between surface flow and subsurface hydrology,
+   addressing the FOA's core requirement for a coupled surface-groundwater
+   model
+4. Builds toward a **hierarchy of models** from process-based RDycore through
+   AI-enhanced DA to reusable foundation model components for hydrologic
+   prediction
+5. Demonstrates **transferable hybrid modeling** by applying the AI-DA
+   framework across different regional watersheds using RDycore's unstructured
+   mesh infrastructure
+6. Delivers a **use case focused on flood resilience for energy
    infrastructure** (e.g., power plants, substations, transmission corridors
    in flood-prone regions)
 
 ### 3.2 Why AI Provides an Advantage
 
 RDycore solves the 2D shallow water equations using finite volume methods on
-unstructured meshes with PETSc. While highly accurate, full-resolution
-simulations are computationally expensive, especially for:
+unstructured meshes with PETSc. Ensemble data assimilation with PetscDA LETKF
+requires tuning localization length scales, inflation factors, and observation
+error models — parameters that are currently set by hand and degrade
+performance when conditions change. Additionally, coupling surface and
+subsurface hydrology traditionally requires expensive 3D groundwater solvers
+that are difficult to integrate with GPU-accelerated surface models.
+AI provides a decisive advantage by:
 
-- **Ensemble flood forecasting** requiring hundreds of scenario runs
-- **Real-time flood warning** for energy infrastructure protection
-- **Seasonal-to-annual water availability** assessments requiring many
-  forward simulations
-- **Uncertainty quantification** across parameter spaces
-
-AI surrogates trained on RDycore simulation data can provide **orders of
-magnitude speedup** while preserving physics-based accuracy, enabling
-capabilities that are currently computationally infeasible.
+- **Learning adaptive localization**: Neural networks can learn localization
+  functions from data that outperform fixed Gaspari-Cohn kernels, especially
+  on irregular unstructured meshes where isotropic localization is suboptimal
+- **Predicting optimal inflation**: AI can predict spatially and temporally
+  varying inflation factors that maintain ensemble spread without manual tuning
+- **Correcting model error**: Neural correction operators trained on
+  analysis increments can reduce systematic bias in RDycore's SWE solver
+- **Learning surface-groundwater exchange**: Neural operators can learn
+  infiltration, recharge, and baseflow exchange fluxes from paired
+  surface-subsurface simulation data, enabling coupled surface-groundwater
+  prediction without the computational cost of a full 3D groundwater solver
+- **Enabling real-time ensemble forecasting**: GPU-accelerated PetscDA LETKF
+  with AI-optimized parameters enables ensemble flood forecasting at
+  operational timescales currently infeasible with hand-tuned DA
+- **Building toward foundation models**: Reusable AI operators for DA and
+  surface-groundwater coupling, trained across diverse watersheds, form the
+  building blocks of a hydrologic foundation model — a key FOA priority
 
 ### 3.3 Technical Approach
 
 ```mermaid
 flowchart TD
-    A[RDycore SWE Solver on PETSc] --> B[High-Fidelity Training Data Generation]
-    B --> C[Physics-Informed Neural Network Surrogates]
-    C --> D[Hybrid AI-Physics Prediction Framework]
-    A --> DA[PetscDA Ensemble DA: ETKF + LETKF on GPU]
-    E[Observational Data: Streamflow + Remote Sensing + Weather] --> DA
-    DA --> AI[AI-Augmented DA: Learned Localization + Error Correction]
-    AI --> D
+    A[RDycore SWE Solver on PETSc] --> B[GPU Ensemble Simulation]
+    B --> C[PetscDA LETKF: GPU-Accelerated Ensemble DA]
+    E[Observational Data: Streamflow + Remote Sensing + Weather] --> C
+    C --> AI[AI-Enhanced DA: Learned Localization + Adaptive Inflation + Error Correction]
+    AI --> C
+    GW[AI-Learned Surface-Groundwater Coupling] --> B
+    B --> GW
+    AI --> D[Improved Ensemble Analysis and Forecast]
+    D --> FM[Reusable Foundation Model Components for Hydrologic DA]
     D --> G[Rapid Ensemble Flood Forecasting]
     D --> H[Energy Infrastructure Risk Assessment]
     G --> I[Use Case: Regional Flood Resilience for Energy Systems]
     H --> I
     I --> J[Decision Gate Metrics and Evaluation]
+    FM --> J
 ```
 
-#### Component 1: Training Data Generation with RDycore
+#### Component 1: RDycore Ensemble Simulation and Training Data
 
 - Run RDycore on GPU-accelerated HPC systems across a matrix of:
   - Watershed geometries (multiple regional domains)
   - Forcing scenarios (precipitation, boundary conditions)
   - Parameter variations (Manning's n, bed elevation perturbations)
   - Initial conditions (antecedent soil moisture proxies)
-- Generate a curated, AI-ready dataset of SWE solutions with metadata
+- Generate curated ensemble simulation archives that serve as:
+  - Training data for AI-learned DA operators
+  - Reference solutions for validation of the AI-DA framework
+- Leverage RDycore's built-in ensemble support and GPU performance
+  (6.6–41.9x speedup over CPUs demonstrated at 471M cell scale)
 
-#### Component 2: Physics-Informed AI Surrogate Development
-
-- Train neural network surrogates that respect conservation laws inherent in
-  the SWE (mass conservation, momentum balance)
-- Explore architectures including:
-  - **Graph Neural Networks (GNNs)** that naturally map to RDycore's
-    unstructured mesh topology
-  - **Fourier Neural Operators (FNOs)** for learning solution operators
-  - **Physics-Informed Neural Networks (PINNs)** with SWE residual losses
-- Leverage PETSc's data structures and DMPlex mesh representation for
-  seamless data pipeline between solver and AI
-
-#### Component 3: AI-Enhanced Data Assimilation (leveraging PETSc PetscDA + TSAdjoint + TAO)
+#### Component 2: AI-Enhanced Data Assimilation (PetscDA LETKF + AI Operators)
 
 - **Ensemble DA Baseline (PetscDA)**: PETSc now includes a dedicated
   **`PetscDA` data assimilation object** (in the `petsc_gem` branch) with
@@ -146,19 +181,48 @@ flowchart TD
     ([`ex3.c`](../petsc_gem/src/ml/da/tutorials/ex3.c)) and 2D wave
     propagation ([`ex4.c`](../petsc_gem/src/ml/da/tutorials/ex4.c))
     demonstrating LETKF with SWE — the exact physics RDycore solves
-- **Variational DA Baseline (TSAdjoint + TAO)**: PETSc's TSAdjoint framework
-  computes exact gradients of cost functions w.r.t. initial conditions and
-  parameters. Working examples include
+- **AI-learned localization**: Train neural networks to replace the
+  hand-tuned Gaspari-Cohn localization matrix Q with a learned operator
+  that adapts to mesh geometry, flow regime, and observational density
+- **Adaptive inflation**: Train AI to predict spatially varying inflation
+  factors from ensemble statistics, replacing fixed scalar inflation
+- **Model error correction**: Use LETKF analysis increments as training
+  signal to learn systematic bias corrections for RDycore's SWE solver
+- **Variational DA complement (TSAdjoint + TAO)**: PETSc's TSAdjoint
+  framework computes exact gradients of cost functions w.r.t. initial
+  conditions and parameters. Working examples include
   [`spectraladjointassimilation.c`](../petsc_gem/src/tao/unconstrained/tutorials/spectraladjointassimilation.c)
   and [`ex20opt_ic.c`](../petsc_gem/src/ts/tutorials/ex20opt_ic.c)
-- **AI acceleration**: Train neural network correction operators that
-  augment PetscDA ensemble analysis — learning to correct ensemble spread
-  deficiencies and model error using the ETKF/LETKF analysis increments
-  as training signal
 - **Hybrid ensemble-variational**: Combine PetscDA ensemble covariances
   with TSAdjoint-computed gradients for hybrid EnVar assimilation
 - Use PETSc's TSTrajectory checkpointing for efficient forward/adjoint
   solution storage and replay
+
+#### Component 3: AI-Learned Surface-Groundwater Coupling
+
+The FOA's core scientific objective requires a "coupled surface-groundwater
+model." Rather than integrating a full 3D groundwater solver (which would
+dominate the 9-month Phase I timeline), we propose an AI-first approach:
+
+- **Training data generation**: Use existing paired surface-subsurface
+  simulation datasets (e.g., from ParFlow-CLM, ATS, or PFLOTRAN runs over
+  the target watershed) to create training pairs of surface states and
+  corresponding groundwater exchange fluxes (infiltration, recharge, baseflow)
+- **Neural operator training**: Train a neural operator (e.g., DeepONet or
+  Fourier Neural Operator) to predict groundwater exchange fluxes given
+  surface water states (h, hu, hv), soil properties, and antecedent conditions
+- **Integration with RDycore**: Add the AI-predicted exchange fluxes as
+  source/sink terms in RDycore's SWE solver, enabling coupled
+  surface-groundwater prediction without a full subsurface solver
+- **Validation**: Compare AI-coupled predictions against reference
+  ParFlow/ATS solutions on held-out scenarios
+- **Foundation model pathway**: The trained neural operator becomes a
+  reusable, transferable component — a building block for a hydrologic
+  foundation model that can be shared on the American Science Cloud
+
+This approach directly addresses the FOA requirement while keeping the
+Phase I scope feasible. Phase II would extend to tighter coupling with a
+full groundwater model.
 
 #### Component 4: Use Case — Flood Resilience for Energy Infrastructure
 
@@ -166,8 +230,11 @@ flowchart TD
   (e.g., Houston/Gulf Coast region — leveraging existing RDycore Houston1km
   mesh and data already in the codebase)
 - Demonstrate rapid ensemble flood forecasting for energy facility protection
-- Quantify AI advantage: speedup, accuracy retention, and decision-relevant
-  lead time improvements
+- Include AI-learned groundwater coupling to capture compound flooding
+  from both surface runoff and groundwater-driven flooding
+- Quantify AI advantage: DA analysis quality improvement, ensemble spread
+  calibration, and decision-relevant lead time improvements vs. baseline
+  LETKF with hand-tuned parameters
 
 ---
 
@@ -182,17 +249,19 @@ The FOA requires Phase I teams to include institutions from **at least two** of:
 
 | Role | Institution Type | Suggested Responsibilities |
 |------|-----------------|---------------------------|
-| **Lead PI** | DOE National Lab | Overall project leadership, RDycore development, HPC simulation, AI surrogate development |
-| **Co-PI 1** | University (IHE) | AI/ML methodology (PINNs, GNNs, FNOs), theoretical foundations, graduate student involvement |
+| **Lead PI** | DOE National Lab | Overall project leadership, RDycore development, HPC simulation, PetscDA integration |
+| **Co-PI 1** | University (IHE) | AI/ML for data assimilation and surface-groundwater coupling, neural operators, graduate student involvement |
 | **Co-PI 2** | Industry Partner | Energy infrastructure use case data, operational flood risk perspective, path to deployment |
-| **Co-PI 3** (optional) | Second DOE Lab or University | Hydrology/data assimilation expertise, observational data access |
+| **Co-PI 3** (optional) | Second DOE Lab or University | Subsurface hydrology expertise, groundwater simulation data for AI training, observational data access |
 
 ### Key Expertise Needed
 
 - **Computational hydrology / shallow water equations** — RDycore team
 - **PETSc / HPC software engineering** — RDycore/PETSc developers
 - **PetscDA / ensemble data assimilation** — PetscDA developer (ETKF/LETKF)
-- **Physics-informed machine learning** — AI/ML researchers
+- **AI/ML for scientific computing** — neural operators, learned DA operators
+- **Subsurface hydrology / groundwater modeling** — for surface-groundwater
+  coupling training data (e.g., ParFlow, ATS, or PFLOTRAN expertise)
 - **Flood risk assessment for energy systems** — domain expert
 - **Observational hydrology / data assimilation** — data scientist
 - **GPU computing / performance portability** — HPC engineer (Kokkos)
@@ -200,14 +269,30 @@ The FOA requires Phase I teams to include institutions from **at least two** of:
 ### Partner Identification Actions
 
 - [ ] Identify 1-2 university partners with AI/ML for scientific computing
-  expertise (e.g., groups working on PINNs, neural operators, or GNNs for
-  PDEs)
+  expertise (e.g., groups working on neural operators, learned DA, or
+  machine learning for geophysical inverse problems)
+- [ ] Identify a partner with subsurface hydrology / groundwater modeling
+  expertise and existing simulation datasets for the target watershed
+  (e.g., groups running ParFlow, ATS, or PFLOTRAN)
 - [ ] Identify an industry partner in the energy sector with flood risk
   concerns (e.g., utility company, energy infrastructure operator, or
   AI-for-energy startup)
 - [ ] Secure Letters of Commitment from all partner institutions
 - [ ] If applicable, obtain written authorization from cognizant DOE
   Contracting Officer for lab participation
+
+### Submission Structure: Collaborative Applications
+
+The FOA strongly prefers **collaborative applications** over subawards.
+Each partner institution submits its own application through Grants.gov
+with an **identical Project Narrative** but institution-specific budgets.
+DOE combines these into one document for merit review.
+
+- Lead institution submits the Excel template (Field 12) with all
+  senior/key personnel, partner institutions, and budget summary
+- Each partner submits identical narrative + own SF-424, budget, bio sketches
+- Unfunded partners (e.g., industry providing in-kind) do not submit
+  separately; lead includes their info
 
 ---
 
@@ -219,55 +304,87 @@ The FOA strongly encourages the following organization:
 
 **Key messages to convey:**
 - Compound flooding threatens U.S. energy infrastructure; current prediction
-  tools are too slow for real-time ensemble forecasting
+  tools lack the observational integration and surface-groundwater coupling
+  needed for reliable ensemble forecasting
 - RDycore is a DOE-funded, GPU-capable, PETSc-based SWE solver designed for
   E3SM — representing years of DOE investment in process-based modeling
-- AI can bridge the gap between high-fidelity simulation and operational
-  flood prediction needs
-- This project will create a hybrid AI-physics framework that preserves
-  RDycore's physical fidelity while enabling rapid scenario evaluation
+- AI can dramatically improve ensemble data assimilation by learning
+  adaptive localization, inflation, and error correction operators from data
+- AI can also bridge the surface-groundwater gap by learning exchange fluxes
+  from paired simulation data, enabling coupled prediction without the
+  computational cost of a full 3D groundwater solver
+- This project will create an AI-enhanced DA framework with AI-learned
+  surface-groundwater coupling that improves RDycore ensemble forecast
+  quality — building toward reusable foundation model components for
+  hydrologic prediction
+- **ASCR co-funding relevance**: This project advances applied mathematics
+  (AI-learned covariance operators for DA), scientific software (PETSc/PetscDA
+  AI-DA interfaces), and GPU computing (Kokkos-accelerated ensemble DA) —
+  core ASCR mission areas
 - **Buy America statement**: This project does not involve construction,
   alteration, maintenance, or repair of public infrastructure
 
 ### Page 1.5: Project Objectives (~0.5 page)
 
 **Objectives aligned with Focus Area B:**
-1. Develop physics-informed AI surrogates for RDycore's SWE solver that
-   achieve >100x speedup with <5% error relative to full simulations
-2. Create an AI data assimilation framework that integrates multi-source
-   observational data with RDycore predictions
-3. Demonstrate transferability of the hybrid framework across at least two
-   regional watersheds
-4. Deliver a use case demonstrating rapid ensemble flood forecasting for
-   energy infrastructure resilience
-5. Define scaling metrics showing AI advantage increases with data/compute
+1. Couple RDycore's GPU-accelerated SWE ensemble solver with PetscDA LETKF
+   for operational ensemble data assimilation
+2. Develop AI-learned localization operators that outperform hand-tuned
+   Gaspari-Cohn localization on RDycore's unstructured mesh
+3. Develop AI-learned adaptive inflation and model error correction operators
+   trained on LETKF analysis increments
+4. Develop AI-learned surface-groundwater coupling operators that predict
+   exchange fluxes from surface states, creating a coupled surface-groundwater
+   prediction capability
+5. Demonstrate transferability of the AI-DA and AI-coupling framework across
+   at least two regional watersheds without manual re-tuning
+6. Deliver a use case demonstrating AI-enhanced ensemble flood forecasting
+   with surface-groundwater coupling for energy infrastructure resilience
+7. Produce reusable, transferable AI operators as foundation model components
+   for the American Science Cloud
 
 ### Pages 2-3.5: Proposed Research and Methods (~1.5 pages)
 
-**Task 1: High-Fidelity Training Data Generation (Months 1-3)**
+**Task 1: RDycore Ensemble Simulation and Data Generation (Months 1-3)**
 - PI: Lab lead
-- Generate RDycore simulation ensembles on GPU clusters
-- Curate AI-ready datasets with standardized metadata
-- Budget: ~25% of total
+- Generate RDycore simulation ensembles on GPU clusters across diverse
+  forcing scenarios, parameter variations, and watershed geometries
+- Obtain or generate paired surface-subsurface simulation data for AI
+  groundwater coupling training (from partner with ParFlow/ATS/PFLOTRAN)
+- Curate AI-ready datasets of ensemble trajectories, analysis increments,
+  and surface-groundwater exchange fluxes
+- Budget: ~15% of total
 
-**Task 2: Physics-Informed AI Surrogate Development (Months 2-6)**
-- PI: University partner
-- Develop and train GNN/FNO/PINN architectures
-- Validate against held-out RDycore simulations
-- Budget: ~30% of total
-
-**Task 3: PetscDA + AI Data Assimilation Integration (Months 3-7)**
-- PI: Lab lead (PetscDA/RDycore integration) + university partner (AI augmentation)
+**Task 2: PetscDA LETKF Integration with RDycore (Months 1-4)**
+- PI: Lab lead (PetscDA/RDycore integration)
 - Couple RDycore with PetscDA LETKF for GPU-accelerated ensemble DA
-- Develop AI-learned localization and error correction operators
-- Integrate observational data streams (streamflow gauges, remote sensing)
+- Implement observation operators for streamflow gauges and remote sensing
+- Establish baseline LETKF performance with hand-tuned localization
 - Budget: ~20% of total
 
-**Task 4: Energy Infrastructure Flood Resilience Use Case (Months 5-9)**
+**Task 3: AI-Enhanced DA Operators (Months 3-7)**
+- PI: University partner (AI/ML) + Lab lead (DA integration)
+- Train neural networks to learn adaptive localization functions from
+  ensemble simulation data and analysis increments
+- Develop AI-learned inflation and model error correction operators
+- Integrate AI operators into PetscDA LETKF analysis cycle
+- Budget: ~20% of total
+
+**Task 4: AI-Learned Surface-Groundwater Coupling (Months 3-7)**
+- PI: University partner (AI/ML) + Groundwater partner
+- Train neural operators (DeepONet/FNO) on paired surface-subsurface data
+  to predict groundwater exchange fluxes from surface states
+- Integrate AI-predicted exchange fluxes as source/sink terms in RDycore
+- Validate against reference subsurface model solutions
+- Budget: ~20% of total
+
+**Task 5: Energy Infrastructure Flood Resilience Use Case (Months 5-9)**
 - PI: Industry partner + Lab lead
-- Apply framework to Houston or similar energy-critical region
-- Demonstrate ensemble forecasting capability
-- Quantify AI advantage metrics
+- Apply AI-enhanced DA framework with surface-groundwater coupling to
+  Houston or similar energy-critical region
+- Demonstrate ensemble forecasting capability with AI-improved analysis
+- Quantify AI advantage: DA quality improvement vs. hand-tuned baseline
+- Evaluate scaling behavior: performance vs. training data volume
 - Budget: ~20% of total
 
 **Project Management and Coordination (Throughout)**
@@ -277,20 +394,22 @@ The FOA strongly encourages the following organization:
 
 | Month | Milestone | Go/No-Go Criterion |
 |-------|-----------|-------------------|
-| 1 | Simulation matrix defined; RDycore runs initiated | N/A |
-| 2 | First training dataset generated (>1000 simulations) | Dataset quality metrics met |
-| 3 | **Go/No-Go**: Initial AI surrogate trained and validated | Surrogate achieves <10% relative error on test set |
-| 4 | AI surrogate refined; PetscDA LETKF coupled with RDycore | Surrogate speedup >50x; LETKF analysis reduces RMSE |
-| 5 | Multi-region transferability test initiated | Framework runs on second watershed |
-| 6 | **6-Month Go/No-Go Review**: Full framework demonstrated | Surrogate <5% error, >100x speedup, data assimilation functional |
-| 7 | Energy infrastructure use case initiated | Use case domain and data secured |
-| 8 | Ensemble forecasting demonstration | >100 ensemble members in <1 hour |
-| 9 | Final evaluation and Phase II planning | All decision gate metrics met |
+| 1 | RDycore ensemble runs initiated; PetscDA LETKF baseline established; paired surface-subsurface data acquisition begun | N/A |
+| 2 | First ensemble dataset generated; observation operators implemented; groundwater training data curated | Dataset quality metrics met |
+| 3 | **Go/No-Go**: PetscDA LETKF coupled with RDycore; baseline DA functional | LETKF analysis reduces RMSE vs. free ensemble |
+| 4 | AI localization training initiated; AI groundwater coupling training initiated | Training data sufficient for both AI tasks |
+| 5 | AI localization operator trained; AI groundwater coupling operator trained | AI localization outperforms hand-tuned; AI coupling matches reference model |
+| 6 | **6-Month Go/No-Go Review**: Full AI-DA + AI-coupling framework demonstrated | AI-DA improves analysis quality; AI coupling captures exchange fluxes; framework runs on 2 watersheds |
+| 7 | Energy infrastructure use case initiated with coupled surface-groundwater | Use case domain and data secured |
+| 8 | Ensemble forecasting demonstration with AI-enhanced DA + groundwater coupling | Ensemble calibration metrics improved vs. baseline |
+| 9 | Final evaluation, foundation model component packaging, Phase II planning | All decision gate metrics met; AI operators packaged for AmSC |
 
-### Pages 4.5-5: Data Sources and Models + Decision Gate Metrics (~1 page)
+### Pages 4.5-4.75: Data Sources and Models (~0.5 page)
 
 **Data Sources:**
-- RDycore-generated simulation data (primary training data)
+- RDycore-generated ensemble simulation data (primary DA training data)
+- Paired surface-subsurface simulation data from ParFlow/ATS/PFLOTRAN
+  (groundwater coupling training data — from partner)
 - USGS streamflow gauge data (validation/assimilation)
 - NOAA precipitation and weather data (forcing)
 - NHDPlus/NWM watershed geometry data
@@ -298,23 +417,40 @@ The FOA strongly encourages the following organization:
 - Existing RDycore test cases (Houston1km mesh already in codebase)
 
 **AI Models/Frameworks:**
-- PyTorch/JAX for neural network training
+- PyTorch/JAX for neural network training (localization, inflation,
+  groundwater coupling operators)
+- DeepONet or Fourier Neural Operator for surface-groundwater coupling
 - PETSc for solver infrastructure and data management
 - **PetscDA** (ETKF/LETKF) for GPU-accelerated ensemble data assimilation
 - PETSc TSAdjoint/TAO for variational DA and parameter optimization
-- RDycore for high-fidelity SWE solutions
+- RDycore for high-fidelity SWE ensemble solutions
 - E3SM for broader Earth system context
 
+**Hierarchy of Models (FOA requirement):**
+1. **Process-based**: RDycore SWE solver (high-fidelity, GPU-accelerated)
+2. **AI-enhanced process-based**: RDycore + AI-learned DA operators +
+   AI-learned groundwater coupling
+3. **Foundation model components**: Reusable, transferable AI operators
+   for localization, inflation, error correction, and surface-groundwater
+   exchange — building blocks for a future hydrologic foundation model
+
+### Pages 4.75-5: Decision Gate Metrics (~0.5 page)
+
 **Decision Gate Metrics (for 6-month go/no-go):**
-1. **Speedup**: AI surrogate achieves >100x wall-clock speedup vs. full
-   RDycore simulation
-2. **Accuracy**: <5% relative L2 error in water depth predictions across
-   test scenarios
-3. **Conservation**: AI surrogate preserves mass conservation to within 1%
-4. **Transferability**: Framework successfully applied to at least 2
-   distinct watersheds
-5. **Scaling behavior**: Performance improves monotonically with additional
-   training data (demonstrating AI advantage trajectory)
+1. **DA quality**: PetscDA LETKF coupled with RDycore reduces ensemble RMSE
+   vs. free ensemble forecast
+2. **AI localization**: AI-learned localization outperforms hand-tuned
+   Gaspari-Cohn localization on held-out validation scenarios
+3. **Calibration**: AI-enhanced ensemble is better calibrated (CRPS, spread/
+   skill ratio) than baseline LETKF with fixed parameters
+4. **Surface-groundwater coupling**: AI-learned coupling operator reproduces
+   reference subsurface model exchange fluxes with < 10% relative error
+5. **Transferability**: AI-DA and AI-coupling framework successfully applied
+   to at least 2 distinct watersheds without re-tuning by hand
+6. **Scaling behavior** (FOA-emphasized metric): AI-DA and AI-coupling
+   performance improves monotonically with additional training data,
+   computing resources, and observational data — demonstrating a clear
+   AI advantage trajectory that justifies Phase II investment
 
 ---
 
@@ -384,7 +520,7 @@ The FOA strongly encourages the following organization:
 - For-profit entities require 20% cost share for R&D activities
 - DOE Labs are exempt from cost sharing
 - Include travel for up to 2 Genesis Mission annual meetings
-- Computing costs for GPU-accelerated RDycore runs and AI training
+- Computing costs for GPU-accelerated RDycore ensemble runs and AI training
 
 ---
 
@@ -395,46 +531,94 @@ The FOA lists review criteria in descending order of importance:
 ### Criterion 1: Scientific and/or Technical Merit and Impact (Highest Weight)
 
 **How we address it:**
-- Novel integration of physics-informed AI with a production-quality DOE
-  SWE solver (RDycore)
-- Clear AI advantage: enabling ensemble flood forecasting that is currently
-  computationally infeasible
+- Novel integration of AI-learned DA operators with a production-quality DOE
+  SWE solver (RDycore) and GPU-accelerated ensemble DA framework (PetscDA)
+- AI-learned surface-groundwater coupling addresses the FOA's core
+  requirement for a "coupled surface-groundwater model" using a novel
+  AI-first approach rather than traditional solver coupling
+- Clear AI advantage: AI-learned localization, inflation, and groundwater
+  coupling operators improve ensemble prediction quality beyond what
+  hand-tuning or traditional coupling can achieve
 - Direct impact on water-energy nexus — protecting energy infrastructure
-  from flooding
+  from compound flooding (surface + groundwater) through improved ensemble
+  flood forecasting
 - Builds on years of DOE investment in RDycore, PETSc, and E3SM
+- Produces reusable foundation model components for the Genesis Mission
 
 ### Criterion 2: Technical Approach, Methods, and Feasibility
 
 **How we address it:**
-- Well-defined task structure with clear milestones
+- Well-defined task structure with clear milestones and quantitative go/no-go
 - Proven base technology (RDycore is operational, GPU-capable, tested)
 - **PetscDA already demonstrates ensemble DA on SWE** — the exact physics
   RDycore solves — with GPU-accelerated LETKF including working tutorials
   for 1D dam-break and 2D wave propagation
-- AI methods (GNNs, FNOs, PINNs) are established but novel in this
-  application context
-- Risk mitigation: multiple AI architectures explored in parallel;
-  PetscDA provides a working DA baseline even if AI augmentation
-  underperforms
+- AI-learned localization and inflation are established research directions
+  in geophysical DA, novel in this application context with unstructured meshes
+- AI-learned surface-groundwater coupling uses proven neural operator
+  architectures (DeepONet, FNO) applied to a well-defined input-output
+  mapping problem with available training data
+- Risk mitigation: PetscDA provides a working DA baseline even if AI
+  augmentation underperforms; AI operators are additive improvements;
+  groundwater coupling can fall back to empirical parameterizations
 - Realistic 9-month timeline with quantitative go/no-go criteria
+- Hierarchy of models from process-based through AI-enhanced to foundation
+  model components — directly addressing FOA requirements
 
 ### Criterion 3: Team, Resources, and Management
 
 **How we address it:**
 - DOE Lab leadership with deep RDycore/PETSc expertise
-- University partner(s) with AI/ML research strength
+- University partner(s) with AI/ML for scientific computing research strength
+- Subsurface hydrology partner for groundwater coupling training data
 - Industry partner providing real-world energy infrastructure context
 - Access to DOE HPC resources (GPU clusters)
 - Clear role delineation across institutions
+- Collaborative application structure (FOA-preferred)
+
+### Criterion 4: Commercialization Potential for Energy Applications
+
+**Note:** This criterion applies only to "applied technology development
+applications." Our proposal spans fundamental research (AI-learned DA
+operators) and applied technology (flood forecasting for energy
+infrastructure). We should address this criterion to strengthen the
+application:
+
+**How we address it:**
+- AI-enhanced flood forecasting has clear commercial value for utilities,
+  energy infrastructure operators, and insurance companies
+- Reusable AI operators for DA and surface-groundwater coupling can be
+  deployed across the water-energy sector
+- Industry partner provides a direct path to operational deployment
+- Foundation model components hosted on AmSC enable broad adoption
 
 ### Criterion 5: Budget and Cost-Effectiveness
 
 **How we address it:**
 - Leverages existing DOE-funded software (RDycore, PETSc, PetscDA, E3SM)
 - PetscDA eliminates need to develop DA infrastructure from scratch
+- AI-first groundwater coupling avoids the cost of integrating a full 3D
+  subsurface solver in Phase I
 - Efficient use of GPU computing for simulation, DA, and AI training
 - Reasonable budget within Phase I range
 - Clear value proposition for Phase II scale-up
+
+### ASCR Co-Funding Relevance
+
+The FOA states that "ASCR intends to work with all offices partnering on
+this solicitation to identify promising co-funding opportunities in all
+focus areas." This proposal is strongly aligned with ASCR's mission:
+
+- **Applied mathematics**: AI-learned covariance operators for ensemble DA
+  represent a novel contribution to computational inverse problems and
+  uncertainty quantification
+- **Scientific software**: PETSc/PetscDA AI-DA interfaces advance the
+  state of the art in scientific software for data assimilation
+- **GPU computing**: Kokkos-accelerated ensemble DA with AI operators
+  demonstrates performance-portable AI-HPC integration
+- **Neural operators for multiphysics coupling**: AI-learned
+  surface-groundwater coupling advances neural operator methodology for
+  scientific computing
 
 ---
 
@@ -443,14 +627,20 @@ The FOA lists review criteria in descending order of importance:
 While the Phase I application focuses on the 9-month proof of concept, the
 narrative should hint at the Phase II vision (3 years, 3-5x budget):
 
-- Scale the hybrid AI-physics framework to continental-scale watersheds
-- Full integration with E3SM for coupled atmosphere-surface water prediction
+- Scale the AI-enhanced DA + AI-coupled surface-groundwater framework to
+  continental-scale watersheds
+- Full integration with E3SM for coupled atmosphere-surface-subsurface
+  water prediction
+- Tighter coupling with a full groundwater model (ParFlow/ATS) — using
+  Phase I's AI coupling as initialization and the full model for validation
 - Operational deployment for real-time flood warning at energy facilities
-- Extension to include groundwater coupling (completing the Focus Area B
-  vision of "coupled surface-groundwater model")
-- Foundation model development for hydrologic prediction
-- Broader Genesis Mission integration — sharing models and data on the
-  American Science Cloud (AmSC)
+- Full hydrologic foundation model development — combining AI-DA operators,
+  surface-groundwater coupling, and multi-watershed training into a
+  transferable, self-improving model hosted on the American Science Cloud
+- Broader Genesis Mission integration — sharing AI-DA models, training
+  datasets, and foundation model components on the AmSC
+- Cross-topic synergies with Topic 16 (Grid) for flood-related grid
+  resilience and Topic 21 (AFFECT) for fluid flow AI methods
 
 ---
 
@@ -472,13 +662,16 @@ narrative should hint at the Phase II vision (3 years, 3-5x budget):
 
 | Risk | Mitigation |
 |------|-----------|
-| AI surrogates may not achieve target accuracy | Explore multiple architectures (GNN, FNO, PINN); define acceptable accuracy thresholds early |
-| Insufficient training data diversity | Leverage RDycore's GPU capability for rapid ensemble generation; use Latin hypercube sampling for parameter space |
-| Data assimilation integration too complex | **LOW RISK**: PetscDA already has working SWE+LETKF tutorials; integration with RDycore follows the same pattern |
+| AI localization operators may not generalize across watersheds | Design mesh-invariant neural architectures; include diverse training domains; hand-tuned LETKF remains functional fallback |
+| AI-learned groundwater coupling may not capture all exchange processes | Focus on dominant fluxes (infiltration, baseflow); validate against reference model; fall back to empirical parameterizations if needed |
+| Insufficient paired surface-subsurface training data | Partner with group that has existing ParFlow/ATS/PFLOTRAN runs; generate additional training data on target watershed; use transfer learning from data-rich to data-poor domains |
+| Insufficient ensemble diversity for AI training | Leverage RDycore's GPU capability for rapid ensemble generation; use Latin hypercube sampling for parameter space |
+| Data assimilation integration too complex | **LOW RISK**: PetscDA already has working SWE+LETKF tutorials; Phase 1 RDycore+LETKF integration already demonstrated |
 | Industry partner difficult to secure quickly | Engage Genesis Mission Consortium partnership service; leverage existing DOE lab industry relationships |
-| 9-month timeline too aggressive | Front-load data generation; PetscDA provides working DA baseline from month 1; parallelize AI development |
+| 9-month timeline too aggressive for 5 tasks | Front-load data generation; PetscDA provides working DA baseline from month 1; parallelize AI-DA and AI-coupling development (Tasks 3 and 4 run concurrently) |
 | Computing resource constraints | Leverage DOE lab allocations; PetscDA LETKF runs on GPU via Kokkos |
-| Transferability across watersheds may be limited | Design AI architectures with mesh-invariant features (GNNs); include diverse training domains |
+| AI-learned inflation may be unstable | Constrain inflation to physically meaningful range; use ensemble diagnostics as regularization |
+| Groundwater partner may not have data for target watershed | Use synthetic training data from idealized domains; validate approach on available data; acquire target watershed data in parallel |
 
 ---
 
@@ -486,19 +679,41 @@ narrative should hint at the Phase II vision (3 years, 3-5x budget):
 
 The proposal should emphasize integration with the broader Genesis Mission:
 
-- **American Science Cloud (AmSC)**: Commit to hosting trained AI models,
-  training datasets, and evaluation benchmarks on the platform
-- **Transformational AI Models Consortium (ModCon)**: Contribute hydrologic
-  AI models to the consortium's portfolio
-- **Cross-topic synergies**: The hybrid AI-physics framework could benefit
+- **American Science Cloud (AmSC)**: Commit to hosting the following
+  concrete artifacts on the platform:
+  - Trained AI-DA operators (localization, inflation, error correction)
+    as downloadable model weights with inference APIs
+  - Trained AI surface-groundwater coupling operators
+  - Curated ensemble simulation training datasets with metadata
+  - Evaluation benchmarks for AI-DA and AI-coupling quality
+  - Jupyter notebooks demonstrating operator usage
+- **Transformational AI Models Consortium (ModCon)**: Contribute AI-enhanced
+  DA operators and surface-groundwater coupling operators to the consortium's
+  portfolio as foundation model components
+- **Cross-topic synergies**: The AI-enhanced DA framework could benefit
   Topic 16 (Grid) for flood-related grid resilience, and Topic 21 (AFFECT)
-  for fluid flow AI methods
-- **Open science**: Commit to open-source release of AI models and training
-  pipelines (RDycore and PETSc are already open source)
-- **ASCR co-funding**: Emphasize advances in applied mathematics (physics-
-  constrained learning), computer science (AI-HPC integration), and
-  scientific software (PETSc/RDycore AI interfaces) to attract ASCR
+  for fluid flow AI methods. The AI-learned surface-groundwater coupling
+  methodology is directly relevant to Topic 17 (Subsurface Energy)
+- **Open science**: Commit to open-source release of AI-DA operators and
+  training pipelines (RDycore and PETSc are already open source under
+  BSD-2-Clause; SPDX: BSD-2-Clause)
+- **ASCR co-funding**: Emphasize advances in applied mathematics (AI-learned
+  covariance operators), computer science (AI-HPC integration), and
+  scientific software (PETSc/RDycore AI-DA interfaces) to attract ASCR
   co-funding interest
+- **Platform integration**: Commit to using Genesis Mission computing
+  resources when practical for AI training and ensemble simulation;
+  participate in up to 2 annual Genesis Mission meetings
+
+### Award Instrument Notes
+
+The FOA uses **Other Transaction Agreements (OTA)** rather than traditional
+grants. Key implications:
+- DOE intends fast-track OTA with either milestone-based or cost-reimbursement
+  structure
+- IP terms will be negotiated under OTA (similar to Bayh-Dole but flexible)
+- DOE Labs are funded through the Field Work Proposal system, not the OTA
+- Administrative provisions of the RFA may not apply to lab subcontractors
 
 ---
 
@@ -603,7 +818,7 @@ parameters:
 
 ### 13.4 How to Leverage Both Frameworks in the Proposal
 
-The proposal should highlight a **three-tier data assimilation strategy**:
+The proposal should highlight a **four-tier strategy**:
 
 1. **PetscDA ensemble DA for RDycore (immediate)**: Couple RDycore's SWE
    solver with PetscDA's LETKF to perform GPU-accelerated ensemble data
@@ -617,11 +832,17 @@ The proposal should highlight a **three-tier data assimilation strategy**:
    - Predict optimal inflation factors
    - Use LETKF analysis increments as training signal
 
-3. **Hybrid ensemble-variational (EnVar)**: Combine PetscDA ensemble
+3. **AI-learned surface-groundwater coupling**: Train neural operators to
+   predict groundwater exchange fluxes from surface states, enabling
+   coupled surface-groundwater prediction without a full 3D subsurface
+   solver. This addresses the FOA's core requirement for a "coupled
+   surface-groundwater model."
+
+4. **Hybrid ensemble-variational (EnVar)**: Combine PetscDA ensemble
    covariances with TSAdjoint-computed gradients for hybrid 4D-EnVar
    assimilation, with AI learning to optimally blend the two.
 
-4. **TAO for joint optimization**: Use TAO to jointly optimize
+5. **TAO for joint optimization**: Use TAO to jointly optimize
    physics-based parameters (Manning's n) and AI model weights.
 
 ### 13.5 Technical Advantage Statement (Updated)
@@ -634,9 +855,13 @@ The proposal should highlight a **three-tier data assimilation strategy**:
 > DA framework. This combination is unique in the scientific computing
 > landscape — no other flood modeling framework has both ensemble and
 > variational DA built into its solver infrastructure with GPU
-> acceleration. The integration of AI techniques with these existing
-> capabilities represents a low-risk, high-reward approach that builds
-> on proven infrastructure rather than developing DA from scratch.
+> acceleration. By adding AI-learned surface-groundwater coupling, we
+> create a complete surface-subsurface prediction system that addresses
+> the FOA's core requirement without the computational overhead of
+> traditional solver coupling. The integration of AI techniques with
+> these existing capabilities represents a low-risk, high-reward approach
+> that builds on proven infrastructure rather than developing DA or
+> groundwater coupling from scratch.
 
 ---
 
@@ -705,10 +930,14 @@ submitted to Environmental Modelling & Software, Dec 2025.
 - **Natural multi-institutional team**: PNNL, LBNL, LANL, CU Boulder, UB
 - **Hurricane Harvey use case**: existing Houston simulation ready for
   energy infrastructure flood resilience demonstration
-- **Computational bottleneck is real**: 471M cells needed for 1.5m
-  resolution — AI surrogates would be transformative for ensembles
-- **Ensemble capability**: built-in support directly relevant to AI
-  training data generation
+- **Ensemble capability**: built-in support directly relevant to AI-DA
+  training data generation and ensemble forecast/analysis cycles
+- **Computational scale**: 471M cells at 1.5m resolution demonstrates
+  the need for AI-optimized DA parameters — hand-tuning at this scale
+  is impractical; learned operators are essential
+- **Surface-only limitation**: RDycore solves surface SWE only — the
+  AI-learned groundwater coupling approach turns this limitation into a
+  strength by demonstrating AI's ability to bridge physics domains
 
 ---
 
@@ -719,28 +948,43 @@ submitted to Environmental Modelling & Software, Dec 2025.
 - "Flooding accounted for 44% of weather-related disasters 2000-2019,
   affecting 1.6 billion people. Nine of ten most expensive US billion-dollar
   weather disasters involved flooding."
-- "Current ESMs use simplified 1D physics at coarse resolution."
+- "Current ESMs use simplified 1D physics at coarse resolution and lack
+  the surface-groundwater coupling needed for compound flood prediction."
 - "RDycore achieves 6.6-41.9x GPU speedup, validated for 471M grid cells
   on Frontier and Perlmutter."
-- "Despite GPU acceleration, ensemble flood forecasting at km-scale remains
-  computationally prohibitive — AI surrogates can bridge this gap."
+- "Despite GPU acceleration, ensemble flood forecasting at km-scale requires
+  data assimilation with carefully tuned localization and inflation — AI
+  can learn these operators from data, replacing brittle hand-tuning."
+- "Coupling surface and subsurface hydrology traditionally requires expensive
+  3D groundwater solvers — AI can learn the exchange fluxes from data,
+  enabling coupled prediction at a fraction of the computational cost."
 - "PETSc now includes a dedicated PetscDA data assimilation object with
   GPU-accelerated ETKF and LETKF implementations that have already been
   demonstrated on shallow water equations — the same physics RDycore solves."
-- "We are not proposing to build data assimilation from scratch — we are
-  proposing to augment an existing, working, GPU-accelerated DA framework
-  with AI to make it faster, more accurate, and more adaptive."
+- "We are not proposing to build data assimilation or groundwater coupling
+  from scratch — we are proposing to augment existing, working infrastructure
+  with AI-learned operators that improve with data and generalize across
+  watersheds."
+- "Our AI operators are designed as reusable foundation model components —
+  transferable across watersheds and shareable on the American Science Cloud."
 
 ### Refined Decision Gate Metrics
 
-1. AI surrogate >100x speedup vs full RDycore GPU simulation
-2. <5% relative L2 error in water depth, benchmarked against validated
-   RDycore solutions
-3. Mass conservation within 1%
-4. Framework applied to at least 2 watersheds via DMPlex
-5. Performance improves with additional training data
-6. PetscDA LETKF successfully coupled with RDycore for ensemble DA
-7. AI-learned localization outperforms hand-tuned localization in LETKF
+1. PetscDA LETKF coupled with RDycore reduces ensemble RMSE vs. free
+   ensemble forecast on the Houston1km domain
+2. AI-learned localization outperforms hand-tuned Gaspari-Cohn localization
+   on held-out validation scenarios (measured by CRPS and spread/skill ratio)
+3. AI-learned inflation maintains ensemble calibration across diverse
+   forcing scenarios without manual re-tuning
+4. AI-learned groundwater coupling reproduces reference subsurface model
+   exchange fluxes with < 10% relative error on held-out scenarios
+5. Framework applied to at least 2 watersheds via DMPlex without
+   re-tuning localization or coupling by hand
+6. **Scaling behavior** (FOA-emphasized): Performance improves monotonically
+   with additional training data, computing, and observational data —
+   demonstrating a clear AI advantage trajectory
+7. AI-learned model error correction reduces systematic bias in RDycore
+   SWE ensemble forecasts
 
 ---
 
@@ -767,17 +1011,24 @@ The integration of PetscDA with RDycore is straightforward because:
 4. Implement forecast callback that calls `RDyAdvance()` for one time step
 5. Construct localization matrix Q from DMPlex mesh geometry
 6. Run ensemble forecast/analysis cycle
+7. Replace Q with AI-learned localization operator; compare vs. baseline
 
 This is a **months-of-work** integration, not a **years-of-work** research
 project — dramatically reducing the risk profile of the proposal.
 
 > **Implementation Plan**: A detailed engineering plan for this integration
 > is available at [`plans/rdycore-letkf-integration-plan.md`](rdycore-letkf-integration-plan.md).
-> Phase 1 (serial twin experiment on dam-break mesh) is being implemented
-> as pre-proposal proof-of-concept work.
+> Phase 1 (serial twin experiment on dam-break mesh) is complete as
+> pre-proposal proof-of-concept work. The `letkf_dam_break_np_1` CTest
+> passes, demonstrating end-to-end RDycore + PetscDA LETKF integration.
 
 ---
 
-*This plan was prepared on March 22, 2026, and updated with PetscDA
-capabilities from the petsc_gem repository. The FOA deadline is
+*This plan was prepared on March 22, 2026, and updated March 23, 2026 to
+remove AI surrogate content and refocus on AI-enhanced data assimilation
+as the primary AI contribution. Updated again March 23, 2026 to address
+FOA gap analysis: added AI-learned surface-groundwater coupling (FOA core
+requirement), foundation model components, ASCR co-funding strategy,
+Criterion 4 coverage, collaborative application guidance, OTA notes,
+and strengthened scaling behavior metrics. The FOA deadline is
 April 28, 2026.*
