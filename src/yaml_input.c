@@ -1107,8 +1107,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     if (config->output.fields_count > 0) {
       static const char *valid_output_fields[] = {
-          "Height",      "MomentumX",       "MomentumY",       "Concentration%" PetscInt_FMT,
-          "WaterSource", "MomentumXSource", "MomentumYSource", "Concentration%" PetscInt_FMT "Source",
+          "Height",      "MomentumX",       "MomentumY",       "SedimentConcentration%" PetscInt_FMT,
+          "WaterSource", "MomentumXSource", "MomentumYSource", "SedimentConcentration%" PetscInt_FMT "Source",
           NULL,
       };
       for (PetscInt f = 0; f < config->output.fields_count; ++f) {

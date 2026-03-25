@@ -220,7 +220,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
       }},
   };
   for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
   }
 
   PetscCall(CreateDM(rdy));
