@@ -107,14 +107,15 @@ static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer
   PetscFunctionBegin;
 
   PetscCall(PetscViewerHDF5PushGroup(viewer, "Domain"));
-
   PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
   PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "fields"));
   PetscCall(VecView(mesh->output.xc, viewer));
   PetscCall(VecView(mesh->output.yc, viewer));
   PetscCall(VecView(mesh->output.zc, viewer));
   PetscCall(VecView(mesh->output.area, viewer));
-
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -346,13 +347,13 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
                          "      </Geometry>\n",
                          num_vertices, h5_gridname));
 
-  // write out mesh coordinates (stored in the "Domain" group by WriteGrid)
+  // write out mesh coordinates (stored in the "fields" group by WriteGrid)
   const char *grid_coord_names[3] = {"XC", "YC", "ZC"};
   for (int f = 0; f < 3; ++f) {
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                           "          %s:/Domain/%s\n"
+                           "          %s:/fields/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
                            grid_coord_names[f], mesh->num_cells_global, h5_gridname, grid_coord_names[f]));
@@ -360,7 +361,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Attribute Name=\"Area\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                          "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                         "          %s:/Domain/Area\n"
+                         "          %s:/fields/Area\n"
                          "        </DataItem>\n"
                          "      </Attribute>\n",
                          mesh->num_cells_global, h5_gridname));
