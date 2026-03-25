@@ -149,14 +149,34 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
     switch (op->config->physics.flow.well_balancing) {
       case WELL_BALANCING_NONE:
         PetscCall(CreateCeedEtaVerticesVector(op->mesh, &op->ceed.eta_vertices));
-        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                         &op->ceed.flux));
+        if (op->ceed.use_slope_reconstruction) {
+          PetscCall(CreateCeedFluxOperatorReconstructed(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.flux));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_h));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
+          PetscCall(PetscCalloc1(op->mesh->num_internal_edges * 4, &op->ceed.ls_grad_coeffs));
+          PetscCall(PrecomputeLSGradCoeffs(op->mesh, op->ceed.ls_grad_coeffs));
+        } else {
+          PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                           &op->ceed.flux));
+        }
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_BS2002:
         PetscCall(CreateCeedEtaVerticesOperator(op->config, op->mesh, &op->ceed.eta_vertices, &op->ceed.eta_vertices_operator));
-        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                         &op->ceed.flux));
+        if (op->ceed.use_slope_reconstruction) {
+          PetscCall(CreateCeedFluxOperatorReconstructed(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.flux));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_h));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
+          PetscCall(PetscCalloc1(op->mesh->num_internal_edges * 4, &op->ceed.ls_grad_coeffs));
+          PetscCall(PrecomputeLSGradCoeffs(op->mesh, op->ceed.ls_grad_coeffs));
+        } else {
+          PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                           &op->ceed.flux));
+        }
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_HR:
@@ -251,6 +271,9 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)domain_dm, &comm));
 
+  PetscBool use_slope_reconstruction = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+
   // check our arguments
   PetscCheck(domain_mesh, comm, PETSC_ERR_USER, "Cannot create an operator with no mesh");
   PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Cannot create an operator with no regions");
@@ -273,6 +296,14 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   // construct CEED or PETSc versions of the flux/sources operators based on
   // our configuration
+  if (use_slope_reconstruction) {
+    PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
+               "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
+    PetscBool no_limiter = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
+    (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
+    (*operator)->ceed.use_limiter              = !no_limiter;
+  }
   PetscCall(CreateOperatorSubOperators(*operator));
 
   // set up our flux divergence vector(s)
@@ -283,6 +314,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /// Frees all resources devoted to the operator.
 /// @param [out] op the operator to be freed
@@ -303,6 +335,13 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.eta_vertices)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
+    }
+    if ((*op)->ceed.use_slope_reconstruction) {
+      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.q_reconstructed)));
+      PetscCall(PetscFree((*op)->ceed.grad_h));
+      PetscCall(PetscFree((*op)->ceed.grad_hu));
+      PetscCall(PetscFree((*op)->ceed.grad_hv));
+      PetscCall(PetscFree((*op)->ceed.ls_grad_coeffs));
     }
   } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
@@ -369,6 +408,35 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
     PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
+  }
+
+  //-------------------------------------
+  // MUSCL Reconstruction Pre-processing
+  //-------------------------------------
+  if (op->ceed.use_slope_reconstruction) {
+    static PetscInt muscl_step_count = 0;
+    const PetscScalar *q_ptr;
+    PetscCall(VecGetArrayRead(u_local, &q_ptr));
+    PetscCall(ComputeLeastSquaresGradients(op->mesh, op->ceed.ls_grad_coeffs, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv));
+
+    // Debug: print max |grad_h| every 100 steps
+    if (muscl_step_count % 100 == 0) {
+      PetscReal max_grad_h = 0.0;
+      for (PetscInt c = 0; c < op->mesh->num_owned_cells; c++) {
+        PetscReal gx = op->ceed.grad_h[c * 2 + 0];
+        PetscReal gy = op->ceed.grad_h[c * 2 + 1];
+        PetscReal g  = PetscSqrtReal(gx * gx + gy * gy);
+        max_grad_h = PetscMax(max_grad_h, g);
+      }
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [MUSCL step %d]: max |grad_h| = %g\n", (int)muscl_step_count, (double)max_grad_h));
+    }
+    muscl_step_count++;
+
+    CeedScalar *q_face_ptr;
+    PetscCallCEED(CeedVectorGetArray(op->ceed.q_reconstructed, CEED_MEM_HOST, &q_face_ptr));
+    PetscCall(ReconstructFaceValues(op->mesh, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv, op->ceed.use_limiter, q_face_ptr));
+    PetscCallCEED(CeedVectorRestoreArray(op->ceed.q_reconstructed, &q_face_ptr));
+    PetscCall(VecRestoreArrayRead(u_local, &q_ptr));
   }
 
   //------------------

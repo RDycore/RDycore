@@ -6,6 +6,7 @@
 #include <private/rdytracerimpl.h>
 
 #include "swe/swe_fluxes_ceed.h"
+#include "swe/swe_muscl_fluxes_ceed.h"
 #include "swe/swe_well_balancing.h"
 #include "tracer/tracer_fluxes_ceed.h"
 
@@ -853,6 +854,505 @@ PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *config, RDyMesh *mesh, C
   PetscCallCEED(CeedElemRestrictionDestroy(&eta_restrict));
   PetscCallCEED(CeedVectorDestroy(&geom));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//----------------------------------------------------------
+// MUSCL slope reconstruction helpers and operator
+//----------------------------------------------------------
+
+/// @brief Precomputes least-squares gradient coefficients for all internal edges.
+///
+/// For each cell i and each neighbor j connected by an internal edge, the
+/// weighted least-squares gradient minimizes:
+///   sum_j w_ij * [q_j - q_i - grad_q_i . (x_j - x_i)]^2,  w_ij = 1/d_ij
+///
+/// The 2x2 normal-equation matrix M_i = A^T W A is built per cell, inverted
+/// analytically, and combined with per-edge weights to give four scalars per
+/// edge ie:
+///   ls_grad_coeffs[ie*4+0] = cx_LR  (coeff for grad_x of left cell)
+///   ls_grad_coeffs[ie*4+1] = cy_LR  (coeff for grad_y of left cell)
+///   ls_grad_coeffs[ie*4+2] = cx_RL  (coeff for grad_x of right cell)
+///   ls_grad_coeffs[ie*4+3] = cy_RL  (coeff for grad_y of right cell)
+///
+/// At run time: grad_x[cl] += cx_LR * (q[cr] - q[cl]),
+///             grad_x[cr] += cx_RL * (q[cr] - q[cl]),  etc.
+///
+/// @param [in]  mesh           the mesh
+/// @param [out] ls_grad_coeffs output array, size num_internal_edges * 4
+PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) {
+  PetscFunctionBeginUser;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscInt num_cells          = mesh->num_cells;
+  PetscInt num_internal_edges = mesh->num_internal_edges;
+
+  // Temporary per-cell symmetric 2x2 matrix: [m00, m01, m11] (m10 = m01)
+  PetscReal *M;
+  PetscCall(PetscCalloc1(num_cells * 3, &M));
+
+  // --- Pass 1: accumulate M entries for each cell ---
+  for (PetscInt ie = 0; ie < num_internal_edges; ie++) {
+    PetscInt e  = edges->internal_edge_ids[ie];
+    PetscInt cl = edges->cell_ids[2 * e];
+    PetscInt cr = edges->cell_ids[2 * e + 1];
+
+    PetscReal dx = cells->centroids[cr].X[0] - cells->centroids[cl].X[0];
+    PetscReal dy = cells->centroids[cr].X[1] - cells->centroids[cl].X[1];
+    PetscReal d  = PetscSqrtReal(dx * dx + dy * dy);
+    PetscReal w  = (d > 0.0) ? 1.0 / d : 0.0;
+
+    // Both cells see the same |dx|,|dy| magnitudes (squared, so sign cancels)
+    M[cl * 3 + 0] += w * dx * dx;
+    M[cl * 3 + 1] += w * dx * dy;
+    M[cl * 3 + 2] += w * dy * dy;
+
+    M[cr * 3 + 0] += w * dx * dx;
+    M[cr * 3 + 1] += w * dx * dy;
+    M[cr * 3 + 2] += w * dy * dy;
+  }
+
+  // --- Invert M per cell (analytic 2x2) and store as inv_m[4] ---
+  PetscReal *inv_m;
+  PetscCall(PetscCalloc1(num_cells * 4, &inv_m));
+
+  PetscInt degenerate_count = 0;
+  for (PetscInt c = 0; c < num_cells; c++) {
+    PetscReal m00 = M[c * 3 + 0];
+    PetscReal m01 = M[c * 3 + 1];
+    PetscReal m11 = M[c * 3 + 2];
+    PetscReal det = m00 * m11 - m01 * m01;
+    if (PetscAbsReal(det) < 1e-30) {
+      // Degenerate (e.g. 1-D cell or isolated cell) — zero gradient
+      degenerate_count++;
+      inv_m[c * 4 + 0] = 0.0;
+      inv_m[c * 4 + 1] = 0.0;
+      inv_m[c * 4 + 2] = 0.0;
+      inv_m[c * 4 + 3] = 0.0;
+    } else {
+      PetscReal inv_det = 1.0 / det;
+      inv_m[c * 4 + 0] =  m11 * inv_det;  // [0,0]
+      inv_m[c * 4 + 1] = -m01 * inv_det;  // [0,1]
+      inv_m[c * 4 + 2] = -m01 * inv_det;  // [1,0]  (symmetric)
+      inv_m[c * 4 + 3] =  m00 * inv_det;  // [1,1]
+    }
+  }
+
+  if (degenerate_count > 0) {
+    PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", degenerate_count));
+  }
+
+  // --- Pass 2: compute per-edge coefficients ---
+  for (PetscInt ie = 0; ie < num_internal_edges; ie++) {
+    PetscInt e  = edges->internal_edge_ids[ie];
+    PetscInt cl = edges->cell_ids[2 * e];
+    PetscInt cr = edges->cell_ids[2 * e + 1];
+
+    PetscReal dx = cells->centroids[cr].X[0] - cells->centroids[cl].X[0];
+    PetscReal dy = cells->centroids[cr].X[1] - cells->centroids[cl].X[1];
+    PetscReal d  = PetscSqrtReal(dx * dx + dy * dy);
+    PetscReal w  = (d > 0.0) ? 1.0 / d : 0.0;
+
+    PetscReal wdx = w * dx;
+    PetscReal wdy = w * dy;
+
+    // Left cell sees right neighbor along (dx, dy)
+    ls_grad_coeffs[ie * 4 + 0] = inv_m[cl * 4 + 0] * wdx + inv_m[cl * 4 + 1] * wdy;  // cx_LR
+    ls_grad_coeffs[ie * 4 + 1] = inv_m[cl * 4 + 2] * wdx + inv_m[cl * 4 + 3] * wdy;  // cy_LR
+
+    // Right cell sees left neighbor along (dx, dy) as well (sign cancels in both w and dq)
+    ls_grad_coeffs[ie * 4 + 2] = inv_m[cr * 4 + 0] * wdx + inv_m[cr * 4 + 1] * wdy;  // cx_RL
+    ls_grad_coeffs[ie * 4 + 3] = inv_m[cr * 4 + 2] * wdx + inv_m[cr * 4 + 3] * wdy;  // cy_RL
+  }
+
+  // Debug: report coefficient range
+  PetscReal cx_min = 1e30, cx_max = -1e30;
+  for (PetscInt ie = 0; ie < num_internal_edges; ie++) {
+    for (PetscInt k = 0; k < 4; k++) {
+      PetscReal v = ls_grad_coeffs[ie * 4 + k];
+      cx_min = PetscMin(cx_min, v);
+      cx_max = PetscMax(cx_max, v);
+    }
+  }
+  PetscCall(PetscPrintf(PETSC_COMM_SELF,
+    "DEBUG [PrecomputeLSGradCoeffs]: %d cells, %d internal edges, coeff range [%g, %g]\n",
+    num_cells, num_internal_edges, (double)cx_min, (double)cx_max));
+
+  PetscCall(PetscFree(M));
+  PetscCall(PetscFree(inv_m));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Computes weighted least-squares cell-centered gradients from the local solution.
+///
+/// Uses the precomputed coefficients from PrecomputeLSGradCoeffs.  For each
+/// internal edge, the contribution to the left and right cell gradients is:
+///   grad_x[cl] += cx_LR * (q[cr] - q[cl])
+///   grad_y[cl] += cy_LR * (q[cr] - q[cl])
+///   grad_x[cr] += cx_RL * (q[cr] - q[cl])   (cx_RL already includes correct sign)
+///   grad_y[cr] += cy_RL * (q[cr] - q[cl])
+///
+/// @param [in]  mesh           the mesh
+/// @param [in]  ls_grad_coeffs precomputed coefficients, size num_internal_edges * 4
+/// @param [in]  q              raw local solution array, size num_cells * 3
+/// @param [out] grad_h         gradient of h,  size num_cells * 2
+/// @param [out] grad_hu        gradient of hu, size num_cells * 2
+/// @param [out] grad_hv        gradient of hv, size num_cells * 2
+PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *mesh, const PetscReal *ls_grad_coeffs, const PetscScalar *q, PetscScalar *grad_h,
+                                            PetscScalar *grad_hu, PetscScalar *grad_hv) {
+  PetscFunctionBeginUser;
+
+  RDyEdges *edges = &mesh->edges;
+
+  PetscCall(PetscArrayzero(grad_h,  mesh->num_cells * 2));
+  PetscCall(PetscArrayzero(grad_hu, mesh->num_cells * 2));
+  PetscCall(PetscArrayzero(grad_hv, mesh->num_cells * 2));
+
+  for (PetscInt ie = 0; ie < mesh->num_internal_edges; ie++) {
+    PetscInt e  = edges->internal_edge_ids[ie];
+    PetscInt cl = edges->cell_ids[2 * e];
+    PetscInt cr = edges->cell_ids[2 * e + 1];
+
+    PetscReal cx_LR = ls_grad_coeffs[ie * 4 + 0];
+    PetscReal cy_LR = ls_grad_coeffs[ie * 4 + 1];
+    PetscReal cx_RL = ls_grad_coeffs[ie * 4 + 2];
+    PetscReal cy_RL = ls_grad_coeffs[ie * 4 + 3];
+
+    // dq = q_R - q_L for each component
+    PetscReal dq_h  = q[cr * 3 + 0] - q[cl * 3 + 0];
+    PetscReal dq_hu = q[cr * 3 + 1] - q[cl * 3 + 1];
+    PetscReal dq_hv = q[cr * 3 + 2] - q[cl * 3 + 2];
+
+    grad_h[cl * 2 + 0]  += cx_LR * dq_h;
+    grad_h[cl * 2 + 1]  += cy_LR * dq_h;
+    grad_hu[cl * 2 + 0] += cx_LR * dq_hu;
+    grad_hu[cl * 2 + 1] += cy_LR * dq_hu;
+    grad_hv[cl * 2 + 0] += cx_LR * dq_hv;
+    grad_hv[cl * 2 + 1] += cy_LR * dq_hv;
+
+    grad_h[cr * 2 + 0]  += cx_RL * dq_h;
+    grad_h[cr * 2 + 1]  += cy_RL * dq_h;
+    grad_hu[cr * 2 + 0] += cx_RL * dq_hu;
+    grad_hu[cr * 2 + 1] += cy_RL * dq_hu;
+    grad_hv[cr * 2 + 0] += cx_RL * dq_hv;
+    grad_hv[cr * 2 + 1] += cy_RL * dq_hv;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Returns minmod(a, b): zero if opposite signs, else value with smaller magnitude.
+static inline PetscReal Minmod(PetscReal a, PetscReal b) {
+  if (a * b <= 0.0) return 0.0;
+  return PetscAbsReal(a) < PetscAbsReal(b) ? a : b;
+}
+
+/// @brief Reconstructs face-centered states for all owned interior edges using
+/// linear extrapolation from cell centroids, optionally limited by minmod.
+///
+/// Without limiter: q_face = q_cell + grad · Δx  (pure second-order, may overshoot)
+/// With minmod limiter: the extrapolation is clamped to minmod(extrap, 0.5*(q_R-q_L))
+/// so reconstructed values stay within the range of the two adjacent cell values.
+///
+/// @param [in]  mesh        the mesh
+/// @param [in]  q           raw local solution array, size num_cells * 3
+/// @param [in]  grad_h      cell-centered gradient of h,  size num_cells * 2
+/// @param [in]  grad_hu     cell-centered gradient of hu, size num_cells * 2
+/// @param [in]  grad_hv     cell-centered gradient of hv, size num_cells * 2
+/// @param [in]  use_limiter apply minmod limiter if PETSC_TRUE
+/// @param [out] q_face      reconstructed face values, size num_owned_internal_edges * 6
+///                          layout per edge: [h_L, hu_L, hv_L, h_R, hu_R, hv_R]
+PetscErrorCode ReconstructFaceValues(RDyMesh *mesh, const PetscScalar *q, const PetscScalar *grad_h, const PetscScalar *grad_hu,
+                                     const PetscScalar *grad_hv, PetscBool use_limiter, CeedScalar *q_face) {
+  PetscFunctionBeginUser;
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyEdges    *edges    = &mesh->edges;
+  RDyVertices *vertices = &mesh->vertices;
+
+  PetscInt owned_edge = 0;
+  for (PetscInt ie = 0; ie < mesh->num_internal_edges; ie++) {
+    PetscInt e = edges->internal_edge_ids[ie];
+    if (!edges->is_owned[e]) continue;
+
+    PetscInt cl = edges->cell_ids[2 * e];
+    PetscInt cr = edges->cell_ids[2 * e + 1];
+
+    // Edge midpoint from its two vertices
+    PetscInt  v0    = edges->vertex_ids[2 * e];
+    PetscInt  v1    = edges->vertex_ids[2 * e + 1];
+    PetscReal x_mid = 0.5 * (vertices->points[v0].X[0] + vertices->points[v1].X[0]);
+    PetscReal y_mid = 0.5 * (vertices->points[v0].X[1] + vertices->points[v1].X[1]);
+
+    // Displacement vectors from cell centroids to edge midpoint
+    PetscReal dx_L = x_mid - cells->centroids[cl].X[0];
+    PetscReal dy_L = y_mid - cells->centroids[cl].X[1];
+    PetscReal dx_R = x_mid - cells->centroids[cr].X[0];
+    PetscReal dy_R = y_mid - cells->centroids[cr].X[1];
+
+    const PetscScalar *grads[3] = {grad_h, grad_hu, grad_hv};
+    for (PetscInt k = 0; k < 3; k++) {
+      PetscReal extrap_L = grads[k][cl * 2 + 0] * dx_L + grads[k][cl * 2 + 1] * dy_L;
+      PetscReal extrap_R = grads[k][cr * 2 + 0] * dx_R + grads[k][cr * 2 + 1] * dy_R;
+
+      PetscReal qL_face, qR_face;
+      if (use_limiter) {
+        // minmod: limit the extrapolation so it doesn't exceed half the cell-to-cell jump.
+        // extrap_L goes toward R, so compare with +0.5*dq.
+        // extrap_R goes toward L, so compare with -0.5*dq.
+        PetscReal dq = q[cr * 3 + k] - q[cl * 3 + k];
+        qL_face      = q[cl * 3 + k] + Minmod(extrap_L,  0.5 * dq);
+        qR_face      = q[cr * 3 + k] + Minmod(extrap_R, -0.5 * dq);
+      } else {
+        qL_face = q[cl * 3 + k] + extrap_L;
+        qR_face = q[cr * 3 + k] + extrap_R;
+      }
+      q_face[owned_edge * 6 + k]     = qL_face;
+      q_face[owned_edge * 6 + 3 + k] = qR_face;
+    }
+    // Clamp water depth from below (extrapolation can produce small negatives)
+    q_face[owned_edge * 6 + 0] = PetscMax(0.0, q_face[owned_edge * 6 + 0]);
+    q_face[owned_edge * 6 + 3] = PetscMax(0.0, q_face[owned_edge * 6 + 3]);
+
+    owned_edge++;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Creates the MUSCL-reconstructed interior flux sub-operator.
+/// Identical to CreateCeedInteriorFluxSuboperator except:
+///   - Uses SWEFlux_Roe_MUSCL Q-function
+///   - Adds passive q_left_face / q_right_face inputs bound to q_reconstructed
+///   - No active q_left / q_right inputs (u_local active input is unused for interior)
+/// @param [in]  config         RDycore configuration
+/// @param [in]  mesh           mesh defining the computational domain
+/// @param [in]  eta_vertices   CeedVector of eta values at vertices (for well-balancing)
+/// @param [out] q_recon_out    the newly created q_reconstructed CeedVector
+/// @param [out] subop          the newly created sub-operator
+static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices,
+                                                                     CeedVector *q_recon_out, CeedOperator *subop) {
+  PetscFunctionBeginUser;
+
+  Ceed ceed = CeedContext();
+
+  CeedInt num_flow_comp = 3;  // NOTE: SWE assumed
+  CeedInt num_comp      = num_flow_comp;
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyEdges    *edges    = &mesh->edges;
+  RDyVertices *vertices = &mesh->vertices;
+
+  // Build the MUSCL Q-function
+  CeedQFunction qf;
+  PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe_MUSCL, SWEFlux_Roe_MUSCL_loc, &qf));
+
+  CeedQFunctionContext qf_context;
+  PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  PetscCallCEED(CeedQFunctionSetContext(qf, qf_context));
+  PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
+
+  CeedInt num_comp_geom = 6;   // sn, cn, -L/A_l, L/A_r, z_beg_vertex, z_end_vertex
+  CeedInt num_comp_cnum = 2;   // courant number for left and right cells
+  CeedInt num_comp_eta  = 1;   // h_vertex
+
+  // Q-function inputs: geom (passive), q_left_face (passive), q_right_face (passive),
+  //                    eta_vert_beg (passive), eta_vert_end (passive)
+  PetscCallCEED(CeedQFunctionAddInput(qf, "geom",         num_comp_geom, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "q_left_face",  num_comp,      CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "q_right_face", num_comp,      CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_beg", num_comp_eta,  CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_end", num_comp_eta,  CEED_EVAL_NONE));
+
+  // Q-function outputs: cell_left (active), cell_right (active), flux (passive), courant (passive)
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_left",     num_comp,      CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_right",    num_comp,      CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "flux",          num_comp,      CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "courant_number", num_comp_cnum, CEED_EVAL_NONE));
+
+  CeedInt num_edges = mesh->num_owned_internal_edges;
+
+  // ---- Geometry vector (passive, precomputed once) ----
+  CeedElemRestriction restrict_geom;
+  CeedVector          geom;
+  {
+    CeedInt g_strides[] = {num_comp_geom, 1, num_comp_geom};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, g_strides, &restrict_geom));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
+    PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+
+    CeedScalar(*g)[6];
+    PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
+    for (CeedInt ie = 0, oe = 0; ie < mesh->num_internal_edges; ie++) {
+      CeedInt e = edges->internal_edge_ids[ie];
+      if (!edges->is_owned[e]) continue;
+      CeedInt l        = edges->cell_ids[2 * e];
+      CeedInt r        = edges->cell_ids[2 * e + 1];
+      g[oe][0]         = edges->sn[e];
+      g[oe][1]         = edges->cn[e];
+      g[oe][2]         = -edges->lengths[e] / cells->areas[l];
+      g[oe][3]         =  edges->lengths[e] / cells->areas[r];
+      CeedInt vid_beg  = edges->vertex_ids[2 * e];
+      CeedInt vid_end  = edges->vertex_ids[2 * e + 1];
+      g[oe][4]         = vertices->points[vid_beg].X[2];
+      g[oe][5]         = vertices->points[vid_end].X[2];
+      oe++;
+    }
+    PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+  }
+
+  // ---- q_reconstructed vector and its left/right restrictions ----
+  // Layout: [h_L, hu_L, hv_L, h_R, hu_R, hv_R] per owned interior edge
+  CeedVector          q_reconstructed;
+  CeedElemRestriction restr_qface_l, restr_qface_r;
+  {
+    CeedInt total = num_edges * 2 * num_comp;  // 6 values per edge
+    PetscCallCEED(CeedVectorCreate(ceed, total, &q_reconstructed));
+    PetscCallCEED(CeedVectorSetValue(q_reconstructed, 0.0));
+
+    // Explicit offset arrays: left starts at ie*6, right at ie*6+3
+    CeedInt *off_l, *off_r;
+    PetscCall(PetscMalloc2(num_edges, &off_l, num_edges, &off_r));
+    for (CeedInt ie = 0; ie < num_edges; ie++) {
+      off_l[ie] = ie * 2 * num_comp;
+      off_r[ie] = ie * 2 * num_comp + num_comp;
+    }
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, total, CEED_MEM_HOST, CEED_COPY_VALUES, off_l, &restr_qface_l));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, total, CEED_MEM_HOST, CEED_COPY_VALUES, off_r, &restr_qface_r));
+    PetscCall(PetscFree2(off_l, off_r));
+  }
+
+  // ---- Flux and Courant number output vectors ----
+  CeedElemRestriction restrict_flux, restrict_cnum;
+  CeedVector          flux, cnum;
+  {
+    CeedInt f_strides[]    = {num_comp,      1, num_comp};
+    CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp,      num_edges * num_comp,      f_strides,    &restrict_flux));
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_cnum, num_edges * num_comp_cnum, cnum_strides, &restrict_cnum));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
+    PetscCallCEED(CeedVectorSetValue(flux, 0.0));
+    PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
+  }
+
+  // ---- Active output restrictions for cell_left / cell_right ----
+  // Map to owned-cell global positions in rhs (same as 1st-order operator)
+  CeedElemRestriction c_restrict_l, c_restrict_r;
+  {
+    CeedInt *c_offset_l, *c_offset_r;
+    PetscCall(PetscMalloc2(num_edges, &c_offset_l, num_edges, &c_offset_r));
+    for (CeedInt ie = 0, oe = 0; ie < mesh->num_internal_edges; ie++) {
+      CeedInt e = edges->internal_edge_ids[ie];
+      if (!edges->is_owned[e]) continue;
+      CeedInt l          = edges->cell_ids[2 * e];
+      CeedInt r          = edges->cell_ids[2 * e + 1];
+      c_offset_l[oe]     = cells->local_to_owned[l] * num_comp;
+      c_offset_r[oe]     = cells->local_to_owned[r] * num_comp;
+      oe++;
+    }
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                            c_offset_l, &c_restrict_l));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                            c_offset_r, &c_restrict_r));
+    PetscCall(PetscFree2(c_offset_l, c_offset_r));
+  }
+
+  // ---- Eta vertex restrictions ----
+  CeedElemRestriction eta_beg_restrict, eta_end_restrict;
+  {
+    CeedInt *eta_beg_offset, *eta_end_offset;
+    PetscCall(PetscMalloc2(num_edges, &eta_beg_offset, num_edges, &eta_end_offset));
+    for (CeedInt ie = 0, oe = 0; ie < mesh->num_internal_edges; ie++) {
+      CeedInt e = edges->internal_edge_ids[ie];
+      if (!edges->is_owned[e]) continue;
+      CeedInt vid_beg        = edges->vertex_ids[2 * e];
+      CeedInt vid_end        = edges->vertex_ids[2 * e + 1];
+      eta_beg_offset[oe]     = vid_beg * num_comp_eta;
+      eta_end_offset[oe]     = vid_end * num_comp_eta;
+      oe++;
+    }
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                            eta_beg_offset, &eta_beg_restrict));
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
+                                            eta_end_offset, &eta_end_restrict));
+    PetscCall(PetscFree2(eta_beg_offset, eta_end_offset));
+  }
+
+  // ---- Assemble the operator ----
+  PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, subop));
+  PetscCallCEED(CeedOperatorSetField(*subop, "geom",          restrict_geom,  CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*subop, "q_left_face",   restr_qface_l,  CEED_BASIS_NONE, q_reconstructed));
+  PetscCallCEED(CeedOperatorSetField(*subop, "q_right_face",  restr_qface_r,  CEED_BASIS_NONE, q_reconstructed));
+  PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_beg",  eta_beg_restrict, CEED_BASIS_NONE, *eta_vertices));
+  PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_end",  eta_end_restrict, CEED_BASIS_NONE, *eta_vertices));
+  PetscCallCEED(CeedOperatorSetField(*subop, "cell_left",     c_restrict_l,   CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*subop, "cell_right",    c_restrict_r,   CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*subop, "flux",          restrict_flux,  CEED_BASIS_NONE, flux));
+  PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
+
+  // Return the q_reconstructed vector to the caller for updates each timestep
+  *q_recon_out = q_reconstructed;
+
+  // Clean up (operator holds references)
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restr_qface_l));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restr_qface_r));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
+  PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
+  PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_r));
+  PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
+  PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
+  PetscCallCEED(CeedVectorDestroy(&geom));
+  PetscCallCEED(CeedVectorDestroy(&flux));
+  PetscCallCEED(CeedVectorDestroy(&cnum));
+  PetscCallCEED(CeedQFunctionDestroy(&qf));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Creates a CEED flux operator using MUSCL-reconstructed face states for
+/// interior edges, with standard 1st-order treatment on boundary edges.
+/// @param [in]  config              RDycore configuration
+/// @param [in]  mesh                mesh defining the computational domain
+/// @param [in]  num_boundaries      number of domain boundaries
+/// @param [in]  boundaries          array of domain boundaries
+/// @param [in]  boundary_conditions array of boundary conditions
+/// @param [in]  eta_vertices        CeedVector of eta values at vertices
+/// @param [out] q_recon_out         the q_reconstructed CeedVector (updated each timestep)
+/// @param [out] flux_op             the newly created composite flux operator
+PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
+                                                   RDyCondition *boundary_conditions, CeedVector *eta_vertices, CeedVector *q_recon_out,
+                                                   CeedOperator *flux_op) {
+  PetscFunctionBegin;
+
+  Ceed ceed = CeedContext();
+
+  PetscCall(CeedOperatorCreateComposite(ceed, flux_op));
+
+  if (config->physics.flow.mode != FLOW_SWE) {
+    PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model for MUSCL reconstruction!");
+  }
+
+  // Sub-operator 0: MUSCL-reconstructed interior fluxes
+  CeedOperator interior_flux_op;
+  PetscCall(CreateCeedInteriorFluxSuboperatorReconstructed(*config, mesh, eta_vertices, q_recon_out, &interior_flux_op));
+  PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
+  PetscCall(CeedOperatorDestroy(&interior_flux_op));
+
+  // Sub-operators 1..num_boundaries: standard 1st-order boundary fluxes
+  for (CeedInt b = 0; b < num_boundaries; ++b) {
+    CeedOperator boundary_flux_op;
+    RDyCondition condition = boundary_conditions[b];
+    PetscCall(CreateCeedBoundaryFluxSuboperator(*config, mesh, eta_vertices, &boundaries[b], condition, &boundary_flux_op));
+    PetscCall(CeedOperatorCompositeAddSub(*flux_op, boundary_flux_op));
+    PetscCall(CeedOperatorDestroy(&boundary_flux_op));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
