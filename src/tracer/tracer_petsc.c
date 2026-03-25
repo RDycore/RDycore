@@ -760,17 +760,17 @@ PetscErrorCode CreatePetscTracerSourceOperator(RDyMesh *mesh, const RDyConfig co
 //----------------------------------
 
 typedef struct {
-  RDyNumericsRiemann     riemann;             // riemann solver type
-  RDyMesh               *mesh;                // domain mesh
-  PetscReal              tiny_h;              // minimum water height for wet conditions
-  PetscReal              h_anuga_regular;     // ANUGA height parameter for velocity regularization
-  PetscReal             *zc;                  // vertex-averaged bed elevation per cell (local indexing)
-  PetscInt               num_flow_comp;       // number of flow components (3)
-  PetscInt               num_tracers_comp;    // number of tracer components
-  TracerRiemannStateData left_states;         // reconstructed "left" states
-  TracerRiemannStateData right_states;        // reconstructed "right" states
-  TracerRiemannEdgeData  edges;               // riemann fluxes on interior edges
-  OperatorDiagnostics   *diagnostics;         // courant number, etc
+  RDyNumericsRiemann     riemann;           // riemann solver type
+  RDyMesh               *mesh;              // domain mesh
+  PetscReal              tiny_h;            // minimum water height for wet conditions
+  PetscReal              h_anuga_regular;   // ANUGA height parameter for velocity regularization
+  PetscReal             *zc;                // vertex-averaged bed elevation per cell (local indexing)
+  PetscInt               num_flow_comp;     // number of flow components (3)
+  PetscInt               num_tracers_comp;  // number of tracer components
+  TracerRiemannStateData left_states;       // reconstructed "left" states
+  TracerRiemannStateData right_states;      // reconstructed "right" states
+  TracerRiemannEdgeData  edges;             // riemann fluxes on interior edges
+  OperatorDiagnostics   *diagnostics;       // courant number, etc
 } TracerInteriorFluxHROperator;
 
 static PetscErrorCode ApplyTracerInteriorFluxHR(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
@@ -857,6 +857,7 @@ static PetscErrorCode ApplyTracerInteriorFluxHR(void *context, PetscOperatorFiel
       PetscReal hci_R = u_ptr[n_dof * r + 3 + s];
       PetscReal ci_L  = (h_L > tiny_h) ? hci_L / h_L : 0.0;
       PetscReal ci_R  = (h_R > tiny_h) ? hci_R / h_R : 0.0;
+
       datal->hci[e * num_tracers_comp + s] = hL_rec * ci_L;
       datar->hci[e * num_tracers_comp + s] = hR_rec * ci_R;
       datal->ci[e * num_tracers_comp + s]  = ci_L;
@@ -973,12 +974,12 @@ PetscErrorCode CreatePetscTracerInteriorFluxHROperator(RDyMesh *mesh, const RDyC
   TracerInteriorFluxHROperator *op;
   PetscCall(PetscCalloc1(1, &op));
   *op = (TracerInteriorFluxHROperator){
-      .riemann         = config.numerics.riemann,
-      .mesh            = mesh,
-      .diagnostics     = diagnostics,
-      .tiny_h          = config.physics.flow.tiny_h,
-      .h_anuga_regular = config.physics.flow.h_anuga_regular,
-      .num_flow_comp   = num_flow_comp,
+      .riemann          = config.numerics.riemann,
+      .mesh             = mesh,
+      .diagnostics      = diagnostics,
+      .tiny_h           = config.physics.flow.tiny_h,
+      .h_anuga_regular  = config.physics.flow.h_anuga_regular,
+      .num_flow_comp    = num_flow_comp,
       .num_tracers_comp = num_tracers_comp,
   };
 
@@ -1127,8 +1128,7 @@ static PetscErrorCode DestroyTracerSourceHR(void *context) {
 
 /// Creates a PetscOperator that computes source terms for HR well-balanced
 /// shallow water equations + tracers (bed slope = 0, friction + erosion/deposition).
-PetscErrorCode CreatePetscTracerSourceHROperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings,
-                                                 PetscOperator *petsc_op) {
+PetscErrorCode CreatePetscTracerSourceHROperator(RDyMesh *mesh, const RDyConfig config, Vec external_sources, Vec mannings, PetscOperator *petsc_op) {
   PetscFunctionBegin;
 
   PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!

@@ -35,7 +35,7 @@ PetscErrorCode CreateTracerQFunctionContext(Ceed ceed, const RDyConfig config, C
 
   tracers_ctx->dtime                   = 0.0;
   tracers_ctx->tiny_h                  = config.physics.flow.tiny_h;
-  tracers_ctx->h_anuga_regular          = config.physics.flow.h_anuga_regular;
+  tracers_ctx->h_anuga_regular         = config.physics.flow.h_anuga_regular;
   tracers_ctx->gravity                 = GRAVITY;
   tracers_ctx->xq2018_threshold        = config.physics.flow.source.xq2018_threshold;
   tracers_ctx->kp_constant             = 0.001;

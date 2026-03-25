@@ -11,10 +11,10 @@
 
 // material properties
 #define MATERIAL_PROPERTY_MANNINGS 0
-#define NUM_MATERIAL_PROPERTIES    1
+#define NUM_MATERIAL_PROPERTIES 1
 
 // tracer transport
-#define MAX_NUM_TRACERS            7
+#define MAX_NUM_TRACERS 7
 
 // convenience macros
 
