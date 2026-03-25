@@ -346,13 +346,13 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
                          "      </Geometry>\n",
                          num_vertices, h5_gridname));
 
-  // write out mesh coordinates (data placed in "fields" group for some reason)
+  // write out mesh coordinates (stored in the "Domain" group by WriteGrid)
   const char *grid_coord_names[3] = {"XC", "YC", "ZC"};
   for (int f = 0; f < 3; ++f) {
     PetscCall(PetscFPrintf(rdy->comm, fp,
                            "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                            "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                           "          %s:/fields/%s\n"
+                           "          %s:/Domain/%s\n"
                            "        </DataItem>\n"
                            "      </Attribute>\n",
                            grid_coord_names[f], mesh->num_cells_global, h5_gridname, grid_coord_names[f]));
@@ -360,7 +360,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Attribute Name=\"Area\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
                          "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                         "          %s:/fields/Area\n"
+                         "          %s:/Domain/Area\n"
                          "        </DataItem>\n"
                          "      </Attribute>\n",
                          mesh->num_cells_global, h5_gridname));
