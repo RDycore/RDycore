@@ -189,6 +189,9 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)domain_dm, &comm));
 
+  PetscBool use_slope_reconstruction = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+
   // check our arguments
   PetscCheck(domain_mesh, comm, PETSC_ERR_USER, "Cannot create an operator with no mesh");
   PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Cannot create an operator with no regions");
@@ -218,17 +221,34 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       PetscCall(PetscLogEventRegister("CeedOperatorApp", RDY_CLASSID, &RDY_CeedOperatorApply_));
       first_time = PETSC_FALSE;
     }
-
     if ((*operator)->config->physics.flow.well_balancing != WELL_BALANCING_NONE) {
       PetscCall(CreateCeedEtaVerticesOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.eta_vertices,
                                               &(*operator)->ceed.eta_vertices_operator));
     } else {
       PetscCall(CreateCeedEtaVerticesVector((*operator)->mesh, &(*operator)->ceed.eta_vertices));
     }
-    PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
-                                     (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices, &(*operator)->ceed.flux));
+    if (use_slope_reconstruction) {
+      PetscBool no_limiter = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
+      (*operator)->ceed.use_limiter = !no_limiter;
+      printf("DEBUG: Using second-order MUSCL reconstruction (%s)\n", no_limiter ? "no limiter" : "minmod limiter");
+      PetscCall(CreateCeedFluxOperatorReconstructed((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
+                                                    (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices,
+                                                    &(*operator)->ceed.q_reconstructed, &(*operator)->ceed.flux));
+      (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
+      PetscCall(PetscCalloc1((*operator)->mesh->num_cells * 2, &(*operator)->ceed.grad_h));
+      PetscCall(PetscCalloc1((*operator)->mesh->num_cells * 2, &(*operator)->ceed.grad_hu));
+      PetscCall(PetscCalloc1((*operator)->mesh->num_cells * 2, &(*operator)->ceed.grad_hv));
+      PetscCall(PetscCalloc1((*operator)->mesh->num_internal_edges * 4, &(*operator)->ceed.ls_grad_coeffs));
+      PetscCall(PrecomputeLSGradCoeffs((*operator)->mesh, (*operator)->ceed.ls_grad_coeffs));
+    } else {
+      printf("DEBUG: NOT using slope reconstruction\n");
+      PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
+                                       (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices, &(*operator)->ceed.flux));
+    }
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
   } else {
+    printf("DEBUG: Not using CEED\n");
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
                                       (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.flux));
@@ -244,6 +264,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /// Frees all resources devoted to the operator.
 /// @param [out] op the operator to be freed
@@ -264,6 +285,13 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.eta_vertices)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
+    }
+    if ((*op)->ceed.use_slope_reconstruction) {
+      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.q_reconstructed)));
+      PetscCall(PetscFree((*op)->ceed.grad_h));
+      PetscCall(PetscFree((*op)->ceed.grad_hu));
+      PetscCall(PetscFree((*op)->ceed.grad_hv));
+      PetscCall(PetscFree((*op)->ceed.ls_grad_coeffs));
     }
   } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
@@ -330,6 +358,35 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     // reset our CeedVectors and restore our PETSc vectors
     PetscCallCEED(CeedVectorTakeArray(op->ceed.u_local, MemTypeP2C(mem_type), &u_local_ptr));
     PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
+  }
+
+  //-------------------------------------
+  // MUSCL Reconstruction Pre-processing
+  //-------------------------------------
+  if (op->ceed.use_slope_reconstruction) {
+    static PetscInt muscl_step_count = 0;
+    const PetscScalar *q_ptr;
+    PetscCall(VecGetArrayRead(u_local, &q_ptr));
+    PetscCall(ComputeLeastSquaresGradients(op->mesh, op->ceed.ls_grad_coeffs, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv));
+
+    // Debug: print max |grad_h| every 100 steps
+    if (muscl_step_count % 100 == 0) {
+      PetscReal max_grad_h = 0.0;
+      for (PetscInt c = 0; c < op->mesh->num_owned_cells; c++) {
+        PetscReal gx = op->ceed.grad_h[c * 2 + 0];
+        PetscReal gy = op->ceed.grad_h[c * 2 + 1];
+        PetscReal g  = PetscSqrtReal(gx * gx + gy * gy);
+        max_grad_h = PetscMax(max_grad_h, g);
+      }
+      PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [MUSCL step %d]: max |grad_h| = %g\n", (int)muscl_step_count, (double)max_grad_h));
+    }
+    muscl_step_count++;
+
+    CeedScalar *q_face_ptr;
+    PetscCallCEED(CeedVectorGetArray(op->ceed.q_reconstructed, CEED_MEM_HOST, &q_face_ptr));
+    PetscCall(ReconstructFaceValues(op->mesh, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv, op->ceed.use_limiter, q_face_ptr));
+    PetscCallCEED(CeedVectorRestoreArray(op->ceed.q_reconstructed, &q_face_ptr));
+    PetscCall(VecRestoreArrayRead(u_local, &q_ptr));
   }
 
   //------------------
