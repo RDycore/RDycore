@@ -151,7 +151,8 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
         PetscCall(CreateCeedEtaVerticesVector(op->mesh, &op->ceed.eta_vertices));
         if (op->ceed.use_slope_reconstruction) {
           PetscCall(CreateCeedFluxOperatorReconstructed(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
-                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.flux));
+                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.muscl_interior_flux,
+                                                        &op->ceed.flux));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_h));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
@@ -167,7 +168,8 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
         PetscCall(CreateCeedEtaVerticesOperator(op->config, op->mesh, &op->ceed.eta_vertices, &op->ceed.eta_vertices_operator));
         if (op->ceed.use_slope_reconstruction) {
           PetscCall(CreateCeedFluxOperatorReconstructed(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
-                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.flux));
+                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.muscl_interior_flux,
+                                                        &op->ceed.flux));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_h));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
@@ -341,6 +343,7 @@ PetscErrorCode DestroyOperator(Operator **op) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }
     if ((*op)->ceed.use_slope_reconstruction) {
+      PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.muscl_interior_flux)));
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.q_reconstructed)));
       PetscCall(PetscFree((*op)->ceed.grad_h));
       PetscCall(PetscFree((*op)->ceed.grad_hu));
@@ -461,10 +464,19 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCall(VecGetArrayAndMemType(f_local, &f_local_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(op->ceed.rhs, MemTypeP2C(mem_type), CEED_USE_POINTER, f_local_ptr));
 
-    // apply the flux operator, computing flux divergences
+    // apply the flux operator(s), computing flux divergences
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    // Zero rhs before accumulating contributions from separate operators.
+    // We use CeedOperatorApplyAdd for each operator so that their contributions
+    // are summed rather than overwritten.
+    PetscCallCEED(CeedVectorSetValue(op->ceed.rhs, 0.0));
+    if (op->ceed.use_slope_reconstruction) {
+      // Interior: MUSCL sub-op applied standalone (all inputs are passive, reads from q_reconstructed)
+      PetscCallCEED(CeedOperatorApplyAdd(op->ceed.muscl_interior_flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    }
+    // Boundary composite (always 1st-order), accumulated on top of interior
+    PetscCallCEED(CeedOperatorApplyAdd(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -871,9 +883,14 @@ static PetscErrorCode SetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   PetscFunctionBegin;
 
   // get the relevant boundary sub-operator
+  // In the standard (1st-order) composite: sub_ops[0] is the interior sub-op,
+  // boundary sub-ops start at index 1.
+  // In the MUSCL composite: the interior sub-op is applied separately, so
+  // boundary sub-ops start at index 0.
   CeedOperator *sub_ops;
   PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  CeedOperator sub_op = sub_ops[1 + boundary.index];
+  PetscInt      boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
+  CeedOperator  sub_op          = sub_ops[boundary_offset + boundary.index];
 
   // fetch the q_dirichlet vector
   CeedOperatorField field;
