@@ -107,14 +107,15 @@ static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer
   PetscFunctionBegin;
 
   PetscCall(PetscViewerHDF5PushGroup(viewer, "Domain"));
-
   PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
   PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "fields"));
   PetscCall(VecView(mesh->output.xc, viewer));
   PetscCall(VecView(mesh->output.yc, viewer));
   PetscCall(VecView(mesh->output.zc, viewer));
   PetscCall(VecView(mesh->output.area, viewer));
-
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -346,7 +347,7 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
                          "      </Geometry>\n",
                          num_vertices, h5_gridname));
 
-  // write out mesh coordinates (data placed in "fields" group for some reason)
+  // write out mesh coordinates (stored in the "fields" group by WriteGrid)
   const char *grid_coord_names[3] = {"XC", "YC", "ZC"};
   for (int f = 0; f < 3; ++f) {
     PetscCall(PetscFPrintf(rdy->comm, fp,
