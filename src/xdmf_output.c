@@ -106,15 +106,16 @@ static PetscErrorCode DetermineGridFile(RDy rdy, char *filename) {
 static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer) {
   PetscFunctionBegin;
 
-  PetscCall(PetscViewerHDF5PushGroup(viewer, "fields"));
-
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "Domain"));
   PetscCall(VecView(mesh->output.vertices_xyz_norder, viewer));
   PetscCall(VecView(mesh->output.cell_conns_norder, viewer));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "fields"));
   PetscCall(VecView(mesh->output.xc, viewer));
   PetscCall(VecView(mesh->output.yc, viewer));
   PetscCall(VecView(mesh->output.zc, viewer));
   PetscCall(VecView(mesh->output.area, viewer));
-
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   PetscFunctionReturn(PETSC_SUCCESS);
