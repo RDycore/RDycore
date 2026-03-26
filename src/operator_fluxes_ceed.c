@@ -1032,10 +1032,15 @@ PetscErrorCode ReconstructFaceValues(RDyMesh *mesh, const PetscScalar *q, const 
     PetscReal dx_R = x_mid - cells->centroids[cr].X[0];
     PetscReal dy_R = y_mid - cells->centroids[cr].X[1];
 
+    // Ghost cells have incomplete LS gradients (only edges local to this process
+    // contribute), so fall back to first-order (cell-center) on the ghost side.
+    PetscBool cl_owned = cells->is_owned[cl];
+    PetscBool cr_owned = cells->is_owned[cr];
+
     const PetscScalar *grads[3] = {grad_h, grad_hu, grad_hv};
     for (PetscInt k = 0; k < 3; k++) {
-      PetscReal extrap_L = grads[k][cl * 2 + 0] * dx_L + grads[k][cl * 2 + 1] * dy_L;
-      PetscReal extrap_R = grads[k][cr * 2 + 0] * dx_R + grads[k][cr * 2 + 1] * dy_R;
+      PetscReal extrap_L = cl_owned ? grads[k][cl * 2 + 0] * dx_L + grads[k][cl * 2 + 1] * dy_L : 0.0;
+      PetscReal extrap_R = cr_owned ? grads[k][cr * 2 + 0] * dx_R + grads[k][cr * 2 + 1] * dy_R : 0.0;
 
       PetscReal qL_face, qR_face;
       if (use_limiter) {
@@ -1193,9 +1198,9 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
       c_offset_r[oe]     = cells->local_to_owned[r] * num_comp;
       oe++;
     }
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             c_offset_l, &c_restrict_l));
-    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_owned_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
+    PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             c_offset_r, &c_restrict_r));
     PetscCall(PetscFree2(c_offset_l, c_offset_r));
   }
@@ -1223,15 +1228,15 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
 
   // ---- Assemble the operator ----
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, subop));
-  PetscCallCEED(CeedOperatorSetField(*subop, "geom",          restrict_geom,  CEED_BASIS_NONE, geom));
-  PetscCallCEED(CeedOperatorSetField(*subop, "q_left_face",   restr_qface_l,  CEED_BASIS_NONE, q_reconstructed));
-  PetscCallCEED(CeedOperatorSetField(*subop, "q_right_face",  restr_qface_r,  CEED_BASIS_NONE, q_reconstructed));
+  PetscCallCEED(CeedOperatorSetField(*subop, "geom",          restrict_geom,    CEED_BASIS_NONE, geom));
+  PetscCallCEED(CeedOperatorSetField(*subop, "q_left_face",   restr_qface_l,    CEED_BASIS_NONE, q_reconstructed));
+  PetscCallCEED(CeedOperatorSetField(*subop, "q_right_face",  restr_qface_r,    CEED_BASIS_NONE, q_reconstructed));
   PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_beg",  eta_beg_restrict, CEED_BASIS_NONE, *eta_vertices));
   PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_end",  eta_end_restrict, CEED_BASIS_NONE, *eta_vertices));
-  PetscCallCEED(CeedOperatorSetField(*subop, "cell_left",     c_restrict_l,   CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*subop, "cell_right",    c_restrict_r,   CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*subop, "flux",          restrict_flux,  CEED_BASIS_NONE, flux));
-  PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
+  PetscCallCEED(CeedOperatorSetField(*subop, "cell_left",     c_restrict_l,     CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*subop, "cell_right",    c_restrict_r,     CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*subop, "flux",          restrict_flux,    CEED_BASIS_NONE, flux));
+  PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum,   CEED_BASIS_NONE, cnum));
 
   // Return the q_reconstructed vector to the caller for updates each timestep
   *q_recon_out = q_reconstructed;
@@ -1256,6 +1261,8 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
 
 /// @brief Creates a CEED flux operator using MUSCL-reconstructed face states for
 /// interior edges, with standard 1st-order treatment on boundary edges.
+/// The MUSCL interior sub-operator is returned separately via interior_op_out
+/// to avoid CEED composite dimension mismatches with the boundary sub-operators.
 /// @param [in]  config              RDycore configuration
 /// @param [in]  mesh                mesh defining the computational domain
 /// @param [in]  num_boundaries      number of domain boundaries
@@ -1263,10 +1270,11 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
 /// @param [in]  boundary_conditions array of boundary conditions
 /// @param [in]  eta_vertices        CeedVector of eta values at vertices
 /// @param [out] q_recon_out         the q_reconstructed CeedVector (updated each timestep)
-/// @param [out] flux_op             the newly created composite flux operator
+/// @param [out] interior_op_out     the MUSCL interior sub-operator (applied separately)
+/// @param [out] flux_op             the newly created composite flux operator (boundary only)
 PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
                                                    RDyCondition *boundary_conditions, CeedVector *eta_vertices, CeedVector *q_recon_out,
-                                                   CeedOperator *flux_op) {
+                                                   CeedOperator *interior_op_out, CeedOperator *flux_op) {
   PetscFunctionBegin;
 
   Ceed ceed = CeedContext();
@@ -1274,16 +1282,14 @@ PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *config, RDyMesh *m
   PetscCall(CeedOperatorCreateComposite(ceed, flux_op));
 
   if (config->physics.flow.mode != FLOW_SWE) {
-    PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model for MUSCL reconstruction!");
+    PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
   }
 
-  // Sub-operator 0: MUSCL-reconstructed interior fluxes
-  CeedOperator interior_flux_op;
-  PetscCall(CreateCeedInteriorFluxSuboperatorReconstructed(*config, mesh, eta_vertices, q_recon_out, &interior_flux_op));
-  PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
-  PetscCall(CeedOperatorDestroy(&interior_flux_op));
+  // Interior MUSCL sub-op returned separately (not in composite) to avoid
+  // CEED composite dimension mismatch with boundary sub-ops.
+  PetscCall(CreateCeedInteriorFluxSuboperatorReconstructed(*config, mesh, eta_vertices, q_recon_out, interior_op_out));
 
-  // Sub-operators 1..num_boundaries: standard 1st-order boundary fluxes
+  // Boundary sub-ops go into the composite as usual
   for (CeedInt b = 0; b < num_boundaries; ++b) {
     CeedOperator boundary_flux_op;
     RDyCondition condition = boundary_conditions[b];
