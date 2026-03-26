@@ -348,14 +348,14 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Topology Type=\"Mixed\" NumberOfElements=\"%" PetscInt_FMT "\">\n"
                          "        <DataItem Format=\"HDF\" DataType=\"int\" Dimensions=\"%" PetscInt_FMT "\">\n"
-                         "          %s:/fields/Cells\n"
+                         "          %s:/Domain/Cells\n"
                          "        </DataItem>\n"
                          "      </Topology>\n",
                          mesh->num_cells_global, size, h5_gridname));
   PetscCall(PetscFPrintf(rdy->comm, fp,
                          "      <Geometry GeometryType=\"XYZ\">\n"
                          "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " 3\">\n"
-                         "          %s:/fields/Vertices\n"
+                         "          %s:/Domain/Vertices\n"
                          "        </DataItem>\n"
                          "      </Geometry>\n",
                          num_vertices, h5_gridname));
