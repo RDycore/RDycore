@@ -191,6 +191,10 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscBool use_slope_reconstruction = PETSC_FALSE;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+  if (use_slope_reconstruction) {
+    PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
+    PetscCheck(!has_tracers, comm, PETSC_ERR_USER, "-second_order MUSCL reconstruction is only supported for pure SWE (no sediment, salinity, or heat tracers)");
+  }
 
   // check our arguments
   PetscCheck(domain_mesh, comm, PETSC_ERR_USER, "Cannot create an operator with no mesh");
@@ -231,7 +235,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       PetscBool no_limiter = PETSC_FALSE;
       PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
       (*operator)->ceed.use_limiter = !no_limiter;
-      printf("DEBUG: Using second-order MUSCL reconstruction (%s)\n", no_limiter ? "no limiter" : "minmod limiter");
+      PetscCall(PetscPrintf(comm, "DEBUG: Using second-order MUSCL reconstruction (%s)\n", no_limiter ? "no limiter" : "minmod limiter"));
       PetscCall(CreateCeedFluxOperatorReconstructed((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                                     (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices,
                                                     &(*operator)->ceed.q_reconstructed, &(*operator)->ceed.flux));
@@ -242,13 +246,13 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       PetscCall(PetscCalloc1((*operator)->mesh->num_internal_edges * 4, &(*operator)->ceed.ls_grad_coeffs));
       PetscCall(PrecomputeLSGradCoeffs((*operator)->mesh, (*operator)->ceed.ls_grad_coeffs));
     } else {
-      printf("DEBUG: NOT using slope reconstruction\n");
+      PetscCall(PetscPrintf(comm, "DEBUG: NOT using slope reconstruction\n"));
       PetscCall(CreateCeedFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                        (*operator)->boundary_conditions, &(*operator)->ceed.eta_vertices, &(*operator)->ceed.flux));
     }
     PetscCall(CreateCeedSourceOperator((*operator)->config, (*operator)->mesh, &(*operator)->ceed.source));
   } else {
-    printf("DEBUG: Not using CEED\n");
+    PetscCall(PetscPrintf(comm, "DEBUG: Not using CEED\n"));
     PetscCall(CreatePetscFluxOperator((*operator)->config, (*operator)->mesh, (*operator)->num_boundaries, (*operator)->boundaries,
                                       (*operator)->boundary_conditions, (*operator)->petsc.boundary_values, (*operator)->petsc.boundary_fluxes,
                                       (*operator)->petsc.boundary_fluxes_accum, &(*operator)->diagnostics, &(*operator)->petsc.flux));
