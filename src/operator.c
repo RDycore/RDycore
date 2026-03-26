@@ -273,6 +273,10 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscBool use_slope_reconstruction = PETSC_FALSE;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+  if (use_slope_reconstruction) {
+    PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
+    PetscCheck(!has_tracers, comm, PETSC_ERR_USER, "-second_order MUSCL reconstruction is only supported for pure SWE (no sediment, salinity, or heat tracers)");
+  }
 
   // check our arguments
   PetscCheck(domain_mesh, comm, PETSC_ERR_USER, "Cannot create an operator with no mesh");

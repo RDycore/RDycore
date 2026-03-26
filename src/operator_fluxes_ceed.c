@@ -926,7 +926,7 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
     PetscReal m11 = M[c * 3 + 2];
     PetscReal det = m00 * m11 - m01 * m01;
     if (PetscAbsReal(det) < 1e-30) {
-      // Degenerate (e.g. 1-D cell or isolated cell) — zero gradient
+      // Degenerate (e.g. 1-D cell or isolated cell) - zero gradient
       degenerate_count++;
       inv_m[c * 4 + 0] = 0.0;
       inv_m[c * 4 + 1] = 0.0;
@@ -942,8 +942,12 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
   }
 
   if (degenerate_count > 0) {
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", degenerate_count));
+    PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) - gradients zeroed\n", degenerate_count));
   }
+
+  // M is no longer needed once inv_m is computed; free it now so it is not
+  // leaked if any subsequent allocation or PetscCall fails.
+  PetscCall(PetscFree(M));
 
   // --- Pass 2: compute per-edge coefficients ---
   for (PetscInt ie = 0; ie < num_internal_edges; ie++) {
@@ -981,7 +985,6 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
     "DEBUG [PrecomputeLSGradCoeffs]: %d cells, %d internal edges, coeff range [%g, %g]\n",
     num_cells, num_internal_edges, (double)cx_min, (double)cx_max));
 
-  PetscCall(PetscFree(M));
   PetscCall(PetscFree(inv_m));
 
   PetscFunctionReturn(PETSC_SUCCESS);
