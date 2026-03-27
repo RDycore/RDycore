@@ -474,9 +474,11 @@ PetscErrorCode AccumulateBoundaryFluxes(RDy rdy) {
       RDyBoundary *boundary = &rdy->boundaries[b];
 
       // get the relevant boundary sub-operator
+      // MUSCL composite has no interior sub-op at index 0; standard has one.
       CeedOperator *sub_ops;
       PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-      CeedOperator sub_op = sub_ops[1 + boundary->index];
+      PetscInt      boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
+      CeedOperator  sub_op          = sub_ops[boundary_offset + boundary->index];
 
       // fetch the relevant vector
       CeedOperatorField field;
