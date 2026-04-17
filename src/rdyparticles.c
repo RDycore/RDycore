@@ -234,10 +234,44 @@ static PetscErrorCode InitParticleSwarmDM(RDy rdy) {
   PetscCall(DMSwarmRegisterPetscDatatypeField(sdm, "velocity_y", 1, PETSC_REAL));
   PetscCall(DMSwarmFinalizeFieldRegister(sdm));
 
-  // ---- Seed particles — one random point per cell per Npc ----------------
-  PetscInt num_local_cells = rdy->mesh.num_owned_cells;
-  PetscCall(DMSwarmSetLocalSizes(sdm, num_local_cells * Npc, 0));
-  PetscCall(DMSwarmSetPointCoordinatesRandom(sdm, Npc));
+  // ---- Seed particles — one per owned cell (Npc == 1: cell centroid) -----
+  // We do NOT use DMSwarmSetPointCoordinatesRandom because it iterates over
+  // ALL local cells from DMPlexGetHeightStratum (including ghost cells on
+  // distributed meshes), which writes past the coordinate array when the
+  // swarm is sized for owned cells only. Instead, we seed particles at cell
+  // centroids for owned cells only.
+  PetscInt num_owned_cells = rdy->mesh.num_owned_cells;
+  PetscInt swarm_buffer    = PetscMax(num_owned_cells * Npc / 4, 8);
+  PetscCall(DMSwarmSetLocalSizes(sdm, num_owned_cells * Npc, swarm_buffer));
+
+  {
+    PetscInt  cStart, cEnd, dim;
+    PetscReal centroid[3];
+    PetscCall(DMGetDimension(rdy->dm, &dim));
+    PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &cStart, &cEnd));
+
+    PetscReal *coords;
+    PetscCall(DMSwarmGetField(sdm, DMSwarmPICField_coor, NULL, NULL, (void **)&coords));
+
+    PetscInt p = 0;  // particle index (only owned cells)
+    for (PetscInt c = cStart; c < cEnd; ++c) {
+      // Skip ghost cells: check if the cell has a non-negative global offset
+      PetscInt gref, junk;
+      PetscCall(DMPlexGetPointGlobal(rdy->dm, c, &gref, &junk));
+      if (gref < 0) continue;  // ghost cell
+
+      PetscCall(DMPlexComputeCellGeometryFVM(rdy->dm, c, NULL, centroid, NULL));
+      for (PetscInt d = 0; d < dim; ++d) {
+        coords[p * dim + d] = centroid[d];
+      }
+      ++p;
+    }
+    PetscCheck(p == num_owned_cells * Npc, comm, PETSC_ERR_PLIB,
+               "Particle count mismatch: seeded %" PetscInt_FMT " but expected %" PetscInt_FMT,
+               p, num_owned_cells * Npc);
+
+    PetscCall(DMSwarmRestoreField(sdm, DMSwarmPICField_coor, NULL, NULL, (void **)&coords));
+  }
 
   // ---- Define the coordinate field as the Vec field for the particle TS --
   // (ex77.c line 939)
