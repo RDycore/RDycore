@@ -1,6 +1,7 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
+#include <private/rdyparticlesimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
 
@@ -235,6 +236,9 @@ PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
 PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscFunctionBegin;
+
+  // destroy particle tracers
+  PetscCall(DestroyParticleSwarm(*rdy));
 
   // destroy FV mesh
   if ((*rdy)->mesh.num_cells) {

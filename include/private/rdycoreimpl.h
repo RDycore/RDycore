@@ -10,6 +10,7 @@
 #include <private/rdymeshimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <private/rdyregionimpl.h>
+#include <private/rdyparticlesimpl.h>
 #include <rdycore.h>
 
 // CEED initialization, availability, context, useful for creating CEED
@@ -221,6 +222,11 @@ struct _p_RDy {
   //-------------------
   PetscViewer           output_viewer;
   PetscViewerAndFormat *output_vf;
+
+  //-------------------
+  // Particle tracers
+  //-------------------
+  RDyParticles particles;
 };
 
 // these are used by both the main (RDycore) driver and the MMS driver

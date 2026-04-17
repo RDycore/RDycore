@@ -9,6 +9,7 @@ set(RDYCORE_C_SOURCE_FILES
   rdymesh.c
   rdymms.c
   rdyamr.c
+  rdyparticles.c
   rdysetup.c
   operator.c
   operator_fluxes_ceed.c

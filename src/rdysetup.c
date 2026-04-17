@@ -3,6 +3,7 @@
 #include <petscdmplex.h>
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdyparticlesimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <rdycore.h>
@@ -1491,6 +1492,10 @@ PetscErrorCode RDySetup(RDy rdy) {
     rdy->is_a_restart_run = PETSC_FALSE;
     rdy->restart_step     = -1;
   }
+
+  // initialize particle tracers (no-op if -particles_per_cell is 0 or absent)
+  RDyLogDebug(rdy, "Initializing particle tracers...");
+  PetscCall(CreateParticleSwarm(rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

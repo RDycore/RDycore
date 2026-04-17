@@ -416,6 +416,9 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
         PetscCall(WriteXDMFHDF5Data(rdy, step, t, h5_gridname));
         PetscCall(WriteXDMFXMFData(rdy, step, t, h5_gridname));
       }
+
+      // write particle output alongside field output (no-op if not enabled)
+      PetscCall(WriteParticleOutput(rdy, step, time));
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
