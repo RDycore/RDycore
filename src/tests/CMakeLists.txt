@@ -5,10 +5,16 @@
 file(COPY ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
+# Copy the particle integration test YAML into the build directory.
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/planar_dam_particles.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 foreach(exe_name
         test_rdyinit
         test_rdymesh
-        test_yaml_input)
+        test_yaml_input
+        test_particle_swarm
+        test_particle_advance)
   set(exe_source ${exe_name}.c)
   add_executable(${exe_name} ${exe_source})
   target_link_libraries(${exe_name} PRIVATE rdycore_c cmocka)

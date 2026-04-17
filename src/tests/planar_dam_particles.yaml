@@ -1,0 +1,80 @@
+# planar_dam_particles.yaml — minimal config for the Phase 5 particle integration test.
+#
+# Runs a 3-step dam-break on the 10x5 planar_dam mesh with 1 particle per cell.
+# Output is disabled to keep the test fast and self-contained.
+# Particles are enabled via -particles_per_cell 1 on the command line.
+
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+time:
+  unit: seconds
+  stop: 0.3
+  stop_n: 3
+  coupling_interval: 0.1
+
+output:
+  format: none
+
+grid:
+  file: planar_dam_10x5.msh
+
+regions:
+  - name: upstream
+    grid_region_id: 1
+  - name: downstream
+    grid_region_id: 2
+
+surface_composition:
+  - region: upstream
+    material: smooth
+  - region: downstream
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: upstream
+    flow: dam_top_ic
+  - region: downstream
+    flow: dam_bottom_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+  - name: top_wall
+    grid_boundary_id: 2
+  - name: bottom_wall
+    grid_boundary_id: 3
+
+boundary_conditions:
+  - boundaries: [top_wall]
+    flow: reflecting_bc
+  - boundaries: [bottom_wall]
+    flow: outflow_bc
+
+flow_conditions:
+  - name: dam_top_ic
+    type: dirichlet
+    height: 10
+    x_momentum: 0
+    y_momentum: 0
+  - name: dam_bottom_ic
+    type: dirichlet
+    height: 5
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting
+  - name: outflow_bc
+    type: critical-outflow
