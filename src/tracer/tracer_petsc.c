@@ -215,6 +215,9 @@ static PetscErrorCode ApplyTracerInteriorFlux(void *context, PetscOperatorFields
     case RIEMANN_ROE:
       PetscCall(ComputeTracerRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
       break;
+    case RIEMANN_UPWINDED_ROE:
+      PetscCall(ComputeUpwindedTracerRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+      break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
   }
@@ -476,6 +479,9 @@ static PetscErrorCode ApplyTracerBoundaryFlux(void *context, PetscOperatorFields
   switch (boundary_flux_op->riemann) {
     case RIEMANN_ROE:
       PetscCall(ComputeTracerRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
+      break;
+    case RIEMANN_UPWINDED_ROE:
+      PetscCall(ComputeUpwindedTracerRoeFlux(datal, datar, data_edge->sn, data_edge->cn, boundary_fluxes_ptr, data_edge->amax));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
@@ -869,6 +875,9 @@ static PetscErrorCode ApplyTracerInteriorFluxHR(void *context, PetscOperatorFiel
   switch (op->riemann) {
     case RIEMANN_ROE:
       PetscCall(ComputeTracerRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
+      break;
+    case RIEMANN_UPWINDED_ROE:
+      PetscCall(ComputeUpwindedTracerRoeFlux(datal, datar, sn_vec_int, cn_vec_int, flux_vec_int, amax_vec_int));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");

@@ -117,4 +117,94 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// @brief Computes the flux for SWE and tracerss across the edge using Roe Riemann solve. The tracer flux is upwinded.
+/// @param [in] *datal A TracerRiemannStateData for values left of the edges
+/// @param [in] *datar A TracerRiemannStateData for values right of the edges
+/// @param [in] sn array containing sines of the angles between edges and y-axis
+/// @param [in] cn array containing cosines of the angles between edges and y-axis
+/// @param [out] fij array containing fluxes through edges
+/// @param [out] amax array storing maximum courant number on edges
+/// @return 0 on success, or a non-zero error code on failure
+static PetscErrorCode ComputeUpwindedTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
+                                           PetscReal *fij, PetscReal *amax) {
+  PetscFunctionBeginUser;
+
+  PetscReal *hl  = datal->h;
+  PetscReal *ul  = datal->u;
+  PetscReal *vl  = datal->v;
+  PetscReal *cil = datal->ci;
+
+  PetscReal *hr  = datar->h;
+  PetscReal *ur  = datar->u;
+  PetscReal *vr  = datar->v;
+  PetscReal *cir = datar->ci;
+
+  PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
+
+  PetscInt num_states    = datal->num_states;
+  PetscInt flow_ncomp    = datal->num_flow_comp;
+  PetscInt tracers_ncomp = datal->num_tracers_comp;
+  PetscInt soln_ncomp    = flow_ncomp + tracers_ncomp;
+
+  PetscInt ci_index_offset;
+
+  PetscReal A[MAX_NUM_FIELD_COMPONENTS]  = {0};
+  PetscReal FL[MAX_NUM_FIELD_COMPONENTS] = {0};
+  PetscReal FR[MAX_NUM_FIELD_COMPONENTS] = {0};
+
+  for (PetscInt i = 0; i < num_states; ++i) {
+    // compute the eigenspectrum for the shallow water equations
+    PetscReal A_swe[3], R_swe[3][3], dW_swe[3], amax_swe;
+    ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A_swe, R_swe, dW_swe, &amax_swe);
+
+    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
+    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
+
+    A[0] = A_swe[0];
+    A[1] = A_swe[1];
+    A[2] = A_swe[2];
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
+      A[j + 3] = A[1];
+    }
+
+    // compute interface fluxes
+    FL[0] = uperpl * hl[i];
+    FL[1] = ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i];
+    FL[2] = vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i];
+
+    FR[0] = uperpr * hr[i];
+    FR[1] = ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i];
+    FR[2] = vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i];
+
+    ci_index_offset = i * tracers_ncomp;
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
+      FL[j + 3] = hl[i] * uperpl * cil[ci_index_offset + j];
+      FR[j + 3] = hr[i] * uperpr * cir[ci_index_offset + j];
+    }
+
+    PetscReal Fh_num_roe = 0.5 * (FL[0] + FR[0])
+                         - 0.5 * (R_swe[0][0] * A_swe[0] * dW_swe[0] + R_swe[0][1] * A_swe[1] * dW_swe[1] +
+                                  R_swe[0][2] * A_swe[2] * dW_swe[2]);
+
+    for (PetscInt dof1 = 0; dof1 < 3; dof1++) {
+      PetscReal Fnum = 0.5 * (FL[dof1] + FR[dof1])
+                     - 0.5 * (R_swe[dof1][0] * A_swe[0] * dW_swe[0] + R_swe[dof1][1] * A_swe[1] * dW_swe[1] +
+                              R_swe[dof1][2] * A_swe[2] * dW_swe[2]);
+      fij[soln_ncomp * i + dof1] = Fnum;
+    }
+
+    for (PetscInt j = 0; j < tracers_ncomp; j++) {
+      PetscReal cL  = cil[ci_index_offset + j];
+      PetscReal cR  = cir[ci_index_offset + j];
+      PetscReal Cup = (Fh_num_roe >= 0.0) ? cL : cR;
+      fij[soln_ncomp * i + (3 + j)] = Fh_num_roe * Cup;
+    }
+
+    amax[i] = amax_swe;
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #endif

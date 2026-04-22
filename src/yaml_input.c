@@ -122,8 +122,9 @@ static const cyaml_strval_t numerics_temporal_types[] = {
 
 // mapping of strings to numerics riemann solver types
 static const cyaml_strval_t numerics_riemann_types[] = {
-    {"roe",  RIEMANN_ROE },
-    {"hllc", RIEMANN_HLLC},
+    {"roe",           RIEMANN_ROE },
+    {"upwinded_roe",  RIEMANN_UPWINDED_ROE },
+    {"hllc",          RIEMANN_HLLC},
 };
 
 // mapping of numerics fields to members of RDyNumericsSection
@@ -926,8 +927,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   if (config->numerics.temporal == TEMPORAL_BEULER) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented.");
   }
-  if (config->numerics.riemann != RIEMANN_ROE) {
-    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) is currently implemented.");
+  if (config->numerics.riemann != RIEMANN_ROE && config->numerics.riemann != RIEMANN_UPWINDED_ROE) {
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) and upwinded roe riemann solver (UPWINDED_ROE) are currently implemented.");
   }
 
   PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");
