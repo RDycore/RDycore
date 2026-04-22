@@ -878,7 +878,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename, Vec local) {
+static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename, Vec *local) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -887,7 +887,7 @@ static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename,
   Vec natural, global;
   PetscCall(DMPlexCreateNaturalVector(rdy->dm_1dof, &natural));
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &global));
-  PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local));
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, local));
 
   PetscCall(VecLoad(natural, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
@@ -897,8 +897,8 @@ static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename,
   PetscCall(DMPlexNaturalToGlobalEnd(rdy->dm_1dof, natural, global));
 
   // scatter global-to-local
-  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, local));
-  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, local));
+  PetscCall(DMGlobalToLocalBegin(rdy->dm_1dof, global, INSERT_VALUES, *local));
+  PetscCall(DMGlobalToLocalEnd(rdy->dm_1dof, global, INSERT_VALUES, *local));
 
   // free up memory
   PetscCall(VecDestroy(&natural));
@@ -951,7 +951,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
       Vec                  local       = NULL;
       for (PetscInt idof = 0; idof < num_sediment_classes; ++idof) {
         if (sediment_ic.classes[idof].file[0]) {  // read sediment data from file
-          PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, local));
+          PetscCall(ReadSingleComponentFromFile(rdy, sediment_ic.classes[idof].file, &local));
         }
 
         // set regional sediment as needed
@@ -988,7 +988,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     RDySalinityCondition salinity_ic = rdy->config.salinity_conditions[f];
     Vec                  local       = NULL;
     if (salinity_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, local));
+      PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, &local));
     }
 
     // overwrite regions as needed
@@ -1024,7 +1024,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     RDyTemperatureCondition temperature_ic = rdy->config.temperature_conditions[f];
     Vec                     local          = NULL;
     if (temperature_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, local));
+      PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, &local));
     }
 
     // overwrite regions as needed
@@ -1072,6 +1072,28 @@ static PetscErrorCode InitSolution(RDy rdy) {
   // initialize the flow solution and copy it into place
   PetscCall(InitFlowSolution(rdy));
   PetscCall(InitTracerSolution(rdy));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// overrides cell centroid elevations with values read from a binary file
+// (e.g., a pit-filled DEM)
+PetscErrorCode OverrideCellElevation(RDy rdy) {
+  PetscFunctionBegin;
+
+  Vec local_elev;
+  PetscCall(RDyReadOneDOFLocalVecFromBinaryFile(rdy, rdy->config.grid.cell_elevation.file, &local_elev));
+
+  PetscScalar *elev_ptr;
+  PetscCall(VecGetArray(local_elev, &elev_ptr));
+
+  RDyCells *cells = &rdy->mesh.cells;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    cells->centroids[icell].X[2] = elev_ptr[icell];
+  }
+
+  PetscCall(VecRestoreArray(local_elev, &elev_ptr));
+  PetscCall(VecDestroy(&local_elev));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1448,6 +1470,12 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
+  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
+  }
+  if (rdy->config.grid.cell_elevation.file[0]) {
+    PetscCall(OverrideCellElevation(rdy));
+  }
   PetscCall(OutputPartitionStatistics(rdy));
 
   RDyLogDebug(rdy, "Initializing regions...");

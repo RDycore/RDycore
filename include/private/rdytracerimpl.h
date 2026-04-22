@@ -11,5 +11,7 @@ PETSC_INTERN PetscErrorCode CreatePetscTracerInteriorFluxOperator(RDyMesh *, con
 PETSC_INTERN PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh *, const RDyConfig, RDyBoundary, RDyCondition, Vec, Vec,
                                                                   OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscTracerSourceOperator(RDyMesh *, const RDyConfig, Vec, Vec, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscTracerInteriorFluxHROperator(RDyMesh *, const RDyConfig, OperatorDiagnostics *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscTracerSourceHROperator(RDyMesh *, const RDyConfig, Vec, Vec, PetscOperator *);
 
 #endif

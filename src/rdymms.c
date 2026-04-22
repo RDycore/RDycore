@@ -220,7 +220,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
       }},
   };
   for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
   }
 
   PetscCall(CreateDM(rdy));
@@ -254,6 +254,12 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // note: section exists for the DM
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
+  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
+  }
+  if (rdy->config.grid.cell_elevation.file[0]) {
+    PetscCall(OverrideCellElevation(rdy));
+  }
 
   RDyLogDebug(rdy, "Initializing regions...");
   PetscCall(InitRegions(rdy));
