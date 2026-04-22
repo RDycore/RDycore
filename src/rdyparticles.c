@@ -222,7 +222,7 @@ static PetscErrorCode InitParticleSwarmDM(RDy rdy) {
   PetscCall(DMCreate(comm, &sdm));
   PetscCall(PetscObjectSetOptionsPrefix((PetscObject)sdm, "part_"));
   PetscCall(DMSetType(sdm, DMSWARM));
-  PetscCall(DMSetDimension(sdm, 2));
+  PetscCall(DMSetDimension(sdm, 3));
 
   // Attach the primary DMPlex as the cell DM so DMSwarm knows the spatial
   // decomposition and can locate particles in cells.
