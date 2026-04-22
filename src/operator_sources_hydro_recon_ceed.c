@@ -186,7 +186,7 @@ static PetscErrorCode CreateCeedSourceHydroReconSuboperator(const RDyConfig conf
 /// @param [in]    mesh      a mesh containing geometric and topological information
 /// @param [out]   source_op the newly created composite source operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateCeedSourceHydroReconOperator(RDyConfig *config, RDyMesh *mesh, CeedOperator *source_op) {
+PetscErrorCode CreateCeedSourceHROperator(RDyConfig *config, RDyMesh *mesh, CeedOperator *source_op) {
   PetscFunctionBegin;
 
   Ceed ceed = CeedContext();

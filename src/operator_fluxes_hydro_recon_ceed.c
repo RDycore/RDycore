@@ -214,8 +214,8 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
 /// @param [in]    boundary_conditions array of boundary conditions
 /// @param [out]   flux_op             the newly created composite operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreateCeedFluxHydroReconOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
-                                                RDyCondition *boundary_conditions, CeedOperator *flux_op) {
+PetscErrorCode CreateCeedFluxHROperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
+                                        RDyCondition *boundary_conditions, CeedOperator *flux_op) {
   PetscFunctionBegin;
 
   Ceed ceed = CeedContext();

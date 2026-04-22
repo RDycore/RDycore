@@ -191,10 +191,10 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 //--------------------------------------------------
 
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateCeedFluxHydroReconOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig, RDyMesh *, CeedVector *, RDyBoundary *, RDyCondition, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateCeedSourceHydroReconOperator(RDyConfig *, RDyMesh *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedSourceHROperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *, CeedVector *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *, RDyMesh *, CeedVector *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,

@@ -160,9 +160,8 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_HR:
-        PetscCall(
-            CreateCeedFluxHydroReconOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
-        PetscCall(CreateCeedSourceHydroReconOperator(op->config, op->mesh, &op->ceed.source));
+        PetscCall(CreateCeedFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
+        PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
         break;
     }
   } else {
