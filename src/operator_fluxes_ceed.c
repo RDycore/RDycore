@@ -51,8 +51,15 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 
   CeedQFunctionContext qf_context;
   if (num_tracers == 0) {  // flow only, and SWE is it!
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
-    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+    switch (config.numerics.riemann) {
+      case RIEMANN_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
+        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+        break;
+    }
   } else {  // flow + tracers
     switch (config.numerics.riemann) {
       case RIEMANN_ROE:
@@ -63,6 +70,7 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
         break;
       default:
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+        break;
     }
     PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
   }
@@ -287,8 +295,15 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
   switch (boundary_condition.flow->type) {
     case CONDITION_DIRICHLET:
       if (num_tracers == 0) {  // flow only
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
-        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
       } else {  // flow + tracers
         switch (config.numerics.riemann) {
           case RIEMANN_ROE:
@@ -306,8 +321,15 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
       break;
     case CONDITION_REFLECTING:
       if (num_tracers == 0) {  // flow only
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
-        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
       } else {  // flow + tracers
         switch (config.numerics.riemann) {
           case RIEMANN_ROE:
@@ -325,8 +347,15 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
       break;
     case CONDITION_CRITICAL_OUTFLOW:
       if (num_tracers == 0) {  // flow only
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Outflow_Roe, SWEBoundaryFlux_Outflow_Roe_loc, qf));
-        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Outflow_Roe, SWEBoundaryFlux_Outflow_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
       } else {  // flow + tracers
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not implemented for tracers");
       }
