@@ -51,10 +51,27 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 
   CeedQFunctionContext qf_context;
   if (num_tracers == 0) {  // flow only, and SWE is it!
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
-    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+    switch (config.numerics.riemann) {
+      case RIEMANN_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
+        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+        break;
+    }
   } else {  // flow + tracers
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
+    switch (config.numerics.riemann) {
+      case RIEMANN_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
+        break;
+      case RIEMANN_UPWIND_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_UpwindRoe, TracerFlux_UpwindRoe_loc, qf));
+        break;
+      default:
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+        break;
+    }
     PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
   }
 
@@ -278,26 +295,67 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
   switch (boundary_condition.flow->type) {
     case CONDITION_DIRICHLET:
       if (num_tracers == 0) {  // flow only
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
-        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
       } else {  // flow + tracers
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_Roe, TracerBoundaryFlux_Dirichlet_Roe_loc, qf));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_Roe, TracerBoundaryFlux_Dirichlet_Roe_loc, qf));
+            break;
+          case RIEMANN_UPWIND_ROE:
+            PetscCallCEED(
+                CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_UpwindRoe, TracerBoundaryFlux_Dirichlet_UpwindRoe_loc, qf));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+        }
         PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }
       break;
     case CONDITION_REFLECTING:
       if (num_tracers == 0) {  // flow only
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
-        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
       } else {  // flow + tracers
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
+            break;
+          case RIEMANN_UPWIND_ROE:
+            PetscCallCEED(
+                CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_UpwindReflecting_Roe, TracerBoundaryFlux_UpwindReflecting_Roe_loc, qf));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+        }
         PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }
       break;
     case CONDITION_CRITICAL_OUTFLOW:
       if (num_tracers == 0) {  // flow only
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Outflow_Roe, SWEBoundaryFlux_Outflow_Roe_loc, qf));
-        PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Outflow_Roe, SWEBoundaryFlux_Outflow_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
       } else {  // flow + tracers
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not implemented for tracers");
       }
@@ -394,7 +452,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum, eta_beg_restrict, eta_end_restrict;
-  CeedVector          geom, flux, flux_accumulated, dirichlet, cnum;
+  CeedVector          geom, flux, dirichlet, cnum;
   {
     CeedInt num_edges = boundary->num_edges;
 

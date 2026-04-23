@@ -20,6 +20,17 @@ foreach(np 2) # test on 1, 2 processes
 endforeach()
 
 file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/sediment_upwind_mms_conv_study.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 2) # test on 1, 2 processes
+  foreach(config basic ceed)
+    foreach(lang ${supported_languages})
+      add_test(sediment_upwind_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} sediment_upwind_mms_conv_study.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
+file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/sediment.yaml
      ${MESH_DIR}/DamBreak_grid5x10.exo
      ${CONDITION_DIR}/DamBreak_grid5x10_wetdownstream.ic.${PETSC_ID_TYPE}.bin
