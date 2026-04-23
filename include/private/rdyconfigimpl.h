@@ -108,7 +108,7 @@ typedef enum {
 // riemann solvers for horizontal flow
 typedef enum {
   RIEMANN_ROE = 0,       // Roe solver
-  RIEMANN_UPWINDED_ROE,  // Upwinded Roe solver for tracers
+  RIEMANN_UPWIND_ROE,  // Upwind Roe solver for tracers
   RIEMANN_HLLC           // Harten, Lax, van Leer Contact solver
 } RDyNumericsRiemann;
 

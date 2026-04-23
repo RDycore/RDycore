@@ -40,7 +40,7 @@ CEED_QFUNCTION_HELPER CeedScalar ComputeDhv(CeedScalar zv_beg, CeedScalar zv_end
 #define RIEMANN_FLUX_TYPE_DEFINED
 typedef enum {
   RIEMANN_FLUX_ROE,
-  RIEMANN_FLUX_UPWINDED_ROE
+  RIEMANN_FLUX_UPWIND_ROE
 } RiemannFluxType;
 #endif
 

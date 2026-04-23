@@ -118,7 +118,7 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Computes the flux for SWE and tracerss across the edge using Roe Riemann solve. The tracer flux is upwinded.
+/// @brief Computes the flux for SWE and tracerss across the edge using Roe Riemann solve. The tracer flux is upwind.
 /// @param [in] *datal A TracerRiemannStateData for values left of the edges
 /// @param [in] *datar A TracerRiemannStateData for values right of the edges
 /// @param [in] sn array containing sines of the angles between edges and y-axis
@@ -126,7 +126,7 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeUpwindedTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
+static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
                                            PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 

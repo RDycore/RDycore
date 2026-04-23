@@ -106,8 +106,8 @@ CEED_QFUNCTION_HELPER void TracerRiemannFlux_Roe(const CeedScalar gravity, const
 }
 
 /// computes the flux across an edge using Roe's approximate Riemann solver
-/// for flow, with upwinded tracer transport
-CEED_QFUNCTION_HELPER void TracerRiemannFlux_UpwindedRoe(const CeedScalar gravity, const CeedScalar tiny_h, TracerState qL, TracerState qR,
+/// for flow, with upwind tracer transport
+CEED_QFUNCTION_HELPER void TracerRiemannFlux_UpwindRoe(const CeedScalar gravity, const CeedScalar tiny_h, TracerState qL, TracerState qR,
                                                          CeedScalar sn, CeedScalar cn, CeedInt flow_ndof, CeedInt tracer_ndof, CeedScalar flux[],
                                                          CeedScalar *amax) {
   const CeedScalar hl = qL.h, hr = qR.h;
@@ -153,7 +153,7 @@ CEED_QFUNCTION_HELPER void TracerRiemannFlux_UpwindedRoe(const CeedScalar gravit
     }
   }
 
-  // upwinded tracer flux: use Roe h-flux to determine upwind direction
+  // upwind tracer flux: use Roe h-flux to determine upwind direction
   CeedScalar Fh_num_roe = flux[0];
   for (CeedInt j = 0; j < tracer_ndof; j++) {
     CeedScalar Cup    = (Fh_num_roe >= 0.0) ? cil[j] : cir[j];

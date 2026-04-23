@@ -58,8 +58,8 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
       case RIEMANN_ROE:
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
         break;
-      case RIEMANN_UPWINDED_ROE:
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_UpwindedRoe, TracerFlux_UpwindedRoe_loc, qf));
+      case RIEMANN_UPWIND_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_UpwindRoe, TracerFlux_UpwindRoe_loc, qf));
         break;
       default:
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
@@ -294,8 +294,8 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
           case RIEMANN_ROE:
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_Roe, TracerBoundaryFlux_Dirichlet_Roe_loc, qf));
             break;
-          case RIEMANN_UPWINDED_ROE:
-            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_UpwindedRoe, TracerBoundaryFlux_Dirichlet_UpwindedRoe_loc, qf));
+          case RIEMANN_UPWIND_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_UpwindRoe, TracerBoundaryFlux_Dirichlet_UpwindRoe_loc, qf));
             break;
           default:
             PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
@@ -312,8 +312,8 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
           case RIEMANN_ROE:
             PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
             break;
-          case RIEMANN_UPWINDED_ROE:
-            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_UpwindedReflecting_Roe, TracerBoundaryFlux_UpwindedReflecting_Roe_loc, qf));
+          case RIEMANN_UPWIND_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_UpwindReflecting_Roe, TracerBoundaryFlux_UpwindReflecting_Roe_loc, qf));
             break;
           default:
             PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
