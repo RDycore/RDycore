@@ -54,7 +54,14 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_Roe, SWEFlux_Roe_loc, qf));
     PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
   } else {  // flow + tracers
-    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
+    switch (config.numerics.riemann) {
+      case RIEMANN_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_Roe, TracerFlux_Roe_loc, qf));
+        break;
+      case RIEMANN_UPWINDED_ROE:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerFlux_UpwindedRoe, TracerFlux_UpwindedRoe_loc, qf));
+        break;
+    }
     PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
   }
 
@@ -281,7 +288,14 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Dirichlet_Roe, SWEBoundaryFlux_Dirichlet_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // flow + tracers
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_Roe, TracerBoundaryFlux_Dirichlet_Roe_loc, qf));
+            break;
+          case RIEMANN_UPWINDED_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Dirichlet_UpwindedRoe, TracerBoundaryFlux_Dirichlet_UpwindedRoe_loc, qf));
+            break;
+        }
         PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }
       break;
@@ -290,7 +304,14 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_Reflecting_Roe, SWEBoundaryFlux_Reflecting_Roe_loc, qf));
         PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
       } else {  // flow + tracers
-        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_Reflecting_Roe, TracerBoundaryFlux_Reflecting_Roe_loc, qf));
+            break;
+          case RIEMANN_UPWINDED_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, TracerBoundaryFlux_UpwindedReflecting_Roe, TracerBoundaryFlux_UpwindedReflecting_Roe_loc, qf));
+            break;
+        }
         PetscCall(CreateTracerQFunctionContext(ceed, config, &qf_context));
       }
       break;

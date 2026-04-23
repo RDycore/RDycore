@@ -105,6 +105,65 @@ CEED_QFUNCTION_HELPER void TracerRiemannFlux_Roe(const CeedScalar gravity, const
   *amax = amax_swe;
 }
 
+/// computes the flux across an edge using Roe's approximate Riemann solver
+/// for flow, with upwinded tracer transport
+CEED_QFUNCTION_HELPER void TracerRiemannFlux_UpwindedRoe(const CeedScalar gravity, const CeedScalar tiny_h, TracerState qL, TracerState qR,
+                                                         CeedScalar sn, CeedScalar cn, CeedInt flow_ndof, CeedInt tracer_ndof, CeedScalar flux[],
+                                                         CeedScalar *amax) {
+  const CeedScalar hl = qL.h, hr = qR.h;
+  const CeedScalar ul = SafeDiv(qL.hu, hl, hl, tiny_h);
+  const CeedScalar vl = SafeDiv(qL.hv, hl, hl, tiny_h);
+  CeedScalar       cil[MAX_NUM_TRACERS], cir[MAX_NUM_TRACERS];
+  for (CeedInt j = 0; j < tracer_ndof; ++j) {
+    cil[j] = SafeDiv(qL.hci[j], hl, hl, tiny_h);
+    cir[j] = SafeDiv(qR.hci[j], hr, hl, tiny_h);
+  }
+  const CeedScalar ur = SafeDiv(qR.hu, hr, hr, tiny_h);
+  const CeedScalar vr = SafeDiv(qR.hv, hr, hr, tiny_h);
+
+  // compute the eigenspectrum for the shallow water equations
+  CeedScalar A_swe[3], R_swe[3][3], dW_swe[3], amax_swe;
+  ComputeSWEEigenspectrum_Roe(hl, ul, vl, hr, ur, vr, sn, cn, gravity, A_swe, R_swe, dW_swe, &amax_swe);
+
+  CeedScalar uperpl = ul * cn + vl * sn;
+  CeedScalar uperpr = ur * cn + vr * sn;
+
+  CeedScalar FL[MAX_NUM_FIELD_COMPONENTS] = {0};
+  CeedScalar FR[MAX_NUM_FIELD_COMPONENTS] = {0};
+
+  // compute interface fluxes
+  FL[0] = uperpl * hl;
+  FL[1] = ul * uperpl * hl + 0.5 * gravity * hl * hl * cn;
+  FL[2] = vl * uperpl * hl + 0.5 * gravity * hl * hl * sn;
+
+  FR[0] = uperpr * hr;
+  FR[1] = ur * uperpr * hr + 0.5 * gravity * hr * hr * cn;
+  FR[2] = vr * uperpr * hr + 0.5 * gravity * hr * hr * sn;
+
+  for (CeedInt j = 0; j < tracer_ndof; j++) {
+    FL[j + 3] = hl * uperpl * cil[j];
+    FR[j + 3] = hr * uperpr * cir[j];
+  }
+
+  // compute Roe flux for flow components
+  for (CeedInt dof1 = 0; dof1 < flow_ndof; dof1++) {
+    flux[dof1] = 0.5 * (FL[dof1] + FR[dof1]);
+    for (CeedInt dof2 = 0; dof2 < flow_ndof; dof2++) {
+      flux[dof1] -= 0.5 * R_swe[dof1][dof2] * A_swe[dof2] * dW_swe[dof2];
+    }
+  }
+
+  // upwinded tracer flux: use Roe h-flux to determine upwind direction
+  CeedScalar Fh_num_roe = flux[0];
+  for (CeedInt j = 0; j < tracer_ndof; j++) {
+    CeedScalar Cup    = (Fh_num_roe >= 0.0) ? cil[j] : cir[j];
+    flux[flow_ndof + j] = Fh_num_roe * Cup;
+  }
+
+  // max wave speed
+  *amax = amax_swe;
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
 

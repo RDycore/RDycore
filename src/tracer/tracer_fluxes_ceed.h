@@ -53,6 +53,9 @@ CEED_QFUNCTION_HELPER int TracerFlux(void *ctx, CeedInt Q, const CeedScalar *con
         case RIEMANN_FLUX_ROE:
           TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracer_ndof, flux, &amax);
           break;
+        case RIEMANN_FLUX_UPWINDED_ROE:
+          TracerRiemannFlux_UpwindedRoe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracer_ndof, flux, &amax);
+          break;
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
@@ -76,6 +79,10 @@ CEED_QFUNCTION_HELPER int TracerFlux(void *ctx, CeedInt Q, const CeedScalar *con
 
 CEED_QFUNCTION(TracerFlux_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return TracerFlux(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
+CEED_QFUNCTION(TracerFlux_UpwindedRoe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return TracerFlux(ctx, Q, in, out, RIEMANN_FLUX_UPWINDED_ROE);
 }
 
 // flow and tracers flux operator Q-function for boundary edges on which dirichlet condition is applied
@@ -110,6 +117,9 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, con
         case RIEMANN_FLUX_ROE:
           TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracer_ndof, flux, &amax);
           break;
+        case RIEMANN_FLUX_UPWINDED_ROE:
+          TracerRiemannFlux_UpwindedRoe(gravity, tiny_h, qL, qR, geom[0][i], geom[1][i], flow_ndof, tracer_ndof, flux, &amax);
+          break;
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i]     = flux[j] * geom[2][i];
@@ -130,6 +140,10 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, con
 
 CEED_QFUNCTION(TracerBoundaryFlux_Dirichlet_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return TracerBoundaryFlux_Dirichlet(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
+CEED_QFUNCTION(TracerBoundaryFlux_Dirichlet_UpwindedRoe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return TracerBoundaryFlux_Dirichlet(ctx, Q, in, out, RIEMANN_FLUX_UPWINDED_ROE);
 }
 
 // flow and tracers flux operator Q-function for boundary edges on which reflecting wall condition is applied
@@ -167,6 +181,9 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Reflecting(void *ctx, CeedInt Q, co
         case RIEMANN_FLUX_ROE:
           TracerRiemannFlux_Roe(gravity, tiny_h, qL, qR, sn, cn, flow_ndof, tracer_ndof, flux, &amax);
           break;
+        case RIEMANN_FLUX_UPWINDED_ROE:
+          TracerRiemannFlux_UpwindedRoe(gravity, tiny_h, qL, qR, sn, cn, flow_ndof, tracer_ndof, flux, &amax);
+          break;
       }
       for (CeedInt j = 0; j < tot_ndof; j++) {
         cell_L[j][i] = flux[j] * geom[2][i];
@@ -184,6 +201,10 @@ CEED_QFUNCTION_HELPER int TracerBoundaryFlux_Reflecting(void *ctx, CeedInt Q, co
 
 CEED_QFUNCTION(TracerBoundaryFlux_Reflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return TracerBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
+CEED_QFUNCTION(TracerBoundaryFlux_UpwindedReflecting_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return TracerBoundaryFlux_Reflecting(ctx, Q, in, out, RIEMANN_FLUX_UPWINDED_ROE);
 }
 
 #pragma GCC diagnostic   pop
