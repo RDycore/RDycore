@@ -302,6 +302,7 @@ PetscErrorCode CreatePetscTracerInteriorFluxOperator(RDyMesh *mesh, const RDyCon
   TracerInteriorFluxOperator *interior_flux_op;
   PetscCall(PetscCalloc1(1, &interior_flux_op));
   *interior_flux_op = (TracerInteriorFluxOperator){
+      .riemann     = config.numerics.riemann,
       .mesh        = mesh,
       .diagnostics = diagnostics,
       .tiny_h      = config.physics.flow.tiny_h,
@@ -561,6 +562,7 @@ PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh *mesh, const RDyCon
   TracerBoundaryFluxOperator *boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
   *boundary_flux_op = (TracerBoundaryFluxOperator){
+      .riemann            = config.numerics.riemann,
       .mesh               = mesh,
       .boundary           = boundary,
       .boundary_condition = boundary_condition,
