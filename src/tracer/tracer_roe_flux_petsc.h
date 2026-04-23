@@ -126,8 +126,8 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
-                                           PetscReal *fij, PetscReal *amax) {
+static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn,
+                                                 const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
   PetscFunctionBeginUser;
 
   PetscReal *hl  = datal->h;
@@ -183,21 +183,19 @@ static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData *datal, 
       FR[j + 3] = hr[i] * uperpr * cir[ci_index_offset + j];
     }
 
-    PetscReal Fh_num_roe = 0.5 * (FL[0] + FR[0])
-                         - 0.5 * (R_swe[0][0] * A_swe[0] * dW_swe[0] + R_swe[0][1] * A_swe[1] * dW_swe[1] +
-                                  R_swe[0][2] * A_swe[2] * dW_swe[2]);
+    PetscReal Fh_num_roe =
+        0.5 * (FL[0] + FR[0]) - 0.5 * (R_swe[0][0] * A_swe[0] * dW_swe[0] + R_swe[0][1] * A_swe[1] * dW_swe[1] + R_swe[0][2] * A_swe[2] * dW_swe[2]);
 
     for (PetscInt dof1 = 0; dof1 < 3; dof1++) {
-      PetscReal Fnum = 0.5 * (FL[dof1] + FR[dof1])
-                     - 0.5 * (R_swe[dof1][0] * A_swe[0] * dW_swe[0] + R_swe[dof1][1] * A_swe[1] * dW_swe[1] +
-                              R_swe[dof1][2] * A_swe[2] * dW_swe[2]);
+      PetscReal Fnum = 0.5 * (FL[dof1] + FR[dof1]) -
+                       0.5 * (R_swe[dof1][0] * A_swe[0] * dW_swe[0] + R_swe[dof1][1] * A_swe[1] * dW_swe[1] + R_swe[dof1][2] * A_swe[2] * dW_swe[2]);
       fij[soln_ncomp * i + dof1] = Fnum;
     }
 
     for (PetscInt j = 0; j < tracers_ncomp; j++) {
-      PetscReal cL  = cil[ci_index_offset + j];
-      PetscReal cR  = cir[ci_index_offset + j];
-      PetscReal Cup = (Fh_num_roe >= 0.0) ? cL : cR;
+      PetscReal cL                  = cil[ci_index_offset + j];
+      PetscReal cR                  = cir[ci_index_offset + j];
+      PetscReal Cup                 = (Fh_num_roe >= 0.0) ? cL : cR;
       fij[soln_ncomp * i + (3 + j)] = Fh_num_roe * Cup;
     }
 

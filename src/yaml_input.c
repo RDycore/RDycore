@@ -928,7 +928,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented.");
   }
   if (config->numerics.riemann != RIEMANN_ROE && config->numerics.riemann != RIEMANN_UPWIND_ROE) {
-    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the roe riemann solver (ROE) and upwind roe riemann solver (UPWIND_ROE) are currently implemented.");
+    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+               "Only the roe riemann solver (ROE) and upwinded roe riemann solver (UPWIND_ROE) are currently implemented.");
   }
 
   PetscCheck(strlen(config->grid.file), comm, PETSC_ERR_USER, "grid.file not specified!");

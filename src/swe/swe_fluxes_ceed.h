@@ -38,10 +38,7 @@ CEED_QFUNCTION_HELPER CeedScalar ComputeDhv(CeedScalar zv_beg, CeedScalar zv_end
 #include "swe_roe_flux_ceed.h"
 #ifndef RIEMANN_FLUX_TYPE_DEFINED
 #define RIEMANN_FLUX_TYPE_DEFINED
-typedef enum {
-  RIEMANN_FLUX_ROE,
-  RIEMANN_FLUX_UPWIND_ROE
-} RiemannFluxType;
+typedef enum { RIEMANN_FLUX_ROE, RIEMANN_FLUX_UPWINDED_ROE } RiemannFluxType;
 #endif
 
 // SWE interior flux operator Q-function
