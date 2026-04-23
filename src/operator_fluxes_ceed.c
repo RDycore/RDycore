@@ -423,7 +423,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, c_restrict_l, restrict_dirichlet, restrict_geom, restrict_flux, restrict_cnum, eta_beg_restrict, eta_end_restrict;
-  CeedVector          geom, flux, flux_accumulated, dirichlet, cnum;
+  CeedVector          geom, flux, dirichlet, cnum;
   {
     CeedInt num_edges = boundary->num_edges;
 
