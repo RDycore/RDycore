@@ -74,7 +74,7 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
           SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], dhv, flux, &amax);
           break;
         default:
-          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+          return 1;
       }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]   = flux[j] * geom[2][i];
@@ -132,7 +132,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Dirichlet(void *ctx, CeedInt Q, const 
           SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, geom[0][i], geom[1][i], dhv, flux, &amax);
           break;
         default:
-          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+          return 1;
       }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]    = flux[j] * geom[2][i];
@@ -188,7 +188,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Reflecting(void *ctx, CeedInt Q, const
           SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, dhv, flux, &amax);
           break;
         default:
-          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+          return 1;
       }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]    = flux[j] * geom[2][i];
@@ -247,7 +247,7 @@ CEED_QFUNCTION_HELPER int SWEBoundaryFlux_Outflow(void *ctx, CeedInt Q, const Ce
           SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, dhv, flux, &amax);
           break;
         default:
-          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
+          return 1;
       }
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i]    = flux[j] * geom[2][i];
