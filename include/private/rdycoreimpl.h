@@ -6,6 +6,7 @@
 #include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdyforcingimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -221,6 +222,11 @@ struct _p_RDy {
   //-------------------
   PetscViewer           output_viewer;
   PetscViewerAndFormat *output_vf;
+
+  //----------------------------------
+  // Forcing (rainfall / boundary BCs)
+  //----------------------------------
+  struct _p_RDyForcing *forcing;
 };
 
 // these are used by both the main (RDycore) driver and the MMS driver

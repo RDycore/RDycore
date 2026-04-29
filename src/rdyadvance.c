@@ -347,6 +347,9 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
 
+  // apply forcing (rainfall source terms and boundary conditions)
+  if (rdy->forcing) PetscCall(RDyApplyForcing(rdy, rdy->forcing, time));
+
   PetscCall(ResetOperatorDiagnostics(rdy->operator));
 
   // advance the solution to the specified time (handling preloading if requested)
