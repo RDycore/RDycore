@@ -1520,5 +1520,9 @@ PetscErrorCode RDySetup(RDy rdy) {
     rdy->restart_step     = -1;
   }
 
+  // initialize forcing (rainfall and boundary conditions from CLI options)
+  RDyLogDebug(rdy, "Initializing forcing...");
+  PetscCall(RDyCreateForcing(rdy, &rdy->forcing));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
