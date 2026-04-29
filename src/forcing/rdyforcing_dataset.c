@@ -320,10 +320,10 @@ PetscErrorCode RDyForcingSetHomogeneousData(RDyHomogeneousDataset *homogeneous_d
 
   PetscReal    cur_value;
   PetscScalar *data_ptr               = homogeneous_data->data_ptr;
-  PetscInt     ndata                   = homogeneous_data->ndata;
-  PetscBool    temporally_interpolate  = homogeneous_data->temporally_interpolate;
-  PetscInt    *cur_idx                 = &homogeneous_data->cur_idx;
-  PetscInt    *prev_idx                = &homogeneous_data->prev_idx;
+  PetscInt     ndata                  = homogeneous_data->ndata;
+  PetscBool    temporally_interpolate = homogeneous_data->temporally_interpolate;
+  PetscInt    *cur_idx                = &homogeneous_data->cur_idx;
+  PetscInt    *prev_idx               = &homogeneous_data->prev_idx;
   PetscCall(RDyForcingGetCurrentData(data_ptr, ndata, cur_time, temporally_interpolate, cur_idx, &cur_value));
 
   if (temporally_interpolate || *cur_idx != *prev_idx) {

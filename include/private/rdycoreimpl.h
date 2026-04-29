@@ -6,11 +6,11 @@
 #include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdyforcingimpl.h>
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <private/rdyregionimpl.h>
-#include <private/rdyforcingimpl.h>
 #include <rdycore.h>
 
 // CEED initialization, availability, context, useful for creating CEED

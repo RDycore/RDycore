@@ -100,8 +100,8 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, RDyUnst
 
   if (data->write_map_for_debugging) {
     snprintf(debug_file, PETSC_MAX_PATH_LEN, "map.source-sink.unstructured.rank_%d.bin", rank);
-    PetscCall(
-        RDyForcingWriteMappingForDebugging(debug_file, data->mesh_nelements, data->data2mesh_idx, data->data_xc, data->data_yc, data->mesh_xc, data->mesh_yc));
+    PetscCall(RDyForcingWriteMappingForDebugging(debug_file, data->mesh_nelements, data->data2mesh_idx, data->data_xc, data->data_yc, data->mesh_xc,
+                                                 data->mesh_yc));
   }
 
   if (data->write_map) {
@@ -731,8 +731,8 @@ PetscErrorCode RDyApplyForcing(RDy rdy, RDyForcing forcing, PetscReal time) {
       break;
     case FORCING_DATASET_HOMOGENEOUS:
       if (forcing->boundary.ndata) {
-        PetscCall(RDyForcingSetHomogeneousBoundary(&forcing->boundary.homogeneous, time, forcing->boundary.ndata / 3,
-                                                   forcing->boundary.data_for_rdycore));
+        PetscCall(
+            RDyForcingSetHomogeneousBoundary(&forcing->boundary.homogeneous, time, forcing->boundary.ndata / 3, forcing->boundary.data_for_rdycore));
         PetscCall(RDySetFlowDirichletBoundaryValues(rdy, forcing->boundary.dirichlet_bc_idx, forcing->boundary.ndata / 3, 3,
                                                     forcing->boundary.data_for_rdycore));
       }

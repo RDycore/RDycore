@@ -7,7 +7,14 @@
 #include <time.h>
 
 //--- Dataset type enum
-typedef enum { FORCING_DATASET_UNSET = 0, FORCING_DATASET_CONSTANT, FORCING_DATASET_HOMOGENEOUS, FORCING_DATASET_RASTER, FORCING_DATASET_UNSTRUCTURED, FORCING_DATASET_MULTI_HOMOGENEOUS } RDyForcingDatasetType;
+typedef enum {
+  FORCING_DATASET_UNSET = 0,
+  FORCING_DATASET_CONSTANT,
+  FORCING_DATASET_HOMOGENEOUS,
+  FORCING_DATASET_RASTER,
+  FORCING_DATASET_UNSTRUCTURED,
+  FORCING_DATASET_MULTI_HOMOGENEOUS
+} RDyForcingDatasetType;
 
 //--- Dataset structures
 
@@ -25,9 +32,9 @@ typedef struct {
 } RDyHomogeneousDataset;
 
 typedef struct {
-  char dir[PETSC_MAX_PATH_LEN];      // directory containing the dataset files
-  char file[PETSC_MAX_PATH_LEN];     // base filename of the dataset
-  char map_file[PETSC_MAX_PATH_LEN]; // path to the spatial mapping file
+  char dir[PETSC_MAX_PATH_LEN];       // directory containing the dataset files
+  char file[PETSC_MAX_PATH_LEN];      // base filename of the dataset
+  char map_file[PETSC_MAX_PATH_LEN];  // path to the spatial mapping file
 
   struct tm start_date, current_date;  // start and current date for the dataset
 
@@ -55,10 +62,10 @@ typedef struct {
 } RDyRasterDataset;
 
 typedef struct {
-  char dir[PETSC_MAX_PATH_LEN];       // directory containing the dataset files
-  char file[PETSC_MAX_PATH_LEN];      // base filename of the dataset
-  char mesh_file[PETSC_MAX_PATH_LEN]; // path to the mesh file on which the dataset is defined
-  char map_file[PETSC_MAX_PATH_LEN];  // path to the spatial mapping file
+  char dir[PETSC_MAX_PATH_LEN];        // directory containing the dataset files
+  char file[PETSC_MAX_PATH_LEN];       // base filename of the dataset
+  char mesh_file[PETSC_MAX_PATH_LEN];  // path to the mesh file on which the dataset is defined
+  char map_file[PETSC_MAX_PATH_LEN];   // path to the spatial mapping file
 
   PetscReal dtime_in_hour;  // temporal duration of each dataset file
   PetscInt  ndata_file;     // number of time records per file
@@ -83,37 +90,37 @@ typedef struct {
 } RDyUnstructuredDataset;
 
 typedef struct {
-  RDyHomogeneousDataset *data;   // array of spatially-homogeneous, temporally-varying datasets
-  PetscInt               ndata;  // number of datasets
+  RDyHomogeneousDataset *data;        // array of spatially-homogeneous, temporally-varying datasets
+  PetscInt               ndata;       // number of datasets
   PetscInt              *region_ids;  // mesh region ID for each dataset
 
-  PetscInt  ndirichlet_bcs;              // number of Dirichlet BCs
-  PetscInt *dirichlet_bc_idx;            // RDycore indices of the Dirichlet BCs
-  PetscInt *dirichlet_bc_to_data_idx;    // maps each Dirichlet BC to a dataset index
+  PetscInt  ndirichlet_bcs;            // number of Dirichlet BCs
+  PetscInt *dirichlet_bc_idx;          // RDycore indices of the Dirichlet BCs
+  PetscInt *dirichlet_bc_to_data_idx;  // maps each Dirichlet BC to a dataset index
 
-  PetscReal **data_for_rdycore;  // per-BC value arrays passed to RDycore
-  PetscReal  *ndata_for_rdycore; // sizes of per-BC value arrays
+  PetscReal **data_for_rdycore;   // per-BC value arrays passed to RDycore
+  PetscReal  *ndata_for_rdycore;  // sizes of per-BC value arrays
 } RDyMultiHomogeneousDataset;
 
 //--- Source/sink and boundary condition structures
 
 typedef struct {
-  RDyForcingDatasetType        type;             // active dataset type (selects which union member is used)
-  RDyConstantDataset           constant;         // spatio-temporally constant source/sink
-  RDyHomogeneousDataset        homogeneous;       // spatially-constant, temporally-varying source/sink
-  RDyRasterDataset             raster;            // spatio-temporally varying source/sink in raster format
-  RDyUnstructuredDataset       unstructured;      // spatio-temporally varying source/sink in unstructured grid format
-  RDyMultiHomogeneousDataset   multihomogeneous;  // multiple spatially-constant, temporally-varying source/sinks
+  RDyForcingDatasetType      type;              // active dataset type (selects which union member is used)
+  RDyConstantDataset         constant;          // spatio-temporally constant source/sink
+  RDyHomogeneousDataset      homogeneous;       // spatially-constant, temporally-varying source/sink
+  RDyRasterDataset           raster;            // spatio-temporally varying source/sink in raster format
+  RDyUnstructuredDataset     unstructured;      // spatio-temporally varying source/sink in unstructured grid format
+  RDyMultiHomogeneousDataset multihomogeneous;  // multiple spatially-constant, temporally-varying source/sinks
 
   PetscInt   ndata;             // size of source/sink data array passed to RDycore
   PetscReal *data_for_rdycore;  // source/sink values passed to RDycore
 } RDyForcingSourceSink;
 
 typedef struct {
-  RDyForcingDatasetType        type;             // active dataset type (selects which union member is used)
-  RDyHomogeneousDataset        homogeneous;       // spatially-homogeneous, temporally-varying BC
-  RDyUnstructuredDataset       unstructured;      // spatio-temporally varying BC in unstructured grid format
-  RDyMultiHomogeneousDataset   multihomogeneous;  // multiple spatially-constant, temporally-varying BCs
+  RDyForcingDatasetType      type;              // active dataset type (selects which union member is used)
+  RDyHomogeneousDataset      homogeneous;       // spatially-homogeneous, temporally-varying BC
+  RDyUnstructuredDataset     unstructured;      // spatio-temporally varying BC in unstructured grid format
+  RDyMultiHomogeneousDataset multihomogeneous;  // multiple spatially-constant, temporally-varying BCs
 
   PetscInt   ndata;             // size of boundary condition data array passed to RDycore
   PetscInt   dirichlet_bc_idx;  // RDycore index of the Dirichlet BC
@@ -125,8 +132,8 @@ typedef struct {
 typedef struct _p_RDyForcing *RDyForcing;
 
 struct _p_RDyForcing {
-  RDyForcingSourceSink         source;
-  RDyForcingBoundaryCondition  boundary;
+  RDyForcingSourceSink        source;
+  RDyForcingBoundaryCondition boundary;
 };
 
 //--- Internal function declarations (rdyforcing_dataset.c)
