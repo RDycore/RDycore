@@ -6,6 +6,15 @@
 // Internal helpers
 //--------------------------------------------------------------------
 
+/// @brief Searches the boundary conditions of an RDy instance for Dirichlet BCs.
+///        Reports the local and global BC index, the number of local edges, and
+///        whether more than one Dirichlet BC is present.
+/// @param [in]  rdy                        RDy instance
+/// @param [out] dirc_bc_idx                local index of the first Dirichlet BC found (-1 if none)
+/// @param [out] num_edges_dirc_bc          number of local boundary edges on that BC
+/// @param [out] global_dirc_bc_idx         global index of the Dirichlet BC across all MPI ranks (-1 if none)
+/// @param [out] multiple_dirc_bcs_present  set to PETSC_TRUE if more than one Dirichlet BC exists
+/// @return PetscErrorCode
 static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt *num_edges_dirc_bc, PetscInt *global_dirc_bc_idx,
                                         PetscBool *multiple_dirc_bcs_present) {
   PetscFunctionBegin;
@@ -37,6 +46,11 @@ static PetscErrorCode FindDirichletBCID(RDy rdy, PetscInt *dirc_bc_idx, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Post-processes a spatially-homogeneous boundary condition dataset after parsing:
+///        locates the single Dirichlet BC, allocates the value array, and stores the BC index.
+/// @param [in]     rdy         RDy instance
+/// @param [in,out] bc_dataset  boundary condition dataset to post-process
+/// @return PetscErrorCode
 static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, RDyForcingBoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -59,6 +73,12 @@ static PetscErrorCode DoPostprocessForBoundaryHomogeneousDataset(RDy rdy, RDyFor
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Post-processes an unstructured source/sink dataset after opening:
+///        retrieves mesh cell centroids, reads dataset coordinates, and builds
+///        (or reads) the spatial mapping from dataset points to mesh cells.
+/// @param [in]     rdy   RDy instance
+/// @param [in,out] data  unstructured dataset to post-process
+/// @return PetscErrorCode
 static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, RDyUnstructuredDataset *data) {
   PetscFunctionBegin;
 
@@ -91,6 +111,12 @@ static PetscErrorCode DoPostprocessForSourceUnstructuredDataset(RDy rdy, RDyUnst
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Post-processes an unstructured boundary condition dataset after opening:
+///        locates the single Dirichlet BC, allocates the value array, retrieves boundary
+///        edge centroids, reads dataset coordinates, and builds the spatial mapping.
+/// @param [in]     rdy         RDy instance
+/// @param [in,out] bc_dataset  boundary condition dataset to post-process
+/// @return PetscErrorCode
 static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, RDyForcingBoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -135,6 +161,12 @@ static PetscErrorCode DoPostprocessForBoundaryUnstructuredDataset(RDy rdy, RDyFo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Post-processes a multi-homogeneous boundary condition dataset after opening:
+///        enumerates all Dirichlet BCs, matches each to a dataset by region ID,
+///        and allocates per-BC value arrays.
+/// @param [in]     rdy         RDy instance
+/// @param [in,out] bc_dataset  boundary condition dataset to post-process
+/// @return PetscErrorCode
 static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, RDyForcingBoundaryCondition *bc_dataset) {
   PetscFunctionBegin;
 
@@ -201,6 +233,12 @@ static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, R
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Post-processes a raster source/sink dataset after opening:
+///        computes data cell centroids from the raster header, retrieves mesh cell
+///        centroids, and builds (or reads) the spatial mapping from raster cells to mesh cells.
+/// @param [in]     rdy   RDy instance
+/// @param [in,out] data  raster dataset to post-process
+/// @return PetscErrorCode
 static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RDyRasterDataset *data) {
   PetscFunctionBegin;
 
@@ -251,6 +289,11 @@ static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RDyRasterData
 // CLI option parsing
 //--------------------------------------------------------------------
 
+/// @brief Parses PETSc CLI options to configure the source/sink (rainfall) dataset.
+///        Exactly one dataset type may be active at a time; an error is raised if
+///        more than one type is specified.
+/// @param [out] rain_dataset  source/sink dataset to populate from CLI options
+/// @return PetscErrorCode
 PetscErrorCode RDyForcingParseRainfallDataOptions(RDyForcingSourceSink *rain_dataset) {
   PetscFunctionBegin;
 
@@ -425,6 +468,11 @@ PetscErrorCode RDyForcingParseRainfallDataOptions(RDyForcingSourceSink *rain_dat
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Parses PETSc CLI options to configure the boundary condition dataset.
+///        Exactly one dataset type may be active at a time; an error is raised if
+///        more than one type is specified.
+/// @param [out] bc  boundary condition dataset to populate from CLI options
+/// @return PetscErrorCode
 PetscErrorCode RDyForcingParseBoundaryDataOptions(RDyForcingBoundaryCondition *bc) {
   PetscFunctionBegin;
 
