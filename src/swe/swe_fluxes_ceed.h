@@ -77,9 +77,9 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
           PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i]    = flux[j] * geom[2][i];
-        cell_R[j][i]    = flux[j] * geom[3][i];
-        flux_out[j][i]  = flux[j];
+        cell_L[j][i]   = flux[j] * geom[2][i];
+        cell_R[j][i]   = flux[j] * geom[3][i];
+        flux_out[j][i] = flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
       courant_num[1][i] = amax * geom[3][i] * dt;
