@@ -50,7 +50,8 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
   const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
   CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*cell_R)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*flux_out)[CEED_Q_VLA]           = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -76,15 +77,17 @@ CEED_QFUNCTION_HELPER int SWEFlux(void *ctx, CeedInt Q, const CeedScalar *const 
           PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported Riemann solver");
       }
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[2][i];
-        cell_R[j][i] = flux[j] * geom[3][i];
+        cell_L[j][i]    = flux[j] * geom[2][i];
+        cell_R[j][i]    = flux[j] * geom[3][i];
+        flux_out[j][i]  = flux[j];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
       courant_num[1][i] = amax * geom[3][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = 0.0;
-        cell_R[j][i] = 0.0;
+        cell_L[j][i]   = 0.0;
+        cell_R[j][i]   = 0.0;
+        flux_out[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
       courant_num[1][i] = 0.0;
