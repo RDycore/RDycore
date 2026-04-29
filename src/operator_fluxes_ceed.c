@@ -687,6 +687,7 @@ PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *mesh, CeedVector *eta_vertic
   // create the vector and initialize with vertex z-values so that
   // ComputeDhv returns 0 when no eta operator updates it (WELL_BALANCING_NONE)
   PetscCallCEED(CeedElemRestrictionCreateVector(eta_restrict, eta_vertices, NULL));
+  PetscCallCEED(CeedVectorSetValue(*eta_vertices, 0.0));
   CeedScalar *eta_array;
   PetscCallCEED(CeedVectorGetArray(*eta_vertices, CEED_MEM_HOST, &eta_array));
   for (CeedInt v = 0; v < num_vertices; v++) {
