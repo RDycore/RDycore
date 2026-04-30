@@ -118,24 +118,31 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
       g[owned_edge][HR_INTERIOR_NEG_L_OVER_AL] = -edges->lengths[iedge] / cells->areas[l];
       g[owned_edge][HR_INTERIOR_L_OVER_AR]     = edges->lengths[iedge] / cells->areas[r];
 
-      // Use vertex-averaged z for cell bed elevation.  DMPlex's centroid z
-      // (from DMPlexComputeCellGeometryFVM) differs from the vertex average
-      // for non-planar quads, which breaks lake-at-rest consistency with ICs
-      // computed as h = eta - mean(vertex_z).
-      CeedScalar zc_l = 0.0;
-      for (CeedInt v = cells->vertex_offsets[l]; v < cells->vertex_offsets[l + 1]; v++) {
-        zc_l += vertices->points[cells->vertex_ids[v]].X[2];
-      }
-      zc_l /= (CeedScalar)cells->num_vertices[l];
+      if (config.grid.cell_elevation.file[0]) {
+        // use cell-centered z from file if provided
+        g[owned_edge][HR_INTERIOR_ZC_LEFT]  = cells->centroids[l].X[2];
+        g[owned_edge][HR_INTERIOR_ZC_RIGHT] = cells->centroids[r].X[2];
 
-      CeedScalar zc_r = 0.0;
-      for (CeedInt v = cells->vertex_offsets[r]; v < cells->vertex_offsets[r + 1]; v++) {
-        zc_r += vertices->points[cells->vertex_ids[v]].X[2];
-      }
-      zc_r /= (CeedScalar)cells->num_vertices[r];
+      } else {
+        // Use vertex-averaged z for cell bed elevation.  DMPlex's centroid z
+        // (from DMPlexComputeCellGeometryFVM) differs from the vertex average
+        // for non-planar quads, which breaks lake-at-rest consistency with ICs
+        // computed as h = eta - mean(vertex_z).
+        CeedScalar zc_l = 0.0;
+        for (CeedInt v = cells->vertex_offsets[l]; v < cells->vertex_offsets[l + 1]; v++) {
+          zc_l += vertices->points[cells->vertex_ids[v]].X[2];
+        }
+        zc_l /= (CeedScalar)cells->num_vertices[l];
 
-      g[owned_edge][HR_INTERIOR_ZC_LEFT]  = zc_l;
-      g[owned_edge][HR_INTERIOR_ZC_RIGHT] = zc_r;
+        CeedScalar zc_r = 0.0;
+        for (CeedInt v = cells->vertex_offsets[r]; v < cells->vertex_offsets[r + 1]; v++) {
+          zc_r += vertices->points[cells->vertex_ids[v]].X[2];
+        }
+        zc_r /= (CeedScalar)cells->num_vertices[r];
+
+        g[owned_edge][HR_INTERIOR_ZC_LEFT]  = zc_l;
+        g[owned_edge][HR_INTERIOR_ZC_RIGHT] = zc_r;
+      }
 
       owned_edge++;
     }
