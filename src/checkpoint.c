@@ -98,10 +98,11 @@ static PetscErrorCode ConsumeMetadata(RDy rdy, PetscBag bag) {
 }
 
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
-static PetscErrorCode WriteHDF5Metadata(RDy rdy, PetscViewer viewer) {
+static PetscErrorCode WriteCheckpointHDF5Metadata(RDy rdy, PetscViewer viewer) {
   PetscFunctionBegin;
   PetscCall(PetscViewerHDF5WriteGroup(viewer, "/metadata"));
   PetscCall(PetscViewerHDF5PushGroup(viewer, "/metadata"));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "rdycore_version", PETSC_STRING, RDYCORE_GIT_HASH));
   PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "nproc", PETSC_INT, &rdy->nproc));
   PetscReal t;
   PetscCall(TSGetTime(rdy->ts, &t));
@@ -172,7 +173,7 @@ static PetscErrorCode WriteCheckpointFile(RDy rdy, Vec X, const char *filename_b
 
 #if PETSCBAG_DOESNT_SUPPORT_HDF5
   if (format == PETSC_VIEWER_HDF5_PETSC) {
-    PetscCall(WriteHDF5Metadata(rdy, viewer));
+    PetscCall(WriteCheckpointHDF5Metadata(rdy, viewer));
   } else {
 #endif
     PetscBag bag;
