@@ -189,6 +189,15 @@ static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode WriteOutputHDF5Metadata(RDy rdy, PetscViewer viewer) {
+  PetscFunctionBegin;
+  PetscCall(PetscViewerHDF5WriteGroup(viewer, "/metadata"));
+  PetscCall(PetscViewerHDF5PushGroup(viewer, "/metadata"));
+  PetscCall(PetscViewerHDF5WriteAttribute(viewer, NULL, "rdycore_version", PETSC_STRING, RDYCORE_GIT_HASH));
+  PetscCall(PetscViewerHDF5PopGroup(viewer));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Writes a XDMF "heavy data" to an HDF5 file. The time is expressed in the
 // units given in the configuration file.
 static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, char *h5_gridname) {
@@ -210,6 +219,10 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
   PetscCall(PetscViewerHDF5Open(rdy->comm, file_name, file_mode, &viewer));
   PetscCall(PetscViewerPushFormat(viewer, PETSC_VIEWER_HDF5_XDMF));
   PetscCall(PetscViewerHDF5SetCollective(viewer, PETSC_TRUE));  // enable collective MPI-IO transfers
+
+  if (file_mode == FILE_MODE_WRITE) {
+    PetscCall(WriteOutputHDF5Metadata(rdy, viewer));
+  }
 
   // write time-dependent solution and diagnostic fields
   char group_name[PETSC_MAX_PATH_LEN];
