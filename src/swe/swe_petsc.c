@@ -1015,11 +1015,17 @@ PetscErrorCode CreatePetscSWEInteriorFluxHROperator(RDyMesh *mesh, const RDyConf
   RDyVertices *vertices = &mesh->vertices;
   PetscCall(PetscCalloc1(mesh->num_cells, &op->zc));
   for (PetscInt c = 0; c < mesh->num_cells; c++) {
-    PetscReal z_sum = 0.0;
-    for (PetscInt v = cells->vertex_offsets[c]; v < cells->vertex_offsets[c + 1]; v++) {
-      z_sum += vertices->points[cells->vertex_ids[v]].X[2];
+    if (config.grid.cell_elevation.file[0]) {
+      // if cell elevation is provided via the file
+      op->zc[c] = cells->centroids[c].X[2];
+    } else {
+      // otherwise, compute vertex-averaged bed elevation
+      PetscReal z_sum = 0.0;
+      for (PetscInt v = cells->vertex_offsets[c]; v < cells->vertex_offsets[c + 1]; v++) {
+        z_sum += vertices->points[cells->vertex_ids[v]].X[2];
+      }
+      op->zc[c] = z_sum / (PetscReal)cells->num_vertices[c];
     }
-    op->zc[c] = z_sum / (PetscReal)cells->num_vertices[c];
   }
 
   PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxHR, DestroyInteriorFluxHR, petsc_op));
