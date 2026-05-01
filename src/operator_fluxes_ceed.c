@@ -941,8 +941,10 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
     }
   }
 
-  if (degenerate_count > 0) {
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "WARNING [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", degenerate_count));
+  PetscInt global_degenerate_count;
+  MPI_Allreduce(&degenerate_count, &global_degenerate_count, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
+  if (global_degenerate_count > 0) {
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "WARNING [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", global_degenerate_count));
   }
 
   // M is no longer needed once inv_m is computed; free it now so it is not
@@ -1164,10 +1166,9 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
   PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_beg", num_comp_eta,  CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_end", num_comp_eta,  CEED_EVAL_NONE));
 
-  // Q-function outputs: cell_left (active), cell_right (active), flux (passive), courant (passive)
-  PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_left",     num_comp,      CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_right",    num_comp,      CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddOutput(qf, "flux",          num_comp,      CEED_EVAL_NONE));
+  // Q-function outputs: cell_left (active), cell_right (active), courant_number (passive)
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_left",      num_comp,      CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "cell_right",     num_comp,      CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "courant_number", num_comp_cnum, CEED_EVAL_NONE));
 
   CeedInt num_edges = mesh->num_owned_internal_edges;
@@ -1222,17 +1223,13 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
     PetscCall(PetscFree2(off_l, off_r));
   }
 
-  // ---- Flux and Courant number output vectors ----
-  CeedElemRestriction restrict_flux, restrict_cnum;
-  CeedVector          flux, cnum;
+  // ---- Courant number output vector ----
+  CeedElemRestriction restrict_cnum;
+  CeedVector          cnum;
   {
-    CeedInt f_strides[]    = {num_comp,      1, num_comp};
     CeedInt cnum_strides[] = {num_comp_cnum, 1, num_comp_cnum};
-    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp,      num_edges * num_comp,      f_strides,    &restrict_flux));
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_cnum, num_edges * num_comp_cnum, cnum_strides, &restrict_cnum));
-    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_flux, &flux, NULL));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_cnum, &cnum, NULL));
-    PetscCallCEED(CeedVectorSetValue(flux, 0.0));
     PetscCallCEED(CeedVectorSetValue(cnum, 0.0));
   }
 
@@ -1288,8 +1285,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
   PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_end",  eta_end_restrict, CEED_BASIS_NONE, *eta_vertices));
   PetscCallCEED(CeedOperatorSetField(*subop, "cell_left",     c_restrict_l,     CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*subop, "cell_right",    c_restrict_r,     CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*subop, "flux",          restrict_flux,    CEED_BASIS_NONE, flux));
-  PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum,   CEED_BASIS_NONE, cnum));
+  PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
 
   // Return the q_reconstructed vector to the caller for updates each timestep
   *q_recon_out = q_reconstructed;
@@ -1298,14 +1294,12 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restr_qface_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&restr_qface_r));
-  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_r));
   PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
   PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
   PetscCallCEED(CeedVectorDestroy(&geom));
-  PetscCallCEED(CeedVectorDestroy(&flux));
   PetscCallCEED(CeedVectorDestroy(&cnum));
   PetscCallCEED(CeedQFunctionDestroy(&qf));
 
