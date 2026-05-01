@@ -306,7 +306,8 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   if (use_slope_reconstruction) {
     PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
                "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
-    PetscBool use_limiter = config->numerics.use_limiter;
+    // limiter is on by default; disable via -no_limiter flag
+    PetscBool use_limiter = PETSC_TRUE;
     PetscBool no_limiter  = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
     if (no_limiter) use_limiter = PETSC_FALSE;
@@ -424,23 +425,9 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   // MUSCL Reconstruction Pre-processing
   //-------------------------------------
   if (op->ceed.use_slope_reconstruction) {
-    static PetscInt muscl_step_count = 0;
     const PetscScalar *q_ptr;
     PetscCall(VecGetArrayRead(u_local, &q_ptr));
     PetscCall(ComputeLeastSquaresGradients(op->mesh, op->ceed.ls_grad_coeffs, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv));
-
-    // Debug: print max |grad_h| every 100 steps
-    if (muscl_step_count % 100 == 0) {
-      PetscReal max_grad_h = 0.0;
-      for (PetscInt c = 0; c < op->mesh->num_owned_cells; c++) {
-        PetscReal gx = op->ceed.grad_h[c * 2 + 0];
-        PetscReal gy = op->ceed.grad_h[c * 2 + 1];
-        PetscReal g  = PetscSqrtReal(gx * gx + gy * gy);
-        max_grad_h = PetscMax(max_grad_h, g);
-      }
-      PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [MUSCL step %d]: max |grad_h| = %g\n", (int)muscl_step_count, (double)max_grad_h));
-    }
-    muscl_step_count++;
 
     CeedScalar *q_face_ptr;
     PetscCallCEED(CeedVectorGetArray(op->ceed.q_reconstructed, CEED_MEM_HOST, &q_face_ptr));

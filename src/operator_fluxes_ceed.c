@@ -942,7 +942,7 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
   }
 
   if (degenerate_count > 0) {
-    PetscCall(PetscPrintf(PETSC_COMM_SELF, "DEBUG [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) - gradients zeroed\n", degenerate_count));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "WARNING [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", degenerate_count));
   }
 
   // M is no longer needed once inv_m is computed; free it now so it is not
@@ -972,18 +972,6 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
     ls_grad_coeffs[ie * 4 + 3] = inv_m[cr * 4 + 2] * wdx + inv_m[cr * 4 + 3] * wdy;  // cy_RL
   }
 
-  // Debug: report coefficient range
-  PetscReal cx_min = 1e30, cx_max = -1e30;
-  for (PetscInt ie = 0; ie < num_internal_edges; ie++) {
-    for (PetscInt k = 0; k < 4; k++) {
-      PetscReal v = ls_grad_coeffs[ie * 4 + k];
-      cx_min = PetscMin(cx_min, v);
-      cx_max = PetscMax(cx_max, v);
-    }
-  }
-  PetscCall(PetscPrintf(PETSC_COMM_SELF,
-    "DEBUG [PrecomputeLSGradCoeffs]: %d cells, %d internal edges, coeff range [%g, %g]\n",
-    num_cells, num_internal_edges, (double)cx_min, (double)cx_max));
 
   PetscCall(PetscFree(inv_m));
 
