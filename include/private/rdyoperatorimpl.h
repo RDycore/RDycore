@@ -131,6 +131,7 @@ typedef struct Operator {
       // CEED flux and source operators (each composed of sub-operators, see
       // CreateOperator in src/operator.c)
       CeedOperator flux, source;
+      CeedOperator muscl_interior_flux;  // MUSCL interior sub-op applied separately (MPI-safe)
 
       // timestep last set on operators
       PetscReal dt;
@@ -144,6 +145,13 @@ typedef struct Operator {
 
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;
+
+      // MUSCL slope reconstruction data (only allocated when use_slope_reconstruction is true)
+      PetscBool    use_slope_reconstruction;
+      PetscBool    use_limiter;                  // minmod limiter (default on with -second_order)
+      PetscScalar *grad_h, *grad_hu, *grad_hv;  // [num_cells * 2]: [c*2+0]=dq/dx, [c*2+1]=dq/dy
+      PetscReal   *ls_grad_coeffs;               // [num_internal_edges * 4]: precomputed LS gradient coefficients
+      CeedVector   q_reconstructed;              // [num_owned_internal_edges * 6]: h_L,hu_L,hv_L,h_R,hu_R,hv_R
     } ceed;
 
     // PETSc operator data
@@ -193,6 +201,10 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig, RDyMesh *, CeedVector *, RDyBoundary *, RDyCondition, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedVector *, CeedOperator *, CeedOperator *);
+PETSC_INTERN PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *, PetscReal *);
+PETSC_INTERN PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *, const PetscReal *, const PetscScalar *, PetscScalar *, PetscScalar *, PetscScalar *);
+PETSC_INTERN PetscErrorCode ReconstructFaceValues(RDyMesh *, const PetscScalar *, const PetscScalar *, const PetscScalar *, const PetscScalar *, PetscBool, CeedScalar *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceHROperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *, CeedVector *);

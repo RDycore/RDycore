@@ -161,6 +161,7 @@ endforeach()
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/mms_single_run.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/mms_conv_study.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_conv_study_second_order.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2) # test on 1, 2 processes
@@ -169,6 +170,14 @@ foreach(np 1 2) # test on 1, 2 processes
       add_test(swe_mms_single_run_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_single_run.yaml ${${config}_args})
       add_test(swe_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_conv_study.yaml ${${config}_args})
     endforeach()
+  endforeach()
+endforeach()
+
+# Second-order MUSCL convergence study (CEED only, requires -second_order flag)
+set(second_order_args -ceed /cpu/self -second_order)
+foreach(np 1 2) # test on 1, 2 processes
+  foreach(lang ${supported_languages})
+    add_test(swe_mms_conv_study_second_order_${lang}_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} mms_conv_study_second_order.yaml ${second_order_args})
   endforeach()
 endforeach()
 

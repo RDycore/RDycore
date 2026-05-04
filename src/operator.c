@@ -149,14 +149,36 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
     switch (op->config->physics.flow.well_balancing) {
       case WELL_BALANCING_NONE:
         PetscCall(CreateCeedEtaVerticesVector(op->mesh, &op->ceed.eta_vertices));
-        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                         &op->ceed.flux));
+        if (op->ceed.use_slope_reconstruction) {
+          PetscCall(CreateCeedFluxOperatorReconstructed(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.muscl_interior_flux,
+                                                        &op->ceed.flux));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_h));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
+          PetscCall(PetscCalloc1(op->mesh->num_internal_edges * 4, &op->ceed.ls_grad_coeffs));
+          PetscCall(PrecomputeLSGradCoeffs(op->mesh, op->ceed.ls_grad_coeffs));
+        } else {
+          PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                           &op->ceed.flux));
+        }
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_BS2002:
         PetscCall(CreateCeedEtaVerticesOperator(op->config, op->mesh, &op->ceed.eta_vertices, &op->ceed.eta_vertices_operator));
-        PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                         &op->ceed.flux));
+        if (op->ceed.use_slope_reconstruction) {
+          PetscCall(CreateCeedFluxOperatorReconstructed(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                        &op->ceed.eta_vertices, &op->ceed.q_reconstructed, &op->ceed.muscl_interior_flux,
+                                                        &op->ceed.flux));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_h));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
+          PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
+          PetscCall(PetscCalloc1(op->mesh->num_internal_edges * 4, &op->ceed.ls_grad_coeffs));
+          PetscCall(PrecomputeLSGradCoeffs(op->mesh, op->ceed.ls_grad_coeffs));
+        } else {
+          PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
+                                           &op->ceed.flux));
+        }
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_HR:
@@ -251,6 +273,14 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)domain_dm, &comm));
 
+  // second_order can be set via yaml (numerics.second_order) or command line (-second_order)
+  PetscBool use_slope_reconstruction = config->numerics.second_order;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+  if (use_slope_reconstruction) {
+    PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
+    PetscCheck(!has_tracers, comm, PETSC_ERR_USER, "second_order MUSCL reconstruction is only supported for pure SWE (no sediment, salinity, or heat tracers)");
+  }
+
   // check our arguments
   PetscCheck(domain_mesh, comm, PETSC_ERR_USER, "Cannot create an operator with no mesh");
   PetscCheck(num_regions > 0, comm, PETSC_ERR_USER, "Cannot create an operator with no regions");
@@ -273,6 +303,17 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   // construct CEED or PETSc versions of the flux/sources operators based on
   // our configuration
+  if (use_slope_reconstruction) {
+    PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
+               "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
+    // limiter comes from YAML config (default: true); -no_limiter CLI flag overrides
+    PetscBool use_limiter = config->numerics.use_limiter;
+    PetscBool no_limiter  = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
+    if (no_limiter) use_limiter = PETSC_FALSE;
+    (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
+    (*operator)->ceed.use_limiter              = use_limiter;
+  }
   PetscCall(CreateOperatorSubOperators(*operator));
 
   // set up our flux divergence vector(s)
@@ -283,6 +324,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 /// Frees all resources devoted to the operator.
 /// @param [out] op the operator to be freed
@@ -303,6 +345,14 @@ PetscErrorCode DestroyOperator(Operator **op) {
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.eta_vertices)));
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
+    }
+    if ((*op)->ceed.use_slope_reconstruction) {
+      PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.muscl_interior_flux)));
+      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.q_reconstructed)));
+      PetscCall(PetscFree((*op)->ceed.grad_h));
+      PetscCall(PetscFree((*op)->ceed.grad_hu));
+      PetscCall(PetscFree((*op)->ceed.grad_hv));
+      PetscCall(PetscFree((*op)->ceed.ls_grad_coeffs));
     }
   } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
@@ -371,6 +421,21 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
   }
 
+  //-------------------------------------
+  // MUSCL Reconstruction Pre-processing
+  //-------------------------------------
+  if (op->ceed.use_slope_reconstruction) {
+    const PetscScalar *q_ptr;
+    PetscCall(VecGetArrayRead(u_local, &q_ptr));
+    PetscCall(ComputeLeastSquaresGradients(op->mesh, op->ceed.ls_grad_coeffs, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv));
+
+    CeedScalar *q_face_ptr;
+    PetscCallCEED(CeedVectorGetArray(op->ceed.q_reconstructed, CEED_MEM_HOST, &q_face_ptr));
+    PetscCall(ReconstructFaceValues(op->mesh, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv, op->ceed.use_limiter, q_face_ptr));
+    PetscCallCEED(CeedVectorRestoreArray(op->ceed.q_reconstructed, &q_face_ptr));
+    PetscCall(VecRestoreArrayRead(u_local, &q_ptr));
+  }
+
   //------------------
   // Flux Calculation
   //------------------
@@ -389,10 +454,19 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCall(VecGetArrayAndMemType(f_local, &f_local_ptr, &mem_type));
     PetscCallCEED(CeedVectorSetArray(op->ceed.rhs, MemTypeP2C(mem_type), CEED_USE_POINTER, f_local_ptr));
 
-    // apply the flux operator, computing flux divergences
+    // apply the flux operator(s), computing flux divergences
     PetscCall(PetscLogEventBegin(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
     PetscCall(PetscLogGpuTimeBegin());
-    PetscCallCEED(CeedOperatorApply(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    // Zero rhs before accumulating contributions from separate operators.
+    // We use CeedOperatorApplyAdd for each operator so that their contributions
+    // are summed rather than overwritten.
+    PetscCallCEED(CeedVectorSetValue(op->ceed.rhs, 0.0));
+    if (op->ceed.use_slope_reconstruction) {
+      // Interior: MUSCL sub-op applied standalone (all inputs are passive, reads from q_reconstructed)
+      PetscCallCEED(CeedOperatorApplyAdd(op->ceed.muscl_interior_flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
+    }
+    // Boundary composite (always 1st-order), accumulated on top of interior
+    PetscCallCEED(CeedOperatorApplyAdd(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
     PetscCall(PetscLogGpuTimeEnd());
     PetscCall(PetscLogEventEnd(RDY_CeedOperatorApply_, u_local, f_global, 0, 0));
 
@@ -580,14 +654,9 @@ PetscErrorCode ResetOperatorDiagnostics(Operator *op) {
 static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edges, RDyMesh *mesh, CourantNumberDiagnostics *courant_diags) {
   PetscFunctionBegin;
 
-  // get the relevant interior sub-operator
-  CeedOperator *sub_ops;
-  PetscCallCEED(CeedOperatorCompositeGetSubList(op_edges, &sub_ops));
-  CeedOperator interior_flux_op = sub_ops[0];
-
   // fetch the field
   CeedOperatorField courant_num;
-  PetscCallCEED(CeedOperatorGetFieldByName(interior_flux_op, "courant_number", &courant_num));
+  PetscCallCEED(CeedOperatorGetFieldByName(op_edges, "courant_number", &courant_num));
 
   CeedVector courant_num_vec;
   PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
@@ -604,47 +673,6 @@ static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edge
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Loops over all boundary conditions and finds the local maximum Courant number.
-///        If needed, the data is moved from device to host.
-/// @param [in] op_edges A CeedOperator object for edges
-/// @param [in] num_boundaries Total number of boundaries
-/// @param [in] boundaries A RDyBoundary object
-/// @param [in] *max_courant_number Local maximum value of courant number
-/// @return 0 on sucess, or a non-zero error code on failure
-static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edges, PetscInt num_boundaries, RDyBoundary *boundaries,
-                                                            CourantNumberDiagnostics *courant_diags) {
-  PetscFunctionBegin;
-
-  // loop over all boundaries
-  for (PetscInt b = 0; b < num_boundaries; ++b) {
-    RDyBoundary boundary = boundaries[b];
-
-    // get the relevant boundary sub-operator
-    CeedOperator *sub_ops;
-    PetscCallCEED(CeedOperatorCompositeGetSubList(op_edges, &sub_ops));
-    CeedOperator boundary_flux_op = sub_ops[1 + boundary.index];
-
-    // fetch the field
-    CeedOperatorField courant_num;
-    PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "courant_number", &courant_num));
-
-    // get access to the data
-    CeedVector courant_num_vec;
-    PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
-    CeedScalar(*courant_num_data)[1];
-    PetscCallCEED(CeedVectorGetArrayRead(courant_num_vec, CEED_MEM_HOST, (const CeedScalar **)&courant_num_data));
-
-    // find the maximum value
-    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
-      courant_diags->max_courant_num = fmax(courant_diags->max_courant_num, courant_num_data[e][0]);
-    }
-
-    // restores the pointer
-    PetscCallCEED(CeedVectorRestoreArrayRead(courant_num_vec, (const CeedScalar **)&courant_num_data));
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /// @brief Finds the global maximum Courant number across all internal and boundary edges.
 /// @param [in] op_edges A CeedOperator object for edges
@@ -653,12 +681,40 @@ static PetscErrorCode CeedFindMaxCourantNumberBoundaryEdges(CeedOperator op_edge
 /// @param [in] comm A MPI_Comm object
 /// @param [out] *max_courant_number Global maximum value of courant number
 /// @return 0 on sucess, or a non-zero error code on failure
-static PetscErrorCode CeedFindMaxCourantNumber(CeedOperator op_edges, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries, MPI_Comm comm,
-                                               CourantNumberDiagnostics *courant_diags) {
+static PetscErrorCode CeedFindMaxCourantNumber(Operator *op, MPI_Comm comm, CourantNumberDiagnostics *courant_diags) {
   PetscFunctionBegin;
 
-  PetscCall(CeedFindMaxCourantNumberInternalEdges(op_edges, mesh, courant_diags));
-  PetscCall(CeedFindMaxCourantNumberBoundaryEdges(op_edges, num_boundaries, boundaries, courant_diags));
+  // For MUSCL, the interior sub-op is stored separately; for 1st-order it is
+  // sub_ops[0] of the composite flux operator.
+  CeedOperator interior_op;
+  if (op->ceed.use_slope_reconstruction) {
+    interior_op = op->ceed.muscl_interior_flux;
+  } else {
+    CeedOperator *sub_ops;
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+    interior_op = sub_ops[0];
+  }
+  PetscCall(CeedFindMaxCourantNumberInternalEdges(interior_op, op->mesh, courant_diags));
+
+  // Boundary sub-ops: offset 0 for MUSCL (no interior in composite), 1 for standard.
+  PetscInt boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
+  for (PetscInt b = 0; b < op->num_boundaries; ++b) {
+    RDyBoundary  boundary = op->boundaries[b];
+    CeedOperator *sub_ops;
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+    CeedOperator boundary_flux_op = sub_ops[boundary_offset + boundary.index];
+
+    CeedOperatorField courant_num;
+    PetscCallCEED(CeedOperatorGetFieldByName(boundary_flux_op, "courant_number", &courant_num));
+    CeedVector courant_num_vec;
+    PetscCallCEED(CeedOperatorFieldGetVector(courant_num, &courant_num_vec));
+    CeedScalar(*courant_num_data)[1];
+    PetscCallCEED(CeedVectorGetArrayRead(courant_num_vec, CEED_MEM_HOST, (const CeedScalar **)&courant_num_data));
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      courant_diags->max_courant_num = fmax(courant_diags->max_courant_num, courant_num_data[e][0]);
+    }
+    PetscCallCEED(CeedVectorRestoreArrayRead(courant_num_vec, (const CeedScalar **)&courant_num_data));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -677,7 +733,7 @@ static PetscErrorCode UpdateCeedCourantNumberDiagnostics(Operator *op) {
   if (CeedEnabled()) {
     // we need to extract the maximum courant number from the operator in the
     // CEED case; in the PETSc case it's already set for this process
-    PetscCall(CeedFindMaxCourantNumber(op->ceed.flux, op->mesh, op->num_boundaries, op->boundaries, comm, courant_num_diags));
+    PetscCall(CeedFindMaxCourantNumber(op, comm, courant_num_diags));
   }
 
   // reduce the courant diagnostics across all processes
@@ -799,9 +855,14 @@ static PetscErrorCode SetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   PetscFunctionBegin;
 
   // get the relevant boundary sub-operator
+  // In the standard (1st-order) composite: sub_ops[0] is the interior sub-op,
+  // boundary sub-ops start at index 1.
+  // In the MUSCL composite: the interior sub-op is applied separately, so
+  // boundary sub-ops start at index 0.
   CeedOperator *sub_ops;
   PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  CeedOperator sub_op = sub_ops[1 + boundary.index];
+  PetscInt      boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
+  CeedOperator  sub_op          = sub_ops[boundary_offset + boundary.index];
 
   // fetch the q_dirichlet vector
   CeedOperatorField field;
