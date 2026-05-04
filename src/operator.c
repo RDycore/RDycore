@@ -306,8 +306,8 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   if (use_slope_reconstruction) {
     PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
                "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
-    // limiter is on by default; disable via -no_limiter flag
-    PetscBool use_limiter = PETSC_TRUE;
+    // limiter comes from YAML config (default: true); -no_limiter CLI flag overrides
+    PetscBool use_limiter = config->numerics.use_limiter;
     PetscBool no_limiter  = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
     if (no_limiter) use_limiter = PETSC_FALSE;

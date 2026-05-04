@@ -857,6 +857,10 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
 
   SET_MISSING_PARAMETER(config->physics.flow.well_balancing, WELL_BALANCING_NONE);
 
+  if (config->numerics.second_order) {
+    SET_MISSING_PARAMETER(config->numerics.use_limiter, PETSC_TRUE);
+  }
+
   SET_MISSING_PARAMETER(config->physics.sediment.num_classes, 0);
 
   SET_MISSING_PARAMETER(config->time.stop, INVALID_REAL);
