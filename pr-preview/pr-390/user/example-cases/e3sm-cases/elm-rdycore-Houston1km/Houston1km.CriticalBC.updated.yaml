@@ -1,0 +1,61 @@
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  step             : 432000  # 5-day
+  coupling_interval: 900.0   # 15 mins
+  time_step        : 10.0
+  unit             : seconds
+
+output:
+  format: xdmf
+  output_interval: 90
+  batch_size: 1
+  time_series:
+    boundary_fluxes: 10
+
+grid:
+  file: Houston1km_with_z_updated.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: domain
+    flow: domain_flow_ic
+
+boundaries:
+  - name: outlet
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [outlet]
+    flow: outflow_bc
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    format: binary
+    file: Houston1km.IC.dat
+  - name: outflow_bc
+    type: critical-outflow
