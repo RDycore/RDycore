@@ -223,11 +223,12 @@ static PetscErrorCode DoPostprocessForBoundaryMultiHomogeneousDataset(RDy rdy, R
           count++;
         }
       }
-
-      PetscFree(boundary_id);
-      PetscFree(boundary_nedges);
-      PetscFree(boundary_type);
     }
+
+    // free up memory
+    PetscFree(boundary_id);
+    PetscFree(boundary_nedges);
+    PetscFree(boundary_type);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -260,8 +261,6 @@ static PetscErrorCode DoPostprocessForSourceRasterDataset(RDy rdy, RDyRasterData
   }
 
   PetscCall(RDyGetNumOwnedCells(rdy, &data->mesh_ncells_local));
-  PetscCalloc1(data->mesh_ncells_local, &data->mesh_xc);
-  PetscCalloc1(data->mesh_ncells_local, &data->mesh_yc);
   PetscCalloc1(data->mesh_ncells_local, &data->data2mesh_idx);
 
   PetscCall(RDyForcingGetCellCentroidsFromMesh(rdy, data->mesh_ncells_local, &data->mesh_xc, &data->mesh_yc));
@@ -335,11 +334,11 @@ PetscErrorCode RDyForcingParseRainfallDataOptions(RDyForcingSourceSink *rain_dat
     PetscBool raster_dir_flag;
     PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_dir", rain_dataset->raster.dir, sizeof(rain_dataset->raster.dir), &raster_dir_flag));
 
-    PetscOptionsGetBool(NULL, NULL, "-raster_rain_write_map_for_debugging", &rain_dataset->raster.write_map_for_debugging, NULL);
-    PetscOptionsGetString(NULL, NULL, "-raster_rain_write_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
-                          &rain_dataset->raster.write_map);
-    PetscOptionsGetString(NULL, NULL, "-raster_rain_read_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
-                          &rain_dataset->raster.read_map);
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-raster_rain_write_map_for_debugging", &rain_dataset->raster.write_map_for_debugging, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_write_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
+                                    &rain_dataset->raster.write_map));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-raster_rain_read_map_file", rain_dataset->raster.map_file, sizeof(rain_dataset->raster.map_file),
+                                    &rain_dataset->raster.read_map));
 
     PetscInt date[NUM_RASTER_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_RASTER_RAIN_DATE_VALUES;
@@ -383,11 +382,12 @@ PetscErrorCode RDyForcingParseRainfallDataOptions(RDyForcingSourceSink *rain_dat
     PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_dir", rain_dataset->unstructured.dir, sizeof(rain_dataset->unstructured.dir),
                                     &unstructured_rain_dir_flag));
 
-    PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_write_map_for_debugging", &rain_dataset->unstructured.write_map_for_debugging, NULL);
-    PetscOptionsGetString(NULL, NULL, "-unstructured_rain_write_map_file", rain_dataset->unstructured.map_file,
-                          sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.write_map);
-    PetscOptionsGetString(NULL, NULL, "-unstructured_rain_read_map_file", rain_dataset->unstructured.map_file,
-                          sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.read_map);
+    PetscCall(
+        PetscOptionsGetBool(NULL, NULL, "-unstructured_rain_write_map_for_debugging", &rain_dataset->unstructured.write_map_for_debugging, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_write_map_file", rain_dataset->unstructured.map_file,
+                                    sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.write_map));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_rain_read_map_file", rain_dataset->unstructured.map_file,
+                                    sizeof(rain_dataset->unstructured.map_file), &rain_dataset->unstructured.read_map));
 
     PetscInt date[NUM_UNSTRUCTURED_RAIN_DATE_VALUES];
     PetscInt ndate = NUM_UNSTRUCTURED_RAIN_DATE_VALUES;
@@ -430,7 +430,9 @@ PetscErrorCode RDyForcingParseRainfallDataOptions(RDyForcingSourceSink *rain_dat
 
 #define MAX_DATASETS 20
 
-  char     *filenames[PETSC_MAX_PATH_LEN];
+  char  filenames_buf[MAX_DATASETS][PETSC_MAX_PATH_LEN];
+  char *filenames[MAX_DATASETS];
+  for (PetscInt i = 0; i < MAX_DATASETS; i++) filenames[i] = filenames_buf[i];
   PetscInt  nfiles = MAX_DATASETS;
   PetscBool multi_files_flag;
 
@@ -462,7 +464,7 @@ PetscErrorCode RDyForcingParseRainfallDataOptions(RDyForcingSourceSink *rain_dat
 #undef MAX_DATASETS
 
   PetscCheck(dataset_type_count <= 1, PETSC_COMM_WORLD, PETSC_ERR_USER,
-             "More than one rainfall cannot be specified. Rainfall types sepcified : Constat %d; Homogeneous %d; Raster %d; Unsturcutred %d",
+             "More than one rainfall cannot be specified. Rainfall types specified : Constant %d; Homogeneous %d; Raster %d; Unstructured %d",
              constant_rain_flag, homogeneous_rain_flag, raster_start_date_flag, unstructured_start_date_flag);
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -503,11 +505,11 @@ PetscErrorCode RDyForcingParseBoundaryDataOptions(RDyForcingBoundaryCondition *b
   PetscBool unstructured_bc_dir_flag;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_dir", bc->unstructured.dir, sizeof(bc->unstructured.dir), &unstructured_bc_dir_flag));
 
-  PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_write_map_for_debugging", &bc->unstructured.write_map_for_debugging, NULL);
-  PetscOptionsGetString(NULL, NULL, "-unstructured_bc_write_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
-                        &bc->unstructured.write_map);
-  PetscOptionsGetString(NULL, NULL, "-unstructured_bc_read_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
-                        &bc->unstructured.read_map);
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-unstructured_bc_write_map_for_debugging", &bc->unstructured.write_map_for_debugging, NULL));
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_write_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
+                                  &bc->unstructured.write_map));
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-unstructured_bc_read_map_file", bc->unstructured.map_file, sizeof(bc->unstructured.map_file),
+                                  &bc->unstructured.read_map));
 
   PetscInt  date[NUM_UNSTRUCTURED_BC_DATE_VALUES];
   PetscInt  ndate = NUM_UNSTRUCTURED_BC_DATE_VALUES;
@@ -549,7 +551,9 @@ PetscErrorCode RDyForcingParseBoundaryDataOptions(RDyForcingBoundaryCondition *b
 
 #define MAX_DATASETS 20
 
-  char     *filenames[PETSC_MAX_PATH_LEN];
+  char  filenames_buf[MAX_DATASETS][PETSC_MAX_PATH_LEN];
+  char *filenames[MAX_DATASETS];
+  for (PetscInt i = 0; i < MAX_DATASETS; i++) filenames[i] = filenames_buf[i];
   PetscInt  nfiles = MAX_DATASETS;
   PetscBool multi_files_flag;
 
@@ -797,6 +801,7 @@ PetscErrorCode RDyDestroyForcing(RDyForcing *forcing) {
         PetscCall(RDyForcingDestroyHomogeneousDataset(&f->source.multihomogeneous.data[idata]));
       }
       PetscCall(PetscFree(f->source.multihomogeneous.data));
+      PetscCall(PetscFree(f->source.multihomogeneous.region_ids));
       break;
   }
 
@@ -823,6 +828,7 @@ PetscErrorCode RDyDestroyForcing(RDyForcing *forcing) {
         PetscCall(RDyForcingDestroyHomogeneousDataset(&f->boundary.multihomogeneous.data[idata]));
       }
       PetscCall(PetscFree(f->boundary.multihomogeneous.data));
+      PetscCall(PetscFree(f->boundary.multihomogeneous.region_ids));
 
       if (f->boundary.multihomogeneous.ndirichlet_bcs) {
         PetscCall(PetscFree(f->boundary.multihomogeneous.dirichlet_bc_idx));

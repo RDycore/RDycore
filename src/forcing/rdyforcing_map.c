@@ -149,7 +149,7 @@ PetscErrorCode RDyForcingReadSpatialMap(RDy rdy, const char filename[], PetscInt
   PetscCall(RDyReadOneDOFGlobalVecFromBinaryFile(rdy, filename, &global));
 
   PetscInt size;
-  VecGetLocalSize(global, &size);
+  PetscCall(VecGetLocalSize(global, &size));
   PetscCheck(ncells == size, PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The ncells (=%" PetscInt_FMT ") does not match the local size of global Vec (=%" PetscInt_FMT ")", ncells, size);
 

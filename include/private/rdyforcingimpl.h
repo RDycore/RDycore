@@ -99,7 +99,7 @@ typedef struct {
   PetscInt *dirichlet_bc_to_data_idx;  // maps each Dirichlet BC to a dataset index
 
   PetscReal **data_for_rdycore;   // per-BC value arrays passed to RDycore
-  PetscReal  *ndata_for_rdycore;  // sizes of per-BC value arrays
+  PetscInt   *ndata_for_rdycore;  // sizes of per-BC value arrays
 } RDyMultiHomogeneousDataset;
 
 //--- Source/sink and boundary condition structures

@@ -296,7 +296,7 @@ PetscErrorCode RDyForcingSetRasterData(RDyRasterDataset *data, PetscReal cur_tim
   PetscFunctionBegin;
 
   if (cur_time / 3600.0 >= (data->ndata_file) * data->dtime_in_hour) {
-    RDyForcingOpenNextRasterDataset(data);
+    PetscCall(RDyForcingOpenNextRasterDataset(data));
   }
 
   PetscInt  offset                = data->header_offset;
@@ -344,7 +344,7 @@ PetscErrorCode RDyForcingSetUnstructuredData(RDyUnstructuredDataset *data, Petsc
   PetscFunctionBegin;
 
   if (cur_time / 3600.0 >= (data->ndata_file) * data->dtime_in_hour) {
-    RDyForcingOpenNextUnstructuredDataset(data);
+    PetscCall(RDyForcingOpenNextUnstructuredDataset(data));
   }
 
   PetscInt offset = 2;
