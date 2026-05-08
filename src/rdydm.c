@@ -265,6 +265,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(DMCreateGlobalVector(rdy->dm_diags, &rdy->vec_diags));
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_avg));
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_inst));
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

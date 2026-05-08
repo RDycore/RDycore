@@ -223,15 +223,28 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
     snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
   }
 
-  // set up primitive variables field spec (same component count as soln_fields,
-  // component names derived by appending "_Mean" to each soln_fields component name)
+  // set up primitive variables field spec for time-averaged (mean) output
   rdy->prim_vars_fields.num_fields              = 1;
   rdy->prim_vars_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
   strcpy(rdy->prim_vars_fields.field_names[0], "PrimitiveVariables");
-  for (PetscInt i = 0; i < rdy->soln_fields.num_field_components[0]; ++i) {
-    snprintf(rdy->prim_vars_fields.field_component_names[0][i], MAX_NAME_LEN, "%s_Mean", rdy->soln_fields.field_component_names[0][i]);
+  strcpy(rdy->prim_vars_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->prim_vars_fields.field_component_names[0][1], "VelocityX_Mean");
+  strcpy(rdy->prim_vars_fields.field_component_names[0][2], "VelocityY_Mean");
+  for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+    snprintf(rdy->prim_vars_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
   }
   rdy->prim_vars_accumulated_time = 0.0;
+
+  // set up primitive variables field spec for instantaneous output
+  rdy->prim_vars_inst_fields.num_fields              = 1;
+  rdy->prim_vars_inst_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_inst_fields.field_names[0], "PrimitiveVariablesInstantaneous");
+  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][0], "Height");  // skipped at write time
+  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][1], "VelocityX");
+  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][2], "VelocityY");
+  for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+    snprintf(rdy->prim_vars_inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+  }
 
   PetscCall(CreateDM(rdy));
 

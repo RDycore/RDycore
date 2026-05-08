@@ -197,6 +197,7 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->vec_diags) PetscCall(VecDestroy(&(*rdy)->vec_diags));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
   if ((*rdy)->vec_prim_vars_avg) PetscCall(VecDestroy(&(*rdy)->vec_prim_vars_avg));
+  if ((*rdy)->vec_prim_vars_inst) PetscCall(VecDestroy(&(*rdy)->vec_prim_vars_inst));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

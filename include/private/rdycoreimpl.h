@@ -143,6 +143,10 @@ struct _p_RDy {
   Vec              vec_prim_vars_avg;
   PetscReal        prim_vars_accumulated_time;
 
+  // field spec and Vec for instantaneous primitive variable output
+  SectionFieldSpec prim_vars_inst_fields;
+  Vec              vec_prim_vars_inst;
+
   // auxiliary DM for diagnostics
   DM               dm_diags;
   SectionFieldSpec field_diags;

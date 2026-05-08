@@ -4,9 +4,36 @@
 #include <rdycore.h>
 #include <string.h>
 
-// like WriteFieldData but writes all field components unconditionally, using spec for field/component names
-static PetscErrorCode WriteAllFieldData(DM dm, Vec global_vec, const SectionFieldSpec *spec, PetscViewer viewer, PetscInt num_refinements) {
+// Returns PETSC_TRUE if at least one *_Mean primitive variable field is requested.
+static PetscBool AnyMeanPrimVarRequested(const RDyOutputSection *output) {
+  for (PetscInt i = 0; i < output->fields_count; ++i) {
+    const char *f   = output->fields[i];
+    size_t      len = strlen(f);
+    if (len > 5 && strcmp(f + len - 5, "_Mean") == 0) return PETSC_TRUE;
+  }
+  return PETSC_FALSE;
+}
+
+// Returns PETSC_TRUE if at least one instantaneous primitive variable field is requested.
+// (VelocityX, VelocityY, Concentration%i — excludes Height which comes from u_global)
+static PetscBool AnyInstPrimVarRequested(const RDyOutputSection *output, const SectionFieldSpec *inst_spec) {
+  for (PetscInt i = 0; i < output->fields_count; ++i) {
+    // skip component 0 (Height), which is intentionally excluded from instantaneous prim var output
+    for (PetscInt c = 1; c < inst_spec->num_field_components[0]; ++c) {
+      if (!strcmp(output->fields[i], inst_spec->field_component_names[0][c])) return PETSC_TRUE;
+    }
+  }
+  return PETSC_FALSE;
+}
+
+// Writes components of global_vec whose names (from spec) match output.fields.
+// Components with index < component_offset are skipped unconditionally.
+// If output.fields_count == 0, no components are written.
+static PetscErrorCode WriteFilteredFieldData(DM dm, Vec global_vec, PetscInt component_offset, const SectionFieldSpec *spec, RDyOutputSection output,
+                                             PetscViewer viewer, PetscInt num_refinements) {
   PetscFunctionBegin;
+
+  if (output.fields_count == 0) PetscFunctionReturn(PETSC_SUCCESS);
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -27,41 +54,63 @@ static PetscErrorCode WriteAllFieldData(DM dm, Vec global_vec, const SectionFiel
   PetscCall(VecGetLocalSize(data_vec, &n));
   PetscCall(VecGetSize(data_vec, &N));
 
-  Vec     *comp;
   PetscInt c_global = 0;
-  PetscCall(PetscMalloc1(bs, &comp));
   for (PetscInt f = 0; f < spec->num_fields; ++f) {
     for (PetscInt c = 0; c < spec->num_field_components[f]; ++c, ++c_global) {
-      PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp[c_global]));
-      PetscCall(PetscObjectSetName((PetscObject)comp[c_global], spec->field_component_names[f][c]));
+      if (c_global < component_offset) continue;
+      const char *name = spec->field_component_names[f][c];
+      PetscBool   write = PETSC_FALSE;
+      for (PetscInt i = 0; i < output.fields_count; ++i) {
+        if (!strcmp(output.fields[i], name)) {
+          write = PETSC_TRUE;
+          break;
+        }
+      }
+      if (write) {
+        Vec comp;
+        PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp));
+        PetscCall(PetscObjectSetName((PetscObject)comp, name));
+        PetscCall(VecStrideGather(data_vec, c_global, comp, INSERT_VALUES));
+        PetscCall(VecView(comp, viewer));
+        PetscCall(VecDestroy(&comp));
+      }
     }
   }
-  PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
-  for (PetscInt c = 0; c < bs; ++c) {
-    PetscCall(VecView(comp[c], viewer));
-    PetscCall(VecDestroy(&comp[c]));
-  }
-  PetscCall(PetscFree(comp));
 
   PetscCall(VecDestroy(&data_vec));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// like WriteFieldMetadata but writes metadata for all field components unconditionally, using spec for names
-static PetscErrorCode WriteAllFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5_basename, const char *group_name, const SectionFieldSpec *spec,
-                                            PetscInt num_cells_global) {
+// Writes XMF metadata for components of spec whose names match output.fields.
+// Components with index < component_offset are skipped unconditionally.
+// If output.fields_count == 0, no metadata is written.
+static PetscErrorCode WriteFilteredFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5_basename, const char *group_name, const SectionFieldSpec *spec,
+                                                 RDyOutputSection output, PetscInt component_offset, PetscInt num_cells_global) {
   PetscFunctionBegin;
 
+  if (output.fields_count == 0) PetscFunctionReturn(PETSC_SUCCESS);
+
+  PetscInt c_global = 0;
   for (PetscInt f = 0; f < spec->num_fields; ++f) {
-    for (PetscInt c = 0; c < spec->num_field_components[f]; ++c) {
+    for (PetscInt c = 0; c < spec->num_field_components[f]; ++c, ++c_global) {
+      if (c_global < component_offset) continue;
       const char *name = spec->field_component_names[f][c];
-      PetscCall(PetscFPrintf(comm, fp,
-                             "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
-                             "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                             "          %s:/%s/%s\n"
-                             "        </DataItem>\n"
-                             "      </Attribute>\n",
-                             name, num_cells_global, h5_basename, group_name, name));
+      PetscBool   write = PETSC_FALSE;
+      for (PetscInt i = 0; i < output.fields_count; ++i) {
+        if (!strcmp(output.fields[i], name)) {
+          write = PETSC_TRUE;
+          break;
+        }
+      }
+      if (write) {
+        PetscCall(PetscFPrintf(comm, fp,
+                               "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
+                               "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
+                               "          %s:/%s/%s\n"
+                               "        </DataItem>\n"
+                               "      </Attribute>\n",
+                               name, num_cells_global, h5_basename, group_name, name));
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -296,7 +345,10 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
   if (rdy->field_diags.num_fields > 0) {  // diagnostics are written only by request
     PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->amr.num_refinements));
   }
-  PetscCall(WriteAllFieldData(rdy->dm, rdy->vec_prim_vars_avg, &rdy->prim_vars_fields, viewer, rdy->amr.num_refinements));
+  // mean primitive variables (component_offset=0: all matching components written)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_avg, 0, &rdy->prim_vars_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  // instantaneous primitive variables (component_offset=1: skip Height at component 0)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_inst, 1, &rdy->prim_vars_inst_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // on the first step ONLY, write the grid to its own file
@@ -446,13 +498,35 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
 
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
   PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm_diags, &rdy->mesh));
-  PetscCall(WriteAllFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_fields, rdy->mesh.num_cells_global));
+  // mean primitive variables (component_offset=0: all matching components)
+  PetscCall(WriteFilteredFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_fields, rdy->config.output, 0, rdy->mesh.num_cells_global));
+  // instantaneous primitive variables (component_offset=1: skip Height at component 0)
+  PetscCall(WriteFilteredFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_inst_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
 
   // write footer and close the file
   PetscCall(PetscFPrintf(rdy->comm, fp, "  </Domain>\n</Xdmf>\n"));
   PetscCall(PetscFClose(rdy->comm, fp));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Copies the current operator primitive variables into vec_prim_vars_inst for output.
+static PetscErrorCode CopyInstantaneousPrimitiveVariables(RDy rdy) {
+  PetscFunctionBegin;
+  Operator *op = rdy->operator;
+  if (CeedEnabled()) {
+    const CeedScalar *pv_data;
+    PetscCallCEED(CeedVectorGetArrayRead(op->ceed.primitive_variables, CEED_MEM_HOST, &pv_data));
+    PetscScalar *inst_data;
+    PetscCall(VecGetArrayWrite(rdy->vec_prim_vars_inst, &inst_data));
+    PetscInt n = rdy->mesh.num_owned_cells * op->num_components;
+    for (PetscInt i = 0; i < n; ++i) inst_data[i] = pv_data[i];
+    PetscCall(VecRestoreArrayWrite(rdy->vec_prim_vars_inst, &inst_data));
+    PetscCallCEED(CeedVectorRestoreArrayRead(op->ceed.primitive_variables, &pv_data));
+  } else {
+    PetscCall(VecCopy(op->primitive_variables, rdy->vec_prim_vars_inst));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -517,8 +591,11 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
   if (output->enable && (time != output->prev_output_time)) {
     PetscBool write_output = PETSC_FALSE;
 
-    // accumulate primitive variables every timestep regardless of output timing
-    PetscCall(AccumulatePrimitiveVariables(rdy));
+    // accumulate primitive variables only if at least one *_Mean field is requested
+    PetscBool need_mean = AnyMeanPrimVarRequested(output);
+    if (need_mean) {
+      PetscCall(AccumulatePrimitiveVariables(rdy));
+    }
 
     // check if it is time to output based on temporal interval
     if (output->time_interval > 0) {
@@ -542,7 +619,15 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
       }
 
       // compute time-averaged primitive variables for this output interval
-      PetscCall(UpdatePrimitiveVariablesMean(rdy));
+      if (need_mean) {
+        PetscCall(UpdatePrimitiveVariablesMean(rdy));
+      }
+
+      // copy instantaneous primitive variables if any instantaneous prim var field is requested
+      PetscBool need_inst = AnyInstPrimVarRequested(output, &rdy->prim_vars_inst_fields);
+      if (need_inst) {
+        PetscCall(CopyInstantaneousPrimitiveVariables(rdy));
+      }
 
       // save the time output was written
       output->prev_output_time = time;
@@ -556,7 +641,9 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
       }
 
       // reset accumulation state for the next output interval
-      PetscCall(ResetPrimitiveVariablesAccum(rdy));
+      if (need_mean) {
+        PetscCall(ResetPrimitiveVariablesAccum(rdy));
+      }
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);

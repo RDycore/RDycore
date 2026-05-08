@@ -1418,15 +1418,28 @@ PetscErrorCode RDySetup(RDy rdy) {
   }
   // TODO: salinity and heat go here
 
-  // set up primitive variables field spec (same component count as soln_fields,
-  // component names derived by appending "_Mean" to each soln_fields component name)
+  // set up primitive variables field spec for time-averaged (mean) output
   rdy->prim_vars_fields.num_fields              = 1;
   rdy->prim_vars_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
   strcpy(rdy->prim_vars_fields.field_names[0], "PrimitiveVariables");
-  for (PetscInt i = 0; i < rdy->soln_fields.num_field_components[0]; ++i) {
-    snprintf(rdy->prim_vars_fields.field_component_names[0][i], MAX_NAME_LEN, "%s_Mean", rdy->soln_fields.field_component_names[0][i]);
+  strcpy(rdy->prim_vars_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->prim_vars_fields.field_component_names[0][1], "VelocityX_Mean");
+  strcpy(rdy->prim_vars_fields.field_component_names[0][2], "VelocityY_Mean");
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(rdy->prim_vars_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
   }
   rdy->prim_vars_accumulated_time = 0.0;
+
+  // set up primitive variables field spec for instantaneous output
+  rdy->prim_vars_inst_fields.num_fields              = 1;
+  rdy->prim_vars_inst_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_inst_fields.field_names[0], "PrimitiveVariablesInstantaneous");
+  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][0], "Height");  // skipped at write time
+  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][1], "VelocityX");
+  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][2], "VelocityY");
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(rdy->prim_vars_inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+  }
 
   PetscCall(CreateDM(rdy));
 
@@ -1436,12 +1449,28 @@ PetscErrorCode RDySetup(RDy rdy) {
     rdy->field_diags.num_fields = 0;
     for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
       // a diagnostic field is a requested output field that doesn't belong
-      // to the solution vector
+      // to the solution vector, prim_vars_fields, or prim_vars_inst_fields
       PetscBool is_diag_field = PETSC_TRUE;
       for (PetscInt j = 0; j < rdy->soln_fields.num_field_components[0]; ++j) {
         if (!strcmp(rdy->soln_fields.field_component_names[0][j], rdy->config.output.fields[i])) {
           is_diag_field = PETSC_FALSE;
           break;
+        }
+      }
+      if (is_diag_field) {
+        for (PetscInt j = 0; j < rdy->prim_vars_fields.num_field_components[0]; ++j) {
+          if (!strcmp(rdy->prim_vars_fields.field_component_names[0][j], rdy->config.output.fields[i])) {
+            is_diag_field = PETSC_FALSE;
+            break;
+          }
+        }
+      }
+      if (is_diag_field) {
+        for (PetscInt j = 0; j < rdy->prim_vars_inst_fields.num_field_components[0]; ++j) {
+          if (!strcmp(rdy->prim_vars_inst_fields.field_component_names[0][j], rdy->config.output.fields[i])) {
+            is_diag_field = PETSC_FALSE;
+            break;
+          }
         }
       }
       if (is_diag_field) {
