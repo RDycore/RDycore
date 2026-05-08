@@ -113,11 +113,13 @@ CEED_QFUNCTION_HELPER int SWESources(void *ctx, CeedInt Q, const CeedScalar *con
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];  // state variables
 
   // outputs
-  CeedScalar(*sources)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*sources)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*primitive_variables)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[1];
 
-  const SWEContext context = (SWEContext)ctx;
-  const CeedScalar tiny_h  = context->tiny_h;
-  const CeedScalar gravity = context->gravity;
+  const SWEContext context  = (SWEContext)ctx;
+  const CeedScalar tiny_h   = context->tiny_h;
+  const CeedScalar gravity  = context->gravity;
+  const CeedScalar h_anuga  = context->h_anuga_regular;
 
   for (CeedInt i = 0; i < Q; i++) {
     SWEState state = {q[0][i], q[1][i], q[2][i]};
@@ -149,6 +151,12 @@ CEED_QFUNCTION_HELPER int SWESources(void *ctx, CeedInt Q, const CeedScalar *con
     sources[0][i] = riemannf[0][i] + ext_src[0][i];
     sources[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
     sources[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
+
+    const CeedScalar h     = state.h;
+    const CeedScalar denom = Square(h) + Square(h_anuga);
+    primitive_variables[0][i] = h;
+    primitive_variables[1][i] = SafeDiv(state.hu * h, denom, h, tiny_h);
+    primitive_variables[2][i] = SafeDiv(state.hv * h, denom, h, tiny_h);
   }
 
   return 0;

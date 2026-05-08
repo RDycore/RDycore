@@ -257,9 +257,48 @@ static PetscErrorCode AddOperatorFluxDivergence(Operator *op) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// sets up primitive variables fields for the source operator — an num_components-component
+// vector (h, u, v[, c_0, c_1, ...]) computed each timestep and its dt-weighted accumulator
+static PetscErrorCode AddOperatorPrimitiveVariables(Operator *op) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
+  const CeedInt num_pv_comp     = op->num_components;
+  const CeedInt num_owned_cells = op->mesh->num_owned_cells;
+
+  PetscCall(CreateSequentialVector(comm, num_owned_cells * num_pv_comp, num_pv_comp, &op->primitive_variables));
+  PetscCall(CreateSequentialVector(comm, num_owned_cells * num_pv_comp, num_pv_comp, &op->primitive_variables_accum));
+  PetscCall(VecZeroEntries(op->primitive_variables_accum));
+
+  if (CeedEnabled()) {
+    Ceed    ceed          = CeedContext();
+    CeedInt pv_strides[]  = {num_pv_comp, 1, num_pv_comp};
+    CeedElemRestriction pv_restriction;
+    PetscCallCEED(
+        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_pv_comp, num_owned_cells * num_pv_comp, pv_strides, &pv_restriction));
+    PetscCallCEED(CeedElemRestrictionCreateVector(pv_restriction, &op->ceed.primitive_variables, NULL));
+    PetscCallCEED(CeedElemRestrictionCreateVector(pv_restriction, &op->ceed.primitive_variables_accum, NULL));
+    PetscCallCEED(CeedVectorSetValue(op->ceed.primitive_variables_accum, 0.0));
+
+    CeedInt      num_source_suboperators;
+    CeedOperator *source_suboperators;
+    PetscCallCEED(CeedOperatorCompositeGetNumSub(op->ceed.source, &num_source_suboperators));
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &source_suboperators));
+    for (CeedInt i = 0; i < num_source_suboperators; ++i) {
+      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "primitive_variables", pv_restriction, CEED_BASIS_NONE, op->ceed.primitive_variables));
+    }
+    PetscCallCEED(CeedElemRestrictionDestroy(&pv_restriction));
+  } else {
+    PetscCall(PetscOperatorSetField(op->petsc.source, "primitive_variables", op->primitive_variables));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Creates an operator representing the system of equations described in the
 /// given configuration.
-/// @param [in]  config              the configuration defining the physics and numerics for the new operator
 /// @param [in]  domain_dm           a DM representing the computational domain on which the operator is defined
 /// @param [in]  domain_mesh         a mesh containing geometric and topological information for the domain
 /// @param [in]  num_regions         the number of disjoint regions partitioning the computational domain
@@ -328,6 +367,9 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   // set up our flux divergence vector(s)
   PetscCall(AddOperatorFluxDivergence(*operator));
 
+  // set up primitive variables vectors for time-averaged output
+  PetscCall(AddOperatorPrimitiveVariables(*operator));
+
   // initialize diagnostics
   PetscCall(ResetOperatorDiagnostics(*operator));
 
@@ -362,6 +404,12 @@ PetscErrorCode DestroyOperator(Operator **op) {
       PetscCall(PetscFree((*op)->ceed.grad_hv));
       PetscCall(PetscFree((*op)->ceed.ls_grad_coeffs));
     }
+    if ((*op)->ceed.primitive_variables) {
+      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.primitive_variables)));
+    }
+    if ((*op)->ceed.primitive_variables_accum) {
+      PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.primitive_variables_accum)));
+    }
   } else {  // petsc
     for (PetscInt b = 0; b < (*op)->num_boundaries; ++b) {
       PetscCall(VecDestroy(&(*op)->petsc.boundary_values[b]));
@@ -378,6 +426,12 @@ PetscErrorCode DestroyOperator(Operator **op) {
   }
   if ((*op)->flux_divergence) {
     PetscCall(VecDestroy(&(*op)->flux_divergence));
+  }
+  if ((*op)->primitive_variables) {
+    PetscCall(VecDestroy(&(*op)->primitive_variables));
+  }
+  if ((*op)->primitive_variables_accum) {
+    PetscCall(VecDestroy(&(*op)->primitive_variables_accum));
   }
 
   PetscFree(*op);

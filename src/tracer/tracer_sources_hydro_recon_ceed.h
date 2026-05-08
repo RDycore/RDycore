@@ -36,11 +36,13 @@ CEED_QFUNCTION_HELPER int TracerSourcesHydroRecon(void *ctx, CeedInt Q, const Ce
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];
 
   // outputs
-  CeedScalar(*sources)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*sources)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*primitive_variables)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[1];
 
   const TracerContext context   = (TracerContext)ctx;
   const CeedInt       flow_ndof = context->flow_ndof;
   const CeedScalar    tiny_h    = context->tiny_h;
+  const CeedScalar    h_anuga   = context->h_anuga_regular;
 
   for (CeedInt i = 0; i < Q; i++) {
     TracerState state = {q[0][i], q[1][i], q[2][i]};
@@ -77,6 +79,16 @@ CEED_QFUNCTION_HELPER int TracerSourcesHydroRecon(void *ctx, CeedInt Q, const Ce
     sources[2][i] = riemannf[2][i] - tby + ext_src[2][i];
     for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
       sources[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (e[j] - d[j]) + ext_src[flow_ndof + j][i];
+    }
+
+    const CeedScalar h     = state.h;
+    const CeedScalar denom = Square(h) + Square(h_anuga);
+    primitive_variables[0][i] = h;
+    primitive_variables[1][i] = SafeDiv(state.hu * h, denom, h, tiny_h);
+    primitive_variables[2][i] = SafeDiv(state.hv * h, denom, h, tiny_h);
+    // tracer concentrations c_j = h*c_j / h
+    for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
+      primitive_variables[flow_ndof + j][i] = (h > tiny_h) ? (state.hci[j] / h) : 0.0;
     }
   }
 

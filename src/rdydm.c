@@ -193,6 +193,7 @@ PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
 
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_diags, &rdy->dm_diags));
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_1dof, &rdy->dm_1dof));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -263,6 +264,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   // total number of field components
   PetscCall(DMCreateGlobalVector(rdy->dm_diags, &rdy->vec_diags));
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_avg));
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

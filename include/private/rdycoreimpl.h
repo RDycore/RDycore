@@ -137,6 +137,12 @@ struct _p_RDy {
   SectionFieldSpec soln_fields;
   PetscBool        refine;
 
+  // field spec, Vec, and accumulated time for time-averaged primitive variables output
+  // (uses the same DM layout as dm above)
+  SectionFieldSpec prim_vars_fields;
+  Vec              vec_prim_vars_avg;
+  PetscReal        prim_vars_accumulated_time;
+
   // auxiliary DM for diagnostics
   DM               dm_diags;
   SectionFieldSpec field_diags;

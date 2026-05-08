@@ -125,6 +125,7 @@ static PetscErrorCode CreateCeedSourceSuboperator(const RDyConfig config, RDyMes
   PetscCallCEED(CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "primitive_variables", num_comp, CEED_EVAL_NONE));
 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_ext_src, restrict_mat_props;

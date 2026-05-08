@@ -1418,6 +1418,16 @@ PetscErrorCode RDySetup(RDy rdy) {
   }
   // TODO: salinity and heat go here
 
+  // set up primitive variables field spec (same component count as soln_fields,
+  // component names derived by appending "_Mean" to each soln_fields component name)
+  rdy->prim_vars_fields.num_fields              = 1;
+  rdy->prim_vars_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_fields.field_names[0], "PrimitiveVariables");
+  for (PetscInt i = 0; i < rdy->soln_fields.num_field_components[0]; ++i) {
+    snprintf(rdy->prim_vars_fields.field_component_names[0][i], MAX_NAME_LEN, "%s_Mean", rdy->soln_fields.field_component_names[0][i]);
+  }
+  rdy->prim_vars_accumulated_time = 0.0;
+
   PetscCall(CreateDM(rdy));
 
   // create the auxiliary DM, which handles requested diagnostics and I/O
