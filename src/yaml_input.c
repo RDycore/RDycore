@@ -1111,16 +1111,31 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     if (config->output.fields_count > 0) {
       static const char *valid_output_fields[] = {
-          "Height",      "MomentumX",       "MomentumY",       "SedimentMassPerUnitArea%" PetscInt_FMT,
-          "WaterSource", "MomentumXSource", "MomentumYSource", "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
+          "Height",
+          "MomentumX",
+          "MomentumY",
+          "SedimentMassPerUnitArea%" PetscInt_FMT,
+          "WaterSource",
+          "MomentumXSource",
+          "MomentumYSource",
+          "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
           // solution mean fields
-          "Height_Mean", "MomentumX_Mean",  "MomentumY_Mean",  "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
+          "Height_Mean",
+          "MomentumX_Mean",
+          "MomentumY_Mean",
+          "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
           // primitive variable mean fields
-          "VelocityX_Mean",  "VelocityY_Mean",  "Concentration%" PetscInt_FMT "_Mean",
+          "VelocityX_Mean",
+          "VelocityY_Mean",
+          "Concentration%" PetscInt_FMT "_Mean",
           // primitive variable instantaneous fields (Height excluded — comes from u_global)
-          "VelocityX",   "VelocityY",       "Concentration%" PetscInt_FMT,
+          "VelocityX",
+          "VelocityY",
+          "Concentration%" PetscInt_FMT,
           // source mean fields
-          "WaterSource_Mean", "MomentumXSource_Mean", "MomentumYSource_Mean",
+          "WaterSource_Mean",
+          "MomentumXSource_Mean",
+          "MomentumYSource_Mean",
           "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean",
           NULL,
       };

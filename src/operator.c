@@ -272,8 +272,8 @@ static PetscErrorCode AddOperatorPrimitiveVariables(Operator *op) {
   PetscCall(VecZeroEntries(op->primitive_variables_accum));
 
   if (CeedEnabled()) {
-    Ceed    ceed          = CeedContext();
-    CeedInt pv_strides[]  = {num_pv_comp, 1, num_pv_comp};
+    Ceed                ceed         = CeedContext();
+    CeedInt             pv_strides[] = {num_pv_comp, 1, num_pv_comp};
     CeedElemRestriction pv_restriction;
     PetscCallCEED(
         CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_pv_comp, num_owned_cells * num_pv_comp, pv_strides, &pv_restriction));
@@ -282,12 +282,13 @@ static PetscErrorCode AddOperatorPrimitiveVariables(Operator *op) {
     PetscCallCEED(CeedVectorSetValue(op->ceed.primitive_variables, 0.0));
     PetscCallCEED(CeedVectorSetValue(op->ceed.primitive_variables_accum, 0.0));
 
-    CeedInt      num_source_suboperators;
+    CeedInt       num_source_suboperators;
     CeedOperator *source_suboperators;
     PetscCallCEED(CeedOperatorCompositeGetNumSub(op->ceed.source, &num_source_suboperators));
     PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &source_suboperators));
     for (CeedInt i = 0; i < num_source_suboperators; ++i) {
-      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "primitive_variables", pv_restriction, CEED_BASIS_NONE, op->ceed.primitive_variables));
+      PetscCallCEED(
+          CeedOperatorSetField(source_suboperators[i], "primitive_variables", pv_restriction, CEED_BASIS_NONE, op->ceed.primitive_variables));
     }
     PetscCallCEED(CeedElemRestrictionDestroy(&pv_restriction));
   } else {
@@ -309,11 +310,10 @@ PetscErrorCode AddOperatorSourceVariables(Operator *op) {
   PetscCall(VecZeroEntries(op->src_accum));
 
   if (CeedEnabled()) {
-    Ceed    ceed          = CeedContext();
-    CeedInt src_strides[] = {num_comp, 1, num_comp};
+    Ceed                ceed          = CeedContext();
+    CeedInt             src_strides[] = {num_comp, 1, num_comp};
     CeedElemRestriction src_restriction;
-    PetscCallCEED(
-        CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, src_strides, &src_restriction));
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, src_strides, &src_restriction));
     PetscCallCEED(CeedElemRestrictionCreateVector(src_restriction, &op->ceed.ceed_src_inst, NULL));
     PetscCallCEED(CeedElemRestrictionCreateVector(src_restriction, &op->ceed.ceed_src_accum, NULL));
     PetscCallCEED(CeedVectorSetValue(op->ceed.ceed_src_inst, 0.0));
@@ -321,7 +321,7 @@ PetscErrorCode AddOperatorSourceVariables(Operator *op) {
 
     // wire ceed_src_inst as the permanent backing vector for the "sources" field
     // in all source sub-operators (mirrors AddOperatorPrimitiveVariables pattern)
-    CeedInt      num_source_suboperators;
+    CeedInt       num_source_suboperators;
     CeedOperator *source_suboperators;
     PetscCallCEED(CeedOperatorCompositeGetNumSub(op->ceed.source, &num_source_suboperators));
     PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &source_suboperators));

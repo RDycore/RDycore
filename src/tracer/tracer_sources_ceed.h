@@ -133,8 +133,8 @@ CEED_QFUNCTION_HELPER int TracerSources(void *ctx, CeedInt Q, const CeedScalar *
       sources[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (e[j] - d[j]) + ext_src[flow_ndof + j][i];
     }
 
-    const CeedScalar h     = state.h;
-    const CeedScalar denom = Square(h) + Square(h_anuga);
+    const CeedScalar h        = state.h;
+    const CeedScalar denom    = Square(h) + Square(h_anuga);
     primitive_variables[0][i] = h;
     primitive_variables[1][i] = SafeDiv(state.hu * h, denom, h, tiny_h);
     primitive_variables[2][i] = SafeDiv(state.hv * h, denom, h, tiny_h);

@@ -579,8 +579,8 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscReal     h_anuga       = source_op->h_anuga_regular;
-  PetscInt      num_mat_props = NUM_MATERIAL_PROPERTIES;
+  PetscReal h_anuga       = source_op->h_anuga_regular;
+  PetscInt  num_mat_props = NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -624,10 +624,10 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
 
       // write primitive variables (h, u, v) using ANUGA regularization
-      PetscReal denom                     = Square(h) + Square(h_anuga);
-      pv_ptr[n_dof * owned_cell_id + 0]   = h;
-      pv_ptr[n_dof * owned_cell_id + 1]   = (h >= tiny_h) ? (hu * h / denom) : 0.0;
-      pv_ptr[n_dof * owned_cell_id + 2]   = (h >= tiny_h) ? (hv * h / denom) : 0.0;
+      PetscReal denom                   = Square(h) + Square(h_anuga);
+      pv_ptr[n_dof * owned_cell_id + 0] = h;
+      pv_ptr[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv_ptr[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
     }
   }
 
@@ -692,8 +692,8 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscReal     h_anuga_xq2018  = source_op->h_anuga_regular;
-  PetscInt      num_mat_props = NUM_MATERIAL_PROPERTIES;
+  PetscReal h_anuga_xq2018 = source_op->h_anuga_regular;
+  PetscInt  num_mat_props  = NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -752,7 +752,7 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
 
       // write primitive variables (h, u, v) using ANUGA regularization
-      PetscReal denom                        = Square(h) + Square(h_anuga_xq2018);
+      PetscReal denom                          = Square(h) + Square(h_anuga_xq2018);
       pv_ptr_xq2018[n_dof * owned_cell_id + 0] = h;
       pv_ptr_xq2018[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
       pv_ptr_xq2018[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;

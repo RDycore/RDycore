@@ -92,7 +92,7 @@ static PetscErrorCode WriteFilteredFieldData(DM dm, Vec global_vec, PetscInt com
   for (PetscInt f = 0; f < spec->num_fields; ++f) {
     for (PetscInt c = 0; c < spec->num_field_components[f]; ++c, ++c_global) {
       if (c_global < component_offset) continue;
-      const char *name = spec->field_component_names[f][c];
+      const char *name  = spec->field_component_names[f][c];
       PetscBool   write = PETSC_FALSE;
       for (PetscInt i = 0; i < output.fields_count; ++i) {
         if (!strcmp(output.fields[i], name)) {
@@ -128,7 +128,7 @@ static PetscErrorCode WriteFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5
   for (PetscInt f = 0; f < spec->num_fields; ++f) {
     for (PetscInt c = 0; c < spec->num_field_components[f]; ++c, ++c_global) {
       if (c_global < component_offset) continue;
-      const char *name = spec->field_component_names[f][c];
+      const char *name  = spec->field_component_names[f][c];
       PetscBool   write = PETSC_FALSE;
       for (PetscInt i = 0; i < output.fields_count; ++i) {
         if (!strcmp(output.fields[i], name)) {
@@ -235,7 +235,7 @@ static PetscErrorCode CopyInstantaneousSourceVariables(RDy rdy) {
 /// Accumulates source variables for time-averaged output.
 static PetscErrorCode AccumulateSourceVariables(RDy rdy) {
   PetscFunctionBegin;
-  PetscReal  dt = rdy->dt;
+  PetscReal dt = rdy->dt;
   rdy->src_accumulated_time += dt;
   Operator *op = rdy->operator;
   if (CeedEnabled()) {
@@ -249,8 +249,8 @@ static PetscErrorCode AccumulateSourceVariables(RDy rdy) {
 /// Computes vec_src_avg from the accumulated source data.
 static PetscErrorCode UpdateSourceMean(RDy rdy) {
   PetscFunctionBegin;
-  Operator *op    = rdy->operator;
-  PetscReal scale = 1.0 / rdy->src_accumulated_time;
+  Operator *op              = rdy->operator;
+  PetscReal           scale = 1.0 / rdy->src_accumulated_time;
   if (CeedEnabled()) {
     const CeedScalar *accum_data;
     PetscCallCEED(CeedVectorGetArrayRead(op->ceed.ceed_src_accum, CEED_MEM_HOST, &accum_data));
@@ -330,7 +330,8 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
   // mean primitive variables (component_offset=1: skip Height_Mean)
   PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_avg, 1, &rdy->prim_vars_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
   // instantaneous primitive variables (component_offset=1: skip Height at component 0)
-  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_inst, 1, &rdy->prim_vars_inst_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  PetscCall(
+      WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_inst, 1, &rdy->prim_vars_inst_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
 
   // on the first step ONLY, write the grid to its own file
@@ -458,7 +459,8 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
   // mean primitive variables (component_offset=1: skip Height_Mean)
   PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
   // instantaneous primitive variables (component_offset=1: skip Height at component 0)
-  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_inst_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
+  PetscCall(
+      WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_inst_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
 
@@ -491,7 +493,7 @@ static PetscErrorCode CopyInstantaneousPrimitiveVariables(RDy rdy) {
 static PetscErrorCode AccumulatePrimitiveVariables(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscReal  dt = rdy->dt;
+  PetscReal dt = rdy->dt;
   rdy->prim_vars_accumulated_time += dt;
 
   Operator *op = rdy->operator;
@@ -521,8 +523,8 @@ static PetscErrorCode ResetPrimitiveVariablesAccum(RDy rdy) {
 static PetscErrorCode UpdatePrimitiveVariablesMean(RDy rdy) {
   PetscFunctionBegin;
 
-  Operator *op    = rdy->operator;
-  PetscReal scale = 1.0 / rdy->prim_vars_accumulated_time;
+  Operator *op              = rdy->operator;
+  PetscReal           scale = 1.0 / rdy->prim_vars_accumulated_time;
 
   if (CeedEnabled()) {
     const CeedScalar *accum_data;

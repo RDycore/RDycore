@@ -1441,7 +1441,7 @@ PetscErrorCode RDySetup(RDy rdy) {
     snprintf(rdy->prim_vars_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
   }
   rdy->prim_vars_accumulated_time = 0.0;
-  rdy->src_accumulated_time        = 0.0;
+  rdy->src_accumulated_time       = 0.0;
 
   // set up primitive variables field spec for instantaneous output
   rdy->prim_vars_inst_fields.num_fields              = 1;

@@ -74,8 +74,8 @@ CEED_QFUNCTION_HELPER int SWESourcesHydroRecon(void *ctx, CeedInt Q, const CeedS
     sources[1][i] = riemannf[1][i] - tbx + ext_src[1][i];
     sources[2][i] = riemannf[2][i] - tby + ext_src[2][i];
 
-    const CeedScalar h     = state.h;
-    const CeedScalar denom = Square(h) + Square(h_anuga);
+    const CeedScalar h        = state.h;
+    const CeedScalar denom    = Square(h) + Square(h_anuga);
     primitive_variables[0][i] = h;
     primitive_variables[1][i] = SafeDiv(state.hu * h, denom, h, tiny_h);
     primitive_variables[2][i] = SafeDiv(state.hv * h, denom, h, tiny_h);

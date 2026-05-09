@@ -660,7 +660,7 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
 
-  PetscReal h_anuga    = source_op->h_anuga_regular;
+  PetscReal h_anuga = source_op->h_anuga_regular;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -713,13 +713,13 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
 
       // write primitive variables (h, u, v[, c_0, c_1, ...]) using ANUGA regularization
-      PetscReal denom              = Square(h) + Square(h_anuga);
+      PetscReal denom                   = Square(h) + Square(h_anuga);
       pv_ptr[n_dof * owned_cell_id + 0] = h;
       pv_ptr[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
       pv_ptr[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
       // tracer concentrations c_s = h*c_s / h
       for (PetscInt s = 0; s < num_tracers_comp; s++) {
-        PetscReal hc_s = u_ptr[n_dof * c + 3 + s];
+        PetscReal hc_s                        = u_ptr[n_dof * c + 3 + s];
         pv_ptr[n_dof * owned_cell_id + 3 + s] = (h >= tiny_h) ? (hc_s / h) : 0.0;
       }
     }

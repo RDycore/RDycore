@@ -195,8 +195,8 @@ typedef struct Operator {
   Vec primitive_variables_accum;
 
   // source output snapshot and accumulation
-  Vec src_inst;              // instantaneous source snapshot (PETSc backend)
-  Vec src_accum;             // running sum for time averaging (PETSc backend)
+  Vec src_inst;   // instantaneous source snapshot (PETSc backend)
+  Vec src_accum;  // running sum for time averaging (PETSc backend)
 
   //-------------------------------------------
   // diagnostics (used by both PETSc and CEED)
