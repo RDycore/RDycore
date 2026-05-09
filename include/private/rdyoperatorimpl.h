@@ -194,11 +194,9 @@ typedef struct Operator {
   // domain-wide primitive variables accumulation (dt-weighted sum)
   Vec primitive_variables_accum;
 
-  // source output snapshot and accumulation (populated during ApplyOperator if has_src_output)
-  PetscBool has_src_output;        // set true if any source field is requested for output
-  PetscReal src_accumulated_time;
-  Vec       src_inst;              // instantaneous source snapshot (PETSc backend)
-  Vec       src_accum;             // running sum for time averaging (PETSc backend)
+  // source output snapshot and accumulation
+  Vec src_inst;              // instantaneous source snapshot (PETSc backend)
+  Vec src_accum;             // running sum for time averaging (PETSc backend)
 
   //-------------------------------------------
   // diagnostics (used by both PETSc and CEED)
@@ -273,9 +271,5 @@ PETSC_INTERN PetscErrorCode GetOperatorDiagnostics(Operator *, OperatorDiagnosti
 
 // source output
 PETSC_INTERN PetscErrorCode AddOperatorSourceVariables(Operator *);
-PETSC_INTERN PetscErrorCode GetOperatorSrcInstantaneous(Operator *, Vec);
-PETSC_INTERN PetscErrorCode AccumulateOperatorSrcVariables(Operator *, PetscReal);
-PETSC_INTERN PetscErrorCode GetOperatorSrcMean(Operator *, PetscReal, Vec);
-PETSC_INTERN PetscErrorCode ResetOperatorSrcAccum(Operator *);
 
 #endif

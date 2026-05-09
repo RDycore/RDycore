@@ -148,7 +148,8 @@ struct _p_RDy {
   SectionFieldSpec prim_vars_fields;
   Vec              vec_prim_vars_avg;
   PetscReal        prim_vars_accumulated_time;
-
+  // accumulated time for time-averaged source output
+  PetscReal src_accumulated_time;
   // field spec and Vec for instantaneous primitive variable output
   SectionFieldSpec prim_vars_inst_fields;
   Vec              vec_prim_vars_inst;

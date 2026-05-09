@@ -309,7 +309,7 @@ PetscErrorCode AddOperatorSourceVariables(Operator *op) {
   PetscCall(VecZeroEntries(op->src_accum));
 
   if (CeedEnabled()) {
-    Ceed    ceed         = CeedContext();
+    Ceed    ceed          = CeedContext();
     CeedInt src_strides[] = {num_comp, 1, num_comp};
     CeedElemRestriction src_restriction;
     PetscCallCEED(
@@ -318,10 +318,19 @@ PetscErrorCode AddOperatorSourceVariables(Operator *op) {
     PetscCallCEED(CeedElemRestrictionCreateVector(src_restriction, &op->ceed.ceed_src_accum, NULL));
     PetscCallCEED(CeedVectorSetValue(op->ceed.ceed_src_inst, 0.0));
     PetscCallCEED(CeedVectorSetValue(op->ceed.ceed_src_accum, 0.0));
+
+    // wire ceed_src_inst as the permanent backing vector for the "sources" field
+    // in all source sub-operators (mirrors AddOperatorPrimitiveVariables pattern)
+    CeedInt      num_source_suboperators;
+    CeedOperator *source_suboperators;
+    PetscCallCEED(CeedOperatorCompositeGetNumSub(op->ceed.source, &num_source_suboperators));
+    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &source_suboperators));
+    for (CeedInt i = 0; i < num_source_suboperators; ++i) {
+      PetscCallCEED(CeedOperatorSetField(source_suboperators[i], "sources", src_restriction, CEED_BASIS_NONE, op->ceed.ceed_src_inst));
+    }
     PetscCallCEED(CeedElemRestrictionDestroy(&src_restriction));
   }
 
-  op->src_accumulated_time = 0.0;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -397,6 +406,9 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   // set up primitive variables vectors for time-averaged output
   PetscCall(AddOperatorPrimitiveVariables(*operator));
+
+  // set up source instantaneous snapshot and accumulation vectors
+  PetscCall(AddOperatorSourceVariables(*operator));
 
   // initialize diagnostics
   PetscCall(ResetOperatorDiagnostics(*operator));
@@ -627,18 +639,6 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     PetscCall(VecRestoreArrayAndMemType(u_local, &u_local_ptr));
   }
 
-  // if source output is requested, snapshot the ext_src CeedVector into ceed_src_inst
-  if (op->has_src_output) {
-    CeedOperator     *source_subops;
-    PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.source, &source_subops));
-    CeedOperatorField ext_src_field;
-    PetscCallCEED(CeedOperatorGetFieldByName(source_subops[0], "ext_src", &ext_src_field));
-    CeedVector ext_src_vec;
-    PetscCallCEED(CeedOperatorFieldGetVector(ext_src_field, &ext_src_vec));
-    PetscCallCEED(CeedVectorSetValue(op->ceed.ceed_src_inst, 0.0));
-    PetscCallCEED(CeedVectorAXPY(op->ceed.ceed_src_inst, 1.0, ext_src_vec));
-  }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -661,10 +661,8 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
   // apply the composite PETSc source operators
   PetscCall(PetscOperatorApply(op->petsc.source, dt, u_local, f_global));
 
-  // if source output is requested, snapshot the external sources
-  if (op->has_src_output) {
-    PetscCall(VecCopy(op->petsc.external_sources, op->src_inst));
-  }
+  // snapshot the external sources into src_inst for output
+  PetscCall(VecCopy(op->petsc.external_sources, op->src_inst));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -887,72 +885,6 @@ PetscErrorCode UpdateOperatorDiagnostics(Operator *op) {
 PetscErrorCode GetOperatorDiagnostics(Operator *op, OperatorDiagnostics *diagnostics) {
   PetscFunctionBegin;
   *diagnostics = op->diagnostics;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-//------------------------
-// Source Output Functions
-//------------------------
-
-/// Copies the instantaneous source snapshot into the given Vec.
-PetscErrorCode GetOperatorSrcInstantaneous(Operator *op, Vec vec_out) {
-  PetscFunctionBegin;
-  if (CeedEnabled()) {
-    const CeedScalar *src_data;
-    PetscCallCEED(CeedVectorGetArrayRead(op->ceed.ceed_src_inst, CEED_MEM_HOST, &src_data));
-    PetscScalar *out_data;
-    PetscCall(VecGetArrayWrite(vec_out, &out_data));
-    PetscInt n = op->mesh->num_owned_cells * op->num_components;
-    for (PetscInt i = 0; i < n; ++i) out_data[i] = src_data[i];
-    PetscCall(VecRestoreArrayWrite(vec_out, &out_data));
-    PetscCallCEED(CeedVectorRestoreArrayRead(op->ceed.ceed_src_inst, &src_data));
-  } else {
-    PetscCall(VecCopy(op->src_inst, vec_out));
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Accumulates the instantaneous source snapshot into the running sum (src_accum += dt * src_inst).
-PetscErrorCode AccumulateOperatorSrcVariables(Operator *op, PetscReal dt) {
-  PetscFunctionBegin;
-  op->src_accumulated_time += dt;
-  if (CeedEnabled()) {
-    PetscCallCEED(CeedVectorAXPY(op->ceed.ceed_src_accum, dt, op->ceed.ceed_src_inst));
-  } else {
-    PetscCall(VecAXPY(op->src_accum, dt, op->src_inst));
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Computes the time-averaged sources (src_accum / accum_time) and places the result in vec_out.
-PetscErrorCode GetOperatorSrcMean(Operator *op, PetscReal accum_time, Vec vec_out) {
-  PetscFunctionBegin;
-  PetscReal scale = 1.0 / accum_time;
-  if (CeedEnabled()) {
-    const CeedScalar *accum_data;
-    PetscCallCEED(CeedVectorGetArrayRead(op->ceed.ceed_src_accum, CEED_MEM_HOST, &accum_data));
-    PetscScalar *out_data;
-    PetscCall(VecGetArrayWrite(vec_out, &out_data));
-    PetscInt n = op->mesh->num_owned_cells * op->num_components;
-    for (PetscInt i = 0; i < n; ++i) out_data[i] = accum_data[i] * scale;
-    PetscCall(VecRestoreArrayWrite(vec_out, &out_data));
-    PetscCallCEED(CeedVectorRestoreArrayRead(op->ceed.ceed_src_accum, &accum_data));
-  } else {
-    PetscCall(VecCopy(op->src_accum, vec_out));
-    PetscCall(VecScale(vec_out, scale));
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// Resets source accumulation state (zeroes src_accum, resets src_accumulated_time).
-PetscErrorCode ResetOperatorSrcAccum(Operator *op) {
-  PetscFunctionBegin;
-  op->src_accumulated_time = 0.0;
-  if (CeedEnabled()) {
-    PetscCallCEED(CeedVectorSetValue(op->ceed.ceed_src_accum, 0.0));
-  } else {
-    PetscCall(VecZeroEntries(op->src_accum));
-  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -1441,6 +1441,7 @@ PetscErrorCode RDySetup(RDy rdy) {
     snprintf(rdy->prim_vars_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
   }
   rdy->prim_vars_accumulated_time = 0.0;
+  rdy->src_accumulated_time        = 0.0;
 
   // set up primitive variables field spec for instantaneous output
   rdy->prim_vars_inst_fields.num_fields              = 1;
@@ -1527,23 +1528,6 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
-
-  // enable source output if any source field is requested for output
-  if (rdy->config.output.fields_count > 0) {
-    PetscBool has_src_output = PETSC_FALSE;
-    for (PetscInt i = 0; i < rdy->config.output.fields_count && !has_src_output; ++i) {
-      for (PetscInt c = 0; c < rdy->src_inst_fields.num_field_components[0] && !has_src_output; ++c) {
-        if (!strcmp(rdy->src_inst_fields.field_component_names[0][c], rdy->config.output.fields[i])) has_src_output = PETSC_TRUE;
-      }
-      for (PetscInt c = 0; c < rdy->src_avg_fields.num_field_components[0] && !has_src_output; ++c) {
-        if (!strcmp(rdy->src_avg_fields.field_component_names[0][c], rdy->config.output.fields[i])) has_src_output = PETSC_TRUE;
-      }
-    }
-    if (has_src_output) {
-      rdy->operator->has_src_output = PETSC_TRUE;
-      PetscCall(AddOperatorSourceVariables(rdy->operator));
-    }
-  }
 
   RDyLogDebug(rdy, "Initializing material properties...");
   PetscCall(InitMaterialProperties(rdy));

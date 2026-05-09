@@ -113,8 +113,9 @@ CEED_QFUNCTION_HELPER int SWESources(void *ctx, CeedInt Q, const CeedScalar *con
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[4];  // state variables
 
   // outputs
-  CeedScalar(*sources)[CEED_Q_VLA]            = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*sources)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*primitive_variables)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*sources_inst)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
 
   const SWEContext context  = (SWEContext)ctx;
   const CeedScalar tiny_h   = context->tiny_h;
@@ -157,6 +158,10 @@ CEED_QFUNCTION_HELPER int SWESources(void *ctx, CeedInt Q, const CeedScalar *con
     primitive_variables[0][i] = h;
     primitive_variables[1][i] = SafeDiv(state.hu * h, denom, h, tiny_h);
     primitive_variables[2][i] = SafeDiv(state.hv * h, denom, h, tiny_h);
+
+    sources_inst[0][i] = ext_src[0][i];
+    sources_inst[1][i] = ext_src[1][i];
+    sources_inst[2][i] = ext_src[2][i];
   }
 
   return 0;

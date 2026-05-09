@@ -216,28 +216,67 @@ static PetscErrorCode ResetSolutionAccum(RDy rdy) {
 /// Copies the current instantaneous source snapshot into vec_src_inst.
 static PetscErrorCode CopyInstantaneousSourceVariables(RDy rdy) {
   PetscFunctionBegin;
-  PetscCall(GetOperatorSrcInstantaneous(rdy->operator, rdy->vec_src_inst));
+  Operator *op = rdy->operator;
+  if (CeedEnabled()) {
+    const CeedScalar *src_data;
+    PetscCallCEED(CeedVectorGetArrayRead(op->ceed.ceed_src_inst, CEED_MEM_HOST, &src_data));
+    PetscScalar *inst_data;
+    PetscCall(VecGetArrayWrite(rdy->vec_src_inst, &inst_data));
+    PetscInt n = rdy->mesh.num_owned_cells * op->num_components;
+    for (PetscInt i = 0; i < n; ++i) inst_data[i] = src_data[i];
+    PetscCall(VecRestoreArrayWrite(rdy->vec_src_inst, &inst_data));
+    PetscCallCEED(CeedVectorRestoreArrayRead(op->ceed.ceed_src_inst, &src_data));
+  } else {
+    PetscCall(VecCopy(op->src_inst, rdy->vec_src_inst));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Accumulates source variables for time-averaged output.
 static PetscErrorCode AccumulateSourceVariables(RDy rdy) {
   PetscFunctionBegin;
-  PetscCall(AccumulateOperatorSrcVariables(rdy->operator, rdy->dt));
+  PetscReal  dt = rdy->dt;
+  rdy->src_accumulated_time += dt;
+  Operator *op = rdy->operator;
+  if (CeedEnabled()) {
+    PetscCallCEED(CeedVectorAXPY(op->ceed.ceed_src_accum, dt, op->ceed.ceed_src_inst));
+  } else {
+    PetscCall(VecAXPY(op->src_accum, dt, op->src_inst));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Computes vec_src_avg from the accumulated source data.
 static PetscErrorCode UpdateSourceMean(RDy rdy) {
   PetscFunctionBegin;
-  PetscCall(GetOperatorSrcMean(rdy->operator, rdy->operator->src_accumulated_time, rdy->vec_src_avg));
+  Operator *op    = rdy->operator;
+  PetscReal scale = 1.0 / rdy->src_accumulated_time;
+  if (CeedEnabled()) {
+    const CeedScalar *accum_data;
+    PetscCallCEED(CeedVectorGetArrayRead(op->ceed.ceed_src_accum, CEED_MEM_HOST, &accum_data));
+    PetscScalar *avg_data;
+    PetscCall(VecGetArrayWrite(rdy->vec_src_avg, &avg_data));
+    PetscInt n = rdy->mesh.num_owned_cells * op->num_components;
+    for (PetscInt i = 0; i < n; ++i) avg_data[i] = accum_data[i] * scale;
+    PetscCall(VecRestoreArrayWrite(rdy->vec_src_avg, &avg_data));
+    PetscCallCEED(CeedVectorRestoreArrayRead(op->ceed.ceed_src_accum, &accum_data));
+  } else {
+    PetscCall(VecCopy(op->src_accum, rdy->vec_src_avg));
+    PetscCall(VecScale(rdy->vec_src_avg, scale));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Resets source accumulation state after a write.
 static PetscErrorCode ResetSourceAccum(RDy rdy) {
   PetscFunctionBegin;
-  PetscCall(ResetOperatorSrcAccum(rdy->operator));
+  rdy->src_accumulated_time = 0.0;
+  Operator *op              = rdy->operator;
+  if (CeedEnabled()) {
+    PetscCallCEED(CeedVectorSetValue(op->ceed.ceed_src_accum, 0.0));
+  } else {
+    PetscCall(VecZeroEntries(op->src_accum));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
