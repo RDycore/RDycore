@@ -4,12 +4,24 @@
 #include <rdycore.h>
 #include <string.h>
 
-// Returns PETSC_TRUE if at least one *_Mean primitive variable field is requested.
-static PetscBool AnyMeanPrimVarRequested(const RDyOutputSection *output) {
+// Returns PETSC_TRUE if at least one solution *_Mean field (Height_Mean, MomentumX_Mean, etc.) is requested.
+static PetscBool AnySolnMeanRequested(const RDyOutputSection *output, const SectionFieldSpec *soln_avg_fields) {
   for (PetscInt i = 0; i < output->fields_count; ++i) {
-    const char *f   = output->fields[i];
-    size_t      len = strlen(f);
-    if (len > 5 && strcmp(f + len - 5, "_Mean") == 0) return PETSC_TRUE;
+    for (PetscInt c = 0; c < soln_avg_fields->num_field_components[0]; ++c) {
+      if (!strcmp(output->fields[i], soln_avg_fields->field_component_names[0][c])) return PETSC_TRUE;
+    }
+  }
+  return PETSC_FALSE;
+}
+
+// Returns PETSC_TRUE if at least one *_Mean primitive variable field is requested
+// (excludes Height_Mean, which is owned by solution time-average output).
+static PetscBool AnyMeanPrimVarRequested(const RDyOutputSection *output, const SectionFieldSpec *prim_vars_fields) {
+  // skip component 0 (Height_Mean), which is now owned by solution time-average output
+  for (PetscInt i = 0; i < output->fields_count; ++i) {
+    for (PetscInt c = 1; c < prim_vars_fields->num_field_components[0]; ++c) {
+      if (!strcmp(output->fields[i], prim_vars_fields->field_component_names[0][c])) return PETSC_TRUE;
+    }
   }
   return PETSC_FALSE;
 }
@@ -21,6 +33,28 @@ static PetscBool AnyInstPrimVarRequested(const RDyOutputSection *output, const S
     // skip component 0 (Height), which is intentionally excluded from instantaneous prim var output
     for (PetscInt c = 1; c < inst_spec->num_field_components[0]; ++c) {
       if (!strcmp(output->fields[i], inst_spec->field_component_names[0][c])) return PETSC_TRUE;
+    }
+  }
+  return PETSC_FALSE;
+}
+
+// Returns PETSC_TRUE if at least one instantaneous source field is requested.
+static PetscBool AnySrcInstRequested(const RDyOutputSection *output, const SectionFieldSpec *src_inst_fields) {
+  if (!src_inst_fields->num_fields) return PETSC_FALSE;
+  for (PetscInt i = 0; i < output->fields_count; ++i) {
+    for (PetscInt c = 0; c < src_inst_fields->num_field_components[0]; ++c) {
+      if (!strcmp(output->fields[i], src_inst_fields->field_component_names[0][c])) return PETSC_TRUE;
+    }
+  }
+  return PETSC_FALSE;
+}
+
+// Returns PETSC_TRUE if at least one time-averaged source field is requested.
+static PetscBool AnySrcMeanRequested(const RDyOutputSection *output, const SectionFieldSpec *src_avg_fields) {
+  if (!src_avg_fields->num_fields) return PETSC_FALSE;
+  for (PetscInt i = 0; i < output->fields_count; ++i) {
+    for (PetscInt c = 0; c < src_avg_fields->num_field_components[0]; ++c) {
+      if (!strcmp(output->fields[i], src_avg_fields->field_component_names[0][c])) return PETSC_TRUE;
     }
   }
   return PETSC_FALSE;
@@ -84,8 +118,8 @@ static PetscErrorCode WriteFilteredFieldData(DM dm, Vec global_vec, PetscInt com
 // Writes XMF metadata for components of spec whose names match output.fields.
 // Components with index < component_offset are skipped unconditionally.
 // If output.fields_count == 0, no metadata is written.
-static PetscErrorCode WriteFilteredFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5_basename, const char *group_name, const SectionFieldSpec *spec,
-                                                 RDyOutputSection output, PetscInt component_offset, PetscInt num_cells_global) {
+static PetscErrorCode WriteFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5_basename, const char *group_name, const SectionFieldSpec *spec,
+                                         RDyOutputSection output, PetscInt component_offset, PetscInt num_cells_global) {
   PetscFunctionBegin;
 
   if (output.fields_count == 0) PetscFunctionReturn(PETSC_SUCCESS);
@@ -117,88 +151,8 @@ static PetscErrorCode WriteFilteredFieldMetadata(MPI_Comm comm, FILE *fp, const 
 }
 
 // writes output fields that match the given set; writes all fields if none are given
-static PetscErrorCode WriteFieldData(DM dm, Vec global_vec, RDyOutputSection output, PetscViewer viewer, PetscInt num_refinements) {
-  PetscFunctionBegin;
-
-  MPI_Comm comm;
-  PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
-
-  // create and populate a multi-component vector
-  Vec data_vec;
-
-  if (!num_refinements) {
-    PetscCall(DMPlexCreateNaturalVector(dm, &data_vec));
-    PetscCall(DMPlexGlobalToNaturalBegin(dm, global_vec, data_vec));
-    PetscCall(DMPlexGlobalToNaturalEnd(dm, global_vec, data_vec));
-  } else {
-    // a refined DM doesn't have a meaningful natural ordering, so we dump a
-    // global vector instead
-    PetscCall(VecDuplicate(global_vec, &data_vec));
-    PetscCall(VecCopy(global_vec, data_vec));
-  }
-
-  // fetch our section to extract names of components
-  PetscSection section;
-  PetscCall(DMGetLocalSection(dm, &section));
-
-  // the block size of a vector is total number of components in all its fields
-  PetscInt num_fields, bs, tot_num_comp = 0;
-  PetscCall(PetscSectionGetNumFields(section, &num_fields));
-  for (PetscInt f = 0; f < num_fields; ++f) {
-    PetscInt num_comp;
-    PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
-    tot_num_comp += num_comp;
-  }
-  PetscCall(VecGetBlockSize(data_vec, &bs));
-  PetscCheck(tot_num_comp == bs, comm, PETSC_ERR_USER,
-             "Vector block size (%" PetscInt_FMT ") is not equal to number of field components (%" PetscInt_FMT ")", bs, tot_num_comp);
-
-  for (PetscInt f = 0; f < num_fields; ++f) {
-    PetscInt num_comp;
-    PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
-
-    // extract each component into a separate vector and write it
-    Vec     *comp;
-    PetscInt n, N;
-    PetscCall(VecGetLocalSize(data_vec, &n));
-    PetscCall(VecGetSize(data_vec, &N));
-    PetscCall(PetscMalloc1(bs, &comp));  // NOLINT
-    for (PetscInt c = 0; c < bs; ++c) {
-      PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp[c]));
-      const char *name;
-      PetscCall(PetscSectionGetComponentName(section, f, c, &name));
-      PetscCall(PetscObjectSetName((PetscObject)comp[c], name));
-    }
-    PetscCall(VecStrideGatherAll(data_vec, comp, INSERT_VALUES));
-    for (PetscInt c = 0; c < bs; ++c) {
-      if (output.fields_count > 0) {
-        const char *name;
-        PetscCall(PetscObjectGetName((PetscObject)comp[c], &name));
-        for (PetscInt i = 0; i < output.fields_count; ++i) {
-          if (!strcmp(output.fields[i], name)) {
-            PetscCall(VecView(comp[c], viewer));
-            PetscCall(VecDestroy(&comp[c]));
-            break;
-          }
-        }
-      } else {
-        // no output fields specified -- write out all data if we're operating
-        // on solution
-        const char *name;
-        PetscCall(PetscSectionGetFieldName(section, 0, &name));
-        if (!strcmp("Solution", name)) {
-          PetscCall(VecView(comp[c], viewer));
-          PetscCall(VecDestroy(&comp[c]));
-        }
-      }
-    }
-    PetscCall(PetscFree(comp));
-  }
-
-  PetscCall(VecDestroy(&data_vec));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
+// NOTE: This function is retained as a static helper but is no longer called directly.
+// All output now goes through WriteFilteredFieldData.
 
 static PetscErrorCode DetermineGridFile(RDy rdy, char *filename) {
   PetscFunctionBegin;
@@ -234,71 +188,56 @@ static PetscErrorCode WriteGrid(MPI_Comm comm, RDyMesh *mesh, PetscViewer viewer
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Updates diagnostic fields in the auxiliary DM
-static PetscErrorCode UpdateDiagnosticFields(RDy rdy) {
+/// Accumulates solution variables for time-averaged output.
+static PetscErrorCode AccumulateSolutionVariables(RDy rdy) {
   PetscFunctionBegin;
+  PetscReal dt = rdy->dt;
+  rdy->soln_accumulated_time += dt;
+  PetscCall(VecAXPY(rdy->vec_soln_accum, dt, rdy->u_global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  // construct a set of available source fields (with a zero-length terminus)
-  // NOTE: so far, all our diagnostics are external source terms, so we can
-  // NOTE: get them all using GetOperatorDomainExternalSource()
-  static char diagnostics_names[3 + MAX_NUM_TRACERS + 1][MAX_NAME_LEN] = {
-      "WaterSource",
-      "MomentumXSource",
-      "MomentumYSource",
-  };
-  static PetscBool first_time = PETSC_TRUE;
-  if (first_time) {
-    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-      snprintf(diagnostics_names[3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT "Source", i);
-    }
-    first_time = PETSC_FALSE;
-  }
+/// Computes vec_soln_avg = vec_soln_accum / soln_accumulated_time.
+static PetscErrorCode UpdateSolutionMean(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(VecCopy(rdy->vec_soln_accum, rdy->vec_soln_avg));
+  PetscCall(VecScale(rdy->vec_soln_avg, 1.0 / rdy->soln_accumulated_time));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  PetscSection section;
-  PetscCall(DMGetLocalSection(rdy->dm_diags, &section));
+/// Resets solution accumulation state after a write.
+static PetscErrorCode ResetSolutionAccum(RDy rdy) {
+  PetscFunctionBegin;
+  rdy->soln_accumulated_time = 0.0;
+  PetscCall(VecZeroEntries(rdy->vec_soln_accum));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  // NOTE: at present, all diagnostics are stored as components of a single
-  // NOTE: "Diagnostics" field in a global vector (no halo cells)
-  PetscInt num_fields;
-  PetscCall(PetscSectionGetNumFields(section, &num_fields));
-  PetscCheck(num_fields == 1, rdy->comm, PETSC_ERR_USER, "Wrong number of diagnostic fields (%" PetscInt_FMT ", should be 1)", num_fields);
+/// Copies the current instantaneous source snapshot into vec_src_inst.
+static PetscErrorCode CopyInstantaneousSourceVariables(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(GetOperatorSrcInstantaneous(rdy->operator, rdy->vec_src_inst));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  PetscInt num_diags;
-  PetscCall(VecGetBlockSize(rdy->vec_diags, &num_diags));
+/// Accumulates source variables for time-averaged output.
+static PetscErrorCode AccumulateSourceVariables(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(AccumulateOperatorSrcVariables(rdy->operator, rdy->dt));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  // fetch the external source components to be output
-  PetscInt *ext_source_comps, num_diags_found = 0;
-  PetscCall(PetscMalloc1(num_diags, &ext_source_comps));
-  for (PetscInt c = 0; c < num_diags; ++c) {
-    const char *diag_name;
-    PetscCall(PetscSectionGetComponentName(section, 0, c, &diag_name));
-    if (!strcmp(diag_name, diagnostics_names[c])) {
-      ext_source_comps[num_diags_found++] = c;
-    }
-  }
+/// Computes vec_src_avg from the accumulated source data.
+static PetscErrorCode UpdateSourceMean(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(GetOperatorSrcMean(rdy->operator, rdy->operator->src_accumulated_time, rdy->vec_src_avg));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
-  if (num_diags_found == 0) {  // no diagnostics requested
-    PetscCall(PetscFree(ext_source_comps));
-    PetscFunctionReturn(PETSC_SUCCESS);
-  }
-
-  // fetch external sources from the operator
-  OperatorData ext_sources = {0};
-  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & ext_sources));
-
-  PetscReal *diag_data;
-  PetscCall(VecGetArrayWrite(rdy->vec_diags, &diag_data));
-  for (PetscInt c = 0; c < num_diags; ++c) {
-    for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
-      diag_data[num_diags * i + c] = ext_sources.values[ext_source_comps[c]][i];
-    }
-  }
-  PetscCall(VecRestoreArrayWrite(rdy->vec_diags, &diag_data));
-
-  // put toys away
-  PetscCall(PetscFree(ext_source_comps));
-  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & ext_sources));
-
+/// Resets source accumulation state after a write.
+static PetscErrorCode ResetSourceAccum(RDy rdy) {
+  PetscFunctionBegin;
+  PetscCall(ResetOperatorSrcAccum(rdy->operator));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -337,16 +276,20 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
     PetscCall(WriteOutputHDF5Metadata(rdy, viewer));
   }
 
-  // write time-dependent solution and diagnostic fields
+  // write time-dependent solution and source fields
   char group_name[PETSC_MAX_PATH_LEN];
   snprintf(group_name, PETSC_MAX_PATH_LEN, "%" PetscInt_FMT " %E %s", step, time, units);
   PetscCall(PetscViewerHDF5PushGroup(viewer, group_name));
-  PetscCall(WriteFieldData(rdy->dm, rdy->u_global, rdy->config.output, viewer, rdy->amr.num_refinements));
-  if (rdy->field_diags.num_fields > 0) {  // diagnostics are written only by request
-    PetscCall(WriteFieldData(rdy->dm_diags, rdy->vec_diags, rdy->config.output, viewer, rdy->amr.num_refinements));
-  }
-  // mean primitive variables (component_offset=0: all matching components written)
-  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_avg, 0, &rdy->prim_vars_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  // solution instantaneous (component_offset=0)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->u_global, 0, &rdy->soln_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  // solution time-averaged (component_offset=0)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_soln_avg, 0, &rdy->soln_avg_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  // sources instantaneous (component_offset=0)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_src_inst, 0, &rdy->src_inst_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  // sources time-averaged (component_offset=0)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_src_avg, 0, &rdy->src_avg_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
+  // mean primitive variables (component_offset=1: skip Height_Mean)
+  PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_avg, 1, &rdy->prim_vars_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
   // instantaneous primitive variables (component_offset=1: skip Height at component 0)
   PetscCall(WriteFilteredFieldData(rdy->dm, rdy->vec_prim_vars_inst, 1, &rdy->prim_vars_inst_fields, rdy->config.output, viewer, rdy->amr.num_refinements));
   PetscCall(PetscViewerHDF5PopGroup(viewer));
@@ -377,37 +320,6 @@ static PetscErrorCode WriteXDMFHDF5Data(RDy rdy, PetscInt step, PetscReal time, 
   PetscCall(PetscViewerPopFormat(viewer));
   PetscCall(PetscViewerDestroy(&viewer));
 
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode WriteFieldMetadata(MPI_Comm comm, RDyOutputSection output, FILE *fp, const char *h5_basename, const char *group_name, DM dm,
-                                         RDyMesh *mesh) {
-  PetscFunctionBegin;
-
-  // write cell field metadata
-  PetscSection section;
-  PetscInt     num_fields, num_comp;
-  PetscCall(DMGetLocalSection(dm, &section));
-  PetscCall(PetscSectionGetNumFields(section, &num_fields));
-  for (PetscInt f = 0; f < num_fields; ++f) {
-    PetscCall(PetscSectionGetFieldComponents(section, f, &num_comp));
-    for (PetscInt c = 0; c < num_comp; ++c) {
-      const char *name;
-      PetscCall(PetscSectionGetComponentName(section, f, c, &name));
-      for (PetscInt ff = 0; ff < output.fields_count; ++ff) {
-        if (!strcmp(output.fields[ff], name)) {
-          PetscCall(PetscFPrintf(comm, fp,
-                                 "      <Attribute Name=\"%s\" AttributeType=\"Scalar\" Center=\"Cell\">\n"
-                                 "        <DataItem Dimensions=\"%" PetscInt_FMT "\" Format=\"HDF\">\n"
-                                 "          %s:/%s/%s\n"
-                                 "        </DataItem>\n"
-                                 "      </Attribute>\n",
-                                 name, mesh->num_cells_global, h5_basename, group_name, name));
-          break;
-        }
-      }
-    }
-  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -496,12 +408,18 @@ static PetscErrorCode WriteXDMFXMFData(RDy rdy, PetscInt step, PetscReal time, c
                          "      </Attribute>\n",
                          mesh->num_cells_global, h5_gridname));
 
-  PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm, &rdy->mesh));
-  PetscCall(WriteFieldMetadata(rdy->comm, rdy->config.output, fp, h5_basename, time_group, rdy->dm_diags, &rdy->mesh));
-  // mean primitive variables (component_offset=0: all matching components)
-  PetscCall(WriteFilteredFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_fields, rdy->config.output, 0, rdy->mesh.num_cells_global));
+  // solution instantaneous (component_offset=0)
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->soln_fields, rdy->config.output, 0, rdy->mesh.num_cells_global));
+  // solution time-averaged (component_offset=0)
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->soln_avg_fields, rdy->config.output, 0, rdy->mesh.num_cells_global));
+  // sources instantaneous (component_offset=0)
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->src_inst_fields, rdy->config.output, 0, rdy->mesh.num_cells_global));
+  // sources time-averaged (component_offset=0)
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->src_avg_fields, rdy->config.output, 0, rdy->mesh.num_cells_global));
+  // mean primitive variables (component_offset=1: skip Height_Mean)
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
   // instantaneous primitive variables (component_offset=1: skip Height at component 0)
-  PetscCall(WriteFilteredFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_inst_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
+  PetscCall(WriteFieldMetadata(rdy->comm, fp, h5_basename, time_group, &rdy->prim_vars_inst_fields, rdy->config.output, 1, rdy->mesh.num_cells_global));
 
   PetscCall(PetscFPrintf(rdy->comm, fp, "    </Grid>\n"));
 
@@ -591,10 +509,22 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
   if (output->enable && (time != output->prev_output_time)) {
     PetscBool write_output = PETSC_FALSE;
 
-    // accumulate primitive variables only if at least one *_Mean field is requested
-    PetscBool need_mean = AnyMeanPrimVarRequested(output);
+    // accumulate solution if any solution *_Mean field is requested
+    PetscBool need_soln_mean = AnySolnMeanRequested(output, &rdy->soln_avg_fields);
+    if (need_soln_mean) {
+      PetscCall(AccumulateSolutionVariables(rdy));
+    }
+
+    // accumulate primitive variables only if at least one prim var *_Mean field is requested
+    PetscBool need_mean = AnyMeanPrimVarRequested(output, &rdy->prim_vars_fields);
     if (need_mean) {
       PetscCall(AccumulatePrimitiveVariables(rdy));
+    }
+
+    // accumulate source variables if any source *_Mean field is requested
+    PetscBool need_src_mean = AnySrcMeanRequested(output, &rdy->src_avg_fields);
+    if (need_src_mean) {
+      PetscCall(AccumulateSourceVariables(rdy));
     }
 
     // check if it is time to output based on temporal interval
@@ -613,14 +543,25 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
 
     // write output
     if (write_output) {
-      // update diagnostic fields
-      if (rdy->field_diags.num_fields > 0) {
-        PetscCall(UpdateDiagnosticFields(rdy));
+      // compute time-averaged solution for this output interval
+      if (need_soln_mean) {
+        PetscCall(UpdateSolutionMean(rdy));
       }
 
       // compute time-averaged primitive variables for this output interval
       if (need_mean) {
         PetscCall(UpdatePrimitiveVariablesMean(rdy));
+      }
+
+      // copy instantaneous source variables if any instantaneous source field is requested
+      PetscBool need_src_inst = AnySrcInstRequested(output, &rdy->src_inst_fields);
+      if (need_src_inst) {
+        PetscCall(CopyInstantaneousSourceVariables(rdy));
+      }
+
+      // compute time-averaged source variables for this output interval
+      if (need_src_mean) {
+        PetscCall(UpdateSourceMean(rdy));
       }
 
       // copy instantaneous primitive variables if any instantaneous prim var field is requested
@@ -641,8 +582,14 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
       }
 
       // reset accumulation state for the next output interval
+      if (need_soln_mean) {
+        PetscCall(ResetSolutionAccum(rdy));
+      }
       if (need_mean) {
         PetscCall(ResetPrimitiveVariablesAccum(rdy));
+      }
+      if (need_src_mean) {
+        PetscCall(ResetSourceAccum(rdy));
       }
     }
   }

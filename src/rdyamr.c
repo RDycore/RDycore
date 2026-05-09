@@ -612,7 +612,6 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   } else {
     // destroy the coarse DM
     PetscCall(DMDestroy(&rdy->dm));
-    PetscCall(DMDestroy(&rdy->dm_diags));
     PetscCall(DMDestroy(&rdy->dm_1dof));
 
     PetscCall(MatMultResuse(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof, PETSC_TRUE));

@@ -137,6 +137,12 @@ struct _p_RDy {
   SectionFieldSpec soln_fields;
   PetscBool        refine;
 
+  // field spec, Vec, accumulator, and accumulated time for time-averaged solution output
+  SectionFieldSpec soln_avg_fields;     // Height_Mean, MomentumX_Mean, MomentumY_Mean, SedimentMassPerUnitAreaN_Mean
+  Vec              vec_soln_avg;        // time-averaged solution (same layout as u_global)
+  Vec              vec_soln_accum;      // running sum for time averaging
+  PetscReal        soln_accumulated_time;
+
   // field spec, Vec, and accumulated time for time-averaged primitive variables output
   // (uses the same DM layout as dm above)
   SectionFieldSpec prim_vars_fields;
@@ -147,10 +153,13 @@ struct _p_RDy {
   SectionFieldSpec prim_vars_inst_fields;
   Vec              vec_prim_vars_inst;
 
-  // auxiliary DM for diagnostics
-  DM               dm_diags;
-  SectionFieldSpec field_diags;
-  Vec              vec_diags;
+  // field spec and Vec for instantaneous source output (uses rdy->dm layout)
+  SectionFieldSpec src_inst_fields;   // WaterSource, MomentumXSource, MomentumYSource, SedimentMassPerUnitAreaNSource
+  Vec              vec_src_inst;
+
+  // field spec and Vec for time-averaged source output (uses rdy->dm layout)
+  SectionFieldSpec src_avg_fields;    // WaterSource_Mean, MomentumXSource_Mean, ...
+  Vec              vec_src_avg;
 
   DM               dm_1dof;
   SectionFieldSpec field_1dof;

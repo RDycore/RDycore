@@ -194,10 +194,13 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
-  if ((*rdy)->vec_diags) PetscCall(VecDestroy(&(*rdy)->vec_diags));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
   if ((*rdy)->vec_prim_vars_avg) PetscCall(VecDestroy(&(*rdy)->vec_prim_vars_avg));
   if ((*rdy)->vec_prim_vars_inst) PetscCall(VecDestroy(&(*rdy)->vec_prim_vars_inst));
+  if ((*rdy)->vec_soln_avg) PetscCall(VecDestroy(&(*rdy)->vec_soln_avg));
+  if ((*rdy)->vec_soln_accum) PetscCall(VecDestroy(&(*rdy)->vec_soln_accum));
+  if ((*rdy)->vec_src_inst) PetscCall(VecDestroy(&(*rdy)->vec_src_inst));
+  if ((*rdy)->vec_src_avg) PetscCall(VecDestroy(&(*rdy)->vec_src_avg));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -270,7 +273,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscCall(DestroyTimeSeries(*rdy));
 
   // destroy DMs
-  if ((*rdy)->dm_diags) DMDestroy(&((*rdy)->dm_diags));
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 

@@ -220,7 +220,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
       }},
   };
   for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
-    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
+    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT, i);
   }
 
   // set up primitive variables field spec for time-averaged (mean) output
@@ -248,15 +248,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   PetscCall(CreateDM(rdy));
 
-  // create the auxiliary DM, which contains error fields for each of the solution fields
-  rdy->field_diags = (SectionFieldSpec){
-      .num_fields           = 1,
-      .num_field_components = {rdy->soln_fields.num_field_components[0]},
-      .field_names          = {"Error"},
-  };
-  for (PetscInt c = 0; c < rdy->field_diags.num_field_components[0]; ++c) {
-    snprintf(rdy->field_diags.field_component_names[0][c], MAX_NAME_LEN, "%s error", rdy->soln_fields.field_component_names[0][c]);
-  }
   PetscCall(CreateAuxiliaryDMs(rdy));
 
   if (rdy->num_tracers) {

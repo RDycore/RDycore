@@ -187,11 +187,10 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This function creates an auxiliary (secondary) DM
+/// @brief This function creates auxiliary (secondary) DMs
 PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_diags, &rdy->dm_diags));
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_1dof, &rdy->dm_1dof));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -260,12 +259,18 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
-  // diagnostics are all piled into a single vector whose block size is the
-  // total number of field components
-  PetscCall(DMCreateGlobalVector(rdy->dm_diags, &rdy->vec_diags));
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_avg));
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_inst));
+
+  // solution time-averaging vectors
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_soln_avg));
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->vec_soln_accum));
+  PetscCall(VecZeroEntries(rdy->vec_soln_accum));
+
+  // source output vectors
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_src_inst));
+  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_src_avg));
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

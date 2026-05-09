@@ -1111,12 +1111,17 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     if (config->output.fields_count > 0) {
       static const char *valid_output_fields[] = {
-          "Height",      "MomentumX",       "MomentumY",       "SedimentConcentration%" PetscInt_FMT,
-          "WaterSource", "MomentumXSource", "MomentumYSource", "SedimentConcentration%" PetscInt_FMT "Source",
+          "Height",      "MomentumX",       "MomentumY",       "SedimentMassPerUnitArea%" PetscInt_FMT,
+          "WaterSource", "MomentumXSource", "MomentumYSource", "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
+          // solution mean fields
+          "Height_Mean", "MomentumX_Mean",  "MomentumY_Mean",  "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
           // primitive variable mean fields
-          "Height_Mean", "VelocityX_Mean",  "VelocityY_Mean",  "Concentration%" PetscInt_FMT "_Mean",
+          "VelocityX_Mean",  "VelocityY_Mean",  "Concentration%" PetscInt_FMT "_Mean",
           // primitive variable instantaneous fields (Height excluded — comes from u_global)
           "VelocityX",   "VelocityY",       "Concentration%" PetscInt_FMT,
+          // source mean fields
+          "WaterSource_Mean", "MomentumXSource_Mean", "MomentumYSource_Mean",
+          "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean",
           NULL,
       };
       for (PetscInt f = 0; f < config->output.fields_count; ++f) {
