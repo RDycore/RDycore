@@ -1110,52 +1110,82 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     }
 
     if (config->output.fields_count > 0) {
-      static const char *valid_output_fields[] = {
+      // non-indexed fields: validated by exact string comparison
+      static const char *exact_output_fields[] = {
           "Height",
           "MomentumX",
           "MomentumY",
-          "SedimentMassPerUnitArea%" PetscInt_FMT,
           "WaterSource",
           "MomentumXSource",
           "MomentumYSource",
-          "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
           // solution mean fields
           "Height_Mean",
           "MomentumX_Mean",
           "MomentumY_Mean",
-          "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
           // primitive variable mean fields
           "VelocityX_Mean",
           "VelocityY_Mean",
-          "Concentration%" PetscInt_FMT "_Mean",
           // primitive variable instantaneous fields (Height excluded — comes from u_global)
           "VelocityX",
           "VelocityY",
-          "Concentration%" PetscInt_FMT,
           // source mean fields
           "WaterSource_Mean",
           "MomentumXSource_Mean",
           "MomentumYSource_Mean",
-          "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean",
           NULL,
       };
+      // indexed fields: validated by substituting [0, num_configured_classes)
+      // Each entry is a printf-style pattern that takes a single PetscInt index.
+      static const char *indexed_output_fields[] = {
+          "SedimentMassPerUnitArea%" PetscInt_FMT,
+          "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
+          "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
+          "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean",
+          "Concentration%" PetscInt_FMT "_Mean",
+          "Concentration%" PetscInt_FMT,
+          NULL,
+      };
+      PetscInt num_classes = config->physics.sediment.num_classes;
+
       for (PetscInt f = 0; f < config->output.fields_count; ++f) {
         PetscBool valid = PETSC_FALSE;
-        for (PetscInt v = 0; valid_output_fields[v]; ++v) {
-          if (!strcmp(valid_output_fields[v], config->output.fields[f])) {
-            valid = true;
-            break;
-          } else {  // try substituting a species size class index
-            char size_class_field[MAX_NAME_LEN];
-            for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
-              snprintf(size_class_field, MAX_NAME_LEN, valid_output_fields[v], i);
-              if (!strcmp(size_class_field, config->output.fields[f])) {
-                valid = true;
+
+        // 1. exact match
+        for (PetscInt v = 0; exact_output_fields[v] && !valid; ++v) {
+          if (!strcmp(exact_output_fields[v], config->output.fields[f])) valid = PETSC_TRUE;
+        }
+
+        // 2. indexed match within configured range
+        if (!valid) {
+          char candidate[MAX_NAME_LEN];
+          for (PetscInt v = 0; indexed_output_fields[v] && !valid; ++v) {
+            for (PetscInt i = 0; i < num_classes; ++i) {
+              snprintf(candidate, MAX_NAME_LEN, indexed_output_fields[v], i);
+              if (!strcmp(candidate, config->output.fields[f])) {
+                valid = PETSC_TRUE;
                 break;
               }
             }
           }
+
+          // 3. if still not valid, check whether the field matches an indexed
+          //    pattern at an out-of-range index and report a specific error
+          if (!valid) {
+            char candidate2[MAX_NAME_LEN];
+            for (PetscInt v = 0; indexed_output_fields[v]; ++v) {
+              for (PetscInt i = num_classes; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
+                snprintf(candidate2, MAX_NAME_LEN, indexed_output_fields[v], i);
+                if (!strcmp(candidate2, config->output.fields[f])) {
+                  PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
+                             "Output field '%s' requests index %" PetscInt_FMT " but only %" PetscInt_FMT
+                             " sediment class(es) are configured (valid indices: 0–%" PetscInt_FMT ")",
+                             config->output.fields[f], i, num_classes, num_classes - 1);
+                }
+              }
+            }
+          }
         }
+
         PetscCheck(valid, comm, PETSC_ERR_USER, "Invalid output field requested: %s", config->output.fields[f]);
       }
     }

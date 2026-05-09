@@ -267,6 +267,11 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_soln_avg));
   PetscCall(VecDuplicate(rdy->u_global, &rdy->vec_soln_accum));
   PetscCall(VecZeroEntries(rdy->vec_soln_accum));
+  // reset accumulated-time scalars whenever accumulation vectors are (re)created
+  // (important for AMR, which calls CreateVectors again after mesh refinement)
+  rdy->soln_accumulated_time      = 0.0;
+  rdy->prim_vars_accumulated_time = 0.0;
+  rdy->src_accumulated_time       = 0.0;
 
   // source output vectors
   PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_src_inst));

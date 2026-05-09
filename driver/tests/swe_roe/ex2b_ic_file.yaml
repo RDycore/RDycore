@@ -32,6 +32,8 @@ output:
     - MomentumXSource_Mean
     - VelocityX
     - VelocityY
+    - VelocityX_Mean
+    - VelocityY_Mean
 
 grid:
   file: DamBreak_grid5x10.exo

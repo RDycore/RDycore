@@ -68,12 +68,28 @@ static PetscErrorCode CreateHRSourceQFunction(Ceed ceed, const RDyConfig config,
 
 /// @brief Creates a CEED source sub-operator for hydrostatic reconstruction.
 ///
-/// The Q-function interface is identical to the standard source operator
-/// (same fields: geom, ext_src, mat_props, riemannf, q -> cell) so that
-/// the riemannf wiring in AddOperatorFluxDivergence works unchanged.
-/// The geom field (dz/dx, dz/dy) is present but unused because the bed-slope
-/// source terms are already accounted for by the HR pressure correction in
-/// the flux operator.
+/// The Q-function interface matches the standard source operator with two
+/// additional passive outputs used for XDMF output:
+///
+/// Inputs (same as standard source operator):
+///    * `geom[num_owned_cells][2]`       - geometric factors (dz/dx, dz/dy);
+///      present for interface compatibility but unused because bed-slope source
+///      terms are already accounted for by the HR pressure correction in the
+///      flux operator
+///    * `ext_src[num_owned_cells][num_comp]` - external source terms
+///    * `mat_props[num_owned_cells][N]`   - material properties (Manning's n, …)
+///    * `riemannf[num_owned_cells][num_comp]` - flux divergences from the flux operator
+///    * `q[num_owned_cells][num_comp]`    - solution state (active input)
+///
+/// Outputs:
+///    * `cell[num_owned_cells][num_comp]` - combined RHS (active output);
+///      written into the global solution update vector
+///    * `primitive_variables[num_owned_cells][num_comp]` - (h, u, v[, tracers])
+///      computed from the solution state; used for time-averaged primitive-variable
+///      XDMF output
+///    * `sources[num_owned_cells][num_comp]` - instantaneous external-source
+///      snapshot (copy of ext_src); wired to ceed_src_inst and used for
+///      instantaneous and time-averaged source XDMF output
 ///
 /// @param [in]  config  RDycore's configuration
 /// @param [in]  mesh    mesh defining the computational domain

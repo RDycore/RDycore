@@ -88,6 +88,30 @@ static PetscErrorCode WriteFilteredFieldData(DM dm, Vec global_vec, PetscInt com
   PetscCall(VecGetLocalSize(data_vec, &n));
   PetscCall(VecGetSize(data_vec, &N));
 
+  // count total components described by the spec (excluding the offset)
+  PetscInt total_spec_comp = 0;
+  for (PetscInt f = 0; f < spec->num_fields; ++f) total_spec_comp += spec->num_field_components[f];
+
+  PetscCheck(bs > 0, comm, PETSC_ERR_USER, "WriteFilteredFieldData: vector block size must be positive (got %" PetscInt_FMT ")", bs);
+  PetscCheck(n % bs == 0, comm, PETSC_ERR_USER,
+             "WriteFilteredFieldData: local vector size (%" PetscInt_FMT ") is not divisible by block size (%" PetscInt_FMT ")", n, bs);
+  PetscCheck(N % bs == 0, comm, PETSC_ERR_USER,
+             "WriteFilteredFieldData: global vector size (%" PetscInt_FMT ") is not divisible by block size (%" PetscInt_FMT ")", N, bs);
+  PetscCheck(total_spec_comp - component_offset <= bs, comm, PETSC_ERR_USER,
+             "WriteFilteredFieldData: spec describes %" PetscInt_FMT " components beyond offset %" PetscInt_FMT
+             ", exceeding vector block size %" PetscInt_FMT,
+             total_spec_comp - component_offset, component_offset, bs);
+
+  // allocate one component Vec per block slot and gather all components in a
+  // single pass, then view only the requested ones (avoids repeated stride-gather
+  // passes when multiple fields are requested)
+  Vec *comp_vecs;
+  PetscCall(PetscMalloc1(bs, &comp_vecs));
+  for (PetscInt j = 0; j < bs; ++j) {
+    PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp_vecs[j]));
+  }
+  PetscCall(VecStrideGatherAll(data_vec, comp_vecs, INSERT_VALUES));
+
   PetscInt c_global = 0;
   for (PetscInt f = 0; f < spec->num_fields; ++f) {
     for (PetscInt c = 0; c < spec->num_field_components[f]; ++c, ++c_global) {
@@ -101,15 +125,14 @@ static PetscErrorCode WriteFilteredFieldData(DM dm, Vec global_vec, PetscInt com
         }
       }
       if (write) {
-        Vec comp;
-        PetscCall(VecCreateMPI(comm, n / bs, N / bs, &comp));
-        PetscCall(PetscObjectSetName((PetscObject)comp, name));
-        PetscCall(VecStrideGather(data_vec, c_global, comp, INSERT_VALUES));
-        PetscCall(VecView(comp, viewer));
-        PetscCall(VecDestroy(&comp));
+        PetscCall(PetscObjectSetName((PetscObject)comp_vecs[c_global], name));
+        PetscCall(VecView(comp_vecs[c_global], viewer));
       }
     }
   }
+
+  for (PetscInt j = 0; j < bs; ++j) PetscCall(VecDestroy(&comp_vecs[j]));
+  PetscCall(PetscFree(comp_vecs));
 
   PetscCall(VecDestroy(&data_vec));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -150,9 +173,7 @@ static PetscErrorCode WriteFieldMetadata(MPI_Comm comm, FILE *fp, const char *h5
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// writes output fields that match the given set; writes all fields if none are given
-// NOTE: This function is retained as a static helper but is no longer called directly.
-// All output now goes through WriteFilteredFieldData.
+// writes output fields that match the given set; writes no fields when fields_count == 0
 
 static PetscErrorCode DetermineGridFile(RDy rdy, char *filename) {
   PetscFunctionBegin;
@@ -200,6 +221,8 @@ static PetscErrorCode AccumulateSolutionVariables(RDy rdy) {
 /// Computes vec_soln_avg = vec_soln_accum / soln_accumulated_time.
 static PetscErrorCode UpdateSolutionMean(RDy rdy) {
   PetscFunctionBegin;
+  PetscCheck(rdy->soln_accumulated_time > 0.0, rdy->comm, PETSC_ERR_USER,
+             "Cannot compute solution mean: accumulated time is zero (no timesteps accumulated before output)");
   PetscCall(VecCopy(rdy->vec_soln_accum, rdy->vec_soln_avg));
   PetscCall(VecScale(rdy->vec_soln_avg, 1.0 / rdy->soln_accumulated_time));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -249,6 +272,8 @@ static PetscErrorCode AccumulateSourceVariables(RDy rdy) {
 /// Computes vec_src_avg from the accumulated source data.
 static PetscErrorCode UpdateSourceMean(RDy rdy) {
   PetscFunctionBegin;
+  PetscCheck(rdy->src_accumulated_time > 0.0, rdy->comm, PETSC_ERR_USER,
+             "Cannot compute source mean: accumulated time is zero (no timesteps accumulated before output)");
   Operator *op              = rdy->operator;
   PetscReal           scale = 1.0 / rdy->src_accumulated_time;
   if (CeedEnabled()) {
@@ -522,6 +547,8 @@ static PetscErrorCode ResetPrimitiveVariablesAccum(RDy rdy) {
 // Computes vec_prim_vars_avg = primitive_variables_accum / prim_vars_accumulated_time.
 static PetscErrorCode UpdatePrimitiveVariablesMean(RDy rdy) {
   PetscFunctionBegin;
+  PetscCheck(rdy->prim_vars_accumulated_time > 0.0, rdy->comm, PETSC_ERR_USER,
+             "Cannot compute primitive-variable mean: accumulated time is zero (no timesteps accumulated before output)");
 
   Operator *op              = rdy->operator;
   PetscReal           scale = 1.0 / rdy->prim_vars_accumulated_time;

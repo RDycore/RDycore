@@ -223,6 +223,18 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
     snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT, i);
   }
 
+  // set up solution time-averaged field spec
+  rdy->soln_avg_fields.num_fields              = 1;
+  rdy->soln_avg_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->soln_avg_fields.field_names[0], "SolutionMean");
+  strcpy(rdy->soln_avg_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->soln_avg_fields.field_component_names[0][1], "MomentumX_Mean");
+  strcpy(rdy->soln_avg_fields.field_component_names[0][2], "MomentumY_Mean");
+  for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+    snprintf(rdy->soln_avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean", i);
+  }
+  rdy->soln_accumulated_time = 0.0;
+
   // set up primitive variables field spec for time-averaged (mean) output
   rdy->prim_vars_fields.num_fields              = 1;
   rdy->prim_vars_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
@@ -245,6 +257,31 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
     snprintf(rdy->prim_vars_inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
   }
+
+  // set up source output field specs (instantaneous and time-averaged)
+  {
+    PetscInt num_src_comp                        = 3 + rdy->num_tracers;
+    rdy->src_inst_fields.num_fields              = 1;
+    rdy->src_inst_fields.num_field_components[0] = num_src_comp;
+    strcpy(rdy->src_inst_fields.field_names[0], "Sources");
+    strcpy(rdy->src_inst_fields.field_component_names[0][0], "WaterSource");
+    strcpy(rdy->src_inst_fields.field_component_names[0][1], "MomentumXSource");
+    strcpy(rdy->src_inst_fields.field_component_names[0][2], "MomentumYSource");
+    for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+      snprintf(rdy->src_inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source", i);
+    }
+
+    rdy->src_avg_fields.num_fields              = 1;
+    rdy->src_avg_fields.num_field_components[0] = num_src_comp;
+    strcpy(rdy->src_avg_fields.field_names[0], "SourcesMean");
+    strcpy(rdy->src_avg_fields.field_component_names[0][0], "WaterSource_Mean");
+    strcpy(rdy->src_avg_fields.field_component_names[0][1], "MomentumXSource_Mean");
+    strcpy(rdy->src_avg_fields.field_component_names[0][2], "MomentumYSource_Mean");
+    for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+      snprintf(rdy->src_avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean", i);
+    }
+  }
+  rdy->src_accumulated_time = 0.0;
 
   PetscCall(CreateDM(rdy));
 
