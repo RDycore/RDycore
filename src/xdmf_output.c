@@ -577,23 +577,28 @@ PetscErrorCode WriteXDMFOutput(TS ts, PetscInt step, PetscReal time, Vec X, void
   if (output->enable && (time != output->prev_output_time)) {
     PetscBool write_output = PETSC_FALSE;
 
+    PetscInt step;
+    PetscCall(TSGetStepNumber(rdy->ts, &step));
+
     // accumulate solution if any solution *_Mean field is requested
     PetscBool need_soln_mean = AnySolnMeanRequested(output, &rdy->soln_avg_fields);
-    if (need_soln_mean) {
+    if (need_soln_mean && rdy->last_accumulated_step != step) {
       PetscCall(AccumulateSolutionVariables(rdy));
     }
 
     // accumulate primitive variables only if at least one prim var *_Mean field is requested
     PetscBool need_mean = AnyMeanPrimVarRequested(output, &rdy->prim_vars_fields);
-    if (need_mean) {
+    if (need_mean && rdy->last_accumulated_step != step) {
       PetscCall(AccumulatePrimitiveVariables(rdy));
     }
 
     // accumulate source variables if any source *_Mean field is requested
     PetscBool need_src_mean = AnySrcMeanRequested(output, &rdy->src_avg_fields);
-    if (need_src_mean) {
+    if (need_src_mean && rdy->last_accumulated_step != step) {
       PetscCall(AccumulateSourceVariables(rdy));
     }
+
+    rdy->last_accumulated_step = step;
 
     // check if it is time to output based on temporal interval
     if (output->time_interval > 0) {

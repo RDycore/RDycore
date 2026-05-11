@@ -269,6 +269,7 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecZeroEntries(rdy->vec_soln_accum));
   // reset accumulated-time scalars whenever accumulation vectors are (re)created
   // (important for AMR, which calls CreateVectors again after mesh refinement)
+  rdy->last_accumulated_step      = -1;  // no steps accumulated yet
   rdy->soln_accumulated_time      = 0.0;
   rdy->prim_vars_accumulated_time = 0.0;
   rdy->src_accumulated_time       = 0.0;

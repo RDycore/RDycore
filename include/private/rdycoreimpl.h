@@ -137,6 +137,8 @@ struct _p_RDy {
   SectionFieldSpec soln_fields;
   PetscBool        refine;
 
+  PetscInt last_accumulated_step;  // last step for variables were accumulated for time-averaged output
+
   // field spec, Vec, accumulator, and accumulated time for time-averaged solution output
   SectionFieldSpec soln_avg_fields;  // Height_Mean, MomentumX_Mean, MomentumY_Mean, SedimentMassPerUnitAreaN_Mean
   Vec              vec_soln_avg;     // time-averaged solution (same layout as u_global)
