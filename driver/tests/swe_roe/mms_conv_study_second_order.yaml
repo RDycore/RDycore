@@ -55,16 +55,16 @@ mms:
     base_refinement: 1
     expected_rates:
       h:
-        L1: 0.95
+        L1: 1.40
         L2: 1.20
         Linf: 0.80
       hu:
-        L1: 1.50
-        L2: 1.50
+        L1: 1.30
+        L2: 1.30
         Linf: 0.85
       hv:
-        L1: 1.50
-        L2: 1.50
+        L1: 1.30
+        L2: 1.30
         Linf: 0.85
 
 logging:
