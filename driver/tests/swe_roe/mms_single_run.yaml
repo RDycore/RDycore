@@ -22,10 +22,10 @@ mms:
     K: 0.6283185307179586 # wave number in x and y (pi/5)
   swe: # functions of x, y, t (non-normalized units)
     # water height
-    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    h:    H * (2 + sin(K*x)*sin(K*y)) * exp(t/T)
     dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/T)
     dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/T)
-    dhdt: H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dhdt: H / T * (2 + sin(K*x)*sin(K*y)) * exp(t/T)
 
     # x velocity
     u:     U * cos(K*x) * sin(K*y) * exp(t/T)

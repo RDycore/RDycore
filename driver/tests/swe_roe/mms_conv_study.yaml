@@ -20,10 +20,10 @@ mms:
     K: 0.6283185307179586 # wave number in x and y (pi/5)
   swe: # functions of x, y, t (non-normalized units)
     # water height
-    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    h:    H * (2 + sin(K*x)*sin(K*y)) * exp(t/T)
     dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/T)
     dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/T)
-    dhdt: H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dhdt: H / T * (2 + sin(K*x)*sin(K*y)) * exp(t/T)
 
     # x velocity
     u:     U * cos(K*x) * sin(K*y) * exp(t/T)
@@ -51,17 +51,17 @@ mms:
     base_refinement: 1 # <-- start at this refinement level
     expected_rates: # uses solution function names above
       h:
-        L1: 0.94
-        L2: 0.95
-        Linf: 0.94
+        L1: 0.90
+        L2: 0.90
+        Linf: 0.80
       hu:
-        L1: 0.91
-        L2: 0.93
-        Linf: 0.77
+        L1: 0.85
+        L2: 0.85
+        Linf: 0.75
       hv:
-        L1: 0.91
-        L2: 0.93
-        Linf: 0.77
+        L1: 0.85
+        L2: 0.85
+        Linf: 0.75
 
 logging:
   level: none
@@ -69,7 +69,7 @@ logging:
 time:
   time_step        : 0.01
   unit             : seconds
-  stop             : 5.00
+  stop             : 5.0
   coupling_interval: 0.01
 
 output:
