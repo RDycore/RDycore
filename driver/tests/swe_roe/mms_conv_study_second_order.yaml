@@ -61,11 +61,11 @@ mms:
       hu:
         L1: 1.50
         L2: 1.50
-        Linf: 0.90
+        Linf: 0.85
       hv:
         L1: 1.50
         L2: 1.50
-        Linf: 0.90
+        Linf: 0.85
 
 logging:
   level: none
