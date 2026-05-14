@@ -310,7 +310,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
     // Limiter is ON by default when MUSCL is active; disable with -no_limiter or yaml use_limiter:false
     PetscBool use_limiter = PETSC_TRUE;
     if (config->numerics.second_order && !config->numerics.use_limiter) use_limiter = PETSC_FALSE;
-    PetscBool no_limiter  = PETSC_FALSE;
+    PetscBool no_limiter = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
     if (no_limiter) use_limiter = PETSC_FALSE;
     (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
@@ -326,7 +326,6 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-
 
 /// Frees all resources devoted to the operator.
 /// @param [out] op the operator to be freed
@@ -675,7 +674,6 @@ static PetscErrorCode CeedFindMaxCourantNumberInternalEdges(CeedOperator op_edge
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-
 /// @brief Finds the global maximum Courant number across all internal and boundary edges.
 /// @param [in] op_edges A CeedOperator object for edges
 /// @param [in] num_boundaries Total number of boundaries
@@ -701,7 +699,7 @@ static PetscErrorCode CeedFindMaxCourantNumber(Operator *op, MPI_Comm comm, Cour
   // Boundary sub-ops: offset 0 for MUSCL (no interior in composite), 1 for standard.
   PetscInt boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
   for (PetscInt b = 0; b < op->num_boundaries; ++b) {
-    RDyBoundary  boundary = op->boundaries[b];
+    RDyBoundary   boundary = op->boundaries[b];
     CeedOperator *sub_ops;
     PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
     CeedOperator boundary_flux_op = sub_ops[boundary_offset + boundary.index];
@@ -863,8 +861,8 @@ static PetscErrorCode SetCeedOperatorBoundaryData(Operator *op, RDyBoundary boun
   // boundary sub-ops start at index 0.
   CeedOperator *sub_ops;
   PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
-  PetscInt      boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
-  CeedOperator  sub_op          = sub_ops[boundary_offset + boundary.index];
+  PetscInt     boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
+  CeedOperator sub_op          = sub_ops[boundary_offset + boundary.index];
 
   // fetch the q_dirichlet vector
   CeedOperatorField field;

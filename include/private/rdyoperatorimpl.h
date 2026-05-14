@@ -148,10 +148,10 @@ typedef struct Operator {
 
       // MUSCL slope reconstruction data (only allocated when use_slope_reconstruction is true)
       PetscBool    use_slope_reconstruction;
-      PetscBool    use_limiter;                  // minmod limiter (default on with -second_order)
+      PetscBool    use_limiter;                 // minmod limiter (default on with -second_order)
       PetscScalar *grad_h, *grad_hu, *grad_hv;  // [num_cells * 2]: [c*2+0]=dq/dx, [c*2+1]=dq/dy
-      PetscReal   *ls_grad_coeffs;               // [num_internal_edges * 4]: precomputed LS gradient coefficients
-      CeedVector   q_reconstructed;              // [num_owned_internal_edges * 6]: h_L,hu_L,hv_L,h_R,hu_R,hv_R
+      PetscReal   *ls_grad_coeffs;              // [num_internal_edges * 4]: precomputed LS gradient coefficients
+      CeedVector   q_reconstructed;             // [num_owned_internal_edges * 6]: h_L,hu_L,hv_L,h_R,hu_R,hv_R
     } ceed;
 
     // PETSc operator data

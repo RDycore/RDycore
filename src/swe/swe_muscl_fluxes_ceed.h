@@ -25,12 +25,12 @@ CEED_QFUNCTION_HELPER CeedScalar ComputeDhv_MUSCL(CeedScalar zv_beg, CeedScalar 
   return hv_end - hv_beg;
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+#pragma GCC diagnostic   push
+#pragma GCC diagnostic   ignored "-Wimplicit-function-declaration"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wimplicit-function-declaration"
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wvla"
+#pragma GCC diagnostic   push
+#pragma GCC diagnostic   ignored "-Wvla"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvla"
 
@@ -47,15 +47,15 @@ CEED_QFUNCTION_HELPER int SWEFlux_MUSCL(void *ctx, CeedInt Q, const CeedScalar *
   // in[2]: q_right_face[3] — pre-reconstructed h, hu, hv at face (from right cell)
   // in[3]: eta_vert_beg[1] — water surface elevation at edge start vertex
   // in[4]: eta_vert_end[1] — water surface elevation at edge end vertex
-  const CeedScalar(*geom)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[0];
-  const CeedScalar(*q_left_face)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-  const CeedScalar(*q_right_face)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[2];
-  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[3];
-  const CeedScalar(*eta_vert_end)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[4];
-  CeedScalar(*cell_L)[CEED_Q_VLA]              = (CeedScalar(*)[CEED_Q_VLA])out[0];
-  CeedScalar(*cell_R)[CEED_Q_VLA]              = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*courant_num)[CEED_Q_VLA]         = (CeedScalar(*)[CEED_Q_VLA])out[2];
-  const SWEContext context                     = (SWEContext)ctx;
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];
+  const CeedScalar(*q_left_face)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*q_right_face)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[4];
+  CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*cell_R)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  const SWEContext context                    = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
   const CeedScalar tiny_h  = context->tiny_h;
@@ -64,7 +64,7 @@ CEED_QFUNCTION_HELPER int SWEFlux_MUSCL(void *ctx, CeedInt Q, const CeedScalar *
 
   for (CeedInt i = 0; i < Q; i++) {
     // Clamp h from below — linear reconstruction can produce small negatives
-    SWEState qL = {fmax(0.0, q_left_face[0][i]),  q_left_face[1][i],  q_left_face[2][i]};
+    SWEState qL = {fmax(0.0, q_left_face[0][i]), q_left_face[1][i], q_left_face[2][i]};
     SWEState qR = {fmax(0.0, q_right_face[0][i]), q_right_face[1][i], q_right_face[2][i]};
 
     CeedScalar dhv = ComputeDhv_MUSCL(geom[4][i], geom[5][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
@@ -82,7 +82,7 @@ CEED_QFUNCTION_HELPER int SWEFlux_MUSCL(void *ctx, CeedInt Q, const CeedScalar *
         cell_R[j][i] = flux[j] * geom[3][i];
       }
       courant_num[0][i] = -amax * geom[2][i] * dt;
-      courant_num[1][i] =  amax * geom[3][i] * dt;
+      courant_num[1][i] = amax * geom[3][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
         cell_L[j][i] = 0.0;
