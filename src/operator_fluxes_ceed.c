@@ -944,7 +944,8 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
   PetscInt global_degenerate_count;
   MPI_Allreduce(&degenerate_count, &global_degenerate_count, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
   if (global_degenerate_count > 0) {
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "WARNING [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", global_degenerate_count));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "WARNING [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n",
+                         global_degenerate_count));
   }
 
   // M is no longer needed once inv_m is computed; free it now so it is not

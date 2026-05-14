@@ -40,7 +40,8 @@ typedef enum {
 } RiemannFluxType_MUSCL;
 
 // Interior flux Q-function: reads pre-reconstructed face states from in[1]/in[2].
-CEED_QFUNCTION_HELPER int SWEFlux_MUSCL(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType_MUSCL flux_type) {
+CEED_QFUNCTION_HELPER int SWEFlux_MUSCL(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
+                                        RiemannFluxType_MUSCL flux_type) {
   // in[0]: geom[6]         — sn, cn, -L/A_l, L/A_r, z_beg_vertex, z_end_vertex
   // in[1]: q_left_face[3]  — pre-reconstructed h, hu, hv at face (from left cell)
   // in[2]: q_right_face[3] — pre-reconstructed h, hu, hv at face (from right cell)

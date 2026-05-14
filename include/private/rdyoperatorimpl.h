@@ -201,10 +201,13 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig, RDyMesh *, CeedVector *, RDyBoundary *, RDyCondition, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedVector *, CeedOperator *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *,
+                                                                CeedVector *, CeedOperator *, CeedOperator *);
 PETSC_INTERN PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *, PetscReal *);
-PETSC_INTERN PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *, const PetscReal *, const PetscScalar *, PetscScalar *, PetscScalar *, PetscScalar *);
-PETSC_INTERN PetscErrorCode ReconstructFaceValues(RDyMesh *, const PetscScalar *, const PetscScalar *, const PetscScalar *, const PetscScalar *, PetscBool, CeedScalar *);
+PETSC_INTERN PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *, const PetscReal *, const PetscScalar *, PetscScalar *, PetscScalar *,
+                                                         PetscScalar *);
+PETSC_INTERN PetscErrorCode ReconstructFaceValues(RDyMesh *, const PetscScalar *, const PetscScalar *, const PetscScalar *, const PetscScalar *,
+                                                  PetscBool, CeedScalar *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceHROperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *, CeedVector *);
