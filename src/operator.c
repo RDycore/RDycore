@@ -277,6 +277,10 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   PetscBool use_slope_reconstruction = config->numerics.second_order;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
   if (use_slope_reconstruction) {
+    if (!CeedEnabled()) {
+      PetscCall(PetscPrintf(comm, "WARNING: second_order MUSCL reconstruction requires the CEED backend; falling back to first-order.\n"));
+      use_slope_reconstruction = PETSC_FALSE;
+    }
     PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
     PetscCheck(!has_tracers, comm, PETSC_ERR_USER,
                "second_order MUSCL reconstruction is only supported for pure SWE (no sediment, salinity, or heat tracers)");
@@ -307,10 +311,10 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   if (use_slope_reconstruction) {
     PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
                "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
-    // Limiter is ON by default when MUSCL is active; disable with -no_limiter or yaml use_limiter:false
-    PetscBool use_limiter = PETSC_TRUE;
-    if (config->numerics.second_order && !config->numerics.use_limiter) use_limiter = PETSC_FALSE;
-    PetscBool no_limiter = PETSC_FALSE;
+    // Limiter is ON by default when MUSCL is active.
+    // Disable via YAML (numerics.no_limiter: true) or CLI (-no_limiter).
+    PetscBool use_limiter = !config->numerics.no_limiter;
+    PetscBool no_limiter  = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
     if (no_limiter) use_limiter = PETSC_FALSE;
     (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;

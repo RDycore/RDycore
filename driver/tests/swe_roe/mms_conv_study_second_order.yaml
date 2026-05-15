@@ -3,9 +3,10 @@ physics:
     mode: swe
 
 numerics:
-  spatial : fv
-  temporal: euler
-  riemann : roe
+  spatial      : fv
+  temporal     : euler
+  riemann      : roe
+  second_order : true
 
 # this section contains analytic forms for the method of manufactured solutions
 mms:
