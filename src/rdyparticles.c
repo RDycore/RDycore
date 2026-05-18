@@ -139,6 +139,9 @@ static PetscErrorCode AdvectParticles(TS ts) {
   // internal time and step size.
   PetscCall(TSSetMaxTime(sts, time));
 
+  PetscCall(TSSetExactFinalTime(sts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetTimeStep(sts, adv->rdy->dt));
+
   // Solve the particle ODE: dx/dt = v(x)
   PetscPreLoadBegin(PETSC_FALSE, "RDyParticle solve");
   PetscCall(TSSolve(sts, coordinates));
