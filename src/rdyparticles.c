@@ -140,7 +140,9 @@ static PetscErrorCode AdvectParticles(TS ts) {
   PetscCall(TSSetMaxTime(sts, time));
 
   // Solve the particle ODE: dx/dt = v(x)
+  PetscPreLoadBegin(PETSC_FALSE, "RDyParticle solve");
   PetscCall(TSSolve(sts, coordinates));
+  PetscPreLoadEnd();
 
   // Return the coordinate Vec to the swarm
   PetscCall(DMSwarmDestroyGlobalVectorFromField(sdm, DMSwarmPICField_coor, &coordinates));
@@ -148,15 +150,19 @@ static PetscErrorCode AdvectParticles(TS ts) {
   // Migrate particles to correct MPI ranks (ex77.c line 860).
   // Must happen BEFORE velocity field population so that cell IDs are valid
   // for the local rank's owned cells.
+  PetscPreLoadBegin(PETSC_FALSE, "RDyParticles: DMSwarmMigrate");
   PetscCall(DMSwarmMigrate(sdm, PETSC_TRUE));
+  PetscPreLoadEnd();
 
   // Reset particle TS if local counts changed after migration (ex77.c lines 863-868).
+  PetscPreLoadBegin(PETSC_FALSE, "RDyParticles: TSReset");
   PetscInt Np_after;
   PetscCall(DMSwarmGetLocalSize(sdm, &Np_after));
   if (Np_before != Np_after) {
     PetscCall(TSReset(sts));
     PetscCall(DMSwarmVectorDefineField(sdm, DMSwarmPICField_coor));
   }
+  PetscPreLoadEnd();
 
   // ---- Populate velocity fields for output (once per step, not per RHS call) ----
   // Done after migration so cell IDs correspond to local owned cells.
