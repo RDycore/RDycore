@@ -9,28 +9,28 @@
       
       
       
-        <link rel="prev" href="../example-cases.html">
+        <link rel="prev" href="swe.html">
       
       
-        <link rel="next" href="../harvey-flooding/harvey-flooding.html">
+        <link rel="next" href="sediment.html">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Idealized dam break problem - RDycore: A River / Flooding dynamical core for E3SM</title>
+        <title>Second-Order MUSCL Reconstruction - RDycore: A River / Flooding dynamical core for E3SM</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -49,7 +49,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#overview" class="md-skip">
+        <a href="#second-order-muscl-reconstruction" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +90,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Idealized dam break problem
+              Second-Order MUSCL Reconstruction
             
           </span>
         </div>
@@ -226,7 +226,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -256,7 +256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../index.html" class="md-nav__link">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -280,8 +280,6 @@
       
   
   
-    
-  
   
   
     
@@ -294,11 +292,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -319,7 +317,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -337,7 +335,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../index.html" class="md-nav__link">
+      <a href="../user/index.html" class="md-nav__link">
         
   
   
@@ -365,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../common/installation.html" class="md-nav__link">
+      <a href="../common/installation.html" class="md-nav__link">
         
   
   
@@ -393,7 +391,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../common/input.html" class="md-nav__link">
+      <a href="../common/input.html" class="md-nav__link">
         
   
   
@@ -421,7 +419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../common/mms.html" class="md-nav__link">
+      <a href="../common/mms.html" class="md-nav__link">
         
   
   
@@ -446,8 +444,6 @@
                 
   
   
-    
-  
   
   
     
@@ -457,11 +453,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
         
           
           <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
@@ -482,7 +478,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -500,7 +496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../example-cases.html" class="md-nav__link">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
         
   
   
@@ -525,37 +521,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Idealized dam break problem
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../user/example-cases/dam-break/index.html" class="md-nav__link">
         
   
   
@@ -571,81 +540,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#script" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Script
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-for-perlmutter-cpu-nodes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example for Perlmutter CPU nodes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-for-perlmutter-gpu-nodes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example for Perlmutter GPU nodes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-for-frontier-using-cpus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example for Frontier using CPUs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-for-frontier-using-gpus" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example for Frontier using GPUs
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -707,7 +601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../harvey-flooding/harvey-flooding.html" class="md-nav__link">
+      <a href="../user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
         
   
   
@@ -735,7 +629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+      <a href="../user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
         
   
   
@@ -763,7 +657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+      <a href="../user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
         
   
   
@@ -856,7 +750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../e3sm-cases/index.html" class="md-nav__link">
+      <a href="../user/example-cases/e3sm-cases/index.html" class="md-nav__link">
         
   
   
@@ -884,7 +778,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
+      <a href="../user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
         
   
   
@@ -979,7 +873,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer/index.html" class="md-nav__link">
+      <a href="../developer/index.html" class="md-nav__link">
         
   
   
@@ -1007,7 +901,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../common/installation.html" class="md-nav__link">
+      <a href="../common/installation.html" class="md-nav__link">
         
   
   
@@ -1035,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer/development.html" class="md-nav__link">
+      <a href="../developer/development.html" class="md-nav__link">
         
   
   
@@ -1063,7 +957,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer/organization.html" class="md-nav__link">
+      <a href="../developer/organization.html" class="md-nav__link">
         
   
   
@@ -1091,7 +985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer/style.html" class="md-nav__link">
+      <a href="../developer/style.html" class="md-nav__link">
         
   
   
@@ -1119,7 +1013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer/tools.html" class="md-nav__link">
+      <a href="../developer/tools.html" class="md-nav__link">
         
   
   
@@ -1147,7 +1041,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developer/ceed.html" class="md-nav__link">
+      <a href="../developer/ceed.html" class="md-nav__link">
         
   
   
@@ -1179,8 +1073,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -1191,11 +1087,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -1216,7 +1112,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1234,7 +1130,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../theory/index.html" class="md-nav__link">
+      <a href="index.html" class="md-nav__link">
         
   
   
@@ -1262,7 +1158,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../theory/swe.html" class="md-nav__link">
+      <a href="swe.html" class="md-nav__link">
         
   
   
@@ -1287,10 +1183,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../theory/muscl.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Second-Order MUSCL Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="muscl.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1306,6 +1229,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-weighted-least-squares-gradient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Weighted Least-Squares Gradient
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-linear-reconstruction-to-face-midpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Linear Reconstruction to Face Midpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-minmod-slope-limiter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Minmod Slope Limiter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-roe-solver-on-reconstructed-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Roe Solver on Reconstructed States
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mpi-parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MPI Parallelism
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-second-order-reconstruction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Second-Order Reconstruction
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1318,7 +1338,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../theory/sediment.html" class="md-nav__link">
+      <a href="sediment.html" class="md-nav__link">
         
   
   
@@ -1373,10 +1393,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#script" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Script
+        Overview
       
     </span>
   </a>
@@ -1384,10 +1404,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-for-perlmutter-cpu-nodes" class="md-nav__link">
+  <a href="#step-1-weighted-least-squares-gradient" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example for Perlmutter CPU nodes
+        Step 1 — Weighted Least-Squares Gradient
       
     </span>
   </a>
@@ -1395,10 +1415,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-for-perlmutter-gpu-nodes" class="md-nav__link">
+  <a href="#step-2-linear-reconstruction-to-face-midpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example for Perlmutter GPU nodes
+        Step 2 — Linear Reconstruction to Face Midpoints
       
     </span>
   </a>
@@ -1406,10 +1426,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-for-frontier-using-cpus" class="md-nav__link">
+  <a href="#step-3-minmod-slope-limiter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example for Frontier using CPUs
+        Step 3 — Minmod Slope Limiter
       
     </span>
   </a>
@@ -1417,10 +1437,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-for-frontier-using-gpus" class="md-nav__link">
+  <a href="#step-4-roe-solver-on-reconstructed-states" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example for Frontier using GPUs
+        Step 4 — Roe Solver on Reconstructed States
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mpi-parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MPI Parallelism
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-second-order-reconstruction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Second-Order Reconstruction
       
     </span>
   </a>
@@ -1444,70 +1486,125 @@
 
 
 
-<h1 id="overview">Overview</h1>
-<p>This is an idealized partial dam break case with an initial water height
-of 10 m and 5 m to the left and right of the dam, respcitively, as shown
-below. The initial velocities in x- and y-direction are zero within the
-domain.</p>
-<p><img src="dam-break-initial-condition.png" width="80%" height="80%"></p>
-<p>The input YAML file (<a href="inputdeck_5120x2560.yaml"><code>inputdeck_5120x2560.yaml</code></a>) corresponds to a mesh with
-<code>dx = dy = 0.002</code> m and has 11,534,336 grid cells. Reflective boundary
-condition is assumed for all boundaries of the mesh. The problem is setup
-to take 100 timesteps. The mesh is in DMPlex's HDF5 v3.0.0 format.
-It is assumed that the user has access the RDycore's project directories
-on the DOE supercomputers, which contains the mesh and pre-installed PETSc.
-The supported DOE supercomputers for this case are:</p>
-<ol>
-<li>Perlmutter (CPU-nodes and GPU-nodes)</li>
-<li>Frontier</li>
-</ol>
-<p>The project directories on these supported machines additionally contain
- meshes for the idealized dam break problem at few additional resolutions:</p>
-<ol>
-<li><code>DamBreak_grid2560x1280.v3.0.0.h5</code>: 2,883,584 grid cells</li>
-<li><code>DamBreak_grid10240x5120.v3.0.0.h5</code>: 46,137,344 grid cells</li>
-<li><code>DamBreak_grid20480x10240.v3.0.0.h5</code>: 184,549,376 grid cells</li>
-</ol>
-<h2 id="script">Script</h2>
-<p><code>setup_batch_for_dam_break.sh</code> Will create symbolic link to the mesh
-file locally, compile RDycore (if needed), and create a batch script
-for DOE supercomputers that can be submitted via <code>sbatch</code>. </p>
-<div class="highlight"><pre><span></span><code><span class="w"> </span>./setup_batch_for_dam_break.sh<span class="w"> </span>-h
-Usage:<span class="w"> </span>./setup_batch_for_dam_break.sh
-
-<span class="w">   </span>-h,<span class="w"> </span>--help<span class="w">                        </span>Display<span class="w"> </span>this<span class="w"> </span>message
-<span class="w">   </span>--rdycore-dir<span class="w">                     </span>Path<span class="w"> </span>to<span class="w"> </span>RDycore<span class="w"> </span>directory
-<span class="w">   </span>--mach<span class="w"> </span>&lt;pm-cpu<span class="p">|</span>pm-gpu<span class="p">|</span>frontier&gt;<span class="w">   </span>Supported<span class="w"> </span>machine<span class="w"> </span>name
-<span class="w">   </span>--frontier-node-type<span class="w"> </span>&lt;cpu<span class="p">|</span>gpu&gt;<span class="w">    </span>To<span class="w"> </span>run<span class="w"> </span>on<span class="w"> </span>Frontier<span class="w"> </span>CPUs<span class="w"> </span>or<span class="w"> </span>GPUs
-<span class="w">   </span>-N<span class="w"> </span>--node<span class="w">  </span>&lt;N&gt;<span class="w">                    </span>Number<span class="w"> </span>of<span class="w"> </span>nodes<span class="w"> </span><span class="o">(</span><span class="nv">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="o">)</span>
-<span class="w">   </span>--project<span class="w"> </span>&lt;project-id&gt;<span class="w">            </span>Project<span class="w"> </span>ID<span class="w"> </span>that<span class="w"> </span>will<span class="w"> </span>charged<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span>job
+<h1 id="second-order-muscl-reconstruction">Second-Order MUSCL Reconstruction</h1>
+<p>The first-order finite volume method described in <a href="swe.html">Shallow Water Equations</a>
+reconstructs left and right states at each face directly from cell-averaged values,
+introducing <span class="arithmatex">\(O(\Delta x)\)</span> numerical diffusion. The MUSCL (Monotone Upstream-centered
+Schemes for Conservation Laws) scheme reduces this to <span class="arithmatex">\(O(\Delta x^2)\)</span> by replacing the
+piecewise-constant reconstruction with a piecewise-linear one.</p>
+<h2 id="overview">Overview</h2>
+<p>For each interior face shared by cells <span class="arithmatex">\(i\)</span> (left) and <span class="arithmatex">\(j\)</span> (right), the first-order
+scheme passes cell-averaged states <span class="arithmatex">\(\mathbf{U}_i\)</span>, <span class="arithmatex">\(\mathbf{U}_j\)</span> directly to the Roe
+solver. MUSCL replaces these with reconstructed face states:</p>
+<div class="arithmatex">\[
+\mathbf{U}_{i \to f} = \mathbf{U}_i + \nabla\mathbf{U}_i \cdot \Delta\vec{x}_i,
+\qquad
+\mathbf{U}_{j \to f} = \mathbf{U}_j + \nabla\mathbf{U}_j \cdot \Delta\vec{x}_j,
+\]</div>
+<p>where <span class="arithmatex">\(\Delta\vec{x}_i = \vec{x}_f - \vec{x}_i\)</span> is the displacement from cell <span class="arithmatex">\(i\)</span>'s
+centroid to the face midpoint <span class="arithmatex">\(\vec{x}_f\)</span>. These reconstructed states are then passed
+to the Roe solver in place of the cell-averaged values.</p>
+<h2 id="step-1-weighted-least-squares-gradient">Step 1 — Weighted Least-Squares Gradient</h2>
+<p>For each cell <span class="arithmatex">\(i\)</span>, the gradient <span class="arithmatex">\(\nabla q_i\)</span> (computed independently for each of
+<span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(hu\)</span>, <span class="arithmatex">\(hv\)</span>) is found by minimizing over the set of neighbors <span class="arithmatex">\(\mathcal{N}(i)\)</span>:</p>
+<div class="arithmatex">\[
+\min_{\nabla q_i} \sum_{j \in \mathcal{N}(i)} w_{ij}
+\left[ q_j - q_i - \nabla q_i \cdot (\vec{x}_j - \vec{x}_i) \right]^2,
+\qquad w_{ij} = \frac{1}{d_{ij}},
+\]</div>
+<p>where <span class="arithmatex">\(d_{ij} = \|\vec{x}_j - \vec{x}_i\|\)</span> and <span class="arithmatex">\((\Delta x_{ij}, \Delta y_{ij}) = \vec{x}_j - \vec{x}_i\)</span>.
+The inverse-distance weighting gives more influence to nearby neighbors.</p>
+<p>The normal equations form the <span class="arithmatex">\(2\times 2\)</span> symmetric system <span class="arithmatex">\(\mathbf{M}_i \,\nabla q_i = \mathbf{b}_i\)</span>,
+where</p>
+<div class="arithmatex">\[
+\mathbf{M}_i =
+\begin{bmatrix}
+\displaystyle\sum_j w_{ij}\,\Delta x_{ij}^2 &amp; \displaystyle\sum_j w_{ij}\,\Delta x_{ij}\,\Delta y_{ij} \\[8pt]
+\displaystyle\sum_j w_{ij}\,\Delta x_{ij}\,\Delta y_{ij} &amp; \displaystyle\sum_j w_{ij}\,\Delta y_{ij}^2
+\end{bmatrix},
+\qquad
+\mathbf{b}_i =
+\begin{bmatrix}
+\displaystyle\sum_j w_{ij}\,\Delta x_{ij}\,(q_j - q_i) \\[8pt]
+\displaystyle\sum_j w_{ij}\,\Delta y_{ij}\,(q_j - q_i)
+\end{bmatrix}.
+\]</div>
+<p>Since <span class="arithmatex">\(\mathbf{M}_i\)</span> is symmetric positive definite (for non-degenerate meshes), its inverse
+is computed analytically:</p>
+<div class="arithmatex">\[
+\mathbf{M}_i^{-1} = \frac{1}{\det\mathbf{M}_i}
+\begin{bmatrix} M_{11} &amp; -M_{01} \\ -M_{01} &amp; M_{00} \end{bmatrix},
+\qquad \det\mathbf{M}_i = M_{00}M_{11} - M_{01}^2.
+\]</div>
+<p>Cells where <span class="arithmatex">\(|\det\mathbf{M}_i| &lt; 10^{-15}\)</span> (degenerate, e.g. isolated or 1D cells) are
+assigned zero gradients. The per-cell coefficients of <span class="arithmatex">\(\mathbf{M}_i^{-1}\)</span> are combined with
+per-edge weights once at startup to produce four scalars per edge that are reused every
+timestep (see <code>PrecomputeLSGradCoeffs</code>).</p>
+<p><strong>Code:</strong> <code>PrecomputeLSGradCoeffs</code> + <code>ComputeLeastSquaresGradients</code>
+in <code>src/operator_fluxes_ceed.c</code>.</p>
+<h2 id="step-2-linear-reconstruction-to-face-midpoints">Step 2 — Linear Reconstruction to Face Midpoints</h2>
+<p>Given cell-centered gradients, the state at face midpoint <span class="arithmatex">\(\vec{x}_f\)</span> is approximated
+by linear extrapolation from each neighboring centroid:</p>
+<div class="arithmatex">\[
+q_{i \to f} = q_i + \nabla q_i \cdot (\vec{x}_f - \vec{x}_i),
+\qquad
+q_{j \to f} = q_j + \nabla q_j \cdot (\vec{x}_f - \vec{x}_j).
+\]</div>
+<p>Ghost cells (owned by another MPI rank) have incomplete gradients because only
+edges local to this process contribute to their least-squares sum. To avoid
+error, reconstruction falls back to first-order (zero extrapolation) on the ghost
+side.</p>
+<p><strong>Code:</strong> <code>ReconstructFaceValues</code> in <code>src/operator_fluxes_ceed.c</code>.</p>
+<h2 id="step-3-minmod-slope-limiter">Step 3 — Minmod Slope Limiter</h2>
+<p>Pure linear reconstruction can produce values outside the range of surrounding
+cell averages, causing spurious oscillations near discontinuities. The minmod
+limiter clips the extrapolated increment so the face value cannot overshoot the
+adjacent cell-average difference:</p>
+<div class="arithmatex">\[
+q_{i \to f} = q_i + \operatorname{minmod}\!\left(\nabla q_i \cdot \Delta\vec{x}_i,\; \tfrac{1}{2}(q_j - q_i)\right),
+\]</div>
+<div class="arithmatex">\[
+q_{j \to f} = q_j + \operatorname{minmod}\!\left(\nabla q_j \cdot \Delta\vec{x}_j,\; -\tfrac{1}{2}(q_j - q_i)\right),
+\]</div>
+<p>where</p>
+<div class="arithmatex">\[
+\operatorname{minmod}(a,\, b) =
+\begin{cases}
+0 &amp; \text{if } a\,b \leq 0, \\
+a &amp; \text{if } |a| \leq |b|, \\
+b &amp; \text{otherwise.}
+\end{cases}
+\]</div>
+<p>The limiter reduces the scheme to first-order accuracy locally wherever the solution
+is non-smooth, preventing oscillations while preserving second-order convergence in
+smooth regions. It is enabled by default when <code>second_order</code> is active. Disable via
+<code>no_limiter: true</code> in the YAML configuration or the <code>-no_limiter</code> command-line flag.</p>
+<p><strong>Code:</strong> <code>Minmod</code> + <code>ReconstructFaceValues</code> in <code>src/operator_fluxes_ceed.c</code>.</p>
+<h2 id="step-4-roe-solver-on-reconstructed-states">Step 4 — Roe Solver on Reconstructed States</h2>
+<p>The reconstructed states <span class="arithmatex">\(\mathbf{U}_{i \to f}\)</span> and <span class="arithmatex">\(\mathbf{U}_{j \to f}\)</span> replace
+the cell-averaged states in the Roe flux computation described in
+<a href="swe.html#evaluating-normal-fluxes">Shallow Water Equations</a>. Water depth is clamped
+to zero from below after reconstruction to prevent unphysical negative values that
+can arise from linear extrapolation.</p>
+<p><strong>Code:</strong> <code>SWEFlux_Roe_MUSCL</code> Q-function in <code>src/swe/swe_muscl_fluxes_ceed.h</code>,
+applied via the CEED operator created by <code>CreateCeedFluxOperatorReconstructed</code>
+in <code>src/operator_fluxes_ceed.c</code>.</p>
+<h2 id="mpi-parallelism">MPI Parallelism</h2>
+<p>Partition-boundary edges are treated at first-order accuracy because ghost-cell
+gradients are incomplete. This does not affect the global convergence rate but can
+introduce small MPI-count-dependent variations in <span class="arithmatex">\(L_\infty\)</span> norms.</p>
+<h2 id="enabling-second-order-reconstruction">Enabling Second-Order Reconstruction</h2>
+<p>MUSCL reconstruction requires the CEED backend. Enable via YAML:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">numerics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">spatial      </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fv</span>
+<span class="w">  </span><span class="nt">temporal     </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">euler</span>
+<span class="w">  </span><span class="nt">riemann      </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roe</span>
+<span class="w">  </span><span class="nt">second_order </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># enable MUSCL reconstruction (CEED backend required)</span>
+<span class="w">  </span><span class="nt">no_limiter   </span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># optional: disable the minmod limiter</span>
 </code></pre></div>
-<ul>
-<li>For Perlmutter:</li>
-<li><code>--mach pm-cpu</code> Run RDycore on CPU nodes</li>
-<li><code>--mach pm-gpu</code> Run RDycore GPU nodes using CUDA</li>
-<li>For Frontier (<code>--mach frontier</code>):</li>
-<li><code>--frontier-node-type cpu</code>: Run RDycore on CPUs</li>
-<li><code>--frontier-node-type gpu</code>: Run RDycore on GPUs using HIP</li>
-</ul>
-<h2 id="example-for-perlmutter-cpu-nodes">Example for Perlmutter CPU nodes</h2>
-<div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>pm-cpu<span class="w"> </span>--project<span class="w"> </span>m4267<span class="w"> </span>-N<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
---rdycore-dir<span class="w"> </span>/global/cfs/projectdirs/m4267/gbisht/rdycore
-</code></pre></div>
-<h2 id="example-for-perlmutter-gpu-nodes">Example for Perlmutter GPU nodes</h2>
-<div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>pm-gpu<span class="w"> </span>--project<span class="w"> </span>m4267_g<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
---rdycore-dir<span class="w"> </span>/global/cfs/projectdirs/m4267/gbisht/rdycore
-</code></pre></div>
-<h2 id="example-for-frontier-using-cpus">Example for Frontier using CPUs</h2>
-<div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--frontier-node-type<span class="w"> </span>cpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
---project<span class="w"> </span>cli192<span class="w"> </span><span class="se">\</span>
---rdycore-dir<span class="w"> </span>/lustre/orion/cli192/proj-shared/gb9/rdycore/rdycore<span class="w"> </span>
-</code></pre></div>
-<h2 id="example-for-frontier-using-gpus">Example for Frontier using GPUs</h2>
-<div class="highlight"><pre><span></span><code>./setup_batch_for_dam_break.sh<span class="w"> </span>--mach<span class="w"> </span>frontier<span class="w"> </span>--frontier-node-type<span class="w"> </span>gpu<span class="w"> </span>-N<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
---project<span class="w"> </span>cli192<span class="w"> </span><span class="se">\</span>
---rdycore-dir<span class="w"> </span>/lustre/orion/cli192/proj-shared/gb9/rdycore/rdycore<span class="w"> </span>
-</code></pre></div>
+<p>Or via command-line flags: <code>-second_order</code> and optionally <code>-no_limiter</code>.
+If the CEED backend is not active, a warning is printed and the solver falls
+back to first-order.</p>
 
 
 
@@ -1563,12 +1660,12 @@ Usage:<span class="w"> </span>./setup_batch_for_dam_break.sh
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../../javascript/mathjax.js"></script>
+        <script src="../javascript/mathjax.js"></script>
       
         <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
       
