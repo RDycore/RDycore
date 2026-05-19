@@ -138,6 +138,9 @@ static PetscErrorCode SetOperatorBoundaries(Operator *op, PetscInt num_boundarie
 static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
   PetscFunctionBegin;
 
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+
   if (CeedEnabled()) {
     // register a logging event for applying our CEED operator
     static PetscBool first_time = PETSC_TRUE;
@@ -157,7 +160,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
           PetscCall(PetscCalloc1(op->mesh->num_internal_edges * 4, &op->ceed.ls_grad_coeffs));
-          PetscCall(PrecomputeLSGradCoeffs(op->mesh, op->ceed.ls_grad_coeffs));
+          PetscCall(PrecomputeLSGradCoeffs(comm, op->mesh, op->ceed.ls_grad_coeffs));
         } else {
           PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
                                            &op->ceed.flux));
@@ -174,7 +177,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hu));
           PetscCall(PetscCalloc1(op->mesh->num_cells * 2, &op->ceed.grad_hv));
           PetscCall(PetscCalloc1(op->mesh->num_internal_edges * 4, &op->ceed.ls_grad_coeffs));
-          PetscCall(PrecomputeLSGradCoeffs(op->mesh, op->ceed.ls_grad_coeffs));
+          PetscCall(PrecomputeLSGradCoeffs(comm, op->mesh, op->ceed.ls_grad_coeffs));
         } else {
           PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
                                            &op->ceed.flux));

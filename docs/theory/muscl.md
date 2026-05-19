@@ -33,11 +33,39 @@ $$
 \qquad w_{ij} = \frac{1}{d_{ij}},
 $$
 
-where $d_{ij} = \|\vec{x}_j - \vec{x}_i\|$. The inverse-distance weighting gives
-more influence to nearby neighbors. The normal equations reduce to the $2\times 2$
-symmetric system $\mathbf{M}_i \,\nabla q_i = \mathbf{b}_i$, which is inverted
-analytically. The per-edge coefficients of $\mathbf{M}_i^{-1}$ are precomputed once
-at startup and reused every timestep.
+where $d_{ij} = \|\vec{x}_j - \vec{x}_i\|$ and $(\Delta x_{ij}, \Delta y_{ij}) = \vec{x}_j - \vec{x}_i$.
+The inverse-distance weighting gives more influence to nearby neighbors.
+
+The normal equations form the $2\times 2$ symmetric system $\mathbf{M}_i \,\nabla q_i = \mathbf{b}_i$,
+where
+
+$$
+\mathbf{M}_i =
+\begin{bmatrix}
+\displaystyle\sum_j w_{ij}\,\Delta x_{ij}^2 & \displaystyle\sum_j w_{ij}\,\Delta x_{ij}\,\Delta y_{ij} \\[8pt]
+\displaystyle\sum_j w_{ij}\,\Delta x_{ij}\,\Delta y_{ij} & \displaystyle\sum_j w_{ij}\,\Delta y_{ij}^2
+\end{bmatrix},
+\qquad
+\mathbf{b}_i =
+\begin{bmatrix}
+\displaystyle\sum_j w_{ij}\,\Delta x_{ij}\,(q_j - q_i) \\[8pt]
+\displaystyle\sum_j w_{ij}\,\Delta y_{ij}\,(q_j - q_i)
+\end{bmatrix}.
+$$
+
+Since $\mathbf{M}_i$ is symmetric positive definite (for non-degenerate meshes), its inverse
+is computed analytically:
+
+$$
+\mathbf{M}_i^{-1} = \frac{1}{\det\mathbf{M}_i}
+\begin{bmatrix} M_{11} & -M_{01} \\ -M_{01} & M_{00} \end{bmatrix},
+\qquad \det\mathbf{M}_i = M_{00}M_{11} - M_{01}^2.
+$$
+
+Cells where $|\det\mathbf{M}_i| < 10^{-15}$ (degenerate, e.g. isolated or 1D cells) are
+assigned zero gradients. The per-cell coefficients of $\mathbf{M}_i^{-1}$ are combined with
+per-edge weights once at startup to produce four scalars per edge that are reused every
+timestep (see `PrecomputeLSGradCoeffs`).
 
 **Code:** `PrecomputeLSGradCoeffs` + `ComputeLeastSquaresGradients`
 in `src/operator_fluxes_ceed.c`.

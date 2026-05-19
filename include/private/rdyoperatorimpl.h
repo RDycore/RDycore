@@ -203,7 +203,7 @@ PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, Pet
 PETSC_INTERN PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig, RDyMesh *, CeedVector *, RDyBoundary *, RDyCondition, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *,
                                                                 CeedVector *, CeedOperator *, CeedOperator *);
-PETSC_INTERN PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *, PetscReal *);
+PETSC_INTERN PetscErrorCode PrecomputeLSGradCoeffs(MPI_Comm, RDyMesh *, PetscReal *);
 PETSC_INTERN PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *, const PetscReal *, const PetscScalar *, PetscScalar *, PetscScalar *,
                                                          PetscScalar *);
 PETSC_INTERN PetscErrorCode ReconstructFaceValues(RDyMesh *, const PetscScalar *, const PetscScalar *, const PetscScalar *, const PetscScalar *,

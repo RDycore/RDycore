@@ -881,7 +881,7 @@ PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *config, RDyMesh *mesh, C
 ///
 /// @param [in]  mesh           the mesh
 /// @param [out] ls_grad_coeffs output array, size num_internal_edges * 4
-PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) {
+PetscErrorCode PrecomputeLSGradCoeffs(MPI_Comm comm, RDyMesh *mesh, PetscReal *ls_grad_coeffs) {
   PetscFunctionBeginUser;
 
   RDyCells *cells = &mesh->cells;
@@ -925,7 +925,7 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
     PetscReal m01 = M[c * 3 + 1];
     PetscReal m11 = M[c * 3 + 2];
     PetscReal det = m00 * m11 - m01 * m01;
-    if (PetscAbsReal(det) < 1e-30) {
+    if (PetscAbsReal(det) < 1e-15) {
       // Degenerate (e.g. 1-D cell or isolated cell) - zero gradient
       degenerate_count++;
       inv_m[c * 4 + 0] = 0.0;
@@ -942,10 +942,10 @@ PetscErrorCode PrecomputeLSGradCoeffs(RDyMesh *mesh, PetscReal *ls_grad_coeffs) 
   }
 
   PetscInt global_degenerate_count;
-  MPI_Allreduce(&degenerate_count, &global_degenerate_count, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD);
+  MPI_Allreduce(&degenerate_count, &global_degenerate_count, 1, MPIU_INT, MPI_SUM, comm);
   if (global_degenerate_count > 0) {
-    PetscCall(
-        PetscPrintf(PETSC_COMM_WORLD, "WARNING [PrecomputeLSGradCoeffs]: %d degenerate cells (det~0) — gradients zeroed\n", global_degenerate_count));
+    PetscCall(PetscPrintf(comm, "WARNING [PrecomputeLSGradCoeffs]: %" PetscInt_FMT " degenerate cells (det~0) — gradients zeroed\n",
+                          global_degenerate_count));
   }
 
   // M is no longer needed once inv_m is computed; free it now so it is not
