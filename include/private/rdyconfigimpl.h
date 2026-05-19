@@ -117,6 +117,8 @@ typedef struct {
   RDyNumericsSpatial  spatial;
   RDyNumericsTemporal temporal;
   RDyNumericsRiemann  riemann;
+  PetscBool           second_order;  // enable MUSCL second-order reconstruction
+  PetscBool           no_limiter;    // disable the minmod slope limiter (limiter is on by default when second_order is set)
 } RDyNumericsSection;
 
 // ------------

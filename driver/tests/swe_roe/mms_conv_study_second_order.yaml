@@ -3,9 +3,10 @@ physics:
     mode: swe
 
 numerics:
-  spatial : fv
-  temporal: euler
-  riemann : roe
+  spatial      : fv
+  temporal     : euler
+  riemann      : roe
+  second_order : true
 
 # this section contains analytic forms for the method of manufactured solutions
 mms:
@@ -20,10 +21,10 @@ mms:
     K: 0.6283185307179586 # wave number in x and y (pi/5)
   swe: # functions of x, y, t (non-normalized units)
     # water height
-    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    h:    H * (2 + sin(K*x)*sin(K*y)) * exp(t/T)
     dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/T)
     dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/T)
-    dhdt: H / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dhdt: H / T * (2 + sin(K*x)*sin(K*y)) * exp(t/T)
 
     # x velocity
     u:     U * cos(K*x) * sin(K*y) * exp(t/T)
@@ -45,23 +46,27 @@ mms:
     # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
 
-  # Convergence study parameters (optional)
+  # Convergence study parameters for second-order MUSCL reconstruction.
+  # Run with: mpirun -n 1 rdycore_mms mms_conv_study_second_order.yaml -ceed /cpu/self -second_order
+  #
+  # Uses 3 refinement levels (num_refinements: 2) to stay in the spatially-dominated
+  # regime before Forward Euler temporal error saturates at the finest mesh level.
   convergence:
-    num_refinements: 3
-    base_refinement: 1 # <-- start at this refinement level
-    expected_rates: # uses solution function names above
+    num_refinements: 2
+    base_refinement: 1
+    expected_rates:
       h:
-        L1: 0.94
-        L2: 0.95
-        Linf: 0.94
+        L1: 1.40
+        L2: 1.20
+        Linf: 0.80
       hu:
-        L1: 0.91
-        L2: 0.93
-        Linf: 0.77
+        L1: 1.30
+        L2: 1.30
+        Linf: 0.85
       hv:
-        L1: 0.91
-        L2: 0.93
-        Linf: 0.77
+        L1: 1.30
+        L2: 1.30
+        Linf: 0.85
 
 logging:
   level: none
@@ -87,4 +92,3 @@ regions:
 boundaries:
   - name: domain_boundary
     grid_boundary_id: 1
-
