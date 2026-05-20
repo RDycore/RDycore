@@ -14,7 +14,7 @@
 /// @param [inout] boundary_fluxes_accum an array of sequential Vecs that can store accumulated boundary fluxes for each boundary
 /// @param [out]   flux_op               the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
+PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, MPI_Comm comm, PetscInt num_boundaries, RDyBoundary *boundaries,
                                        RDyCondition *boundary_conditions, Vec *boundary_values, Vec *boundary_fluxes, Vec *boundary_fluxes_accum,
                                        OperatorDiagnostics *diagnostics, PetscOperator *flux_op) {
   PetscFunctionBegin;
@@ -31,7 +31,7 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscIn
   if (config->physics.sediment.num_classes > 0) {
     PetscCall(CreatePetscTracerInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
   } else {
-    PetscCall(CreatePetscSWEInteriorFluxOperator(mesh, *config, diagnostics, &interior_flux_op));
+    PetscCall(CreatePetscSWEInteriorFluxOperator(mesh, comm, *config, diagnostics, &interior_flux_op));
   }
   PetscCall(PetscOperatorCompositeAddSub(*flux_op, interior_flux_op));
 
