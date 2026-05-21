@@ -88,8 +88,16 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
 ///      components with each (owned) cell in the domain
 ///
 /// Active output fields:
-///    * `cell[num_owned_cells][3]` - an array associating a 3-component source
-///      value with each (owned) cell in the domain
+///    * `cell[num_owned_cells][num_comp]` - the combined RHS (flux divergence +
+///      source) written into the global solution update vector
+///
+/// Passive output fields:
+///    * `primitive_variables[num_owned_cells][num_comp]` - (h, u, v[, tracers])
+///      computed from the solution state each timestep; used for time-averaged
+///      primitive-variable output
+///    * `sources[num_owned_cells][num_comp]` - the instantaneous external-source
+///      snapshot (copy of ext_src); wired to ceed_src_inst and used for
+///      instantaneous and time-averaged source XDMF output
 ///
 /// Q-function context field labels:
 ///    * `time step` - the time step used by the operator
@@ -125,6 +133,8 @@ static PetscErrorCode CreateCeedSourceSuboperator(const RDyConfig config, RDyMes
   PetscCallCEED(CeedQFunctionAddInput(qf, "riemannf", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddOutput(qf, "cell", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "primitive_variables", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf, "sources", num_comp, CEED_EVAL_NONE));
 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction restrict_c, restrict_q, restrict_geom, restrict_ext_src, restrict_mat_props;

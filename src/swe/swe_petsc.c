@@ -534,6 +534,7 @@ typedef struct {
   Vec       external_sources;
   Vec       material_properties;
   PetscReal tiny_h;             // minimum water height for wet conditions
+  PetscReal h_anuga_regular;    // ANUGA height parameter used for velocity regularization
   PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
   PetscBool include_bed_slope;  // if false, bed slope is zero (HR: handled by flux pressure correction)
 } SourceOperator;
@@ -566,12 +567,20 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscScalar *flux_div_ptr;
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
+  // access primitive variables output vector
+  Vec prim_vars_vec;
+  PetscCall(PetscOperatorFieldsGet(fields, "primitive_variables", &prim_vars_vec));
+  PetscCheck(prim_vars_vec, comm, PETSC_ERR_USER, "No 'primitive_variables' field found in source operator!");
+  PetscScalar *pv_ptr;
+  PetscCall(VecGetArray(prim_vars_vec, &pv_ptr));
+
   PetscInt size;
   PetscCall(VecGetSize(source_vec, &size));
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt num_mat_props = NUM_MATERIAL_PROPERTIES;
+  PetscReal h_anuga       = source_op->h_anuga_regular;
+  PetscInt  num_mat_props = NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -613,6 +622,12 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
       f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
       f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+
+      // write primitive variables (h, u, v) using ANUGA regularization
+      PetscReal denom                   = Square(h) + Square(h_anuga);
+      pv_ptr[n_dof * owned_cell_id + 0] = h;
+      pv_ptr[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv_ptr[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
     }
   }
 
@@ -621,6 +636,8 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscCall(VecRestoreArray(f_global, &f_ptr));
   PetscCall(VecRestoreArray(source_vec, &source_ptr));
   PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
+  PetscCall(VecRestoreArray(flux_div, &flux_div_ptr));
+  PetscCall(VecRestoreArray(prim_vars_vec, &pv_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -663,12 +680,20 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscScalar *flux_div_ptr;
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
+  // access primitive variables output vector
+  Vec prim_vars_vec_xq2018;
+  PetscCall(PetscOperatorFieldsGet(fields, "primitive_variables", &prim_vars_vec_xq2018));
+  PetscCheck(prim_vars_vec_xq2018, comm, PETSC_ERR_USER, "No 'primitive_variables' field found in source operator!");
+  PetscScalar *pv_ptr_xq2018;
+  PetscCall(VecGetArray(prim_vars_vec_xq2018, &pv_ptr_xq2018));
+
   PetscInt size;
   PetscCall(VecGetSize(source_vec, &size));
   PetscInt n_dof = size / mesh->num_owned_cells;
   PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
 
-  PetscInt num_mat_props = NUM_MATERIAL_PROPERTIES;
+  PetscReal h_anuga_xq2018 = source_op->h_anuga_regular;
+  PetscInt  num_mat_props  = NUM_MATERIAL_PROPERTIES;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -725,6 +750,12 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
       f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
       f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+
+      // write primitive variables (h, u, v) using ANUGA regularization
+      PetscReal denom                          = Square(h) + Square(h_anuga_xq2018);
+      pv_ptr_xq2018[n_dof * owned_cell_id + 0] = h;
+      pv_ptr_xq2018[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv_ptr_xq2018[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
     }
   }
 
@@ -733,6 +764,8 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscCall(VecRestoreArray(f_global, &f_ptr));
   PetscCall(VecRestoreArray(source_vec, &source_ptr));
   PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
+  PetscCall(VecRestoreArray(flux_div, &flux_div_ptr));
+  PetscCall(VecRestoreArray(prim_vars_vec_xq2018, &pv_ptr_xq2018));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -761,6 +794,7 @@ PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *mesh, const RDyConfig confi
       .external_sources    = external_sources,
       .material_properties = material_properties,
       .tiny_h              = config.physics.flow.tiny_h,
+      .h_anuga_regular     = config.physics.flow.h_anuga_regular,
       .xq2018_threshold    = config.physics.flow.source.xq2018_threshold,
       .include_bed_slope   = PETSC_TRUE,
   };
@@ -1045,6 +1079,7 @@ PetscErrorCode CreatePetscSWESourceHROperator(RDyMesh *mesh, const RDyConfig con
       .external_sources    = external_sources,
       .material_properties = material_properties,
       .tiny_h              = config.physics.flow.tiny_h,
+      .h_anuga_regular     = config.physics.flow.h_anuga_regular,
       .xq2018_threshold    = config.physics.flow.source.xq2018_threshold,
       .include_bed_slope   = PETSC_FALSE,  // HR: bed slope handled by flux pressure correction
   };

@@ -152,6 +152,15 @@ typedef struct Operator {
       PetscScalar *grad_h, *grad_hu, *grad_hv;  // [num_cells * 2]: [c*2+0]=dq/dx, [c*2+1]=dq/dy
       PetscReal   *ls_grad_coeffs;              // [num_internal_edges * 4]: precomputed LS gradient coefficients
       CeedVector   q_reconstructed;             // [num_owned_internal_edges * 6]: h_L,hu_L,hv_L,h_R,hu_R,hv_R
+
+      // domain-wide primitive variables vector (current step, output from source Q-function)
+      CeedVector primitive_variables;
+      // domain-wide primitive variables accumulation vector (dt-weighted sum)
+      CeedVector primitive_variables_accum;
+
+      // instantaneous external source snapshot and accumulation for time-averaged source output
+      CeedVector ceed_src_inst;   // instantaneous source snapshot
+      CeedVector ceed_src_accum;  // running sum for time averaging
     } ceed;
 
     // PETSc operator data
@@ -179,6 +188,15 @@ typedef struct Operator {
 
   // domain-wide flux divergence data
   Vec flux_divergence;
+
+  // domain-wide primitive variables (current step; 3 components: h, u, v)
+  Vec primitive_variables;
+  // domain-wide primitive variables accumulation (dt-weighted sum)
+  Vec primitive_variables_accum;
+
+  // source output snapshot and accumulation
+  Vec src_inst;   // instantaneous source snapshot (PETSc backend)
+  Vec src_accum;  // running sum for time averaging (PETSc backend)
 
   //-------------------------------------------
   // diagnostics (used by both PETSc and CEED)
@@ -250,5 +268,8 @@ PETSC_INTERN PetscErrorCode RestoreOperatorDomainMaterialProperties(Operator *, 
 PETSC_INTERN PetscErrorCode ResetOperatorDiagnostics(Operator *);
 PETSC_INTERN PetscErrorCode UpdateOperatorDiagnostics(Operator *);
 PETSC_INTERN PetscErrorCode GetOperatorDiagnostics(Operator *, OperatorDiagnostics *);
+
+// source output
+PETSC_INTERN PetscErrorCode AddOperatorSourceVariables(Operator *);
 
 #endif

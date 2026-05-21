@@ -194,8 +194,10 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
-  if ((*rdy)->vec_diags) PetscCall(VecDestroy(&(*rdy)->vec_diags));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
+  // soln_output.petsc_accum is the only RDy-owned output Vec; all other output
+  // vecs are non-owning references into Operator-owned vectors.
+  if ((*rdy)->soln_output.petsc_accum) PetscCall(VecDestroy(&(*rdy)->soln_output.petsc_accum));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -268,7 +270,6 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscCall(DestroyTimeSeries(*rdy));
 
   // destroy DMs
-  if ((*rdy)->dm_diags) DMDestroy(&((*rdy)->dm_diags));
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 

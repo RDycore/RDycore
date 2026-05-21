@@ -602,6 +602,7 @@ typedef struct {
   Vec       external_sources;  // external source vector
   Vec       mannings;          // mannings coefficient vector
   PetscReal tiny_h;            // minimum water height for wet conditions
+  PetscReal h_anuga_regular;   // ANUGA height parameter used for velocity regularization
   PetscReal xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
 } TracerSourceOperator;
 
@@ -649,9 +650,17 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
   PetscScalar *flux_div_ptr;
   PetscCall(VecGetArray(flux_div, &flux_div_ptr));  // domain global vector
 
+  // access primitive variables output vector
+  Vec prim_vars_vec;
+  PetscCall(PetscOperatorFieldsGet(fields, "primitive_variables", &prim_vars_vec));
+  PetscCheck(prim_vars_vec, comm, PETSC_ERR_USER, "No 'primitive_variables' field found in source operator!");
+  PetscScalar *pv_ptr;
+  PetscCall(VecGetArray(prim_vars_vec, &pv_ptr));
+
   PetscInt n_dof;
   PetscCall(VecGetBlockSize(u_local, &n_dof));
 
+  PetscReal h_anuga = source_op->h_anuga_regular;
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (cells->is_owned[c]) {
       PetscInt owned_cell_id = cells->local_to_owned[c];
@@ -702,6 +711,17 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
       f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
       f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
       f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+
+      // write primitive variables (h, u, v[, c_0, c_1, ...]) using ANUGA regularization
+      PetscReal denom                   = Square(h) + Square(h_anuga);
+      pv_ptr[n_dof * owned_cell_id + 0] = h;
+      pv_ptr[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv_ptr[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
+      // tracer concentrations c_s = h*c_s / h
+      for (PetscInt s = 0; s < num_tracers_comp; s++) {
+        PetscReal hc_s                        = u_ptr[n_dof * c + 3 + s];
+        pv_ptr[n_dof * owned_cell_id + 3 + s] = (h >= tiny_h) ? (hc_s / h) : 0.0;
+      }
     }
   }
 
@@ -710,6 +730,8 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
   PetscCall(VecRestoreArray(f_global, &f_ptr));
   PetscCall(VecRestoreArray(source_vec, &source_ptr));
   PetscCall(VecRestoreArray(mannings_vec, &mannings_ptr));
+  PetscCall(VecRestoreArray(flux_div, &flux_div_ptr));
+  PetscCall(VecRestoreArray(prim_vars_vec, &pv_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -746,6 +768,7 @@ PetscErrorCode CreatePetscTracerSourceOperator(RDyMesh *mesh, const RDyConfig co
       .external_sources = external_sources,
       .mannings         = mannings,
       .tiny_h           = config.physics.flow.tiny_h,
+      .h_anuga_regular  = config.physics.flow.h_anuga_regular,
       .xq2018_threshold = config.physics.flow.source.xq2018_threshold,
   };
 

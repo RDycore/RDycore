@@ -9,6 +9,7 @@
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyoperatorimpl.h>
+#include <private/rdyoutputimpl.h>
 #include <private/rdyregionimpl.h>
 #include <rdycore.h>
 
@@ -137,10 +138,14 @@ struct _p_RDy {
   SectionFieldSpec soln_fields;
   PetscBool        refine;
 
-  // auxiliary DM for diagnostics
-  DM               dm_diags;
-  SectionFieldSpec field_diags;
-  Vec              vec_diags;
+  PetscInt last_accumulated_step;  // last step for variables were accumulated for time-averaged output
+
+  // Output variables: bundle field specs, vectors, and accumulated time for
+  // solution, primitive variables, and sources.  The vecs are non-owning
+  // references except soln_output.petsc_accum (RDy-owned, allocated in CreateVectors).
+  OutputVar soln_output;       // solution time-averaged output (avg_fields only; inst uses u_global + soln_fields)
+  OutputVar prim_vars_output;  // primitive variable instantaneous + time-averaged output
+  OutputVar src_output;        // source instantaneous + time-averaged output
 
   DM               dm_1dof;
   SectionFieldSpec field_1dof;

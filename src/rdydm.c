@@ -187,12 +187,12 @@ PetscErrorCode CreateDM(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// This function creates an auxiliary (secondary) DM
+/// @brief This function creates auxiliary (secondary) DMs
 PetscErrorCode CreateAuxiliaryDMs(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_diags, &rdy->dm_diags));
   PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->field_1dof, &rdy->dm_1dof));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -259,10 +259,19 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(VecViewFromOptions(rdy->u_global, NULL, "-vec_view"));
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
-  // diagnostics are all piled into a single vector whose block size is the
-  // total number of field components
-  PetscCall(DMCreateGlobalVector(rdy->dm_diags, &rdy->vec_diags));
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
+
+  // solution time-averaging: allocate only the RDy-owned accumulation Vec;
+  // petsc_inst is a non-owning reference to u_global set here too.
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->soln_output.petsc_accum));
+  PetscCall(VecZeroEntries(rdy->soln_output.petsc_accum));
+  rdy->soln_output.petsc_inst = rdy->u_global;
+  // reset accumulated-time scalars whenever accumulation vectors are (re)created
+  // (important for AMR, which calls CreateVectors again after mesh refinement)
+  rdy->last_accumulated_step             = -1;  // no steps accumulated yet
+  rdy->soln_output.accumulated_time      = 0.0;
+  rdy->prim_vars_output.accumulated_time = 0.0;
+  rdy->src_output.accumulated_time       = 0.0;
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

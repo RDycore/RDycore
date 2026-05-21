@@ -1414,37 +1414,71 @@ PetscErrorCode RDySetup(RDy rdy) {
       }},
   };
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
+    snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT, i);
   }
   // TODO: salinity and heat go here
 
-  PetscCall(CreateDM(rdy));
+  // set up solution time-averaged field spec
+  rdy->soln_output.avg_fields.num_fields              = 1;
+  rdy->soln_output.avg_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->soln_output.avg_fields.field_names[0], "SolutionMean");
+  strcpy(rdy->soln_output.avg_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->soln_output.avg_fields.field_component_names[0][1], "MomentumX_Mean");
+  strcpy(rdy->soln_output.avg_fields.field_component_names[0][2], "MomentumY_Mean");
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(rdy->soln_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean", i);
+  }
+  rdy->soln_output.skip_first_component = PETSC_FALSE;
 
-  // create the auxiliary DM, which handles requested diagnostics and I/O
-  if (rdy->config.output.fields_count > 0) {
-    rdy->field_diags            = (SectionFieldSpec){0};
-    rdy->field_diags.num_fields = 0;
-    for (PetscInt i = 0; i < rdy->config.output.fields_count; ++i) {
-      // a diagnostic field is a requested output field that doesn't belong
-      // to the solution vector
-      PetscBool is_diag_field = PETSC_TRUE;
-      for (PetscInt j = 0; j < rdy->soln_fields.num_field_components[0]; ++j) {
-        if (!strcmp(rdy->soln_fields.field_component_names[0][j], rdy->config.output.fields[i])) {
-          is_diag_field = PETSC_FALSE;
-          break;
-        }
-      }
-      if (is_diag_field) {
-        if (!rdy->field_diags.num_fields) {
-          rdy->field_diags.num_fields = 1;
-          strcpy(rdy->field_diags.field_names[0], "Diagnostics");
-          rdy->field_diags.num_field_components[0] = 0;
-        }
-        strcpy(rdy->field_diags.field_component_names[0][rdy->field_diags.num_field_components[0]], rdy->config.output.fields[i]);
-        ++rdy->field_diags.num_field_components[0];
-      }
+  // set up primitive variables field spec for time-averaged (mean) output
+  rdy->prim_vars_output.avg_fields.num_fields              = 1;
+  rdy->prim_vars_output.avg_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_output.avg_fields.field_names[0], "PrimitiveVariables");
+  strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][1], "VelocityX_Mean");
+  strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][2], "VelocityY_Mean");
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT "_Mean", i);
+  }
+
+  // set up primitive variables field spec for instantaneous output
+  rdy->prim_vars_output.inst_fields.num_fields              = 1;
+  rdy->prim_vars_output.inst_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_output.inst_fields.field_names[0], "PrimitiveVariablesInstantaneous");
+  strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][0], "Height");  // skipped at write time
+  strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][1], "VelocityX");
+  strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][2], "VelocityY");
+  for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+    snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
+  }
+  rdy->prim_vars_output.skip_first_component = PETSC_TRUE;
+
+  // set up source output field specs (instantaneous and time-averaged)
+  {
+    PetscInt num_src_comp                               = 3 + rdy->config.physics.sediment.num_classes;
+    rdy->src_output.inst_fields.num_fields              = 1;
+    rdy->src_output.inst_fields.num_field_components[0] = num_src_comp;
+    strcpy(rdy->src_output.inst_fields.field_names[0], "Sources");
+    strcpy(rdy->src_output.inst_fields.field_component_names[0][0], "WaterSource");
+    strcpy(rdy->src_output.inst_fields.field_component_names[0][1], "MomentumXSource");
+    strcpy(rdy->src_output.inst_fields.field_component_names[0][2], "MomentumYSource");
+    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+      snprintf(rdy->src_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source", i);
+    }
+
+    rdy->src_output.avg_fields.num_fields              = 1;
+    rdy->src_output.avg_fields.num_field_components[0] = num_src_comp;
+    strcpy(rdy->src_output.avg_fields.field_names[0], "SourcesMean");
+    strcpy(rdy->src_output.avg_fields.field_component_names[0][0], "WaterSource_Mean");
+    strcpy(rdy->src_output.avg_fields.field_component_names[0][1], "MomentumXSource_Mean");
+    strcpy(rdy->src_output.avg_fields.field_component_names[0][2], "MomentumYSource_Mean");
+    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
+      snprintf(rdy->src_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean", i);
     }
   }
+  rdy->src_output.skip_first_component = PETSC_FALSE;
+
+  PetscCall(CreateDM(rdy));
 
   rdy->field_1dof = (SectionFieldSpec){
       .num_fields           = 1,
@@ -1494,6 +1528,19 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
+
+  // Wire OutputVar references to Operator-owned vectors (must happen after InitOperator).
+  {
+    Operator *op                      = rdy->operator;
+    rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
+    rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
+    rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
+    rdy->prim_vars_output.ceed_accum  = op->ceed.primitive_variables_accum;
+    rdy->src_output.petsc_inst        = op->src_inst;
+    rdy->src_output.petsc_accum       = op->src_accum;
+    rdy->src_output.ceed_inst         = op->ceed.ceed_src_inst;
+    rdy->src_output.ceed_accum        = op->ceed.ceed_src_accum;
+  }
 
   RDyLogDebug(rdy, "Initializing material properties...");
   PetscCall(InitMaterialProperties(rdy));
