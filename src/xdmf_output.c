@@ -5,14 +5,18 @@
 #include <string.h>
 
 // Returns PETSC_TRUE if at least one component of spec appears in output->fields.
-// When skip_first_component is PETSC_TRUE, component 0 is excluded (used for prim vars
-// where component 0 is Height, already written from u_global/soln_fields).
+// When skip_first_component is PETSC_TRUE, the first component (global index 0 across
+// all fields) is excluded (used for prim vars where that component is Height, already
+// written from u_global/soln_fields).
 static PetscBool AnyFieldRequested(const RDyOutputSection *output, const SectionFieldSpec *spec, PetscBool skip_first_component) {
   if (!spec->num_fields) return PETSC_FALSE;
-  PetscInt start = skip_first_component ? 1 : 0;
-  for (PetscInt i = 0; i < output->fields_count; ++i) {
-    for (PetscInt c = start; c < spec->num_field_components[0]; ++c) {
-      if (!strcmp(output->fields[i], spec->field_component_names[0][c])) return PETSC_TRUE;
+  PetscInt c_global = 0;
+  for (PetscInt f = 0; f < spec->num_fields; ++f) {
+    for (PetscInt c = 0; c < spec->num_field_components[f]; ++c, ++c_global) {
+      if (skip_first_component && c_global == 0) continue;
+      for (PetscInt i = 0; i < output->fields_count; ++i) {
+        if (!strcmp(output->fields[i], spec->field_component_names[f][c])) return PETSC_TRUE;
+      }
     }
   }
   return PETSC_FALSE;

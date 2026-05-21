@@ -1141,8 +1141,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
           "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
           "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
           "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean",
-          "Concentration%" PetscInt_FMT "_Mean",
-          "Concentration%" PetscInt_FMT,
+          "SedimentConcentration%" PetscInt_FMT "_Mean",
+          "SedimentConcentration%" PetscInt_FMT,
           NULL,
       };
       PetscInt num_classes = config->physics.sediment.num_classes;

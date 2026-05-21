@@ -1438,7 +1438,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][1], "VelocityX_Mean");
   strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][2], "VelocityY_Mean");
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-    snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
+    snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT "_Mean", i);
   }
 
   // set up primitive variables field spec for instantaneous output
@@ -1449,7 +1449,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][1], "VelocityX");
   strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][2], "VelocityY");
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-    snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+    snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
   }
   rdy->prim_vars_output.skip_first_component = PETSC_TRUE;
 
