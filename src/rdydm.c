@@ -260,23 +260,18 @@ PetscErrorCode CreateVectors(RDy rdy) {
   PetscCall(DMCreateLocalVector(rdy->dm, &rdy->u_local));
 
   PetscCall(DMCreateGlobalVector(rdy->dm_1dof, &rdy->vec_1dof));
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_avg));
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_prim_vars_inst));
 
-  // solution time-averaging vectors
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_soln_avg));
-  PetscCall(VecDuplicate(rdy->u_global, &rdy->vec_soln_accum));
-  PetscCall(VecZeroEntries(rdy->vec_soln_accum));
+  // solution time-averaging: allocate only the RDy-owned accumulation Vec;
+  // petsc_inst is a non-owning reference to u_global set here too.
+  PetscCall(VecDuplicate(rdy->u_global, &rdy->soln_output.petsc_accum));
+  PetscCall(VecZeroEntries(rdy->soln_output.petsc_accum));
+  rdy->soln_output.petsc_inst = rdy->u_global;
   // reset accumulated-time scalars whenever accumulation vectors are (re)created
   // (important for AMR, which calls CreateVectors again after mesh refinement)
-  rdy->last_accumulated_step      = -1;  // no steps accumulated yet
-  rdy->soln_accumulated_time      = 0.0;
-  rdy->prim_vars_accumulated_time = 0.0;
-  rdy->src_accumulated_time       = 0.0;
-
-  // source output vectors
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_src_inst));
-  PetscCall(DMCreateGlobalVector(rdy->dm, &rdy->vec_src_avg));
+  rdy->last_accumulated_step             = -1;  // no steps accumulated yet
+  rdy->soln_output.accumulated_time      = 0.0;
+  rdy->prim_vars_output.accumulated_time = 0.0;
+  rdy->src_output.accumulated_time       = 0.0;
 
   if (rdy->config.physics.sediment.num_classes) {
     // Vecs for flow

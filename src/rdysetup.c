@@ -1419,64 +1419,64 @@ PetscErrorCode RDySetup(RDy rdy) {
   // TODO: salinity and heat go here
 
   // set up solution time-averaged field spec
-  rdy->soln_avg_fields.num_fields              = 1;
-  rdy->soln_avg_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
-  strcpy(rdy->soln_avg_fields.field_names[0], "SolutionMean");
-  strcpy(rdy->soln_avg_fields.field_component_names[0][0], "Height_Mean");
-  strcpy(rdy->soln_avg_fields.field_component_names[0][1], "MomentumX_Mean");
-  strcpy(rdy->soln_avg_fields.field_component_names[0][2], "MomentumY_Mean");
+  rdy->soln_output.avg_fields.num_fields              = 1;
+  rdy->soln_output.avg_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->soln_output.avg_fields.field_names[0], "SolutionMean");
+  strcpy(rdy->soln_output.avg_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->soln_output.avg_fields.field_component_names[0][1], "MomentumX_Mean");
+  strcpy(rdy->soln_output.avg_fields.field_component_names[0][2], "MomentumY_Mean");
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-    snprintf(rdy->soln_avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean", i);
+    snprintf(rdy->soln_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean", i);
   }
-  rdy->soln_accumulated_time = 0.0;
+  rdy->soln_output.skip_first_component = PETSC_FALSE;
 
   // set up primitive variables field spec for time-averaged (mean) output
-  rdy->prim_vars_fields.num_fields              = 1;
-  rdy->prim_vars_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
-  strcpy(rdy->prim_vars_fields.field_names[0], "PrimitiveVariables");
-  strcpy(rdy->prim_vars_fields.field_component_names[0][0], "Height_Mean");
-  strcpy(rdy->prim_vars_fields.field_component_names[0][1], "VelocityX_Mean");
-  strcpy(rdy->prim_vars_fields.field_component_names[0][2], "VelocityY_Mean");
+  rdy->prim_vars_output.avg_fields.num_fields              = 1;
+  rdy->prim_vars_output.avg_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_output.avg_fields.field_names[0], "PrimitiveVariables");
+  strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][0], "Height_Mean");
+  strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][1], "VelocityX_Mean");
+  strcpy(rdy->prim_vars_output.avg_fields.field_component_names[0][2], "VelocityY_Mean");
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-    snprintf(rdy->prim_vars_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
+    snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT "_Mean", i);
   }
-  rdy->prim_vars_accumulated_time = 0.0;
-  rdy->src_accumulated_time       = 0.0;
 
   // set up primitive variables field spec for instantaneous output
-  rdy->prim_vars_inst_fields.num_fields              = 1;
-  rdy->prim_vars_inst_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
-  strcpy(rdy->prim_vars_inst_fields.field_names[0], "PrimitiveVariablesInstantaneous");
-  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][0], "Height");  // skipped at write time
-  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][1], "VelocityX");
-  strcpy(rdy->prim_vars_inst_fields.field_component_names[0][2], "VelocityY");
+  rdy->prim_vars_output.inst_fields.num_fields              = 1;
+  rdy->prim_vars_output.inst_fields.num_field_components[0] = rdy->soln_fields.num_field_components[0];
+  strcpy(rdy->prim_vars_output.inst_fields.field_names[0], "PrimitiveVariablesInstantaneous");
+  strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][0], "Height");  // skipped at write time
+  strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][1], "VelocityX");
+  strcpy(rdy->prim_vars_output.inst_fields.field_component_names[0][2], "VelocityY");
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-    snprintf(rdy->prim_vars_inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
+    snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "Concentration%" PetscInt_FMT, i);
   }
+  rdy->prim_vars_output.skip_first_component = PETSC_TRUE;
 
   // set up source output field specs (instantaneous and time-averaged)
   {
-    PetscInt num_src_comp                        = 3 + rdy->config.physics.sediment.num_classes;
-    rdy->src_inst_fields.num_fields              = 1;
-    rdy->src_inst_fields.num_field_components[0] = num_src_comp;
-    strcpy(rdy->src_inst_fields.field_names[0], "Sources");
-    strcpy(rdy->src_inst_fields.field_component_names[0][0], "WaterSource");
-    strcpy(rdy->src_inst_fields.field_component_names[0][1], "MomentumXSource");
-    strcpy(rdy->src_inst_fields.field_component_names[0][2], "MomentumYSource");
+    PetscInt num_src_comp                               = 3 + rdy->config.physics.sediment.num_classes;
+    rdy->src_output.inst_fields.num_fields              = 1;
+    rdy->src_output.inst_fields.num_field_components[0] = num_src_comp;
+    strcpy(rdy->src_output.inst_fields.field_names[0], "Sources");
+    strcpy(rdy->src_output.inst_fields.field_component_names[0][0], "WaterSource");
+    strcpy(rdy->src_output.inst_fields.field_component_names[0][1], "MomentumXSource");
+    strcpy(rdy->src_output.inst_fields.field_component_names[0][2], "MomentumYSource");
     for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-      snprintf(rdy->src_inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source", i);
+      snprintf(rdy->src_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source", i);
     }
 
-    rdy->src_avg_fields.num_fields              = 1;
-    rdy->src_avg_fields.num_field_components[0] = num_src_comp;
-    strcpy(rdy->src_avg_fields.field_names[0], "SourcesMean");
-    strcpy(rdy->src_avg_fields.field_component_names[0][0], "WaterSource_Mean");
-    strcpy(rdy->src_avg_fields.field_component_names[0][1], "MomentumXSource_Mean");
-    strcpy(rdy->src_avg_fields.field_component_names[0][2], "MomentumYSource_Mean");
+    rdy->src_output.avg_fields.num_fields              = 1;
+    rdy->src_output.avg_fields.num_field_components[0] = num_src_comp;
+    strcpy(rdy->src_output.avg_fields.field_names[0], "SourcesMean");
+    strcpy(rdy->src_output.avg_fields.field_component_names[0][0], "WaterSource_Mean");
+    strcpy(rdy->src_output.avg_fields.field_component_names[0][1], "MomentumXSource_Mean");
+    strcpy(rdy->src_output.avg_fields.field_component_names[0][2], "MomentumYSource_Mean");
     for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
-      snprintf(rdy->src_avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean", i);
+      snprintf(rdy->src_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean", i);
     }
   }
+  rdy->src_output.skip_first_component = PETSC_FALSE;
 
   PetscCall(CreateDM(rdy));
 
@@ -1528,6 +1528,19 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
+
+  // Wire OutputVar references to Operator-owned vectors (must happen after InitOperator).
+  {
+    Operator *op                      = rdy->operator;
+    rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
+    rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
+    rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
+    rdy->prim_vars_output.ceed_accum  = op->ceed.primitive_variables_accum;
+    rdy->src_output.petsc_inst        = op->src_inst;
+    rdy->src_output.petsc_accum       = op->src_accum;
+    rdy->src_output.ceed_inst         = op->ceed.ceed_src_inst;
+    rdy->src_output.ceed_accum        = op->ceed.ceed_src_accum;
+  }
 
   RDyLogDebug(rdy, "Initializing material properties...");
   PetscCall(InitMaterialProperties(rdy));

@@ -9,6 +9,7 @@
 #include <private/rdylogimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyoperatorimpl.h>
+#include <private/rdyoutputimpl.h>
 #include <private/rdyregionimpl.h>
 #include <rdycore.h>
 
@@ -139,30 +140,12 @@ struct _p_RDy {
 
   PetscInt last_accumulated_step;  // last step for variables were accumulated for time-averaged output
 
-  // field spec, Vec, accumulator, and accumulated time for time-averaged solution output
-  SectionFieldSpec soln_avg_fields;  // Height_Mean, MomentumX_Mean, MomentumY_Mean, SedimentMassPerUnitAreaN_Mean
-  Vec              vec_soln_avg;     // time-averaged solution (same layout as u_global)
-  Vec              vec_soln_accum;   // running sum for time averaging
-  PetscReal        soln_accumulated_time;
-
-  // field spec, Vec, and accumulated time for time-averaged primitive variables output
-  // (uses the same DM layout as dm above)
-  SectionFieldSpec prim_vars_fields;
-  Vec              vec_prim_vars_avg;
-  PetscReal        prim_vars_accumulated_time;
-  // accumulated time for time-averaged source output
-  PetscReal src_accumulated_time;
-  // field spec and Vec for instantaneous primitive variable output
-  SectionFieldSpec prim_vars_inst_fields;
-  Vec              vec_prim_vars_inst;
-
-  // field spec and Vec for instantaneous source output (uses rdy->dm layout)
-  SectionFieldSpec src_inst_fields;  // WaterSource, MomentumXSource, MomentumYSource, SedimentMassPerUnitAreaNSource
-  Vec              vec_src_inst;
-
-  // field spec and Vec for time-averaged source output (uses rdy->dm layout)
-  SectionFieldSpec src_avg_fields;  // WaterSource_Mean, MomentumXSource_Mean, ...
-  Vec              vec_src_avg;
+  // Output variables: bundle field specs, vectors, and accumulated time for
+  // solution, primitive variables, and sources.  The vecs are non-owning
+  // references except soln_output.petsc_accum (RDy-owned, allocated in CreateVectors).
+  OutputVar soln_output;       // solution time-averaged output (avg_fields only; inst uses u_global + soln_fields)
+  OutputVar prim_vars_output;  // primitive variable instantaneous + time-averaged output
+  OutputVar src_output;        // source instantaneous + time-averaged output
 
   DM               dm_1dof;
   SectionFieldSpec field_1dof;

@@ -674,6 +674,19 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // reinitialize the operator
   PetscCall(InitOperator(rdy));
 
+  // Re-wire OutputVar references since the operator was destroyed and recreated.
+  {
+    Operator *op                      = rdy->operator;
+    rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
+    rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
+    rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
+    rdy->prim_vars_output.ceed_accum  = op->ceed.primitive_variables_accum;
+    rdy->src_output.petsc_inst        = op->src_inst;
+    rdy->src_output.petsc_accum       = op->src_accum;
+    rdy->src_output.ceed_inst         = op->ceed.ceed_src_inst;
+    rdy->src_output.ceed_accum        = op->ceed.ceed_src_accum;
+  }
+
   // reinitialize material properties
   PetscCall(InitMaterialProperties(rdy));
 

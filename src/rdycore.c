@@ -195,12 +195,9 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
-  if ((*rdy)->vec_prim_vars_avg) PetscCall(VecDestroy(&(*rdy)->vec_prim_vars_avg));
-  if ((*rdy)->vec_prim_vars_inst) PetscCall(VecDestroy(&(*rdy)->vec_prim_vars_inst));
-  if ((*rdy)->vec_soln_avg) PetscCall(VecDestroy(&(*rdy)->vec_soln_avg));
-  if ((*rdy)->vec_soln_accum) PetscCall(VecDestroy(&(*rdy)->vec_soln_accum));
-  if ((*rdy)->vec_src_inst) PetscCall(VecDestroy(&(*rdy)->vec_src_inst));
-  if ((*rdy)->vec_src_avg) PetscCall(VecDestroy(&(*rdy)->vec_src_avg));
+  // soln_output.petsc_accum is the only RDy-owned output Vec; all other output
+  // vecs are non-owning references into Operator-owned vectors.
+  if ((*rdy)->soln_output.petsc_accum) PetscCall(VecDestroy(&(*rdy)->soln_output.petsc_accum));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
