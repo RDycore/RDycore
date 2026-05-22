@@ -222,7 +222,7 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
         }
 
         for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
-          rhs_local_ptr[n_dof * left_local_cell_id + i_dof]  += flux_vec_int[n_dof * e + i_dof] * (-edge_len / areal);
+          rhs_local_ptr[n_dof * left_local_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (-edge_len / areal);
           rhs_local_ptr[n_dof * right_local_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (edge_len / arear);
         }
       }
