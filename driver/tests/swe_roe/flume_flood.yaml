@@ -1,0 +1,130 @@
+# Flume-scale channel-floodplain overtopping test
+#
+# Domain: 40m x 5m (1m channel, 2m FP each side, 0.5m bank)
+# Forcing: steady channel inflow, overtopping onto floodplains
+#
+# Normal depth sizing at this scale:
+#   Q = 0.3 m^3/s over 1m channel
+#   q_y = Q/W = 0.3/1.0 = 0.3 m^2/s
+#   h_n ~ 0.6m > 0.5m bank --> overtopping
+#
+# Boundary IDs:
+#   1 = channel_inflow   upstream channel (x=2..3)
+#   2 = left_fp_inflow   upstream left FP (x=0..2)  -- wall
+#   3 = right_fp_inflow  upstream right FP (x=3..5) -- wall
+#   4 = outflow          downstream full width
+#   5 = left_wall        x=0
+#   6 = right_wall       x=5
+#   7 = left_bank        interior (no BC)
+#   8 = right_bank       interior (no BC)
+
+physics:
+  flow:
+    mode: swe
+    source:
+      method: implicit_xq2018
+    well_balancing: hydrostatic_reconstruction
+    tiny_h: 1.0e-4
+    h_anuga_reg_parameter: 1.0e-4
+
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 300.0          # 10 minutes -- flood front reaches end well before this
+  unit: seconds
+  coupling_interval: 10.0
+  time_step: 0.005
+
+output:
+  format: xdmf
+  time_interval: 10
+  time_unit: seconds
+  batch_size: 60
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+
+grid:
+  file: flume_flood.exo
+  cell_elevation:
+    file: flume_elevation_int32.bin
+
+regions:
+  - name: left_fp
+    grid_region_id: 1
+  - name: channel
+    grid_region_id: 2
+  - name: right_fp
+    grid_region_id: 3
+
+surface_composition:
+  - region: left_fp
+    material: bed
+  - region: channel
+    material: bed
+  - region: right_fp
+    material: bed
+
+materials:
+  - name: bed
+    properties:
+      manning:
+        value: 0.02    # smooth flume walls
+
+initial_conditions:
+  - region: left_fp
+    flow: thin_film_ic
+  - region: channel
+    flow: thin_film_ic
+  - region: right_fp
+    flow: thin_film_ic
+
+boundaries:
+  - name: channel_inflow
+    grid_boundary_id: 1
+  - name: left_fp_inflow
+    grid_boundary_id: 2
+  - name: right_fp_inflow
+    grid_boundary_id: 3
+  - name: outflow
+    grid_boundary_id: 4
+  - name: left_wall
+    grid_boundary_id: 5
+  - name: right_wall
+    grid_boundary_id: 6
+
+boundary_conditions:
+  - boundaries: [channel_inflow]
+    flow: channel_inflow_bc
+  - boundaries: [left_fp_inflow, right_fp_inflow, left_wall, right_wall]
+    flow: wall_bc
+  - boundaries: [outflow]
+    flow: outflow_bc
+
+flow_conditions:
+  - name: thin_film_ic
+    type: dirichlet
+    height: 1.0e-3
+    x_momentum: 0.0
+    y_momentum: 0.0
+
+  # Q = 0.3 m^3/s, W = 1m, h_n ~ 0.6m > 0.5m bank
+  - name: channel_inflow_bc
+    type: dirichlet
+    height: 0.1
+    x_momentum: 0.0
+    y_momentum: 0.3   # q_y = Q/W = 0.3/1.0
+
+  - name: outflow_bc
+    type: critical-outflow
+
+  - name: wall_bc
+    type: reflecting

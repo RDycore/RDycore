@@ -93,13 +93,8 @@ typedef struct {
   PetscScalar *q_reconstructed;             // [num_owned_internal_edges * 6]: reconstructed face states
 } InteriorFluxOperator;
 
-// Second-order MUSCL interior flux: compute least-squares gradients, reconstruct
-// face states, solve the Riemann problem, and accumulate into f_global via a
-// local vector with DMLocalToGlobal(ADD_VALUES).  Using a local vector sends
-// ghost-cell contributions back to their owning process so that partition-
-// boundary edges are handled consistently: only the edge owner accumulates,
-// and its ghost-side contribution is communicated back rather than being
-// recomputed (incorrectly) by the non-owning process.
+// Second-order MUSCL interior flux: only the edge owner accumulates,
+// and its ghost-side contribution is communicated back
 static PetscErrorCode ApplyInteriorFlux2R(InteriorFluxOperator *interior_flux_op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
@@ -134,7 +129,6 @@ static PetscErrorCode ApplyInteriorFlux2R(InteriorFluxOperator *interior_flux_op
   // Collect the h/hu/hv for left and right cells to compute u/v.
   // For owned interior edges, use reconstructed face states;
   // for non-owned (ghost-side) edges, fall back to cell-averaged values
-  // (their fluxes will be discarded — the owning rank's contribution wins).
   PetscInt owned_e = 0;
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
     PetscInt  edge_id             = edges->internal_edge_ids[e];

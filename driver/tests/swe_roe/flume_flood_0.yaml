@@ -1,0 +1,109 @@
+# Flume-scale well-balancing test ("lake at rest")
+#
+# Same geometry as flume_flood: 40m x 5m, 0.5m bank step.
+# All boundaries reflecting; IC is a constant free surface eta=1.0m:
+#   channel  (z_bed=0.0): h = 1.0  --> eta = 1.0m
+#   left_fp  (z_bed=0.5): h = 0.5  --> eta = 1.0m
+#   right_fp (z_bed=0.5): h = 0.5  --> eta = 1.0m
+#
+# Expected result: h and momenta remain exactly at their initial values.
+# Any drift in h or growth in momentum indicates a well-balancing failure.
+
+physics:
+  flow:
+    mode: swe
+    source:
+      method: implicit_xq2018
+    well_balancing: hydrostatic_reconstruction
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 60.0
+  unit: seconds
+  time_step: 0.005
+
+output:
+  format: xdmf
+  time_interval: 10
+  time_unit: seconds
+  batch_size: 6
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+
+grid:
+  file: flume_flood.exo
+  cell_elevation:
+      file: flume_elevation_flat_int32.bin
+
+regions:
+  - name: left_fp
+    grid_region_id: 1
+  - name: channel
+    grid_region_id: 2
+  - name: right_fp
+    grid_region_id: 3
+
+surface_composition:
+  - region: left_fp
+    material: bed
+  - region: channel
+    material: bed
+  - region: right_fp
+    material: bed
+
+materials:
+  - name: bed
+    properties:
+      manning:
+        value: 0.02
+
+initial_conditions:
+  - region: channel
+    flow: channel_ic
+  - region: left_fp
+    flow: fp_ic
+  - region: right_fp
+    flow: fp_ic
+
+boundaries:
+  - name: channel_inflow
+    grid_boundary_id: 1
+  - name: left_fp_inflow
+    grid_boundary_id: 2
+  - name: right_fp_inflow
+    grid_boundary_id: 3
+  - name: outflow
+    grid_boundary_id: 4
+  - name: left_wall
+    grid_boundary_id: 5
+  - name: right_wall
+    grid_boundary_id: 6
+
+boundary_conditions:
+  - boundaries: [channel_inflow, left_fp_inflow, right_fp_inflow, outflow, left_wall, right_wall]
+    flow: wall_bc
+
+flow_conditions:
+  - name: channel_ic
+    type: dirichlet
+    height: 1.0
+    x_momentum: 0.0
+    y_momentum: 0.0
+
+  - name: fp_ic
+    type: dirichlet
+    height: 0.5
+    x_momentum: 0.0
+    y_momentum: 0.0
+
+  - name: wall_bc
+    type: reflecting
