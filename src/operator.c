@@ -352,9 +352,11 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)domain_dm, &comm));
 
-  // second_order can be set via yaml (numerics.second_order) or command line (-second_order)
+  // second_order can be set via yaml (numerics.second_order) or command line (-second_order).
+  // Resolve once and write back into config so PETSc and CEED backends see the same value.
   PetscBool use_slope_reconstruction = config->numerics.second_order;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+  config->numerics.second_order = use_slope_reconstruction;
   if (use_slope_reconstruction) {
     PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
     PetscCheck(!has_tracers, comm, PETSC_ERR_USER,
@@ -396,7 +398,7 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
       (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
       (*operator)->ceed.use_limiter              = use_limiter;
     }
-    // For PETSc, second_order config is read directly in CreatePetscSWEInteriorFluxOperator.
+    // PETSc reads config->numerics.second_order directly in CreatePetscSWEInteriorFluxOperator.
   }
   PetscCall(CreateOperatorSubOperators(*operator));
 
