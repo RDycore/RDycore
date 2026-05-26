@@ -230,7 +230,7 @@ PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, Cee
 PETSC_INTERN PetscErrorCode CreateCeedSourceHROperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *, CeedVector *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *, RDyMesh *, CeedVector *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
+PETSC_INTERN PetscErrorCode CreatePetscFluxOperator(RDyConfig *, RDyMesh *, MPI_Comm, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
                                                     OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, Vec *, Vec *, Vec *,
                                                       OperatorDiagnostics *, PetscOperator *);

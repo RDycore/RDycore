@@ -194,7 +194,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
   } else {
     switch (op->config->physics.flow.well_balancing) {
       case WELL_BALANCING_NONE:
-        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, comm, op->num_boundaries, op->boundaries, op->boundary_conditions,
                                           op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
                                           &op->petsc.flux));
         PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
@@ -202,7 +202,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
       case WELL_BALANCING_BS2002:
         // BS2002 well-balancing is only implemented in the CEED backend;
         // the PETSc backend uses the standard operators.
-        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+        PetscCall(CreatePetscFluxOperator(op->config, op->mesh, comm, op->num_boundaries, op->boundaries, op->boundary_conditions,
                                           op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
                                           &op->petsc.flux));
         PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
@@ -352,14 +352,12 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)domain_dm, &comm));
 
-  // second_order can be set via yaml (numerics.second_order) or command line (-second_order)
+  // second_order can be set via yaml (numerics.second_order) or command line (-second_order).
+  // Resolve once and write back into config so PETSc and CEED backends see the same value.
   PetscBool use_slope_reconstruction = config->numerics.second_order;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
+  config->numerics.second_order = use_slope_reconstruction;
   if (use_slope_reconstruction) {
-    if (!CeedEnabled()) {
-      PetscCall(PetscPrintf(comm, "WARNING: second_order MUSCL reconstruction requires the CEED backend; falling back to first-order.\n"));
-      use_slope_reconstruction = PETSC_FALSE;
-    }
     PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
     PetscCheck(!has_tracers, comm, PETSC_ERR_USER,
                "second_order MUSCL reconstruction is only supported for pure SWE (no sediment, salinity, or heat tracers)");
@@ -390,14 +388,17 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   if (use_slope_reconstruction) {
     PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
                "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
-    // Limiter is ON by default when MUSCL is active.
-    // Disable via YAML (numerics.no_limiter: true) or CLI (-no_limiter).
-    PetscBool use_limiter = !config->numerics.no_limiter;
-    PetscBool no_limiter  = PETSC_FALSE;
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
-    if (no_limiter) use_limiter = PETSC_FALSE;
-    (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
-    (*operator)->ceed.use_limiter              = use_limiter;
+    if (CeedEnabled()) {
+      // Limiter is ON by default when MUSCL is active.
+      // Disable via YAML (numerics.no_limiter: true) or CLI (-no_limiter).
+      PetscBool use_limiter = !config->numerics.no_limiter;
+      PetscBool no_limiter  = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
+      if (no_limiter) use_limiter = PETSC_FALSE;
+      (*operator)->ceed.use_slope_reconstruction = PETSC_TRUE;
+      (*operator)->ceed.use_limiter              = use_limiter;
+    }
+    // PETSc reads config->numerics.second_order directly in CreatePetscSWEInteriorFluxOperator.
   }
   PetscCall(CreateOperatorSubOperators(*operator));
 
