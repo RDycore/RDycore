@@ -95,8 +95,10 @@ typedef struct {
 
 // Second-order MUSCL interior flux: only the edge owner accumulates,
 // and its ghost-side contribution is communicated back
-static PetscErrorCode ApplyInteriorFlux2R(InteriorFluxOperator *interior_flux_op, PetscReal dt, Vec u_local, Vec f_global) {
+static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
+
+  InteriorFluxOperator *interior_flux_op = context;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
@@ -221,12 +223,6 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
   PetscFunctionBegin;
 
   InteriorFluxOperator *interior_flux_op = context;
-
-  // dispatch to MUSCL second-order path if enabled
-  if (interior_flux_op->use_slope_reconstruction) {
-    PetscCall(ApplyInteriorFlux2R(interior_flux_op, dt, u_local, f_global));
-    PetscFunctionReturn(PETSC_SUCCESS);
-  }
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
@@ -397,7 +393,9 @@ PetscErrorCode CreatePetscSWEInteriorFluxOperator(RDyMesh *mesh, MPI_Comm comm, 
     }
   }
 
-  PetscCall(PetscOperatorCreate(interior_flux_op, ApplyInteriorFlux, DestroyInteriorFlux, petsc_op));
+  PetscErrorCode (*apply)(void *, PetscOperatorFields, PetscReal, Vec, Vec) =
+      interior_flux_op->use_slope_reconstruction ? ApplyInteriorFlux2R : ApplyInteriorFlux;
+  PetscCall(PetscOperatorCreate(interior_flux_op, apply, DestroyInteriorFlux, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
