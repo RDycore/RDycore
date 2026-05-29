@@ -503,6 +503,23 @@ PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_ind
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode RDyGetBoundaryCellOwnedIDs(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt *values) {
+  PetscFunctionBegin;
+  PetscCall(CheckBoundaryConditionIndex(rdy, boundary_index));
+  PetscCall(CheckBoundaryNumEdges(rdy, boundary_index, size));
+
+  RDyBoundary boundary = rdy->boundaries[boundary_index];
+  RDyCells   *cells    = &rdy->mesh.cells;
+  RDyEdges   *edges    = &rdy->mesh.edges;
+
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt iedge = boundary.edge_ids[e];
+    PetscInt icell = edges->cell_ids[2 * iedge];
+    values[e]      = cells->local_to_owned[icell];
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDySetRegionalManningsN(RDy rdy, const PetscInt region_index, const PetscInt size, PetscReal *n_values) {
   PetscFunctionBegin;
 

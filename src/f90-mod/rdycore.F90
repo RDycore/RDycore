@@ -24,7 +24,7 @@ module rdycore
             RDyGetOwnedCellXCentroids, RDyGetOwnedCellYCentroids, RDyGetOwnedCellZCentroids, &
             RDyGetOwnedCellAreas, RDyGetOwnedCellNaturalIDs, &
             RDyGetBoundaryEdgeXCentroids, RDyGetBoundaryEdgeYCentroids, RDyGetBoundaryEdgeZCentroids, &
-            RDyGetBoundaryCellNaturalIDs, &
+            RDyGetBoundaryCellNaturalIDs, RDyGetBoundaryCellOwnedIDs, &
             RDySetDomainWaterSource, RDySetRegionalWaterSource, RDySetDomainXMomentumSource, &
             RDySetDomainYMomentumSource, RDySetDomainManningsN, RDySetInitialConditions, &
             RDyCreatePrognosticVec, RDyReadOneDOFLocalVecFromBinaryFile, RDyReadOneDOFGlobalVecFromBinaryFile, &
@@ -338,6 +338,14 @@ module rdycore
     end function
 
     integer(c_int) function rdygetboundarycellnaturalids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryCellNaturalIDs")
+      use iso_c_binding
+      type(c_ptr), value, intent(in) :: rdy
+      PetscInt   , value, intent(in) :: boundary_index
+      PetscInt   , value, intent(in) :: size
+      type(c_ptr), value, intent(in) :: values
+    end function
+
+    integer(c_int) function rdygetboundarycellownedids_(rdy, boundary_index, size, values) bind(c, name="RDyGetBoundaryCellOwnedIDs")
       use iso_c_binding
       type(c_ptr), value, intent(in) :: rdy
       PetscInt   , value, intent(in) :: boundary_index
@@ -828,6 +836,15 @@ contains
     PetscInt,        pointer, intent(inout) :: values(:)
     integer,         intent(out)            :: ierr
     ierr = rdygetboundarycellnaturalids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
+  end subroutine
+
+  subroutine RDyGetBoundaryCellOwnedIDs(rdy_, boundary_index, size, values, ierr)
+    type(RDy),       intent(inout)          :: rdy_
+    PetscInt,        intent(in)             :: size
+    PetscInt,        intent(in)             :: boundary_index
+    PetscInt,        pointer, intent(inout) :: values(:)
+    integer,         intent(out)            :: ierr
+    ierr = rdygetboundarycellownedids_(rdy_%c_rdy, boundary_index - 1, size, c_loc(values))
   end subroutine
 
   subroutine RDySetDomainWaterSource(rdy_, size, watsrc, ierr)

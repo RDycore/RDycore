@@ -91,6 +91,7 @@ PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellZCentroids(RDy rdy, const PetscInt
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryID(RDy rdy, const PetscInt boundary_index, PetscInt *value);
 
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellNaturalIDs(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt *values);
+PETSC_EXTERN PetscErrorCode RDyGetBoundaryCellOwnedIDs(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscInt *values);
 
 PETSC_EXTERN PetscErrorCode RDySetFlowDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, const PetscInt ndof,
                                                               PetscReal *values);
