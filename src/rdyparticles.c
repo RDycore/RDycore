@@ -14,10 +14,12 @@
 // Enable via: -particles_per_cell N  (N > 0 enables, N = 0 disables)
 
 #include <petscdmswarm.h>
+#include <petscviewerhdf5.h>  // note: includes hdf5.h
 #include <petscts.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdymeshimpl.h>
 #include <private/rdyparticlesimpl.h>
+#include <string.h>
 
 // ---------------------------------------------------------------------------
 // FreeStreaming — RHS function for the particle TS
@@ -162,6 +164,13 @@ static PetscErrorCode AdvectParticles(TS ts) {
   PetscInt Np_after;
   PetscCall(DMSwarmGetLocalSize(sdm, &Np_after));
   if (Np_before != Np_after) {
+    PetscInt Np_global_before = 0, Np_global_after = 0;
+    MPI_Allreduce(&Np_before, &Np_global_before, 1, MPIU_INT, MPI_SUM, adv->rdy->comm);
+    MPI_Allreduce(&Np_after, &Np_global_after, 1, MPIU_INT, MPI_SUM, adv->rdy->comm);
+    RDyLogDebug(adv->rdy,
+                "AdvectParticles: particle count changed after DMSwarmMigrate "
+                "(global: %" PetscInt_FMT " -> %" PetscInt_FMT ", lost %" PetscInt_FMT ")",
+                Np_global_before, Np_global_after, Np_global_before - Np_global_after);
     PetscCall(TSReset(sts));
     PetscCall(DMSwarmVectorDefineField(sdm, DMSwarmPICField_coor));
   }
@@ -396,9 +405,10 @@ PetscErrorCode DestroyParticleSwarm(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Writes particle positions and velocities to an XDMF file.
-/// Called from WriteXDMFOutput when particles are enabled.
-/// Generates filename: <output_dir>/<prefix>-particles-<step>.xmf
+/// Writes particle positions to HDF5 + XDMF files compatible with VisIT/ParaView.
+/// Each call produces:
+///   <output_dir>/<prefix>-particles-<step06d>.h5
+///   <output_dir>/<prefix>-particles-<step06d>.xmf
 PetscErrorCode WriteParticleOutput(RDy rdy, PetscInt step, PetscReal time) {
   PetscFunctionBegin;
 
@@ -406,22 +416,114 @@ PetscErrorCode WriteParticleOutput(RDy rdy, PetscInt step, PetscReal time) {
 
   DM sdm = rdy->particles.dm_swarm;
 
-  // Build the output filename
+  // ---- 1. Get local and global particle counts ----------------------------
+  PetscInt Np_local;
+  PetscCall(DMSwarmGetLocalSize(sdm, &Np_local));
+
+  MPI_Comm comm = rdy->comm;
+
+  // per-rank write offset via exclusive scan
+  PetscInt rank_offset = 0;
+  MPI_Exscan(&Np_local, &rank_offset, 1, MPIU_INT, MPI_SUM, comm);
+
+  PetscInt Np_global = 0;
+  MPI_Allreduce(&Np_local, &Np_global, 1, MPIU_INT, MPI_SUM, comm);
+
+  // ---- 2. Build filenames -------------------------------------------------
   char output_dir[PETSC_MAX_PATH_LEN];
   PetscCall(GetOutputDirectory(rdy, output_dir));
-
   char prefix[PETSC_MAX_PATH_LEN];
   PetscCall(DetermineConfigPrefix(rdy, prefix));
 
-  char filename[PETSC_MAX_PATH_LEN];
-  snprintf(filename, PETSC_MAX_PATH_LEN, "%s/%s-particles-%06" PetscInt_FMT ".xmf", output_dir, prefix, step);
+  char h5_path[PETSC_MAX_PATH_LEN], xmf_path[PETSC_MAX_PATH_LEN];
+  snprintf(h5_path, PETSC_MAX_PATH_LEN, "%s/%s-particles-%06" PetscInt_FMT ".h5", output_dir, prefix, step);
+  snprintf(xmf_path, PETSC_MAX_PATH_LEN, "%s/%s-particles-%06" PetscInt_FMT ".xmf", output_dir, prefix, step);
 
-  // Write particle fields to XDMF/HDF5
-  // DMSwarmViewFieldsXDMF writes coordinates plus the listed fields
-  const char *field_names[] = {"velocity_x", "velocity_y"};
-  PetscCall(DMSwarmViewFieldsXDMF(sdm, filename, 2, field_names));
+  // basename for XMF reference so the two files can be moved together
+  const char *h5_basename = strrchr(h5_path, '/');
+  h5_basename             = h5_basename ? h5_basename + 1 : h5_path;
 
-  RDyLogDebug(rdy, "Wrote particle output: %s (step=%" PetscInt_FMT ", t=%g)", filename, step, (double)time);
+  // ---- 3. Write HDF5 with collective MPI-IO -------------------------------
+  hid_t fapl = H5Pcreate(H5P_FILE_ACCESS);
+  H5Pset_fapl_mpio(fapl, comm, MPI_INFO_NULL);
+  hid_t file_id = H5Fcreate(h5_path, H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
+  H5Pclose(fapl);
+
+  // Create /Coordinates dataset: global shape (Np_global, 3)
+  hsize_t gdims[2] = {(hsize_t)Np_global, 3};
+  hid_t   fspace   = H5Screate_simple(2, gdims, NULL);
+  hid_t   dset     = H5Dcreate2(file_id, "/Coordinates", H5T_NATIVE_DOUBLE, fspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Collective transfer property
+  hid_t dxpl = H5Pcreate(H5P_DATASET_XFER);
+  H5Pset_dxpl_mpio(dxpl, H5FD_MPIO_COLLECTIVE);
+
+  // Fetch raw 2-D coordinates (x, y) from DMSwarm; pad z=0 for XDMF XYZ
+  PetscReal *raw_coords;
+  PetscCall(DMSwarmGetField(sdm, DMSwarmPICField_coor, NULL, NULL, (void **)&raw_coords));
+
+  double *buf = NULL;
+  if (Np_local > 0) {
+    PetscCall(PetscMalloc1(Np_local * 3, &buf));
+    for (PetscInt p = 0; p < Np_local; ++p) {
+      buf[p * 3 + 0] = (double)raw_coords[p * 2 + 0];
+      buf[p * 3 + 1] = (double)raw_coords[p * 2 + 1];
+      buf[p * 3 + 2] = 0.0;
+    }
+  }
+
+  PetscCall(DMSwarmRestoreField(sdm, DMSwarmPICField_coor, NULL, NULL, (void **)&raw_coords));
+
+  // File hyperslab: each rank writes its contiguous block
+  if (Np_local > 0) {
+    hsize_t offset[2] = {(hsize_t)rank_offset, 0};
+    hsize_t count[2]  = {(hsize_t)Np_local, 3};
+    H5Sselect_hyperslab(fspace, H5S_SELECT_SET, offset, NULL, count, NULL);
+  } else {
+    // Ranks with no particles must still participate in collective I/O
+    H5Sselect_none(fspace);
+  }
+
+  // Memory dataspace
+  hsize_t mem_dims[2] = {(hsize_t)Np_local, 3};
+  hid_t   mspace     = (Np_local > 0) ? H5Screate_simple(2, mem_dims, NULL) : H5Screate(H5S_NULL);
+
+  H5Dwrite(dset, H5T_NATIVE_DOUBLE, mspace, fspace, dxpl, buf);
+
+  H5Sclose(mspace);
+  H5Sclose(fspace);
+  H5Pclose(dxpl);
+  H5Dclose(dset);
+  H5Fclose(file_id);
+
+  if (buf) PetscCall(PetscFree(buf));
+
+  // ---- 4. Write XMF (rank 0 only) -----------------------------------------
+  PetscMPIInt rank;
+  MPI_Comm_rank(comm, &rank);
+  if (rank == 0) {
+    FILE *fp;
+    PetscCall(PetscFOpen(PETSC_COMM_SELF, xmf_path, "w", &fp));
+    PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp,
+                           "<?xml version=\"1.0\" ?>\n"
+                           "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []>\n"
+                           "<Xdmf Version=\"3.0\">\n"
+                           "  <Domain>\n"
+                           "    <Grid Name=\"Particles\" GridType=\"Uniform\">\n"
+                           "      <Topology TopologyType=\"Polyvertex\" Dimensions=\"%" PetscInt_FMT "\"/>\n"
+                           "      <Geometry GeometryType=\"XYZ\">\n"
+                           "        <DataItem Format=\"HDF\" Dimensions=\"%" PetscInt_FMT " 3\" NumberType=\"Float\" Precision=\"8\">\n"
+                           "          %s:/Coordinates\n"
+                           "        </DataItem>\n"
+                           "      </Geometry>\n"
+                           "    </Grid>\n"
+                           "  </Domain>\n"
+                           "</Xdmf>\n",
+                           Np_global, Np_global, h5_basename));
+    PetscCall(PetscFClose(PETSC_COMM_SELF, fp));
+  }
+
+  RDyLogDebug(rdy, "Wrote particle output: %s (step=%" PetscInt_FMT ", t=%g)", xmf_path, step, (double)time);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
