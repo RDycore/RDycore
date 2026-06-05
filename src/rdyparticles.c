@@ -84,8 +84,9 @@ static PetscErrorCode FreeStreaming(TS ts, PetscReal t, Vec X, Vec F, void *ctx)
       }
     }
 
-    f_arr[p * 2 + 0] = vel_x;
-    f_arr[p * 2 + 1] = vel_y;
+    f_arr[p * 3 + 0] = vel_x;
+    f_arr[p * 3 + 1] = vel_y;
+    f_arr[p * 3 + 2] = 0.0;
   }
 
   PetscCall(VecRestoreArray(F, &f_arr));
@@ -265,7 +266,8 @@ static PetscErrorCode InitParticleSwarmDM(RDy rdy) {
   {
     PetscInt  cStart, cEnd, dim;
     PetscReal centroid[3];
-    PetscCall(DMGetDimension(rdy->dm, &dim));
+    PetscCall(DMGetCoordinateDim(rdy->dm, &dim));
+    printf("rdy->dm, &dim = %d\n", dim);
     PetscCall(DMPlexGetHeightStratum(rdy->dm, 0, &cStart, &cEnd));
 
     PetscReal *coords;
@@ -466,9 +468,9 @@ PetscErrorCode WriteParticleOutput(RDy rdy, PetscInt step, PetscReal time) {
   if (Np_local > 0) {
     PetscCall(PetscMalloc1(Np_local * 3, &buf));
     for (PetscInt p = 0; p < Np_local; ++p) {
-      buf[p * 3 + 0] = (double)raw_coords[p * 2 + 0];
-      buf[p * 3 + 1] = (double)raw_coords[p * 2 + 1];
-      buf[p * 3 + 2] = 0.0;
+      buf[p * 3 + 0] = (double)raw_coords[p * 3 + 0];
+      buf[p * 3 + 1] = (double)raw_coords[p * 3 + 1];
+      buf[p * 3 + 2] = (double)raw_coords[p * 3 + 2];
     }
   }
 
