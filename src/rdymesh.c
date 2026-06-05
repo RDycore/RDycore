@@ -783,6 +783,18 @@ static PetscErrorCode ComputeXYSlopesForTriangle(PetscReal xyz0[3], PetscReal xy
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode TriangleProjected2DArea(PetscReal a[3], PetscReal b[3], PetscReal c[3], PetscReal *area) {
+  PetscFunctionBegin;
+
+  PetscReal e1[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+  PetscReal e2[3] = {c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+
+  PetscReal cz = e1[0] * e2[1] - e1[1] * e2[0];
+
+  *area = 0.5 * PetscAbsReal(cz);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // computes geometric attributes about cells needed by RDycore
 static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
   PetscFunctionBegin;
@@ -828,15 +840,21 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
       cells->dz_dx[icell] = 0.0;
       cells->dz_dy[icell] = 0.0;
 
-      // TODO: Revisit the approach to compute dz/dx and dz/y for quad cells.
+      PetscReal total_area = 0.0;
       for (PetscInt ii = 0; ii < 4; ii++) {
         PetscInt a = vertexIDs[ii][0];
         PetscInt b = vertexIDs[ii][1];
 
+        PetscReal area_k;
+        PetscCall(TriangleProjected2DArea(vertices->points[a].X, vertices->points[b].X, cells->centroids[icell].X, &area_k));
+
         PetscCall(ComputeXYSlopesForTriangle(vertices->points[a].X, vertices->points[b].X, cells->centroids[icell].X, &dz_dx, &dz_dy));
-        cells->dz_dx[icell] += 0.5 * dz_dx;
-        cells->dz_dy[icell] += 0.5 * dz_dy;
+        cells->dz_dx[icell] += area_k * dz_dx;
+        cells->dz_dy[icell] += area_k * dz_dy;
+        total_area += area_k;
       }
+      cells->dz_dx[icell] = cells->dz_dx[icell] / total_area;
+      cells->dz_dy[icell] = cells->dz_dy[icell] / total_area;
     }
   }
 
