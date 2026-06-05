@@ -22,6 +22,9 @@ set(RDYCORE_C_SOURCE_FILES
   swe/swe_petsc.c
   tracer/tracer_ceed.c
   tracer/tracer_petsc.c
+  forcing/rdyforcing.c
+  forcing/rdyforcing_dataset.c
+  forcing/rdyforcing_map.c
   time_series.c
   xdmf_output.c
   yaml_input.c
