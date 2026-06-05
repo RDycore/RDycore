@@ -353,7 +353,6 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   PetscCall(PetscObjectGetComm((PetscObject)domain_dm, &comm));
 
   // second_order can be set via yaml (numerics.second_order) or command line (-second_order).
-  // Resolve once and write back into config so PETSc and CEED backends see the same value.
   PetscBool use_slope_reconstruction = config->numerics.second_order;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
   config->numerics.second_order = use_slope_reconstruction;

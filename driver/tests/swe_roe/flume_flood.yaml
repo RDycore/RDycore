@@ -37,7 +37,7 @@ logging:
   level: detail
 
 time:
-  stop: 300.0          # 10 minutes -- flood front reaches end well before this
+  stop: 200.0          # channel steady by ~150s; extra time for overbank front
   unit: seconds
   coupling_interval: 10.0
   time_step: 0.005
@@ -46,11 +46,13 @@ output:
   format: xdmf
   time_interval: 10
   time_unit: seconds
-  batch_size: 60
+  batch_size: 1    # >1 truncates output when using time_interval (output_interval=0)
   fields:
     - Height
     - MomentumX
     - MomentumY
+    - VelocityX
+    - VelocityY
 
 grid:
   file: flume_flood.exo
@@ -119,9 +121,9 @@ flow_conditions:
   # Q = 0.3 m^3/s, W = 1m, h_n ~ 0.6m > 0.5m bank
   - name: channel_inflow_bc
     type: dirichlet
-    height: 0.1
+    height: 0.6        # inflow depth; interior stage set by conveyance + outfall
     x_momentum: 0.0
-    y_momentum: 0.3   # q_y = Q/W = 0.3/1.0
+    y_momentum: 1.0   # q_y = 1.0 m^2/s (Q~1.0); surplus over conveyance spills the bank
 
   - name: outflow_bc
     type: critical-outflow
