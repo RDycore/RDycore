@@ -122,9 +122,14 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
   PetscReal        *amax_vec_int = data_edge->amax;
   PetscReal        *flux_vec_int = data_edge->fluxes;
 
-  // compute cell-centered gradients and reconstruct face states
+  DM dm;
+  PetscCall(VecGetDM(u_local, &dm));
+
+  // compute cell-centered gradients, communicate them into ghost cells so partition-boundary
+  // edges stay second order, then reconstruct face states
   PetscCall(ComputeLeastSquaresGradients(mesh, interior_flux_op->ls_grad_coeffs, u_ptr, interior_flux_op->grad_h, interior_flux_op->grad_hu,
                                          interior_flux_op->grad_hv));
+  PetscCall(CommunicateCellGradients(dm, mesh, interior_flux_op->grad_h, interior_flux_op->grad_hu, interior_flux_op->grad_hv));
   PetscCall(ReconstructFaceValues(mesh, u_ptr, interior_flux_op->grad_h, interior_flux_op->grad_hu, interior_flux_op->grad_hv,
                                   interior_flux_op->use_limiter, interior_flux_op->q_reconstructed));
 
@@ -171,8 +176,6 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Unsupported Riemann solver");
   }
 
-  DM dm;
-  PetscCall(VecGetDM(u_local, &dm));
   Vec          rhs_local;
   PetscScalar *rhs_local_ptr;
   PetscCall(DMGetLocalVector(dm, &rhs_local));

@@ -224,6 +224,7 @@ PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDy
 PETSC_INTERN PetscErrorCode PrecomputeLSGradCoeffs(MPI_Comm, RDyMesh *, PetscReal *);
 PETSC_INTERN PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *, const PetscReal *, const PetscScalar *, PetscScalar *, PetscScalar *,
                                                          PetscScalar *);
+PETSC_INTERN PetscErrorCode CommunicateCellGradients(DM, RDyMesh *, PetscScalar *, PetscScalar *, PetscScalar *);
 PETSC_INTERN PetscErrorCode ReconstructFaceValues(RDyMesh *, const PetscScalar *, const PetscScalar *, const PetscScalar *, const PetscScalar *,
                                                   PetscBool, CeedScalar *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);

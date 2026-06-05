@@ -542,6 +542,8 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
     const PetscScalar *q_ptr;
     PetscCall(VecGetArrayRead(u_local, &q_ptr));
     PetscCall(ComputeLeastSquaresGradients(op->mesh, op->ceed.ls_grad_coeffs, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv));
+    // fill ghost-cell gradients so partition-boundary edges reconstruct to second order
+    PetscCall(CommunicateCellGradients(op->dm, op->mesh, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv));
 
     CeedScalar *q_face_ptr;
     PetscCallCEED(CeedVectorGetArray(op->ceed.q_reconstructed, CEED_MEM_HOST, &q_face_ptr));
