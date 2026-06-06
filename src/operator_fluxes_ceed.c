@@ -1038,6 +1038,75 @@ PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *mesh, const PetscReal *ls_g
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Communicates cell-centered gradients into ghost (non-owned) cells so that
+/// MUSCL reconstruction is fully second-order at partition boundaries.
+///
+/// ComputeLeastSquaresGradients only accumulates contributions from edges local to this
+/// process, so ghost cells receive incomplete gradients. Owned cells, by contrast, have
+/// complete gradients (all of their face-neighbors are present locally). This routine
+/// scatters each owned cell's gradient into the ghost copies held on neighboring ranks
+/// using the existing block-size-3 SWE DM. The three fields' k-th gradient component are
+/// packed together so the exchange is done in two passes (k = 0 -> x, k = 1 -> y); in
+/// serial it is an identity round-trip and leaves the gradients unchanged.
+///
+/// @param [in]     dm       the block-size-3 SWE DM (its global vector holds owned cells)
+/// @param [in]     mesh     the mesh
+/// @param [in,out] grad_h   cell-centered gradient of h,  size num_cells * 2
+/// @param [in,out] grad_hu  cell-centered gradient of hu, size num_cells * 2
+/// @param [in,out] grad_hv  cell-centered gradient of hv, size num_cells * 2
+PetscErrorCode CommunicateCellGradients(DM dm, RDyMesh *mesh, PetscScalar *grad_h, PetscScalar *grad_hu, PetscScalar *grad_hv) {
+  PetscFunctionBeginUser;
+
+  RDyCells    *cells    = &mesh->cells;
+  PetscScalar *grads[3] = {grad_h, grad_hu, grad_hv};
+
+  Vec g_global, l_local;
+  PetscCall(DMGetGlobalVector(dm, &g_global));
+  PetscCall(DMGetLocalVector(dm, &l_local));
+
+  // This routine packs the three SWE fields' k-th gradient component into the bs=3 DM
+  // vectors, so fail fast if a DM with a different block size is ever passed in.
+  PetscInt bs;
+  PetscCall(VecGetBlockSize(g_global, &bs));
+  PetscCheck(bs == 3, PetscObjectComm((PetscObject)dm), PETSC_ERR_ARG_WRONG,
+             "CommunicateCellGradients requires a block-size-3 DM, got block size %" PetscInt_FMT, bs);
+
+  // One pass per gradient component (k = 0 -> x, k = 1 -> y). Each pass packs the three
+  // fields' k-th component into a single bs=3 vector and exchanges the halo.
+  for (PetscInt k = 0; k < 2; k++) {
+    // zero first so any owned entry not written below stays well-defined (the pack
+    // loop covers all owned cells today, but this guards against future changes)
+    PetscCall(VecZeroEntries(g_global));
+    PetscScalar *g_ptr;
+    PetscCall(VecGetArray(g_global, &g_ptr));
+    for (PetscInt c = 0; c < mesh->num_cells; c++) {
+      if (cells->is_owned[c]) {
+        PetscInt owned       = cells->local_to_owned[c];
+        g_ptr[3 * owned + 0] = grads[0][c * 2 + k];
+        g_ptr[3 * owned + 1] = grads[1][c * 2 + k];
+        g_ptr[3 * owned + 2] = grads[2][c * 2 + k];
+      }
+    }
+    PetscCall(VecRestoreArray(g_global, &g_ptr));
+
+    PetscCall(DMGlobalToLocal(dm, g_global, INSERT_VALUES, l_local));
+
+    const PetscScalar *l_ptr;
+    PetscCall(VecGetArrayRead(l_local, &l_ptr));
+    for (PetscInt c = 0; c < mesh->num_cells; c++) {
+      grads[0][c * 2 + k] = l_ptr[3 * c + 0];
+      grads[1][c * 2 + k] = l_ptr[3 * c + 1];
+      grads[2][c * 2 + k] = l_ptr[3 * c + 2];
+    }
+    PetscCall(VecRestoreArrayRead(l_local, &l_ptr));
+  }
+
+  PetscCall(DMRestoreGlobalVector(dm, &g_global));
+  PetscCall(DMRestoreLocalVector(dm, &l_local));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // Returns minmod(a, b): zero if opposite signs, else value with smaller magnitude.
 static inline PetscReal Minmod(PetscReal a, PetscReal b) {
   if (a * b <= 0.0) return 0.0;
@@ -1087,15 +1156,12 @@ PetscErrorCode ReconstructFaceValues(RDyMesh *mesh, const PetscScalar *q, const 
     PetscReal dx_R = x_mid - cells->centroids[cr].X[0];
     PetscReal dy_R = y_mid - cells->centroids[cr].X[1];
 
-    // Ghost cells have incomplete LS gradients (only edges local to this process
-    // contribute), so fall back to first-order (cell-center) on the ghost side.
-    PetscBool cl_owned = cells->is_owned[cl];
-    PetscBool cr_owned = cells->is_owned[cr];
-
+    // Ghost-cell gradients are filled by CommunicateCellGradients before this routine
+    // runs, so both sides carry complete gradients and extrapolate to second order.
     const PetscScalar *grads[3] = {grad_h, grad_hu, grad_hv};
     for (PetscInt k = 0; k < 3; k++) {
-      PetscReal extrap_L = cl_owned ? grads[k][cl * 2 + 0] * dx_L + grads[k][cl * 2 + 1] * dy_L : 0.0;
-      PetscReal extrap_R = cr_owned ? grads[k][cr * 2 + 0] * dx_R + grads[k][cr * 2 + 1] * dy_R : 0.0;
+      PetscReal extrap_L = grads[k][cl * 2 + 0] * dx_L + grads[k][cl * 2 + 1] * dy_L;
+      PetscReal extrap_R = grads[k][cr * 2 + 0] * dx_R + grads[k][cr * 2 + 1] * dy_R;
 
       PetscReal qL_face, qR_face;
       if (use_limiter) {
