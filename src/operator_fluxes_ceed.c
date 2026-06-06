@@ -1074,6 +1074,9 @@ PetscErrorCode CommunicateCellGradients(DM dm, RDyMesh *mesh, PetscScalar *grad_
   // One pass per gradient component (k = 0 -> x, k = 1 -> y). Each pass packs the three
   // fields' k-th component into a single bs=3 vector and exchanges the halo.
   for (PetscInt k = 0; k < 2; k++) {
+    // zero first so any owned entry not written below stays well-defined (the pack
+    // loop covers all owned cells today, but this guards against future changes)
+    PetscCall(VecZeroEntries(g_global));
     PetscScalar *g_ptr;
     PetscCall(VecGetArray(g_global, &g_ptr));
     for (PetscInt c = 0; c < mesh->num_cells; c++) {
