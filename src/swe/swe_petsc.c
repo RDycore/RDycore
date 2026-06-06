@@ -202,7 +202,7 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
       CourantNumberDiagnostics *courant_num_diags = &interior_flux_op->diagnostics->courant_number;
       if (cnum > courant_num_diags->max_courant_num) {
         courant_num_diags->max_courant_num = cnum;
-        courant_num_diags->global_edge_id  = edges->global_ids[e];
+        courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
         if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[left_local_cell_id];
         else courant_num_diags->global_cell_id = cells->global_ids[right_local_cell_id];
       }
@@ -300,7 +300,7 @@ static PetscErrorCode ApplyInteriorFlux(void *context, PetscOperatorFields field
         CourantNumberDiagnostics *courant_num_diags = &interior_flux_op->diagnostics->courant_number;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
           if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[left_local_cell_id];
           else courant_num_diags->global_cell_id = cells->global_ids[right_local_cell_id];
         }
@@ -590,7 +590,7 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
         PetscReal cnum = data_edge->amax[e] * edge_len / cell_area * dt;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
           courant_num_diags->global_cell_id  = cells->global_ids[local_cell_id];
         }
 
@@ -1111,7 +1111,7 @@ static PetscErrorCode ApplyInteriorFluxHR(void *context, PetscOperatorFields fie
         CourantNumberDiagnostics *courant_num_diags = &op->diagnostics->courant_number;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
           if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[l];
           else courant_num_diags->global_cell_id = cells->global_ids[r];
         }

@@ -1064,6 +1064,13 @@ PetscErrorCode CommunicateCellGradients(DM dm, RDyMesh *mesh, PetscScalar *grad_
   PetscCall(DMGetGlobalVector(dm, &g_global));
   PetscCall(DMGetLocalVector(dm, &l_local));
 
+  // This routine packs the three SWE fields' k-th gradient component into the bs=3 DM
+  // vectors, so fail fast if a DM with a different block size is ever passed in.
+  PetscInt bs;
+  PetscCall(VecGetBlockSize(g_global, &bs));
+  PetscCheck(bs == 3, PetscObjectComm((PetscObject)dm), PETSC_ERR_ARG_WRONG,
+             "CommunicateCellGradients requires a block-size-3 DM, got block size %" PetscInt_FMT, bs);
+
   // One pass per gradient component (k = 0 -> x, k = 1 -> y). Each pass packs the three
   // fields' k-th component into a single bs=3 vector and exchanges the halo.
   for (PetscInt k = 0; k < 2; k++) {
