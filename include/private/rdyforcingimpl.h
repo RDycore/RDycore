@@ -23,12 +23,11 @@ typedef struct {
 } RDyConstantDataset;
 
 typedef struct {
-  char         filename[PETSC_MAX_PATH_LEN];  // path to the binary PETSc Vec data file
-  Vec          data_vec;                      // PETSc Vec loaded from the data file
-  PetscInt     ndata;                         // number of temporal data values
-  PetscScalar *data_ptr;                      // raw pointer into data_vec array
-  PetscBool    temporally_interpolate;        // if true, interpolate between adjacent time values
-  PetscInt     cur_idx, prev_idx;             // current and previous temporal indices
+  char      filename[PETSC_MAX_PATH_LEN];  // path to the binary PETSc Vec data file
+  Vec       data_vec;                      // PETSc Vec loaded from the data file
+  PetscInt  ndata;                         // number of temporal data values
+  PetscBool temporally_interpolate;        // if true, interpolate between adjacent time values
+  PetscInt  cur_idx, prev_idx;             // current and previous temporal indices
 } RDyHomogeneousDataset;
 
 typedef struct {
@@ -39,8 +38,7 @@ typedef struct {
   struct tm start_date, current_date;  // start and current date for the dataset
 
   // binary data
-  Vec          data_vec;  // PETSc Vec loaded from the current data file
-  PetscScalar *data_ptr;  // raw pointer into data_vec array
+  Vec data_vec;  // PETSc Vec loaded from the current data file
 
   PetscInt header_offset;  // number of values in the file header before the data records start
 
@@ -73,8 +71,7 @@ typedef struct {
   struct tm start_date, current_date;  // start and current date for the dataset
 
   // binary data
-  Vec          data_vec;  // PETSc Vec loaded from the current data file
-  PetscScalar *data_ptr;  // raw pointer into data_vec array
+  Vec data_vec;  // PETSc Vec loaded from the current data file
 
   PetscInt ndata;   // number of spatial data points
   PetscInt stride;  // number of values per data point

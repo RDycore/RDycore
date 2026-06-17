@@ -73,8 +73,6 @@ PetscErrorCode RDyForcingOpenHomogeneousDataset(RDyHomogeneousDataset *data) {
 
   PetscCall(RDyForcingOpenData(data->filename, &data->data_vec, &data->ndata));
 
-  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
-
   data->cur_idx  = -1;
   data->prev_idx = -1;
 
@@ -86,7 +84,6 @@ PetscErrorCode RDyForcingOpenHomogeneousDataset(RDyHomogeneousDataset *data) {
 PetscErrorCode RDyForcingDestroyHomogeneousDataset(RDyHomogeneousDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
   PetscCall(VecDestroy(&data->data_vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -131,15 +128,19 @@ PetscErrorCode RDyForcingOpenRasterDataset(RDyRasterDataset *data) {
 
   PetscInt tmp;
   PetscCall(RDyForcingOpenData(data->file, &data->data_vec, &tmp));
-  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+
+  PetscScalar *data_ptr;
+  PetscCall(VecGetArray(data->data_vec, &data_ptr));
 
   data->header_offset = 5;
 
-  data->ncols    = (PetscInt)data->data_ptr[0];
-  data->nrows    = (PetscInt)data->data_ptr[1];
-  data->xlc      = data->data_ptr[2];
-  data->ylc      = data->data_ptr[3];
-  data->cellsize = data->data_ptr[4];
+  data->ncols    = (PetscInt)data_ptr[0];
+  data->nrows    = (PetscInt)data_ptr[1];
+  data->xlc      = data_ptr[2];
+  data->ylc      = data_ptr[3];
+  data->cellsize = data_ptr[4];
+
+  PetscCall(VecRestoreArray(data->data_vec, &data_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -149,7 +150,6 @@ PetscErrorCode RDyForcingOpenRasterDataset(RDyRasterDataset *data) {
 PetscErrorCode RDyForcingDestroyRasterDataset(RDyRasterDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
   PetscCall(VecDestroy(&data->data_vec));
 
   PetscCall(PetscFree(data->mesh_xc));
@@ -166,7 +166,6 @@ PetscErrorCode RDyForcingDestroyRasterDataset(RDyRasterDataset *data) {
 PetscErrorCode RDyForcingOpenNextRasterDataset(RDyRasterDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
   PetscCall(VecDestroy(&data->data_vec));
 
   struct tm *current_date = &data->current_date;
@@ -178,15 +177,18 @@ PetscErrorCode RDyForcingOpenNextRasterDataset(RDyRasterDataset *data) {
 
   PetscInt ndata;
   PetscCall(RDyForcingOpenData(data->file, &data->data_vec, &ndata));
-  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+  PetscScalar *data_ptr;
+  PetscCall(VecGetArray(data->data_vec, &data_ptr));
 
-  PetscCheck(data->ncols == (PetscInt)data->data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER,
+  PetscCheck(data->ncols == (PetscInt)data_ptr[0], PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The number of columns in the previous and new rainfal do not match");
-  PetscCheck(data->nrows == (PetscInt)data->data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER,
+  PetscCheck(data->nrows == (PetscInt)data_ptr[1], PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The number of rows in the previous and new rainfal do not match");
-  PetscCheck(data->xlc == data->data_ptr[2], PETSC_COMM_WORLD, PETSC_ERR_USER, "The xc of the previous and new rainfal do not match");
-  PetscCheck(data->ylc == data->data_ptr[3], PETSC_COMM_WORLD, PETSC_ERR_USER, "The yc of the previous and new rainfal do not match");
-  PetscCheck(data->cellsize == data->data_ptr[4], PETSC_COMM_WORLD, PETSC_ERR_USER, "The cellsize of the previous and new rainfal do not match");
+  PetscCheck(data->xlc == data_ptr[2], PETSC_COMM_WORLD, PETSC_ERR_USER, "The xc of the previous and new rainfal do not match");
+  PetscCheck(data->ylc == data_ptr[3], PETSC_COMM_WORLD, PETSC_ERR_USER, "The yc of the previous and new rainfal do not match");
+  PetscCheck(data->cellsize == data_ptr[4], PETSC_COMM_WORLD, PETSC_ERR_USER, "The cellsize of the previous and new rainfal do not match");
+
+  PetscCall(VecRestoreArray(data->data_vec, &data_ptr));
 
   data->ndata_file++;
 
@@ -212,10 +214,11 @@ PetscErrorCode RDyForcingOpenUnstructuredDataset(RDyUnstructuredDataset *data, P
 
   PetscInt size;
   PetscCall(VecGetSize(data->data_vec, &size));
-  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
+  PetscScalar *data_ptr;
+  PetscCall(VecGetArray(data->data_vec, &data_ptr));
 
-  data->ndata  = data->data_ptr[0];
-  data->stride = data->data_ptr[1];
+  data->ndata  = data_ptr[0];
+  data->stride = data_ptr[1];
 
   PetscCheck((size - 2) / data->stride == data->ndata, PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The length (=%" PetscInt_FMT ") of loaded Vec does is not consistent with first (N = %" PetscInt_FMT
@@ -224,6 +227,7 @@ PetscErrorCode RDyForcingOpenUnstructuredDataset(RDyUnstructuredDataset *data, P
 
   PetscCheck(data->stride == expected_data_stride, PETSC_COMM_WORLD, PETSC_ERR_USER,
              "The data stride is %" PetscInt_FMT ", while the expected stride is %" PetscInt_FMT ".", data->stride, expected_data_stride);
+  PetscCall(VecRestoreArray(data->data_vec, &data_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -233,7 +237,6 @@ PetscErrorCode RDyForcingOpenUnstructuredDataset(RDyUnstructuredDataset *data, P
 PetscErrorCode RDyForcingDestroyUnstructuredDataset(RDyUnstructuredDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
   PetscCall(VecDestroy(&data->data_vec));
 
   PetscCall(PetscFree(data->data_xc));
@@ -252,7 +255,6 @@ PetscErrorCode RDyForcingDestroyUnstructuredDataset(RDyUnstructuredDataset *data
 PetscErrorCode RDyForcingOpenNextUnstructuredDataset(RDyUnstructuredDataset *data) {
   PetscFunctionBegin;
 
-  PetscCall(VecRestoreArray(data->data_vec, &data->data_ptr));
   PetscCall(VecDestroy(&data->data_vec));
 
   struct tm *current_date = &data->current_date;
@@ -267,8 +269,6 @@ PetscErrorCode RDyForcingOpenNextUnstructuredDataset(RDyUnstructuredDataset *dat
   PetscCall(PetscViewerBinaryOpen(PETSC_COMM_SELF, data->file, FILE_MODE_READ, &viewer));
   PetscCall(VecLoad(data->data_vec, viewer));
   PetscCall(PetscViewerDestroy(&viewer));
-
-  PetscCall(VecGetArray(data->data_vec, &data->data_ptr));
 
   data->ndata_file++;
 
@@ -302,10 +302,13 @@ PetscErrorCode RDyForcingSetRasterData(RDyRasterDataset *data, PetscReal cur_tim
   PetscInt  offset                = data->header_offset;
   PetscReal mm_per_hr_2_m_per_sec = 1.0 / (1000.0 * 3600.0);
 
+  PetscScalar *data_ptr;
+  PetscCall(VecGetArray(data->data_vec, &data_ptr));
   for (PetscInt icell = 0; icell < ncells; icell++) {
     PetscInt idx = data->data2mesh_idx[icell];
-    rain[icell]  = data->data_ptr[idx + offset] * mm_per_hr_2_m_per_sec;
+    rain[icell]  = data_ptr[idx + offset] * mm_per_hr_2_m_per_sec;
   }
+  PetscCall(VecRestoreArray(data->data_vec, &data_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -318,12 +321,14 @@ PetscErrorCode RDyForcingSetRasterData(RDyRasterDataset *data, PetscReal cur_tim
 PetscErrorCode RDyForcingSetHomogeneousData(RDyHomogeneousDataset *homogeneous_data, PetscReal cur_time, PetscInt ncells, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscReal    cur_value;
-  PetscScalar *data_ptr               = homogeneous_data->data_ptr;
-  PetscInt     ndata                  = homogeneous_data->ndata;
-  PetscBool    temporally_interpolate = homogeneous_data->temporally_interpolate;
-  PetscInt    *cur_idx                = &homogeneous_data->cur_idx;
-  PetscInt    *prev_idx               = &homogeneous_data->prev_idx;
+  PetscScalar *data_ptr;
+  PetscCall(VecGetArray(homogeneous_data->data_vec, &data_ptr));
+
+  PetscReal cur_value;
+  PetscInt  ndata                  = homogeneous_data->ndata;
+  PetscBool temporally_interpolate = homogeneous_data->temporally_interpolate;
+  PetscInt *cur_idx                = &homogeneous_data->cur_idx;
+  PetscInt *prev_idx               = &homogeneous_data->prev_idx;
   PetscCall(RDyForcingGetCurrentData(data_ptr, ndata, cur_time, temporally_interpolate, cur_idx, &cur_value));
 
   if (temporally_interpolate || *cur_idx != *prev_idx) {
@@ -332,6 +337,8 @@ PetscErrorCode RDyForcingSetHomogeneousData(RDyHomogeneousDataset *homogeneous_d
       values[icell] = cur_value;
     }
   }
+
+  PetscCall(VecRestoreArray(homogeneous_data->data_vec, &data_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -350,13 +357,17 @@ PetscErrorCode RDyForcingSetUnstructuredData(RDyUnstructuredDataset *data, Petsc
   PetscInt offset = 2;
   PetscInt stride = data->stride;
 
+  PetscScalar *data_ptr;
+  PetscCall(VecGetArray(data->data_vec, &data_ptr));
   for (PetscInt icell = 0; icell < data->mesh_nelements; icell++) {
     PetscInt idx = data->data2mesh_idx[icell] * stride;
 
     for (PetscInt ii = 0; ii < stride; ii++) {
-      data_values[icell * stride + ii] = data->data_ptr[idx + ii + offset];
+      data_values[icell * stride + ii] = data_ptr[idx + ii + offset];
     }
   }
+
+  PetscCall(VecRestoreArray(data->data_vec, &data_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -369,12 +380,14 @@ PetscErrorCode RDyForcingSetUnstructuredData(RDyUnstructuredDataset *data, Petsc
 PetscErrorCode RDyForcingSetHomogeneousBoundary(RDyHomogeneousDataset *bc_data, PetscReal cur_time, PetscInt num_values, PetscReal *bc_values) {
   PetscFunctionBegin;
 
-  PetscReal    cur_bc;
-  PetscScalar *bc_ptr                 = bc_data->data_ptr;
-  PetscInt     ndata                  = bc_data->ndata;
-  PetscBool    temporally_interpolate = bc_data->temporally_interpolate;
-  PetscInt    *cur_bc_idx             = &bc_data->cur_idx;
-  PetscInt    *prev_bc_idx            = &bc_data->prev_idx;
+  PetscScalar *bc_ptr;
+  PetscCall(VecGetArray(bc_data->data_vec, &bc_ptr));
+
+  PetscReal cur_bc;
+  PetscInt  ndata                  = bc_data->ndata;
+  PetscBool temporally_interpolate = bc_data->temporally_interpolate;
+  PetscInt *cur_bc_idx             = &bc_data->cur_idx;
+  PetscInt *prev_bc_idx            = &bc_data->prev_idx;
 
   PetscCall(RDyForcingGetCurrentData(bc_ptr, ndata, cur_time, temporally_interpolate, cur_bc_idx, &cur_bc));
 
@@ -386,6 +399,8 @@ PetscErrorCode RDyForcingSetHomogeneousBoundary(RDyHomogeneousDataset *bc_data, 
       bc_values[ii * 3 + 2] = 0.0;
     }
   }
+
+  PetscCall(VecRestoreArray(bc_data->data_vec, &bc_ptr));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
