@@ -180,14 +180,14 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// retrieves the index of a temperature condition using its name
-static PetscErrorCode FindTemperatureCondition(RDy rdy, const char *name, PetscInt *index) {
+// retrieves the index of a heat condition using its name
+static PetscErrorCode FindHeatCondition(RDy rdy, const char *name, PetscInt *index) {
   PetscFunctionBegin;
 
   // NOTE: could be optimized as above
   *index = -1;
-  for (PetscInt i = 0; i < rdy->config.num_temperature_conditions; ++i) {
-    if (!strcmp(rdy->config.temperature_conditions[i].name, name)) {
+  for (PetscInt i = 0; i < rdy->config.num_heat_conditions; ++i) {
+    if (!strcmp(rdy->config.heat_conditions[i].name, name)) {
       *index = i;
       break;
     }
@@ -641,11 +641,11 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
     }
 
     if (rdy->config.physics.heat) {
-      PetscCheck(strlen(ic_spec.temperature), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial temperature condition!", region.name);
-      PetscInt temperature_index;
-      PetscCall(FindTemperatureCondition(rdy, ic_spec.temperature, &temperature_index));
-      RDyTemperatureCondition *temperature_cond = &rdy->config.temperature_conditions[temperature_index];
-      ic->temperature                           = temperature_cond;
+      PetscCheck(strlen(ic_spec.heat), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial heat condition!", region.name);
+      PetscInt heat_index;
+      PetscCall(FindHeatCondition(rdy, ic_spec.heat, &heat_index));
+      RDyHeatCondition *heat_cond = &rdy->config.heat_conditions[heat_index];
+      ic->heat                    = heat_cond;
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -692,8 +692,12 @@ static PetscErrorCode InitSources(RDy rdy) {
         if (rdy->config.physics.salinity && strlen(src_spec.salinity)) {
           PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for salinity.");
         }
-        if (rdy->config.physics.heat && strlen(src_spec.temperature)) {
-          PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend InitSources for heat transfer.");
+        if (rdy->config.physics.heat && strlen(src_spec.heat)) {
+          PetscInt heat_index;
+          PetscCall(FindHeatCondition(rdy, src_spec.heat, &heat_index));
+          PetscCheck(heat_index != -1, rdy->comm, PETSC_ERR_USER,
+                     "Heat source condition '%s' for region '%s' was not found!", src_spec.heat, region.name);
+          src->heat = &rdy->config.heat_conditions[heat_index];
         }
       }
     }
@@ -764,6 +768,14 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
         PetscInt sal_index;
         PetscCall(FindSalinityCondition(rdy, bc_spec.salinity, &sal_index));
         bc->salinity = &rdy->config.salinity_conditions[sal_index];
+      }
+
+      if (rdy->config.physics.heat && strlen(bc_spec.heat)) {
+        PetscInt heat_index;
+        PetscCall(FindHeatCondition(rdy, bc_spec.heat, &heat_index));
+        PetscCheck(heat_index != -1, rdy->comm, PETSC_ERR_USER,
+                   "Heat boundary condition '%s' for boundary '%s' was not found!", bc_spec.heat, boundary.name);
+        bc->heat = &rdy->config.heat_conditions[heat_index];
       }
     } else {
       // this boundary wasn't explicitly requested, so set up an auto-generated
@@ -1019,19 +1031,19 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     }
   }
 
-  // initialize thermal conditions
-  for (PetscInt f = 0; f < rdy->config.num_temperature_conditions; ++f) {
-    RDyTemperatureCondition temperature_ic = rdy->config.temperature_conditions[f];
-    Vec                     local          = NULL;
-    if (temperature_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, temperature_ic.file, &local));
+  // initialize heat conditions
+  for (PetscInt f = 0; f < rdy->config.num_heat_conditions; ++f) {
+    RDyHeatCondition heat_ic = rdy->config.heat_conditions[f];
+    Vec              local   = NULL;
+    if (heat_ic.file[0]) {  // read from file
+      PetscCall(ReadSingleComponentFromFile(rdy, heat_ic.file, &local));
     }
 
     // overwrite regions as needed
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
       RDyRegion    region = rdy->regions[r];
       RDyCondition ic     = rdy->initial_conditions[r];
-      if (!strcmp(ic.temperature->name, temperature_ic.name)) {
+      if (!strcmp(ic.heat->name, heat_ic.name)) {
         if (local) {
           PetscScalar *local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
@@ -1048,7 +1060,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
         } else {
           for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
             PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
-            u_ptr[ndof * owned_cell_id] = mupEval(temperature_ic.temperature);
+            u_ptr[ndof * owned_cell_id] = mupEval(heat_ic.water_temperature);
           }
         }
       }

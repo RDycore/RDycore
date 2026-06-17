@@ -47,16 +47,16 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   };
   analytic_salinity.concentration = rdy->config.mms.salinity.solutions.S;
 
-  static RDyTemperatureCondition analytic_temperature = {
+  static RDyHeatCondition analytic_heat = {
       .name = "analytic_bc",
       .type = CONDITION_DIRICHLET,
   };
-  analytic_temperature.temperature = rdy->config.mms.temperature.solutions.T;
-  RDyCondition analytic_bc         = {
-              .flow        = &analytic_flow,
-              .sediment    = &analytic_sediment,
-              .salinity    = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
-              .temperature = (rdy->config.physics.heat ? &analytic_temperature : NULL),
+  analytic_heat.water_temperature = rdy->config.mms.temperature.solutions.T;
+  RDyCondition analytic_bc        = {
+              .flow     = &analytic_flow,
+              .sediment = &analytic_sediment,
+              .salinity = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
+              .heat     = (rdy->config.physics.heat ? &analytic_heat : NULL),
   };
 
   // Assign the boundary condition to each boundary.
@@ -778,12 +778,12 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       PetscReal *temperature_boundary_values, *T;
       PetscCall(PetscCalloc1(num_edges, &temperature_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &T));
-      RDyTemperatureCondition *temperature_bc = rdy->boundary_conditions[b].temperature;
-      PetscCall(EvaluateTemporalSolution(temperature_bc->temperature, num_edges, x, y, time, T));
+      RDyHeatCondition *heat_bc = rdy->boundary_conditions[b].heat;
+      PetscCall(EvaluateTemporalSolution(heat_bc->water_temperature, num_edges, x, y, time, T));
       for (PetscInt e = 0; e < num_edges; ++e) {
         temperature_boundary_values[e] = h[e] * T[e];
       }
-      PetscCall(RDySetTemperatureDirichletBoundaryValues(rdy, b, num_edges, temperature_boundary_values));
+      PetscCall(RDySetHeatDirichletBoundaryValues(rdy, b, num_edges, temperature_boundary_values));
       PetscCall(PetscFree(temperature_boundary_values));
       PetscCall(PetscFree(T));
     }

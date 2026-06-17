@@ -96,6 +96,7 @@ static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
     CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, physics_sediment_fields_schema),
     CYAML_FIELD_BOOL("salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity),
+    CYAML_FIELD_BOOL("heat", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, heat),
     CYAML_FIELD_END
 };
 
@@ -443,7 +444,7 @@ static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediment, 0),
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
-    CYAML_FIELD_STRING("temperature", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, temperature, 0),
+    CYAML_FIELD_STRING("heat", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, heat, 0),
     CYAML_FIELD_END
 };
 
@@ -500,6 +501,7 @@ static const cyaml_schema_field_t boundary_condition_spec_fields_schema[] = {
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, sediment, 0),
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, salinity, 0),
+    CYAML_FIELD_STRING("heat",     CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, heat, 0),
     CYAML_FIELD_END
 };
 
@@ -609,6 +611,36 @@ static const cyaml_schema_value_t salinity_condition_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySalinityCondition, salinity_condition_fields_schema),
 };
 
+// -----------------------
+// heat_conditions section
+// -----------------------
+// - name: <name-of-heat-condition-1>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   water_temperature: <value>         # water surface temperature (°C)
+//   downwelling_shortwave: <value>     # downwelling shortwave radiation (W/m²)
+//   downwelling_longwave: <value>      # downwelling longwave radiation (W/m²)
+//   wind_speed: <value>                # wind speed (m/s)
+//   air_temperature: <value>           # air temperature (°C)
+
+// schema for heat condition fields
+static const cyaml_schema_field_t heat_condition_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyHeatCondition, name, 1),
+    CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyHeatCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
+    CYAML_FIELD_STRING("water_temperature",     CYAML_FLAG_OPTIONAL, RDyHeatCondition, water_temperature_expression, 0),
+    CYAML_FIELD_STRING("downwelling_shortwave", CYAML_FLAG_OPTIONAL, RDyHeatCondition, downwelling_shortwave_expression, 0),
+    CYAML_FIELD_STRING("downwelling_longwave",  CYAML_FLAG_OPTIONAL, RDyHeatCondition, downwelling_longwave_expression, 0),
+    CYAML_FIELD_STRING("wind_speed",            CYAML_FLAG_OPTIONAL, RDyHeatCondition, wind_speed_expression, 0),
+    CYAML_FIELD_STRING("air_temperature",       CYAML_FLAG_OPTIONAL, RDyHeatCondition, air_temperature_expression, 0),
+    CYAML_FIELD_STRING("file",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, file, 1),
+    CYAML_FIELD_ENUM("format",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
+    CYAML_FIELD_END
+};
+
+// a single heat_conditions entry
+static const cyaml_schema_value_t heat_condition_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyHeatCondition, heat_condition_fields_schema),
+};
+
 // ----------------
 // ensemble section
 // ----------------
@@ -633,6 +665,8 @@ static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE("salinity_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE("heat_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, heat_conditions,
+                               &heat_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_END
 };
 
@@ -772,6 +806,8 @@ static const cyaml_schema_field_t config_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("heat_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, heat_conditions, num_heat_conditions,
+                               &heat_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
     CYAML_FIELD_END
 };
@@ -1373,6 +1409,31 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
     mupSetExpr(sal_cond->concentration, sal_cond->expression);
   }
 
+  // heat conditions
+  for (PetscInt h = 0; h < config->num_heat_conditions; ++h) {
+    RDyHeatCondition *heat_cond = &config->heat_conditions[h];
+    if (heat_cond->water_temperature_expression[0]) {
+      heat_cond->water_temperature = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->water_temperature, heat_cond->water_temperature_expression);
+    }
+    if (heat_cond->downwelling_shortwave_expression[0]) {
+      heat_cond->downwelling_shortwave = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->downwelling_shortwave, heat_cond->downwelling_shortwave_expression);
+    }
+    if (heat_cond->downwelling_longwave_expression[0]) {
+      heat_cond->downwelling_longwave = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->downwelling_longwave, heat_cond->downwelling_longwave_expression);
+    }
+    if (heat_cond->wind_speed_expression[0]) {
+      heat_cond->wind_speed = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->wind_speed, heat_cond->wind_speed_expression);
+    }
+    if (heat_cond->air_temperature_expression[0]) {
+      heat_cond->air_temperature = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->air_temperature, heat_cond->air_temperature_expression);
+    }
+  }
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1891,6 +1952,15 @@ PetscErrorCode DestroyConfig(RDy rdy) {
   for (PetscInt s = 0; s < rdy->config.num_salinity_conditions; ++s) {
     RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[s];
     mupRelease(sal_cond->concentration);
+  }
+
+  for (PetscInt h = 0; h < rdy->config.num_heat_conditions; ++h) {
+    RDyHeatCondition *heat_cond = &rdy->config.heat_conditions[h];
+    if (heat_cond->water_temperature) mupRelease(heat_cond->water_temperature);
+    if (heat_cond->downwelling_shortwave) mupRelease(heat_cond->downwelling_shortwave);
+    if (heat_cond->downwelling_longwave) mupRelease(heat_cond->downwelling_longwave);
+    if (heat_cond->wind_speed) mupRelease(heat_cond->wind_speed);
+    if (heat_cond->air_temperature) mupRelease(heat_cond->air_temperature);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

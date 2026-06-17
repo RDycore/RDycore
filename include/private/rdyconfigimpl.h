@@ -303,22 +303,23 @@ typedef struct {
 // The following data structures are used in several sections.
 
 // This type defines an initial condition and/or source/sink with named
-// flow, sediment, and salinity conditions.
+// flow, sediment, salinity, and heat conditions.
 typedef struct {
-  char region[MAX_NAME_LEN + 1];       // name of associated region
-  char flow[MAX_NAME_LEN + 1];         // name of related flow condition
-  char sediment[MAX_NAME_LEN + 1];     // name of related sediment condition
-  char salinity[MAX_NAME_LEN + 1];     // name of related salinity condition
-  char temperature[MAX_NAME_LEN + 1];  // name of related temperature condition
+  char region[MAX_NAME_LEN + 1];    // name of associated region
+  char flow[MAX_NAME_LEN + 1];      // name of related flow condition
+  char sediment[MAX_NAME_LEN + 1];  // name of related sediment condition
+  char salinity[MAX_NAME_LEN + 1];  // name of related salinity condition
+  char heat[MAX_NAME_LEN + 1];      // name of related heat condition
 } RDyRegionConditionSpec;
 
-// This type defines a boundary condition with named flow, sediment, and salinity conditions.
+// This type defines a boundary condition with named flow, sediment, salinity, and heat conditions.
 typedef struct {
   PetscInt num_boundaries;                                    // number of associated boundaries
   char     boundaries[MAX_NUM_BOUNDARIES][MAX_NAME_LEN + 1];  // names of associated boundaries
   char     flow[MAX_NAME_LEN + 1];                            // name of related flow condition
   char     sediment[MAX_NAME_LEN + 1];                        // name of related sediment conditions
   char     salinity[MAX_NAME_LEN + 1];                        // name of related salinity condition
+  char     heat[MAX_NAME_LEN + 1];                            // name of related heat condition
 } RDyBoundaryConditionSpec;
 
 // This struct describes a condition on a single field component. There are two valid
@@ -378,18 +379,26 @@ typedef struct {
 } RDySalinityCondition;
 
 // ----------------------
-// heat transfer section
+// heat_conditions section
 // ----------------------
 
-// heat-transfer-related condition data
+// heat-related condition data
 typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
-  MathExpression    expression;   // expression for temperature
-  void             *temperature;  // muparser-backed functional form
+  MathExpression    water_temperature_expression;      // expression for water temperature
+  MathExpression    downwelling_shortwave_expression;  // expression for downwelling shortwave radiation
+  MathExpression    downwelling_longwave_expression;   // expression for downwelling longwave radiation
+  MathExpression    wind_speed_expression;             // expression for wind speed
+  MathExpression    air_temperature_expression;        // expression for air temperature
+  void             *water_temperature;                 // muparser-backed functional form
+  void             *downwelling_shortwave;             // muparser-backed functional form
+  void             *downwelling_longwave;              // muparser-backed functional form
+  void             *wind_speed;                        // muparser-backed functional form
+  void             *air_temperature;                   // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
-} RDyTemperatureCondition;
+} RDyHeatCondition;
 
 // ----------------
 // ensemble section
@@ -405,10 +414,10 @@ typedef struct {
   PetscInt                 flow_conditions_count;
   RDySedimentCondition    *sediment_conditions;
   PetscInt                 sediment_conditions_count;
-  RDySalinityCondition    *salinity_conditions;
-  PetscInt                 salinity_conditions_count;
-  RDyTemperatureCondition *temperature_conditions;
-  PetscInt                 temperature_conditions_count;
+  RDySalinityCondition *salinity_conditions;
+  PetscInt              salinity_conditions_count;
+  RDyHeatCondition     *heat_conditions;
+  PetscInt              heat_conditions_count;
 } RDyEnsembleMember;
 
 // specification of an ensemble
@@ -461,10 +470,10 @@ typedef struct {
   RDyFlowCondition        flow_conditions[MAX_NUM_CONDITIONS];
   PetscInt                num_sediment_conditions;
   RDySedimentCondition    sediment_conditions[MAX_NUM_CONDITIONS];
-  PetscInt                num_salinity_conditions;
-  RDySalinityCondition    salinity_conditions[MAX_NUM_CONDITIONS];
-  PetscInt                num_temperature_conditions;
-  RDyTemperatureCondition temperature_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_salinity_conditions;
+  RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_heat_conditions;
+  RDyHeatCondition     heat_conditions[MAX_NUM_CONDITIONS];
 
   RDyEnsembleSection ensemble;
 

@@ -148,17 +148,17 @@ PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const PetscInt bou
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode RDySetTemperatureDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, PetscReal *values) {
+PetscErrorCode RDySetHeatDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges, PetscReal *values) {
   PetscFunctionBegin;
 
-  PetscCheck(rdy->config.physics.heat, rdy->comm, PETSC_ERR_USER, "Trying to set temperature dirichlet values, but heat transfer is disabled");
+  PetscCheck(rdy->config.physics.heat, rdy->comm, PETSC_ERR_USER, "Trying to set heat dirichlet values, but heat transfer is disabled");
   PetscCall(CheckBoundaryParameters(rdy, boundary_index, num_edges));
 
   RDyBoundary  boundary      = rdy->boundaries[boundary_index];
   RDyCondition boundary_cond = rdy->boundary_conditions[boundary_index];
-  PetscCheck(boundary_cond.temperature->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
-             "Trying to set dirichlet values for temperature on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
-             boundary_cond.temperature->type);
+  PetscCheck(boundary_cond.heat->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+             "Trying to set dirichlet values for heat on boundary %" PetscInt_FMT ", but it has a different type (%u)", boundary_index,
+             boundary_cond.heat->type);
 
   PetscInt num_classes = rdy->config.physics.sediment.num_classes;
   PetscInt comp_offset = 3 + num_classes + (rdy->config.physics.salinity ? 1 : 0);
