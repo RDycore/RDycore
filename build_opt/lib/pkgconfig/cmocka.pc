@@ -1,5 +1,0 @@
-Name: cmocka
-Description: The cmocka unit testing library
-Version: 1.1.5
-Libs: -L/Users/wsugiarta/Documents/github/RDycore/build_opt/lib -lcmocka
-Cflags: -I/Users/wsugiarta/Documents/github/RDycore/build_opt/include

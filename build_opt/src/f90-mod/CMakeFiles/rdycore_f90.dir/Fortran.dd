@@ -1,4 +1,0 @@
-ninja_dyndep_version = 1.0
-build src/f90-mod/CMakeFiles/rdycore_f90.dir/rdycore.F90.o | src/f90-mod/rdycore.mod: dyndep
-  restat = 1
-

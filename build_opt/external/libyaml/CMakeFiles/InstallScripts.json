@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/wsugiarta/Documents/github/RDycore/build_opt/external/libyaml/cmake_install.cmake",
-		"/Users/wsugiarta/Documents/github/RDycore/build_opt/external/libyaml/tests/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
