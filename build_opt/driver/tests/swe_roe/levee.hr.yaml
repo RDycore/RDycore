@@ -1,0 +1,59 @@
+# This test input corresponds to toy-problems/swe_roe/ex2b.c, but uses a file
+# to specify the initial conditions (and a corresponding Exodus mesh).
+
+physics:
+  flow:
+    mode: swe
+    well_balancing: hydrostatic_reconstruction
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  stop: 60
+  unit: seconds
+  stop_n: 600
+
+output:
+  format: xdmf
+  output_interval: 600
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+
+grid:
+  file: levee.exo
+  cell_elevation: 
+    file: levee_elevation.${PETSC_ID_TYPE}.bin
+
+# one region represents the whole domain
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.033
+
+initial_conditions:
+  - region: domain
+    flow: domain_flow_ic
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    file: levee_ic.${PETSC_ID_TYPE}.bin
+    format: binary
+

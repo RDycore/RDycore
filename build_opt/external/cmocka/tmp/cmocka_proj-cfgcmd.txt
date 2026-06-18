@@ -1,0 +1,1 @@
+cmd='/opt/homebrew/bin/cmake;-DCMAKE_INSTALL_PREFIX=/Users/wsugiarta/Documents/github/RDycore/build_opt;-DCMAKE_BUILD_TYPE=Debug;-DCMAKE_C_COMPILER=/Users/wsugiarta/Documents/github/petsc/arch-opt/bin/mpicc;-DBUILD_SHARED_LIBS=OFF;-DWITH_EXAMPLES=OFF;-DHAVE_WORDS_BIGENDIAN=TRUE;-DWORDS_BIGENDIAN=FALSE;-GNinja;-S;<SOURCE_DIR><SOURCE_SUBDIR>;-B;<BINARY_DIR>'

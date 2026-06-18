@@ -1,0 +1,31 @@
+{
+	"revision" : 0,
+	"rules" : 
+	[
+		{
+			"outputs" : [],
+			"primary-output" : "src/f90-mod/CMakeFiles/rdycore_f90.dir/rdycore.F90.o",
+			"provides" : 
+			[
+				{
+					"compiled-module-path" : "src/f90-mod/rdycore.mod",
+					"is-interface" : true,
+					"logical-name" : "rdycore.mod"
+				}
+			],
+			"requires" : 
+			[
+				{
+					"logical-name" : "iso_c_binding.mod"
+				},
+				{
+					"logical-name" : "petscsys.mod"
+				},
+				{
+					"logical-name" : "petscvec.mod"
+				}
+			]
+		}
+	],
+	"version" : 0
+}

@@ -1,0 +1,47 @@
+{
+	"bmi-installation" : 
+	{
+		"destination" : "bin",
+		"message-level" : "",
+		"permissions" : "",
+		"script-location" : "/Users/wsugiarta/Documents/github/RDycore/build_opt/driver/CMakeFiles/rdycore_f90_exe.dir/install-cxx-module-bmi-Debug.cmake"
+	},
+	"compiler-frontend-variant" : "GNU",
+	"compiler-id" : "GNU",
+	"compiler-simulate-id" : "",
+	"config" : "Debug",
+	"cxx-modules" : {},
+	"database-info" : null,
+	"dir-cur-bld" : "/Users/wsugiarta/Documents/github/RDycore/build_opt/driver",
+	"dir-cur-src" : "/Users/wsugiarta/Documents/github/RDycore/driver",
+	"dir-top-bld" : "/Users/wsugiarta/Documents/github/RDycore/build_opt",
+	"dir-top-src" : "/Users/wsugiarta/Documents/github/RDycore",
+	"exports" : [],
+	"forward-modules-from-target-dirs" : [],
+	"include-dirs" : 
+	[
+		"/Users/wsugiarta/Documents/github/petsc/include",
+		"/Users/wsugiarta/Documents/github/RDycore/include",
+		"include",
+		"src/f90-mod",
+		"include/private",
+		"/Users/wsugiarta/Documents/github/RDycore/external/libcyaml/include",
+		"/Users/wsugiarta/Documents/github/petsc/arch-opt/include"
+	],
+	"language" : "Fortran",
+	"linked-target-dirs" : 
+	[
+		"/Users/wsugiarta/Documents/github/RDycore/build_opt/src/f90-mod/CMakeFiles/rdycore_f90.dir"
+	],
+	"module-dir" : "/Users/wsugiarta/Documents/github/RDycore/build_opt/driver",
+	"sources" : 
+	{
+		"driver/CMakeFiles/rdycore_f90_exe.dir/main.F90.o" : 
+		{
+			"language" : "Fortran",
+			"source" : "/Users/wsugiarta/Documents/github/RDycore/driver/main.F90"
+		}
+	},
+	"submodule-ext" : ".smod",
+	"submodule-sep" : "@"
+}

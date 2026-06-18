@@ -1,0 +1,12 @@
+{
+	"modules" : 
+	{
+		"rdycoremod.mod" : 
+		{
+			"bmi" : "/Users/wsugiarta/Documents/github/RDycore/build_opt/src/f90-mod/tests/rdycoremod.mod",
+			"is-private" : false
+		}
+	},
+	"references" : {},
+	"usages" : {}
+}

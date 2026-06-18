@@ -1,0 +1,8 @@
+[0/1] Install the project...
+-- Install configuration: "Debug"
+-- Installing: /Users/wsugiarta/Documents/github/RDycore/build_opt/include/yaml.h
+-- Installing: /Users/wsugiarta/Documents/github/RDycore/build_opt/lib/libyaml.a
+-- Installing: /Users/wsugiarta/Documents/github/RDycore/build_opt/cmake/yamlConfig.cmake
+-- Installing: /Users/wsugiarta/Documents/github/RDycore/build_opt/cmake/yamlTargets.cmake
+-- Installing: /Users/wsugiarta/Documents/github/RDycore/build_opt/cmake/yamlTargets-debug.cmake
+-- Installing: /Users/wsugiarta/Documents/github/RDycore/build_opt/cmake/yamlConfigVersion.cmake

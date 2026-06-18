@@ -226,7 +226,7 @@ PETSC_INTERN PetscErrorCode ComputeLeastSquaresGradients(RDyMesh *, const PetscR
                                                          PetscScalar *);
 PETSC_INTERN PetscErrorCode CommunicateCellGradients(DM, RDyMesh *, PetscScalar *, PetscScalar *, PetscScalar *);
 PETSC_INTERN PetscErrorCode ReconstructFaceValues(RDyMesh *, const PetscScalar *, const PetscScalar *, const PetscScalar *, const PetscScalar *,
-                                                  PetscBool, CeedScalar *);
+                                                  RDyLimiterType, CeedScalar *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceOperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedSourceHROperator(RDyConfig *, RDyMesh *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedEtaVerticesVector(RDyMesh *, CeedVector *);

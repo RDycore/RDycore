@@ -547,7 +547,9 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 
     CeedScalar *q_face_ptr;
     PetscCallCEED(CeedVectorGetArray(op->ceed.q_reconstructed, CEED_MEM_HOST, &q_face_ptr));
-    PetscCall(ReconstructFaceValues(op->mesh, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv, op->ceed.use_limiter, q_face_ptr));
+    // CEED (incl. GPU) path keeps the binary minmod/none choice; van Leer is CPU/PETSc-only for now.
+    PetscCall(ReconstructFaceValues(op->mesh, q_ptr, op->ceed.grad_h, op->ceed.grad_hu, op->ceed.grad_hv,
+                                    op->ceed.use_limiter ? LIMITER_MINMOD : LIMITER_NONE, q_face_ptr));
     PetscCallCEED(CeedVectorRestoreArray(op->ceed.q_reconstructed, &q_face_ptr));
     PetscCall(VecRestoreArrayRead(u_local, &q_ptr));
   }

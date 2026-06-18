@@ -1113,11 +1113,35 @@ static inline PetscReal Minmod(PetscReal a, PetscReal b) {
   return PetscAbsReal(a) < PetscAbsReal(b) ? a : b;
 }
 
+// Returns the van Leer-limited slope from two candidate slopes a and b:
+//   vanleer(a, b) = 2ab/(a+b) for ab>0, else 0  (harmonic mean of the two slopes).
+// Equivalent to the symmetric limiter phi(r) = (r+|r|)/(1+|r|); smoother than minmod.
+// The ab>0 guard guarantees a+b != 0, so the division is safe.
+static inline PetscReal VanLeer(PetscReal a, PetscReal b) {
+  if (a * b <= 0.0) return 0.0;
+  return 2.0 * a * b / (a + b);
+}
+
+// Applies the selected slope limiter to a local extrapolation `extrap` against the
+// neighbor half-jump `half_dq` (signed toward the same face). Returns the limited
+// increment to add to the cell-centered value.
+static inline PetscReal LimitSlope(RDyLimiterType limiter, PetscReal extrap, PetscReal half_dq) {
+  switch (limiter) {
+    case LIMITER_NONE:
+      return extrap;
+    case LIMITER_VANLEER:
+      return VanLeer(extrap, half_dq);
+    case LIMITER_MINMOD:
+    default:
+      return Minmod(extrap, half_dq);
+  }
+}
+
 /// @brief Reconstructs face-centered states for all owned interior edges using
 /// linear extrapolation from cell centroids, optionally limited by minmod.
 ///
-/// Without limiter: q_face = q_cell + grad · Δx  (pure second-order, may overshoot)
-/// With minmod limiter: the extrapolation is clamped to minmod(extrap, 0.5*(q_R-q_L))
+/// LIMITER_NONE: q_face = q_cell + grad · Δx  (pure second-order, may overshoot)
+/// LIMITER_MINMOD/VANLEER: the extrapolation is limited against 0.5*(q_R-q_L)
 /// so reconstructed values stay within the range of the two adjacent cell values.
 ///
 /// @param [in]  mesh        the mesh
@@ -1125,11 +1149,11 @@ static inline PetscReal Minmod(PetscReal a, PetscReal b) {
 /// @param [in]  grad_h      cell-centered gradient of h,  size num_cells * 2
 /// @param [in]  grad_hu     cell-centered gradient of hu, size num_cells * 2
 /// @param [in]  grad_hv     cell-centered gradient of hv, size num_cells * 2
-/// @param [in]  use_limiter apply minmod limiter if PETSC_TRUE
+/// @param [in]  limiter     slope limiter to apply (none, minmod, or van Leer)
 /// @param [out] q_face      reconstructed face values, size num_owned_internal_edges * 6
 ///                          layout per edge: [h_L, hu_L, hv_L, h_R, hu_R, hv_R]
 PetscErrorCode ReconstructFaceValues(RDyMesh *mesh, const PetscScalar *q, const PetscScalar *grad_h, const PetscScalar *grad_hu,
-                                     const PetscScalar *grad_hv, PetscBool use_limiter, CeedScalar *q_face) {
+                                     const PetscScalar *grad_hv, RDyLimiterType limiter, CeedScalar *q_face) {
   PetscFunctionBeginUser;
 
   RDyCells    *cells    = &mesh->cells;
@@ -1163,18 +1187,11 @@ PetscErrorCode ReconstructFaceValues(RDyMesh *mesh, const PetscScalar *q, const 
       PetscReal extrap_L = grads[k][cl * 2 + 0] * dx_L + grads[k][cl * 2 + 1] * dy_L;
       PetscReal extrap_R = grads[k][cr * 2 + 0] * dx_R + grads[k][cr * 2 + 1] * dy_R;
 
-      PetscReal qL_face, qR_face;
-      if (use_limiter) {
-        // minmod: limit the extrapolation so it doesn't exceed half the cell-to-cell jump.
-        // extrap_L goes toward R, so compare with +0.5*dq.
-        // extrap_R goes toward L, so compare with -0.5*dq.
-        PetscReal dq = q[cr * 3 + k] - q[cl * 3 + k];
-        qL_face      = q[cl * 3 + k] + Minmod(extrap_L, 0.5 * dq);
-        qR_face      = q[cr * 3 + k] + Minmod(extrap_R, -0.5 * dq);
-      } else {
-        qL_face = q[cl * 3 + k] + extrap_L;
-        qR_face = q[cr * 3 + k] + extrap_R;
-      }
+      // Limit each extrapolation against half the cell-to-cell jump (the centered slope).
+      // extrap_L goes toward R, so compare with +0.5*dq; extrap_R goes toward L, so -0.5*dq.
+      PetscReal dq      = q[cr * 3 + k] - q[cl * 3 + k];
+      PetscReal qL_face = q[cl * 3 + k] + LimitSlope(limiter, extrap_L, 0.5 * dq);
+      PetscReal qR_face = q[cr * 3 + k] + LimitSlope(limiter, extrap_R, -0.5 * dq);
       q_face[owned_edge * 6 + k]     = qL_face;
       q_face[owned_edge * 6 + 3 + k] = qR_face;
     }

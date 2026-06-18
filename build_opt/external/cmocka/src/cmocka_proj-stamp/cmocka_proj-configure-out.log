@@ -1,0 +1,152 @@
+-- The C compiler identification is AppleClang 17.0.0.17000013
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /Users/wsugiarta/Documents/github/petsc/arch-opt/bin/mpicc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Performing Test REQUIRED_FLAGS_WERROR
+-- Performing Test REQUIRED_FLAGS_WERROR - Success
+-- Performing Test WITH_STD_GNU99_FLAG
+-- Performing Test WITH_STD_GNU99_FLAG - Success
+-- Performing Test WITH_WPEDANTIC_FLAG
+-- Performing Test WITH_WPEDANTIC_FLAG - Success
+-- Performing Test WITH_WALL_FLAG
+-- Performing Test WITH_WALL_FLAG - Success
+-- Performing Test WITH_WSHADOW_FLAG
+-- Performing Test WITH_WSHADOW_FLAG - Success
+-- Performing Test WITH_WMISSING_PROTOTYPES_FLAG
+-- Performing Test WITH_WMISSING_PROTOTYPES_FLAG - Success
+-- Performing Test WITH_WCAST_ALIGN_FLAG
+-- Performing Test WITH_WCAST_ALIGN_FLAG - Success
+-- Performing Test WITH_WERROR_ADDRESS_FLAG
+-- Performing Test WITH_WERROR_ADDRESS_FLAG - Success
+-- Performing Test WITH_WSTRICT_PROTOTYPES_FLAG
+-- Performing Test WITH_WSTRICT_PROTOTYPES_FLAG - Success
+-- Performing Test WITH_WERROR_STRICT_PROTOTYPES_FLAG
+-- Performing Test WITH_WERROR_STRICT_PROTOTYPES_FLAG - Success
+-- Performing Test WITH_WWRITE_STRINGS_FLAG
+-- Performing Test WITH_WWRITE_STRINGS_FLAG - Success
+-- Performing Test WITH_WERROR_WRITE_STRINGS_FLAG
+-- Performing Test WITH_WERROR_WRITE_STRINGS_FLAG - Success
+-- Performing Test WITH_WERROR_IMPLICIT_FUNCTION_DECLARATION_FLAG
+-- Performing Test WITH_WERROR_IMPLICIT_FUNCTION_DECLARATION_FLAG - Success
+-- Performing Test WITH_WPOINTER_ARITH_FLAG
+-- Performing Test WITH_WPOINTER_ARITH_FLAG - Success
+-- Performing Test WITH_WERROR_POINTER_ARITH_FLAG
+-- Performing Test WITH_WERROR_POINTER_ARITH_FLAG - Success
+-- Performing Test WITH_WDECLARATION_AFTER_STATEMENT_FLAG
+-- Performing Test WITH_WDECLARATION_AFTER_STATEMENT_FLAG - Success
+-- Performing Test WITH_WERROR_DECLARATION_AFTER_STATEMENT_FLAG
+-- Performing Test WITH_WERROR_DECLARATION_AFTER_STATEMENT_FLAG - Success
+-- Performing Test WITH_WRETURN_TYPE_FLAG
+-- Performing Test WITH_WRETURN_TYPE_FLAG - Success
+-- Performing Test WITH_WERROR_RETURN_TYPE_FLAG
+-- Performing Test WITH_WERROR_RETURN_TYPE_FLAG - Success
+-- Performing Test WITH_WUNINITIALIZED_FLAG
+-- Performing Test WITH_WUNINITIALIZED_FLAG - Success
+-- Performing Test WITH_WERROR_UNINITIALIZED_FLAG
+-- Performing Test WITH_WERROR_UNINITIALIZED_FLAG - Success
+-- Performing Test WITH_WIMPLICIT_FALLTHROUGH_FLAG
+-- Performing Test WITH_WIMPLICIT_FALLTHROUGH_FLAG - Success
+-- Performing Test WITH_WERROR_STRICT_OVERFLOW_FLAG
+-- Performing Test WITH_WERROR_STRICT_OVERFLOW_FLAG - Success
+-- Performing Test WITH_WSTRICT_OVERFLOW_2_FLAG
+-- Performing Test WITH_WSTRICT_OVERFLOW_2_FLAG - Success
+-- Performing Test WITH_WNO_FORMAT_ZERO_LENGTH_FLAG
+-- Performing Test WITH_WNO_FORMAT_ZERO_LENGTH_FLAG - Success
+-- Performing Test WITH_WMISSING_FIELD_INITIALIZERS_FLAG
+-- Performing Test WITH_WMISSING_FIELD_INITIALIZERS_FLAG - Success
+-- Performing Test REQUIRED_FLAGS_WFORMAT
+-- Performing Test REQUIRED_FLAGS_WFORMAT - Success
+-- Performing Test WITH_WFORMAT_SECURITY_FLAG
+-- Performing Test WITH_WFORMAT_SECURITY_FLAG - Success
+-- Performing Test WITH_WERROR_FORMAT_SECURITY_FLAG
+-- Performing Test WITH_WERROR_FORMAT_SECURITY_FLAG - Success
+-- Performing Test WITH_FNO_COMMON_FLAG
+-- Performing Test WITH_FNO_COMMON_FLAG - Success
+-- Performing Test WITH_STACK_PROTECTOR_STRONG
+-- Performing Test WITH_STACK_PROTECTOR_STRONG - Success
+-- Performing Test WITH_STACK_CLASH_PROTECTION
+-- Performing Test WITH_STACK_CLASH_PROTECTION - Success
+-- Looking for assert.h
+-- Looking for assert.h - found
+-- Looking for inttypes.h
+-- Looking for inttypes.h - found
+-- Looking for io.h
+-- Looking for io.h - not found
+-- Looking for malloc.h
+-- Looking for malloc.h - not found
+-- Looking for memory.h
+-- Looking for memory.h - found
+-- Looking for setjmp.h
+-- Looking for setjmp.h - found
+-- Looking for signal.h
+-- Looking for signal.h - found
+-- Looking for stdarg.h
+-- Looking for stdarg.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stdio.h
+-- Looking for stdio.h - found
+-- Looking for stdlib.h
+-- Looking for stdlib.h - found
+-- Looking for string.h
+-- Looking for string.h - found
+-- Looking for strings.h
+-- Looking for strings.h - found
+-- Looking for sys/stat.h
+-- Looking for sys/stat.h - found
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for time.h
+-- Looking for time.h - found
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+-- Performing Test HAVE_STRUCT_TIMESPEC
+-- Performing Test HAVE_STRUCT_TIMESPEC - Success
+-- Check size of uintptr_t
+-- Check size of uintptr_t - done
+-- Looking for calloc
+-- Looking for calloc - found
+-- Looking for exit
+-- Looking for exit - found
+-- Looking for fprintf
+-- Looking for fprintf - found
+-- Looking for free
+-- Looking for free - found
+-- Looking for longjmp
+-- Looking for longjmp - found
+-- Looking for siglongjmp
+-- Looking for siglongjmp - found
+-- Looking for malloc
+-- Looking for malloc - found
+-- Looking for memcpy
+-- Looking for memcpy - found
+-- Looking for memset
+-- Looking for memset - found
+-- Looking for printf
+-- Looking for printf - found
+-- Looking for setjmp
+-- Looking for setjmp - found
+-- Looking for signal
+-- Looking for signal - found
+-- Looking for strsignal
+-- Looking for strsignal - found
+-- Looking for strcmp
+-- Looking for strcmp - found
+-- Looking for clock_gettime
+-- Looking for clock_gettime - found
+-- Looking for sprintf
+-- Looking for sprintf - found
+-- Looking for vsnprintf
+-- Looking for vsnprintf - found
+-- Performing Test HAVE_GCC_THREAD_LOCAL_STORAGE
+-- Performing Test HAVE_GCC_THREAD_LOCAL_STORAGE - Success
+-- Performing Test HAVE_CLOCK_REALTIME
+-- Performing Test HAVE_CLOCK_REALTIME - Success
+-- Could NOT find Doxygen (missing: DOXYGEN_EXECUTABLE) 
+-- Configuring done (10.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/wsugiarta/Documents/github/RDycore/build_opt/external/cmocka

@@ -127,6 +127,12 @@ static const cyaml_strval_t numerics_riemann_types[] = {
     {"hllc",          RIEMANN_HLLC},
 };
 
+static const cyaml_strval_t numerics_limiter_types[] = {
+    {"minmod",   LIMITER_MINMOD },
+    {"none",     LIMITER_NONE   },
+    {"van_leer", LIMITER_VANLEER},
+};
+
 // mapping of numerics fields to members of RDyNumericsSection
 static const cyaml_schema_field_t numerics_fields_schema[] = {
     CYAML_FIELD_ENUM("spatial", CYAML_FLAG_DEFAULT, RDyNumericsSection, spatial, numerics_spatial_types, CYAML_ARRAY_LEN(numerics_spatial_types)),
@@ -134,6 +140,7 @@ static const cyaml_schema_field_t numerics_fields_schema[] = {
     CYAML_FIELD_ENUM("riemann", CYAML_FLAG_DEFAULT, RDyNumericsSection, riemann, numerics_riemann_types, CYAML_ARRAY_LEN(numerics_riemann_types)),
     CYAML_FIELD_BOOL("second_order", CYAML_FLAG_OPTIONAL, RDyNumericsSection, second_order),
     CYAML_FIELD_BOOL("no_limiter", CYAML_FLAG_OPTIONAL, RDyNumericsSection, no_limiter),
+    CYAML_FIELD_ENUM("limiter", CYAML_FLAG_OPTIONAL, RDyNumericsSection, limiter, numerics_limiter_types, CYAML_ARRAY_LEN(numerics_limiter_types)),
     CYAML_FIELD_END
 };
 

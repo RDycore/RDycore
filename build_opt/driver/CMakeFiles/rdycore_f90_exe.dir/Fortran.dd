@@ -1,0 +1,4 @@
+ninja_dyndep_version = 1.0
+build driver/CMakeFiles/rdycore_f90_exe.dir/main.F90.o | driver/rdy_driver.mod: dyndep | src/f90-mod/rdycore.mod
+  restat = 1
+

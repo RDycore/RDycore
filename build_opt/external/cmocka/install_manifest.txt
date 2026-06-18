@@ -1,0 +1,8 @@
+/Users/wsugiarta/Documents/github/RDycore/build_opt/lib/pkgconfig/cmocka.pc
+/Users/wsugiarta/Documents/github/RDycore/build_opt/lib/cmake/cmocka/cmocka-config-version.cmake
+/Users/wsugiarta/Documents/github/RDycore/build_opt/include/cmocka.h
+/Users/wsugiarta/Documents/github/RDycore/build_opt/include/cmocka_pbc.h
+/Users/wsugiarta/Documents/github/RDycore/build_opt/include/cmocka_version.h
+/Users/wsugiarta/Documents/github/RDycore/build_opt/lib/libcmocka.a
+/Users/wsugiarta/Documents/github/RDycore/build_opt/lib/cmake/cmocka/cmocka-config.cmake
+/Users/wsugiarta/Documents/github/RDycore/build_opt/lib/cmake/cmocka/cmocka-config-debug.cmake

@@ -1,0 +1,4 @@
+# ninja log v7
+1	79	1781194763355808373	src/CMakeFiles/cmocka.dir/cmocka.c.o	9441c65864aba844
+79	109	1781194763434099060	src/libcmocka.a	d9c8dfa23c35ffbb
+1	20	1781194763488322569	CMakeFiles/install.util	d679ce963e1fca4a

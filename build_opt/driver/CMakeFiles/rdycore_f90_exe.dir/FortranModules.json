@@ -1,0 +1,12 @@
+{
+	"modules" : 
+	{
+		"rdy_driver.mod" : 
+		{
+			"bmi" : "/Users/wsugiarta/Documents/github/RDycore/build_opt/driver/rdy_driver.mod",
+			"is-private" : false
+		}
+	},
+	"references" : {},
+	"usages" : {}
+}

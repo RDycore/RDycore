@@ -1,0 +1,9 @@
+-- The C compiler identification is AppleClang 17.0.0.17000013
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /Users/wsugiarta/Documents/github/petsc/arch-opt/bin/mpicc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/wsugiarta/Documents/github/RDycore/build_opt/external/libyaml

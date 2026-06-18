@@ -86,9 +86,9 @@ typedef struct {
   RiemannEdgeData      edges;            // riemann fluxes on interior edges
   OperatorDiagnostics *diagnostics;      // courant number, etc
   // MUSCL second-order reconstruction (allocated only when use_slope_reconstruction is true)
-  PetscBool    use_slope_reconstruction;
-  PetscBool    use_limiter;
-  PetscReal   *ls_grad_coeffs;              // [num_internal_edges * 4]: precomputed LS gradient coefficients
+  PetscBool      use_slope_reconstruction;
+  RDyLimiterType limiter;                   // MUSCL slope limiter (none, minmod, or van Leer)
+  PetscReal     *ls_grad_coeffs;            // [num_internal_edges * 4]: precomputed LS gradient coefficients
   PetscScalar *grad_h, *grad_hu, *grad_hv;  // [num_cells * 2]: cell-centered gradients
   PetscScalar *q_reconstructed;             // [num_owned_internal_edges * 6]: reconstructed face states
 } InteriorFluxOperator;
@@ -131,7 +131,7 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
                                          interior_flux_op->grad_hv));
   PetscCall(CommunicateCellGradients(dm, mesh, interior_flux_op->grad_h, interior_flux_op->grad_hu, interior_flux_op->grad_hv));
   PetscCall(ReconstructFaceValues(mesh, u_ptr, interior_flux_op->grad_h, interior_flux_op->grad_hu, interior_flux_op->grad_hv,
-                                  interior_flux_op->use_limiter, interior_flux_op->q_reconstructed));
+                                  interior_flux_op->limiter, interior_flux_op->q_reconstructed));
 
   // Collect the h/hu/hv for left and right cells to compute u/v.
   // For owned interior edges, use reconstructed face states;
@@ -365,12 +365,18 @@ PetscErrorCode CreatePetscSWEInteriorFluxOperator(RDyMesh *mesh, MPI_Comm comm, 
   };
 
   if (config.numerics.second_order) {
-    PetscBool use_limiter = !config.numerics.no_limiter;
-    PetscBool no_limiter  = PETSC_FALSE;
+    // Resolve the slope limiter. Default is minmod (config.numerics.limiter == LIMITER_MINMOD == 0).
+    // Back-compat: numerics.no_limiter / -no_limiter force LIMITER_NONE; -van_leer forces LIMITER_VANLEER.
+    RDyLimiterType limiter = config.numerics.limiter;
+    if (config.numerics.no_limiter) limiter = LIMITER_NONE;
+    PetscBool no_limiter = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-no_limiter", &no_limiter, NULL));
-    if (no_limiter) use_limiter = PETSC_FALSE;
+    if (no_limiter) limiter = LIMITER_NONE;
+    PetscBool van_leer = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-van_leer", &van_leer, NULL));
+    if (van_leer) limiter = LIMITER_VANLEER;
     interior_flux_op->use_slope_reconstruction = PETSC_TRUE;
-    interior_flux_op->use_limiter              = use_limiter;
+    interior_flux_op->limiter                  = limiter;
     PetscCall(PetscCalloc1(mesh->num_internal_edges * 4, &interior_flux_op->ls_grad_coeffs));
     PetscCall(PetscCalloc1(mesh->num_cells * 2, &interior_flux_op->grad_h));
     PetscCall(PetscCalloc1(mesh->num_cells * 2, &interior_flux_op->grad_hu));

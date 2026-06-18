@@ -1,0 +1,4 @@
+ninja_dyndep_version = 1.0
+build src/f90-mod/tests/CMakeFiles/test_coupling.dir/test_coupling.F90.o | src/f90-mod/tests/rdycoremod.mod: dyndep | src/f90-mod/rdycore.mod
+  restat = 1
+

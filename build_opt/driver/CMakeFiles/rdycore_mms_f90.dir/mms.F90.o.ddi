@@ -1,0 +1,28 @@
+{
+	"revision" : 0,
+	"rules" : 
+	[
+		{
+			"outputs" : [],
+			"primary-output" : "driver/CMakeFiles/rdycore_mms_f90.dir/mms.F90.o",
+			"provides" : 
+			[
+				{
+					"compiled-module-path" : "driver/mms_driver.mod",
+					"is-interface" : true,
+					"logical-name" : "mms_driver.mod"
+				}
+			],
+			"requires" : 
+			[
+				{
+					"logical-name" : "petsc.mod"
+				},
+				{
+					"logical-name" : "rdycore.mod"
+				}
+			]
+		}
+	],
+	"version" : 0
+}
