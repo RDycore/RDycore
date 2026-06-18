@@ -1189,9 +1189,9 @@ PetscErrorCode ReconstructFaceValues(RDyMesh *mesh, const PetscScalar *q, const 
 
       // Limit each extrapolation against half the cell-to-cell jump (the centered slope).
       // extrap_L goes toward R, so compare with +0.5*dq; extrap_R goes toward L, so -0.5*dq.
-      PetscReal dq      = q[cr * 3 + k] - q[cl * 3 + k];
-      PetscReal qL_face = q[cl * 3 + k] + LimitSlope(limiter, extrap_L, 0.5 * dq);
-      PetscReal qR_face = q[cr * 3 + k] + LimitSlope(limiter, extrap_R, -0.5 * dq);
+      PetscReal dq                   = q[cr * 3 + k] - q[cl * 3 + k];
+      PetscReal qL_face              = q[cl * 3 + k] + LimitSlope(limiter, extrap_L, 0.5 * dq);
+      PetscReal qR_face              = q[cr * 3 + k] + LimitSlope(limiter, extrap_R, -0.5 * dq);
       q_face[owned_edge * 6 + k]     = qL_face;
       q_face[owned_edge * 6 + 3 + k] = qR_face;
     }

@@ -87,10 +87,10 @@ typedef struct {
   OperatorDiagnostics *diagnostics;      // courant number, etc
   // MUSCL second-order reconstruction (allocated only when use_slope_reconstruction is true)
   PetscBool      use_slope_reconstruction;
-  RDyLimiterType limiter;                   // MUSCL slope limiter (none, minmod, or van Leer)
-  PetscReal     *ls_grad_coeffs;            // [num_internal_edges * 4]: precomputed LS gradient coefficients
-  PetscScalar *grad_h, *grad_hu, *grad_hv;  // [num_cells * 2]: cell-centered gradients
-  PetscScalar *q_reconstructed;             // [num_owned_internal_edges * 6]: reconstructed face states
+  RDyLimiterType limiter;                     // MUSCL slope limiter (none, minmod, or van Leer)
+  PetscReal     *ls_grad_coeffs;              // [num_internal_edges * 4]: precomputed LS gradient coefficients
+  PetscScalar   *grad_h, *grad_hu, *grad_hv;  // [num_cells * 2]: cell-centered gradients
+  PetscScalar   *q_reconstructed;             // [num_owned_internal_edges * 6]: reconstructed face states
 } InteriorFluxOperator;
 
 // Second-order MUSCL interior flux: only the edge owner accumulates,
