@@ -133,34 +133,20 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
   PetscCall(ReconstructFaceValues(mesh, u_ptr, interior_flux_op->grad_h, interior_flux_op->grad_hu, interior_flux_op->grad_hv,
                                   interior_flux_op->limiter, interior_flux_op->q_reconstructed));
 
-  // Collect the h/hu/hv for left and right cells to compute u/v.
-  // For owned interior edges, use reconstructed face states;
-  // for non-owned (ghost-side) edges, fall back to cell-averaged values
+  // Collect reconstructed face states for each OWNED interior edge, packed by owned-edge
+  // index (owned_e) to match q_reconstructed and the Riemann batch. Non-owned edges are
+  // not solved here; their flux is supplied by the owning rank via DMLocalToGlobal below.
   PetscInt owned_e = 0;
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
-    PetscInt  edge_id             = edges->internal_edge_ids[e];
-    PetscInt  left_local_cell_id  = edges->cell_ids[2 * edge_id];
-    PetscInt  right_local_cell_id = edges->cell_ids[2 * edge_id + 1];
-    PetscBool owned               = edges->is_owned[edge_id];
-
-    if (right_local_cell_id != -1) {
-      if (owned) {
-        datal->h[e]  = fmax(0.0, interior_flux_op->q_reconstructed[owned_e * 6 + 0]);
-        datal->hu[e] = interior_flux_op->q_reconstructed[owned_e * 6 + 1];
-        datal->hv[e] = interior_flux_op->q_reconstructed[owned_e * 6 + 2];
-        datar->h[e]  = fmax(0.0, interior_flux_op->q_reconstructed[owned_e * 6 + 3]);
-        datar->hu[e] = interior_flux_op->q_reconstructed[owned_e * 6 + 4];
-        datar->hv[e] = interior_flux_op->q_reconstructed[owned_e * 6 + 5];
-        owned_e++;
-      } else {
-        datal->h[e]  = u_ptr[n_dof * left_local_cell_id + 0];
-        datal->hu[e] = u_ptr[n_dof * left_local_cell_id + 1];
-        datal->hv[e] = u_ptr[n_dof * left_local_cell_id + 2];
-        datar->h[e]  = u_ptr[n_dof * right_local_cell_id + 0];
-        datar->hu[e] = u_ptr[n_dof * right_local_cell_id + 1];
-        datar->hv[e] = u_ptr[n_dof * right_local_cell_id + 2];
-      }
-    }
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    if (!edges->is_owned[edge_id]) continue;
+    datal->h[owned_e]  = fmax(0.0, interior_flux_op->q_reconstructed[owned_e * 6 + 0]);
+    datal->hu[owned_e] = interior_flux_op->q_reconstructed[owned_e * 6 + 1];
+    datal->hv[owned_e] = interior_flux_op->q_reconstructed[owned_e * 6 + 2];
+    datar->h[owned_e]  = fmax(0.0, interior_flux_op->q_reconstructed[owned_e * 6 + 3]);
+    datar->hu[owned_e] = interior_flux_op->q_reconstructed[owned_e * 6 + 4];
+    datar->hv[owned_e] = interior_flux_op->q_reconstructed[owned_e * 6 + 5];
+    owned_e++;
   }
 
   const PetscReal tiny_h  = interior_flux_op->tiny_h;
@@ -182,23 +168,23 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
   PetscCall(VecZeroEntries(rhs_local));
   PetscCall(VecGetArray(rhs_local, &rhs_local_ptr));
 
+  owned_e = 0;
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
     PetscInt edge_id = edges->internal_edge_ids[e];
-    if (!edges->is_owned[edge_id]) continue;  // non-owned edges handled by their owning process
+    if (!edges->is_owned[edge_id]) continue;  // non-owned edges are contributed by their owning rank
 
     PetscInt left_local_cell_id  = edges->cell_ids[2 * edge_id];
     PetscInt right_local_cell_id = edges->cell_ids[2 * edge_id + 1];
-    if (right_local_cell_id == -1) continue;
 
     PetscReal edge_len = edges->lengths[edge_id];
-    PetscReal hl       = datal->h[e];
-    PetscReal hr       = datar->h[e];
+    PetscReal hl       = datal->h[owned_e];
+    PetscReal hr       = datar->h[owned_e];
 
     if (!(hr < tiny_h && hl < tiny_h)) {
       PetscReal areal = cells->areas[left_local_cell_id];
       PetscReal arear = cells->areas[right_local_cell_id];
 
-      PetscReal                 cnum              = amax_vec_int[e] * edge_len / fmin(areal, arear) * dt;
+      PetscReal                 cnum              = amax_vec_int[owned_e] * edge_len / fmin(areal, arear) * dt;
       CourantNumberDiagnostics *courant_num_diags = &interior_flux_op->diagnostics->courant_number;
       if (cnum > courant_num_diags->max_courant_num) {
         courant_num_diags->max_courant_num = cnum;
@@ -208,14 +194,18 @@ static PetscErrorCode ApplyInteriorFlux2R(void *context, PetscOperatorFields fie
       }
 
       for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
-        rhs_local_ptr[n_dof * left_local_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (-edge_len / areal);
-        rhs_local_ptr[n_dof * right_local_cell_id + i_dof] += flux_vec_int[n_dof * e + i_dof] * (edge_len / arear);
+        rhs_local_ptr[n_dof * left_local_cell_id + i_dof] += flux_vec_int[n_dof * owned_e + i_dof] * (-edge_len / areal);
+        rhs_local_ptr[n_dof * right_local_cell_id + i_dof] += flux_vec_int[n_dof * owned_e + i_dof] * (edge_len / arear);
       }
     }
+    owned_e++;
   }
 
   PetscCall(VecRestoreArray(rhs_local, &rhs_local_ptr));
   PetscCall(VecRestoreArray(u_local, &u_ptr));
+  // Needed for 2R but not first order: 2R accumulates each owned edge's reconstructed flux into both adjacent cells of a
+  // local vector (including ghost cells), and DMLocalToGlobal(ADD_VALUES) adds the ghost contributions back onto their
+  // owning ranks. (The CEED version instead calls DMLocalToGlobal once, after both interior and boundary fluxes are accumulated.)
   PetscCall(DMLocalToGlobal(dm, rhs_local, ADD_VALUES, f_global));
   PetscCall(DMRestoreLocalVector(dm, &rhs_local));
 
@@ -385,18 +375,26 @@ PetscErrorCode CreatePetscSWEInteriorFluxOperator(RDyMesh *mesh, MPI_Comm comm, 
     PetscCall(PrecomputeLSGradCoeffs(comm, mesh, interior_flux_op->ls_grad_coeffs));
   }
 
-  // allocate left/right/edge Riemann data structures
-  PetscCall(CreateRiemannStateData(mesh->num_internal_edges, &interior_flux_op->left_states));
-  PetscCall(CreateRiemannStateData(mesh->num_internal_edges, &interior_flux_op->right_states));
-  PetscCall(CreateRiemannEdgeData(mesh->num_internal_edges, num_comp, &interior_flux_op->edges));
+  // Allocate left/right/edge Riemann data. The 2R path solves only owned internal edges
+  // (reconstructed states are owned-only), so size its batch to num_owned_internal_edges;
+  // first order solves all internal edges.
+  RDyEdges *edges  = &mesh->edges;
+  PetscInt  n_riem = interior_flux_op->use_slope_reconstruction ? mesh->num_owned_internal_edges : mesh->num_internal_edges;
+  PetscCall(CreateRiemannStateData(n_riem, &interior_flux_op->left_states));
+  PetscCall(CreateRiemannStateData(n_riem, &interior_flux_op->right_states));
+  PetscCall(CreateRiemannEdgeData(n_riem, num_comp, &interior_flux_op->edges));
 
-  // copy mesh geometry data into place
-  RDyEdges *edges = &mesh->edges;
+  // copy edge normals into place, in the order the Apply loop reads them: owned-edge
+  // order (owned_e) for 2R, full internal-edge order (e) for first order
+  PetscInt owned_e = 0;
   for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
-    PetscInt edge_id       = edges->internal_edge_ids[e];
-    PetscInt right_cell_id = edges->cell_ids[2 * edge_id + 1];
-
-    if (right_cell_id != -1) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    if (interior_flux_op->use_slope_reconstruction) {
+      if (!edges->is_owned[edge_id]) continue;
+      interior_flux_op->edges.cn[owned_e] = edges->cn[edge_id];
+      interior_flux_op->edges.sn[owned_e] = edges->sn[edge_id];
+      owned_e++;
+    } else if (edges->cell_ids[2 * edge_id + 1] != -1) {
       interior_flux_op->edges.cn[e] = edges->cn[edge_id];
       interior_flux_op->edges.sn[e] = edges->sn[edge_id];
     }
