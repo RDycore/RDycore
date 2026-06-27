@@ -8,7 +8,7 @@ static PetscBool initialized_ = PETSC_FALSE;
 PetscClassId     RDY_CLASSID;
 
 /// Fetches RDycore version information.
-PETSC_EXTERN PetscErrorCode RDyGetVersion(int *major, int *minor, int *patch, PetscBool *release) {
+PETSC_EXTERN PetscErrorCode RDyGetVersion(int* major, int* minor, int* patch, PetscBool* release) {
   PetscFunctionBegin;
   *major   = RDYCORE_MAJOR_VERSION;
   *minor   = RDYCORE_MINOR_VERSION;
@@ -18,7 +18,7 @@ PETSC_EXTERN PetscErrorCode RDyGetVersion(int *major, int *minor, int *patch, Pe
 }
 
 // Constructs a multi-line string describing detailed build information
-PETSC_EXTERN PetscErrorCode RDyGetBuildConfiguration(const char **build_config) {
+PETSC_EXTERN PetscErrorCode RDyGetBuildConfiguration(const char** build_config) {
   PetscFunctionBegin;
 #define BUILD_STR_LEN 1024
   static char build_str[BUILD_STR_LEN] = {0};
@@ -55,7 +55,7 @@ PETSC_EXTERN PetscErrorCode RDyGetBuildConfiguration(const char **build_config) 
 // This allows the Fortran driver to extract build information
 PETSC_EXTERN PetscErrorCode RDyGetBuildConfigurationF90(char build_config[1024]) {
   PetscFunctionBegin;
-  const char *c_build_config;
+  const char* c_build_config;
   PetscCall(RDyGetBuildConfiguration(&c_build_config));
   strncpy(build_config, c_build_config, 1024);
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -63,13 +63,13 @@ PETSC_EXTERN PetscErrorCode RDyGetBuildConfigurationF90(char build_config[1024])
 
 /// Initializes a process for use by RDycore. Call this at the beginning of
 /// your program.
-PetscErrorCode RDyInit(int argc, char *argv[], const char *help) {
+PetscErrorCode RDyInit(int argc, char* argv[], const char* help) {
   PetscFunctionBegin;
   if (!initialized_) {
     PetscBool petsc_initialized;
     PetscCall(PetscInitialized(&petsc_initialized));
     if (!petsc_initialized) {
-      PetscCall(PetscInitialize(&argc, &argv, (char *)0, (char *)help));
+      PetscCall(PetscInitialize(&argc, &argv, (char*)0, (char*)help));
     }
 
     // set up our logging class ID
@@ -111,7 +111,7 @@ PetscErrorCode RDyInitFortran(void) {
 // Functions called at shutdown. This can be used by all subsystems via
 // RDyOnFinalize().
 typedef void (*ShutdownFunc)(void);
-static ShutdownFunc *shutdown_funcs_     = NULL;
+static ShutdownFunc* shutdown_funcs_     = NULL;
 static int           num_shutdown_funcs_ = 0;
 static int           shutdown_funcs_cap_ = 0;
 
@@ -155,7 +155,7 @@ PetscBool RDyInitialized(void) { return initialized_; }
 /// @param comm        [in] the MPI communicator used by the simulation or ensemble
 /// @param config_file [in] a path to a configuration (.yaml) file
 /// @param rdy         [out] a pointer that stores the newly created RDy.
-PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
+PetscErrorCode RDyCreate(MPI_Comm comm, const char* config_file, RDy* rdy) {
   PetscFunctionBegin;
 
   PetscCall(PetscNew(rdy));
@@ -173,7 +173,7 @@ PetscErrorCode RDyCreate(MPI_Comm comm, const char *config_file, RDy *rdy) {
 }
 
 // fortran 90 version of RDyCreate
-PetscErrorCode RDyCreateF90(MPI_Fint *f90_comm, const char *config_file, RDy *rdy) {
+PetscErrorCode RDyCreateF90(MPI_Fint* f90_comm, const char* config_file, RDy* rdy) {
   PetscFunctionBegin;
 
   PetscCall(RDyCreate(MPI_Comm_f2c(*f90_comm), config_file, rdy));
@@ -188,7 +188,7 @@ PetscBool RDyRestarted(RDy rdy) { return rdy->config.restart.file[0]; }
 /// @brief Destroys PETSc Vecs associated with the DM
 /// @param rdy A RDy struct
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyDestroyVectors(RDy *rdy) {
+PetscErrorCode RDyDestroyVectors(RDy* rdy) {
   PetscFunctionBegin;
   // destroy vectors
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
@@ -203,7 +203,7 @@ PetscErrorCode RDyDestroyVectors(RDy *rdy) {
 }
 
 /// @brief Destroys a region data structure.
-PetscErrorCode DestroyRegion(RDyRegion *region) {
+PetscErrorCode DestroyRegion(RDyRegion* region) {
   PetscFunctionBegin;
 
   if (region->owned_cell_global_ids) {
@@ -219,7 +219,7 @@ PetscErrorCode DestroyRegion(RDyRegion *region) {
 /// @brief Destroy boundary data structures
 /// @param rdy A RDy struct
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
+PetscErrorCode RDyDestroyBoundaries(RDy* rdy) {
   PetscFunctionBegin;
 
   for (PetscInt i = 0; i < (*rdy)->num_boundaries; ++i) {
@@ -235,7 +235,7 @@ PetscErrorCode RDyDestroyBoundaries(RDy *rdy) {
 
 /// Destroys the given RDy object, freeing any allocated resources.
 /// @param rdy [out] a pointer to the RDy object to be destroyed.
-PetscErrorCode RDyDestroy(RDy *rdy) {
+PetscErrorCode RDyDestroy(RDy* rdy) {
   PetscFunctionBegin;
 
   // destroy FV mesh

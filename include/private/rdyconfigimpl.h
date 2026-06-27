@@ -194,7 +194,7 @@ typedef enum { OUTPUT_NONE = 0, OUTPUT_BINARY, OUTPUT_XDMF, OUTPUT_CGNS } RDyOut
 
 // observations
 typedef struct {
-  PetscInt *cells;
+  PetscInt* cells;
   PetscInt  cells_count;
 } RDyObservationSites;
 
@@ -218,7 +218,7 @@ typedef struct {
 typedef struct {
   PetscBool       enable;                         // true if output is requested
   char            directory[PETSC_MAX_PATH_LEN];  // output directory
-  char          **fields;                         // array of selected output field names
+  char**          fields;                         // array of selected output field names
   PetscInt        fields_count;                   // number of selected output fields
   RDyOutputFormat format;                         // file format
   PetscInt        output_interval;                // output interval [steps between outputs]
@@ -262,7 +262,7 @@ typedef struct {
 // from a file
 typedef struct {
   MathExpression    expression;                // expression for property value
-  void             *value;                     // muparser-backed functional form
+  void*             value;                     // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];  // file from which data is to be read
   PetscViewerFormat format;                    // file format
 } RDyMaterialPropertySpec;
@@ -328,7 +328,7 @@ typedef struct {
 // 2. file and format are set, indicating that the data is to be read from a file
 typedef struct {
   MathExpression    expression;  // expression for component
-  void             *value;       // muparser-backed functional form
+  void*             value;       // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyComponentCondition;
@@ -345,10 +345,10 @@ typedef struct {
   MathExpression    x_momentum_expression;  // expression for water y-momentum
   MathExpression    y_momentum_expression;  // expression for water y-momentum
   MathExpression    value_expression;       // expression for value
-  void             *height;                 // muparser-backed functional form
-  void             *x_momentum;             // muparser-backed functional form
-  void             *y_momentum;             // muparser-backed functional form
-  void             *value;                  // muparser-backed functional form
+  void*             height;                 // muparser-backed functional form
+  void*             x_momentum;             // muparser-backed functional form
+  void*             y_momentum;             // muparser-backed functional form
+  void*             value;                  // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyFlowCondition;
@@ -373,7 +373,7 @@ typedef struct {
   char              name[MAX_NAME_LEN + 1];
   RDyConditionType  type;
   MathExpression    expression;     // expression for concentration
-  void             *concentration;  // muparser-backed functional form
+  void*             concentration;  // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDySalinityCondition;
@@ -391,11 +391,11 @@ typedef struct {
   MathExpression    downwelling_longwave_expression;   // expression for downwelling longwave radiation
   MathExpression    wind_speed_expression;             // expression for wind speed
   MathExpression    air_temperature_expression;        // expression for air temperature
-  void             *water_temperature;                 // muparser-backed functional form
-  void             *downwelling_shortwave;             // muparser-backed functional form
-  void             *downwelling_longwave;              // muparser-backed functional form
-  void             *wind_speed;                        // muparser-backed functional form
-  void             *air_temperature;                   // muparser-backed functional form
+  void*             water_temperature;                 // muparser-backed functional form
+  void*             downwelling_shortwave;             // muparser-backed functional form
+  void*             downwelling_longwave;              // muparser-backed functional form
+  void*             wind_speed;                        // muparser-backed functional form
+  void*             air_temperature;                   // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyHeatCondition;
@@ -406,24 +406,24 @@ typedef struct {
 
 // specification of an ensemble member with overridable parameters
 typedef struct {
-  char                     name[MAX_NAME_LEN + 1];
-  RDyGridSection           grid;
-  RDyMaterialSpec         *materials;
-  PetscInt                 materials_count;
-  RDyFlowCondition        *flow_conditions;
-  PetscInt                 flow_conditions_count;
-  RDySedimentCondition    *sediment_conditions;
-  PetscInt                 sediment_conditions_count;
-  RDySalinityCondition *salinity_conditions;
+  char                  name[MAX_NAME_LEN + 1];
+  RDyGridSection        grid;
+  RDyMaterialSpec*      materials;
+  PetscInt              materials_count;
+  RDyFlowCondition*     flow_conditions;
+  PetscInt              flow_conditions_count;
+  RDySedimentCondition* sediment_conditions;
+  PetscInt              sediment_conditions_count;
+  RDySalinityCondition* salinity_conditions;
   PetscInt              salinity_conditions_count;
-  RDyHeatCondition     *heat_conditions;
+  RDyHeatCondition*     heat_conditions;
   PetscInt              heat_conditions_count;
 } RDyEnsembleMember;
 
 // specification of an ensemble
 typedef struct {
   PetscInt           size;
-  RDyEnsembleMember *members;
+  RDyEnsembleMember* members;
   PetscInt           members_count;  // set automatically; must be equal to size!
 } RDyEnsembleSection;
 
@@ -466,10 +466,10 @@ typedef struct {
   PetscInt                 num_boundary_conditions;
   RDyBoundaryConditionSpec boundary_conditions[MAX_NUM_BOUNDARIES];
 
-  PetscInt                num_flow_conditions;
-  RDyFlowCondition        flow_conditions[MAX_NUM_CONDITIONS];
-  PetscInt                num_sediment_conditions;
-  RDySedimentCondition    sediment_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_flow_conditions;
+  RDyFlowCondition     flow_conditions[MAX_NUM_CONDITIONS];
+  PetscInt             num_sediment_conditions;
+  RDySedimentCondition sediment_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_salinity_conditions;
   RDySalinityCondition salinity_conditions[MAX_NUM_CONDITIONS];
   PetscInt             num_heat_conditions;

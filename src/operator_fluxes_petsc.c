@@ -56,9 +56,9 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, MPI_Com
 /// Interior edges use HR reconstruction + pressure correction; boundary edges
 /// reuse the standard boundary flux operator (HR is a no-op on boundaries since
 /// zc_L == zc_R for boundary cells).
-PetscErrorCode CreatePetscFluxHROperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
-                                         RDyCondition *boundary_conditions, Vec *boundary_values, Vec *boundary_fluxes, Vec *boundary_fluxes_accum,
-                                         OperatorDiagnostics *diagnostics, PetscOperator *flux_op) {
+PetscErrorCode CreatePetscFluxHROperator(RDyConfig* config, RDyMesh* mesh, PetscInt num_boundaries, RDyBoundary* boundaries,
+                                         RDyCondition* boundary_conditions, Vec* boundary_values, Vec* boundary_fluxes, Vec* boundary_fluxes_accum,
+                                         OperatorDiagnostics* diagnostics, PetscOperator* flux_op) {
   PetscFunctionBegin;
 
   PetscCall(PetscOperatorCreateComposite(flux_op));

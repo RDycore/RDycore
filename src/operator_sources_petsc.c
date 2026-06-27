@@ -10,7 +10,7 @@
 /// @param [in]    material_properties a sequential Vec that can store material properties for the local process
 /// @param [out]   source_op           the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreatePetscSourceOperator(RDyConfig *config, RDyMesh *mesh, Vec external_sources, Vec material_properties, PetscOperator *source_op) {
+PetscErrorCode CreatePetscSourceOperator(RDyConfig* config, RDyMesh* mesh, Vec external_sources, Vec material_properties, PetscOperator* source_op) {
   PetscFunctionBegin;
 
   PetscCall(PetscOperatorCreateComposite(source_op));
@@ -27,8 +27,8 @@ PetscErrorCode CreatePetscSourceOperator(RDyConfig *config, RDyMesh *mesh, Vec e
 }
 
 /// Creates a PETSc source operator for the HR well-balanced SWE (bed slope = 0).
-PetscErrorCode CreatePetscSourceHROperator(RDyConfig *config, RDyMesh *mesh, Vec external_sources, Vec material_properties,
-                                           PetscOperator *source_op) {
+PetscErrorCode CreatePetscSourceHROperator(RDyConfig* config, RDyMesh* mesh, Vec external_sources, Vec material_properties,
+                                           PetscOperator* source_op) {
   PetscFunctionBegin;
 
   PetscCall(PetscOperatorCreateComposite(source_op));

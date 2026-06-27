@@ -29,7 +29,7 @@ PetscErrorCode GetOutputDirectory(RDy rdy, char dir[PETSC_MAX_PATH_LEN]) {
 
 // creates the directory on rank 0 of the provided communicator, broadcasting
 // results to the rest of the communicator's processes
-PetscErrorCode CreateDirectory(MPI_Comm comm, const char *directory) {
+PetscErrorCode CreateDirectory(MPI_Comm comm, const char* directory) {
   PetscFunctionBegin;
   PetscMPIInt rank, result_and_errno[2];
   MPI_Comm_rank(comm, &rank);
@@ -66,8 +66,8 @@ static PetscErrorCode CreateOutputDirectory(RDy rdy) {
 // * with the given prefix
 // * with the given zero-padded index (padded to the given max index value)
 // * and the given suffix
-PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix, PetscInt index, PetscInt max_index_val, const char *suffix,
-                                       char *filename) {
+PetscErrorCode GenerateIndexedFilename(const char* directory, const char* prefix, PetscInt index, PetscInt max_index_val, const char* suffix,
+                                       char* filename) {
   PetscFunctionBegin;
   int  num_digits = (int)(log10((double)max_index_val)) + 1;
   char fmt[16]    = {0};
@@ -79,7 +79,7 @@ PetscErrorCode GenerateIndexedFilename(const char *directory, const char *prefix
 }
 
 // generates a filename in the given directory in the format <prefix>-YYYY-MM-DD-hh:mm:ss.<suffix>
-PetscErrorCode GenerateTimestampedFilename(const char *directory, const char *prefix, time_t t, const char *suffix, char *filename) {
+PetscErrorCode GenerateTimestampedFilename(const char* directory, const char* prefix, time_t t, const char* suffix, char* filename) {
   PetscFunctionBegin;
   struct tm date;
   localtime_r(&t, &date);
@@ -92,7 +92,7 @@ PetscErrorCode GenerateTimestampedFilename(const char *directory, const char *pr
 /// * the desired file format as specified by rdy->config.output_format
 /// * the simulation time
 /// * the specified suffix
-PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char *suffix, char *filename) {
+PetscErrorCode DetermineOutputFile(RDy rdy, PetscInt step, PetscReal time, const char* suffix, char* filename) {
   PetscFunctionBegin;
 
   char prefix[PETSC_MAX_PATH_LEN];
@@ -158,13 +158,13 @@ PetscErrorCode DestroyOutputViewer(RDy rdy) {
 }
 
 // this writes a log message for output at the proper interval
-PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X, void *ctx) {
+PetscErrorCode WriteOutputLogMessage(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
   PetscFunctionBegin;
   RDy rdy = ctx;
   if (step % rdy->config.output.output_interval == 0) {
-    static const char *formats[4] = {"none", "binary", "XDMF", "CGNS"};
-    const char        *format     = formats[rdy->config.output.format];
-    const char        *units      = TimeUnitAsString(rdy->config.time.unit);
+    static const char* formats[4] = {"none", "binary", "XDMF", "CGNS"};
+    const char*        format     = formats[rdy->config.output.format];
+    const char*        units      = TimeUnitAsString(rdy->config.time.unit);
     RDyLogDetail(rdy, "Step %" PetscInt_FMT ": writing %s output at t = %g %s", step, format, time, units);
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -184,7 +184,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
     }
 
     if (rdy->config.output.time_interval) {
-      const char *units = TimeUnitAsString(rdy->config.output.time_unit);
+      const char* units = TimeUnitAsString(rdy->config.output.time_unit);
       RDyLogDebug(rdy, "Writing output every %" PetscInt_FMT " %s", rdy->config.output.time_interval, units);
     }
 
@@ -227,7 +227,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
       // CGNS output is handled via the Options database. We need to set monitoring
       // for all formats that aren't XDMF or CGNS.
       if (rdy->config.output.format != OUTPUT_CGNS) {
-        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void *))TSMonitorSolution, rdy->output_vf, NULL));
+        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode (*)(TS, PetscInt, PetscReal, Vec, void*))TSMonitorSolution, rdy->output_vf, NULL));
       }
     }
   }
@@ -300,10 +300,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
                ConvertTimeFromSeconds(next_coupling_time, rdy->config.time.unit));
 
   // if adaptive time is enabled, try to increase the dt
-  RDyTimeAdaptiveSection *time_adapt = &rdy->config.time.adaptive;
+  RDyTimeAdaptiveSection* time_adapt = &rdy->config.time.adaptive;
   if (time_adapt->enable) {
     OperatorDiagnostics diagnostics;
-    PetscCall(GetOperatorDiagnostics(rdy->operator, & diagnostics));
+    PetscCall(GetOperatorDiagnostics(rdy->operator, &diagnostics));
 
     // if previous courant number is valid
     if (diagnostics.updated) {
@@ -331,7 +331,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
       // if needed, log the Courant number
       if (rdy->config.logging.level >= LOG_DEBUG) {
-        const char *units  = TimeUnitAsString(rdy->config.time.unit);
+        const char* units  = TimeUnitAsString(rdy->config.time.unit);
         PetscReal   dt_old = ConvertTimeFromSeconds(rdy->dt, rdy->config.time.unit);
         PetscReal   dt_new = ConvertTimeFromSeconds(dt, rdy->config.time.unit);
         RDyLogDebug(rdy, "Increasing dt from %f [%s] to %f [%s]", dt_old, units, dt_new, units);
@@ -365,7 +365,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
   if (time_adapt->enable) {
     OperatorDiagnostics diagnostics;
-    PetscCall(GetOperatorDiagnostics(rdy->operator, & diagnostics));
+    PetscCall(GetOperatorDiagnostics(rdy->operator, &diagnostics));
     if (!diagnostics.updated) {
       PetscCall(UpdateOperatorDiagnostics(rdy->operator));
     }
@@ -400,14 +400,14 @@ PetscBool RDyFinished(RDy rdy) {
 }
 
 /// Retrieves the time units specified in the config file
-PetscErrorCode RDyGetTimeUnit(RDy rdy, RDyTimeUnit *unit) {
+PetscErrorCode RDyGetTimeUnit(RDy rdy, RDyTimeUnit* unit) {
   PetscFunctionBegin;
   *unit = rdy->config.time.unit;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Retrieves the simulation time in the desired units
-PetscErrorCode RDyGetTime(RDy rdy, RDyTimeUnit unit, PetscReal *time) {
+PetscErrorCode RDyGetTime(RDy rdy, RDyTimeUnit unit, PetscReal* time) {
   PetscFunctionBegin;
   PetscReal t;
   PetscCall(TSGetTime(rdy->ts, &t));
@@ -416,7 +416,7 @@ PetscErrorCode RDyGetTime(RDy rdy, RDyTimeUnit unit, PetscReal *time) {
 }
 
 /// Retrieves the internal time step size in the desired units
-PetscErrorCode RDyGetTimeStep(RDy rdy, RDyTimeUnit unit, PetscReal *time_step) {
+PetscErrorCode RDyGetTimeStep(RDy rdy, RDyTimeUnit unit, PetscReal* time_step) {
   PetscFunctionBegin;
   *time_step = ConvertTimeFromSeconds(rdy->dt, unit);
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -424,7 +424,7 @@ PetscErrorCode RDyGetTimeStep(RDy rdy, RDyTimeUnit unit, PetscReal *time_step) {
 
 /// Converts the time t_from, expressed in units unit_from, to the time t_to,
 /// expressed in units unit_to.
-PetscErrorCode RDyConvertTime(RDyTimeUnit unit_from, PetscReal t_from, RDyTimeUnit unit_to, PetscReal *t_to) {
+PetscErrorCode RDyConvertTime(RDyTimeUnit unit_from, PetscReal t_from, RDyTimeUnit unit_to, PetscReal* t_to) {
   PetscFunctionBegin;
   *t_to = ConvertTimeToSeconds(t_from, unit_from);
   *t_to = ConvertTimeFromSeconds(*t_to, unit_to);
@@ -432,14 +432,14 @@ PetscErrorCode RDyConvertTime(RDyTimeUnit unit_from, PetscReal t_from, RDyTimeUn
 }
 
 /// Stores the step index in step.
-PetscErrorCode RDyGetStep(RDy rdy, PetscInt *step) {
+PetscErrorCode RDyGetStep(RDy rdy, PetscInt* step) {
   PetscFunctionBegin;
   PetscCall(TSGetStepNumber(rdy->ts, step));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// Retrieves the coupling interval in the desired units
-PetscErrorCode RDyGetCouplingInterval(RDy rdy, RDyTimeUnit unit, PetscReal *interval) {
+PetscErrorCode RDyGetCouplingInterval(RDy rdy, RDyTimeUnit unit, PetscReal* interval) {
   PetscFunctionBegin;
   // convert the coupling interval from config file units to desired units
   PetscCall(RDyConvertTime(rdy->config.time.unit, rdy->config.time.coupling_interval, unit, interval));

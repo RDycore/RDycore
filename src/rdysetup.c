@@ -22,8 +22,8 @@ static const PetscReal days_in_mon = 30.0;
 static const PetscReal days_in_yr  = 365.0;
 
 /// Returns a string corresponding to the given time unit
-const char *TimeUnitAsString(RDyTimeUnit time_unit) {
-  static const char *time_unit_strings[6] = {
+const char* TimeUnitAsString(RDyTimeUnit time_unit) {
+  static const char* time_unit_strings[6] = {
       "sec",  // seconds
       "min",  // minutes
       "hr",   // hours
@@ -132,7 +132,7 @@ PetscErrorCode OverrideParameters(RDy rdy) {
 }
 
 // retrieves the index of a flow condition using its name
-static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *index) {
+static PetscErrorCode FindFlowCondition(RDy rdy, const char* name, PetscInt* index) {
   PetscFunctionBegin;
 
   // NOTE: linear search on N condition names is O(N) complexity; binary search
@@ -149,7 +149,7 @@ static PetscErrorCode FindFlowCondition(RDy rdy, const char *name, PetscInt *ind
 }
 
 // retrieves the index of a sediment condition using its name
-static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt *index) {
+static PetscErrorCode FindSedimentCondition(RDy rdy, const char* name, PetscInt* index) {
   PetscFunctionBegin;
 
   // NOTE: could be optimized as above
@@ -165,7 +165,7 @@ static PetscErrorCode FindSedimentCondition(RDy rdy, const char *name, PetscInt 
 }
 
 // retrieves the index of a salinity condition using its name
-static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt *index) {
+static PetscErrorCode FindSalinityCondition(RDy rdy, const char* name, PetscInt* index) {
   PetscFunctionBegin;
 
   // NOTE: could be optimized as above
@@ -181,7 +181,7 @@ static PetscErrorCode FindSalinityCondition(RDy rdy, const char *name, PetscInt 
 }
 
 // retrieves the index of a heat condition using its name
-static PetscErrorCode FindHeatCondition(RDy rdy, const char *name, PetscInt *index) {
+static PetscErrorCode FindHeatCondition(RDy rdy, const char* name, PetscInt* index) {
   PetscFunctionBegin;
 
   // NOTE: could be optimized as above
@@ -215,7 +215,7 @@ PetscErrorCode InitRegions(RDy rdy) {
   // fetch region IDs
   IS region_id_is;
   PetscCall(DMLabelGetValueIS(label, &region_id_is));
-  const PetscInt *region_ids;
+  const PetscInt* region_ids;
   PetscCall(ISGetIndices(region_id_is, &region_ids));
 
   // allocate and set region data
@@ -225,7 +225,7 @@ PetscErrorCode InitRegions(RDy rdy) {
     IS       cell_is;  // cell index space
     PetscCall(DMLabelGetStratumIS(label, region_id, &cell_is));
     if (cell_is) {
-      RDyRegion *region = &rdy->regions[r];
+      RDyRegion* region = &rdy->regions[r];
       region->index     = r;
       region->id        = region_id;
 
@@ -245,7 +245,7 @@ PetscErrorCode InitRegions(RDy rdy) {
         region->num_local_cells = num_local_cells;
         PetscCall(PetscCalloc1(region->num_local_cells, &region->cell_local_ids));
 
-        const PetscInt *cell_ids;
+        const PetscInt* cell_ids;
         PetscCall(ISGetIndices(cell_is, &cell_ids));
         for (PetscInt i = 0; i < num_local_cells; ++i) {
           region->cell_local_ids[i] = cell_ids[i] - c_start;
@@ -303,11 +303,11 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   if (boundary_edge_present) {
     ISDuplicate(boundary_edge_is, &unassigned_edges_is);
 
-    RDyMesh  *mesh  = &rdy->mesh;
-    RDyEdges *edges = &mesh->edges;
-    RDyCells *cells = &mesh->cells;
+    RDyMesh*  mesh  = &rdy->mesh;
+    RDyEdges* edges = &mesh->edges;
+    RDyCells* cells = &mesh->cells;
 
-    PetscInt *invalid_idx;
+    PetscInt* invalid_idx;
     PetscCall(PetscCalloc1(mesh->num_edges, &invalid_idx));
 
     for (PetscInt iedge = 0; iedge < mesh->num_edges; iedge++) {
@@ -349,7 +349,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
   PetscCall(DMGetLabel(rdy->dm, "Face Sets", &label));
   PetscInt        num_boundaries_in_file = 0;
   IS              boundary_id_is;
-  const PetscInt *boundary_ids;
+  const PetscInt* boundary_ids;
   if (label) {  // found face sets!
     PetscCall(DMLabelGetNumValues(label, &num_boundaries_in_file));
     PetscCheck(num_boundaries_in_file <= MAX_NUM_BOUNDARIES, rdy->comm, PETSC_ERR_USER,
@@ -458,7 +458,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
       IS       edge_is;  // edge index space//
       PetscCall(DMLabelGetStratumIS(label, boundary_id, &edge_is));
       if (edge_is) {
-        RDyBoundary *boundary = &rdy->boundaries[b];
+        RDyBoundary* boundary = &rdy->boundaries[b];
         boundary->index       = b;
         boundary->id          = boundary_id;
 
@@ -479,7 +479,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
         }
 
         // extract edge IDs
-        const PetscInt *edge_ids;
+        const PetscInt* edge_ids;
         PetscCall(ISGetIndices(edge_is, &edge_ids));
         for (PetscInt i = 0; i < num_edges; ++i) {
           PetscCheck((edge_ids[i] >= e_start) && (edge_ids[i] < e_end), PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG,
@@ -514,7 +514,7 @@ PetscErrorCode InitBoundaries(RDy rdy) {
         RDySurfaceCompositionSpec surface_comp = rdy->config.surface_composition[isurf_comp];          \
         if (!strcmp(surface_comp.region, region.name)) {                                               \
           if (mat_prop_vec) {                                                                          \
-            PetscScalar *prop_ptr;                                                                     \
+            PetscScalar* prop_ptr;                                                                     \
             PetscCall(VecGetArray(mat_prop_vec, &prop_ptr));                                           \
             for (PetscInt c = 0; c < region.num_local_cells; ++c) {                                    \
               PetscInt cell = region.cell_local_ids[c];                                                \
@@ -561,7 +561,7 @@ PetscErrorCode InitMaterialProperties(RDy rdy) {
   }
 
   // read material properties in from regional specifications and/or files
-  PetscReal *material_property_values[NUM_MATERIAL_PROPERTIES];
+  PetscReal* material_property_values[NUM_MATERIAL_PROPERTIES];
   for (PetscInt p = 0; p < NUM_MATERIAL_PROPERTIES; ++p) {
     PetscCall(PetscCalloc1(rdy->mesh.num_cells, &material_property_values[p]));
   }
@@ -572,7 +572,7 @@ PetscErrorCode InitMaterialProperties(RDy rdy) {
 
   // set the properties on the operator
   OperatorData material_properties;
-  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & material_properties));
+  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, &material_properties));
   for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
     if (rdy->mesh.cells.is_owned[i]) {
       PetscInt owned_cell = rdy->mesh.cells.local_to_owned[i];
@@ -581,7 +581,7 @@ PetscErrorCode InitMaterialProperties(RDy rdy) {
       }
     }
   }
-  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & material_properties));
+  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, &material_properties));
   for (PetscInt p = 0; p < NUM_MATERIAL_PROPERTIES; ++p) {
     PetscCall(PetscFree(material_property_values[p]));
   }
@@ -599,7 +599,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
 
   // assign іnitial conditions to each region as indicated in our config
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-    RDyCondition *ic              = &rdy->initial_conditions[r];
+    RDyCondition* ic              = &rdy->initial_conditions[r];
     RDyRegion     region          = rdy->regions[r];
     PetscInt      region_ic_index = -1;
     for (PetscInt ic = 0; ic < rdy->config.num_initial_conditions; ++ic) {
@@ -615,7 +615,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
     PetscInt flow_index;
     PetscCall(FindFlowCondition(rdy, ic_spec.flow, &flow_index));
     PetscCheck(flow_index != -1, rdy->comm, PETSC_ERR_USER, "initial flow condition '%s' for region '%s' was not found!", ic_spec.flow, region.name);
-    RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
+    RDyFlowCondition* flow_cond = &rdy->config.flow_conditions[flow_index];
     PetscCheck(flow_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                "initial flow condition '%s' for region '%s' is not of dirichlet type!", flow_cond->name, region.name);
     ic->flow = flow_cond;
@@ -624,7 +624,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       PetscCheck(strlen(ic_spec.sediment), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial sediment condition!", region.name);
       PetscInt sed_index;
       PetscCall(FindSedimentCondition(rdy, ic_spec.sediment, &sed_index));
-      RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[sed_index];
+      RDySedimentCondition* sed_cond = &rdy->config.sediment_conditions[sed_index];
       PetscCheck(sed_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                  "initial sediment condition '%s' for region '%s' is not of dirichlet type!", sed_cond->name, region.name);
       ic->sediment = sed_cond;
@@ -634,7 +634,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       PetscCheck(strlen(ic_spec.salinity), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial salinity condition!", region.name);
       PetscInt sal_index;
       PetscCall(FindSalinityCondition(rdy, ic_spec.salinity, &sal_index));
-      RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[sal_index];
+      RDySalinityCondition* sal_cond = &rdy->config.salinity_conditions[sal_index];
       PetscCheck(sal_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
                  "initial salinity condition '%s' for region '%s' is not of dirichlet type!", sal_cond->name, region.name);
       ic->salinity = sal_cond;
@@ -644,7 +644,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       PetscCheck(strlen(ic_spec.heat), rdy->comm, PETSC_ERR_USER, "Region '%s' has no initial heat condition!", region.name);
       PetscInt heat_index;
       PetscCall(FindHeatCondition(rdy, ic_spec.heat, &heat_index));
-      RDyHeatCondition *heat_cond = &rdy->config.heat_conditions[heat_index];
+      RDyHeatCondition* heat_cond = &rdy->config.heat_conditions[heat_index];
       ic->heat                    = heat_cond;
     }
   }
@@ -661,7 +661,7 @@ static PetscErrorCode InitSources(RDy rdy) {
 
     // assign sources to each region as needed
     for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyCondition *src              = &rdy->sources[r];
+      RDyCondition* src              = &rdy->sources[r];
       RDyRegion     region           = rdy->regions[r];
       PetscInt      region_src_index = -1;
 
@@ -680,7 +680,7 @@ static PetscErrorCode InitSources(RDy rdy) {
           PetscCall(FindFlowCondition(rdy, src_spec.flow, &flow_index));
           PetscCheck(flow_index != -1, rdy->comm, PETSC_ERR_USER, "source flow condition '%s' for region '%s' was not found!", src_spec.flow,
                      region.name);
-          RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[flow_index];
+          RDyFlowCondition* flow_cond = &rdy->config.flow_conditions[flow_index];
           PetscCheck(flow_cond->type == CONDITION_RUNOFF, rdy->comm, PETSC_ERR_USER, "flow source '%s' for region '%s' is not of runoff type!",
                      flow_cond->name, region.name);
           src->flow = flow_cond;
@@ -695,8 +695,8 @@ static PetscErrorCode InitSources(RDy rdy) {
         if (rdy->config.physics.heat && strlen(src_spec.heat)) {
           PetscInt heat_index;
           PetscCall(FindHeatCondition(rdy, src_spec.heat, &heat_index));
-          PetscCheck(heat_index != -1, rdy->comm, PETSC_ERR_USER,
-                     "Heat source condition '%s' for region '%s' was not found!", src_spec.heat, region.name);
+          PetscCheck(heat_index != -1, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' was not found!", src_spec.heat,
+                     region.name);
           src->heat = &rdy->config.heat_conditions[heat_index];
         }
       }
@@ -710,11 +710,11 @@ static PetscErrorCode InitSources(RDy rdy) {
 static PetscErrorCode InitBoundaryConditions(RDy rdy) {
   PetscFunctionBegin;
   // Set up a reflecting flow boundary condition.
-  RDyFlowCondition *reflecting_flow = NULL;
+  RDyFlowCondition* reflecting_flow = NULL;
   for (PetscInt c = 0; c < MAX_NUM_CONDITIONS; ++c) {
     if (!strlen(rdy->config.flow_conditions[c].name)) {
       reflecting_flow = &rdy->config.flow_conditions[c];
-      strcpy((char *)reflecting_flow->name, "reflecting");
+      strcpy((char*)reflecting_flow->name, "reflecting");
       reflecting_flow->type = CONDITION_REFLECTING;
       break;
     }
@@ -726,7 +726,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
 
   // Assign a boundary condition to each boundary.
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-    RDyCondition *bc       = &rdy->boundary_conditions[b];
+    RDyCondition* bc       = &rdy->boundary_conditions[b];
     RDyBoundary   boundary = rdy->boundaries[b];
 
     // identify the index of the boundary condition assigned to this boundary.
@@ -773,8 +773,8 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
       if (rdy->config.physics.heat && strlen(bc_spec.heat)) {
         PetscInt heat_index;
         PetscCall(FindHeatCondition(rdy, bc_spec.heat, &heat_index));
-        PetscCheck(heat_index != -1, rdy->comm, PETSC_ERR_USER,
-                   "Heat boundary condition '%s' for boundary '%s' was not found!", bc_spec.heat, boundary.name);
+        PetscCheck(heat_index != -1, rdy->comm, PETSC_ERR_USER, "Heat boundary condition '%s' for boundary '%s' was not found!", bc_spec.heat,
+                   boundary.name);
         bc->heat = &rdy->config.heat_conditions[heat_index];
       }
     } else {
@@ -806,7 +806,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscInt n_local, ndof;
   PetscCall(VecGetLocalSize(rdy->flow_global_vec, &n_local));
   PetscCall(VecGetBlockSize(rdy->flow_global_vec, &ndof));
-  PetscScalar *u_ptr;
+  PetscScalar* u_ptr;
   PetscCall(VecGetArray(rdy->flow_global_vec, &u_ptr));
 
   // initialize flow conditions
@@ -853,7 +853,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.flow->name, flow_ic.name)) {
         if (local) {  // reading from file
-          PetscScalar *local_ptr;
+          PetscScalar* local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_local_id = region.cell_local_ids[c];
@@ -890,7 +890,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char *filename, Vec *local) {
+static PetscErrorCode ReadSingleComponentFromFile(RDy rdy, const char* filename, Vec* local) {
   PetscFunctionBegin;
 
   PetscViewer viewer;
@@ -952,7 +952,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscInt n_local, ndof;
   PetscCall(VecGetLocalSize(rdy->tracer_global_vec, &n_local));
   PetscCall(VecGetBlockSize(rdy->tracer_global_vec, &ndof));
-  PetscScalar *u_ptr;
+  PetscScalar* u_ptr;
   PetscCall(VecGetArray(rdy->tracer_global_vec, &u_ptr));
 
   // initialize sediment conditions one size class at a time
@@ -972,7 +972,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
           RDyCondition ic     = rdy->initial_conditions[r];
           if (!strcmp(ic.sediment->name, sediment_ic.name)) {
             if (local) {
-              PetscScalar *local_ptr;
+              PetscScalar* local_ptr;
               PetscCall(VecGetArray(local, &local_ptr));
               for (PetscInt c = 0; c < region.num_local_cells; ++c) {
                 PetscInt cell_local_id = region.cell_local_ids[c];
@@ -1009,7 +1009,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.salinity->name, salinity_ic.name)) {
         if (local) {  // reading from file
-          PetscScalar *local_ptr;
+          PetscScalar* local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_local_id = region.cell_local_ids[c];
@@ -1045,7 +1045,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
       RDyCondition ic     = rdy->initial_conditions[r];
       if (!strcmp(ic.heat->name, heat_ic.name)) {
         if (local) {
-          PetscScalar *local_ptr;
+          PetscScalar* local_ptr;
           PetscCall(VecGetArray(local, &local_ptr));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_local_id = region.cell_local_ids[c];
@@ -1096,10 +1096,10 @@ PetscErrorCode OverrideCellElevation(RDy rdy) {
   Vec local_elev;
   PetscCall(RDyReadOneDOFLocalVecFromBinaryFile(rdy, rdy->config.grid.cell_elevation.file, &local_elev));
 
-  PetscScalar *elev_ptr;
+  PetscScalar* elev_ptr;
   PetscCall(VecGetArray(local_elev, &elev_ptr));
 
-  RDyCells *cells = &rdy->mesh.cells;
+  RDyCells* cells = &rdy->mesh.cells;
   for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
     cells->centroids[icell].X[2] = elev_ptr[icell];
   }
@@ -1129,12 +1129,12 @@ PetscErrorCode InitOperator(RDy rdy) {
 /// @param [in]    U   the global solution vector at time t
 /// @param [out]   F   the global right hand side vector to be evaluated at time t
 /// @param [inout] ctx a pointer to the operator representing the system being solved
-static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void *ctx) {
+static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void* ctx) {
   PetscFunctionBegin;
 
   RDy       rdy = ctx;
   DM        dm  = rdy->dm;
-  Operator *op  = rdy->operator;
+  Operator* op  = rdy->operator;
 
   PetscScalar dt;
   PetscCall(TSGetTimeStep(ts, &dt));
@@ -1153,7 +1153,7 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
     PetscInt nstep;
     PetscCall(TSGetStepNumber(ts, &nstep));
 
-    const char *backend = (CeedEnabled()) ? "ceed" : "petsc";
+    const char* backend = (CeedEnabled()) ? "ceed" : "petsc";
     char        file[PETSC_MAX_PATH_LEN];
     snprintf(file, PETSC_MAX_PATH_LEN, "F_%s_nstep%" PetscInt_FMT "_N%d.dat", backend, nstep, rdy->nproc);
 
@@ -1174,7 +1174,7 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
     PetscInt  stepnum;
     PetscCall(TSGetTime(ts, &time));
     PetscCall(TSGetStepNumber(ts, &stepnum));
-    const char *units = TimeUnitAsString(rdy->config.time.unit);
+    const char* units = TimeUnitAsString(rdy->config.time.unit);
 
     RDyLogDebug(rdy, "[%" PetscInt_FMT "] Time = %f [%s] Max courant number %g", stepnum, ConvertTimeFromSeconds(time, rdy->config.time.unit), units,
                 diagnostics.courant_number.max_courant_num);
@@ -1234,9 +1234,9 @@ PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary       boundary      = rdy->boundaries[b];
     RDyCondition      boundary_cond = rdy->boundary_conditions[b];
-    RDyFlowCondition *flow_bc       = boundary_cond.flow;
+    RDyFlowCondition* flow_bc       = boundary_cond.flow;
 
-    PetscReal *boundary_values;
+    PetscReal* boundary_values;
     PetscCall(PetscCalloc1(3 * boundary.num_edges, &boundary_values));
     switch (boundary_cond.flow->type) {
       case CONDITION_DIRICHLET:
@@ -1273,7 +1273,7 @@ PetscErrorCode InitSourceConditions(RDy rdy) {
     for (PetscInt r = 0; r < rdy->num_regions; r++) {
       RDyCondition src = rdy->sources[r];
 
-      RDyFlowCondition *flow_src = src.flow;
+      RDyFlowCondition* flow_src = src.flow;
       if (flow_src) {
         PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, r, mupEval(flow_src->value)));
       }
@@ -1291,7 +1291,7 @@ static char overridden_logfile_[PETSC_MAX_PATH_LEN] = {0};
 /// the YAML config file.
 /// @param [inout] rdy      the RDycore simulator
 /// @param [in]    log_file the name of the log file written by RDycore
-PetscErrorCode RDySetLogFile(RDy rdy, const char *filename) {
+PetscErrorCode RDySetLogFile(RDy rdy, const char* filename) {
   PetscFunctionBegin;
   strncpy(overridden_logfile_, filename, PETSC_MAX_PATH_LEN - 1);
   overridden_logfile_[PETSC_MAX_PATH_LEN - 1] = '\0';
@@ -1314,8 +1314,8 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
       gethostname(hostname, MAX_NAME_LEN);
       PetscFPrintf(rdy->comm, stderr, "Pausing... press Enter to resume.\n");
       if (rdy->nproc > 1) {
-        pid_t *pids;
-        char  *hostnames;
+        pid_t* pids;
+        char*  hostnames;
         PetscCall(PetscCalloc1(rdy->nproc, &pids));
         PetscCall(PetscCalloc1(rdy->nproc * (MAX_NAME_LEN + 1), &hostnames));
         MPI_Gather(&pid, 1, MPI_INT, pids, 1, MPI_INT, 0, rdy->comm);
@@ -1348,8 +1348,8 @@ PetscErrorCode PauseIfRequested(RDy rdy) {
 static PetscErrorCode OutputPartitionStatistics(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscMPIInt *num_owned_cells_per_rank;
-  RDyMesh     *mesh = &rdy->mesh;
+  PetscMPIInt* num_owned_cells_per_rank;
+  RDyMesh*     mesh = &rdy->mesh;
 
   if (!rdy->rank) {
     PetscCall(PetscCalloc1(rdy->nproc, &num_owned_cells_per_rank));
@@ -1543,7 +1543,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   // Wire OutputVar references to Operator-owned vectors (must happen after InitOperator).
   {
-    Operator *op                      = rdy->operator;
+    Operator* op                      = rdy->operator;
     rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
     rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
     rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;

@@ -51,7 +51,7 @@ static PetscErrorCode CreateDMSection(DM dm, SectionFieldSpec fields) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode CreateCellCenteredDMFromDM(DM dm, PetscInt refinement_level, const SectionFieldSpec fields, DM *cc_dm) {
+PetscErrorCode CreateCellCenteredDMFromDM(DM dm, PetscInt refinement_level, const SectionFieldSpec fields, DM* cc_dm) {
   PetscFunctionBegin;
 
   PetscCall(DMClone(dm, cc_dm));
