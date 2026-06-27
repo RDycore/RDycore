@@ -3,6 +3,10 @@
 #include <private/rdysweimpl.h>
 #include <private/rdytracerimpl.h>
 
+static PetscBool HasTracers(const RDyConfig* config) {
+  return (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
+}
+
 /// Creates a PETSc source operator appropriate for the given configuration.
 /// @param [in]    config              the configuration defining the physics and numerics for the new operator
 /// @param [in]    mesh                a mesh containing geometric and topological information for the domain
@@ -16,7 +20,7 @@ PetscErrorCode CreatePetscSourceOperator(RDyConfig* config, RDyMesh* mesh, Vec e
   PetscCall(PetscOperatorCreateComposite(source_op));
 
   PetscOperator source_0;
-  if (config->physics.sediment.num_classes > 0) {
+  if (HasTracers(config)) {
     PetscCall(CreatePetscTracerSourceOperator(mesh, *config, external_sources, material_properties, &source_0));
   } else {
     PetscCall(CreatePetscSWESourceOperator(mesh, *config, external_sources, material_properties, &source_0));
@@ -34,7 +38,7 @@ PetscErrorCode CreatePetscSourceHROperator(RDyConfig* config, RDyMesh* mesh, Vec
   PetscCall(PetscOperatorCreateComposite(source_op));
 
   PetscOperator source_0;
-  if (config->physics.sediment.num_classes > 0) {
+  if (HasTracers(config)) {
     PetscCall(CreatePetscTracerSourceHROperator(mesh, *config, external_sources, material_properties, &source_0));
   } else {
     PetscCall(CreatePetscSWESourceHROperator(mesh, *config, external_sources, material_properties, &source_0));

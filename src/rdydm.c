@@ -218,13 +218,13 @@ PetscErrorCode CreateTracerDM(RDy rdy) {
     if (rdy->config.physics.salinity) {
       PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Salinity", MAX_NAME_LEN));
       rdy->tracer_fields.num_field_components[comp] = 1;
-      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[comp][0], "SedimentConcentration", MAX_NAME_LEN));
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[comp][0], "Salinity", MAX_NAME_LEN));
       ++comp;
     }
     if (rdy->config.physics.heat) {
-      PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Temperature", MAX_NAME_LEN));
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_names[comp], "Heat", MAX_NAME_LEN));
       rdy->tracer_fields.num_field_components[comp] = 1;
-      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[comp][0], "Temperature", MAX_NAME_LEN));
+      PetscCall(PetscStrncpy(rdy->tracer_fields.field_component_names[comp][0], "HeatMassPerUnitArea", MAX_NAME_LEN));
       ++comp;
     }
     PetscCall(CreateCellCenteredDMFromDM(rdy->dm, rdy->amr.num_refinements, rdy->tracer_fields, &rdy->tracer_dm));
@@ -273,12 +273,12 @@ PetscErrorCode CreateVectors(RDy rdy) {
   rdy->prim_vars_output.accumulated_time = 0.0;
   rdy->src_output.accumulated_time       = 0.0;
 
-  if (rdy->config.physics.sediment.num_classes) {
+  if (rdy->num_tracers > 0) {
     // Vecs for flow
     PetscCall(DMCreateGlobalVector(rdy->flow_dm, &rdy->flow_global_vec));
     PetscCall(DMCreateLocalVector(rdy->flow_dm, &rdy->flow_local_vec));
 
-    // Vecs for sediment
+    // Vecs for tracer-like quantities
     PetscCall(DMCreateGlobalVector(rdy->tracer_dm, &rdy->tracer_global_vec));
     PetscCall(DMCreateLocalVector(rdy->tracer_dm, &rdy->tracer_local_vec));
 

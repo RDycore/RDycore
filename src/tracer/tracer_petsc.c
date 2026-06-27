@@ -7,6 +7,10 @@
 
 #include "tracer_roe_flux_petsc.h"
 
+static PetscInt NumTracers(const RDyConfig* config) {
+  return config->physics.sediment.num_classes + (config->physics.salinity ? 1 : 0) + (config->physics.heat ? 1 : 0);
+}
+
 /// @brief Allocates memory for prognostic (h/hu/hv/hci) and diagnostic (u/v/ci) variables stored at
 ///        cell centers for tracers dynamics
 /// @param [in]  num_states        number of states
@@ -108,11 +112,15 @@ static PetscErrorCode ComputeRiemannVelocitiesAndConcentration(const PetscReal t
   PetscInt index;
   for (PetscInt n = 0; n < data->num_states; n++) {
     if (data->h[n] < tiny_h) {
-      data->u[n] = 0.0;
-      data->v[n] = 0.0;
+      data->h[n]  = 0.0;
+      data->hu[n] = 0.0;
+      data->hv[n] = 0.0;
+      data->u[n]  = 0.0;
+      data->v[n]  = 0.0;
       for (PetscInt s = 0; s < data->num_tracers_comp; s++) {
-        index           = n * data->num_tracers_comp + s;
-        data->ci[index] = 0.0;
+        index            = n * data->num_tracers_comp + s;
+        data->hci[index] = 0.0;
+        data->ci[index]  = 0.0;
       }
     } else {
       data->u[n] = data->hu[n] / data->h[n];
@@ -297,7 +305,7 @@ PetscErrorCode CreatePetscTracerInteriorFluxOperator(RDyMesh* mesh, const RDyCon
   PetscFunctionBegin;
 
   PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
-  PetscInt num_tracers_comp = config.physics.sediment.num_classes;
+  PetscInt num_tracers_comp = NumTracers(&config);
 
   TracerInteriorFluxOperator* interior_flux_op;
   PetscCall(PetscCalloc1(1, &interior_flux_op));
@@ -394,6 +402,56 @@ static PetscErrorCode ApplyTracerReflectingBC(RDyMesh* mesh, RDyBoundary boundar
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+static PetscErrorCode ApplyTracerCriticalOutflowBC(RDyMesh* mesh, RDyBoundary boundary, TracerRiemannStateData* datal, TracerRiemannStateData* datar,
+                                                   TracerRiemannEdgeData* data_edge) {
+  PetscFunctionBeginUser;
+
+  RDyCells* cells = &mesh->cells;
+  RDyEdges* edges = &mesh->edges;
+
+  PetscReal* cn_vec_bnd = data_edge->cn;
+  PetscReal* sn_vec_bnd = data_edge->sn;
+
+  PetscInt num_tracers_comp = datal->num_tracers_comp;
+
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt edge_id            = boundary.edge_ids[e];
+    PetscInt left_local_cell_id = edges->cell_ids[2 * edge_id];
+
+    if (cells->is_owned[left_local_cell_id]) {
+      PetscReal uperp = datal->u[e] * cn_vec_bnd[e] + datal->v[e] * sn_vec_bnd[e];
+      if (uperp < 0.0) {
+        datal->h[e] = 0.0;
+        datal->u[e] = 0.0;
+        datal->v[e] = 0.0;
+        datar->h[e] = 0.0;
+        datar->u[e] = 0.0;
+        datar->v[e] = 0.0;
+        for (PetscInt s = 0; s < num_tracers_comp; s++) {
+          datal->ci[e * num_tracers_comp + s]  = 0.0;
+          datar->ci[e * num_tracers_comp + s]  = 0.0;
+          datal->hci[e * num_tracers_comp + s] = 0.0;
+          datar->hci[e * num_tracers_comp + s] = 0.0;
+        }
+      } else {
+        PetscReal q = datal->h[e] * fabs(uperp);
+        datar->h[e] = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
+
+        PetscReal velocity = PetscPowReal(GRAVITY * datar->h[e], 0.5);
+        datar->u[e]        = velocity * cn_vec_bnd[e];
+        datar->v[e]        = velocity * sn_vec_bnd[e];
+        for (PetscInt s = 0; s < num_tracers_comp; s++) {
+          PetscReal ci                         = datal->ci[e * num_tracers_comp + s];
+          datar->ci[e * num_tracers_comp + s]  = ci;
+          datar->hci[e * num_tracers_comp + s] = datar->h[e] * ci;
+        }
+      }
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Computes the fluxes through the boundary edges of mesh locally owned and
 ///        adds contribution in f_global Vec.
 /// @param [in] context  a TracerInteriorFluxOperator
@@ -470,7 +528,7 @@ static PetscErrorCode ApplyTracerBoundaryFlux(void* context, PetscOperatorFields
       PetscCall(ApplyTracerReflectingBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
       break;
     case CONDITION_CRITICAL_OUTFLOW:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not supported for tracers");
+      PetscCall(ApplyTracerCriticalOutflowBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);
@@ -557,7 +615,7 @@ PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh* mesh, const RDyCon
   PetscFunctionBegin;
 
   PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
-  PetscInt num_tracers_comp = config.physics.sediment.num_classes;
+  PetscInt num_tracers_comp = NumTracers(&config);
 
   TracerBoundaryFluxOperator* boundary_flux_op;
   PetscCall(PetscCalloc1(1, &boundary_flux_op));
@@ -596,14 +654,15 @@ PetscErrorCode CreatePetscTracerBoundaryFluxOperator(RDyMesh* mesh, const RDyCon
 //-----------------
 
 typedef struct {
-  RDyMesh*  mesh;              // domain mesh
-  PetscInt  num_flow_comp;     // number of flow components
-  PetscInt  num_tracers_comp;  // number of tracers components
-  Vec       external_sources;  // external source vector
-  Vec       mannings;          // mannings coefficient vector
-  PetscReal tiny_h;            // minimum water height for wet conditions
-  PetscReal h_anuga_regular;   // ANUGA height parameter used for velocity regularization
-  PetscReal xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
+  RDyMesh*  mesh;               // domain mesh
+  PetscInt  num_flow_comp;      // number of flow components
+  PetscInt  num_sediment_comp;  // number of sediment components
+  PetscInt  num_tracers_comp;   // number of tracers components
+  Vec       external_sources;   // external source vector
+  Vec       mannings;           // mannings coefficient vector
+  PetscReal tiny_h;             // minimum water height for wet conditions
+  PetscReal h_anuga_regular;    // ANUGA height parameter used for velocity regularization
+  PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
 } TracerSourceOperator;
 
 /// @brief Set the contribution of the source-term using the semi-implicit time integeration method
@@ -620,13 +679,14 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void* context, PetscOperator
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  TracerSourceOperator* source_op        = context;
-  Vec                   source_vec       = source_op->external_sources;
-  Vec                   mannings_vec     = source_op->mannings;
-  RDyMesh*              mesh             = source_op->mesh;
-  RDyCells*             cells            = &mesh->cells;
-  PetscReal             tiny_h           = source_op->tiny_h;
-  PetscInt              num_tracers_comp = source_op->num_tracers_comp;
+  TracerSourceOperator* source_op         = context;
+  Vec                   source_vec        = source_op->external_sources;
+  Vec                   mannings_vec      = source_op->mannings;
+  RDyMesh*              mesh              = source_op->mesh;
+  RDyCells*             cells             = &mesh->cells;
+  PetscReal             tiny_h            = source_op->tiny_h;
+  PetscInt              num_sediment_comp = source_op->num_sediment_comp;
+  PetscInt              num_tracers_comp  = source_op->num_tracers_comp;
 
   // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
   // parameterization
@@ -697,14 +757,18 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void* context, PetscOperator
         tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
         tby = (hv + dt * Fsum_y - dt * bedy) * factor;
 
-        for (PetscInt s = 0; s < num_tracers_comp; s++) {
+        for (PetscInt s = 0; s < num_sediment_comp; s++) {
           PetscReal ci    = u_ptr[n_dof * c + 3 + s] / h;
           PetscReal tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
-          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + 3 + s];
+          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di);
         }
+      }
+
+      for (PetscInt s = 0; s < num_tracers_comp; s++) {
+        f_ptr[n_dof * owned_cell_id + 3 + s] += source_ptr[n_dof * owned_cell_id + 3 + s];
       }
 
       // NOTE: we accumulate everything into the RHS vector by convention.
@@ -757,19 +821,20 @@ PetscErrorCode CreatePetscTracerSourceOperator(RDyMesh* mesh, const RDyConfig co
   PetscFunctionBegin;
 
   PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
-  PetscInt num_tracers_comp = config.physics.sediment.num_classes;
+  PetscInt num_tracers_comp = NumTracers(&config);
 
   TracerSourceOperator* source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (TracerSourceOperator){
-      .mesh             = mesh,
-      .num_flow_comp    = num_flow_comp,
-      .num_tracers_comp = num_tracers_comp,
-      .external_sources = external_sources,
-      .mannings         = mannings,
-      .tiny_h           = config.physics.flow.tiny_h,
-      .h_anuga_regular  = config.physics.flow.h_anuga_regular,
-      .xq2018_threshold = config.physics.flow.source.xq2018_threshold,
+      .mesh              = mesh,
+      .num_flow_comp     = num_flow_comp,
+      .num_sediment_comp = config.physics.sediment.num_classes,
+      .num_tracers_comp  = num_tracers_comp,
+      .external_sources  = external_sources,
+      .mannings          = mannings,
+      .tiny_h            = config.physics.flow.tiny_h,
+      .h_anuga_regular   = config.physics.flow.h_anuga_regular,
+      .xq2018_threshold  = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;
@@ -1003,7 +1068,7 @@ PetscErrorCode CreatePetscTracerInteriorFluxHROperator(RDyMesh* mesh, const RDyC
   PetscFunctionBegin;
 
   PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
-  PetscInt num_tracers_comp = config.physics.sediment.num_classes;
+  PetscInt num_tracers_comp = NumTracers(&config);
 
   TracerInteriorFluxHROperator* op;
   PetscCall(PetscCalloc1(1, &op));
@@ -1055,13 +1120,14 @@ PetscErrorCode CreatePetscTracerInteriorFluxHROperator(RDyMesh* mesh, const RDyC
 //-------------------------------
 
 typedef struct {
-  RDyMesh*  mesh;              // domain mesh
-  PetscInt  num_flow_comp;     // number of flow components
-  PetscInt  num_tracers_comp;  // number of tracers components
-  Vec       external_sources;  // external source vector
-  Vec       mannings;          // mannings coefficient vector
-  PetscReal tiny_h;            // minimum water height for wet conditions
-  PetscReal xq2018_threshold;  // threshold for XQ2018
+  RDyMesh*  mesh;               // domain mesh
+  PetscInt  num_flow_comp;      // number of flow components
+  PetscInt  num_sediment_comp;  // number of sediment components
+  PetscInt  num_tracers_comp;   // number of tracers components
+  Vec       external_sources;   // external source vector
+  Vec       mannings;           // mannings coefficient vector
+  PetscReal tiny_h;             // minimum water height for wet conditions
+  PetscReal xq2018_threshold;   // threshold for XQ2018
 } TracerSourceHROperator;
 
 static PetscErrorCode ApplyTracerSourceHRSemiImplicit(void* context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
@@ -1070,13 +1136,14 @@ static PetscErrorCode ApplyTracerSourceHRSemiImplicit(void* context, PetscOperat
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
 
-  TracerSourceHROperator* source_op        = context;
-  Vec                     source_vec       = source_op->external_sources;
-  Vec                     mannings_vec     = source_op->mannings;
-  RDyMesh*                mesh             = source_op->mesh;
-  RDyCells*               cells            = &mesh->cells;
-  PetscReal               tiny_h           = source_op->tiny_h;
-  PetscInt                num_tracers_comp = source_op->num_tracers_comp;
+  TracerSourceHROperator* source_op         = context;
+  Vec                     source_vec        = source_op->external_sources;
+  Vec                     mannings_vec      = source_op->mannings;
+  RDyMesh*                mesh              = source_op->mesh;
+  RDyCells*               cells             = &mesh->cells;
+  PetscReal               tiny_h            = source_op->tiny_h;
+  PetscInt                num_sediment_comp = source_op->num_sediment_comp;
+  PetscInt                num_tracers_comp  = source_op->num_tracers_comp;
 
   const PetscReal kp_constant             = 0.001;
   const PetscReal settling_velocity       = 0.01;
@@ -1129,14 +1196,18 @@ static PetscErrorCode ApplyTracerSourceHRSemiImplicit(void* context, PetscOperat
         tbx = (hu + dt * Fsum_x - dt * bedx) * factor;
         tby = (hv + dt * Fsum_y - dt * bedy) * factor;
 
-        for (PetscInt s = 0; s < num_tracers_comp; s++) {
+        for (PetscInt s = 0; s < num_sediment_comp; s++) {
           PetscReal ci    = u_ptr[n_dof * c + 3 + s] / h;
           PetscReal tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
           PetscReal ei    = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
           PetscReal di    = settling_velocity * ci * (1.0 - tau_b / tau_critical_deposition);
 
-          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di) + source_ptr[n_dof * owned_cell_id + 3 + s];
+          f_ptr[n_dof * owned_cell_id + 3 + s] += (ei - di);
         }
+      }
+
+      for (PetscInt s = 0; s < num_tracers_comp; s++) {
+        f_ptr[n_dof * owned_cell_id + 3 + s] += source_ptr[n_dof * owned_cell_id + 3 + s];
       }
 
       f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
@@ -1166,18 +1237,19 @@ PetscErrorCode CreatePetscTracerSourceHROperator(RDyMesh* mesh, const RDyConfig 
   PetscFunctionBegin;
 
   PetscInt num_flow_comp    = 3;  // NOTE: SWE assumed!
-  PetscInt num_tracers_comp = config.physics.sediment.num_classes;
+  PetscInt num_tracers_comp = NumTracers(&config);
 
   TracerSourceHROperator* source_op;
   PetscCall(PetscCalloc1(1, &source_op));
   *source_op = (TracerSourceHROperator){
-      .mesh             = mesh,
-      .num_flow_comp    = num_flow_comp,
-      .num_tracers_comp = num_tracers_comp,
-      .external_sources = external_sources,
-      .mannings         = mannings,
-      .tiny_h           = config.physics.flow.tiny_h,
-      .xq2018_threshold = config.physics.flow.source.xq2018_threshold,
+      .mesh              = mesh,
+      .num_flow_comp     = num_flow_comp,
+      .num_sediment_comp = config.physics.sediment.num_classes,
+      .num_tracers_comp  = num_tracers_comp,
+      .external_sources  = external_sources,
+      .mannings          = mannings,
+      .tiny_h            = config.physics.flow.tiny_h,
+      .xq2018_threshold  = config.physics.flow.source.xq2018_threshold,
   };
 
   MPI_Comm comm;

@@ -3,6 +3,7 @@
 
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
+#include <petscsnes.h>
 #include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdydmimpl.h>
@@ -112,6 +113,8 @@ struct _RDyOps {
 // class ID for PETSc logging events
 extern PetscClassId RDY_CLASSID;
 
+typedef struct _RDyHeat* RDyHeat;
+
 // an application context that stores data relevant to a simulation
 struct _p_RDy {
   PETSCHEADER(struct _RDyOps);
@@ -209,6 +212,12 @@ struct _p_RDy {
 
   // time₋stepping solver
   TS ts;
+
+  // PETSc-only heat source correction
+  SNES    heat_snes;
+  Mat     heat_jac;
+  Vec     heat_residual;
+  RDyHeat heat_context;
 
   // host solution vectors (global and local)
   Vec u_global, u_local;

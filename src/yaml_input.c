@@ -621,6 +621,7 @@ static const cyaml_schema_value_t salinity_condition_entry = {
 //   downwelling_longwave: <value>      # downwelling longwave radiation (W/m²)
 //   wind_speed: <value>                # wind speed (m/s)
 //   air_temperature: <value>           # air temperature (°C)
+//   specific_humidity: <value>         # specific humidity (kg/kg)
 
 // schema for heat condition fields
 static const cyaml_schema_field_t heat_condition_fields_schema[] = {
@@ -631,6 +632,7 @@ static const cyaml_schema_field_t heat_condition_fields_schema[] = {
     CYAML_FIELD_STRING("downwelling_longwave",  CYAML_FLAG_OPTIONAL, RDyHeatCondition, downwelling_longwave_expression, 0),
     CYAML_FIELD_STRING("wind_speed",            CYAML_FLAG_OPTIONAL, RDyHeatCondition, wind_speed_expression, 0),
     CYAML_FIELD_STRING("air_temperature",       CYAML_FLAG_OPTIONAL, RDyHeatCondition, air_temperature_expression, 0),
+    CYAML_FIELD_STRING("specific_humidity",     CYAML_FLAG_OPTIONAL, RDyHeatCondition, specific_humidity_expression, 0),
     CYAML_FIELD_STRING("file",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, file, 1),
     CYAML_FIELD_ENUM("format",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -1121,6 +1123,25 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
     PetscCheck(sal_cond->expression[0], comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s", sal_cond->name);
   }
 
+  // validate heat conditions
+  for (PetscInt i = 0; i < config->num_heat_conditions; ++i) {
+    const RDyHeatCondition* heat_cond = &config->heat_conditions[i];
+    PetscCheck(heat_cond->type >= 0, comm, PETSC_ERR_USER, "Heat condition type not set in heat_conditions.%s", heat_cond->name);
+    if (heat_cond->type == CONDITION_RUNOFF) {
+      PetscCheck(heat_cond->downwelling_shortwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_shortwave for heat_conditions.%s",
+                 heat_cond->name);
+      PetscCheck(heat_cond->downwelling_longwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_longwave for heat_conditions.%s",
+                 heat_cond->name);
+      PetscCheck(heat_cond->wind_speed_expression[0], comm, PETSC_ERR_USER, "Missing wind_speed for heat_conditions.%s", heat_cond->name);
+      PetscCheck(heat_cond->air_temperature_expression[0], comm, PETSC_ERR_USER, "Missing air_temperature for heat_conditions.%s", heat_cond->name);
+      PetscCheck(heat_cond->specific_humidity_expression[0], comm, PETSC_ERR_USER, "Missing specific_humidity for heat_conditions.%s",
+                 heat_cond->name);
+    } else if (heat_cond->type == CONDITION_DIRICHLET) {
+      PetscCheck(heat_cond->water_temperature_expression[0] || heat_cond->file[0], comm, PETSC_ERR_USER,
+                 "Missing water_temperature for heat_conditions.%s", heat_cond->name);
+    }
+  }
+
   // validate output options
   if (config->output.format != OUTPUT_NONE || config->output.output_interval > 0 || config->output.time_interval > 0) {
     config->output.enable           = PETSC_TRUE;
@@ -1158,23 +1179,35 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
           "Height",
           "MomentumX",
           "MomentumY",
+          "Salinity",
+          "Temperature",
+          "HeatMassPerUnitArea",
           "WaterSource",
           "MomentumXSource",
           "MomentumYSource",
+          "SalinitySource",
+          "HeatSource",
           // solution mean fields
           "Height_Mean",
           "MomentumX_Mean",
           "MomentumY_Mean",
+          "Salinity_Mean",
+          "HeatMassPerUnitArea_Mean",
           // primitive variable mean fields
           "VelocityX_Mean",
           "VelocityY_Mean",
+          "SalinityConcentration_Mean",
+          "Temperature_Mean",
           // primitive variable instantaneous fields (Height excluded — comes from u_global)
           "VelocityX",
           "VelocityY",
+          "SalinityConcentration",
           // source mean fields
           "WaterSource_Mean",
           "MomentumXSource_Mean",
           "MomentumYSource_Mean",
+          "SalinitySource_Mean",
+          "HeatSource_Mean",
           NULL,
       };
       // indexed fields: validated by substituting [0, num_configured_classes)
@@ -1431,6 +1464,10 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig* config) {
     if (heat_cond->air_temperature_expression[0]) {
       heat_cond->air_temperature = mupCreate(muBASETYPE_FLOAT);
       mupSetExpr(heat_cond->air_temperature, heat_cond->air_temperature_expression);
+    }
+    if (heat_cond->specific_humidity_expression[0]) {
+      heat_cond->specific_humidity = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->specific_humidity, heat_cond->specific_humidity_expression);
     }
   }
 
@@ -1750,6 +1787,7 @@ static PetscErrorCode PrintPhysics(RDy rdy) {
   RDyLogDetail(rdy, "  Flow:");
   RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment.num_classes > 0));
   RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
+  RDyLogDetail(rdy, "  Heat model: %s", FlagString(rdy->config.physics.heat));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1961,6 +1999,7 @@ PetscErrorCode DestroyConfig(RDy rdy) {
     if (heat_cond->downwelling_longwave) mupRelease(heat_cond->downwelling_longwave);
     if (heat_cond->wind_speed) mupRelease(heat_cond->wind_speed);
     if (heat_cond->air_temperature) mupRelease(heat_cond->air_temperature);
+    if (heat_cond->specific_humidity) mupRelease(heat_cond->specific_humidity);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

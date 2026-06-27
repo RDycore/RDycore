@@ -70,6 +70,7 @@ static PetscErrorCode CreateSequentialVector(MPI_Comm comm, PetscInt size, Petsc
   PetscCall(VecSetBlockSize(*vec, block_size));
   PetscCall(VecSetType(*vec, seq_vec_type));
   PetscCall(VecSetUp(*vec));
+  PetscCall(VecZeroEntries(*vec));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

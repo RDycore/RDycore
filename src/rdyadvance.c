@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdyheatimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <rdycore.h>
 #include <string.h>
@@ -362,6 +363,12 @@ PetscErrorCode RDyAdvance(RDy rdy) {
     PetscCall(TSSolve(rdy->ts, rdy->u_global));
   }
   PetscPreLoadEnd();
+
+  if (rdy->config.physics.heat) {
+    PetscCall(RDyHeatCaptureStarState(rdy));
+    PetscCall(RDyHeatUpdateForcing(rdy, time));
+    PetscCall(SNESSolve(rdy->heat_snes, NULL, rdy->u_global));
+  }
 
   if (time_adapt->enable) {
     OperatorDiagnostics diagnostics;

@@ -1,5 +1,6 @@
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
+#include <private/rdyheatimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
 #include <rdycore.h>
@@ -195,6 +196,10 @@ PetscErrorCode RDyDestroyVectors(RDy* rdy) {
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
+  if ((*rdy)->flow_global_vec && (*rdy)->flow_global_vec != (*rdy)->u_global) PetscCall(VecDestroy(&(*rdy)->flow_global_vec));
+  if ((*rdy)->flow_local_vec && (*rdy)->flow_local_vec != (*rdy)->u_local) PetscCall(VecDestroy(&(*rdy)->flow_local_vec));
+  if ((*rdy)->tracer_global_vec) PetscCall(VecDestroy(&(*rdy)->tracer_global_vec));
+  if ((*rdy)->tracer_local_vec) PetscCall(VecDestroy(&(*rdy)->tracer_local_vec));
   // soln_output.petsc_accum is the only RDy-owned output Vec; all other output
   // vecs are non-owning references into Operator-owned vectors.
   if ((*rdy)->soln_output.petsc_accum) PetscCall(VecDestroy(&(*rdy)->soln_output.petsc_accum));
@@ -259,6 +264,7 @@ PetscErrorCode RDyDestroy(RDy* rdy) {
 
   // destroy solver
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
+  PetscCall(RDyHeatDestroy(*rdy));
 
   PetscCall(RDyDestroyVectors(rdy));
 
@@ -274,6 +280,8 @@ PetscErrorCode RDyDestroy(RDy* rdy) {
 
   // destroy DMs
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
+  if ((*rdy)->flow_dm && (*rdy)->flow_dm != (*rdy)->dm) DMDestroy(&((*rdy)->flow_dm));
+  if ((*rdy)->tracer_dm) DMDestroy(&((*rdy)->tracer_dm));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
   if ((*rdy)->amr.num_refinements) {

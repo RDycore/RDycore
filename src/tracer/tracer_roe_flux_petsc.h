@@ -46,6 +46,12 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData* datal, Tracer
   PetscReal FR[MAX_NUM_FIELD_COMPONENTS]                          = {0};
 
   for (PetscInt i = 0; i < num_states; ++i) {
+    if (hl[i] <= 0.0 && hr[i] <= 0.0) {
+      for (PetscInt j = 0; j < soln_ncomp; j++) fij[soln_ncomp * i + j] = 0.0;
+      amax[i] = 0.0;
+      continue;
+    }
+
     // compute the eigenspectrum for the shallow water equations
     PetscReal A_swe[3], R_swe[3][3], dW_swe[3], amax_swe;
     ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A_swe, R_swe, dW_swe, &amax_swe);
@@ -154,6 +160,12 @@ static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData* datal, 
   PetscReal FR[MAX_NUM_FIELD_COMPONENTS] = {0};
 
   for (PetscInt i = 0; i < num_states; ++i) {
+    if (hl[i] <= 0.0 && hr[i] <= 0.0) {
+      for (PetscInt j = 0; j < soln_ncomp; j++) fij[soln_ncomp * i + j] = 0.0;
+      amax[i] = 0.0;
+      continue;
+    }
+
     // compute the eigenspectrum for the shallow water equations
     PetscReal A_swe[3], R_swe[3][3], dW_swe[3], amax_swe;
     ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A_swe, R_swe, dW_swe, &amax_swe);

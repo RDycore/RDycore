@@ -177,6 +177,9 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
 
+  PetscCheck(!(rdy->config.physics.heat && CeedEnabled()), rdy->comm, PETSC_ERR_USER,
+             "heat equation support is currently implemented only for the PETSc backend");
+
   // set names of solution components
   PetscStrncpy(mms_comp_names[0], " h ", MAX_NAME_LEN);
   PetscStrncpy(mms_comp_names[1], "hu ", MAX_NAME_LEN);
@@ -781,7 +784,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       RDyHeatCondition* heat_bc = rdy->boundary_conditions[b].heat;
       PetscCall(EvaluateTemporalSolution(heat_bc->water_temperature, num_edges, x, y, time, T));
       for (PetscInt e = 0; e < num_edges; ++e) {
-        temperature_boundary_values[e] = h[e] * T[e];
+        temperature_boundary_values[e] = T[e];
       }
       PetscCall(RDySetHeatDirichletBoundaryValues(rdy, b, num_edges, temperature_boundary_values));
       PetscCall(PetscFree(temperature_boundary_values));

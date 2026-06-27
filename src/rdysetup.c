@@ -4,6 +4,7 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdyheatimpl.h>
 #include <private/rdyoperatorimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()
@@ -20,6 +21,10 @@ static const PetscReal mins_in_hr  = 60.0;
 static const PetscReal hrs_in_day  = 24.0;
 static const PetscReal days_in_mon = 30.0;
 static const PetscReal days_in_yr  = 365.0;
+
+static PetscInt SalinityTracerOffset(const RDyConfig* config) { return config->physics.sediment.num_classes; }
+
+static PetscInt HeatTracerOffset(const RDyConfig* config) { return config->physics.sediment.num_classes + (config->physics.salinity ? 1 : 0); }
 
 /// Returns a string corresponding to the given time unit
 const char* TimeUnitAsString(RDyTimeUnit time_unit) {
@@ -645,7 +650,9 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
       PetscInt heat_index;
       PetscCall(FindHeatCondition(rdy, ic_spec.heat, &heat_index));
       RDyHeatCondition* heat_cond = &rdy->config.heat_conditions[heat_index];
-      ic->heat                    = heat_cond;
+      PetscCheck(heat_cond->type == CONDITION_DIRICHLET, rdy->comm, PETSC_ERR_USER,
+                 "initial heat condition '%s' for region '%s' is not of dirichlet type!", heat_cond->name, region.name);
+      ic->heat = heat_cond;
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -655,7 +662,7 @@ static PetscErrorCode InitInitialConditions(RDy rdy) {
 //   can be run after refinement
 static PetscErrorCode InitSources(RDy rdy) {
   PetscFunctionBegin;
-  if (rdy->config.num_sources > 0) {
+  if (rdy->config.num_sources > 0 || rdy->config.physics.heat) {
     // allocate storage for sources
     PetscCall(PetscCalloc1(rdy->num_regions, &rdy->sources));
 
@@ -699,6 +706,19 @@ static PetscErrorCode InitSources(RDy rdy) {
                      region.name);
           src->heat = &rdy->config.heat_conditions[heat_index];
         }
+      }
+      if (rdy->config.physics.heat) {
+        PetscCheck(src->heat, rdy->comm, PETSC_ERR_USER, "Region '%s' has no heat source condition!", region.name);
+        PetscCheck(src->heat->downwelling_shortwave, rdy->comm, PETSC_ERR_USER,
+                   "Heat source condition '%s' for region '%s' is missing downwelling_shortwave", src->heat->name, region.name);
+        PetscCheck(src->heat->downwelling_longwave, rdy->comm, PETSC_ERR_USER,
+                   "Heat source condition '%s' for region '%s' is missing downwelling_longwave", src->heat->name, region.name);
+        PetscCheck(src->heat->wind_speed, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing wind_speed",
+                   src->heat->name, region.name);
+        PetscCheck(src->heat->air_temperature, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing air_temperature",
+                   src->heat->name, region.name);
+        PetscCheck(src->heat->specific_humidity, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing specific_humidity",
+                   src->heat->name, region.name);
       }
     }
   }
@@ -954,6 +974,8 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
   PetscCall(VecGetBlockSize(rdy->tracer_global_vec, &ndof));
   PetscScalar* u_ptr;
   PetscCall(VecGetArray(rdy->tracer_global_vec, &u_ptr));
+  const PetscScalar* flow_ptr;
+  PetscCall(VecGetArrayRead(rdy->flow_global_vec, &flow_ptr));
 
   // initialize sediment conditions one size class at a time
   PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
@@ -995,77 +1017,87 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
     }
   }
 
-  // initialize salinity conditions
-  for (PetscInt f = 0; f < rdy->config.num_salinity_conditions; ++f) {
-    RDySalinityCondition salinity_ic = rdy->config.salinity_conditions[f];
-    Vec                  local       = NULL;
-    if (salinity_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, &local));
-    }
+  if (rdy->config.physics.salinity) {
+    // initialize salinity conditions
+    for (PetscInt f = 0; f < rdy->config.num_salinity_conditions; ++f) {
+      RDySalinityCondition salinity_ic = rdy->config.salinity_conditions[f];
+      Vec                  local       = NULL;
+      if (salinity_ic.file[0]) {  // read from file
+        PetscCall(ReadSingleComponentFromFile(rdy, salinity_ic.file, &local));
+      }
 
-    // overwrite regions as needed
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyRegion    region = rdy->regions[r];
-      RDyCondition ic     = rdy->initial_conditions[r];
-      if (!strcmp(ic.salinity->name, salinity_ic.name)) {
-        if (local) {  // reading from file
-          PetscScalar* local_ptr;
-          PetscCall(VecGetArray(local, &local_ptr));
-          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
-            PetscInt cell_local_id = region.cell_local_ids[c];
-            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
-            if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-              PetscInt idof                      = num_sediment_classes;
-              u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+      // overwrite regions as needed
+      for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+        RDyRegion    region = rdy->regions[r];
+        RDyCondition ic     = rdy->initial_conditions[r];
+        if (!strcmp(ic.salinity->name, salinity_ic.name)) {
+          if (local) {  // reading from file
+            PetscScalar* local_ptr;
+            PetscCall(VecGetArray(local, &local_ptr));
+            for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+              PetscInt cell_local_id = region.cell_local_ids[c];
+              PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+              if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
+                PetscInt idof                      = SalinityTracerOffset(&rdy->config);
+                u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+              }
             }
-          }
-          PetscCall(VecRestoreArray(local, &local_ptr));
-          PetscCall(VecDestroy(&local));
-        } else {
-          for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-            PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
-            u_ptr[ndof * owned_cell_id] = mupEval(salinity_ic.concentration);
+            PetscCall(VecRestoreArray(local, &local_ptr));
+            PetscCall(VecDestroy(&local));
+          } else {
+            for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+              PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
+              PetscInt idof                      = SalinityTracerOffset(&rdy->config);
+              u_ptr[ndof * owned_cell_id + idof] = mupEval(salinity_ic.concentration);
+            }
           }
         }
       }
     }
   }
 
-  // initialize heat conditions
-  for (PetscInt f = 0; f < rdy->config.num_heat_conditions; ++f) {
-    RDyHeatCondition heat_ic = rdy->config.heat_conditions[f];
-    Vec              local   = NULL;
-    if (heat_ic.file[0]) {  // read from file
-      PetscCall(ReadSingleComponentFromFile(rdy, heat_ic.file, &local));
-    }
+  if (rdy->config.physics.heat) {
+    // initialize heat conditions
+    for (PetscInt f = 0; f < rdy->config.num_heat_conditions; ++f) {
+      RDyHeatCondition heat_ic = rdy->config.heat_conditions[f];
+      Vec              local   = NULL;
+      if (heat_ic.file[0]) {  // read from file
+        PetscCall(ReadSingleComponentFromFile(rdy, heat_ic.file, &local));
+      }
 
-    // overwrite regions as needed
-    for (PetscInt r = 0; r < rdy->num_regions; ++r) {
-      RDyRegion    region = rdy->regions[r];
-      RDyCondition ic     = rdy->initial_conditions[r];
-      if (!strcmp(ic.heat->name, heat_ic.name)) {
-        if (local) {
-          PetscScalar* local_ptr;
-          PetscCall(VecGetArray(local, &local_ptr));
-          for (PetscInt c = 0; c < region.num_local_cells; ++c) {
-            PetscInt cell_local_id = region.cell_local_ids[c];
-            PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
-            if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
-              PetscInt idof                      = num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0);
-              u_ptr[ndof * owned_cell_id + idof] = local_ptr[cell_local_id];
+      // overwrite regions as needed
+      for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+        RDyRegion    region = rdy->regions[r];
+        RDyCondition ic     = rdy->initial_conditions[r];
+        if (!strcmp(ic.heat->name, heat_ic.name)) {
+          if (local) {
+            PetscScalar* local_ptr;
+            PetscCall(VecGetArray(local, &local_ptr));
+            for (PetscInt c = 0; c < region.num_local_cells; ++c) {
+              PetscInt cell_local_id = region.cell_local_ids[c];
+              PetscInt owned_cell_id = rdy->mesh.cells.local_to_owned[cell_local_id];
+              if (rdy->mesh.cells.is_owned[cell_local_id]) {  // skip ghost cells
+                PetscInt  idof                     = HeatTracerOffset(&rdy->config);
+                PetscReal h                        = flow_ptr[flow_ndof * owned_cell_id];
+                u_ptr[ndof * owned_cell_id + idof] = h * local_ptr[cell_local_id];
+              }
             }
-          }
-          PetscCall(VecRestoreArray(local, &local_ptr));
-          PetscCall(VecDestroy(&local));
-        } else {
-          for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-            PetscInt owned_cell_id      = region.owned_cell_global_ids[c];
-            u_ptr[ndof * owned_cell_id] = mupEval(heat_ic.water_temperature);
+            PetscCall(VecRestoreArray(local, &local_ptr));
+            PetscCall(VecDestroy(&local));
+          } else {
+            for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+              PetscInt  owned_cell_id            = region.owned_cell_global_ids[c];
+              PetscInt  idof                     = HeatTracerOffset(&rdy->config);
+              PetscReal h                        = flow_ptr[flow_ndof * owned_cell_id];
+              u_ptr[ndof * owned_cell_id + idof] = h * mupEval(heat_ic.water_temperature);
+            }
           }
         }
       }
     }
   }
+
+  PetscCall(VecRestoreArrayRead(rdy->flow_global_vec, &flow_ptr));
 
   // copy tracer data into the global solution vector
   for (PetscInt i = 0; i < tracer_ndof; i++) {
@@ -1248,6 +1280,15 @@ PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
           boundary_values[3 * e + 2] = mupEval(flow_bc->y_momentum);
         }
         PetscCall(RDySetFlowDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, 3, boundary_values));
+        if (rdy->config.physics.heat && boundary_cond.heat && boundary_cond.heat->type == CONDITION_DIRICHLET) {
+          PetscReal* heat_values;
+          PetscCall(PetscCalloc1(boundary.num_edges, &heat_values));
+          for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+            heat_values[e] = mupEval(boundary_cond.heat->water_temperature);
+          }
+          PetscCall(RDySetHeatDirichletBoundaryValues(rdy, boundary.index, boundary.num_edges, heat_values));
+          PetscCall(PetscFree(heat_values));
+        }
         break;
       case CONDITION_REFLECTING:
         break;
@@ -1409,6 +1450,9 @@ PetscErrorCode RDySetup(RDy rdy) {
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
 
+  PetscCheck(!(rdy->config.physics.heat && CeedEnabled()), rdy->comm, PETSC_ERR_USER,
+             "heat equation support is currently implemented only for the PETSc backend");
+
   // print configuration info
   PetscCall(PrintConfig(rdy));
 
@@ -1428,7 +1472,12 @@ PetscErrorCode RDySetup(RDy rdy) {
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
     snprintf(rdy->soln_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT, i);
   }
-  // TODO: salinity and heat go here
+  if (rdy->config.physics.salinity) {
+    snprintf(rdy->soln_fields.field_component_names[0][3 + SalinityTracerOffset(&rdy->config)], MAX_NAME_LEN, "Salinity");
+  }
+  if (rdy->config.physics.heat) {
+    snprintf(rdy->soln_fields.field_component_names[0][3 + HeatTracerOffset(&rdy->config)], MAX_NAME_LEN, "HeatMassPerUnitArea");
+  }
 
   // set up solution time-averaged field spec
   rdy->soln_output.avg_fields.num_fields              = 1;
@@ -1439,6 +1488,12 @@ PetscErrorCode RDySetup(RDy rdy) {
   strcpy(rdy->soln_output.avg_fields.field_component_names[0][2], "MomentumY_Mean");
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
     snprintf(rdy->soln_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean", i);
+  }
+  if (rdy->config.physics.salinity) {
+    snprintf(rdy->soln_output.avg_fields.field_component_names[0][3 + SalinityTracerOffset(&rdy->config)], MAX_NAME_LEN, "Salinity_Mean");
+  }
+  if (rdy->config.physics.heat) {
+    snprintf(rdy->soln_output.avg_fields.field_component_names[0][3 + HeatTracerOffset(&rdy->config)], MAX_NAME_LEN, "HeatMassPerUnitArea_Mean");
   }
   rdy->soln_output.skip_first_component = PETSC_FALSE;
 
@@ -1452,6 +1507,13 @@ PetscErrorCode RDySetup(RDy rdy) {
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
     snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT "_Mean", i);
   }
+  if (rdy->config.physics.salinity) {
+    snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + SalinityTracerOffset(&rdy->config)], MAX_NAME_LEN,
+             "SalinityConcentration_Mean");
+  }
+  if (rdy->config.physics.heat) {
+    snprintf(rdy->prim_vars_output.avg_fields.field_component_names[0][3 + HeatTracerOffset(&rdy->config)], MAX_NAME_LEN, "Temperature_Mean");
+  }
 
   // set up primitive variables field spec for instantaneous output
   rdy->prim_vars_output.inst_fields.num_fields              = 1;
@@ -1463,11 +1525,18 @@ PetscErrorCode RDySetup(RDy rdy) {
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
     snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentConcentration%" PetscInt_FMT, i);
   }
+  if (rdy->config.physics.salinity) {
+    snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + SalinityTracerOffset(&rdy->config)], MAX_NAME_LEN,
+             "SalinityConcentration");
+  }
+  if (rdy->config.physics.heat) {
+    snprintf(rdy->prim_vars_output.inst_fields.field_component_names[0][3 + HeatTracerOffset(&rdy->config)], MAX_NAME_LEN, "Temperature");
+  }
   rdy->prim_vars_output.skip_first_component = PETSC_TRUE;
 
   // set up source output field specs (instantaneous and time-averaged)
   {
-    PetscInt num_src_comp                               = 3 + rdy->config.physics.sediment.num_classes;
+    PetscInt num_src_comp                               = 3 + rdy->num_tracers;
     rdy->src_output.inst_fields.num_fields              = 1;
     rdy->src_output.inst_fields.num_field_components[0] = num_src_comp;
     strcpy(rdy->src_output.inst_fields.field_names[0], "Sources");
@@ -1476,6 +1545,12 @@ PetscErrorCode RDySetup(RDy rdy) {
     strcpy(rdy->src_output.inst_fields.field_component_names[0][2], "MomentumYSource");
     for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
       snprintf(rdy->src_output.inst_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source", i);
+    }
+    if (rdy->config.physics.salinity) {
+      snprintf(rdy->src_output.inst_fields.field_component_names[0][3 + SalinityTracerOffset(&rdy->config)], MAX_NAME_LEN, "SalinitySource");
+    }
+    if (rdy->config.physics.heat) {
+      snprintf(rdy->src_output.inst_fields.field_component_names[0][3 + HeatTracerOffset(&rdy->config)], MAX_NAME_LEN, "HeatSource");
     }
 
     rdy->src_output.avg_fields.num_fields              = 1;
@@ -1486,6 +1561,12 @@ PetscErrorCode RDySetup(RDy rdy) {
     strcpy(rdy->src_output.avg_fields.field_component_names[0][2], "MomentumYSource_Mean");
     for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
       snprintf(rdy->src_output.avg_fields.field_component_names[0][3 + i], MAX_NAME_LEN, "SedimentMassPerUnitArea%" PetscInt_FMT "Source_Mean", i);
+    }
+    if (rdy->config.physics.salinity) {
+      snprintf(rdy->src_output.avg_fields.field_component_names[0][3 + SalinityTracerOffset(&rdy->config)], MAX_NAME_LEN, "SalinitySource_Mean");
+    }
+    if (rdy->config.physics.heat) {
+      snprintf(rdy->src_output.avg_fields.field_component_names[0][3 + HeatTracerOffset(&rdy->config)], MAX_NAME_LEN, "HeatSource_Mean");
     }
   }
   rdy->src_output.skip_first_component = PETSC_FALSE;
@@ -1503,7 +1584,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   rdy->amr.dm_base      = rdy->dm;
   rdy->amr.dm_1dof_base = rdy->dm_1dof;
 
-  if (rdy->config.physics.sediment.num_classes) {
+  if (rdy->num_tracers > 0) {
     PetscCall(CreateFlowDM(rdy));
     PetscCall(CreateTracerDM(rdy));
   } else {
@@ -1540,6 +1621,11 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Initializing operator...");
   PetscCall(InitOperator(rdy));
+
+  if (rdy->config.physics.heat) {
+    RDyLogDebug(rdy, "Initializing PETSc heat source correction...");
+    PetscCall(RDyHeatCreate(rdy));
+  }
 
   // Wire OutputVar references to Operator-owned vectors (must happen after InitOperator).
   {

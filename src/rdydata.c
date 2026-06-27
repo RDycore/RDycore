@@ -152,6 +152,7 @@ PetscErrorCode RDySetHeatDirichletBoundaryValues(RDy rdy, const PetscInt boundar
   PetscFunctionBegin;
 
   PetscCheck(rdy->config.physics.heat, rdy->comm, PETSC_ERR_USER, "Trying to set heat dirichlet values, but heat transfer is disabled");
+  PetscCheck(!CeedEnabled(), rdy->comm, PETSC_ERR_USER, "Heat boundary values are currently supported only with the PETSc backend");
   PetscCall(CheckBoundaryParameters(rdy, boundary_index, num_edges));
 
   RDyBoundary  boundary      = rdy->boundaries[boundary_index];
@@ -163,7 +164,22 @@ PetscErrorCode RDySetHeatDirichletBoundaryValues(RDy rdy, const PetscInt boundar
   PetscInt num_classes = rdy->config.physics.sediment.num_classes;
   PetscInt comp_offset = 3 + num_classes + (rdy->config.physics.salinity ? 1 : 0);
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Extend the code to set offset correctly");
-  PetscCall(SetOperatorBoundaryValues(rdy->operator, boundary, comp_offset, 1, num_edges, values));
+
+  Vec      boundary_values = rdy->operator->petsc.boundary_values[boundary_index];
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(boundary_values, &ndof));
+  const PetscScalar* boundary_values_ptr;
+  PetscCall(VecGetArrayRead(boundary_values, &boundary_values_ptr));
+  PetscReal* hT_values;
+  PetscCall(PetscCalloc1(num_edges, &hT_values));
+  for (PetscInt e = 0; e < num_edges; ++e) {
+    PetscReal h  = boundary_values_ptr[ndof * e];
+    hT_values[e] = h * values[e];
+  }
+  PetscCall(VecRestoreArrayRead(boundary_values, &boundary_values_ptr));
+
+  PetscCall(SetOperatorBoundaryValues(rdy->operator, boundary, comp_offset, 1, num_edges, hT_values));
+  PetscCall(PetscFree(hT_values));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

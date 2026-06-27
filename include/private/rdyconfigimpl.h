@@ -391,11 +391,13 @@ typedef struct {
   MathExpression    downwelling_longwave_expression;   // expression for downwelling longwave radiation
   MathExpression    wind_speed_expression;             // expression for wind speed
   MathExpression    air_temperature_expression;        // expression for air temperature
+  MathExpression    specific_humidity_expression;      // expression for specific humidity
   void*             water_temperature;                 // muparser-backed functional form
   void*             downwelling_shortwave;             // muparser-backed functional form
   void*             downwelling_longwave;              // muparser-backed functional form
   void*             wind_speed;                        // muparser-backed functional form
   void*             air_temperature;                   // muparser-backed functional form
+  void*             specific_humidity;                 // muparser-backed functional form
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyHeatCondition;
