@@ -5,23 +5,6 @@
 #include <private/rdyheatimpl.h>
 #include <private/rdymathimpl.h>
 
-typedef struct {
-  PetscReal* downwelling_shortwave;
-  PetscReal* downwelling_longwave;
-  PetscReal* wind_speed;
-  PetscReal* air_temperature;
-  PetscReal* specific_humidity;
-} RDyHeatForcing;
-
-struct _RDyHeat {
-  RDyMesh*       mesh;
-  RDyConfig*     config;
-  PetscInt       heat_comp;
-  PetscReal      dt;
-  Vec            star_state;
-  RDyHeatForcing forcing;
-};
-
 static const PetscReal WATER_ALBEDO             = 0.08;
 static const PetscReal WATER_EMISSIVITY         = 0.97;
 static const PetscReal STEFAN_BOLTZMANN         = 5.670374419e-8;
