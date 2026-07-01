@@ -12,6 +12,7 @@ typedef struct {
   PetscReal* wind_speed;
   PetscReal* air_temperature;
   PetscReal* specific_humidity;
+  PetscReal* direct_source;  // per-owned-cell direct Q_net override (W/m²); bypasses HeatQNet when use_direct_source is set
 } RDyHeatForcing;
 
 struct _RDyHeat {
@@ -21,6 +22,7 @@ struct _RDyHeat {
   PetscReal      dt;
   Vec            star_state;
   RDyHeatForcing forcing;
+  PetscBool      use_direct_source;  // when PETSC_TRUE, use direct_source instead of HeatQNet()
 };
 
 PETSC_INTERN PetscErrorCode RDyHeatCreate(RDy);

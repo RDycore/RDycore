@@ -633,6 +633,7 @@ static const cyaml_schema_field_t heat_condition_fields_schema[] = {
     CYAML_FIELD_STRING("wind_speed",            CYAML_FLAG_OPTIONAL, RDyHeatCondition, wind_speed_expression, 0),
     CYAML_FIELD_STRING("air_temperature",       CYAML_FLAG_OPTIONAL, RDyHeatCondition, air_temperature_expression, 0),
     CYAML_FIELD_STRING("specific_humidity",     CYAML_FLAG_OPTIONAL, RDyHeatCondition, specific_humidity_expression, 0),
+    CYAML_FIELD_STRING("heat_flux",             CYAML_FLAG_OPTIONAL, RDyHeatCondition, heat_flux_expression, 0),
     CYAML_FIELD_STRING("file",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, file, 1),
     CYAML_FIELD_ENUM("format",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
     CYAML_FIELD_END
@@ -743,6 +744,14 @@ static const cyaml_schema_field_t mms_sediment_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_schema_field_t mms_temperature_fields_schema[] = {
+    CYAML_FIELD_STRING("T",    CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.T,    0),
+    CYAML_FIELD_STRING("dTdx", CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.dTdx, 0),
+    CYAML_FIELD_STRING("dTdy", CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.dTdy, 0),
+    CYAML_FIELD_STRING("dTdt", CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.dTdt, 0),
+    CYAML_FIELD_END
+};
+
 static const cyaml_schema_field_t mms_error_norms_fields_schema[] = {
     CYAML_FIELD_FLOAT("L1", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, L1),
     CYAML_FIELD_FLOAT("L2", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, L2),
@@ -773,7 +782,7 @@ static const cyaml_schema_field_t mms_fields_schema[] = {
     CYAML_FIELD_MAPPING("swe", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_swe_fields_schema),
     CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyMMSSection, sediment, mms_sediment_fields_schema),
     CYAML_FIELD_MAPPING("salinity", CYAML_FLAG_OPTIONAL, RDyMMSSection, salinity, mms_sediment_fields_schema),
-    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSSection, temperature, mms_sediment_fields_schema),
+    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSSection, temperature, mms_temperature_fields_schema),
     CYAML_FIELD_MAPPING("convergence", CYAML_FLAG_OPTIONAL, RDyMMSSection, convergence, mms_convergence_fields_schema),
     CYAML_FIELD_END
 };
@@ -1128,14 +1137,28 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
     const RDyHeatCondition* heat_cond = &config->heat_conditions[i];
     PetscCheck(heat_cond->type >= 0, comm, PETSC_ERR_USER, "Heat condition type not set in heat_conditions.%s", heat_cond->name);
     if (heat_cond->type == CONDITION_RUNOFF) {
-      PetscCheck(heat_cond->downwelling_shortwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_shortwave for heat_conditions.%s",
-                 heat_cond->name);
-      PetscCheck(heat_cond->downwelling_longwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_longwave for heat_conditions.%s",
-                 heat_cond->name);
-      PetscCheck(heat_cond->wind_speed_expression[0], comm, PETSC_ERR_USER, "Missing wind_speed for heat_conditions.%s", heat_cond->name);
-      PetscCheck(heat_cond->air_temperature_expression[0], comm, PETSC_ERR_USER, "Missing air_temperature for heat_conditions.%s", heat_cond->name);
-      PetscCheck(heat_cond->specific_humidity_expression[0], comm, PETSC_ERR_USER, "Missing specific_humidity for heat_conditions.%s",
-                 heat_cond->name);
+      if (heat_cond->heat_flux_expression[0]) {
+        // heat_flux is an alternative to the 5-parameter atmospheric parameterization
+        PetscCheck(!heat_cond->downwelling_shortwave_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and downwelling_shortwave cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->downwelling_longwave_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and downwelling_longwave cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->wind_speed_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and wind_speed cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->air_temperature_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and air_temperature cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->specific_humidity_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and specific_humidity cannot both be specified for heat_conditions.%s", heat_cond->name);
+      } else {
+        PetscCheck(heat_cond->downwelling_shortwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_shortwave for heat_conditions.%s",
+                   heat_cond->name);
+        PetscCheck(heat_cond->downwelling_longwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_longwave for heat_conditions.%s",
+                   heat_cond->name);
+        PetscCheck(heat_cond->wind_speed_expression[0], comm, PETSC_ERR_USER, "Missing wind_speed for heat_conditions.%s", heat_cond->name);
+        PetscCheck(heat_cond->air_temperature_expression[0], comm, PETSC_ERR_USER, "Missing air_temperature for heat_conditions.%s", heat_cond->name);
+        PetscCheck(heat_cond->specific_humidity_expression[0], comm, PETSC_ERR_USER, "Missing specific_humidity for heat_conditions.%s",
+                   heat_cond->name);
+      }
     } else if (heat_cond->type == CONDITION_DIRICHLET) {
       PetscCheck(heat_cond->water_temperature_expression[0] || heat_cond->file[0], comm, PETSC_ERR_USER,
                  "Missing water_temperature for heat_conditions.%s", heat_cond->name);
@@ -1468,6 +1491,10 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig* config) {
     if (heat_cond->specific_humidity_expression[0]) {
       heat_cond->specific_humidity = mupCreate(muBASETYPE_FLOAT);
       mupSetExpr(heat_cond->specific_humidity, heat_cond->specific_humidity_expression);
+    }
+    if (heat_cond->heat_flux_expression[0]) {
+      heat_cond->heat_flux = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->heat_flux, heat_cond->heat_flux_expression);
     }
   }
 
@@ -2000,6 +2027,7 @@ PetscErrorCode DestroyConfig(RDy rdy) {
     if (heat_cond->wind_speed) mupRelease(heat_cond->wind_speed);
     if (heat_cond->air_temperature) mupRelease(heat_cond->air_temperature);
     if (heat_cond->specific_humidity) mupRelease(heat_cond->specific_humidity);
+    if (heat_cond->heat_flux) mupRelease(heat_cond->heat_flux);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -398,6 +398,8 @@ typedef struct {
   void*             wind_speed;                        // muparser-backed functional form
   void*             air_temperature;                   // muparser-backed functional form
   void*             specific_humidity;                 // muparser-backed functional form
+  MathExpression    heat_flux_expression;              // expression for direct heat flux (W/m²), alternative to atm params
+  void*             heat_flux;                         // muparser-backed functional form for heat_flux
   char              file[PETSC_MAX_PATH_LEN];
   PetscViewerFormat format;
 } RDyHeatCondition;

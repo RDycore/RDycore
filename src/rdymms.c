@@ -7,14 +7,16 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdyheatimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdyoperatorimpl.h>
 
 #include "petscstring.h"
 #include "private/config.h"
 
-static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
-static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
+static const PetscReal GRAVITY            = 9.806;   // gravitational acceleration [m/s^2]
+static const PetscReal DENSITY_OF_WATER   = 1000.0;  // [kg/m^3]
+static const PetscReal SPECIFIC_HEAT_OF_WATER = 4186.0;  // [J/(kg·K)]
 
 // NOTE: our boundary conditions are expressed in terms of momenta and not flow
 // velocities, so we have to chain together a few things to evaluate x and y
@@ -148,6 +150,20 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t + 0.5 * dt));
   PetscCall(RDyMMSComputeSourceTerms(rdy, t + 0.5 * dt));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// TS post-step callback for MMS heat: runs the SNES heat source step after each TS advance.
+// direct_source[] must already have been filled by MMSPreStep -> RDyMMSComputeSourceTerms.
+static PetscErrorCode MMSPostStep(TS ts) {
+  PetscFunctionBegin;
+  RDy rdy;
+  PetscCall(TSGetApplicationContext(ts, (void*)&rdy));
+  PetscCall(RDyHeatCaptureStarState(rdy));
+  PetscCall(RDyHeatUpdateForcing(rdy, 0.0));  // updates heat->dt from rdy->dt
+  PetscCall(SNESSolve(rdy->heat_snes, NULL, rdy->u_global));
+  // Reset flag so stale MMS forcing cannot leak into subsequent non-MMS calls
+  rdy->heat_context->use_direct_source = PETSC_FALSE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -342,6 +358,12 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
+
+  if (rdy->config.physics.heat) {
+    RDyLogDebug(rdy, "Initializing MMS heat SNES...");
+    PetscCall(RDyHeatCreate(rdy));
+    PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
+  }
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
@@ -674,7 +696,19 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdy, N, cell_x, cell_y, time, dTdy));
       PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdt, N, cell_x, cell_y, time, dTdt));
 
-      // TODO: heat transfer logic goes here!
+      // Compute Q_mms = rho_w * cp_w * [ h*dTdt + T*dhdt
+      //   + h*u*dTdx + T*h*dudx + T*u*dhdx
+      //   + h*v*dTdy + T*h*dvdy + T*v*dhdy ] per owned cell
+      // and supply it as direct_source to the SNES heat solver.
+      // No manufactured body force is injected into TSSolve (S_TS = 0 by algebraic cancellation).
+      RDyHeat heat = rdy->heat_context;
+      for (PetscInt i = 0; i < N; ++i) {
+        PetscReal Q_mms = DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER *
+                          (h[i] * dTdt[i] + T[i] * dhdt[i] + h[i] * u[i] * dTdx[i] + T[i] * h[i] * dudx[i] + T[i] * u[i] * dhdx[i] +
+                           h[i] * v[i] * dTdy[i] + T[i] * h[i] * dvdy[i] + T[i] * v[i] * dhdy[i]);
+        heat->forcing.direct_source[i] = Q_mms;
+      }
+      heat->use_direct_source = PETSC_TRUE;
 
       PetscCall(PetscFree(T));
       PetscCall(PetscFree(dTdx));
@@ -1041,13 +1075,29 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
       CheckConvergence(c[i], 3 + i, L2);
       CheckConvergence(c[i], 3 + i, Linf);
     }
+    // Check temperature convergence separately using the T expected rates
+    if (rdy->config.physics.heat) {
+      PetscInt heat_index = 3 + rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0);
+      CheckConvergence(T, heat_index, L1);
+      CheckConvergence(T, heat_index, L2);
+      CheckConvergence(T, heat_index, Linf);
+    }
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
     PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
 
     // run the problem to completion and print error norms
-    while (!RDyFinished(rdy)) {
-      PetscCall(RDyAdvance(rdy));
+    if (rdy->config.physics.heat) {
+      // For MMS heat runs, use TSSolve directly so MMSPostStep handles the SNES
+      // each TS step. Using RDyAdvance would trigger a duplicate SNES call.
+      PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.stop, rdy->config.time.unit);
+      PetscCall(TSSetMaxTime(rdy->ts, final_time));
+      PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
+      PetscCall(TSSolve(rdy->ts, rdy->u_global));
+    } else {
+      while (!RDyFinished(rdy)) {
+        PetscCall(RDyAdvance(rdy));
+      }
     }
 
     // compute error norms for the final solution

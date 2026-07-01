@@ -709,16 +709,19 @@ static PetscErrorCode InitSources(RDy rdy) {
       }
       if (rdy->config.physics.heat) {
         PetscCheck(src->heat, rdy->comm, PETSC_ERR_USER, "Region '%s' has no heat source condition!", region.name);
-        PetscCheck(src->heat->downwelling_shortwave, rdy->comm, PETSC_ERR_USER,
-                   "Heat source condition '%s' for region '%s' is missing downwelling_shortwave", src->heat->name, region.name);
-        PetscCheck(src->heat->downwelling_longwave, rdy->comm, PETSC_ERR_USER,
-                   "Heat source condition '%s' for region '%s' is missing downwelling_longwave", src->heat->name, region.name);
-        PetscCheck(src->heat->wind_speed, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing wind_speed",
-                   src->heat->name, region.name);
-        PetscCheck(src->heat->air_temperature, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing air_temperature",
-                   src->heat->name, region.name);
-        PetscCheck(src->heat->specific_humidity, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing specific_humidity",
-                   src->heat->name, region.name);
+        if (!src->heat->heat_flux) {
+          // No direct heat_flux override: require all 5 atmospheric parameters
+          PetscCheck(src->heat->downwelling_shortwave, rdy->comm, PETSC_ERR_USER,
+                     "Heat source condition '%s' for region '%s' is missing downwelling_shortwave", src->heat->name, region.name);
+          PetscCheck(src->heat->downwelling_longwave, rdy->comm, PETSC_ERR_USER,
+                     "Heat source condition '%s' for region '%s' is missing downwelling_longwave", src->heat->name, region.name);
+          PetscCheck(src->heat->wind_speed, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing wind_speed",
+                     src->heat->name, region.name);
+          PetscCheck(src->heat->air_temperature, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing air_temperature",
+                     src->heat->name, region.name);
+          PetscCheck(src->heat->specific_humidity, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing specific_humidity",
+                     src->heat->name, region.name);
+        }
       }
     }
   }

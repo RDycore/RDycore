@@ -82,8 +82,12 @@ static PetscErrorCode HeatResidual(SNES snes, Vec X, Vec F, void* ctx) {
       PetscReal h          = x[n_dof * owned_cell];
       if (h >= heat->config->physics.flow.tiny_h) {
         PetscReal hT = x[j];
-        PetscReal T  = hT / h;
-        f[j]         = hT - star[j] - heat->dt * HeatQNet(heat, owned_cell, T) / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
+        if (heat->use_direct_source) {
+          f[j] = hT - star[j] - heat->dt * heat->forcing.direct_source[owned_cell] / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
+        } else {
+          PetscReal T  = hT / h;
+          f[j]         = hT - star[j] - heat->dt * HeatQNet(heat, owned_cell, T) / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
+        }
       }
     }
   }
@@ -114,7 +118,7 @@ static PetscErrorCode HeatJacobian(SNES snes, Vec X, Mat J, Mat P, void* ctx) {
     if (comp == heat->heat_comp) {
       PetscInt  owned_cell = j / n_dof;
       PetscReal h          = x[n_dof * owned_cell];
-      if (h >= heat->config->physics.flow.tiny_h) {
+      if (h >= heat->config->physics.flow.tiny_h && !heat->use_direct_source) {
         PetscReal T  = x[j] / h;
         PetscReal dQ = DHeatQNetDTemperature(heat, owned_cell, T);
         diag         = 1.0 - heat->dt * dQ / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER * h);
@@ -138,10 +142,24 @@ static PetscErrorCode FillForcingFromSources(RDy rdy) {
   PetscFunctionBegin;
   RDyHeat heat = rdy->heat_context;
 
+  // In MMS mode, sources are not set up; nothing to do
+  if (!rdy->sources) PetscFunctionReturn(PETSC_SUCCESS);
+
   for (PetscInt r = 0; r < rdy->num_regions; ++r) {
     RDyRegion    region = rdy->regions[r];
     RDyCondition src    = rdy->sources[r];
     PetscCheck(src.heat, rdy->comm, PETSC_ERR_USER, "Region '%s' has no heat source condition!", region.name);
+
+    // If heat_flux is specified, use direct_source instead of the atmospheric parameterization
+    if (src.heat->heat_flux) {
+      PetscReal qnet = mupEval(src.heat->heat_flux);
+      for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+        PetscInt owned_cell                        = region.owned_cell_global_ids[c];
+        heat->forcing.direct_source[owned_cell]    = qnet;
+      }
+      heat->use_direct_source = PETSC_TRUE;
+      continue;
+    }
 
     PetscReal downwelling_shortwave = mupEval(src.heat->downwelling_shortwave);
     PetscReal downwelling_longwave  = mupEval(src.heat->downwelling_longwave);
@@ -183,6 +201,7 @@ PetscErrorCode RDyHeatCreate(RDy rdy) {
   PetscCall(PetscCalloc1(num_owned_cells, &heat->forcing.wind_speed));
   PetscCall(PetscCalloc1(num_owned_cells, &heat->forcing.air_temperature));
   PetscCall(PetscCalloc1(num_owned_cells, &heat->forcing.specific_humidity));
+  PetscCall(PetscCalloc1(num_owned_cells, &heat->forcing.direct_source));
   PetscCall(FillForcingFromSources(rdy));
 
   PetscCall(SNESCreate(rdy->comm, &rdy->heat_snes));
@@ -208,6 +227,7 @@ PetscErrorCode RDyHeatDestroy(RDy rdy) {
     PetscCall(PetscFree(heat->forcing.wind_speed));
     PetscCall(PetscFree(heat->forcing.air_temperature));
     PetscCall(PetscFree(heat->forcing.specific_humidity));
+    PetscCall(PetscFree(heat->forcing.direct_source));
     PetscCall(PetscFree(rdy->heat_context));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
