@@ -61,6 +61,15 @@ typedef enum {
   WELL_BALANCING_HR,        // hydrostatic reconstruction well-balancing
 } RDyWellBalanceMethod;
 
+// MUSCL slope limiter for second-order reconstruction.
+// MINMOD is the default (== 0) so an unspecified config preserves the historical
+// "limiter on" behavior; NONE disables limiting (pure linear extrapolation).
+typedef enum {
+  LIMITER_MINMOD = 0,  // minmod limiter (default when second_order is set)
+  LIMITER_NONE,        // no limiter: unlimited linear extrapolation
+  LIMITER_VANLEER,     // van Leer limiter (smooth, harmonic-mean TVD limiter)
+} RDyLimiterType;
+
 typedef struct {
   RDyFlowSourceMethod method;            // temporal discretization method for source term
   PetscReal           xq2018_threshold;  // threshold for the XQ2018's implicit time integration of source term
@@ -118,7 +127,8 @@ typedef struct {
   RDyNumericsTemporal temporal;
   RDyNumericsRiemann  riemann;
   PetscBool           second_order;  // enable MUSCL second-order reconstruction
-  PetscBool           no_limiter;    // disable the minmod slope limiter (limiter is on by default when second_order is set)
+  PetscBool           no_limiter;    // (deprecated) disable the slope limiter; equivalent to limiter = none
+  RDyLimiterType      limiter;       // MUSCL slope limiter (default minmod when second_order is set)
 } RDyNumericsSection;
 
 // ------------
