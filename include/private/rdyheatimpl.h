@@ -20,14 +20,12 @@ struct _RDyHeat {
   RDyConfig*     config;
   PetscInt       heat_comp;
   PetscReal      dt;
-  Vec            star_state;
   RDyHeatForcing forcing;
   PetscBool      use_direct_source;  // when PETSC_TRUE, use direct_source instead of HeatQNet()
 };
 
 PETSC_INTERN PetscErrorCode RDyHeatCreate(RDy);
 PETSC_INTERN PetscErrorCode RDyHeatDestroy(RDy);
-PETSC_INTERN PetscErrorCode RDyHeatCaptureStarState(RDy);
 PETSC_INTERN PetscErrorCode RDyHeatUpdateForcing(RDy, PetscReal);
 
 #endif

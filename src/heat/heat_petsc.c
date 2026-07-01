@@ -56,77 +56,80 @@ static PetscReal DHeatQNetDTemperature(RDyHeat heat, PetscInt owned_cell, PetscR
   return d_q_lw + d_q_sh + d_q_e;
 }
 
-static PetscErrorCode HeatResidual(SNES snes, Vec X, Vec F, void* ctx) {
+static PetscErrorCode HeatIFunction(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
+  (void)t;
   PetscFunctionBegin;
   RDy     rdy  = ctx;
   RDyHeat heat = rdy->heat_context;
 
   PetscInt n_dof;
-  PetscCall(VecGetBlockSize(X, &n_dof));
+  PetscCall(VecGetBlockSize(U, &n_dof));
   PetscInt start, end;
-  PetscCall(VecGetOwnershipRange(X, &start, &end));
+  PetscCall(VecGetOwnershipRange(U, &start, &end));
 
-  const PetscScalar *x, *star;
+  const PetscScalar *u, *udot;
   PetscScalar*       f;
-  PetscCall(VecGetArrayRead(X, &x));
-  PetscCall(VecGetArrayRead(heat->star_state, &star));
+  PetscCall(VecGetArrayRead(U, &u));
+  PetscCall(VecGetArrayRead(Udot, &udot));
   PetscCall(VecGetArray(F, &f));
 
   PetscInt n_local;
-  PetscCall(VecGetLocalSize(X, &n_local));
+  PetscCall(VecGetLocalSize(U, &n_local));
   for (PetscInt j = 0; j < n_local; ++j) {
     PetscInt comp = (start + j) % n_dof;
-    f[j]          = x[j] - star[j];
+    f[j]          = udot[j];
     if (comp == heat->heat_comp) {
       PetscInt  owned_cell = j / n_dof;
-      PetscReal h          = x[n_dof * owned_cell];
+      PetscReal h          = u[n_dof * owned_cell];
       if (h >= heat->config->physics.flow.tiny_h) {
-        PetscReal hT = x[j];
+        PetscReal hT = u[j];
         if (heat->use_direct_source) {
-          f[j] = hT - star[j] - heat->dt * heat->forcing.direct_source[owned_cell] / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
+          f[j] = udot[j] - heat->forcing.direct_source[owned_cell] / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
         } else {
-          PetscReal T  = hT / h;
-          f[j]         = hT - star[j] - heat->dt * HeatQNet(heat, owned_cell, T) / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
+          PetscReal T = hT / h;
+          f[j]        = udot[j] - HeatQNet(heat, owned_cell, T) / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
         }
       }
     }
   }
 
-  PetscCall(VecRestoreArrayRead(X, &x));
-  PetscCall(VecRestoreArrayRead(heat->star_state, &star));
+  PetscCall(VecRestoreArrayRead(U, &u));
+  PetscCall(VecRestoreArrayRead(Udot, &udot));
   PetscCall(VecRestoreArray(F, &f));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode HeatJacobian(SNES snes, Vec X, Mat J, Mat P, void* ctx) {
+static PetscErrorCode HeatIJacobian(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat P, void* ctx) {
+  (void)t;
+  (void)Udot;
   PetscFunctionBegin;
   RDy     rdy  = ctx;
   RDyHeat heat = rdy->heat_context;
 
   PetscInt n_dof, start, end;
-  PetscCall(VecGetBlockSize(X, &n_dof));
-  PetscCall(VecGetOwnershipRange(X, &start, &end));
+  PetscCall(VecGetBlockSize(U, &n_dof));
+  PetscCall(VecGetOwnershipRange(U, &start, &end));
 
-  const PetscScalar* x;
-  PetscCall(VecGetArrayRead(X, &x));
+  const PetscScalar* u;
+  PetscCall(VecGetArrayRead(U, &u));
 
   PetscCall(MatZeroEntries(P));
   for (PetscInt j = 0; j < end - start; ++j) {
     PetscInt  global = start + j;
     PetscInt  comp   = global % n_dof;
-    PetscReal diag   = 1.0;
+    PetscReal diag   = shift;
     if (comp == heat->heat_comp) {
       PetscInt  owned_cell = j / n_dof;
-      PetscReal h          = x[n_dof * owned_cell];
+      PetscReal h          = u[n_dof * owned_cell];
       if (h >= heat->config->physics.flow.tiny_h && !heat->use_direct_source) {
-        PetscReal T  = x[j] / h;
+        PetscReal T  = u[j] / h;
         PetscReal dQ = DHeatQNetDTemperature(heat, owned_cell, T);
-        diag         = 1.0 - heat->dt * dQ / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER * h);
+        diag         = shift - dQ / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER * h);
       }
     }
     PetscCall(MatSetValue(P, global, global, diag, INSERT_VALUES));
   }
-  PetscCall(VecRestoreArrayRead(X, &x));
+  PetscCall(VecRestoreArrayRead(U, &u));
 
   PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
@@ -191,8 +194,6 @@ PetscErrorCode RDyHeatCreate(RDy rdy) {
   heat->heat_comp = 3 + rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0);
   heat->dt        = rdy->dt;
 
-  PetscCall(VecDuplicate(rdy->u_global, &heat->star_state));
-  PetscCall(VecDuplicate(rdy->u_global, &rdy->heat_residual));
   PetscCall(DMCreateMatrix(rdy->dm, &rdy->heat_jac));
 
   PetscInt num_owned_cells = rdy->mesh.num_owned_cells;
@@ -204,24 +205,22 @@ PetscErrorCode RDyHeatCreate(RDy rdy) {
   PetscCall(PetscCalloc1(num_owned_cells, &heat->forcing.direct_source));
   PetscCall(FillForcingFromSources(rdy));
 
-  PetscCall(SNESCreate(rdy->comm, &rdy->heat_snes));
-  PetscCall(SNESSetFunction(rdy->heat_snes, rdy->heat_residual, HeatResidual, rdy));
-  PetscCall(SNESSetJacobian(rdy->heat_snes, rdy->heat_jac, rdy->heat_jac, HeatJacobian, rdy));
-  PetscCall(SNESSetTolerances(rdy->heat_snes, 1e-10, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
-  PetscCall(SNESSetOptionsPrefix(rdy->heat_snes, "heat_"));
-  PetscCall(SNESSetFromOptions(rdy->heat_snes));
+  PetscCall(TSCreate(rdy->comm, &rdy->heat_ts));
+  PetscCall(TSSetType(rdy->heat_ts, TSBEULER));
+  PetscCall(TSSetIFunction(rdy->heat_ts, NULL, HeatIFunction, rdy));
+  PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, HeatIJacobian, rdy));
+  PetscCall(TSSetOptionsPrefix(rdy->heat_ts, "heat_"));
+  PetscCall(TSSetFromOptions(rdy->heat_ts));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode RDyHeatDestroy(RDy rdy) {
   PetscFunctionBegin;
-  if (rdy->heat_snes) PetscCall(SNESDestroy(&rdy->heat_snes));
+  if (rdy->heat_ts) PetscCall(TSDestroy(&rdy->heat_ts));
   if (rdy->heat_jac) PetscCall(MatDestroy(&rdy->heat_jac));
-  if (rdy->heat_residual) PetscCall(VecDestroy(&rdy->heat_residual));
   if (rdy->heat_context) {
     RDyHeat heat = rdy->heat_context;
-    if (heat->star_state) PetscCall(VecDestroy(&heat->star_state));
     PetscCall(PetscFree(heat->forcing.downwelling_shortwave));
     PetscCall(PetscFree(heat->forcing.downwelling_longwave));
     PetscCall(PetscFree(heat->forcing.wind_speed));
@@ -230,12 +229,6 @@ PetscErrorCode RDyHeatDestroy(RDy rdy) {
     PetscCall(PetscFree(heat->forcing.direct_source));
     PetscCall(PetscFree(rdy->heat_context));
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-PetscErrorCode RDyHeatCaptureStarState(RDy rdy) {
-  PetscFunctionBegin;
-  PetscCall(VecCopy(rdy->u_global, rdy->heat_context->star_state));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

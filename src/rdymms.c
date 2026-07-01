@@ -153,15 +153,18 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// TS post-step callback for MMS heat: runs the SNES heat source step after each TS advance.
+// TS post-step callback for MMS heat: runs the heat TS source step after each TS advance.
 // direct_source[] must already have been filled by MMSPreStep -> RDyMMSComputeSourceTerms.
 static PetscErrorCode MMSPostStep(TS ts) {
   PetscFunctionBegin;
   RDy rdy;
   PetscCall(TSGetApplicationContext(ts, (void*)&rdy));
-  PetscCall(RDyHeatCaptureStarState(rdy));
   PetscCall(RDyHeatUpdateForcing(rdy, 0.0));  // updates heat->dt from rdy->dt
-  PetscCall(SNESSolve(rdy->heat_snes, NULL, rdy->u_global));
+  PetscCall(TSSetTime(rdy->heat_ts, 0.0));
+  PetscCall(TSSetMaxTime(rdy->heat_ts, rdy->dt));
+  PetscCall(TSSetExactFinalTime(rdy->heat_ts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetTimeStep(rdy->heat_ts, rdy->dt));
+  PetscCall(TSSolve(rdy->heat_ts, rdy->u_global));
   // Reset flag so stale MMS forcing cannot leak into subsequent non-MMS calls
   rdy->heat_context->use_direct_source = PETSC_FALSE;
   PetscFunctionReturn(PETSC_SUCCESS);

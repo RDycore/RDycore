@@ -365,9 +365,12 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscPreLoadEnd();
 
   if (rdy->config.physics.heat) {
-    PetscCall(RDyHeatCaptureStarState(rdy));
     PetscCall(RDyHeatUpdateForcing(rdy, time));
-    PetscCall(SNESSolve(rdy->heat_snes, NULL, rdy->u_global));
+    PetscCall(TSSetTime(rdy->heat_ts, 0.0));
+    PetscCall(TSSetMaxTime(rdy->heat_ts, rdy->dt));
+    PetscCall(TSSetExactFinalTime(rdy->heat_ts, TS_EXACTFINALTIME_MATCHSTEP));
+    PetscCall(TSSetTimeStep(rdy->heat_ts, rdy->dt));
+    PetscCall(TSSolve(rdy->heat_ts, rdy->u_global));
   }
 
   if (time_adapt->enable) {

@@ -3,7 +3,7 @@
 
 #include <ceed/ceed.h>
 #include <petsc/private/petscimpl.h>
-#include <petscsnes.h>
+#include <petscts.h>
 #include <private/rdyboundaryimpl.h>
 #include <private/rdyconfigimpl.h>
 #include <private/rdydmimpl.h>
@@ -214,9 +214,8 @@ struct _p_RDy {
   TS ts;
 
   // PETSc-only heat source correction
-  SNES    heat_snes;
+  TS      heat_ts;
   Mat     heat_jac;
-  Vec     heat_residual;
   RDyHeat heat_context;
 
   // host solution vectors (global and local)
