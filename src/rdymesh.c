@@ -801,6 +801,7 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
 
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
+  RDyEdges    *edges    = &mesh->edges;
 
   MPI_Comm comm;
   PetscCall(PetscObjectGetComm((PetscObject)dm, &comm));
@@ -855,6 +856,21 @@ static PetscErrorCode ComputeAdditionalCellAttributes(DM dm, RDyMesh *mesh) {
       }
       cells->dz_dx[icell] = cells->dz_dx[icell] / total_area;
       cells->dz_dy[icell] = cells->dz_dy[icell] / total_area;
+    }
+  }
+
+  // save the neighbor IDs for each owned cell
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    if (cells->is_owned[icell]) {
+      for (PetscInt iedge = 0; iedge < cells->num_edges[icell]; iedge++) {
+        PetscInt edge_offset = cells->edge_offsets[icell];
+        PetscInt index       = cells->edge_ids[edge_offset + iedge];
+        PetscInt cell_up     = edges->cell_ids[2 * index];
+        PetscInt cell_dn     = edges->cell_ids[2 * index + 1];
+
+        PetscInt cell_offset                     = cells->neighbor_offsets[icell];
+        cells->neighbor_ids[cell_offset + iedge] = (cell_up == icell) ? cell_dn : cell_up;
+      }
     }
   }
 
