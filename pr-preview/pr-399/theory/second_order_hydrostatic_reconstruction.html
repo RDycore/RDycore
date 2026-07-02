@@ -1,0 +1,1835 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Second-Order Well-Balanced Hydrostatic Reconstruction - RDycore: A River / Flooding dynamical core for E3SM</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#second-order-well-balanced-hydrostatic-reconstruction" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RDycore: A River / Flooding dynamical core for E3SM
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Second-Order Well-Balanced Hydrostatic Reconstruction
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RDycore: A River / Flooding dynamical core for E3SM
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/input.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Input Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/mms.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MMS Driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDycore Example Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RDycore Example Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/dam-break/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idealized dam break problem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5_3" id="__nav_2_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hurricane Harvey
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hurricane Harvey
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    With MRMS rainfall and outflow BC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    With average rainfall and ocean BC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E3SM-RDycore Example Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    E3SM-RDycore Example Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hurricane Harvey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/development.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/organization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Structure and Organization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/style.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Style Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/ceed.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SWE implementation using libCEED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Theory Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="swe.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shallow Water Equations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="muscl.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Second-Order MUSCL Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sediment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sediment Transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-the-two-cannot-simply-be-stacked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the two cannot simply be stacked
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#continuous-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous target
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-combined-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The combined scheme
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The combined scheme">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-reconstruct-the-free-surface-velocities-and-bed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Reconstruct the free surface, velocities, and bed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-hydrostatic-reconstruction-at-the-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Hydrostatic reconstruction at the interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-riemann-flux-on-starred-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Riemann flux on starred states
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-per-cell-corrections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Per-cell corrections
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lake-at-rest-derivation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lake-at-rest derivation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lake-at-rest derivation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-piece-buys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each piece buys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#positivity-and-wetdry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Positivity and wet/dry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-plan-petsc-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation plan (PETSc backend)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation plan (PETSc backend)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-srcoperatorc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. src/operator.c
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-srcsweswe_petscc-operator-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. src/swe/swe_petsc.c — operator struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-srcsweswe_petscc-new-applyinteriorfluxhr2r" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. src/swe/swe_petsc.c — new ApplyInteriorFluxHR2R
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-srcsweswe_petscc-createpetscsweinteriorfluxhr2roperator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. src/swe/swe_petsc.c — CreatePetscSWEInteriorFluxHR2ROperator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Header
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="second-order-well-balanced-hydrostatic-reconstruction">Second-Order Well-Balanced Hydrostatic Reconstruction</h1>
+<p><strong>Status: design / plan (PETSc backend).</strong> This note specifies how to combine
+<a href="muscl.html">MUSCL second-order reconstruction</a> with
+<a href="swe.html">hydrostatic-reconstruction (HR) well-balancing</a> into a single scheme that
+is <em>simultaneously</em> second-order accurate and exactly well-balanced (lake-at-rest
+preserving) over arbitrary bed topography. The construction follows Audusse,
+Bouchut, Bristeau, Klein &amp; Perthame, <em>SIAM J. Sci. Comput.</em> 25 (2004).</p>
+<h2 id="why-the-two-cannot-simply-be-stacked">Why the two cannot simply be stacked</h2>
+<p>The current code gates these features apart (<code>CreateOperator</code> in <code>src/operator.c</code>)
+because they use <em>different</em> well-balancing mechanisms:</p>
+<ul>
+<li><strong>HR</strong> uses piecewise-constant (first-order) cell states, performs hydrostatic
+  reconstruction at each interface, and adds a per-cell hydrostatic <em>pressure
+  correction</em>. The bed-slope source is then identically zero
+  (<code>SWESourcesHydroRecon</code>).</li>
+<li><strong>MUSCL</strong> reconstructs <span class="arithmatex">\((h, hu, hv)\)</span> to the faces and relies on the
+  vertex-based <span class="arithmatex">\(\Delta h_v\)</span> correction for well-balancing — <em>not</em> HR.</li>
+</ul>
+<p>The key fact that drives the combined design:</p>
+<blockquote>
+<p>Well-balanced HR at second order requires reconstructing the <strong>free surface</strong>
+<span class="arithmatex">\(\eta = h + z_b\)</span> (not the depth <span class="arithmatex">\(h\)</span>), <strong>plus</strong> a centered source term. Either
+piece alone is insufficient.</p>
+</blockquote>
+<h2 id="continuous-target">Continuous target</h2>
+<p>In the SWE momentum equation the bed enters as a source <span class="arithmatex">\(-g\,h\,\nabla z_b\)</span>, while
+the hydrostatic pressure <span class="arithmatex">\(\tfrac{1}{2}gh^2\)</span> lives in the flux. Combining them, the
+exact momentum forcing is</p>
+<div class="arithmatex">\[
+-\nabla\!\left(\tfrac{1}{2}g h^2\right) \;-\; g\,h\,\nabla z_b
+\;=\; -\,g\,h\,\nabla\eta ,
+\qquad \eta = h + z_b .
+\]</div>
+<p>A scheme is <strong>well-balanced</strong> iff this discrete forcing vanishes exactly for the
+lake at rest, <span class="arithmatex">\(\eta \equiv \text{const}\)</span>, <span class="arithmatex">\(\mathbf{u} = 0\)</span>. It is <strong>second-order</strong>
+iff the discrete forcing matches <span class="arithmatex">\(-g h\nabla\eta\)</span> to <span class="arithmatex">\(O(\Delta x^2)\)</span> for smooth
+non-equilibrium states.</p>
+<h2 id="the-combined-scheme">The combined scheme</h2>
+<p>For an interior edge <span class="arithmatex">\(e\)</span> shared by cells <span class="arithmatex">\(i\)</span> (left) and <span class="arithmatex">\(j\)</span> (right), with edge
+length <span class="arithmatex">\(L_e\)</span> and unit normal <span class="arithmatex">\(\hat{\mathbf{n}}\)</span> pointing out of cell <span class="arithmatex">\(i\)</span>:</p>
+<h3 id="1-reconstruct-the-free-surface-velocities-and-bed">1. Reconstruct the free surface, velocities, and bed</h3>
+<p>Using limited least-squares gradients (the existing MUSCL machinery applied to
+<span class="arithmatex">\(\eta = h + z_b\)</span> rather than <span class="arithmatex">\(h\)</span>), reconstruct from each side <span class="arithmatex">\(s \in \{i, j\}\)</span> to
+the face midpoint:</p>
+<div class="arithmatex">\[
+\eta_{s,e}, \quad u_{s,e}, \quad v_{s,e}, \quad z_{s,e},
+\qquad
+h_{s,e} = \max\!\left(0,\; \eta_{s,e} - z_{s,e}\right).
+\]</div>
+<p>The bed <span class="arithmatex">\(z_{s,e}\)</span> is reconstructed from a <strong>time-invariant</strong> bed gradient
+<span class="arithmatex">\(\nabla z_b\)</span> (precomputed once at setup). Because the limiter acts on <span class="arithmatex">\(\eta\)</span>, a
+constant free surface reconstructs exactly (<span class="arithmatex">\(\eta_{s,e} = \text{const}\)</span>), which is
+what preserves lake-at-rest regardless of limiter activity.</p>
+<h3 id="2-hydrostatic-reconstruction-at-the-interface">2. Hydrostatic reconstruction at the interface</h3>
+<div class="arithmatex">\[
+z^\ast_e = \max\!\left(z_{i,e},\, z_{j,e}\right),
+\qquad
+h^\ast_{s,e} = \max\!\left(0,\; \eta_{s,e} - z^\ast_e\right),
+\]</div>
+<p>with starred states <span class="arithmatex">\(\mathbf{U}^\ast_{s,e} = \big(h^\ast_{s,e},\,
+h^\ast_{s,e} u_{s,e},\, h^\ast_{s,e} v_{s,e}\big)\)</span>.</p>
+<h3 id="3-riemann-flux-on-starred-states">3. Riemann flux on starred states</h3>
+<div class="arithmatex">\[
+\hat{\mathbf{F}}_e = \mathrm{Roe}\!\left(\mathbf{U}^\ast_{i,e},\,
+\mathbf{U}^\ast_{j,e};\, \hat{\mathbf{n}}\right).
+\]</div>
+<h3 id="4-per-cell-corrections">4. Per-cell corrections</h3>
+<p>The semi-discrete update for cell <span class="arithmatex">\(i\)</span> is</p>
+<div class="arithmatex">\[
+A_i \frac{d\mathbf{U}_i}{dt}
+= -\sum_{e \in \partial i} L_e
+\left[\hat{\mathbf{F}}_e + \mathbf{S}^{\text{int}}_{i,e}\right]
+\;+\; \sum_{e \in \partial i} L_e\, \mathbf{S}^{\text{cen}}_{i,e},
+\]</div>
+<p>with two momentum-only correction terms (zero in the mass component):</p>
+<div class="arithmatex">\[
+\mathbf{S}^{\text{int}}_{i,e} =
+\begin{pmatrix} 0 \\ P_{i,e}\,\hat n_x \\ P_{i,e}\,\hat n_y \end{pmatrix},
+\quad
+P_{i,e} = \tfrac{1}{2} g \left(h_{i,e}^2 - (h^\ast_{i,e})^2\right)
+\qquad\text{(interface pressure correction)},
+\]</div>
+<div class="arithmatex">\[
+\mathbf{S}^{\text{cen}}_{i,e} =
+\begin{pmatrix} 0 \\ C_{i,e}\,\hat n_x \\ C_{i,e}\,\hat n_y \end{pmatrix},
+\quad
+C_{i,e} = \tfrac{1}{2} g \left(h_{i,e} + h_i\right)\!\left(z_i - z_{i,e}\right)
+\qquad\text{(centered source)} .
+\]</div>
+<p>Here <span class="arithmatex">\(h_i, z_i\)</span> are cell-centroid values and <span class="arithmatex">\(h_{i,e}, z_{i,e}\)</span> are the reconstructed
+face values <strong>on cell <span class="arithmatex">\(i\)</span>'s own side</strong> of the edge. Note the <strong>sign placement</strong>: the
+interface correction sits inside the flux bracket (scaled <span class="arithmatex">\(-L_e/A_i\)</span> like the flux),
+whereas the centered term enters as a <span class="arithmatex">\(+\)</span> source (scaled <span class="arithmatex">\(+L_e/A_i\)</span>, i.e. the
+<em>opposite</em> sign of the flux scaling). Getting this sign wrong silently breaks
+well-balancing.</p>
+<h2 id="lake-at-rest-derivation">Lake-at-rest derivation</h2>
+<p>Set <span class="arithmatex">\(\eta \equiv H\)</span> (constant) and <span class="arithmatex">\(\mathbf{u} = 0\)</span>. Then <span class="arithmatex">\(\eta_{s,e} = H\)</span> for all
+sides, <span class="arithmatex">\(h_{s,e} = H - z_{s,e}\)</span>, and <span class="arithmatex">\(h_i = H - z_i\)</span>.</p>
+<p><strong>Starred states are equal across the edge.</strong> Since <span class="arithmatex">\(h^\ast_{i,e} = H - z^\ast_e
+= h^\ast_{j,e} =: h^\ast_e\)</span> and velocities vanish, the Roe flux reduces to pure
+pressure (the dissipation <span class="arithmatex">\(\propto \Delta\mathbf{U}^\ast = 0\)</span>):</p>
+<div class="arithmatex">\[
+\hat{\mathbf{F}}_e \cdot \hat{\mathbf{n}}\big|_{\text{mom}}
+= \tfrac{1}{2} g\, (h^\ast_e)^2 .
+\]</div>
+<p><strong>Flux + interface correction telescopes to the cell's own face depth.</strong> Along
+<span class="arithmatex">\(\hat{\mathbf{n}}\)</span> the magnitude is</p>
+<div class="arithmatex">\[
+\tfrac{1}{2} g (h^\ast_e)^2 + P_{i,e}
+= \tfrac{1}{2} g (h^\ast_e)^2 + \tfrac{1}{2} g\!\left(h_{i,e}^2 - (h^\ast_e)^2\right)
+= \tfrac{1}{2} g\, h_{i,e}^2 .
+\]</div>
+<p>The neighbor's state has dropped out entirely — this decoupling is the heart of HR.
+Cell <span class="arithmatex">\(i\)</span>'s contribution from edge <span class="arithmatex">\(e\)</span> is therefore <span class="arithmatex">\(-L_e\,\tfrac{1}{2}g h_{i,e}^2\,
+\hat{\mathbf{n}}\)</span>.</p>
+<p><strong>The centered term converts the face depth to the cell depth.</strong> At rest,</p>
+<div class="arithmatex">\[
+z_i - z_{i,e} = (H - h_i) - (H - h_{i,e}) = h_{i,e} - h_i,
+\]</div>
+<p>so</p>
+<div class="arithmatex">\[
+C_{i,e} = \tfrac{1}{2} g\,(h_{i,e} + h_i)(h_{i,e} - h_i)
+= \tfrac{1}{2} g\!\left(h_{i,e}^2 - h_i^2\right).
+\]</div>
+<p>Adding the centered contribution <span class="arithmatex">\(+L_e\, C_{i,e}\,\hat{\mathbf{n}}\)</span>, the <strong>net</strong> edge
+contribution along <span class="arithmatex">\(\hat{\mathbf{n}}\)</span> becomes</p>
+<div class="arithmatex">\[
+-L_e\,\tfrac{1}{2}g\, h_{i,e}^2 + L_e\,\tfrac{1}{2}g\!\left(h_{i,e}^2 - h_i^2\right)
+= -L_e\,\tfrac{1}{2} g\, h_i^2 .
+\]</div>
+<p>The face-dependent <span class="arithmatex">\(h_{i,e}^2\)</span> cancels, leaving a constant <span class="arithmatex">\(h_i^2\)</span> per cell. Summing
+over the cell's edges,</p>
+<div class="arithmatex">\[
+A_i \frac{d\mathbf{U}_i}{dt}\bigg|_{\text{mom}}
+= -\tfrac{1}{2} g\, h_i^2 \sum_{e \in \partial i} L_e\,\hat{\mathbf{n}}_e
+= \mathbf{0},
+\]</div>
+<p>because <span class="arithmatex">\(\sum_e L_e\,\hat{\mathbf{n}}_e = 0\)</span> for any closed polygon. The lake at rest
+is preserved <strong>exactly</strong>. <span class="arithmatex">\(\blacksquare\)</span></p>
+<h3 id="what-each-piece-buys">What each piece buys</h3>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Pressure correction <span class="arithmatex">\(P_{i,e}\)</span></th>
+<th>Centered <span class="arithmatex">\(C_{i,e}\)</span></th>
+<th>Well-balanced</th>
+<th>Source accuracy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>face depth <span class="arithmatex">\(h_{i,e}\)</span></td>
+<td>none</td>
+<td><strong>no</strong> — <span class="arithmatex">\(-\sum L_e h_{i,e}^2 \hat n \ne 0\)</span></td>
+<td>2nd (but useless)</td>
+</tr>
+<tr>
+<td>B</td>
+<td><strong>cell</strong> depth <span class="arithmatex">\(h_i\)</span></td>
+<td>none</td>
+<td>yes (constant <span class="arithmatex">\(h_i^2\)</span> telescopes directly)</td>
+<td>not guaranteed 2nd</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>face depth <span class="arithmatex">\(h_{i,e}\)</span></td>
+<td><strong>yes</strong></td>
+<td><strong>yes</strong> (proof above)</td>
+<td><strong>2nd (Audusse)</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>A</strong> keeps the consistent face-depth pressure but, without the centered term, the
+  surviving <span class="arithmatex">\(h_{i,e}^2\)</span> varies edge to edge and does not cancel ⇒ spurious currents.</li>
+<li><strong>B</strong> forces a constant <span class="arithmatex">\(h_i^2\)</span> into the correction, so it cancels directly without
+  a centered term. It is exactly well-balanced and is the smallest delta from the
+  current first-order HR code, but it pairs face-reconstructed Roe states with a
+  cell-depth bed correction — a non-standard combination with no second-order
+  guarantee on the bed source. Acceptable on gentle topography; can degrade where
+  depth and bed slope co-vary strongly (steep/curved beds, transients, wet–dry).</li>
+<li><strong>C</strong> is the published scheme: second-order accurate <em>and</em> exactly well-balanced.
+  The centered term is one isolated accumulation block, so building C and toggling
+  the block off recovers B for free as an A/B baseline.</li>
+</ul>
+<p><strong>Recommendation: implement C</strong>, with the <span class="arithmatex">\(\mathbf{S}^{\text{cen}}\)</span> block guarded so
+it can be disabled to fall back to B.</p>
+<h3 id="positivity-and-wetdry">Positivity and wet/dry</h3>
+<p>The derivation assumes wet cells (no <span class="arithmatex">\(\max(0,\cdot)\)</span> clamping active). The clamps in
+steps 1–2 preserve <span class="arithmatex">\(h \ge 0\)</span> and the scheme degrades to the standard robust HR
+behavior at wet/dry fronts, where exact well-balancing is necessarily relaxed.</p>
+<h2 id="implementation-plan-petsc-backend">Implementation plan (PETSc backend)</h2>
+<p>MUSCL and HR are both implemented in the PETSc backend, so this is entirely a
+PETSc-side change. CEED is out of scope for now.</p>
+<h3 id="1-srcoperatorc">1. <code>src/operator.c</code></h3>
+<ul>
+<li>Remove the <code>PetscCheck(... well_balancing != WELL_BALANCING_HR ...)</code> guard in
+  <code>CreateOperator</code> that forbids the combination.</li>
+<li>In the PETSc branch of <code>CreateOperatorSubOperators</code>, route the
+  <code>WELL_BALANCING_HR</code> case to a new <code>CreatePetscSWEInteriorFluxHR2ROperator</code> when
+  <code>config-&gt;numerics.second_order</code> is set; otherwise keep
+  <code>CreatePetscSWEInteriorFluxHROperator</code>. The source operator
+  (<code>CreatePetscSWESourceHROperator</code>) is unchanged — it already zeroes the bed
+  slope, which remains correct because both corrections live in the flux operator.</li>
+</ul>
+<h3 id="2-srcsweswe_petscc-operator-struct">2. <code>src/swe/swe_petsc.c</code> — operator struct</h3>
+<p>Extend <code>InteriorFluxHROperator</code> with the reconstruction machinery (mirroring
+<code>InteriorFluxOperator</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="n">PetscBool</span><span class="w">    </span><span class="n">use_slope_reconstruction</span><span class="p">,</span><span class="w"> </span><span class="n">use_limiter</span><span class="p">;</span>
+<span class="n">PetscReal</span><span class="w">   </span><span class="o">*</span><span class="n">ls_grad_coeffs</span><span class="p">;</span><span class="w">                  </span><span class="c1">// [num_internal_edges * 4]</span>
+<span class="n">PetscScalar</span><span class="w"> </span><span class="o">*</span><span class="n">grad_eta</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">grad_hu</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">grad_hv</span><span class="p">;</span><span class="w">    </span><span class="c1">// [num_cells * 2]  — reconstruct eta, not h</span>
+<span class="n">PetscScalar</span><span class="w"> </span><span class="o">*</span><span class="n">grad_zb</span><span class="p">;</span><span class="w">                         </span><span class="c1">// [num_cells * 2]  — precomputed, time-invariant</span>
+<span class="n">PetscScalar</span><span class="w"> </span><span class="o">*</span><span class="n">eta_cell</span><span class="p">;</span><span class="w">                        </span><span class="c1">// [num_cells]      — scratch: h + zc each step</span>
+<span class="n">PetscScalar</span><span class="w"> </span><span class="o">*</span><span class="n">q_reconstructed</span><span class="p">;</span><span class="w">                 </span><span class="c1">// [num_owned_internal_edges * 6] = eta,hu,hv per side</span>
+<span class="n">PetscScalar</span><span class="w"> </span><span class="o">*</span><span class="n">z_reconstructed</span><span class="p">;</span><span class="w">                 </span><span class="c1">// [num_owned_internal_edges * 2] = z_L, z_R at face</span>
+</code></pre></div>
+<h3 id="3-srcsweswe_petscc-new-applyinteriorfluxhr2r">3. <code>src/swe/swe_petsc.c</code> — new <code>ApplyInteriorFluxHR2R</code></h3>
+<p>Clone <code>ApplyInteriorFlux2R</code> (the owned-edge / <code>DMLocalToGlobal(ADD)</code> parallel
+pattern) and inject HR. Each step:</p>
+<ol>
+<li>Build <code>eta_cell[c] = u_ptr[3c] + zc[c]</code> for all local cells (including ghosts).</li>
+<li><code>ComputeLeastSquaresGradients</code> on <span class="arithmatex">\((\eta, hu, hv)\)</span>, then <code>CommunicateCellGradients</code>.
+   (<code>grad_zb</code> is precomputed and communicated once at setup; it does not change.)</li>
+<li>Reconstruct to owned faces: <span class="arithmatex">\(\eta_{s,e}, hu_{s,e}, hv_{s,e}\)</span> into <code>q_reconstructed</code>
+   and <span class="arithmatex">\(z_{s,e}\)</span> into <code>z_reconstructed</code>. A dedicated <code>ReconstructFaceValuesHR</code> is
+   preferred over overloading <code>ReconstructFaceValues</code>, to keep the <span class="arithmatex">\(\eta\)</span>-vs-<span class="arithmatex">\(h\)</span>
+   semantics explicit. Reconstruct <span class="arithmatex">\(z_b\)</span> <strong>unlimited</strong> (fixed input data).</li>
+<li>Per owned edge: <span class="arithmatex">\(h_{s,e} = \max(0, \eta_{s,e} - z_{s,e})\)</span>;
+   <span class="arithmatex">\(z^\ast = \max(z_{i,e}, z_{j,e})\)</span>; <span class="arithmatex">\(h^\ast_{s,e} = \max(0, \eta_{s,e} - z^\ast)\)</span>.
+   Fill <code>datal/datar</code> with the starred states; velocities from the <strong>face</strong> depth
+   <span class="arithmatex">\(h_{s,e}\)</span> via <code>ComputeRiemannVelocities</code> (ANUGA regularization). Keep the
+   first-order ghost-edge fallback, routed through HR with cell <span class="arithmatex">\(zc\)</span>.</li>
+<li><code>ComputeSWERoeFlux</code> on starred states.</li>
+<li>Accumulate into the local RHS, per owned edge with cells <span class="arithmatex">\(l, r\)</span>
+   (<code>flux_scale_l = -L_e/A_l</code>, <code>flux_scale_r = +L_e/A_r</code>):</li>
+<li><strong>Roe flux</strong>: <code>flux_vec * flux_scale_s</code>.</li>
+<li><strong>Interface correction</strong>: <code>P_s = 0.5*g*(h_face_s^2 - h_star_s^2)</code>, added to
+     momentum via <code>P_s * {cn,sn} * flux_scale_s</code>.</li>
+<li><strong>Centered term</strong> (guarded <code>if (include_Sc)</code> → toggles C↔B):
+     <code>C_s = 0.5*g*(h_face_s + h_cell_s)*(zc_s - z_face_s)</code>, added via
+     <code>C_s * {cn,sn} * (-flux_scale_s)</code> — <strong>opposite sign</strong> of the flux scaling.</li>
+<li>Courant diagnostic unchanged.</li>
+</ol>
+<h3 id="4-srcsweswe_petscc-createpetscsweinteriorfluxhr2roperator">4. <code>src/swe/swe_petsc.c</code> — <code>CreatePetscSWEInteriorFluxHR2ROperator</code></h3>
+<p>Clone <code>CreatePetscSWEInteriorFluxHROperator</code> plus the MUSCL allocations from
+<code>CreatePetscSWEInteriorFluxOperator</code>: <code>PrecomputeLSGradCoeffs</code>, allocate gradients
+and <code>q/z_reconstructed</code>, read the limiter flags. <strong>Precompute <code>grad_zb</code> once here</strong>
+(LS gradient of the per-cell <code>zc</code> field + <code>CommunicateCellGradients</code>) and store it.
+Reuse the existing vertex-averaged <code>zc</code> logic. Extend <code>DestroyInteriorFluxHR</code> to
+free the new arrays.</p>
+<h3 id="5-header">5. Header</h3>
+<p>Declare <code>CreatePetscSWEInteriorFluxHR2ROperator</code> alongside
+<code>CreatePetscSWEInteriorFluxHROperator</code> in <code>include/private/rdysweimpl.h</code>.</p>
+<h3 id="6-configuration">6. Configuration</h3>
+<p>Reuses the existing <code>numerics.second_order</code> and <code>numerics.no_limiter</code> flags under
+<code>physics.flow.well_balancing: HR</code>. No new config keys.</p>
+<h2 id="verification">Verification</h2>
+<ul>
+<li><strong>Lake at rest over non-flat bed</strong> (sloped + bump, <span class="arithmatex">\(\mathbf{u} = 0\)</span>): assert
+  <span class="arithmatex">\(\max\|\mathbf{u}\|\)</span> stays at round-off across many steps. This is the test that
+  distinguishes B/C (pass) from A (fail) and catches <span class="arithmatex">\(\mathbf{S}^{\text{cen}}\)</span> sign
+  errors.</li>
+<li><strong>Smooth MMS / convergence study</strong>: confirm the 2nd-order spatial rate, and that C
+  beats B on the source-containing error when the bed varies.</li>
+<li><strong>Regression</strong>: existing standalone HR and MUSCL tests must be unaffected when only
+  one feature is active.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascript/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
