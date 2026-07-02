@@ -651,7 +651,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
   if (rdy->config.grid.cell_elevation.file[0]) {
-    PetscCall(OverrideCellElevation(rdy));
+    PetscCall(OverrideCellAttributes(rdy));
   }
 
   // initialize the refined solution from existing previous solution
