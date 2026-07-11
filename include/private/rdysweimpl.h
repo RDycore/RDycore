@@ -9,6 +9,7 @@
 PETSC_INTERN PetscErrorCode CreateSWEQFunctionContext(Ceed, const RDyConfig, CeedQFunctionContext *);
 PETSC_INTERN PetscErrorCode CreatePetscSWEInteriorFluxOperator(RDyMesh *, MPI_Comm, const RDyConfig, OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSWEInteriorFluxHROperator(RDyMesh *, const RDyConfig, OperatorDiagnostics *, PetscOperator *);
+PETSC_INTERN PetscErrorCode CreatePetscSWEInteriorFluxHR2ROperator(RDyMesh *, MPI_Comm, const RDyConfig, OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSWEBoundaryFluxOperator(RDyMesh *, const RDyConfig, RDyBoundary, RDyCondition, Vec, Vec, Vec,
                                                                OperatorDiagnostics *, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *, const RDyConfig, Vec, Vec, PetscOperator *);

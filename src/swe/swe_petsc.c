@@ -2,75 +2,8 @@
 #include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
 
+#include "swe_riemann_petsc.h"
 #include "swe_roe_flux_petsc.h"
-
-static PetscErrorCode CreateRiemannStateData(PetscInt num_states, RiemannStateData *data) {
-  PetscFunctionBegin;
-
-  data->num_states = num_states;
-  PetscCall(PetscCalloc1(num_states, &data->h));
-  PetscCall(PetscCalloc1(num_states, &data->hu));
-  PetscCall(PetscCalloc1(num_states, &data->hv));
-  PetscCall(PetscCalloc1(num_states, &data->u));
-  PetscCall(PetscCalloc1(num_states, &data->v));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode DestroyRiemannStateData(RiemannStateData data) {
-  PetscFunctionBegin;
-
-  data.num_states = 0;
-  PetscCall(PetscFree(data.h));
-  PetscCall(PetscFree(data.hu));
-  PetscCall(PetscFree(data.hv));
-  PetscCall(PetscFree(data.u));
-  PetscCall(PetscFree(data.v));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode CreateRiemannEdgeData(PetscInt num_edges, PetscInt num_comp, RiemannEdgeData *data) {
-  PetscFunctionBegin;
-
-  data->num_edges = num_edges;
-  PetscCall(PetscCalloc1(num_edges, &data->cn));
-  PetscCall(PetscCalloc1(num_edges, &data->sn));
-  PetscCall(PetscCalloc1(num_edges * num_comp, &data->fluxes));
-  PetscCall(PetscCalloc1(num_edges, &data->amax));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode DestroyRiemannEdgeData(RiemannEdgeData data) {
-  PetscFunctionBegin;
-
-  data.num_edges = 0;
-  PetscCall(PetscFree(data.cn));
-  PetscCall(PetscFree(data.sn));
-  PetscCall(PetscFree(data.fluxes));
-  PetscCall(PetscFree(data.amax));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode ComputeRiemannVelocities(PetscReal tiny_h, PetscReal h_anuga, RiemannStateData *data) {
-  PetscFunctionBeginUser;
-  PetscReal denom;
-
-  for (PetscInt n = 0; n < data->num_states; n++) {
-    if (data->h[n] < tiny_h) {
-      data->u[n] = 0.0;
-      data->v[n] = 0.0;
-    } else {
-      denom      = Square(data->h[n]) + Square(h_anuga);
-      data->u[n] = data->hu[n] * data->h[n] / denom;
-      data->v[n] = data->hv[n] * data->h[n] / denom;
-    }
-  }
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 //------------------------
 // Interior Flux Operator
@@ -1205,23 +1138,8 @@ PetscErrorCode CreatePetscSWEInteriorFluxHROperator(RDyMesh *mesh, const RDyConf
     }
   }
 
-  // compute vertex-averaged bed elevation for each cell
-  RDyCells    *cells    = &mesh->cells;
-  RDyVertices *vertices = &mesh->vertices;
-  PetscCall(PetscCalloc1(mesh->num_cells, &op->zc));
-  for (PetscInt c = 0; c < mesh->num_cells; c++) {
-    if (config.grid.cell_elevation.file[0]) {
-      // if cell elevation is provided via the file
-      op->zc[c] = cells->centroids[c].X[2];
-    } else {
-      // otherwise, compute vertex-averaged bed elevation
-      PetscReal z_sum = 0.0;
-      for (PetscInt v = cells->vertex_offsets[c]; v < cells->vertex_offsets[c + 1]; v++) {
-        z_sum += vertices->points[cells->vertex_ids[v]].X[2];
-      }
-      op->zc[c] = z_sum / (PetscReal)cells->num_vertices[c];
-    }
-  }
+  // compute per-cell bed elevation (shared with the HR + MUSCL operator)
+  PetscCall(ComputeCellBedElevation(mesh, config, &op->zc));
 
   PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxHR, DestroyInteriorFluxHR, petsc_op));
 

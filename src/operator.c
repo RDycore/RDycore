@@ -208,7 +208,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
         PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
         break;
       case WELL_BALANCING_HR:
-        PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+        PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, comm, op->num_boundaries, op->boundaries, op->boundary_conditions,
                                             op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
                                             &op->petsc.flux));
         PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
