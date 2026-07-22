@@ -25,6 +25,7 @@ set(RDYCORE_C_SOURCE_FILES
   forcing/rdyforcing.c
   forcing/rdyforcing_dataset.c
   forcing/rdyforcing_map.c
+  heat/heat_petsc.c
   time_series.c
   xdmf_output.c
   yaml_input.c

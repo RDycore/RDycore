@@ -7,14 +7,16 @@
 #include <petscsys.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdyheatimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdyoperatorimpl.h>
 
 #include "petscstring.h"
 #include "private/config.h"
 
-static const PetscReal GRAVITY          = 9.806;   // gravitational acceleration [m/s^2]
-static const PetscReal DENSITY_OF_WATER = 1000.0;  // [kg/m^3]
+static const PetscReal GRAVITY                = 9.806;   // gravitational acceleration [m/s^2]
+static const PetscReal DENSITY_OF_WATER       = 1000.0;  // [kg/m^3]
+static const PetscReal SPECIFIC_HEAT_OF_WATER = 4186.0;  // [J/(kg·K)]
 
 // NOTE: our boundary conditions are expressed in terms of momenta and not flow
 // velocities, so we have to chain together a few things to evaluate x and y
@@ -39,7 +41,7 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   };
   for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
     strncpy(analytic_sediment.classes[i].expression, rdy->config.mms.sediment.expressions.c[i], MAX_EXPRESSION_LEN);
-    analytic_sediment.classes[i].value = (void *)rdy->config.mms.sediment.solutions.c[i];
+    analytic_sediment.classes[i].value = (void*)rdy->config.mms.sediment.solutions.c[i];
   };
   static RDySalinityCondition analytic_salinity = {
       .name = "analytic_bc",
@@ -47,16 +49,16 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   };
   analytic_salinity.concentration = rdy->config.mms.salinity.solutions.S;
 
-  static RDyTemperatureCondition analytic_temperature = {
+  static RDyHeatCondition analytic_heat = {
       .name = "analytic_bc",
       .type = CONDITION_DIRICHLET,
   };
-  analytic_temperature.temperature = rdy->config.mms.temperature.solutions.T;
-  RDyCondition analytic_bc         = {
-              .flow        = &analytic_flow,
-              .sediment    = &analytic_sediment,
-              .salinity    = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
-              .temperature = (rdy->config.physics.heat ? &analytic_temperature : NULL),
+  analytic_heat.water_temperature = rdy->config.mms.temperature.solutions.T;
+  RDyCondition analytic_bc        = {
+             .flow     = &analytic_flow,
+             .sediment = &analytic_sediment,
+             .salinity = (rdy->config.physics.salinity ? &analytic_salinity : NULL),
+             .heat     = (rdy->config.physics.heat ? &analytic_heat : NULL),
   };
 
   // Assign the boundary condition to each boundary.
@@ -73,7 +75,7 @@ static PetscErrorCode SetAnalyticBoundaryCondition(RDy rdy) {
   mupDefineBulkVar(func, "y", y)
 
 // evaluates the given expression at all given x, y, placing the results into values
-static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal *x, PetscReal *y, PetscReal *values) {
+static PetscErrorCode EvaluateSpatialSolution(void* expr, PetscInt n, PetscReal* x, PetscReal* y, PetscReal* values) {
   PetscFunctionBegin;
 
   SET_SPATIAL_VARIABLES(expr);
@@ -87,10 +89,10 @@ static PetscErrorCode EvaluateSpatialSolution(void *expr, PetscInt n, PetscReal 
   mupDefineBulkVar(func, "t", t)
 
 // evaluates the given expression at all given x, y, t, placing the results into values
-static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal *x, PetscReal *y, PetscReal time, PetscReal *values) {
+static PetscErrorCode EvaluateTemporalSolution(void* expr, PetscInt n, PetscReal* x, PetscReal* y, PetscReal time, PetscReal* values) {
   PetscFunctionBegin;
 
-  PetscReal *t;
+  PetscReal* t;
   PetscCalloc1(n, &t);
   for (PetscInt i = 0; i < n; ++i) t[i] = time;
   SET_SPATIOTEMPORAL_VARIABLES(expr);
@@ -103,6 +105,80 @@ static PetscErrorCode EvaluateTemporalSolution(void *expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
+// Computes the prescribed MMS heat flux at one time without changing any
+// production forcing state. The MMS driver selects the temporal quadrature
+// for this source before invoking the heat TS.
+static PetscErrorCode ComputeMMSHeatSource(RDy rdy, PetscReal time, PetscReal source[]) {
+  PetscFunctionBegin;
+
+  PetscInt N;
+  PetscCall(RDyGetNumOwnedCells(rdy, &N));
+
+  PetscReal *cell_x, *cell_y;
+  PetscCall(PetscCalloc1(N, &cell_x));
+  PetscCall(PetscCalloc1(N, &cell_y));
+  PetscInt l = 0;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (rdy->mesh.cells.is_owned[icell]) {
+      cell_x[l] = rdy->mesh.cells.centroids[icell].X[0];
+      cell_y[l] = rdy->mesh.cells.centroids[icell].X[1];
+      ++l;
+    }
+  }
+
+  PetscReal *h, *u, *v, *T;
+  PetscReal *dhdx, *dhdy, *dhdt, *dudx, *dvdy;
+  PetscReal *dTdx, *dTdy, *dTdt;
+  PetscCall(PetscCalloc1(N, &h));
+  PetscCall(PetscCalloc1(N, &u));
+  PetscCall(PetscCalloc1(N, &v));
+  PetscCall(PetscCalloc1(N, &T));
+  PetscCall(PetscCalloc1(N, &dhdx));
+  PetscCall(PetscCalloc1(N, &dhdy));
+  PetscCall(PetscCalloc1(N, &dhdt));
+  PetscCall(PetscCalloc1(N, &dudx));
+  PetscCall(PetscCalloc1(N, &dvdy));
+  PetscCall(PetscCalloc1(N, &dTdx));
+  PetscCall(PetscCalloc1(N, &dTdy));
+  PetscCall(PetscCalloc1(N, &dTdt));
+
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.h, N, cell_x, cell_y, time, h));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.u, N, cell_x, cell_y, time, u));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.v, N, cell_x, cell_y, time, v));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdx, N, cell_x, cell_y, time, dhdx));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdy, N, cell_x, cell_y, time, dhdy));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dhdt, N, cell_x, cell_y, time, dhdt));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dudx, N, cell_x, cell_y, time, dudx));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdy, N, cell_x, cell_y, time, dvdy));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdx, N, cell_x, cell_y, time, dTdx));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdy, N, cell_x, cell_y, time, dTdy));
+  PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdt, N, cell_x, cell_y, time, dTdt));
+
+  for (PetscInt i = 0; i < N; ++i) {
+    source[i] = DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER *
+                (h[i] * dTdt[i] + T[i] * dhdt[i] + h[i] * u[i] * dTdx[i] + T[i] * h[i] * dudx[i] + T[i] * u[i] * dhdx[i] + h[i] * v[i] * dTdy[i] +
+                 T[i] * h[i] * dvdy[i] + T[i] * v[i] * dhdy[i]);
+  }
+
+  PetscCall(PetscFree(cell_x));
+  PetscCall(PetscFree(cell_y));
+  PetscCall(PetscFree(h));
+  PetscCall(PetscFree(u));
+  PetscCall(PetscFree(v));
+  PetscCall(PetscFree(T));
+  PetscCall(PetscFree(dhdx));
+  PetscCall(PetscFree(dhdy));
+  PetscCall(PetscFree(dhdt));
+  PetscCall(PetscFree(dudx));
+  PetscCall(PetscFree(dvdy));
+  PetscCall(PetscFree(dTdx));
+  PetscCall(PetscFree(dTdy));
+  PetscCall(PetscFree(dTdt));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // sets the z coordinate of refined mesh vertices to match the analytic value
 // z(x, y)
 static PetscErrorCode SnapVerticesToBathymetry(RDy rdy) {
@@ -110,7 +186,7 @@ static PetscErrorCode SnapVerticesToBathymetry(RDy rdy) {
 
   Vec          coordinates;
   PetscSection coordSection;
-  PetscScalar *coords;
+  PetscScalar* coords;
   PetscInt     v, vStart, vEnd, offset;
   PetscReal    x, y, z;
 
@@ -139,7 +215,7 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionBegin;
 
   RDy rdy;
-  PetscCall(TSGetApplicationContext(ts, (void *)&rdy));
+  PetscCall(TSGetApplicationContext(ts, (void*)&rdy));
 
   PetscReal t, dt;
   PetscCall(TSGetTime(ts, &t));
@@ -148,6 +224,49 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t + 0.5 * dt));
   PetscCall(RDyMMSComputeSourceTerms(rdy, t + 0.5 * dt));
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// TS post-step callback for MMS heat: applies the source quadrature associated
+// with the configured one-step implicit heat method after each transport step.
+// Manufactured expressions are only available in the MMS driver, so this
+// sampling intentionally remains outside HeatIFunction.
+static PetscErrorCode MMSPostStep(TS ts) {
+  PetscFunctionBegin;
+  RDy rdy;
+  PetscCall(TSGetApplicationContext(ts, (void*)&rdy));
+
+  PetscReal t0, t1;
+  PetscCall(TSGetPrevTime(ts, &t0));
+  PetscCall(TSGetTime(ts, &t1));
+
+  RDyHeat   heat = rdy->heat_context;
+  TSType    heat_ts_type;
+  PetscBool is_beuler, is_cn;
+  PetscCall(TSGetType(rdy->heat_ts, &heat_ts_type));
+  PetscCall(PetscStrcmp(heat_ts_type, TSBEULER, &is_beuler));
+  PetscCall(PetscStrcmp(heat_ts_type, TSCN, &is_cn));
+  PetscCheck(is_beuler || is_cn, rdy->comm, PETSC_ERR_SUP, "MMS heat source sampling supports only TSBEULER and TSCN, not '%s'", heat_ts_type);
+
+  if (is_beuler) {
+    PetscCall(ComputeMMSHeatSource(rdy, t1, heat->forcing.direct_source));
+  } else {
+    PetscInt   num_owned_cells;
+    PetscReal* left_source;
+    PetscCall(RDyGetNumOwnedCells(rdy, &num_owned_cells));
+    PetscCall(PetscMalloc1(num_owned_cells, &left_source));
+    PetscCall(ComputeMMSHeatSource(rdy, t0, left_source));
+    PetscCall(ComputeMMSHeatSource(rdy, t1, heat->forcing.direct_source));
+    for (PetscInt c = 0; c < num_owned_cells; ++c) {
+      heat->forcing.direct_source[c] = 0.5 * (left_source[c] + heat->forcing.direct_source[c]);
+    }
+    PetscCall(PetscFree(left_source));
+  }
+
+  heat->use_direct_source = PETSC_TRUE;
+  PetscCall(RDyHeatAdvance(rdy, t0, t1));
+  // Reset flag so stale MMS forcing cannot leak into subsequent non-MMS calls
+  heat->use_direct_source = PETSC_FALSE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -176,6 +295,9 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
+
+  PetscCheck(!(rdy->config.physics.heat && CeedEnabled()), rdy->comm, PETSC_ERR_USER,
+             "heat equation support is currently implemented only for the PETSc backend");
 
   // set names of solution components
   PetscStrncpy(mms_comp_names[0], " h ", MAX_NAME_LEN);
@@ -324,7 +446,7 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
 
   // Wire OutputVar references to Operator-owned vectors (must happen after InitOperator).
   {
-    Operator *op                      = rdy->operator;
+    Operator* op                      = rdy->operator;
     rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
     rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
     rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
@@ -339,6 +461,12 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   PetscCall(InitSolver(rdy));
 
   PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
+
+  if (rdy->config.physics.heat) {
+    RDyLogDebug(rdy, "Initializing MMS heat TS...");
+    PetscCall(RDyHeatCreate(rdy));
+    PetscCall(TSSetPostStep(rdy->ts, MMSPostStep));
+  }
 
   RDyLogDebug(rdy, "Initializing solution and source data...");
   PetscCall(RDyMMSComputeSolution(rdy, 0.0, rdy->u_global));
@@ -358,7 +486,7 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
   PetscInt n_local, ndof;
   PetscCall(VecGetLocalSize(solution, &n_local));
   PetscCall(VecGetBlockSize(solution, &ndof));
-  PetscScalar *x_ptr;
+  PetscScalar* x_ptr;
   PetscCall(VecGetArray(solution, &x_ptr));
 
   PetscInt flow_ndof;
@@ -423,11 +551,11 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
       if (num_sediment_classes > 0) {
         PetscInt   offset = 3;
-        PetscReal *ci;
+        PetscReal* ci;
         PetscCall(PetscCalloc1(region.num_local_cells, &ci));
         for (PetscInt i = 0; i < num_sediment_classes; ++i) {
           PetscInt l = 0;
-          PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci));
+          PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci));
           for (PetscInt c = 0; c < region.num_local_cells; ++c) {
             PetscInt cell_id = region.cell_local_ids[c];
             if (ndof * cell_id < n_local) {  // skip ghost cells
@@ -442,10 +570,10 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       // salinity concentration
       if (rdy->config.physics.salinity) {
         PetscInt   offset = 3 + num_sediment_classes;
-        PetscReal *s;
+        PetscReal* s;
         PetscInt   l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &s));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.salinity.solutions.S, N, cell_x, cell_y, time, s));
+        PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.salinity.solutions.S, N, cell_x, cell_y, time, s));
         for (PetscInt c = 0; c < region.num_local_cells; ++c) {
           PetscInt cell_id = region.cell_local_ids[c];
           if (ndof * cell_id < n_local) {  // skip ghost cells
@@ -459,10 +587,10 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
       // temperature profile
       if (rdy->config.physics.heat) {
         PetscInt   offset = 3 + num_sediment_classes + (rdy->config.physics.salinity ? 1 : 0);
-        PetscReal *T;
+        PetscReal* T;
         PetscInt   l = 0;
         PetscCall(PetscCalloc1(region.num_local_cells, &T));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
+        PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
         for (PetscInt c = 0; c < region.num_local_cells; ++c) {
           PetscInt cell_id = region.cell_local_ids[c];
           if (ndof * cell_id < n_local) {  // skip ghost cells
@@ -489,8 +617,8 @@ PetscErrorCode RDyMMSComputeSolution(RDy rdy, PetscReal time, Vec solution) {
 PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
   PetscFunctionBegin;
 
-  RDyMesh  *mesh  = &rdy->mesh;
-  RDyCells *cells = &mesh->cells;
+  RDyMesh*  mesh  = &rdy->mesh;
+  RDyCells* cells = &mesh->cells;
 
   PetscInt N;
   PetscCall(RDyGetNumOwnedCells(rdy, &N));
@@ -542,7 +670,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdy, N, cell_x, cell_y, time, dvdy));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.dvdt, N, cell_x, cell_y, time, dvdt));
 
-    PetscReal *n;
+    PetscReal* n;
     PetscCall(PetscCalloc1(N, &n));
     PetscCall(EvaluateTemporalSolution(rdy->config.mms.swe.solutions.n, N, cell_x, cell_y, time, n));
 
@@ -586,7 +714,7 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
     PetscInt num_sediment_classes = rdy->config.physics.sediment.num_classes;
     if (num_sediment_classes) {
       PetscReal *ci[MAX_NUM_SEDIMENT_CLASSES], *dcidx[MAX_NUM_SEDIMENT_CLASSES], *dcidy[MAX_NUM_SEDIMENT_CLASSES], *dcidt[MAX_NUM_SEDIMENT_CLASSES];
-      PetscReal *hci_source;
+      PetscReal* hci_source;
 
       PetscCall(PetscCalloc1(N, &hci_source));
       for (PetscInt i = 0; i < num_sediment_classes; ++i) {
@@ -597,10 +725,10 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
 
         // NOTE: we cast to void * here because sediment solutions are stored as
         // NOTE: pointer-sensible integers so they fit into an array
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.dcdx[i], N, cell_x, cell_y, time, dcidx[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.dcdy[i], N, cell_x, cell_y, time, dcidy[i]));
-        PetscCall(EvaluateTemporalSolution((void *)rdy->config.mms.sediment.solutions.dcdt[i], N, cell_x, cell_y, time, dcidt[i]));
+        PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.sediment.solutions.c[i], N, cell_x, cell_y, time, ci[i]));
+        PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.sediment.solutions.dcdx[i], N, cell_x, cell_y, time, dcidx[i]));
+        PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.sediment.solutions.dcdy[i], N, cell_x, cell_y, time, dcidy[i]));
+        PetscCall(EvaluateTemporalSolution((void*)rdy->config.mms.sediment.solutions.dcdt[i], N, cell_x, cell_y, time, dcidt[i]));
       }
 
       // FIXME: Need to move these constants into a struct that is specific to the erosion/deposition
@@ -659,26 +787,6 @@ PetscErrorCode RDyMMSComputeSourceTerms(RDy rdy, PetscReal time) {
       PetscCall(PetscFree(dsdt));
     }
 
-    PetscReal *T, *dTdx, *dTdy, *dTdt;
-    if (rdy->config.physics.heat) {
-      PetscCall(PetscCalloc1(N, &T));
-      PetscCall(PetscCalloc1(N, &dTdx));
-      PetscCall(PetscCalloc1(N, &dTdy));
-      PetscCall(PetscCalloc1(N, &dTdt));
-
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdx, N, cell_x, cell_y, time, dTdx));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdy, N, cell_x, cell_y, time, dTdy));
-      PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.dTdt, N, cell_x, cell_y, time, dTdt));
-
-      // TODO: heat transfer logic goes here!
-
-      PetscCall(PetscFree(T));
-      PetscCall(PetscFree(dTdx));
-      PetscCall(PetscFree(dTdy));
-      PetscCall(PetscFree(dTdt));
-    }
-
     PetscCall(PetscFree(h));
     PetscCall(PetscFree(u));
     PetscCall(PetscFree(v));
@@ -714,7 +822,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     // fetch x, y for each edge (and set t = time)
     RDyBoundary boundary  = rdy->boundaries[b];
     PetscInt    num_edges = boundary.num_edges;
-    PetscReal  *x, *y;
+    PetscReal * x, *y;
     PetscCall(PetscCalloc1(num_edges, &x));
     PetscCall(PetscCalloc1(num_edges, &y));
     for (PetscInt e = 0; e < num_edges; ++e) {
@@ -725,8 +833,8 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     }
 
     // compute h, hu, hv on each edge (SWE-specific)
-    RDyFlowCondition *flow_bc = rdy->boundary_conditions[b].flow;
-    PetscReal        *h, *u, *v;
+    RDyFlowCondition* flow_bc = rdy->boundary_conditions[b].flow;
+    PetscReal *       h, *u, *v;
     PetscCall(PetscCalloc1(num_edges, &h));
     PetscCall(PetscCalloc1(num_edges, &u));
     PetscCall(PetscCalloc1(num_edges, &v));
@@ -735,7 +843,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
     PetscCall(EvaluateTemporalSolution(flow_bc->y_momentum, num_edges, x, y, time, v));
 
     // set flow boundary values (SWE-specific, ndof == 3)
-    PetscReal *boundary_values;
+    PetscReal* boundary_values;
     PetscCall(PetscCalloc1(3 * num_edges, &boundary_values));
     for (PetscInt e = 0; e < num_edges; ++e) {
       boundary_values[3 * e]     = h[e];
@@ -750,7 +858,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       PetscReal *sediment_boundary_values, *ci;
       PetscCall(PetscCalloc1(num_sediment_classes * num_edges, &sediment_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &ci));
-      RDySedimentCondition *sediment_bc = rdy->boundary_conditions[b].sediment;
+      RDySedimentCondition* sediment_bc = rdy->boundary_conditions[b].sediment;
       for (PetscInt i = 0; i < num_sediment_classes; ++i) {
         PetscCall(EvaluateTemporalSolution(sediment_bc->classes[i].value, num_edges, x, y, time, ci));
         for (PetscInt e = 0; e < num_edges; ++e) {
@@ -765,7 +873,7 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       PetscReal *salinity_boundary_values, *s;
       PetscCall(PetscCalloc1(num_edges, &salinity_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &s));
-      RDySalinityCondition *salinity_bc = rdy->boundary_conditions[b].salinity;
+      RDySalinityCondition* salinity_bc = rdy->boundary_conditions[b].salinity;
       PetscCall(EvaluateTemporalSolution(salinity_bc->concentration, num_edges, x, y, time, s));
       for (PetscInt e = 0; e < num_edges; ++e) {
         salinity_boundary_values[e] = h[e] * s[e];
@@ -778,12 +886,12 @@ PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy rdy, PetscReal time) {
       PetscReal *temperature_boundary_values, *T;
       PetscCall(PetscCalloc1(num_edges, &temperature_boundary_values));
       PetscCall(PetscCalloc1(num_edges, &T));
-      RDyTemperatureCondition *temperature_bc = rdy->boundary_conditions[b].temperature;
-      PetscCall(EvaluateTemporalSolution(temperature_bc->temperature, num_edges, x, y, time, T));
+      RDyHeatCondition* heat_bc = rdy->boundary_conditions[b].heat;
+      PetscCall(EvaluateTemporalSolution(heat_bc->water_temperature, num_edges, x, y, time, T));
       for (PetscInt e = 0; e < num_edges; ++e) {
-        temperature_boundary_values[e] = h[e] * T[e];
+        temperature_boundary_values[e] = T[e];
       }
-      PetscCall(RDySetTemperatureDirichletBoundaryValues(rdy, b, num_edges, temperature_boundary_values));
+      PetscCall(RDySetHeatDirichletBoundaryValues(rdy, b, num_edges, temperature_boundary_values));
       PetscCall(PetscFree(temperature_boundary_values));
       PetscCall(PetscFree(T));
     }
@@ -847,8 +955,8 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
 // are all arrays large enough to store the number of dof. If non-NULL,
 // num_global_cells stores the number of distinct global cells and global_area
 // stores the total area covered by distinct global cells.
-PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms,
-                                       PetscInt *num_global_cells, PetscReal *global_area) {
+PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal* L1_norms, PetscReal* L2_norms, PetscReal* Linf_norms,
+                                       PetscInt* num_global_cells, PetscReal* global_area) {
   PetscFunctionBegin;
   // compute the error vector
   Vec error;
@@ -860,7 +968,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscCall(VecGetBlockSize(error, &ndof));
 
   // compute the componentwise error norms on local cells
-  PetscReal *e;
+  PetscReal* e;
   PetscCall(VecGetArray(error, &e));
   PetscReal area_sum = 0.0;
   memset(L1_norms, 0, ndof * sizeof(PetscReal));
@@ -902,7 +1010,7 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal *L1_no
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, PetscReal *L1_norms, PetscReal *L2_norms, PetscReal *Linf_norms) {
+static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_comps, PetscReal* L1_norms, PetscReal* L2_norms, PetscReal* Linf_norms) {
   PetscFunctionBegin;
   PetscPrintf(comm, "  Error norms at t = %g:\n", time);
   for (PetscInt c = 0; c < num_comps; ++c) {
@@ -917,7 +1025,7 @@ static PetscErrorCode PrintErrorNorms(MPI_Comm comm, PetscReal time, int num_com
 // mms section of the configuration and evolving the solution to the given time,
 // computing error norms for each component, and calculating rates of
 // convergence (and variances) with linear regression
-PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal *L1_conv_rates, PetscReal *L2_conv_rates, PetscReal *Linf_conv_rates) {
+PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates, PetscReal* L2_conv_rates, PetscReal* Linf_conv_rates) {
   PetscFunctionBegin;
 
   PetscReal final_time = rdy->config.time.stop;
@@ -1038,13 +1146,30 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
       CheckConvergence(c[i], 3 + i, L2);
       CheckConvergence(c[i], 3 + i, Linf);
     }
+    // Check temperature convergence separately using the T expected rates
+    if (rdy->config.physics.heat) {
+      PetscInt heat_index = 3 + rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0);
+      CheckConvergence(T, heat_index, L1);
+      CheckConvergence(T, heat_index, L2);
+      CheckConvergence(T, heat_index, Linf);
+    }
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
     PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
 
     // run the problem to completion and print error norms
-    while (!RDyFinished(rdy)) {
-      PetscCall(RDyAdvance(rdy));
+    if (rdy->config.physics.heat) {
+      // For MMS heat runs, use the transport TSSolve directly so MMSPostStep
+      // handles the second heat TSSolve after each transport step. Using
+      // RDyAdvance would trigger a duplicate heat solve.
+      PetscReal final_time = ConvertTimeToSeconds(rdy->config.time.stop, rdy->config.time.unit);
+      PetscCall(TSSetMaxTime(rdy->ts, final_time));
+      PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
+      PetscCall(TSSolve(rdy->ts, rdy->u_global));
+    } else {
+      while (!RDyFinished(rdy)) {
+        PetscCall(RDyAdvance(rdy));
+      }
     }
 
     // compute error norms for the final solution

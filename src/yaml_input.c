@@ -96,6 +96,7 @@ static const cyaml_schema_field_t physics_fields_schema[] = {
     CYAML_FIELD_MAPPING("flow", CYAML_FLAG_DEFAULT, RDyPhysicsSection, flow, physics_flow_fields_schema),
     CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, sediment, physics_sediment_fields_schema),
     CYAML_FIELD_BOOL("salinity", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, salinity),
+    CYAML_FIELD_BOOL("heat", CYAML_FLAG_OPTIONAL, RDyPhysicsSection, heat),
     CYAML_FIELD_END
 };
 
@@ -443,7 +444,7 @@ static const cyaml_schema_field_t region_condition_spec_fields_schema[] = {
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyRegionConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, sediment, 0),
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, salinity, 0),
-    CYAML_FIELD_STRING("temperature", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, temperature, 0),
+    CYAML_FIELD_STRING("heat", CYAML_FLAG_OPTIONAL, RDyRegionConditionSpec, heat, 0),
     CYAML_FIELD_END
 };
 
@@ -500,6 +501,7 @@ static const cyaml_schema_field_t boundary_condition_spec_fields_schema[] = {
     CYAML_FIELD_STRING("flow", CYAML_FLAG_DEFAULT, RDyBoundaryConditionSpec, flow, 1),
     CYAML_FIELD_STRING("sediment", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, sediment, 0),
     CYAML_FIELD_STRING("salinity", CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, salinity, 0),
+    CYAML_FIELD_STRING("heat",     CYAML_FLAG_OPTIONAL, RDyBoundaryConditionSpec, heat, 0),
     CYAML_FIELD_END
 };
 
@@ -609,6 +611,39 @@ static const cyaml_schema_value_t salinity_condition_entry = {
     CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDySalinityCondition, salinity_condition_fields_schema),
 };
 
+// -----------------------
+// heat_conditions section
+// -----------------------
+// - name: <name-of-heat-condition-1>
+//   type: <dirichlet|neumann|reflecting|critical>
+//   water_temperature: <value>         # water surface temperature (°C)
+//   downwelling_shortwave: <value>     # downwelling shortwave radiation (W/m²)
+//   downwelling_longwave: <value>      # downwelling longwave radiation (W/m²)
+//   wind_speed: <value>                # wind speed (m/s)
+//   air_temperature: <value>           # air temperature (°C)
+//   specific_humidity: <value>         # specific humidity (kg/kg)
+
+// schema for heat condition fields
+static const cyaml_schema_field_t heat_condition_fields_schema[] = {
+    CYAML_FIELD_STRING("name", CYAML_FLAG_DEFAULT, RDyHeatCondition, name, 1),
+    CYAML_FIELD_ENUM("type", CYAML_FLAG_DEFAULT, RDyHeatCondition, type, condition_types, CYAML_ARRAY_LEN(condition_types)),
+    CYAML_FIELD_STRING("water_temperature",     CYAML_FLAG_OPTIONAL, RDyHeatCondition, water_temperature_expression, 0),
+    CYAML_FIELD_STRING("downwelling_shortwave", CYAML_FLAG_OPTIONAL, RDyHeatCondition, downwelling_shortwave_expression, 0),
+    CYAML_FIELD_STRING("downwelling_longwave",  CYAML_FLAG_OPTIONAL, RDyHeatCondition, downwelling_longwave_expression, 0),
+    CYAML_FIELD_STRING("wind_speed",            CYAML_FLAG_OPTIONAL, RDyHeatCondition, wind_speed_expression, 0),
+    CYAML_FIELD_STRING("air_temperature",       CYAML_FLAG_OPTIONAL, RDyHeatCondition, air_temperature_expression, 0),
+    CYAML_FIELD_STRING("specific_humidity",     CYAML_FLAG_OPTIONAL, RDyHeatCondition, specific_humidity_expression, 0),
+    CYAML_FIELD_STRING("heat_flux",             CYAML_FLAG_OPTIONAL, RDyHeatCondition, heat_flux_expression, 0),
+    CYAML_FIELD_STRING("file",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, file, 1),
+    CYAML_FIELD_ENUM("format",   CYAML_FLAG_OPTIONAL, RDyHeatCondition, format, input_file_formats, CYAML_ARRAY_LEN(input_file_formats)),
+    CYAML_FIELD_END
+};
+
+// a single heat_conditions entry
+static const cyaml_schema_value_t heat_condition_entry = {
+    CYAML_VALUE_MAPPING(CYAML_FLAG_DEFAULT, RDyHeatCondition, heat_condition_fields_schema),
+};
+
 // ----------------
 // ensemble section
 // ----------------
@@ -633,6 +668,8 @@ static const cyaml_schema_field_t ensemble_member_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE("salinity_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE("heat_conditions", CYAML_FLAG_OPTIONAL | CYAML_FLAG_POINTER, RDyEnsembleMember, heat_conditions,
+                               &heat_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_END
 };
 
@@ -707,6 +744,14 @@ static const cyaml_schema_field_t mms_sediment_fields_schema[] = {
     CYAML_FIELD_END
 };
 
+static const cyaml_schema_field_t mms_temperature_fields_schema[] = {
+    CYAML_FIELD_STRING("T",    CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.T,    0),
+    CYAML_FIELD_STRING("dTdx", CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.dTdx, 0),
+    CYAML_FIELD_STRING("dTdy", CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.dTdy, 0),
+    CYAML_FIELD_STRING("dTdt", CYAML_FLAG_OPTIONAL, RDyMMSTemperatureSolutions, expressions.dTdt, 0),
+    CYAML_FIELD_END
+};
+
 static const cyaml_schema_field_t mms_error_norms_fields_schema[] = {
     CYAML_FIELD_FLOAT("L1", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, L1),
     CYAML_FIELD_FLOAT("L2", CYAML_FLAG_OPTIONAL, RDyMMSErrorNorms, L2),
@@ -737,7 +782,7 @@ static const cyaml_schema_field_t mms_fields_schema[] = {
     CYAML_FIELD_MAPPING("swe", CYAML_FLAG_OPTIONAL, RDyMMSSection, swe, mms_swe_fields_schema),
     CYAML_FIELD_MAPPING("sediment", CYAML_FLAG_OPTIONAL, RDyMMSSection, sediment, mms_sediment_fields_schema),
     CYAML_FIELD_MAPPING("salinity", CYAML_FLAG_OPTIONAL, RDyMMSSection, salinity, mms_sediment_fields_schema),
-    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSSection, temperature, mms_sediment_fields_schema),
+    CYAML_FIELD_MAPPING("temperature", CYAML_FLAG_OPTIONAL, RDyMMSSection, temperature, mms_temperature_fields_schema),
     CYAML_FIELD_MAPPING("convergence", CYAML_FLAG_OPTIONAL, RDyMMSSection, convergence, mms_convergence_fields_schema),
     CYAML_FIELD_END
 };
@@ -772,6 +817,8 @@ static const cyaml_schema_field_t config_fields_schema[] = {
                                &sediment_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_SEQUENCE_COUNT("salinity_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, salinity_conditions, num_salinity_conditions,
                                &salinity_condition_entry, 0, MAX_NUM_CONDITIONS),
+    CYAML_FIELD_SEQUENCE_COUNT("heat_conditions", CYAML_FLAG_OPTIONAL, RDyConfig, heat_conditions, num_heat_conditions,
+                               &heat_condition_entry, 0, MAX_NUM_CONDITIONS),
     CYAML_FIELD_MAPPING("ensemble", CYAML_FLAG_OPTIONAL, RDyConfig, ensemble, ensemble_fields_schema),
     CYAML_FIELD_END
 };
@@ -805,16 +852,16 @@ static const cyaml_schema_value_t mms_config_schema = {
 // clang-format on
 
 // CYAML log function (of type cyaml_log_fn_t)
-static void YamlLog(cyaml_log_t level, void *ctx, const char *fmt, va_list args) {
+static void YamlLog(cyaml_log_t level, void* ctx, const char* fmt, va_list args) {
   // render a log string
   char message[1024];
   vsnprintf(message, 1023, fmt, args);
-  MPI_Comm *comm = ctx;
+  MPI_Comm* comm = ctx;
   PetscFPrintf(*comm, stdout, "%s", message);
 }
 
 // CYAML memory allocation function (of type cyaml_mem_fn_t)
-static void *YamlAlloc(void *ctx, void *ptr, size_t size) {
+static void* YamlAlloc(void* ctx, void* ptr, size_t size) {
   if (size) {
     PetscRealloc(size, &ptr);
     return ptr;
@@ -826,7 +873,7 @@ static void *YamlAlloc(void *ctx, void *ptr, size_t size) {
 
 // parses the given YAML string into the given config representation using the
 // given configuration schema
-static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, const cyaml_schema_value_t *config_schema, RDyConfig **config) {
+static PetscErrorCode ParseYaml(MPI_Comm comm, const char* yaml_str, const cyaml_schema_value_t* config_schema, RDyConfig** config) {
   PetscFunctionBegin;
 
   // configure our YAML parser
@@ -837,9 +884,9 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, const cyaml
       .log_level = CYAML_LOG_WARNING,
   };
 
-  const uint8_t *yaml_data     = (const uint8_t *)yaml_str;
+  const uint8_t* yaml_data     = (const uint8_t*)yaml_str;
   size_t         yaml_data_len = strlen(yaml_str);
-  cyaml_err_t    err           = cyaml_load_data(yaml_data, yaml_data_len, &yaml_config, config_schema, (void **)config, NULL);
+  cyaml_err_t    err           = cyaml_load_data(yaml_data, yaml_data_len, &yaml_config, config_schema, (void**)config, NULL);
   PetscCheck(err == CYAML_OK, comm, PETSC_ERR_USER, "Error parsing config file: %s", cyaml_strerror(err));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -848,7 +895,7 @@ static PetscErrorCode ParseYaml(MPI_Comm comm, const char *yaml_str, const cyaml
 // sets missing parameters to their default values for the parameters
 #define SET_MISSING_PARAMETER(param, value) \
   if (!param) param = value
-static PetscErrorCode SetMissingValues(RDyConfig *config) {
+static PetscErrorCode SetMissingValues(RDyConfig* config) {
   PetscFunctionBegin;
 
   SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
@@ -890,7 +937,7 @@ static PetscErrorCode SetMissingValues(RDyConfig *config) {
 #undef SET_MISSING_PARAMETER
 
 // checks config for any invalid or omitted parameters
-static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool mms_mode) {
+static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool mms_mode) {
   PetscFunctionBegin;
 
   // check ensemble settings
@@ -1058,7 +1105,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // validate our flow conditions
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
-    const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
+    const RDyFlowCondition* flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
     if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
       PetscCheck(flow_cond->height_expression[0] || flow_cond->file[0] || flow_cond->value_expression[0], comm, PETSC_ERR_USER,
@@ -1070,7 +1117,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // validate sediment conditions
   for (PetscInt i = 0; i < config->num_sediment_conditions; ++i) {
-    const RDySedimentCondition *sed_cond = &config->sediment_conditions[i];
+    const RDySedimentCondition* sed_cond = &config->sediment_conditions[i];
     PetscCheck(sed_cond->type >= 0, comm, PETSC_ERR_USER, "Sediment condition type not set in sediment_conditions.%s", sed_cond->name);
     for (PetscInt j = 0; j < config->physics.sediment.num_classes; ++j) {
       PetscCheck(sed_cond->classes[j].expression[0] || sed_cond->classes[j].file[0], comm, PETSC_ERR_USER,
@@ -1080,9 +1127,42 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
   // validate salinity conditions
   for (PetscInt i = 0; i < config->num_salinity_conditions; ++i) {
-    const RDySalinityCondition *sal_cond = &config->salinity_conditions[i];
+    const RDySalinityCondition* sal_cond = &config->salinity_conditions[i];
     PetscCheck(sal_cond->type >= 0, comm, PETSC_ERR_USER, "Salinity condition type not set in salinity_conditions.%s", sal_cond->name);
     PetscCheck(sal_cond->expression[0], comm, PETSC_ERR_USER, "Missing salinity concentration for salinity_conditions.%s", sal_cond->name);
+  }
+
+  // validate heat conditions
+  for (PetscInt i = 0; i < config->num_heat_conditions; ++i) {
+    const RDyHeatCondition* heat_cond = &config->heat_conditions[i];
+    PetscCheck(heat_cond->type >= 0, comm, PETSC_ERR_USER, "Heat condition type not set in heat_conditions.%s", heat_cond->name);
+    if (heat_cond->type == CONDITION_RUNOFF) {
+      if (heat_cond->heat_flux_expression[0]) {
+        // heat_flux is an alternative to the 5-parameter atmospheric parameterization
+        PetscCheck(!heat_cond->downwelling_shortwave_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and downwelling_shortwave cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->downwelling_longwave_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and downwelling_longwave cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->wind_speed_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and wind_speed cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->air_temperature_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and air_temperature cannot both be specified for heat_conditions.%s", heat_cond->name);
+        PetscCheck(!heat_cond->specific_humidity_expression[0], comm, PETSC_ERR_USER,
+                   "heat_flux and specific_humidity cannot both be specified for heat_conditions.%s", heat_cond->name);
+      } else {
+        PetscCheck(heat_cond->downwelling_shortwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_shortwave for heat_conditions.%s",
+                   heat_cond->name);
+        PetscCheck(heat_cond->downwelling_longwave_expression[0], comm, PETSC_ERR_USER, "Missing downwelling_longwave for heat_conditions.%s",
+                   heat_cond->name);
+        PetscCheck(heat_cond->wind_speed_expression[0], comm, PETSC_ERR_USER, "Missing wind_speed for heat_conditions.%s", heat_cond->name);
+        PetscCheck(heat_cond->air_temperature_expression[0], comm, PETSC_ERR_USER, "Missing air_temperature for heat_conditions.%s", heat_cond->name);
+        PetscCheck(heat_cond->specific_humidity_expression[0], comm, PETSC_ERR_USER, "Missing specific_humidity for heat_conditions.%s",
+                   heat_cond->name);
+      }
+    } else if (heat_cond->type == CONDITION_DIRICHLET) {
+      PetscCheck(heat_cond->water_temperature_expression[0] || heat_cond->file[0], comm, PETSC_ERR_USER,
+                 "Missing water_temperature for heat_conditions.%s", heat_cond->name);
+    }
   }
 
   // validate output options
@@ -1118,32 +1198,44 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
 
     if (config->output.fields_count > 0) {
       // non-indexed fields: validated by exact string comparison
-      static const char *exact_output_fields[] = {
+      static const char* exact_output_fields[] = {
           "Height",
           "MomentumX",
           "MomentumY",
+          "Salinity",
+          "Temperature",
+          "HeatMassPerUnitArea",
           "WaterSource",
           "MomentumXSource",
           "MomentumYSource",
+          "SalinitySource",
+          "HeatSource",
           // solution mean fields
           "Height_Mean",
           "MomentumX_Mean",
           "MomentumY_Mean",
+          "Salinity_Mean",
+          "HeatMassPerUnitArea_Mean",
           // primitive variable mean fields
           "VelocityX_Mean",
           "VelocityY_Mean",
+          "SalinityConcentration_Mean",
+          "Temperature_Mean",
           // primitive variable instantaneous fields (Height excluded — comes from u_global)
           "VelocityX",
           "VelocityY",
+          "SalinityConcentration",
           // source mean fields
           "WaterSource_Mean",
           "MomentumXSource_Mean",
           "MomentumYSource_Mean",
+          "SalinitySource_Mean",
+          "HeatSource_Mean",
           NULL,
       };
       // indexed fields: validated by substituting [0, num_configured_classes)
       // Each entry is a printf-style pattern that takes a single PetscInt index.
-      static const char *indexed_output_fields[] = {
+      static const char* indexed_output_fields[] = {
           "SedimentMassPerUnitArea%" PetscInt_FMT,
           "SedimentMassPerUnitArea%" PetscInt_FMT "Source",
           "SedimentMassPerUnitArea%" PetscInt_FMT "_Mean",
@@ -1200,9 +1292,9 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#define DEFINE_CONSTANT(model, function, constants, name) mupDefineConst((void *)model->solutions.function, #name, constants->name)
+#define DEFINE_CONSTANT(model, function, constants, name) mupDefineConst((void*)model->solutions.function, #name, constants->name)
 
-#define DEFINE_CONSTANT_I(model, function, constants) mupDefineConst((void *)model->solutions.function, "I", constants->I_)
+#define DEFINE_CONSTANT_I(model, function, constants) mupDefineConst((void*)model->solutions.function, "I", constants->I_)
 
 #define DEFINE_CONSTANTS_FOR_FUNCTION(model, function, constants) \
   DEFINE_CONSTANT(model, function, constants, A);                 \
@@ -1232,15 +1324,15 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   DEFINE_CONSTANT(model, function, constants, Y);                 \
   DEFINE_CONSTANT(model, function, constants, Z)
 
-#define DEFINE_FUNCTION(model, constants, function)                             \
-  {                                                                             \
-    void *solution            = mupCreate(muBASETYPE_FLOAT);                    \
-    model->solutions.function = (typeof(model->solutions.function))solution;    \
-    mupSetExpr((void *)model->solutions.function, model->expressions.function); \
-    DEFINE_CONSTANTS_FOR_FUNCTION(model, function, constants);                  \
+#define DEFINE_FUNCTION(model, constants, function)                            \
+  {                                                                            \
+    void* solution            = mupCreate(muBASETYPE_FLOAT);                   \
+    model->solutions.function = (typeof(model->solutions.function))solution;   \
+    mupSetExpr((void*)model->solutions.function, model->expressions.function); \
+    DEFINE_CONSTANTS_FOR_FUNCTION(model, function, constants);                 \
   }
 
-static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSWESolutions *swe) {
+static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstants* constants, RDyMMSSWESolutions* swe) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relavent variables (e.g. x, y or x, y, t)
@@ -1270,8 +1362,8 @@ static PetscErrorCode ParseSWEManufacturedSolutions(MPI_Comm comm, RDyMMSConstan
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, PetscInt num_classes, RDyMMSConstants *constants,
-                                                         RDyMMSSedimentSolutions *sediments) {
+static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, PetscInt num_classes, RDyMMSConstants* constants,
+                                                         RDyMMSSedimentSolutions* sediments) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
@@ -1286,7 +1378,7 @@ static PetscErrorCode ParseSedimentManufacturedSolutions(MPI_Comm comm, PetscInt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSSalinitySolutions *salinity) {
+static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSConstants* constants, RDyMMSSalinitySolutions* salinity) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
@@ -1300,7 +1392,7 @@ static PetscErrorCode ParseSalinityManufacturedSolutions(MPI_Comm comm, RDyMMSCo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode ParseTemperatureManufacturedSolutions(MPI_Comm comm, RDyMMSConstants *constants, RDyMMSTemperatureSolutions *temperature) {
+static PetscErrorCode ParseTemperatureManufacturedSolutions(MPI_Comm comm, RDyMMSConstants* constants, RDyMMSTemperatureSolutions* temperature) {
   PetscFunctionBegin;
 
   // NOTE: you must define the relevant variables (e.g. x, y or x, y, t)
@@ -1316,7 +1408,7 @@ static PetscErrorCode ParseTemperatureManufacturedSolutions(MPI_Comm comm, RDyMM
 
 // parses mathematical expressions given for manufactured solutions, material
 // properties, initial/boundary conditions, etc
-static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
+static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig* config) {
   PetscFunctionBegin;
 
   if (config->mms.swe.expressions.h[0]) {
@@ -1337,7 +1429,7 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
 
   // material properties
   for (PetscInt m = 0; m < config->num_materials; ++m) {
-    RDyMaterialPropertiesSpec *properties = &config->materials[m].properties;
+    RDyMaterialPropertiesSpec* properties = &config->materials[m].properties;
     if (properties->manning.expression[0]) {
       properties->manning.value = mupCreate(muBASETYPE_FLOAT);
       mupSetExpr(properties->manning.value, properties->manning.expression);
@@ -1346,7 +1438,7 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
 
   // flow conditions
   for (PetscInt f = 0; f < config->num_flow_conditions; ++f) {
-    RDyFlowCondition *flow_cond = &config->flow_conditions[f];
+    RDyFlowCondition* flow_cond = &config->flow_conditions[f];
     flow_cond->height           = mupCreate(muBASETYPE_FLOAT);
     mupSetExpr(flow_cond->height, flow_cond->height_expression);
     flow_cond->x_momentum = mupCreate(muBASETYPE_FLOAT);
@@ -1359,7 +1451,7 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
 
   // sediment conditions
   for (PetscInt s = 0; s < config->num_sediment_conditions; ++s) {
-    RDySedimentCondition *sed_cond = &config->sediment_conditions[s];
+    RDySedimentCondition* sed_cond = &config->sediment_conditions[s];
     for (PetscInt i = 0; i < config->physics.sediment.num_classes; ++i) {
       sed_cond->classes[i].value = mupCreate(muBASETYPE_FLOAT);
       mupSetExpr(sed_cond->classes[i].value, sed_cond->classes[i].expression);
@@ -1368,9 +1460,42 @@ static PetscErrorCode ParseMathExpressions(MPI_Comm comm, RDyConfig *config) {
 
   // salinity conditions
   for (PetscInt s = 0; s < config->num_salinity_conditions; ++s) {
-    RDySalinityCondition *sal_cond = &config->salinity_conditions[s];
+    RDySalinityCondition* sal_cond = &config->salinity_conditions[s];
     sal_cond->concentration        = mupCreate(muBASETYPE_FLOAT);
     mupSetExpr(sal_cond->concentration, sal_cond->expression);
+  }
+
+  // heat conditions
+  for (PetscInt h = 0; h < config->num_heat_conditions; ++h) {
+    RDyHeatCondition* heat_cond = &config->heat_conditions[h];
+    if (heat_cond->water_temperature_expression[0]) {
+      heat_cond->water_temperature = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->water_temperature, heat_cond->water_temperature_expression);
+    }
+    if (heat_cond->downwelling_shortwave_expression[0]) {
+      heat_cond->downwelling_shortwave = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->downwelling_shortwave, heat_cond->downwelling_shortwave_expression);
+    }
+    if (heat_cond->downwelling_longwave_expression[0]) {
+      heat_cond->downwelling_longwave = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->downwelling_longwave, heat_cond->downwelling_longwave_expression);
+    }
+    if (heat_cond->wind_speed_expression[0]) {
+      heat_cond->wind_speed = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->wind_speed, heat_cond->wind_speed_expression);
+    }
+    if (heat_cond->air_temperature_expression[0]) {
+      heat_cond->air_temperature = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->air_temperature, heat_cond->air_temperature_expression);
+    }
+    if (heat_cond->specific_humidity_expression[0]) {
+      heat_cond->specific_humidity = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->specific_humidity, heat_cond->specific_humidity_expression);
+    }
+    if (heat_cond->heat_flux_expression[0]) {
+      heat_cond->heat_flux = mupCreate(muBASETYPE_FLOAT);
+      mupSetExpr(heat_cond->heat_flux, heat_cond->heat_flux_expression);
+    }
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1467,8 +1592,8 @@ static PetscErrorCode SetAdditionalOptions(RDy rdy) {
 }
 
 typedef struct {
-  const char *pattern;
-  const char *substitution;
+  const char* pattern;
+  const char* substitution;
 } Substitution;
 
 // supported string substitutions
@@ -1480,18 +1605,18 @@ static const Substitution substitutions[] = {
 // ON RANK 0 ONLY, reads the given file and performs the given set of string
 // substitutions, storing the resulting (newly allocated) string in content
 // and its size in content_size
-static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, const Substitution substitutions[], char **content,
-                                        PetscMPIInt *content_size) {
+static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char* filename, const Substitution substitutions[], char** content,
+                                        PetscMPIInt* content_size) {
   PetscFunctionBegin;
 
-  FILE *file = NULL;
+  FILE* file = NULL;
   PetscCall(PetscFOpen(comm, filename, "r", &file));
 
   // determine the file's size and read it into a buffer
   fseek(file, 0, SEEK_END);
   PetscMPIInt raw_size = (PetscMPIInt)ftell(file);
   rewind(file);
-  char *raw_content;
+  char* raw_content;
   PetscCall(PetscCalloc1(raw_size + 1, &raw_content));
   fread(raw_content, sizeof(char), raw_size, file);
   PetscCall(PetscFClose(comm, file));
@@ -1504,7 +1629,7 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
     const Substitution sub         = substitutions[s];
     PetscInt           pattern_len = (PetscInt)strlen(sub.pattern);
     PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
-    char              *p           = raw_content;
+    char*              p           = raw_content;
     while (p != NULL) {
       p = strstr(p, sub.pattern);
       if (p != NULL) {
@@ -1522,9 +1647,9 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
       const Substitution sub         = substitutions[s];
       PetscInt           subst_len   = (PetscInt)strlen(sub.substitution);
       PetscInt           pattern_len = (PetscInt)strlen(sub.pattern);
-      char              *p = raw_content, *q = *content;
+      char *             p = raw_content, *q = *content;
       while (p != NULL) {
-        char *new_p = strstr(p, sub.pattern);
+        char* new_p = strstr(p, sub.pattern);
         if (new_p != NULL) {
           memcpy(q, p, new_p - p);
           q += new_p - p;
@@ -1549,11 +1674,11 @@ static PetscErrorCode ReadAndSubstitute(MPI_Comm comm, const char *filename, con
 }
 
 /// Determines the prefix of the YAML configuration file.
-PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
+PetscErrorCode DetermineConfigPrefix(RDy rdy, char* prefix) {
   PetscFunctionBegin;
 
   memset(prefix, 0, sizeof(char) * (strlen(rdy->config_file) + 1));
-  char *p = strstr(rdy->config_file, ".yaml");
+  char* p = strstr(rdy->config_file, ".yaml");
   if (!p) {  // could be .yml, I suppose (Windows habits die hard!)
     p = strstr(rdy->config_file, ".yml");
   }
@@ -1568,7 +1693,7 @@ PetscErrorCode DetermineConfigPrefix(RDy rdy, char *prefix) {
 
 // reads the config file on process 0, broadcasts it as a string to all other
 // processes, making it available as config_str
-static PetscErrorCode ReadAndBroadcastConfigFile(RDy rdy, char **config_str) {
+static PetscErrorCode ReadAndBroadcastConfigFile(RDy rdy, char** config_str) {
   PetscFunctionBegin;
   PetscMPIInt config_size;
   if (rdy->rank == 0) {
@@ -1594,11 +1719,11 @@ static PetscErrorCode ReadAndBroadcastConfigFile(RDy rdy, char **config_str) {
 PetscErrorCode ReadConfigFile(RDy rdy) {
   PetscFunctionBegin;
 
-  char *config_str;
+  char* config_str;
   PetscCall(ReadAndBroadcastConfigFile(rdy, &config_str));
 
   // parse the YAML config file into a new config struct and validate it
-  RDyConfig *config;
+  RDyConfig* config;
   PetscCall(ParseYaml(rdy->comm, config_str, &config_schema, &config));
   PetscCall(SetMissingValues(config));
   PetscCall(ValidateConfig(rdy->comm, config, PETSC_FALSE));
@@ -1634,11 +1759,11 @@ PetscErrorCode ReadConfigFile(RDy rdy) {
 PetscErrorCode ReadMMSConfigFile(RDy rdy) {
   PetscFunctionBegin;
 
-  char *config_str;
+  char* config_str;
   PetscCall(ReadAndBroadcastConfigFile(rdy, &config_str));
 
   // parse the YAML config file into a new config struct and validate it
-  RDyConfig *config;
+  RDyConfig* config;
   PetscCall(ParseYaml(rdy->comm, config_str, &mms_config_schema, &config));
   PetscCall(SetMissingValues(config));
   PetscCall(ValidateConfig(rdy->comm, config, PETSC_TRUE));
@@ -1672,7 +1797,7 @@ PetscErrorCode ReadMMSConfigFile(RDy rdy) {
 //  PrintConfig
 // =============
 
-static const char *FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
+static const char* FlagString(PetscBool flag) { return flag ? "enabled" : "disabled"; }
 
 static PetscErrorCode PrintEnsemble(RDy rdy) {
   PetscFunctionBegin;
@@ -1689,21 +1814,22 @@ static PetscErrorCode PrintPhysics(RDy rdy) {
   RDyLogDetail(rdy, "  Flow:");
   RDyLogDetail(rdy, "  Sediment model: %s", FlagString(rdy->config.physics.sediment.num_classes > 0));
   RDyLogDetail(rdy, "  Salinity model: %s", FlagString(rdy->config.physics.salinity));
+  RDyLogDetail(rdy, "  Heat model: %s", FlagString(rdy->config.physics.heat));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static const char *SpatialString(RDyNumericsSpatial method) {
-  static const char *strings[2] = {"finite volume (FV)", "finite element (FE)"};
+static const char* SpatialString(RDyNumericsSpatial method) {
+  static const char* strings[2] = {"finite volume (FV)", "finite element (FE)"};
   return strings[method];
 }
 
-static const char *TemporalString(RDyNumericsTemporal method) {
-  static const char *strings[3] = {"forward euler", "4th-order Runge-Kutta", "backward euler"};
+static const char* TemporalString(RDyNumericsTemporal method) {
+  static const char* strings[3] = {"forward euler", "4th-order Runge-Kutta", "backward euler"};
   return strings[method];
 }
 
-static const char *RiemannString(RDyNumericsRiemann solver) {
-  static const char *strings[2] = {"roe", "hllc"};
+static const char* RiemannString(RDyNumericsRiemann solver) {
+  static const char* strings[2] = {"roe", "hllc"};
   return strings[solver];
 }
 
@@ -1716,8 +1842,8 @@ static PetscErrorCode PrintNumerics(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static const char *TimeUnitString(RDyTimeUnit unit) {
-  static const char *strings[6] = {"seconds", "minutes", "hours", "days", "months", "years"};
+static const char* TimeUnitString(RDyTimeUnit unit) {
+  static const char* strings[6] = {"seconds", "minutes", "hours", "days", "months", "years"};
   return strings[unit];
 }
 
@@ -1801,7 +1927,7 @@ static PetscErrorCode DestroyMMSConstants(RDyMMSConstants *mms_constants) {
 }
 */
 
-static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions *swe_mms) {
+static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions* swe_mms) {
   PetscFunctionBegin;
   mupRelease(swe_mms->solutions.h);
   mupRelease(swe_mms->solutions.dhdx);
@@ -1819,29 +1945,29 @@ static PetscErrorCode DestroySWEManufacturedSolutions(RDyMMSSWESolutions *swe_mm
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroySedimentManufacturedSolutions(RDyMMSSedimentSolutions *sed_mms) {
+static PetscErrorCode DestroySedimentManufacturedSolutions(RDyMMSSedimentSolutions* sed_mms) {
   PetscFunctionBegin;
   for (PetscInt i = 0; i < MAX_NUM_SEDIMENT_CLASSES; ++i) {
     if (sed_mms->expressions.c[i][0]) {
-      mupRelease((void *)sed_mms->solutions.c[i]);
+      mupRelease((void*)sed_mms->solutions.c[i]);
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroySalinityManufacturedSolutions(RDyMMSSalinitySolutions *sed_mms) {
+static PetscErrorCode DestroySalinityManufacturedSolutions(RDyMMSSalinitySolutions* sed_mms) {
   PetscFunctionBegin;
-  mupRelease((void *)sed_mms->solutions.S);
+  mupRelease((void*)sed_mms->solutions.S);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyTemperatureManufacturedSolutions(RDyMMSTemperatureSolutions *sed_mms) {
+static PetscErrorCode DestroyTemperatureManufacturedSolutions(RDyMMSTemperatureSolutions* sed_mms) {
   PetscFunctionBegin;
-  mupRelease((void *)sed_mms->solutions.T);
+  mupRelease((void*)sed_mms->solutions.T);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode DestroyManufacturedSolutions(RDyMMSSection *mms) {
+static PetscErrorCode DestroyManufacturedSolutions(RDyMMSSection* mms) {
   PetscFunctionBegin;
 
   if (mms->swe.expressions.h[0]) {
@@ -1867,14 +1993,14 @@ PetscErrorCode DestroyConfig(RDy rdy) {
   PetscCall(DestroyManufacturedSolutions(&rdy->config.mms));
 
   for (PetscInt m = 0; m < rdy->config.num_materials; ++m) {
-    RDyMaterialPropertiesSpec *properties = &rdy->config.materials[m].properties;
+    RDyMaterialPropertiesSpec* properties = &rdy->config.materials[m].properties;
     if (properties->manning.expression[0]) {
       mupRelease(properties->manning.value);
     }
   }
 
   for (PetscInt f = 0; f < rdy->config.num_flow_conditions; ++f) {
-    RDyFlowCondition *flow_cond = &rdy->config.flow_conditions[f];
+    RDyFlowCondition* flow_cond = &rdy->config.flow_conditions[f];
     mupRelease(flow_cond->height);
     mupRelease(flow_cond->x_momentum);
     mupRelease(flow_cond->y_momentum);
@@ -1882,15 +2008,26 @@ PetscErrorCode DestroyConfig(RDy rdy) {
   }
 
   for (PetscInt s = 0; s < rdy->config.num_sediment_conditions; ++s) {
-    RDySedimentCondition *sed_cond = &rdy->config.sediment_conditions[s];
+    RDySedimentCondition* sed_cond = &rdy->config.sediment_conditions[s];
     for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
       mupRelease(sed_cond->classes[i].value);
     }
   }
 
   for (PetscInt s = 0; s < rdy->config.num_salinity_conditions; ++s) {
-    RDySalinityCondition *sal_cond = &rdy->config.salinity_conditions[s];
+    RDySalinityCondition* sal_cond = &rdy->config.salinity_conditions[s];
     mupRelease(sal_cond->concentration);
+  }
+
+  for (PetscInt h = 0; h < rdy->config.num_heat_conditions; ++h) {
+    RDyHeatCondition* heat_cond = &rdy->config.heat_conditions[h];
+    if (heat_cond->water_temperature) mupRelease(heat_cond->water_temperature);
+    if (heat_cond->downwelling_shortwave) mupRelease(heat_cond->downwelling_shortwave);
+    if (heat_cond->downwelling_longwave) mupRelease(heat_cond->downwelling_longwave);
+    if (heat_cond->wind_speed) mupRelease(heat_cond->wind_speed);
+    if (heat_cond->air_temperature) mupRelease(heat_cond->air_temperature);
+    if (heat_cond->specific_humidity) mupRelease(heat_cond->specific_humidity);
+    if (heat_cond->heat_flux) mupRelease(heat_cond->heat_flux);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

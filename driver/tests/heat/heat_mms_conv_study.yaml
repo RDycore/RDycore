@@ -1,0 +1,91 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+# Method of Manufactured Solutions for SWE + heat spatial convergence (Case 2).
+# The second heat TSSolve uses direct_source = Q_mms (computed per cell from
+# the manufactured solution derivatives). All spatial error comes from the FV
+# upwind transport of hT in the transport TSSolve.
+# Expected convergence: ~O(dx) for T (1st-order upwind), consistent with h/hu/hv.
+mms:
+  constants:
+    H: 0.005   # water height scale factor
+    W: 20.0    # time scale for SWE (s)
+    U: 0.025   # x-velocity scale factor
+    V: 0.025   # y-velocity scale factor
+    N: 0.01    # Manning coefficient scale factor
+    Z: 0.0025  # elevation scale factor
+    A: 5.0     # temperature scale factor (deg C)
+    T: 20.0    # temperature time scale (s)
+    K: 0.6283185307179586  # wave number (pi/5)
+
+  swe:
+    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/W)
+    dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/W)
+    dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/W)
+    dhdt: H / W * (1 + sin(K*x)*sin(K*y)) * exp(t/W)
+    u:     U * cos(K*x) * sin(K*y) * exp(t/W)
+    dudx: -U * K * sin(K*x) * sin(K*y) * exp(t/W)
+    dudy:  U * K * cos(K*x) * cos(K*y) * exp(t/W)
+    dudt:  U / W * cos(K*x) * sin(K*y) * exp(t/W)
+    v:     V * sin(K*x) * cos(K*y) * exp(t/W)
+    dvdx:  K * V * cos(K*x) * cos(K*y) * exp(t/W)
+    dvdy: -K * V * sin(K*x) * sin(K*y) * exp(t/W)
+    dvdt:  V / W * sin(K*x) * cos(K*y) * exp(t/W)
+    z:     Z * sin(K*x) * sin(K*y)
+    dzdx:  Z * K * cos(K*x) * sin(K*y)
+    dzdy:  Z * K * sin(K*x) * cos(K*y)
+    n:     N * (1 + sin(K*x) * sin(K*y))
+
+  temperature:
+    T:    A * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dTdx: A * K * sin(K*y) * cos(K*x) * exp(t/T)
+    dTdy: A * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dTdt: A / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+
+  convergence:
+    num_refinements: 3
+    base_refinement: 1
+    expected_rates:
+      h:
+        L1: 0.94
+        L2: 0.95
+        Linf: 0.94
+      hu:
+        L1: 0.91
+        L2: 0.93
+        Linf: 0.77
+      hv:
+        L1: 0.91
+        L2: 0.93
+        Linf: 0.77
+      T:
+        L1: 0.90
+        L2: 0.91
+        Linf: 0.75
+
+logging:
+  level: none
+
+time:
+  time_step: 0.01
+  unit: seconds
+  stop: 5.0
+  coupling_interval: 0.01
+
+grid:
+  file: mms_triangles_dx1.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+boundaries:
+  - name: domain_boundary
+    grid_boundary_id: 1

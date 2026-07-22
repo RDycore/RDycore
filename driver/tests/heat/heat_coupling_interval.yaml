@@ -1,0 +1,62 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: none
+
+# RDyAdvance spans one second while the transport TS takes four 0.25-second
+# steps. With h=1 m and Q=rho_w*Cp_w W/m^2, the full coupling interval must
+# increase the temperature from 20 C to 21 C.
+time:
+  time_step: 0.25
+  unit: seconds
+  stop: 1.0
+  coupling_interval: 1.0
+
+grid:
+  file: mms_triangles_dx1.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: flat_domain
+
+materials:
+  - name: flat_domain
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: domain
+    flow: lake_at_rest
+    heat: initial_temperature
+
+sources:
+  - region: domain
+    heat: constant_heat_flux
+
+flow_conditions:
+  - name: lake_at_rest
+    type: dirichlet
+    height: 1.0
+    x_momentum: 0.0
+    y_momentum: 0.0
+
+heat_conditions:
+  - name: initial_temperature
+    type: dirichlet
+    water_temperature: 20.0
+  - name: constant_heat_flux
+    type: runoff
+    heat_flux: 4186000.0
