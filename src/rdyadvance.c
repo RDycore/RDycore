@@ -365,12 +365,10 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscPreLoadEnd();
 
   if (rdy->config.physics.heat) {
+    // Production heat forcing is currently autonomous, so evaluating it at the
+    // coupling interval's left endpoint preserves the existing behavior.
     PetscCall(RDyHeatUpdateForcing(rdy, time));
-    PetscCall(TSSetTime(rdy->heat_ts, 0.0));
-    PetscCall(TSSetMaxTime(rdy->heat_ts, rdy->dt));
-    PetscCall(TSSetExactFinalTime(rdy->heat_ts, TS_EXACTFINALTIME_MATCHSTEP));
-    PetscCall(TSSetTimeStep(rdy->heat_ts, rdy->dt));
-    PetscCall(TSSolve(rdy->heat_ts, rdy->u_global));
+    PetscCall(RDyHeatAdvance(rdy, time, next_coupling_time));
   }
 
   if (time_adapt->enable) {

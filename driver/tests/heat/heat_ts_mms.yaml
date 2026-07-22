@@ -8,10 +8,12 @@ numerics:
   temporal: euler
   riemann: roe
 
-# Method of Manufactured Solutions for SNES heat source isolation (Case 1).
+# Method of Manufactured Solutions for heat TS source isolation (Case 1).
 # Flow is stationary (u=v=0, h=H0 constant), so TSSolve introduces no
-# transport error. All numerical error comes from the Euler time discretization
-# of the SNES heat source step. Expected convergence: O(dt) for T.
+# transport error. The MMS driver samples the prescribed source at the right
+# endpoint for backward Euler and with the trapezoidal average for
+# Crank-Nicolson. Expected temperature convergence is O(dt) for backward Euler
+# and O(dt^2) for Crank-Nicolson.
 mms:
   constants:
     H: 1.0      # constant water depth (m)

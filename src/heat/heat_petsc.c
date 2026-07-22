@@ -157,8 +157,8 @@ static PetscErrorCode FillForcingFromSources(RDy rdy) {
     if (src.heat->heat_flux) {
       PetscReal qnet = mupEval(src.heat->heat_flux);
       for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
-        PetscInt owned_cell                        = region.owned_cell_global_ids[c];
-        heat->forcing.direct_source[owned_cell]    = qnet;
+        PetscInt owned_cell                     = region.owned_cell_global_ids[c];
+        heat->forcing.direct_source[owned_cell] = qnet;
       }
       heat->use_direct_source = PETSC_TRUE;
       continue;
@@ -236,5 +236,20 @@ PetscErrorCode RDyHeatUpdateForcing(RDy rdy, PetscReal time) {
   PetscFunctionBegin;
   (void)time;
   rdy->heat_context->dt = rdy->dt;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode RDyHeatAdvance(RDy rdy, PetscReal start_time, PetscReal end_time) {
+  PetscFunctionBegin;
+  PetscCheck(end_time > start_time, rdy->comm, PETSC_ERR_ARG_OUTOFRANGE, "Heat end time %g must be greater than start time %g", (double)end_time,
+             (double)start_time);
+
+  PetscReal interval = end_time - start_time;
+  PetscCall(TSSetTime(rdy->heat_ts, start_time));
+  PetscCall(TSSetMaxTime(rdy->heat_ts, end_time));
+  PetscCall(TSSetExactFinalTime(rdy->heat_ts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetTimeStep(rdy->heat_ts, interval));
+  PetscCall(TSSolve(rdy->heat_ts, rdy->u_global));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -27,5 +27,6 @@ struct _RDyHeat {
 PETSC_INTERN PetscErrorCode RDyHeatCreate(RDy);
 PETSC_INTERN PetscErrorCode RDyHeatDestroy(RDy);
 PETSC_INTERN PetscErrorCode RDyHeatUpdateForcing(RDy, PetscReal);
+PETSC_INTERN PetscErrorCode RDyHeatAdvance(RDy, PetscReal, PetscReal);
 
 #endif

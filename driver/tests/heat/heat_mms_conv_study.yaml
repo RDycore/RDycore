@@ -9,9 +9,9 @@ numerics:
   riemann: roe
 
 # Method of Manufactured Solutions for SWE + heat spatial convergence (Case 2).
-# The SNES uses direct_source = Q_mms (computed per cell from the manufactured
-# solution derivatives), making the SNES step linear (converges in 1 Newton
-# step). All spatial error comes from the FV upwind transport of hT in TSSolve.
+# The second heat TSSolve uses direct_source = Q_mms (computed per cell from
+# the manufactured solution derivatives). All spatial error comes from the FV
+# upwind transport of hT in the transport TSSolve.
 # Expected convergence: ~O(dx) for T (1st-order upwind), consistent with h/hu/hv.
 mms:
   constants:
