@@ -185,8 +185,6 @@ static PetscErrorCode FillForcingFromSources(RDy rdy) {
 
 PetscErrorCode RDyHeatCreate(RDy rdy) {
   PetscFunctionBegin;
-  PetscCheck(!CeedEnabled(), rdy->comm, PETSC_ERR_USER, "heat equation support is currently implemented only for the PETSc backend");
-
   PetscCall(PetscCalloc1(1, &rdy->heat_context));
   RDyHeat heat    = rdy->heat_context;
   heat->mesh      = &rdy->mesh;
@@ -207,8 +205,14 @@ PetscErrorCode RDyHeatCreate(RDy rdy) {
 
   PetscCall(TSCreate(rdy->comm, &rdy->heat_ts));
   PetscCall(TSSetType(rdy->heat_ts, TSBEULER));
-  PetscCall(TSSetIFunction(rdy->heat_ts, NULL, HeatIFunction, rdy));
-  PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, HeatIJacobian, rdy));
+  if (CeedEnabled()) {
+    PetscCall(CreateCeedHeatOperators(rdy));
+    PetscCall(TSSetIFunction(rdy->heat_ts, NULL, HeatIFunctionCeed, rdy));
+    PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, HeatIJacobianCeed, rdy));
+  } else {
+    PetscCall(TSSetIFunction(rdy->heat_ts, NULL, HeatIFunction, rdy));
+    PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, HeatIJacobian, rdy));
+  }
   PetscCall(TSSetOptionsPrefix(rdy->heat_ts, "heat_"));
   PetscCall(TSSetFromOptions(rdy->heat_ts));
 
@@ -221,6 +225,7 @@ PetscErrorCode RDyHeatDestroy(RDy rdy) {
   if (rdy->heat_jac) PetscCall(MatDestroy(&rdy->heat_jac));
   if (rdy->heat_context) {
     RDyHeat heat = rdy->heat_context;
+    if (CeedEnabled()) PetscCall(DestroyCeedHeatOperators(rdy));
     PetscCall(PetscFree(heat->forcing.downwelling_shortwave));
     PetscCall(PetscFree(heat->forcing.downwelling_longwave));
     PetscCall(PetscFree(heat->forcing.wind_speed));
@@ -243,6 +248,10 @@ PetscErrorCode RDyHeatAdvance(RDy rdy, PetscReal start_time, PetscReal end_time)
   PetscFunctionBegin;
   PetscCheck(end_time > start_time, rdy->comm, PETSC_ERR_ARG_OUTOFRANGE, "Heat end time %g must be greater than start time %g", (double)end_time,
              (double)start_time);
+
+  // push any forcing updates (including the use_direct_source toggle) through to
+  // the CEED operators before they are evaluated
+  if (CeedEnabled()) PetscCall(UpdateCeedHeatForcing(rdy));
 
   PetscReal interval = end_time - start_time;
   PetscCall(TSSetTime(rdy->heat_ts, start_time));

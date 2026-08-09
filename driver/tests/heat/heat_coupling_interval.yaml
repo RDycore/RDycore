@@ -44,6 +44,7 @@ initial_conditions:
 
 sources:
   - region: domain
+    flow: no_runoff
     heat: constant_heat_flux
 
 flow_conditions:
@@ -52,6 +53,9 @@ flow_conditions:
     height: 1.0
     x_momentum: 0.0
     y_momentum: 0.0
+  - name: no_runoff
+    type: runoff
+    value: 0.0
 
 heat_conditions:
   - name: initial_temperature

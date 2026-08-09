@@ -44,6 +44,7 @@ PetscErrorCode CreateTracerQFunctionContext(Ceed ceed, const RDyConfig config, C
   tracers_ctx->tau_critical_deposition = 1000.0;
   tracers_ctx->rhow                    = DENSITY_OF_WATER;
   tracers_ctx->tracer_ndof             = num_tracers;
+  tracers_ctx->num_sediment_classes    = config.physics.sediment.num_classes;
   tracers_ctx->flow_ndof               = 3;  // NOTE: SWE assumed!
 
   PetscCallCEED(CeedQFunctionContextCreate(ceed, qf_context));
@@ -80,6 +81,8 @@ PetscErrorCode CreateTracerQFunctionContext(Ceed ceed, const RDyConfig config, C
 
   PetscCallCEED(
       CeedQFunctionContextRegisterInt32(*qf_context, "tracer_ndof", offsetof(struct TracerContext_, tracer_ndof), 1, "number of tracers classes"));
+  PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "num_sediment_classes", offsetof(struct TracerContext_, num_sediment_classes), 1,
+                                                  "number of sediment size classes (leading subset of the tracer DOFs)"));
   PetscCallCEED(CeedQFunctionContextRegisterInt32(*qf_context, "flow_ndof", offsetof(struct TracerContext_, flow_ndof), 1, "number of flow DoF"));
 
   PetscFunctionReturn(CEED_ERROR_SUCCESS);

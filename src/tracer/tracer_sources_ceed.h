@@ -64,7 +64,10 @@ int CEED_QFUNCTION_HELPER TracerSemiImplicitBedFrictionRoughness(TracerContext c
   *tbx = (hu + dt * (Fsum_x - bedx)) * factor;
   *tby = (hv + dt * (Fsum_y - bedy)) * factor;
 
-  for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
+  // NOTE: erosion/deposition is sediment-specific physics, so it is applied only
+  // NOTE: to the leading num_sediment_classes tracer DOFs. The trailing salinity
+  // NOTE: and heat DOFs are transported as passive scalars.
+  for (CeedInt j = 0; j < context->num_sediment_classes; ++j) {
     const CeedScalar ci    = SafeDiv(state.hci[j], h, h, tiny_h);
     CeedScalar       tau_b = 0.5 * rhow * Cd * (Square(u) + Square(v));
     e[j]                   = kp_constant * (tau_b - tau_critical_erosion) / tau_critical_erosion;
@@ -130,7 +133,8 @@ CEED_QFUNCTION_HELPER int TracerSources(void *ctx, CeedInt Q, const CeedScalar *
     sources[1][i] = riemannf[1][i] - bedx - tbx + ext_src[1][i];
     sources[2][i] = riemannf[2][i] - bedy - tby + ext_src[2][i];
     for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
-      sources[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (e[j] - d[j]) + ext_src[flow_ndof + j][i];
+      const CeedScalar erosion_deposition = (j < context->num_sediment_classes) ? (e[j] - d[j]) : 0.0;
+      sources[flow_ndof + j][i]           = riemannf[flow_ndof + j][i] + erosion_deposition + ext_src[flow_ndof + j][i];
     }
 
     const CeedScalar h        = state.h;

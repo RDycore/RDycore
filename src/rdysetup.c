@@ -1453,9 +1453,6 @@ PetscErrorCode RDySetup(RDy rdy) {
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
 
-  PetscCheck(!(rdy->config.physics.heat && CeedEnabled()), rdy->comm, PETSC_ERR_USER,
-             "heat equation support is currently implemented only for the PETSc backend");
-
   // print configuration info
   PetscCall(PrintConfig(rdy));
 
@@ -1626,7 +1623,7 @@ PetscErrorCode RDySetup(RDy rdy) {
   PetscCall(InitOperator(rdy));
 
   if (rdy->config.physics.heat) {
-    RDyLogDebug(rdy, "Initializing PETSc heat source correction...");
+    RDyLogDebug(rdy, "Initializing heat source correction...");
     PetscCall(RDyHeatCreate(rdy));
   }
 

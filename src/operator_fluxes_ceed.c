@@ -152,7 +152,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_right", num_comp, CEED_EVAL_NONE));
-  if (config.physics.sediment.num_classes == 0) {
+  if (NumTracers(config) == 0) {
     PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_beg", num_comp_eta, CEED_EVAL_NONE));
     PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_end", num_comp_eta, CEED_EVAL_NONE));
   }
@@ -235,7 +235,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
                                             &c_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_r,
                                             &c_restrict_r));
-    if (config.physics.sediment.num_classes == 0) {
+    if (NumTracers(config) == 0) {
       PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
                                               eta_beg_offset, &eta_beg_restrict));
       PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST, CEED_COPY_VALUES,
@@ -257,7 +257,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedOperatorSetField(*subop, "geom", restrict_geom, CEED_BASIS_NONE, geom));
   PetscCallCEED(CeedOperatorSetField(*subop, "q_left", q_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(*subop, "q_right", q_restrict_r, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
-  if (config.physics.sediment.num_classes == 0) {
+  if (NumTracers(config) == 0) {
     PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_beg", eta_beg_restrict, CEED_BASIS_NONE, *eta_vertices));
     PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_end", eta_end_restrict, CEED_BASIS_NONE, *eta_vertices));
   }
@@ -274,7 +274,7 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_r));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_r));
-  if (config.physics.sediment.num_classes == 0) {
+  if (NumTracers(config) == 0) {
     PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
     PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
   }
@@ -440,7 +440,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   CeedInt num_comp_eta  = 1;  // h_vertex
   PetscCallCEED(CeedQFunctionAddInput(qf, "geom", num_comp_geom, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE));
-  if (config.physics.sediment.num_classes == 0) {
+  if (NumTracers(config) == 0) {
     PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_beg", num_comp_eta, CEED_EVAL_NONE));
     PetscCallCEED(CeedQFunctionAddInput(qf, "eta_vert_end", num_comp_eta, CEED_EVAL_NONE));
   }
@@ -531,7 +531,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
                                             q_offset_l, &q_restrict_l));
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES,
                                             c_offset_l, &c_restrict_l));
-    if (config.physics.sediment.num_classes == 0) {
+    if (NumTracers(config) == 0) {
       PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
                                               CEED_COPY_VALUES, eta_beg_offset, &eta_beg_restrict));
       PetscCallCEED(CeedElemRestrictionCreate(ceed, num_owned_edges, 1, num_comp_eta, 1, mesh->num_vertices * num_comp_eta, CEED_MEM_HOST,
@@ -561,7 +561,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, subop));
   PetscCallCEED(CeedOperatorSetField(*subop, "geom", restrict_geom, CEED_BASIS_NONE, geom));
   PetscCallCEED(CeedOperatorSetField(*subop, "q_left", q_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
-  if (config.physics.sediment.num_classes == 0) {
+  if (NumTracers(config) == 0) {
     PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_beg", eta_beg_restrict, CEED_BASIS_NONE, *eta_vertices));
     PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_end", eta_end_restrict, CEED_BASIS_NONE, *eta_vertices));
   }
@@ -578,7 +578,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
-  if (config.physics.sediment.num_classes == 0) {
+  if (NumTracers(config) == 0) {
     PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
     PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
   }

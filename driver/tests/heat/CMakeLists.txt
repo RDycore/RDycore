@@ -4,6 +4,9 @@
 
 set(mms_c_driver ${mms_driver})
 
+# arguments for specific configurations ("basic" config has no options)
+set(ceed_args -ceed /cpu/self)
+
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_ts_mms.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_mms_conv_study.yaml
@@ -11,11 +14,13 @@ file(COPY
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-# Case 1: TS isolation smoke tests for both supported implicit methods
+# Case 1: TS isolation smoke tests for both supported implicit methods, on both backends
 foreach(np 1 2)
   foreach(method beuler cn)
-    foreach(lang ${supported_languages})
-      add_test(heat_ts_mms_${method}_${lang}_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} heat_ts_mms.yaml -heat_ts_type ${method})
+    foreach(config basic ceed)
+      foreach(lang ${supported_languages})
+        add_test(heat_ts_mms_${method}_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} heat_ts_mms.yaml -heat_ts_type ${method} ${${config}_args})
+      endforeach()
     endforeach()
   endforeach()
 endforeach()
@@ -29,10 +34,13 @@ add_test(NAME heat_ts_mms_temporal_convergence
 set_tests_properties(heat_ts_mms_temporal_convergence PROPERTIES
                      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-# Case 2: SWE + heat spatial convergence study
+# Case 2: SWE + heat spatial convergence study, on both backends. The CEED variant
+# exercises passive transport of the h*T DOF through the flux and source operators.
 foreach(np 1 2)
-  foreach(lang ${supported_languages})
-    add_test(heat_mms_conv_study_${lang}_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} heat_mms_conv_study.yaml)
+  foreach(config basic ceed)
+    foreach(lang ${supported_languages})
+      add_test(heat_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver} heat_mms_conv_study.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()
 
@@ -42,6 +50,8 @@ endforeach()
 add_executable(test_heat_coupling test_heat_coupling.c)
 target_link_libraries(test_heat_coupling PRIVATE rdycore_c)
 foreach(np 1 2)
-  add_test(heat_coupling_interval_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np}
-           ${CMAKE_CURRENT_BINARY_DIR}/test_heat_coupling heat_coupling_interval.yaml)
+  foreach(config basic ceed)
+    add_test(heat_coupling_interval_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np}
+             ${CMAKE_CURRENT_BINARY_DIR}/test_heat_coupling heat_coupling_interval.yaml ${${config}_args})
+  endforeach()
 endforeach()

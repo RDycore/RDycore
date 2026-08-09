@@ -18,6 +18,7 @@ struct TracerContext_ {
   CeedScalar tau_critical_deposition;
   CeedScalar rhow;
   CeedInt    tracer_ndof;
+  CeedInt    num_sediment_classes;
   CeedInt    flow_ndof;
 };
 

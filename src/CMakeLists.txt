@@ -25,6 +25,7 @@ set(RDYCORE_C_SOURCE_FILES
   forcing/rdyforcing.c
   forcing/rdyforcing_dataset.c
   forcing/rdyforcing_map.c
+  heat/heat_ceed.c
   heat/heat_petsc.c
   time_series.c
   xdmf_output.c
@@ -33,7 +34,7 @@ set(RDYCORE_C_SOURCE_FILES
 
 # generate <physics>_ceed.h headers inside each CEED operator implementation
 # directory so the JIT compilers have everything they need
-foreach(physics swe;tracer)
+foreach(physics swe;tracer;heat)
   string(TOUPPER ${physics} PHYSICS)
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/private/physics_ceed.h.in

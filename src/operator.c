@@ -516,7 +516,10 @@ static PetscErrorCode ApplyCeedOperator(Operator* op, PetscReal dt, Vec u_local,
   //------------------
   // Eta Calculation
   //------------------
-  if (op->config->physics.flow.well_balancing == WELL_BALANCING_BS2002 && op->config->physics.sediment.num_classes == 0) {
+  // NOTE: only the tracer-free SWE Q-functions consume the eta vertex fields, so
+  // NOTE: this must match the Q-function selection in operator_fluxes_ceed.c
+  PetscBool flow_only = (PetscBool)(op->config->physics.sediment.num_classes == 0 && !op->config->physics.salinity && !op->config->physics.heat);
+  if (op->config->physics.flow.well_balancing == WELL_BALANCING_BS2002 && flow_only) {
     // point our CEED solution vector at our PETSc solution vector
     PetscMemType mem_type;
     PetscScalar* u_local_ptr;
@@ -1056,6 +1059,101 @@ PetscErrorCode SetOperatorBoundaryValues(Operator* op, RDyBoundary boundary, Pet
     PetscCall(SetCeedOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
   } else {
     PetscCall(SetPetscOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Reads values out of the CEED q_dirichlet vector for the given boundary,
+///        extracting components [comp_offset, comp_offset + num_comp) for each edge.
+/// @param [in]  op          the operator whose boundary data is read
+/// @param [in]  boundary    the boundary whose Dirichlet values are read
+/// @param [in]  comp_offset the index of the first component to read
+/// @param [in]  num_comp    the number of components to read
+/// @param [in]  num_edges   the number of boundary edges
+/// @param [out] values      destination values in strided layout values[num_comp * e + c]
+static PetscErrorCode GetCeedOperatorBoundaryData(Operator* op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                                  PetscReal* values) {
+  PetscFunctionBegin;
+
+  // get the relevant boundary sub-operator (see SetCeedOperatorBoundaryData for
+  // the sub-operator ordering convention)
+  CeedOperator* sub_ops;
+  PetscCallCEED(CeedOperatorCompositeGetSubList(op->ceed.flux, &sub_ops));
+  PetscInt     boundary_offset = op->ceed.use_slope_reconstruction ? 0 : 1;
+  CeedOperator sub_op          = sub_ops[boundary_offset + boundary.index];
+
+  // fetch the q_dirichlet vector
+  CeedOperatorField field;
+  PetscCallCEED(CeedOperatorGetFieldByName(sub_op, "q_dirichlet", &field));
+  CeedVector vec;
+  PetscCallCEED(CeedOperatorFieldGetVector(field, &vec));
+
+  // read directly from the requested component slice
+  PetscInt          total_comp = op->num_components;
+  const CeedScalar* ptr;
+  PetscCallCEED(CeedVectorGetArrayRead(vec, CEED_MEM_HOST, &ptr));
+  const CeedScalar(*arr)[total_comp];
+  *((const CeedScalar**)&arr) = ptr;
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      values[num_comp * e + c] = arr[e][comp_offset + c];
+    }
+  }
+  PetscCallCEED(CeedVectorRestoreArrayRead(vec, &ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Reads values out of the PETSc boundary_values vector for the given boundary,
+///        extracting components [comp_offset, comp_offset + num_comp) for each edge.
+/// @param [in]  op          the operator whose boundary data is read
+/// @param [in]  boundary    the boundary whose Dirichlet values are read
+/// @param [in]  comp_offset the index of the first component to read
+/// @param [in]  num_comp    the number of components to read
+/// @param [in]  num_edges   the number of boundary edges
+/// @param [out] values      destination values in strided layout values[num_comp * e + c]
+static PetscErrorCode GetPetscOperatorBoundaryData(Operator* op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                                   PetscReal* values) {
+  PetscFunctionBegin;
+
+  PetscInt           total_comp = op->num_components;
+  const PetscScalar* data;
+  PetscCall(VecGetArrayRead(op->petsc.boundary_values[boundary.index], &data));
+  for (PetscInt c = 0; c < num_comp; ++c) {
+    for (PetscInt e = 0; e < num_edges; ++e) {
+      values[num_comp * e + c] = data[total_comp * e + comp_offset + c];
+    }
+  }
+  PetscCall(VecRestoreArrayRead(op->petsc.boundary_values[boundary.index], &data));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Retrieves a contiguous range of components [comp_offset, comp_offset + num_comp) of
+/// the operator's Dirichlet boundary values for the given boundary, writing them into
+/// the flat strided array values[num_comp * e + c]. This is the read-side counterpart of
+/// SetOperatorBoundaryValues, and reads from the underlying q_dirichlet (CEED) or
+/// boundary_values (PETSc) array.
+/// @param [in]  op          the operator from which values are read
+/// @param [in]  boundary    the boundary whose Dirichlet values are read
+/// @param [in]  comp_offset the index of the first component to read
+/// @param [in]  num_comp    the number of components to read
+/// @param [in]  num_edges   the number of boundary edges (must equal boundary.num_edges)
+/// @param [out] values      destination values in the strided layout values[num_comp * e + c]
+PetscErrorCode GetOperatorBoundaryValues(Operator* op, RDyBoundary boundary, PetscInt comp_offset, PetscInt num_comp, PetscInt num_edges,
+                                         PetscReal* values) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)op->dm, &comm));
+  PetscCheck(boundary.num_edges == num_edges, comm, PETSC_ERR_USER,
+             "num_edges (% " PetscInt_FMT ") does not match boundary.num_edges (% " PetscInt_FMT ")", num_edges, boundary.num_edges);
+
+  if (CeedEnabled()) {
+    PetscCall(GetCeedOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
+  } else {
+    PetscCall(GetPetscOperatorBoundaryData(op, boundary, comp_offset, num_comp, num_edges, values));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

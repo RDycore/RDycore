@@ -296,9 +296,6 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   // override parameters using command line arguments
   PetscCall(OverrideParameters(rdy));
 
-  PetscCheck(!(rdy->config.physics.heat && CeedEnabled()), rdy->comm, PETSC_ERR_USER,
-             "heat equation support is currently implemented only for the PETSc backend");
-
   // set names of solution components
   PetscStrncpy(mms_comp_names[0], " h ", MAX_NAME_LEN);
   PetscStrncpy(mms_comp_names[1], "hu ", MAX_NAME_LEN);
