@@ -56,7 +56,19 @@ static PetscReal DHeatQNetDTemperature(RDyHeat heat, PetscInt owned_cell, PetscR
   return d_q_lw + d_q_sh + d_q_e;
 }
 
-static PetscErrorCode HeatIFunction(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
+// The implicit atmospheric source step comes in two flavors that differ only in
+// how the net surface heat flux Q_net is obtained, so each gets its own
+// IFunction/IJacobian pair rather than branching per DOF inside the loop:
+//
+//   * "prescribed source" - Q_net is read straight from RDyHeatForcing::direct_source
+//     (a YAML heat_flux override, or the manufactured source used by the MMS driver)
+//   * "atmospheric source" - Q_net is computed from the local atmospheric forcing
+//     via HeatQNet()
+//
+// SetHeatTSCallbacks() selects the pair; see its comment for when that happens.
+
+static PetscErrorCode HeatIFunctionPrescribedSource(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
+  (void)ts;
   (void)t;
   PetscFunctionBegin;
   RDy     rdy  = ctx;
@@ -75,20 +87,19 @@ static PetscErrorCode HeatIFunction(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, 
 
   PetscInt n_local;
   PetscCall(VecGetLocalSize(U, &n_local));
+
+  const PetscInt   heat_comp     = heat->heat_comp;
+  const PetscReal  tiny_h        = heat->config->physics.flow.tiny_h;
+  const PetscReal* direct_source = heat->forcing.direct_source;
+
   for (PetscInt j = 0; j < n_local; ++j) {
     PetscInt comp = (start + j) % n_dof;
     f[j]          = udot[j];
-    if (comp == heat->heat_comp) {
+    if (comp == heat_comp) {
       PetscInt  owned_cell = j / n_dof;
       PetscReal h          = u[n_dof * owned_cell];
-      if (h >= heat->config->physics.flow.tiny_h) {
-        PetscReal hT = u[j];
-        if (heat->use_direct_source) {
-          f[j] = udot[j] - heat->forcing.direct_source[owned_cell] / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
-        } else {
-          PetscReal T = hT / h;
-          f[j]        = udot[j] - HeatQNet(heat, owned_cell, T) / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
-        }
+      if (h >= tiny_h) {
+        f[j] = udot[j] - direct_source[owned_cell] / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
       }
     }
   }
@@ -99,7 +110,74 @@ static PetscErrorCode HeatIFunction(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode HeatIJacobian(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat P, void* ctx) {
+static PetscErrorCode HeatIFunctionAtmosphericSource(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void* ctx) {
+  (void)ts;
+  (void)t;
+  PetscFunctionBegin;
+  RDy     rdy  = ctx;
+  RDyHeat heat = rdy->heat_context;
+
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(U, &n_dof));
+  PetscInt start, end;
+  PetscCall(VecGetOwnershipRange(U, &start, &end));
+
+  const PetscScalar *u, *udot;
+  PetscScalar*       f;
+  PetscCall(VecGetArrayRead(U, &u));
+  PetscCall(VecGetArrayRead(Udot, &udot));
+  PetscCall(VecGetArray(F, &f));
+
+  PetscInt n_local;
+  PetscCall(VecGetLocalSize(U, &n_local));
+
+  const PetscInt  heat_comp = heat->heat_comp;
+  const PetscReal tiny_h    = heat->config->physics.flow.tiny_h;
+
+  for (PetscInt j = 0; j < n_local; ++j) {
+    PetscInt comp = (start + j) % n_dof;
+    f[j]          = udot[j];
+    if (comp == heat_comp) {
+      PetscInt  owned_cell = j / n_dof;
+      PetscReal h          = u[n_dof * owned_cell];
+      if (h >= tiny_h) {
+        PetscReal T = u[j] / h;
+        f[j]        = udot[j] - HeatQNet(heat, owned_cell, T) / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER);
+      }
+    }
+  }
+
+  PetscCall(VecRestoreArrayRead(U, &u));
+  PetscCall(VecRestoreArrayRead(Udot, &udot));
+  PetscCall(VecRestoreArray(F, &f));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// A prescribed Q_net does not depend on temperature, so the residual reduces to
+// Udot and its Jacobian is exactly shift*I for every DOF. That needs no state and
+// no per-cell work, which is why this callback is shared by both backends.
+static PetscErrorCode HeatIJacobianPrescribedSource(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat P, void* ctx) {
+  (void)ts;
+  (void)t;
+  (void)U;
+  (void)Udot;
+  (void)ctx;
+  PetscFunctionBegin;
+
+  PetscCall(MatZeroEntries(P));
+  PetscCall(MatShift(P, shift));
+  PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
+  if (J != P) {
+    PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode HeatIJacobianAtmosphericSource(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat P, void* ctx) {
+  (void)ts;
   (void)t;
   (void)Udot;
   PetscFunctionBegin;
@@ -113,15 +191,18 @@ static PetscErrorCode HeatIJacobian(TS ts, PetscReal t, Vec U, Vec Udot, PetscRe
   const PetscScalar* u;
   PetscCall(VecGetArrayRead(U, &u));
 
+  const PetscInt  heat_comp = heat->heat_comp;
+  const PetscReal tiny_h    = heat->config->physics.flow.tiny_h;
+
   PetscCall(MatZeroEntries(P));
   for (PetscInt j = 0; j < end - start; ++j) {
     PetscInt  global = start + j;
     PetscInt  comp   = global % n_dof;
     PetscReal diag   = shift;
-    if (comp == heat->heat_comp) {
+    if (comp == heat_comp) {
       PetscInt  owned_cell = j / n_dof;
       PetscReal h          = u[n_dof * owned_cell];
-      if (h >= heat->config->physics.flow.tiny_h && !heat->use_direct_source) {
+      if (h >= tiny_h) {
         PetscReal T  = u[j] / h;
         PetscReal dQ = DHeatQNetDTemperature(heat, owned_cell, T);
         diag         = shift - dQ / (DENSITY_OF_WATER * SPECIFIC_HEAT_OF_WATER * h);
@@ -137,6 +218,32 @@ static PetscErrorCode HeatIJacobian(TS ts, PetscReal t, Vec U, Vec Udot, PetscRe
     PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
   }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Installs the IFunction/IJacobian pair matching the active source treatment and
+// backend.
+//
+// NOTE: use_direct_source is not fixed for the lifetime of the TS - the MMS driver
+// NOTE: raises it around every RDyHeatAdvance() and lowers it afterwards - so this
+// NOTE: runs immediately before each solve rather than only at setup.
+static PetscErrorCode SetHeatTSCallbacks(RDy rdy) {
+  PetscFunctionBegin;
+  RDyHeat heat = rdy->heat_context;
+
+  TSIFunctionFn* ifunction;
+  TSIJacobianFn* ijacobian;
+  if (heat->use_direct_source) {
+    ifunction = CeedEnabled() ? HeatIFunctionCeedPrescribedSource : HeatIFunctionPrescribedSource;
+    ijacobian = HeatIJacobianPrescribedSource;  // shift*I, so no backend-specific variant
+  } else {
+    ifunction = CeedEnabled() ? HeatIFunctionCeedAtmosphericSource : HeatIFunctionAtmosphericSource;
+    ijacobian = CeedEnabled() ? HeatIJacobianCeedAtmosphericSource : HeatIJacobianAtmosphericSource;
+  }
+
+  PetscCall(TSSetIFunction(rdy->heat_ts, NULL, ifunction, rdy));
+  PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, ijacobian, rdy));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -205,14 +312,8 @@ PetscErrorCode RDyHeatCreate(RDy rdy) {
 
   PetscCall(TSCreate(rdy->comm, &rdy->heat_ts));
   PetscCall(TSSetType(rdy->heat_ts, TSBEULER));
-  if (CeedEnabled()) {
-    PetscCall(CreateCeedHeatOperators(rdy));
-    PetscCall(TSSetIFunction(rdy->heat_ts, NULL, HeatIFunctionCeed, rdy));
-    PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, HeatIJacobianCeed, rdy));
-  } else {
-    PetscCall(TSSetIFunction(rdy->heat_ts, NULL, HeatIFunction, rdy));
-    PetscCall(TSSetIJacobian(rdy->heat_ts, rdy->heat_jac, rdy->heat_jac, HeatIJacobian, rdy));
-  }
+  if (CeedEnabled()) PetscCall(CreateCeedHeatOperators(rdy));
+  PetscCall(SetHeatTSCallbacks(rdy));
   PetscCall(TSSetOptionsPrefix(rdy->heat_ts, "heat_"));
   PetscCall(TSSetFromOptions(rdy->heat_ts));
 
@@ -249,8 +350,9 @@ PetscErrorCode RDyHeatAdvance(RDy rdy, PetscReal start_time, PetscReal end_time)
   PetscCheck(end_time > start_time, rdy->comm, PETSC_ERR_ARG_OUTOFRANGE, "Heat end time %g must be greater than start time %g", (double)end_time,
              (double)start_time);
 
-  // push any forcing updates (including the use_direct_source toggle) through to
-  // the CEED operators before they are evaluated
+  // the source treatment may have changed since the last solve, so pick the
+  // matching callbacks and push any forcing updates through to the CEED operators
+  PetscCall(SetHeatTSCallbacks(rdy));
   if (CeedEnabled()) PetscCall(UpdateCeedHeatForcing(rdy));
 
   PetscReal interval = end_time - start_time;

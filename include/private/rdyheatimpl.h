@@ -19,8 +19,9 @@ typedef struct {
 // CEED-backend state for the implicit atmospheric heat source step; unused (and
 // left zeroed) when the PETSc backend is selected
 typedef struct {
-  CeedOperator ifunction_op;  // computes the implicit residual
-  CeedOperator ijacobian_op;  // computes the (diagonal) implicit Jacobian
+  CeedOperator ifunction_prescribed_op;   // implicit residual with a prescribed net heat flux
+  CeedOperator ifunction_atmospheric_op;  // implicit residual with the atmospheric Q_net parameterization
+  CeedOperator ijacobian_op;              // (diagonal) implicit Jacobian for the atmospheric case
 
   CeedVector u;         // wraps the PETSc state vector during operator application
   CeedVector u_dot;     // wraps the PETSc state time derivative
@@ -30,9 +31,7 @@ typedef struct {
 
   Vec diagonal_vec;  // receives the Jacobian diagonal before MatDiagonalSet()
 
-  CeedContextFieldLabel shift_label;                    // "time shift" on ijacobian_op
-  CeedContextFieldLabel ifunction_direct_source_label;  // "use direct source" on ifunction_op
-  CeedContextFieldLabel ijacobian_direct_source_label;  // "use direct source" on ijacobian_op
+  CeedContextFieldLabel shift_label;  // "time shift" on ijacobian_op
 } RDyHeatCeed;
 
 struct _RDyHeat {
@@ -54,7 +53,8 @@ PETSC_INTERN PetscErrorCode RDyHeatAdvance(RDy, PetscReal, PetscReal);
 PETSC_INTERN PetscErrorCode CreateCeedHeatOperators(RDy);
 PETSC_INTERN PetscErrorCode DestroyCeedHeatOperators(RDy);
 PETSC_INTERN PetscErrorCode UpdateCeedHeatForcing(RDy);
-PETSC_INTERN PetscErrorCode HeatIFunctionCeed(TS, PetscReal, Vec, Vec, Vec, void*);
-PETSC_INTERN PetscErrorCode HeatIJacobianCeed(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void*);
+PETSC_INTERN PetscErrorCode HeatIFunctionCeedPrescribedSource(TS, PetscReal, Vec, Vec, Vec, void*);
+PETSC_INTERN PetscErrorCode HeatIFunctionCeedAtmosphericSource(TS, PetscReal, Vec, Vec, Vec, void*);
+PETSC_INTERN PetscErrorCode HeatIJacobianCeedAtmosphericSource(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void*);
 
 #endif

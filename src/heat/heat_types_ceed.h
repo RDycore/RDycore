@@ -32,7 +32,6 @@ struct HeatContext_ {
   CeedScalar celsius_to_kelvin;         //
   CeedInt    heat_comp;                 // index of the h*T component within the solution state
   CeedInt    num_comp;                  // number of solution components
-  CeedInt    use_direct_source;         // nonzero => use HEAT_FORCING_DIRECT_SOURCE instead of the atmospheric parameterization
 };
 
 #endif

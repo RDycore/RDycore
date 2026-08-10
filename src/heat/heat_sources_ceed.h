@@ -65,9 +65,13 @@ CEED_QFUNCTION_HELPER CeedScalar HeatDQNetDTemperatureCeed(const HeatContext con
   return d_q_lw + d_q_sh + d_q_e;
 }
 
-/// Q-function evaluating the residual of the implicit atmospheric heat source
-/// step. This is the CEED analogue of HeatIFunction() in heat_petsc.c; it is
-/// purely pointwise, with no spatial coupling.
+// The implicit source step comes in two flavors (prescribed vs. atmospheric
+// Q_net); each gets its own Q-function so the choice costs nothing per
+// quadrature point. See SetHeatTSCallbacks() in heat_petsc.c for the selection.
+
+/// Q-function evaluating the residual of the implicit heat source step when the
+/// net surface heat flux is prescribed per cell. CEED analogue of
+/// HeatIFunctionPrescribedSource() in heat_petsc.c; purely pointwise.
 ///
 /// Input fields:
 ///   in[0]: q[num_owned_cells][num_comp]                — state (active)
@@ -76,7 +80,7 @@ CEED_QFUNCTION_HELPER CeedScalar HeatDQNetDTemperatureCeed(const HeatContext con
 ///
 /// Output fields:
 ///   out[0]: residual[num_owned_cells][num_comp]        — implicit residual (active)
-CEED_QFUNCTION(HeatIFunctionQF)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(HeatIFunctionPrescribedSourceQF)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*q)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];
   const CeedScalar(*q_dot)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*forcing)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
@@ -86,6 +90,7 @@ CEED_QFUNCTION(HeatIFunctionQF)(void *ctx, CeedInt Q, const CeedScalar *const in
   const HeatContext context   = (HeatContext)ctx;
   const CeedInt     num_comp  = context->num_comp;
   const CeedInt     heat_comp = context->heat_comp;
+  const CeedScalar  tiny_h    = context->tiny_h;
   const CeedScalar  rho_cp    = context->density_of_water * context->specific_heat_of_water;
 
   for (CeedInt i = 0; i < Q; i++) {
@@ -93,26 +98,55 @@ CEED_QFUNCTION(HeatIFunctionQF)(void *ctx, CeedInt Q, const CeedScalar *const in
     for (CeedInt c = 0; c < num_comp; ++c) residual[c][i] = q_dot[c][i];
 
     const CeedScalar h = q[0][i];
-    if (h >= context->tiny_h) {
+    if (h >= tiny_h) {
+      residual[heat_comp][i] = q_dot[heat_comp][i] - forcing[HEAT_FORCING_DIRECT_SOURCE][i] / rho_cp;
+    }
+  }
+  return 0;
+}
+
+/// Q-function evaluating the residual of the implicit heat source step when the
+/// net surface heat flux is computed from atmospheric forcing. CEED analogue of
+/// HeatIFunctionAtmosphericSource() in heat_petsc.c; purely pointwise.
+///
+/// Field layout matches HeatIFunctionPrescribedSourceQF().
+CEED_QFUNCTION(HeatIFunctionAtmosphericSourceQF)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  const CeedScalar(*q)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];
+  const CeedScalar(*q_dot)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*forcing)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+
+  CeedScalar(*residual)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
+
+  const HeatContext context   = (HeatContext)ctx;
+  const CeedInt     num_comp  = context->num_comp;
+  const CeedInt     heat_comp = context->heat_comp;
+  const CeedScalar  tiny_h    = context->tiny_h;
+  const CeedScalar  rho_cp    = context->density_of_water * context->specific_heat_of_water;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    // every component (and every dry cell) carries the trivial residual Udot
+    for (CeedInt c = 0; c < num_comp; ++c) residual[c][i] = q_dot[c][i];
+
+    const CeedScalar h = q[0][i];
+    if (h >= tiny_h) {
       CeedScalar cell_forcing[NUM_HEAT_FORCINGS];
       for (CeedInt c = 0; c < NUM_HEAT_FORCINGS; ++c) cell_forcing[c] = forcing[c][i];
 
-      CeedScalar q_net;
-      if (context->use_direct_source) {
-        q_net = cell_forcing[HEAT_FORCING_DIRECT_SOURCE];
-      } else {
-        q_net = HeatQNetCeed(context, cell_forcing, q[heat_comp][i] / h);
-      }
+      const CeedScalar q_net = HeatQNetCeed(context, cell_forcing, q[heat_comp][i] / h);
       residual[heat_comp][i] = q_dot[heat_comp][i] - q_net / rho_cp;
     }
   }
   return 0;
 }
 
-/// Q-function evaluating the diagonal of the IJacobian for the implicit
-/// atmospheric heat source step. The residual is pointwise, so the Jacobian is
-/// exactly diagonal and can be written straight into a PETSc Mat with
-/// MatDiagonalSet(). This is the CEED analogue of HeatIJacobian() in heat_petsc.c.
+/// Q-function evaluating the diagonal of the IJacobian for the atmospheric source
+/// step. The residual is pointwise, so the Jacobian is exactly diagonal and can be
+/// written straight into a PETSc Mat with MatDiagonalSet(). CEED analogue of
+/// HeatIJacobianAtmosphericSource() in heat_petsc.c.
+///
+/// There is deliberately no prescribed-source counterpart: a prescribed Q_net is
+/// temperature-independent, so that Jacobian is shift*I and both backends share
+/// HeatIJacobianPrescribedSource().
 ///
 /// Input fields:
 ///   in[0]: q[num_owned_cells][num_comp]                — state (active)
@@ -120,7 +154,7 @@ CEED_QFUNCTION(HeatIFunctionQF)(void *ctx, CeedInt Q, const CeedScalar *const in
 ///
 /// Output fields:
 ///   out[0]: diagonal[num_owned_cells][num_comp]        — Jacobian diagonal (active)
-CEED_QFUNCTION(HeatIJacobianDiagonalQF)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+CEED_QFUNCTION(HeatIJacobianAtmosphericSourceQF)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   const CeedScalar(*q)[CEED_Q_VLA]       = (const CeedScalar(*)[CEED_Q_VLA])in[0];
   const CeedScalar(*forcing)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
 
@@ -129,6 +163,7 @@ CEED_QFUNCTION(HeatIJacobianDiagonalQF)(void *ctx, CeedInt Q, const CeedScalar *
   const HeatContext context   = (HeatContext)ctx;
   const CeedInt     num_comp  = context->num_comp;
   const CeedInt     heat_comp = context->heat_comp;
+  const CeedScalar  tiny_h    = context->tiny_h;
   const CeedScalar  shift     = context->shift;
   const CeedScalar  rho_cp    = context->density_of_water * context->specific_heat_of_water;
 
@@ -137,7 +172,7 @@ CEED_QFUNCTION(HeatIJacobianDiagonalQF)(void *ctx, CeedInt Q, const CeedScalar *
     for (CeedInt c = 0; c < num_comp; ++c) diagonal[c][i] = shift;
 
     const CeedScalar h = q[0][i];
-    if (h >= context->tiny_h && !context->use_direct_source) {
+    if (h >= tiny_h) {
       CeedScalar cell_forcing[NUM_HEAT_FORCINGS];
       for (CeedInt c = 0; c < NUM_HEAT_FORCINGS; ++c) cell_forcing[c] = forcing[c][i];
 
