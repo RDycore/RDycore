@@ -42,4 +42,4 @@ versions of the above software, are [here](https://rdycore.github.io/RDycore/com
 ## Papers
 - Bisht, G., Xu, D., Johnson, J., Brown, J., Knepley, M., Adams, M., Feng, D., Hao, Engwirda, D., Kumar, M., and Tan, Z., (2026) Development of a River Dynamical Core for E3SM to Simulate Compound Flooding on Exascale-class Heterogeneous Supercomputers. https://doi.org/10.1016/j.envsoft.2025.106804
 - Hao, D., Xu, D., & Bisht, G. (2026). Capturing sub‐kilometer Flood inundation dynamics during the California rain‐on‐snow Events of 2017. Geophysical Research Letters, 53(1), e2025GL118744. https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL118744
-
+- Xu, D., Bisht, G., Feng, D., Tan, Z., Hao, D., Engwirda, D., Benedict, J.J., Tran, V.N., Kumar, M., Ivanov, V. and Leung, L.R., 2026. Significant rural contributions to severe coastal urban flooding through flow connectivity. Geophysical Research Letters, 53(14), p.e2026GL122550.
