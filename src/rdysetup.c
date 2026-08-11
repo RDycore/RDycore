@@ -1078,7 +1078,7 @@ static PetscErrorCode InitSolution(RDy rdy) {
 
 // overrides cell centroid elevations with values read from a binary file
 // (e.g., a pit-filled DEM)
-PetscErrorCode OverrideCellElevation(RDy rdy) {
+PetscErrorCode OverrideCellAttributes(RDy rdy) {
   PetscFunctionBegin;
 
   Vec local_elev;
@@ -1088,8 +1088,61 @@ PetscErrorCode OverrideCellElevation(RDy rdy) {
   PetscCall(VecGetArray(local_elev, &elev_ptr));
 
   RDyCells *cells = &rdy->mesh.cells;
+
+  // override the Z value at cell centroids
   for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
     cells->centroids[icell].X[2] = elev_ptr[icell];
+  }
+
+  // the evaluation values typically are provided by D4 or D8 conditioning of the DEM,
+  // recompute dz/dx and dz/dy of owned cells by based on the updated cell centroid elevations
+  // of the neighbors and only use the downhill value
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (cells->is_owned[icell]) {
+      PetscReal x_cell = cells->centroids[icell].X[0];
+      PetscReal y_cell = cells->centroids[icell].X[1];
+      PetscReal z_cell = cells->centroids[icell].X[2];
+
+      PetscReal max_slope = 0.0;  // steepest downhill slope magnitude found so far (>= 0)
+      PetscReal best_dx = 0.0, best_dy = 0.0, best_dist = 0.0;
+      PetscBool found_downhill = PETSC_FALSE;
+
+      PetscInt cell_offset = cells->neighbor_offsets[icell];
+      for (PetscInt ineighbor = 0; ineighbor < cells->num_edges[icell]; ++ineighbor) {
+        PetscInt neighbor_id = cells->neighbor_ids[cell_offset + ineighbor];
+        if (neighbor_id > -1) {
+          PetscReal x_n = cells->centroids[neighbor_id].X[0];
+          PetscReal y_n = cells->centroids[neighbor_id].X[1];
+          PetscReal z_n = cells->centroids[neighbor_id].X[2];
+
+          PetscReal dx   = x_n - x_cell;
+          PetscReal dy   = y_n - y_cell;
+          PetscReal dist = PetscSqrtReal(dx * dx + dy * dy);
+
+          if (z_n < z_cell && dist > 0.0) {
+            PetscReal slope = (z_cell - z_n) / dist;  // positive downhill slope magnitude
+            if (slope > max_slope) {
+              max_slope      = slope;
+              best_dx        = dx;
+              best_dy        = dy;
+              best_dist      = dist;
+              found_downhill = PETSC_TRUE;
+            }
+          }
+        }
+      }
+
+      if (found_downhill) {
+        // project the steepest downhill slope onto x/y using the true (possibly non-axis-aligned)
+        // displacement vector; sign flipped so the result is uphill-positive, matching
+        // ComputeXYSlopesForTriangle's convention
+        cells->dz_dx[icell] = -max_slope * best_dx / best_dist;
+        cells->dz_dy[icell] = -max_slope * best_dy / best_dist;
+      } else {
+        cells->dz_dx[icell] = 0.0;
+        cells->dz_dy[icell] = 0.0;
+      }
+    }
   }
 
   PetscCall(VecRestoreArray(local_elev, &elev_ptr));
@@ -1508,7 +1561,7 @@ PetscErrorCode RDySetup(RDy rdy) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
   if (rdy->config.grid.cell_elevation.file[0]) {
-    PetscCall(OverrideCellElevation(rdy));
+    PetscCall(OverrideCellAttributes(rdy));
   }
   PetscCall(OutputPartitionStatistics(rdy));
 
