@@ -5,6 +5,7 @@ build_opt/
 *.code-workspace
 compile_commands.json
 .cache/
+__pycache__/
 site/
 *.cgns
 .clangd

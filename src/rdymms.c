@@ -105,26 +105,53 @@ static PetscErrorCode EvaluateTemporalSolution(void* expr, PetscInt n, PetscReal
 #undef SET_SPATIAL_VARIABLES
 #undef SET_SPATIOTEMPORAL_VARIABLES
 
+// Collects the centroids of this rank's owned cells, in owned-cell order (the
+// same order used by the operator's per-cell forcing arrays and by the error
+// norm loop). The caller frees cell_x and cell_y.
+static PetscErrorCode GetOwnedCellCentroids(RDy rdy, PetscInt* num_owned_cells, PetscReal** cell_x, PetscReal** cell_y) {
+  PetscFunctionBegin;
+
+  PetscInt N;
+  PetscCall(RDyGetNumOwnedCells(rdy, &N));
+  PetscCall(PetscCalloc1(N, cell_x));
+  PetscCall(PetscCalloc1(N, cell_y));
+
+  PetscInt l = 0;
+  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
+    if (rdy->mesh.cells.is_owned[icell]) {
+      (*cell_x)[l] = rdy->mesh.cells.centroids[icell].X[0];
+      (*cell_y)[l] = rdy->mesh.cells.centroids[icell].X[1];
+      ++l;
+    }
+  }
+  *num_owned_cells = N;
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// index of the prognostic heat DOF (hT) within the solution vector
+static PetscInt MMSHeatComponentIndex(RDy rdy) { return 3 + rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0); }
+
+// Number of components for which error norms are reported. Beyond the
+// 3 + num_tracers prognostic DOF, heat-enabled runs report the derived
+// temperature T = hT/h as one additional trailing component, since hT is what
+// the solver advances but T is the physically meaningful quantity.
+static PetscInt MMSNumErrorComponents(RDy rdy) { return 3 + rdy->num_tracers + (rdy->config.physics.heat ? 1 : 0); }
+
+// running max over the simulation of |Q_mms|_inf, the manufactured heat source
+// installed by MMSPostStep. Case 1 (source-free moving transport) is defined by
+// this being zero to roundoff, which is otherwise unobservable from the output.
+static PetscReal mms_max_heat_source = 0.0;
+
 // Computes the prescribed MMS heat flux at one time without changing any
 // production forcing state. The MMS driver selects the temporal quadrature
 // for this source before invoking the heat TS.
 static PetscErrorCode ComputeMMSHeatSource(RDy rdy, PetscReal time, PetscReal source[]) {
   PetscFunctionBegin;
 
-  PetscInt N;
-  PetscCall(RDyGetNumOwnedCells(rdy, &N));
-
+  PetscInt   N;
   PetscReal *cell_x, *cell_y;
-  PetscCall(PetscCalloc1(N, &cell_x));
-  PetscCall(PetscCalloc1(N, &cell_y));
-  PetscInt l = 0;
-  for (PetscInt icell = 0; icell < rdy->mesh.num_cells; ++icell) {
-    if (rdy->mesh.cells.is_owned[icell]) {
-      cell_x[l] = rdy->mesh.cells.centroids[icell].X[0];
-      cell_y[l] = rdy->mesh.cells.centroids[icell].X[1];
-      ++l;
-    }
-  }
+  PetscCall(GetOwnedCellCentroids(rdy, &N, &cell_x, &cell_y));
 
   PetscReal *h, *u, *v, *T;
   PetscReal *dhdx, *dhdy, *dhdt, *dudx, *dvdy;
@@ -227,15 +254,89 @@ static PetscErrorCode MMSPreStep(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// Guards the heat component of the transport operator's external source vector.
+//
+// Today this is vacuous: nothing can write that slot, because rdycore.h exposes
+// RDySetRegionalWaterSource / XMomentum / YMomentum / Sediment but no heat
+// equivalent. The check exists so that if such an API is ever added and wired
+// into MMSPreStep by mistake, the manufactured d(hT)/dt would be applied in both
+// split solves and this fails loudly instead of silently halving the measured
+// order.
+static PetscErrorCode AssertZeroTransportHeatSource(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscInt heat_comp = MMSHeatComponentIndex(rdy);
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion region = rdy->regions[r];
+    if (!region.num_owned_cells) continue;
+
+    OperatorData source_data;
+    PetscCall(GetOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+    PetscReal max_heat_source = 0.0;
+    for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
+      max_heat_source = PetscMax(max_heat_source, PetscAbsReal(source_data.values[heat_comp][c]));
+    }
+    PetscCall(RestoreOperatorRegionalExternalSource(rdy->operator, region, &source_data));
+    PetscCheck(max_heat_source == 0.0, rdy->comm, PETSC_ERR_PLIB,
+               "The transport external source vector has a nonzero heat component (%g) in region %" PetscInt_FMT
+               ". The manufactured heat residual belongs to the heat solve alone; installing it in both solves would "
+               "apply d(hT)/dt twice.",
+               (double)max_heat_source, r);
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // TS post-step callback for MMS heat: applies the source quadrature associated
 // with the configured one-step implicit heat method after each transport step.
 // Manufactured expressions are only available in the MMS driver, so this
 // sampling intentionally remains outside HeatIFunction.
+//
+// How the manufactured correction is split between the two solves
+// ---------------------------------------------------------------
+// RDycore advances a coupling interval with a Lie split: the transport TSSolve
+// advances SWE and carries hT as a passive tracer, then the heat TSSolve holds
+// the flow fixed and changes only hT. Writing D(C) = div(huT, hvT), the unsplit
+// manufactured correction is S_C = C_t + D(C) - R_atm, and consistency requires
+// the two split corrections to sum to it -- so C_t must appear once in that sum,
+// not once per solve. RDycore allocates it as
+//
+//   transport solve: the full manufactured h, hu, hv sources, and *nothing* for
+//                    heat, so the numerical tracer flux performs the complete hT
+//                    transport rather than having it cancelled analytically;
+//   heat solve:      the complete conservative residual C_t + D(C), which the
+//                    direct-source branch consumes in place of the atmospheric
+//                    parameterization.
+//
+// To leading order the composite update is then
+//
+//   C^{n+1} = C^n + dt*C_t + dt*[D(C) - D_h(C)] + O(dt^2),
+//
+// with D_h the discrete flux divergence, so the residual measures exactly the
+// spatial truncation error of the tracer flux plus the temporal and splitting
+// error. MMSPreStep installing a heat source too would double-count C_t.
+//
+// The zero heat component of the transport source is structural, not a
+// convention: no public API writes that slot (see RDySetRegional*Source in
+// rdycore.h -- there is no heat equivalent), and the operator's external source
+// vector is zero-initialized. AssertZeroTransportHeatSource below guards against
+// a future API that changes this.
+//
+// Scope limit: because this branch *replaces* HeatQNet(T) rather than correcting
+// it, the direct_source MMS path does not verify the nonlinear atmospheric
+// parameterization or its analytic Jacobian. In this path the heat TS type also
+// does not determine the order of the source step -- the residual has no state
+// dependence, so every consistent one-step method gives the same update and the
+// TS type selects only which manufactured quadrature is sampled below.
 static PetscErrorCode MMSPostStep(TS ts) {
   PetscFunctionBegin;
   RDy rdy;
   PetscCall(TSGetApplicationContext(ts, (void*)&rdy));
 
+  PetscCall(AssertZeroTransportHeatSource(rdy));
+
+  // The heat source is applied over the transport interval that just completed,
+  // as a single implicit step of exactly that length.
   PetscReal t0, t1;
   PetscCall(TSGetPrevTime(ts, &t0));
   PetscCall(TSGetTime(ts, &t1));
@@ -263,7 +364,21 @@ static PetscErrorCode MMSPostStep(TS ts) {
     PetscCall(PetscFree(left_source));
   }
 
+  // Track |Q_mms|_inf so the manufactured construction can be checked directly
+  // rather than inferred from the final hT error. A source-free moving-transport
+  // case (C_t + div(huT, hvT) == 0) must keep this at roundoff scale.
+  {
+    PetscInt num_owned_cells;
+    PetscCall(RDyGetNumOwnedCells(rdy, &num_owned_cells));
+    for (PetscInt c = 0; c < num_owned_cells; ++c) {
+      mms_max_heat_source = PetscMax(mms_max_heat_source, PetscAbsReal(heat->forcing.direct_source[c]));
+    }
+  }
+
   heat->use_direct_source = PETSC_TRUE;
+  // NOTE: on the failure path below the flag stays raised. That is harmless
+  // NOTE: because the MMS driver aborts, but it is the reason production code
+  // NOTE: must never rely on this reset.
   PetscCall(RDyHeatAdvance(rdy, t0, t1));
   // Reset flag so stale MMS forcing cannot leak into subsequent non-MMS calls
   heat->use_direct_source = PETSC_FALSE;
@@ -274,7 +389,8 @@ extern PetscErrorCode PauseIfRequested(RDy rdy);  // for -pause support
 extern PetscErrorCode InitOperator(RDy rdy);
 extern PetscErrorCode InitSolver(RDy rdy);
 
-#define MAX_NUM_COMPONENTS 3 + MAX_NUM_TRACERS
+// prognostic DOF plus one slot for the derived temperature T = hT/h
+#define MAX_NUM_COMPONENTS (3 + MAX_NUM_TRACERS + 1)
 static char mms_comp_names[MAX_NUM_COMPONENTS][MAX_NAME_LEN + 1] = {0};
 
 // this can be used in place of RDySetup for the MMS driver, which uses a
@@ -310,9 +426,15 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
     ++index;
   }
   if (rdy->config.physics.heat) {
-    PetscStrncpy(mms_comp_names[index], "temperature", MAX_NAME_LEN);
+    // NOTE: the prognostic heat DOF is the conservative variable hT; the
+    // NOTE: derived temperature T = hT/h is reported as a trailing component.
+    PetscStrncpy(mms_comp_names[index], "hT ", MAX_NAME_LEN);
     ++index;
+    PetscStrncpy(mms_comp_names[3 + rdy->num_tracers], " T ", MAX_NAME_LEN);
   }
+
+  // reset the manufactured heat source diagnostic for this run
+  mms_max_heat_source = 0.0;
 
   // if a refinement level is not specified, set the base refinement level
   PetscInt refine_level = 0;
@@ -947,51 +1069,69 @@ PetscErrorCode RDyMMSUpdateMaterialProperties(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// Computes the componentwise L1, L2, and Linf error norms for the relevant
-// manufactured solution at the given time. L1_norms, L2_norms, and Linf_norms
-// are all arrays large enough to store the number of dof. If non-NULL,
-// num_global_cells stores the number of distinct global cells and global_area
-// stores the total area covered by distinct global cells.
-PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal* L1_norms, PetscReal* L2_norms, PetscReal* Linf_norms,
-                                       PetscInt* num_global_cells, PetscReal* global_area) {
+// Computes componentwise L1, L2, and Linf norms of (u_global - reference) over
+// this rank's owned cells and reduces them across ranks. When heat is enabled a
+// trailing derived-temperature component is appended: T is recovered as hT/h
+// with the same tiny_h guard the operators use, and the reference temperature
+// comes from T_reference when given, or from the reference vector's own hT/h
+// otherwise.
+static PetscErrorCode ComputeComponentwiseNorms(RDy rdy, Vec reference, const PetscReal* T_reference, PetscReal* L1_norms, PetscReal* L2_norms,
+                                                PetscReal* Linf_norms, PetscInt* num_global_cells, PetscReal* global_area) {
   PetscFunctionBegin;
-  // compute the error vector
-  Vec error;
-  PetscCall(RDyCreatePrognosticVec(rdy, &error));
-  PetscCall(RDyMMSComputeSolution(rdy, time, error));
-  PetscCall(VecAYPX(error, -1.0, rdy->u_global));
 
   PetscInt ndof;
-  PetscCall(VecGetBlockSize(error, &ndof));
+  PetscCall(VecGetBlockSize(reference, &ndof));
+  PetscInt num_comps        = MMSNumErrorComponents(rdy);
+  PetscInt heat_comp        = rdy->config.physics.heat ? MMSHeatComponentIndex(rdy) : -1;
+  PetscInt temperature_comp = rdy->config.physics.heat ? 3 + rdy->num_tracers : -1;
 
-  // compute the componentwise error norms on local cells
-  PetscReal* e;
-  PetscCall(VecGetArray(error, &e));
+  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+
+  const PetscScalar *u, *r;
+  PetscCall(VecGetArrayRead(rdy->u_global, &u));
+  PetscCall(VecGetArrayRead(reference, &r));
+
   PetscReal area_sum = 0.0;
-  memset(L1_norms, 0, ndof * sizeof(PetscReal));
-  memset(L2_norms, 0, ndof * sizeof(PetscReal));
-  memset(Linf_norms, 0, ndof * sizeof(PetscReal));
+  memset(L1_norms, 0, num_comps * sizeof(PetscReal));
+  memset(L2_norms, 0, num_comps * sizeof(PetscReal));
+  memset(Linf_norms, 0, num_comps * sizeof(PetscReal));
   for (PetscInt i = 0; i < rdy->mesh.num_owned_cells; ++i) {
     PetscInt  cell_id = rdy->mesh.cells.owned_to_local[i];
     PetscReal area    = rdy->mesh.cells.areas[cell_id];
 
     for (PetscInt dof = 0; dof < ndof; ++dof) {
-      PetscReal e_dof = e[ndof * i + dof];
+      PetscReal e_dof = PetscRealPart(u[ndof * i + dof] - r[ndof * i + dof]);
       L1_norms[dof] += PetscAbsReal(e_dof) * area;
       L2_norms[dof] += e_dof * e_dof * area;
       Linf_norms[dof] = PetscMax(PetscAbsReal(e_dof), Linf_norms[dof]);
     }
+
+    if (temperature_comp >= 0) {
+      PetscReal h_num = PetscRealPart(u[ndof * i]);
+      PetscReal T_num = (h_num >= tiny_h) ? PetscRealPart(u[ndof * i + heat_comp]) / h_num : 0.0;
+      PetscReal T_ref;
+      if (T_reference) {
+        T_ref = T_reference[i];
+      } else {
+        PetscReal h_ref = PetscRealPart(r[ndof * i]);
+        T_ref           = (h_ref >= tiny_h) ? PetscRealPart(r[ndof * i + heat_comp]) / h_ref : 0.0;
+      }
+      PetscReal e_T = T_num - T_ref;
+      L1_norms[temperature_comp] += PetscAbsReal(e_T) * area;
+      L2_norms[temperature_comp] += e_T * e_T * area;
+      Linf_norms[temperature_comp] = PetscMax(PetscAbsReal(e_T), Linf_norms[temperature_comp]);
+    }
     area_sum += area;
   }
-  PetscCall(VecRestoreArray(error, &e));
-  PetscCall(VecDestroy(&error));
+  PetscCall(VecRestoreArrayRead(reference, &r));
+  PetscCall(VecRestoreArrayRead(rdy->u_global, &u));
 
-  // obtain global error norms
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, ndof, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
-  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, ndof, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD));
+  // obtain global norms
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L1_norms, num_comps, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, L2_norms, num_comps, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD));
+  PetscCall(MPI_Allreduce(MPI_IN_PLACE, Linf_norms, num_comps, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD));
 
-  for (PetscInt dof = 0; dof < ndof; ++dof) {
+  for (PetscInt dof = 0; dof < num_comps; ++dof) {
     L2_norms[dof] = PetscSqrtReal(L2_norms[dof]);
   }
 
@@ -1004,6 +1144,42 @@ PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal* L1_no
   if (global_area) {
     PetscCall(MPI_Reduce(&area_sum, global_area, 1, MPI_DOUBLE, MPI_SUM, 0, PETSC_COMM_WORLD));
   }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Computes the componentwise L1, L2, and Linf error norms for the relevant
+// manufactured solution at the given time. L1_norms, L2_norms, and Linf_norms
+// are all arrays large enough to store MMSNumErrorComponents(rdy) values --
+// the prognostic dof, plus the derived temperature when heat is enabled. If
+// non-NULL, num_global_cells stores the number of distinct global cells and
+// global_area stores the total area covered by distinct global cells.
+PetscErrorCode RDyMMSComputeErrorNorms(RDy rdy, PetscReal time, PetscReal* L1_norms, PetscReal* L2_norms, PetscReal* Linf_norms,
+                                       PetscInt* num_global_cells, PetscReal* global_area) {
+  PetscFunctionBegin;
+
+  Vec exact;
+  PetscCall(RDyCreatePrognosticVec(rdy, &exact));
+  PetscCall(RDyMMSComputeSolution(rdy, time, exact));
+
+  // Evaluate the exact temperature from the manufactured expression at the owned
+  // cell centroids, so the reported T error is a true pointwise difference
+  // rather than a ratio of two error norms.
+  PetscReal* T_exact = NULL;
+  if (rdy->config.physics.heat) {
+    PetscInt   N;
+    PetscReal *cell_x, *cell_y;
+    PetscCall(GetOwnedCellCentroids(rdy, &N, &cell_x, &cell_y));
+    PetscCall(PetscCalloc1(N, &T_exact));
+    PetscCall(EvaluateTemporalSolution(rdy->config.mms.temperature.solutions.T, N, cell_x, cell_y, time, T_exact));
+    PetscCall(PetscFree(cell_x));
+    PetscCall(PetscFree(cell_y));
+  }
+
+  PetscCall(ComputeComponentwiseNorms(rdy, exact, T_exact, L1_norms, L2_norms, Linf_norms, num_global_cells, global_area));
+
+  PetscCall(PetscFree(T_exact));
+  PetscCall(VecDestroy(&exact));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1041,7 +1217,20 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
   PetscReal L1_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS],
       Linf_norms[MAX_NUM_REFINEMENTS + 1][MAX_NUM_COMPONENTS];
 
-  int num_comps = 3 + rdy->num_tracers;
+  int num_comps = (int)MMSNumErrorComponents(rdy);
+
+  // timestep refinement schedule, taken from the unrefined (level 0) instance so
+  // every level scales relative to it rather than chaining off its predecessor
+  PetscInt  dt_exponent    = rdy->config.mms.convergence.timestep_refinement_exponent;
+  PetscReal base_dt        = rdy->dt;  // seconds; honors any -dt override
+  PetscReal base_time_step = rdy->config.time.time_step;
+  PetscInt  base_stop_n    = rdy->config.time.stop_n;
+  PetscCheck(dt_exponent >= 0, rdy->comm, PETSC_ERR_USER, "mms.convergence.timestep_refinement_exponent (%" PetscInt_FMT ") must be non-negative",
+             dt_exponent);
+  if (dt_exponent) {
+    PetscPrintf(rdy->comm, "Refining the timestep with the mesh: dt ~ dx^%" PetscInt_FMT " (dt_0 = %g s, stop_n_0 = %" PetscInt_FMT ")\n",
+                dt_exponent, (double)base_dt, base_stop_n);
+  }
 
   // create refined RDy objects and set them up (dumb, but easy)
   RDy rdys[MAX_NUM_REFINEMENTS + 1];
@@ -1053,10 +1242,15 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
     PetscCall(PetscOptionsSetValue(NULL, "-dm_refine", num_refinements));
     PetscCall(RDyMMSSetup(rdys[r]));
 
-    // override timestepping info (no good way to do this currently)
-    rdys[r]->config.time.time_step = rdys[r - 1]->config.time.time_step;
-    rdys[r]->config.time.stop_n    = rdys[r - 1]->config.time.stop_n;
-    TSSetTimeStep(rdys[r]->ts, rdys[r]->config.time.time_step);
+    // Override timestepping info (no good way to do this currently). Each level
+    // halves dx, so the timestep is scaled by 2^(-p) per level and stop_n by the
+    // reciprocal; without the stop_n change the finer levels would stop early at
+    // a different final time and the error comparison would be meaningless.
+    PetscReal level_factor         = PetscPowReal(2.0, (PetscReal)(dt_exponent * r));
+    rdys[r]->config.time.time_step = base_time_step / level_factor;
+    rdys[r]->config.time.stop_n    = (PetscInt)PetscCeilReal(base_stop_n * level_factor);
+    rdys[r]->dt                    = base_dt / level_factor;
+    TSSetTimeStep(rdys[r]->ts, rdys[r]->dt);
     TSSetMaxSteps(rdys[r]->ts, rdys[r]->config.time.stop_n);
   }
 
@@ -1106,6 +1300,51 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// Writes the final prognostic state to a PETSc binary file so a later run can
+// difference against it. Refining dt on a fixed mesh does not drive the error
+// against the exact solution to zero -- it converges to the semi-discrete
+// solution, whose distance from the exact solution is the O(dx) transport error.
+// Differencing two runs on the *same* mesh removes that floor and leaves the
+// temporal-plus-splitting error, which is what a temporal order claim needs.
+//
+// NOTE: the file stores the global vector in DMPlex's distributed ordering, so a
+// NOTE: reference is only comparable to a run on the same mesh with the same
+// NOTE: number of ranks.
+static PetscErrorCode SaveFinalState(RDy rdy, const char* filename) {
+  PetscFunctionBegin;
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_WRITE, &viewer));
+  PetscCall(VecView(rdy->u_global, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscPrintf(rdy->comm, "  Wrote final state to %s\n", filename);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Loads a reference state written by SaveFinalState and reports componentwise
+// difference norms against the current solution.
+static PetscErrorCode ReportReferenceDifference(RDy rdy, const char* filename, PetscInt num_comps) {
+  PetscFunctionBegin;
+  Vec reference;
+  PetscCall(RDyCreatePrognosticVec(rdy, &reference));
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, filename, FILE_MODE_READ, &viewer));
+  PetscCall(VecLoad(reference, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscReal L1_norms[MAX_NUM_COMPONENTS], L2_norms[MAX_NUM_COMPONENTS], Linf_norms[MAX_NUM_COMPONENTS];
+  PetscCall(ComputeComponentwiseNorms(rdy, reference, NULL, L1_norms, L2_norms, Linf_norms, NULL, NULL));
+
+  PetscPrintf(rdy->comm, "  Reference differences (%s):\n", filename);
+  for (PetscInt c = 0; c < num_comps; ++c) {
+    PetscPrintf(rdy->comm, "    ref %s: L1 = %g, L2 = %g, Linf = %g\n", mms_comp_names[c], L1_norms[c], L2_norms[c], Linf_norms[c]);
+  }
+  PetscPrintf(rdy->comm, "\n");
+
+  PetscCall(VecDestroy(&reference));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #define CheckConvergence(comp, comp_index, norm)                                                                                         \
   if (isnan(norm##_conv_rates[comp_index]) || (norm##_conv_rates[comp_index] <= rdy->config.mms.convergence.expected_rates.comp.norm)) { \
     SETERRQ(rdy->comm, PETSC_ERR_USER, "FAIL: %s convergence rate for %s is %g (expected %g)", #norm, mms_comp_names[comp_index],        \
@@ -1115,14 +1354,14 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
 PetscErrorCode RDyMMSRun(RDy rdy) {
   PetscFunctionBegin;
 
-  PetscInt ndof = 3 + rdy->num_tracers;  // NOTE: SWE assumed!
+  PetscInt num_comps = MMSNumErrorComponents(rdy);  // NOTE: SWE assumed!
   if (rdy->config.mms.convergence.num_refinements) {
     PetscReal L1_conv_rates[MAX_NUM_COMPONENTS], L2_conv_rates[MAX_NUM_COMPONENTS], Linf_conv_rates[MAX_NUM_COMPONENTS];
     // run a convergence study
     PetscCall(RDyMMSEstimateConvergenceRates(rdy, L1_conv_rates, L2_conv_rates, Linf_conv_rates));
 
     PetscPrintf(rdy->comm, "Convergence rates:\n");
-    for (PetscInt idof = 0; idof < ndof; idof++) {
+    for (PetscInt idof = 0; idof < num_comps; idof++) {
       PetscPrintf(rdy->comm, "  %s: L1 = %g, L2 = %g, Linf = %g\n", mms_comp_names[idof], L1_conv_rates[idof], L2_conv_rates[idof],
                   Linf_conv_rates[idof]);
     }
@@ -1138,17 +1377,32 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     CheckConvergence(hv, 2, L2);
     CheckConvergence(hv, 2, Linf);
 
-    for (PetscInt i = 0; i < rdy->num_tracers; ++i) {
+    // NOTE: rdy->num_tracers counts salinity and heat as well as sediment, so
+    // NOTE: this loop is restricted to the sediment classes that c[] describes;
+    // NOTE: salinity and heat are checked against their own thresholds below.
+    for (PetscInt i = 0; i < rdy->config.physics.sediment.num_classes; ++i) {
       CheckConvergence(c[i], 3 + i, L1);
       CheckConvergence(c[i], 3 + i, L2);
       CheckConvergence(c[i], 3 + i, Linf);
     }
-    // Check temperature convergence separately using the T expected rates
+    if (rdy->config.physics.salinity) {
+      PetscInt salinity_index = 3 + rdy->config.physics.sediment.num_classes;
+      CheckConvergence(S, salinity_index, L1);
+      CheckConvergence(S, salinity_index, L2);
+      CheckConvergence(S, salinity_index, Linf);
+    }
+    // The conservative variable hT is what the solver advances; T = hT/h is the
+    // physically meaningful quantity and can combine or cancel h and hT errors,
+    // so the two carry independent thresholds.
     if (rdy->config.physics.heat) {
-      PetscInt heat_index = 3 + rdy->config.physics.sediment.num_classes + (rdy->config.physics.salinity ? 1 : 0);
-      CheckConvergence(T, heat_index, L1);
-      CheckConvergence(T, heat_index, L2);
-      CheckConvergence(T, heat_index, Linf);
+      PetscInt heat_index        = MMSHeatComponentIndex(rdy);
+      PetscInt temperature_index = 3 + rdy->num_tracers;
+      CheckConvergence(hT, heat_index, L1);
+      CheckConvergence(hT, heat_index, L2);
+      CheckConvergence(hT, heat_index, Linf);
+      CheckConvergence(T, temperature_index, L1);
+      CheckConvergence(T, temperature_index, L2);
+      CheckConvergence(T, temperature_index, Linf);
     }
     PetscPrintf(rdy->comm, "PASS: all convergence rates satisfy thresholds.\n");
   } else {
@@ -1178,10 +1432,23 @@ PetscErrorCode RDyMMSRun(RDy rdy) {
     PetscInt  num_global_cells;
     PetscCall(RDyMMSComputeErrorNorms(rdy, cur_time, L1_norms, L2_norms, Linf_norms, &num_global_cells, &global_area));
 
-    PrintErrorNorms(rdy->comm, cur_time, ndof, L1_norms, L2_norms, Linf_norms);
+    PrintErrorNorms(rdy->comm, cur_time, num_comps, L1_norms, L2_norms, Linf_norms);
 
+    if (rdy->config.physics.heat) {
+      PetscReal max_heat_source;
+      PetscCall(MPI_Allreduce(&mms_max_heat_source, &max_heat_source, 1, MPI_DOUBLE, MPI_MAX, rdy->comm));
+      PetscPrintf(rdy->comm, "  Max-|Q_mms|-inf  : %18.12e\n", max_heat_source);
+    }
     PetscPrintf(rdy->comm, "  Avg-cell-area    : %18.16f\n", global_area / num_global_cells);
     PetscPrintf(rdy->comm, "  Avg-length-scale : %18.16f\n", PetscSqrtReal(global_area / num_global_cells));
+
+    // same-mesh reference-solution support for temporal/splitting order studies
+    char      reference_file[PETSC_MAX_PATH_LEN] = {0};
+    PetscBool have_reference = PETSC_FALSE, save_reference = PETSC_FALSE;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-mms_save_final_state", reference_file, sizeof(reference_file), &save_reference));
+    if (save_reference) PetscCall(SaveFinalState(rdy, reference_file));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-mms_reference_solution", reference_file, sizeof(reference_file), &have_reference));
+    if (have_reference) PetscCall(ReportReferenceDifference(rdy, reference_file, num_comps));
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -8,12 +8,22 @@ numerics:
   temporal: euler
   riemann: roe
 
-# Method of Manufactured Solutions for heat TS source isolation (Case 1).
+# Method of Manufactured Solutions for heat TS source isolation (Case 0).
 # Flow is stationary (u=v=0, h=H0 constant), so TSSolve introduces no
 # transport error. The MMS driver samples the prescribed source at the right
 # endpoint for backward Euler and with the trapezoidal average for
-# Crank-Nicolson. Expected temperature convergence is O(dt) for backward Euler
-# and O(dt^2) for Crank-Nicolson.
+# Crank-Nicolson. Expected convergence is O(dt) for backward Euler and O(dt^2)
+# for Crank-Nicolson.
+#
+# What that measures is the source *quadrature*, not the heat TS: in the
+# prescribed-source branch the residual has no state dependence, so every
+# consistent one-step method gives the same update and the TS type changes only
+# which endpoint sampling MMSPostStep installs. Because h is identically 1 here,
+# the conservative hT error and the derived T error coincide.
+#
+# This is also the only heat MMS case in which a fixed-mesh dt study against the
+# exact solution is meaningful; once transport is active the error plateaus on
+# the spatial floor (see heat_mms_moving_source.yaml).
 mms:
   constants:
     H: 1.0      # constant water depth (m)

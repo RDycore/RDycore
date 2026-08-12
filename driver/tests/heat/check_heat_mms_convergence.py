@@ -1,68 +1,44 @@
 #!/usr/bin/env python3
-"""Check method-dependent temporal convergence of the isolated MMS heat source."""
+"""Case 0: method-dependent temporal convergence of the isolated MMS heat source.
+
+The flow is stationary here (u = v = 0, h constant), so the transport operator
+contributes nothing and the spatial error is identically zero. That is what makes
+a fixed-mesh dt-refinement study against the *exact* solution valid for this case
+and invalid once transport is active -- see check_heat_moving_source.py, which
+uses a same-mesh reference instead for exactly that reason.
+
+What this measures is the manufactured source *quadrature*, not the heat TS
+itself. In the prescribed-source branch the heat residual is f = udot - S/(rho c)
+with S a per-cell array that does not vary with the stage time, so every
+consistent one-step method produces the same update and backward Euler and
+Crank-Nicolson differ only in what MMSPostStep bakes into the source (right
+endpoint versus trapezoidal average). The identical-error guard at the end checks
+precisely that the branch is live.
+"""
 
 import argparse
 import math
-import re
-import subprocess
 
+from mms_common import NORMS, check_rate, error_norms, max_error_over_components, run_driver
 
-TEMPERATURE_ERROR = re.compile(
-    r"^\s*temperature:\s+L1\s*=\s*([+\-0-9.eE]+).*?"
-    r"L2\s*=\s*([+\-0-9.eE]+).*?Linf\s*=\s*([+\-0-9.eE]+)",
-    re.MULTILINE,
-)
-FLOW_ERROR = re.compile(
-    r"^\s*(h|hu|hv)\s*:\s+L1\s*=\s*([+\-0-9.eE]+).*?"
-    r"L2\s*=\s*([+\-0-9.eE]+).*?Linf\s*=\s*([+\-0-9.eE]+)",
-    re.MULTILINE,
-)
-
-
-def convergence_rate(step_sizes, errors):
-    x = [math.log(value) for value in step_sizes]
-    y = [math.log(value) for value in errors]
-    x_mean = sum(x) / len(x)
-    y_mean = sum(y) / len(y)
-    return sum((a - x_mean) * (b - y_mean) for a, b in zip(x, y)) / sum(
-        (a - x_mean) ** 2 for a in x
-    )
+# Case 0 has h identically 1, so the conservative hT error and the derived T
+# error coincide; both are checked to keep the two reporting paths honest.
+COMPONENTS = ("hT", "T")
+FLOW_TOLERANCE = 1.0e-10
+EXPECTED = {"beuler": (0.85, 1.15), "cn": (1.8, 2.2)}
 
 
 def run_case(driver, input_file, method, step_size, final_time):
     max_steps = math.ceil(final_time / step_size) + 1
-    command = [
-        driver,
-        input_file,
-        "-dt",
-        str(step_size),
-        "-ts_max_steps",
-        str(max_steps),
-        "-heat_ts_type",
-        method,
-    ]
-    result = subprocess.run(command, check=False, text=True, capture_output=True)
-    output = result.stdout + result.stderr
-    if result.returncode:
-        raise RuntimeError(f"{' '.join(command)} failed:\n{output}")
+    output = run_driver(driver, input_file, ["-dt", step_size, "-ts_max_steps", max_steps, "-heat_ts_type", method])
 
-    temperature_matches = TEMPERATURE_ERROR.findall(output)
-    if not temperature_matches:
-        raise RuntimeError(f"Could not find the temperature error in output:\n{output}")
-
-    flow_matches = FLOW_ERROR.findall(output)
-    if len(flow_matches) < 3:
-        raise RuntimeError(f"Could not find all flow error norms in output:\n{output}")
-    max_flow_error = max(float(value) for match in flow_matches[-3:] for value in match[1:])
-    if max_flow_error > 1.0e-10:
+    max_flow_error = max_error_over_components(output, ("h", "hu", "hv"))
+    if max_flow_error > FLOW_TOLERANCE:
         raise RuntimeError(
             f"Lake-at-rest flow error {max_flow_error:g} exceeds tolerance for {method}, dt={step_size:g}"
         )
 
-    return {
-        norm: float(value)
-        for norm, value in zip(("L1", "L2", "Linf"), temperature_matches[-1])
-    }
+    return {component: error_norms(output, component) for component in COMPONENTS}
 
 
 def main():
@@ -73,37 +49,21 @@ def main():
     args = parser.parse_args()
 
     step_sizes = [0.1, 0.05, 0.025, 0.0125]
-    expected = {"beuler": (0.85, 1.15), "cn": (1.8, 2.2)}
     all_errors = {}
-    for method, bounds in expected.items():
-        case_errors = [
-            run_case(args.driver, args.input, method, step_size, args.final_time)
-            for step_size in step_sizes
-        ]
-        all_errors[method] = {
-            norm: [errors[norm] for errors in case_errors]
-            for norm in ("L1", "L2", "Linf")
-        }
+    for method, bounds in EXPECTED.items():
+        case_errors = [run_case(args.driver, args.input, method, step_size, args.final_time) for step_size in step_sizes]
 
         print(f"{method}:")
-        for norm, errors in all_errors[method].items():
-            rate = convergence_rate(step_sizes, errors)
-            if not bounds[0] <= rate <= bounds[1]:
-                raise RuntimeError(
-                    f"{method} temperature {norm} rate {rate:.6g} is outside "
-                    f"[{bounds[0]}, {bounds[1]}]; errors={errors}"
-                )
-            print(f"  {norm}: rate={rate:.6f}, errors={errors}")
+        all_errors[method] = {}
+        for component in COMPONENTS:
+            for norm in NORMS:
+                errors = [errors[component][norm] for errors in case_errors]
+                all_errors[method][(component, norm)] = errors
+                check_rate(f"{method} {component} {norm}", step_sizes, errors, bounds)
 
-    for norm in ("L1", "L2", "Linf"):
-        if math.isclose(
-            all_errors["beuler"][norm][0],
-            all_errors["cn"][norm][0],
-            rel_tol=1.0e-6,
-        ):
-            raise RuntimeError(
-                f"Backward Euler and Crank-Nicolson produced identical coarse-step {norm} errors"
-            )
+    for key in all_errors["beuler"]:
+        if math.isclose(all_errors["beuler"][key][0], all_errors["cn"][key][0], rel_tol=1.0e-6):
+            raise RuntimeError(f"Backward Euler and Crank-Nicolson produced identical coarse-step {key} errors")
 
 
 if __name__ == "__main__":

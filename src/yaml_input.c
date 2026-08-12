@@ -765,6 +765,7 @@ static const cyaml_schema_field_t mms_convergence_rates_fields_schema[] = {
     CYAML_FIELD_MAPPING("hv", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hv, mms_error_norms_fields_schema),
     CYAML_MMS_CONVERGENCE_RATES_SEDIMENT_FIELDS // defined in build/include/cyaml_sediment_fields.h
     CYAML_FIELD_MAPPING("S", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, S, mms_error_norms_fields_schema),
+    CYAML_FIELD_MAPPING("hT", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, hT, mms_error_norms_fields_schema),
     CYAML_FIELD_MAPPING("T", CYAML_FLAG_OPTIONAL, RDyMMSConvergenceRates, T, mms_error_norms_fields_schema),
     CYAML_FIELD_END
 };
@@ -772,6 +773,7 @@ static const cyaml_schema_field_t mms_convergence_rates_fields_schema[] = {
 static const cyaml_schema_field_t mms_convergence_fields_schema[] = {
     CYAML_FIELD_INT("num_refinements", CYAML_FLAG_DEFAULT, RDyMMSConvergence, num_refinements),
     CYAML_FIELD_INT("base_refinement", CYAML_FLAG_OPTIONAL, RDyMMSConvergence, base_refinement),
+    CYAML_FIELD_INT("timestep_refinement_exponent", CYAML_FLAG_OPTIONAL, RDyMMSConvergence, timestep_refinement_exponent),
     CYAML_FIELD_MAPPING("expected_rates", CYAML_FLAG_DEFAULT, RDyMMSConvergence,
                         expected_rates, mms_convergence_rates_fields_schema),
     CYAML_FIELD_END
