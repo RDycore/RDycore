@@ -26,6 +26,7 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_mms_conv_study.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_coupling_interval.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
+     ${MESH_DIR}/DamBreak_grid5x10.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)

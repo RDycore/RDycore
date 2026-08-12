@@ -13,7 +13,18 @@ logging:
 
 # RDyAdvance spans one second while the transport TS takes four 0.25-second
 # steps. With h=1 m and Q=rho_w*Cp_w W/m^2, the full coupling interval must
-# increase the temperature from 20 C to 21 C.
+# increase the temperature from 20 C to 21 C. A heat solve that spanned only the
+# 0.25 s transport step would instead reach 20.25 C.
+#
+# The mesh must have a FLAT bed. The "lake at rest" condition below prescribes a
+# uniform water *depth*, which is only a lake at rest when the bed is level --
+# on a sloped bed a uniform depth is not a level surface, so the water flows.
+# That matters here because the surface heat flux raises the conservative
+# variable hT at a depth-independent rate Q/(rho*Cp), so T = hT/h picks up the
+# depth variation and the pointwise check below no longer holds. This test used
+# mms_triangles_dx1.exo, whose bed carries the MMS bathymetry
+# z = 0.0025*sin(pi*x/5)*sin(pi*y/5); the resulting sloshing left h in
+# [0.9827, 1.0176] and T off by 1/h - 1 = 0.0176.
 time:
   time_step: 0.25
   unit: seconds
@@ -21,7 +32,7 @@ time:
   coupling_interval: 1.0
 
 grid:
-  file: mms_triangles_dx1.exo
+  file: DamBreak_grid5x10.exo  # flat bed (z = 0); see the note above
 
 regions:
   - name: domain
