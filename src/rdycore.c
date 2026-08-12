@@ -191,13 +191,23 @@ PetscBool RDyRestarted(RDy rdy) { return rdy->config.restart.file[0]; }
 /// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode RDyDestroyVectors(RDy* rdy) {
   PetscFunctionBegin;
+
+  // With no tracers, the flow Vecs alias the solution Vecs instead of owning
+  // storage of their own (see CreateVectors). Break those aliases up front,
+  // *before* anything is destroyed: VecDestroy() nulls the pointer it is handed,
+  // so testing "flow_global_vec != u_global" after u_global has been destroyed
+  // compares a dangling pointer against NULL, passes, and destroys the same Vec
+  // a second time.
+  if ((*rdy)->flow_global_vec == (*rdy)->u_global) (*rdy)->flow_global_vec = NULL;
+  if ((*rdy)->flow_local_vec == (*rdy)->u_local) (*rdy)->flow_local_vec = NULL;
+
   // destroy vectors
   if ((*rdy)->rhs) PetscCall(VecDestroy(&((*rdy)->rhs)));
   if ((*rdy)->u_global) PetscCall(VecDestroy(&((*rdy)->u_global)));
   if ((*rdy)->u_local) PetscCall(VecDestroy(&((*rdy)->u_local)));
   if ((*rdy)->vec_1dof) PetscCall(VecDestroy(&(*rdy)->vec_1dof));
-  if ((*rdy)->flow_global_vec && (*rdy)->flow_global_vec != (*rdy)->u_global) PetscCall(VecDestroy(&(*rdy)->flow_global_vec));
-  if ((*rdy)->flow_local_vec && (*rdy)->flow_local_vec != (*rdy)->u_local) PetscCall(VecDestroy(&(*rdy)->flow_local_vec));
+  if ((*rdy)->flow_global_vec) PetscCall(VecDestroy(&(*rdy)->flow_global_vec));
+  if ((*rdy)->flow_local_vec) PetscCall(VecDestroy(&(*rdy)->flow_local_vec));
   if ((*rdy)->tracer_global_vec) PetscCall(VecDestroy(&(*rdy)->tracer_global_vec));
   if ((*rdy)->tracer_local_vec) PetscCall(VecDestroy(&(*rdy)->tracer_local_vec));
   // soln_output.petsc_accum is the only RDy-owned output Vec; all other output
