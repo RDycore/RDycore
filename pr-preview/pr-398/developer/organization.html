@@ -1888,7 +1888,7 @@ information.</p>
 object:</p>
 <div class="highlight"><pre><span></span><code>  // create an RDy on the given communicator with the given input
   RDy rdy;
-  PetscCall(RDyCreate(MPI_COMM_WORLD, &quot;my-input.yaml&quot;, &amp;rdy));
+  PetscCall(RDyCreate(MPI_COMM_WORLD, "my-input.yaml", &amp;rdy));
 </code></pre></div>
 <p>This only creates the object--it does not read input or allocate any resources
 for the problem described within the input.</p>
@@ -2159,7 +2159,7 @@ the C function <code>RDyCreateF90</code> within the <code>interface</code> block
 <a href="https://github.com/RDycore/RDycore/blob/main/src/f90-mod/rdycore.F90"><code>f90-mod/rdycore.F90</code></a>:</p>
 <div class="highlight"><pre><span></span><code>  interface
     ...
-    integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name=&quot;RDyCreateF90&quot;)
+    integer(c_int) function rdycreate_(comm, filename, rdy) bind(c, name="RDyCreateF90")
       use iso_c_binding, only: c_int, c_ptr
       integer,            intent(in)  :: comm
       type(c_ptr), value, intent(in)  :: filename

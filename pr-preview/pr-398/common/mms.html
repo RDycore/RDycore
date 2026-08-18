@@ -514,6 +514,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#heat-error-norms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heat error norms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-solution-self-convergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference-solution self-convergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scope-of-the-heat-mms-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope of the heat MMS path
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1388,6 +1421,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#heat-error-norms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heat error norms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-solution-self-convergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference-solution self-convergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scope-of-the-heat-mms-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope of the heat MMS path
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1475,10 +1541,18 @@ a convergent manufactured solution. So these sections are replaced by a single
 <span class="w">    </span><span class="c1"># Manning coefficient n(x,y)</span>
 <span class="w">    </span><span class="nt">n</span><span class="p">:</span><span class="w">     </span><span class="l l-Scalar l-Scalar-Plain">N * (1 + sin(K*x) * sin(K*y))</span>
 
+<span class="w">  </span><span class="c1"># Manufactured water temperature, required when physics.heat is enabled</span>
+<span class="w">  </span><span class="nt">temperature</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">T</span><span class="p">:</span><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">A * (1 + sin(K*x)*sin(K*y)) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dTdx</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A * K * sin(K*y) * cos(K*x) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dTdy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A * K * sin(K*x) * cos(K*y) * exp(t/T)</span>
+<span class="w">    </span><span class="nt">dTdt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)</span>
+
 <span class="w">  </span><span class="c1"># Convergence study parameters (optional)</span>
 <span class="w">  </span><span class="nt">convergence</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">num_refinements</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
 <span class="w">    </span><span class="nt">base_refinement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">timestep_refinement_exponent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <span class="w">    </span><span class="nt">expected_rates</span><span class="p">:</span>
 <span class="w">      </span><span class="nt">h</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
@@ -1492,6 +1566,14 @@ a convergent manufactured solution. So these sections are replaced by a single
 <span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.73</span>
 <span class="w">        </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.78</span>
 <span class="w">        </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.62</span>
+<span class="w">      </span><span class="nt">hT</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.93</span>
+<span class="w">        </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.92</span>
+<span class="w">        </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.92</span>
+<span class="w">      </span><span class="nt">T</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">L1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.90</span>
+<span class="w">        </span><span class="nt">L2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.88</span>
+<span class="w">        </span><span class="nt">Linf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.72</span>
 </code></pre></div>
 <p>The <code>mms</code> section defines the forms of the manufactured solutions for the
 model equations corresponding to parameters set in the <code>physics</code> section.</p>
@@ -1506,6 +1588,14 @@ water equations (SWE) in terms of a water height <code>h</code> with a flow velo
 coordinates <code>x</code> and <code>y</code> and the time <code>t</code>. Other model parameters (<code>z</code>, the
 elevation function, and <code>n</code>, the Manning coefficient) are functions of <code>x</code> and
 <code>y</code> only.</p>
+<p>The <code>temperature</code> subsection is required when <code>physics.heat</code> is enabled. It gives
+the manufactured water temperature <code>T</code> and its partial derivatives. Note that
+RDycore's prognostic heat variable is the conservative quantity <code>hT</code>, not <code>T</code>
+itself; the driver forms <code>h*T</code> when it initializes and evaluates the exact
+solution, and reports error norms for both (see
+<a href="#heat-error-norms">Heat error norms</a> below).</p>
+<p>Manufactured expressions are limited to 128 characters, so a long derivative may
+have to be written without spaces.</p>
 <p>These analytic forms are parsed and compiled at runtime so they can be evaluated
 as needed by the model. This means you can define a new manufactured solution in
 every MMS driver input file, without developing code and rebuilding RDycore.</p>
@@ -1514,24 +1604,92 @@ every MMS driver input file, without developing code and rebuilding RDycore.</p>
 performing convergence studies that determine whether the MMS problem has been
 solved successfully for each solution component:</p>
 <ul>
-<li><code>num_refinements</code>: the number of times the domain (and timestep) are refined
-  uniformly from the base resolution to test the rate of convergence of the
-  solution error. This parameter is required.</li>
+<li><code>num_refinements</code>: the number of times the domain is refined uniformly from
+  the base resolution to test the rate of convergence of the solution error.
+  This parameter is required.</li>
 <li><code>base_refinement</code>: this optional parameter specifies the number of times the
   mesh should be refined to establish the coarsest resolution to be used in the
   convergence study. For example, a <code>base_refinement</code> of 2 indicates that a
   mesh loaded from a file should be refined twice before performing a
   convergence study.</li>
-<li><code>expected_rates</code>: a sub-subsection with <code>L1</code>, <code>L2</code>, and <code>Linf</code>
+<li>
+<p><code>timestep_refinement_exponent</code>: an optional exponent <code>p</code> giving the timestep
+  used at refinement level <code>r</code> as <code>dt_0 / 2^(p*r)</code>, where <code>dt_0</code> is the timestep
+  configured in the <code>time</code> section. <code>stop_n</code> is scaled by the reciprocal so that
+  every level ends at the same physical time. The default of <code>0</code> holds the
+  timestep fixed across levels, which can let temporal and operator-splitting
+  error dominate the finest meshes; <code>1</code> refines <code>dt</code> with <code>dx</code>, and <code>2</code> refines
+  it with <code>dx^2</code>.</p>
+<p>Note that with <code>p = 1</code> and first-order discretizations in both space and
+time, the error behaves as <code>E ~ Cx dx + Ct dt = (Cx + K Ct) dx</code>, so the
+reported rate is a <strong>joint space-time rate</strong>, not an isolated spatial one.
+Isolating the spatial order requires a timestep strategy under which the
+temporal error is demonstrably negligible or asymptotically smaller --
+<code>numerics.temporal: rk4</code>, a fixed <code>dt</code> shown to be small enough, or <code>p = 2</code>
+(correct, but the work scales as <code>dx^-4</code>).</p>
+</li>
+<li>
+<p><code>expected_rates</code>: a sub-subsection with <code>L1</code>, <code>L2</code>, and <code>Linf</code>
   entries for each relevant solution component name giving the expected rates of
   convergence for the appropriate error norms. Each of the component names and
   expected rates are optional, so you can specify only those you want to use
-  as pass/fail criteria.</li>
+  as pass/fail criteria.</p>
+</li>
 </ul>
 <p><strong>NOTE: When the MMS driver performs a convergence study, it writes no output.
 If you need to write a mesh or solution data, you can always use an input file
 without the <code>convergence</code> section to compute error norms for a single spatial
 resolution, writing output as needed.</strong></p>
+<h3 id="heat-error-norms">Heat error norms</h3>
+<p>When <code>physics.heat</code> is enabled the driver reports two rows for the heat solution:</p>
+<div class="highlight"><pre><span></span><code>  hT : L1 = ..., L2 = ..., Linf = ...
+   T : L1 = ..., L2 = ..., Linf = ...
+</code></pre></div>
+<ul>
+<li><code>hT</code> is the error in the conservative variable the solver actually advances.</li>
+<li><code>T</code> is the error in the derived temperature <code>hT / h</code>, guarded by
+  <code>physics.flow.tiny_h</code> exactly as the operators guard it, and compared against
+  the manufactured <code>T</code> evaluated at the same cell centroids. This is the
+  physically meaningful quantity, and it can combine or partially cancel errors
+  in <code>h</code> and <code>hT</code>, so it generally converges at a slightly different rate.</li>
+</ul>
+<p>Both carry independent <code>expected_rates</code> entries (<code>hT</code> and <code>T</code>). They coincide
+only when <code>h</code> is identically 1.</p>
+<h3 id="reference-solution-self-convergence">Reference-solution self-convergence</h3>
+<p>Two command-line options support measuring temporal (and operator-splitting)
+order on a fixed mesh:</p>
+<ul>
+<li><code>-mms_save_final_state &lt;file&gt;</code> writes the final prognostic state to a PETSc
+  binary file.</li>
+<li><code>-mms_reference_solution &lt;file&gt;</code> loads such a file and reports componentwise
+  difference norms against the current solution, prefixed with <code>ref</code>.</li>
+</ul>
+<p>These exist because refining <code>dt</code> on a fixed mesh does <strong>not</strong> drive the error
+against the exact solution to zero once transport is active: the solution
+converges to the semi-discrete (method-of-lines) solution, whose distance from
+the exact solution is the spatial truncation error. A study against the exact
+solution therefore plateaus on that floor and reports a rate near zero.
+Differencing two runs that share a spatial discretization cancels the floor and
+leaves the temporal and splitting error alone. Choose the reference timestep at
+or below <code>dt_min / 16</code> -- at first order the reference's own error biases the
+finest measured point by roughly <code>dt_ref / dt_min</code> -- and validate it by halving
+it once and confirming the reported errors barely move.</p>
+<p>The file stores the global vector in DMPlex's distributed ordering, so a
+reference is only comparable to a run on the same mesh with the same number of
+MPI ranks.</p>
+<h3 id="scope-of-the-heat-mms-path">Scope of the heat MMS path</h3>
+<p>The MMS driver drives the heat source solve through the <code>direct_source</code> branch,
+which <strong>replaces</strong> the nonlinear atmospheric parameterization <code>Q_net(T)</code> rather
+than correcting it. The heat MMS cases therefore verify passive transport of
+<code>hT</code>, the manufactured source quadrature, and the Lie composition of the two
+solves -- but they do <strong>not</strong> verify <code>Q_net(T)</code> or its analytic Jacobian.</p>
+<p>A consequence worth stating: in this path the heat residual <code>f = udot - S/(rho c)</code>
+has no state dependence, since <code>S</code> is a per-cell array that does not vary with
+the stage time. Every consistent one-step method therefore produces the same
+update, and the heat TS type (<code>-heat_ts_type beuler</code> or <code>cn</code>) affects only which
+manufactured quadrature the driver installs -- the right endpoint for backward
+Euler, the endpoint average for Crank-Nicolson. It does not affect the order of
+the source step.</p>
 
 
 
