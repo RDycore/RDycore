@@ -64,10 +64,18 @@ mms:
     # Manning coefficient n(x,y)
     n:     N * (1 + sin(K*x) * sin(K*y))
 
+  # Manufactured water temperature, required when physics.heat is enabled
+  temperature:
+    T:    A * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dTdx: A * K * sin(K*y) * cos(K*x) * exp(t/T)
+    dTdy: A * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dTdt: A / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+
   # Convergence study parameters (optional)
   convergence:
     num_refinements: 3
     base_refinement: 1
+    timestep_refinement_exponent: 1
     expected_rates:
       h:
         L1: 1
@@ -81,6 +89,14 @@ mms:
         L1: 0.73
         L2: 0.78
         Linf: 0.62
+      hT:
+        L1: 0.93
+        L2: 0.92
+        Linf: 0.92
+      T:
+        L1: 0.90
+        L2: 0.88
+        Linf: 0.72
 ```
 
 The `mms` section defines the forms of the manufactured solutions for the
@@ -99,6 +115,16 @@ coordinates `x` and `y` and the time `t`. Other model parameters (`z`, the
 elevation function, and `n`, the Manning coefficient) are functions of `x` and
 `y` only.
 
+The `temperature` subsection is required when `physics.heat` is enabled. It gives
+the manufactured water temperature `T` and its partial derivatives. Note that
+RDycore's prognostic heat variable is the conservative quantity `hT`, not `T`
+itself; the driver forms `h*T` when it initializes and evaluates the exact
+solution, and reports error norms for both (see
+[Heat error norms](#heat-error-norms) below).
+
+Manufactured expressions are limited to 128 characters, so a long derivative may
+have to be written without spaces.
+
 These analytic forms are parsed and compiled at runtime so they can be evaluated
 as needed by the model. This means you can define a new manufactured solution in
 every MMS driver input file, without developing code and rebuilding RDycore.
@@ -109,14 +135,30 @@ The optional `convergence` subsection contains the following parameters for
 performing convergence studies that determine whether the MMS problem has been
 solved successfully for each solution component:
 
-* `num_refinements`: the number of times the domain (and timestep) are refined
-  uniformly from the base resolution to test the rate of convergence of the
-  solution error. This parameter is required.
+* `num_refinements`: the number of times the domain is refined uniformly from
+  the base resolution to test the rate of convergence of the solution error.
+  This parameter is required.
 * `base_refinement`: this optional parameter specifies the number of times the
   mesh should be refined to establish the coarsest resolution to be used in the
   convergence study. For example, a `base_refinement` of 2 indicates that a
   mesh loaded from a file should be refined twice before performing a
   convergence study.
+* `timestep_refinement_exponent`: an optional exponent `p` giving the timestep
+  used at refinement level `r` as `dt_0 / 2^(p*r)`, where `dt_0` is the timestep
+  configured in the `time` section. `stop_n` is scaled by the reciprocal so that
+  every level ends at the same physical time. The default of `0` holds the
+  timestep fixed across levels, which can let temporal and operator-splitting
+  error dominate the finest meshes; `1` refines `dt` with `dx`, and `2` refines
+  it with `dx^2`.
+
+    Note that with `p = 1` and first-order discretizations in both space and
+    time, the error behaves as `E ~ Cx dx + Ct dt = (Cx + K Ct) dx`, so the
+    reported rate is a **joint space-time rate**, not an isolated spatial one.
+    Isolating the spatial order requires a timestep strategy under which the
+    temporal error is demonstrably negligible or asymptotically smaller --
+    `numerics.temporal: rk4`, a fixed `dt` shown to be small enough, or `p = 2`
+    (correct, but the work scales as `dx^-4`).
+
 * `expected_rates`: a sub-subsection with `L1`, `L2`, and `Linf`
   entries for each relevant solution component name giving the expected rates of
   convergence for the appropriate error norms. Each of the component names and
@@ -127,3 +169,63 @@ solved successfully for each solution component:
 If you need to write a mesh or solution data, you can always use an input file
 without the `convergence` section to compute error norms for a single spatial
 resolution, writing output as needed.**
+
+### Heat error norms
+
+When `physics.heat` is enabled the driver reports two rows for the heat solution:
+
+```text
+  hT : L1 = ..., L2 = ..., Linf = ...
+   T : L1 = ..., L2 = ..., Linf = ...
+```
+
+* `hT` is the error in the conservative variable the solver actually advances.
+* `T` is the error in the derived temperature `hT / h`, guarded by
+  `physics.flow.tiny_h` exactly as the operators guard it, and compared against
+  the manufactured `T` evaluated at the same cell centroids. This is the
+  physically meaningful quantity, and it can combine or partially cancel errors
+  in `h` and `hT`, so it generally converges at a slightly different rate.
+
+Both carry independent `expected_rates` entries (`hT` and `T`). They coincide
+only when `h` is identically 1.
+
+### Reference-solution self-convergence
+
+Two command-line options support measuring temporal (and operator-splitting)
+order on a fixed mesh:
+
+* `-mms_save_final_state <file>` writes the final prognostic state to a PETSc
+  binary file.
+* `-mms_reference_solution <file>` loads such a file and reports componentwise
+  difference norms against the current solution, prefixed with `ref`.
+
+These exist because refining `dt` on a fixed mesh does **not** drive the error
+against the exact solution to zero once transport is active: the solution
+converges to the semi-discrete (method-of-lines) solution, whose distance from
+the exact solution is the spatial truncation error. A study against the exact
+solution therefore plateaus on that floor and reports a rate near zero.
+Differencing two runs that share a spatial discretization cancels the floor and
+leaves the temporal and splitting error alone. Choose the reference timestep at
+or below `dt_min / 16` -- at first order the reference's own error biases the
+finest measured point by roughly `dt_ref / dt_min` -- and validate it by halving
+it once and confirming the reported errors barely move.
+
+The file stores the global vector in DMPlex's distributed ordering, so a
+reference is only comparable to a run on the same mesh with the same number of
+MPI ranks.
+
+### Scope of the heat MMS path
+
+The MMS driver drives the heat source solve through the `direct_source` branch,
+which **replaces** the nonlinear atmospheric parameterization `Q_net(T)` rather
+than correcting it. The heat MMS cases therefore verify passive transport of
+`hT`, the manufactured source quadrature, and the Lie composition of the two
+solves -- but they do **not** verify `Q_net(T)` or its analytic Jacobian.
+
+A consequence worth stating: in this path the heat residual `f = udot - S/(rho c)`
+has no state dependence, since `S` is a per-cell array that does not vary with
+the stage time. Every consistent one-step method therefore produces the same
+update, and the heat TS type (`-heat_ts_type beuler` or `cn`) affects only which
+manufactured quadrature the driver installs -- the right endpoint for backward
+Euler, the endpoint average for Crank-Nicolson. It does not affect the order of
+the source step.

@@ -14,19 +14,19 @@
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn, const PetscReal *cn,
-                                           PetscReal *fij, PetscReal *amax) {
+static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData* datal, TracerRiemannStateData* datar, const PetscReal* sn, const PetscReal* cn,
+                                           PetscReal* fij, PetscReal* amax) {
   PetscFunctionBeginUser;
 
-  PetscReal *hl  = datal->h;
-  PetscReal *ul  = datal->u;
-  PetscReal *vl  = datal->v;
-  PetscReal *cil = datal->ci;
+  PetscReal* hl  = datal->h;
+  PetscReal* ul  = datal->u;
+  PetscReal* vl  = datal->v;
+  PetscReal* cil = datal->ci;
 
-  PetscReal *hr  = datar->h;
-  PetscReal *ur  = datar->u;
-  PetscReal *vr  = datar->v;
-  PetscReal *cir = datar->ci;
+  PetscReal* hr  = datar->h;
+  PetscReal* ur  = datar->u;
+  PetscReal* vr  = datar->v;
+  PetscReal* cir = datar->ci;
 
   PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
 
@@ -46,6 +46,12 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
   PetscReal FR[MAX_NUM_FIELD_COMPONENTS]                          = {0};
 
   for (PetscInt i = 0; i < num_states; ++i) {
+    if (hl[i] <= 0.0 && hr[i] <= 0.0) {
+      for (PetscInt j = 0; j < soln_ncomp; j++) fij[soln_ncomp * i + j] = 0.0;
+      amax[i] = 0.0;
+      continue;
+    }
+
     // compute the eigenspectrum for the shallow water equations
     PetscReal A_swe[3], R_swe[3][3], dW_swe[3], amax_swe;
     ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A_swe, R_swe, dW_swe, &amax_swe);
@@ -126,19 +132,19 @@ static PetscErrorCode ComputeTracerRoeFlux(TracerRiemannStateData *datal, Tracer
 /// @param [out] fij array containing fluxes through edges
 /// @param [out] amax array storing maximum courant number on edges
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData *datal, TracerRiemannStateData *datar, const PetscReal *sn,
-                                                 const PetscReal *cn, PetscReal *fij, PetscReal *amax) {
+static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData* datal, TracerRiemannStateData* datar, const PetscReal* sn,
+                                                 const PetscReal* cn, PetscReal* fij, PetscReal* amax) {
   PetscFunctionBeginUser;
 
-  PetscReal *hl  = datal->h;
-  PetscReal *ul  = datal->u;
-  PetscReal *vl  = datal->v;
-  PetscReal *cil = datal->ci;
+  PetscReal* hl  = datal->h;
+  PetscReal* ul  = datal->u;
+  PetscReal* vl  = datal->v;
+  PetscReal* cil = datal->ci;
 
-  PetscReal *hr  = datar->h;
-  PetscReal *ur  = datar->u;
-  PetscReal *vr  = datar->v;
-  PetscReal *cir = datar->ci;
+  PetscReal* hr  = datar->h;
+  PetscReal* ur  = datar->u;
+  PetscReal* vr  = datar->v;
+  PetscReal* cir = datar->ci;
 
   PetscAssert(datal->num_states == datar->num_states, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Size of data left and right of edges is not the same!");
 
@@ -154,6 +160,12 @@ static PetscErrorCode ComputeUpwindTracerRoeFlux(TracerRiemannStateData *datal, 
   PetscReal FR[MAX_NUM_FIELD_COMPONENTS] = {0};
 
   for (PetscInt i = 0; i < num_states; ++i) {
+    if (hl[i] <= 0.0 && hr[i] <= 0.0) {
+      for (PetscInt j = 0; j < soln_ncomp; j++) fij[soln_ncomp * i + j] = 0.0;
+      amax[i] = 0.0;
+      continue;
+    }
+
     // compute the eigenspectrum for the shallow water equations
     PetscReal A_swe[3], R_swe[3][3], dW_swe[3], amax_swe;
     ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A_swe, R_swe, dW_swe, &amax_swe);

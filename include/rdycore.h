@@ -37,6 +37,8 @@ PETSC_EXTERN PetscErrorCode RDyMMSComputeSolution(RDy, PetscReal, Vec);
 PETSC_EXTERN PetscErrorCode RDyMMSEnforceBoundaryConditions(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyMMSComputeSourceTerms(RDy, PetscReal);
 PETSC_EXTERN PetscErrorCode RDyMMSUpdateMaterialProperties(RDy);
+// NOTE: the three norm arrays below must hold 3 + num_tracers entries, plus one
+// NOTE: more for the derived temperature hT/h when heat is enabled.
 PETSC_EXTERN PetscErrorCode RDyMMSComputeErrorNorms(RDy, PetscReal, PetscReal *, PetscReal *, PetscReal *, PetscInt *, PetscReal *);
 PETSC_EXTERN PetscErrorCode RDyMMSEstimateConvergenceRates(RDy, PetscReal *, PetscReal *, PetscReal *);
 PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
@@ -98,8 +100,8 @@ PETSC_EXTERN PetscErrorCode RDySetSedimentDirichletBoundaryValues(RDy rdy, const
                                                                   const PetscInt num_classes, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
                                                                   PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetTemperatureDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
-                                                                     PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetHeatDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
+                                                              PetscReal *values);
 
 PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
