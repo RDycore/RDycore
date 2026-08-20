@@ -668,10 +668,12 @@ int main(int argc, char *argv[]) {
     PetscReal beta      = 1e-4;
     PetscInt  gauge_stride                  = 7;     // twin mode: gauges at natural cells 0, s, 2s, ...
     PetscReal n0                            = 0.03;  // gauge mode: constant prior
-    char      map_file[PETSC_MAX_PATH_LEN] = {0};
-    char      obs_file[PETSC_MAX_PATH_LEN] = {0};
-    PetscBool have_map_file                = PETSC_FALSE;
-    PetscBool have_obs_file                = PETSC_FALSE;
+    char      map_file[PETSC_MAX_PATH_LEN]         = {0};
+    char      obs_file[PETSC_MAX_PATH_LEN]         = {0};
+    char      gauge_cells_file[PETSC_MAX_PATH_LEN] = {0};  // twin mode: real gauge geometry (natural cell IDs)
+    PetscBool have_map_file                        = PETSC_FALSE;
+    PetscBool have_obs_file                        = PETSC_FALSE;
+    PetscBool have_gauge_cells                     = PETSC_FALSE;
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate", &calibrate, NULL));
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate_percell", &calibrate_percell, NULL));
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate_gauges", &calibrate_gauges, NULL));
@@ -686,6 +688,7 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_prior_file", prior_file, sizeof(prior_file), &have_prior_file));
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_gauges_twin", &gauges_twin, NULL));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_gauge_stride", &gauge_stride, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_gauge_cells_file", gauge_cells_file, sizeof(gauge_cells_file), &have_gauge_cells));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_n0", &n0, NULL));
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_obs_file", obs_file, sizeof(obs_file), &have_obs_file));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_freq", &obs_freq, NULL));
@@ -698,11 +701,9 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_fd_eps", &fd_eps, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_fd_tol", &fd_tol, NULL));
 
-    // NOTE: the disk ("basic") trajectory is the only one that works here.
-    // The memory trajectory SEGVs on the segmented multi-observation adjoint
-    // (NULL stack element in TSTrajectoryGet_Memory/UpdateTS -- PETSc bug,
-    // reproducer: any -adjoint_calibrate_gauges run with
-    // -ts_trajectory_type memory).
+    // NOTE: the memory/revolve trajectory requires the single-TSSolve
+    // forward in ForwardObserve (see the comment there); both disk and
+    // memory trajectories are supported.
 
     RDy rdy;
     PetscCall(RDyCreate(comm, argv[1], &rdy));
@@ -1120,12 +1121,34 @@ int main(int argc, char *argv[]) {
         for (PetscInt i = 0; i < n_owned; ++i) n_true[i] = (xc[i] < 0.5 * (x_min + x_max)) ? 0.03 : 0.06;
         PetscCall(RDySetDomainManningsN(rdy, n_owned, n_true));
 
-        PetscInt  ng = (ncells_global + gauge_stride - 1) / gauge_stride;
-        PetscInt *gcells;
+        PetscInt   ng;
+        PetscInt  *gcells;
         PetscReal *zbg;
-        PetscCall(PetscMalloc1(ng, &gcells));
-        PetscCall(PetscMalloc1(ng, &zbg));
-        for (PetscInt g = 0; g < ng; ++g) gcells[g] = g * gauge_stride;
+        if (have_gauge_cells) {
+          // real gauge geometry: whitespace-separated natural cell IDs
+          // (e.g. data/harvey_gauges/gauge_cells_real17.txt)
+          PetscMPIInt rank;
+          PetscCallMPI(MPI_Comm_rank(comm, &rank));
+          PetscInt cells_buf[1024], n_read = 0;
+          if (rank == 0) {
+            FILE *fp = fopen(gauge_cells_file, "r");
+            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot open %s", gauge_cells_file);
+            while (n_read < 1024 && fscanf(fp, "%" PetscInt_FMT, &cells_buf[n_read]) == 1) ++n_read;
+            fclose(fp);
+            PetscCheck(n_read > 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "no cell IDs in %s", gauge_cells_file);
+          }
+          PetscCallMPI(MPI_Bcast(&n_read, 1, MPIU_INT, 0, comm));
+          PetscCallMPI(MPI_Bcast(cells_buf, n_read, MPIU_INT, 0, comm));
+          ng = n_read;
+          PetscCall(PetscMalloc1(ng, &gcells));
+          PetscCall(PetscMalloc1(ng, &zbg));
+          for (PetscInt g = 0; g < ng; ++g) gcells[g] = cells_buf[g];
+        } else {
+          ng = (ncells_global + gauge_stride - 1) / gauge_stride;
+          PetscCall(PetscMalloc1(ng, &gcells));
+          PetscCall(PetscMalloc1(ng, &zbg));
+          for (PetscInt g = 0; g < ng; ++g) gcells[g] = g * gauge_stride;
+        }
         Mat Hg;
         PetscCall(CreateGaugeObservationMatrix(rdy, ng, gcells, &Hg, zbg));
 
@@ -1264,6 +1287,35 @@ int main(int argc, char *argv[]) {
       if (jred_gate > 0.0)
         PetscCheck(J_final < jred_gate * J_init, comm, PETSC_ERR_PLIB, "gauge calibration misfit reduction too small: %g -> %g",
                    (double)J_init, (double)J_final);
+
+      if (gauges_twin) {  // recovery error vs the two-zone truth used to generate the table
+        PetscInt n_owned_rec;
+        PetscCall(RDyGetNumOwnedCells(rdy, &n_owned_rec));
+        PetscReal *xc_rec;
+        PetscCall(PetscMalloc1(n_owned_rec, &xc_rec));
+        PetscCall(RDyMeshGetOwnedCellXCentroids(&rdy->mesh, n_owned_rec, xc_rec));
+        PetscReal x_lo = PETSC_MAX_REAL, x_hi = -PETSC_MAX_REAL;
+        for (PetscInt i = 0; i < n_owned_rec; ++i) {
+          x_lo = PetscMin(x_lo, xc_rec[i]);
+          x_hi = PetscMax(x_hi, xc_rec[i]);
+        }
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_lo, 1, MPIU_REAL, MPIU_MIN, comm));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_hi, 1, MPIU_REAL, MPIU_MAX, comm));
+        const PetscScalar *p_rec;
+        PetscCall(VecGetArrayRead(p, &p_rec));
+        PetscReal sums[2] = {0.0, 0.0};
+        for (PetscInt i = 0; i < n_owned_rec; ++i) {
+          PetscReal nt = (xc_rec[i] < 0.5 * (x_lo + x_hi)) ? 0.03 : 0.06;
+          PetscReal d  = PetscRealPart(p_rec[i]) - nt;
+          sums[0] += d * d;
+          sums[1] += nt * nt;
+        }
+        PetscCall(VecRestoreArrayRead(p, &p_rec));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, sums, 2, MPIU_REAL, MPIU_SUM, comm));
+        PetscCall(PetscPrintf(comm, "gauges twin recovery: rel L2 err %.3e (%" PetscInt_FMT " gauges, %" PetscInt_FMT " parameters)\n",
+                              (double)PetscSqrtReal(sums[0] / sums[1]), ngauges, ncells_global));
+        PetscCall(PetscFree(xc_rec));
+      }
 
       for (PetscInt k = 0; k < K; ++k) {
         PetscCall(VecDestroy(&y_k[k]));

@@ -48,7 +48,10 @@ finite-difference gates. On a Hurricane Harvey twin configuration
 a two-zone truth field to $19.4\%$ with proper Tikhonov
 regularization, and the gauge-sparse setting exhibits --- and lets us
 dissect --- the classic semiconvergence of underdetermined friction
-estimation. To our knowledge this makes RDycore the
+estimation; a twin using the actual 17-gauge USGS network geometry
+fits its 238 observations essentially perfectly while recovering the
+field to only $45\%$, quantifying why real-data calibration must
+shrink the parameter space to match the network. To our knowledge this makes RDycore the
 first E3SM component model with built-in discrete-adjoint parameter
 estimation, without rewriting the solver in a machine-learning framework.
 \end{abstract}
@@ -544,10 +547,29 @@ $[0.01, 0.2]$. Right: proper Tikhonov weight ($\beta = 10^{-4}$, 686
 gauges), 1000 iterations --- $19.4\%$ error, no drift, sharp zone
 boundary.}
 \label{fig:map}
-\end{figure} Real USGS Harvey gauges (746
-stage series already in hand, HydroShare DOI
-10.4211/hs.c037167e497546a1bc1508dfb32a9cff) require stage-datum QC and
-are deliberately out of scope for this draft.
+\end{figure} \paragraph{The real gauge network.}
+The synthetic gauge sets above are a controlled ramp; the network that
+matters is the real one. Twenty USGS gauges fall inside the Houston
+mesh, seventeen with Hurricane Harvey stage records
+(HydroShare DOI 10.4211/hs.c037167e497546a1bc1508dfb32a9cff). Re-running
+the same twin with the observation operator built at those seventeen
+gauge cells --- 238 observations (17 gauges $\times$ 14 times) against
+2{,}746 parameters --- is a sobering experiment: BLMVM drives the
+misfit down by a factor of $2\times10^{7}$, an essentially perfect fit
+of the observations, while the recovered field is $45.4\%$ from the
+truth and pinned against the bounds in places
+($n \in [0.010, 0.171]$). This is semiconvergence in its purest form:
+the real network's null space is so large that data fit says almost
+nothing about parameter recovery, and no Tikhonov weight or stopping
+rule rescues a per-cell field from 238 observations. The practical
+conclusion for real-data calibration is to shrink the parameter space
+to match the network --- the land-cover-class parameterization
+($\sim$13 NLCD classes for this domain, overdetermined $18\times$ by
+the same observations) is the planned configuration, with the per-cell
+map reserved for densely observed settings. Calibration against the
+actual stage records (rather than twin-synthetic values at the real
+gauge locations) additionally requires the stage-datum QC completed
+after this draft was frozen, and is deliberately deferred.
 
 \section{Nondifferentiability catalog}
 \label{sec:nondiff}
