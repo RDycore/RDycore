@@ -11,6 +11,23 @@ set(mms_c_driver ${mms_driver})
 set(ceed_args -ceed /cpu/self)
 set(preload_args -preload)
 
+# Explicit-source + FD-Jacobian registration smoke test (PETSc backend only:
+# numerics.jacobian rejects the CEED backend)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_jacobian_fd.yaml ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  add_test(swe_roe_ex2b_jacobian_fd_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_c_driver} ex2b_jacobian_fd.yaml)
+endforeach()
+
+# ARK-IMEX forward smoke test (implicit Manning friction; both operator
+# backends -- the CEED explicit side uses the friction-free Q-functions from
+# PR #359, and the two backends agree to machine precision after 100 steps)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_arkimex.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(config basic ceed)
+  add_test(swe_roe_ex2b_arkimex_c_np_1_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${rdycore_c_driver} ex2b_arkimex.yaml -ts_adapt_type none ${${config}_args})
+endforeach()
+
 # Dirichlet BC test
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/ex2b_dirichlet_bc.yaml ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

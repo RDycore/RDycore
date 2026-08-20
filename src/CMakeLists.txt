@@ -19,6 +19,7 @@ set(RDYCORE_C_SOURCE_FILES
   operator_sources_petsc.c
   petsc_operator.c
   swe/swe_ceed.c
+  swe/swe_jacobian_petsc.c
   swe/swe_petsc.c
   tracer/tracer_ceed.c
   tracer/tracer_petsc.c

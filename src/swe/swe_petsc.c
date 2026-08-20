@@ -803,6 +803,190 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Adds the source-term contribution with a plain explicit (dt-free) friction
+///        treatment: tb = Cd |v| q / h with Cd = g n^2 h^{-1/3}, evaluated at the current
+///        state with no time-step-dependent splitting. This makes the RHS a genuine ODE
+///        right-hand side f(u), which is required on the adjoint/Jacobian path
+///        (numerics.jacobian != none): the semi-implicit and XQ2018 treatments embed dt
+///        (and the flux divergence) inside the source and admit no well-defined df/du.
+/// @param [in] context   a context for the SourceOperator
+/// @param [in] fields    a PetscOperatorFields (the "riemannf" field is not needed here)
+/// @param [in] dt        time step (unused -- explicit treatment)
+/// @param [in] u_local   a Vec that contains unknowns for locally-present and ghost cells
+/// @param [out] f_global a Vec that stores the fluxes for only locally-present cells
+static PetscErrorCode ApplySourceExplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBeginUser;
+  (void)dt;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
+
+  SourceOperator *source_op     = context;
+  Vec             source_vec    = source_op->external_sources;
+  Vec             mat_props_vec = source_op->material_properties;
+  RDyMesh        *mesh          = source_op->mesh;
+  RDyCells       *cells         = &mesh->cells;
+  PetscReal       tiny_h        = source_op->tiny_h;
+
+  PetscScalar *source_ptr, *mat_props_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));        // sequential vector
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));  // sequential vector
+  PetscCall(VecGetArray(u_local, &u_ptr));                // domain local vector (indexed by local cells)
+  PetscCall(VecGetArray(f_global, &f_ptr));               // domain global vector (indexed by owned cells)
+
+  // access primitive variables output vector
+  Vec prim_vars_vec;
+  PetscCall(PetscOperatorFieldsGet(fields, "primitive_variables", &prim_vars_vec));
+  PetscCheck(prim_vars_vec, comm, PETSC_ERR_USER, "No 'primitive_variables' field found in source operator!");
+  PetscScalar *pv_ptr;
+  PetscCall(VecGetArray(prim_vars_vec, &pv_ptr));
+
+  PetscInt size;
+  PetscCall(VecGetSize(source_vec, &size));
+  PetscInt n_dof = size / mesh->num_owned_cells;
+  PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  PetscReal h_anuga       = source_op->h_anuga_regular;
+  PetscInt  num_mat_props = NUM_MATERIAL_PROPERTIES;
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) {
+      PetscInt owned_cell_id = cells->local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal hu = u_ptr[n_dof * c + 1];
+      PetscReal hv = u_ptr[n_dof * c + 2];
+
+      PetscReal bedx = 0.0, bedy = 0.0;
+      if (source_op->include_bed_slope) {
+        bedx = cells->dz_dx[c] * GRAVITY * h;
+        bedy = cells->dz_dy[c] * GRAVITY * h;
+      }
+
+      // NOTE on stability: this dt-free drag carries its own stability limit,
+      // dt < 1/tb with tb = g n^2 h^{-4/3} |v|, which is INDEPENDENT of the CFL
+      // condition and becomes binding on thin films (tb ~ h^{-4/3}). On the 30 m
+      // Harvey mesh the spun-up state is 99.9% wet with a median depth of 6 mm,
+      // giving tb up to 420/s, i.e. dt < 2.4 ms versus the CFL-limited 0.25 s;
+      // 90k cells violate dt*tb > 1 at 0.25 s and the run diverges by step 2.
+      // This is genuine source stiffness, not a regularization artifact
+      // (rewriting the drag with ANUGA-regularized velocities changes the
+      // trajectory not at all -- the offending cells have h >> h_anuga).
+      // `semi_implicit` avoids it by capping the impulse at the available
+      // momentum (factor = tb/(1 + dt*tb)), at the cost of embedding dt in the
+      // RHS; the differentiable equivalent is `ark_imex`, which integrates this
+      // same drag implicitly. Use explicit only where depths stay resolved.
+      PetscReal tbx = 0.0, tby = 0.0;
+      if (h >= tiny_h) {  // wet conditions
+        PetscReal u = hu / h;
+        PetscReal v = hv / h;
+
+        // Manning's coefficient
+        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + MATERIAL_PROPERTY_MANNINGS];
+
+        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
+
+        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+        PetscReal tb       = Cd * velocity / h;  // = g n^2 h^{-4/3} |v|
+
+        tbx = tb * hu;  // = g n^2 h^{-7/3} q_x |q|
+        tby = tb * hv;
+      }
+
+      // NOTE: we accumulate everything into the RHS vector by convention.
+      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+      f_ptr[n_dof * owned_cell_id + 1] += -bedx - tbx + source_ptr[n_dof * owned_cell_id + 1];
+      f_ptr[n_dof * owned_cell_id + 2] += -bedy - tby + source_ptr[n_dof * owned_cell_id + 2];
+
+      // write primitive variables (h, u, v) using ANUGA regularization
+      PetscReal denom                   = Square(h) + Square(h_anuga);
+      pv_ptr[n_dof * owned_cell_id + 0] = h;
+      pv_ptr[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv_ptr[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
+    }
+  }
+
+  // restore vectors
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+  PetscCall(VecRestoreArray(source_vec, &source_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
+  PetscCall(VecRestoreArray(prim_vars_vec, &pv_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Adds the NON-STIFF source-term contributions (bed slope and external
+///        sources) for the ARK-IMEX temporal method: the Manning drag lives on
+///        the implicit side (TSSetIFunction; see swe_jacobian_petsc.c), so it
+///        is omitted from this explicit right-hand side.
+static PetscErrorCode ApplySourceARKImex(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBeginUser;
+  (void)dt;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
+
+  SourceOperator *source_op     = context;
+  Vec             source_vec    = source_op->external_sources;
+  Vec             mat_props_vec = source_op->material_properties;
+  RDyMesh        *mesh          = source_op->mesh;
+  RDyCells       *cells         = &mesh->cells;
+  PetscReal       tiny_h        = source_op->tiny_h;
+
+  PetscScalar *source_ptr, *mat_props_ptr, *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(source_vec, &source_ptr));
+  PetscCall(VecGetArray(mat_props_vec, &mat_props_ptr));
+  PetscCall(VecGetArray(u_local, &u_ptr));
+  PetscCall(VecGetArray(f_global, &f_ptr));
+  (void)mat_props_ptr;  // Manning n is not used on the explicit side
+
+  Vec prim_vars_vec;
+  PetscCall(PetscOperatorFieldsGet(fields, "primitive_variables", &prim_vars_vec));
+  PetscCheck(prim_vars_vec, comm, PETSC_ERR_USER, "No 'primitive_variables' field found in source operator!");
+  PetscScalar *pv_ptr;
+  PetscCall(VecGetArray(prim_vars_vec, &pv_ptr));
+
+  PetscInt size;
+  PetscCall(VecGetSize(source_vec, &size));
+  PetscInt n_dof = size / mesh->num_owned_cells;
+  PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  PetscReal h_anuga = source_op->h_anuga_regular;
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) {
+      PetscInt owned_cell_id = cells->local_to_owned[c];
+
+      PetscReal h  = u_ptr[n_dof * c + 0];
+      PetscReal hu = u_ptr[n_dof * c + 1];
+      PetscReal hv = u_ptr[n_dof * c + 2];
+
+      PetscReal bedx = 0.0, bedy = 0.0;
+      if (source_op->include_bed_slope) {
+        bedx = cells->dz_dx[c] * GRAVITY * h;
+        bedy = cells->dz_dy[c] * GRAVITY * h;
+      }
+
+      f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];
+      f_ptr[n_dof * owned_cell_id + 1] += -bedx + source_ptr[n_dof * owned_cell_id + 1];
+      f_ptr[n_dof * owned_cell_id + 2] += -bedy + source_ptr[n_dof * owned_cell_id + 2];
+
+      PetscReal denom                   = Square(h) + Square(h_anuga);
+      pv_ptr[n_dof * owned_cell_id + 0] = h;
+      pv_ptr[n_dof * owned_cell_id + 1] = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv_ptr[n_dof * owned_cell_id + 2] = (h >= tiny_h) ? (hv * h / denom) : 0.0;
+    }
+  }
+
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+  PetscCall(VecRestoreArray(source_vec, &source_ptr));
+  PetscCall(VecRestoreArray(mat_props_vec, &mat_props_ptr));
+  PetscCall(VecRestoreArray(prim_vars_vec, &pv_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Adds contribution of the source-term using implicit time integration approach of:
 ///        Xia, Xilin, and Qiuhua Liang. "A new efficient implicit scheme for discretising the stiff
 ///        friction terms in the shallow water equations." Advances in water resources 117 (2018): 87-97.
@@ -970,8 +1154,14 @@ PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *mesh, const RDyConfig confi
     case SOURCE_IMPLICIT_XQ2018:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
       break;
+    case SOURCE_EXPLICIT:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceExplicit, DestroySource, petsc_op));
+      break;
+    case SOURCE_ARK_IMEX:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceARKImex, DestroySource, petsc_op));
+      break;
     default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit, implicit_xq2018, and explicit are supported in the PETSc version");
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1255,8 +1445,14 @@ PetscErrorCode CreatePetscSWESourceHROperator(RDyMesh *mesh, const RDyConfig con
     case SOURCE_IMPLICIT_XQ2018:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
       break;
+    case SOURCE_EXPLICIT:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceExplicit, DestroySource, petsc_op));
+      break;
+    case SOURCE_ARK_IMEX:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceARKImex, DestroySource, petsc_op));
+      break;
     default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit, implicit_xq2018, and explicit are supported in the PETSc version");
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);

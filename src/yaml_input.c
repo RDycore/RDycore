@@ -60,6 +60,8 @@ static const cyaml_strval_t physics_flow_modes[] = {
 static const cyaml_strval_t source_time_methods[] = {
     {"semi_implicit",   SOURCE_SEMI_IMPLICIT  },
     {"implicit_xq2018", SOURCE_IMPLICIT_XQ2018},
+    {"explicit",        SOURCE_EXPLICIT       },
+    {"ark_imex",        SOURCE_ARK_IMEX       },
 };
 
 // mapping of treatment of "source" fields to members
@@ -115,9 +117,10 @@ static const cyaml_strval_t numerics_spatial_types[] = {
 
 // mapping of strings to numerics temporal types
 static const cyaml_strval_t numerics_temporal_types[] = {
-    {"euler",  TEMPORAL_EULER },
-    {"rk4",    TEMPORAL_RK4   },
-    {"beuler", TEMPORAL_BEULER},
+    {"euler",   TEMPORAL_EULER   },
+    {"rk4",     TEMPORAL_RK4     },
+    {"beuler",  TEMPORAL_BEULER  },
+    {"arkimex", TEMPORAL_ARK_IMEX},
 };
 
 // mapping of strings to numerics riemann solver types
@@ -133,6 +136,13 @@ static const cyaml_strval_t numerics_limiter_types[] = {
     {"van_leer", LIMITER_VANLEER},
 };
 
+// mapping of strings to numerics RHS Jacobian methods
+static const cyaml_strval_t numerics_jacobian_types[] = {
+    {"none",     JACOBIAN_NONE    },
+    {"fd",       JACOBIAN_FD      },
+    {"analytic", JACOBIAN_ANALYTIC},
+};
+
 // mapping of numerics fields to members of RDyNumericsSection
 static const cyaml_schema_field_t numerics_fields_schema[] = {
     CYAML_FIELD_ENUM("spatial", CYAML_FLAG_DEFAULT, RDyNumericsSection, spatial, numerics_spatial_types, CYAML_ARRAY_LEN(numerics_spatial_types)),
@@ -141,6 +151,7 @@ static const cyaml_schema_field_t numerics_fields_schema[] = {
     CYAML_FIELD_BOOL("second_order", CYAML_FLAG_OPTIONAL, RDyNumericsSection, second_order),
     CYAML_FIELD_BOOL("no_limiter", CYAML_FLAG_OPTIONAL, RDyNumericsSection, no_limiter),
     CYAML_FIELD_ENUM("limiter", CYAML_FLAG_OPTIONAL, RDyNumericsSection, limiter, numerics_limiter_types, CYAML_ARRAY_LEN(numerics_limiter_types)),
+    CYAML_FIELD_ENUM("jacobian", CYAML_FLAG_OPTIONAL, RDyNumericsSection, jacobian, numerics_jacobian_types, CYAML_ARRAY_LEN(numerics_jacobian_types)),
     CYAML_FIELD_END
 };
 
@@ -934,7 +945,12 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
   }
   if (config->numerics.temporal == TEMPORAL_BEULER) {
-    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented.");
+    // implicit stepping solves G(u) = u - u_n - dt f(u) with SNES, which
+    // needs the assembled RHS Jacobian (and a dt-free RHS: explicit source)
+    PetscCheck(config->numerics.jacobian != JACOBIAN_NONE, comm, PETSC_ERR_USER,
+               "The backward euler temporal method (BEULER) requires numerics.jacobian: analytic (or fd)");
+    PetscCheck(config->physics.flow.source.method == SOURCE_EXPLICIT, comm, PETSC_ERR_USER,
+               "The backward euler temporal method (BEULER) requires physics.flow.source.method: explicit");
   }
   if (config->numerics.riemann != RIEMANN_ROE && config->numerics.riemann != RIEMANN_UPWIND_ROE) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,

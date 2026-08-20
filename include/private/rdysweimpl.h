@@ -14,4 +14,9 @@ PETSC_INTERN PetscErrorCode CreatePetscSWEBoundaryFluxOperator(RDyMesh *, const 
 PETSC_INTERN PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *, const RDyConfig, Vec, Vec, PetscOperator *);
 PETSC_INTERN PetscErrorCode CreatePetscSWESourceHROperator(RDyMesh *, const RDyConfig, Vec, Vec, PetscOperator *);
 
+// SWE RHS Jacobian (swe_jacobian_petsc.c): matrix creation and TS registration
+PETSC_INTERN PetscErrorCode RegisterSWERHSJacobian(RDy);
+PETSC_INTERN PetscErrorCode RegisterSWEIMEXFriction(RDy);
+PETSC_INTERN PetscErrorCode DestroySWERHSJacobian(RDy);
+
 #endif

@@ -216,6 +216,21 @@ struct _p_RDy {
   // host right-hand-side (residual) vector
   Vec rhs;
 
+  // RHS Jacobian (allocated only when numerics.jacobian != none)
+  Mat rhs_jac;
+  // FD-coloring context for the finite-difference Jacobian baseline
+  MatFDColoring rhs_jac_fd_coloring;
+  // time at which the RHS Jacobian was requested (used by the FD wrapper)
+  PetscReal rhs_jac_time;
+  // parameter Jacobian df/dn (n = per-cell Manning coefficient); allocated
+  // alongside rhs_jac -- two nonzeros per cell (the momentum rows)
+  Mat rhs_jac_p;
+  // implicit-part Jacobian for ARK-IMEX friction (shift I - dS_fric/du)
+  Mat imex_ijac;
+  // zero explicit-part parameter Jacobian for ARK-IMEX (the ARKIMEX adjoint
+  // consumes both dF/dp and dG/dp; the explicit part has no n-dependence)
+  Mat imex_jacp_rhs;
+
   // operator representing the system of equations
   Operator *operator;
 

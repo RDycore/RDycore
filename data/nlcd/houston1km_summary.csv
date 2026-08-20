@@ -1,0 +1,16 @@
+nlcd_code,name,manning,num_cells,pct_cells,pct_area
+11,"Open Water",0.038,4,0.146,0.146
+21,"Developed, Open Space",0.04,52,1.894,1.894
+22,"Developed, Low Intensity",0.09,224,8.157,8.157
+23,"Developed, Medium Intensity",0.12,1197,43.591,43.591
+24,"Developed, High Intensity",0.16,491,17.881,17.881
+31,"Barren Land",0.027,20,0.728,0.728
+41,"Deciduous Forest",0.15,10,0.364,0.364
+42,"Evergreen Forest",0.12,44,1.602,1.602
+43,"Mixed Forest",0.14,2,0.073,0.073
+52,"Shrub/Scrub",0.115,13,0.473,0.473
+71,"Grassland/Herbaceous",0.038,4,0.146,0.146
+81,"Pasture/Hay",0.038,454,16.533,16.533
+82,"Cultivated Crops",0.035,67,2.440,2.440
+90,"Woody Wetlands",0.098,147,5.353,5.353
+95,"Emergent Herbaceous Wetlands",0.068,17,0.619,0.619

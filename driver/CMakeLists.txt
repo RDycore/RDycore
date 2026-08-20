@@ -19,8 +19,15 @@ add_executable(rdycore_amr
 set_target_properties(rdycore_amr PROPERTIES OUTPUT_NAME rdycore_amr)
 target_link_libraries(rdycore_amr PRIVATE rdycore_c)
 
+# adjoint sensitivity driver
+add_executable(rdycore_adjoint
+  adjoint_test.c
+)
+set_target_properties(rdycore_adjoint PROPERTIES OUTPUT_NAME rdycore_adjoint)
+target_link_libraries(rdycore_adjoint PRIVATE rdycore_c)
+
 install(
-  TARGETS rdycore_exe rdycore_mms rdycore_amr
+  TARGETS rdycore_exe rdycore_mms rdycore_amr rdycore_adjoint
   DESTINATION bin
 )
 
