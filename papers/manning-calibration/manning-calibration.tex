@@ -458,14 +458,42 @@ three digits. The splitting also runs under RDycore's libCEED operator
 backend --- the explicit side uses the friction-free source Q-functions
 prepared in PR \#359, and the two backends agree to machine precision
 ($5\times10^{-16}$ relative) after 100 ARK-IMEX steps; a
-device-resident implicit part is the natural follow-up. Two implementation facts others will hit: PETSc's ARKIMEX
+device-resident implicit part is the natural follow-up. Three implementation facts others will hit: PETSc's ARKIMEX
 adjoint dereferences \emph{both} the implicit- and explicit-part
 parameter Jacobians, so a zero explicit-part
 \texttt{TSSetRHSJacobianP} must be registered even when the parameter
-appears only implicitly; and the embedded step-size controller must be
+appears only implicitly; the embedded step-size controller must be
 disabled for finite-difference gradient validation, since perturbed
 solves otherwise take different step sequences (an apparent
-$\sim$$10^{-4}$ gradient error that vanishes with fixed steps).
+$\sim$$10^{-4}$ gradient error that vanishes with fixed steps); and
+PETSc's in-memory checkpointing trajectory cannot tolerate a
+\emph{segmented} forward solve (one \texttt{TSSolve} per observation
+window): \texttt{TSSolve} sets its converged reason before the final
+trajectory write of every call, which the memory trajectory interprets
+as the end of the forward run, corrupting the checkpoint schedule at
+every interior observation time. The forward sweep must be a single
+\texttt{TSSolve} with observations recorded by a monitor; the
+segmented backward sweep is unaffected.
+
+\paragraph{Checkpointed adjoints for long windows.}
+A naive stored trajectory for a full 36-hour Hurricane Harvey window
+at the 30\,m mesh's CFL-limited $\Delta t = 0.25$\,s (518{,}400 steps,
+2.93M cells) would occupy tens of petabytes. PETSc's checkpointing
+trajectory (\texttt{-ts\_trajectory\_type memory} with the revolve
+optimal-schedule library) replaces storage with recomputation, and we
+validated it across the full hierarchy: on the dam-break twin it
+reproduces the disk-trajectory calibration and gradient gates
+bit-for-bit for explicit RK, backward Euler, and ARK-IMEX (the
+implicit integrators need the same tight inner tolerances as in
+Section~\ref{sec:adjoint}, since checkpoint recomputation re-solves
+the stage systems); and on the 30\,m mesh a forward-plus-adjoint sweep
+with only \emph{three} states checkpointed in memory matches the
+disk-trajectory gradient to all printed digits while running slightly
+faster (recomputation is cheaper than trajectory I/O at this scale)
+and in less memory. For the full window, a few hundred checkpoints
+($\sim$14\,GB aggregate) bound the recompute overhead by a factor of
+about four, making the long-window adjoint memory-feasible; the
+remaining cost is the forward compute itself, addressed next.
 
 \section{Hurricane Harvey demonstration}
 \label{sec:houston}
@@ -558,12 +586,26 @@ verification baseline (FD coloring) kept alive in the configuration
 system.
 
 Next steps, in order: the Houston per-cell demonstration with real USGS
-Harvey gauges (datum QC pending); ARKIMEX friction splitting with its
-adjoint; regularization studies (total variation, land-cover priors)
-for the ill-posedness that our observability results quantify; and
-coupling the gradient path to PyTorch through the existing
-PETSc--PyTorch bridge for learned-physics and hybrid data-assimilation
-experiments.
+Harvey gauges (datum QC pending); regularization studies (total
+variation, land-cover priors) for the ill-posedness that our
+observability results quantify; and coupling the gradient path to
+PyTorch through the existing PETSc--PyTorch bridge for learned-physics
+and hybrid data-assimilation experiments.
+
+A closing note on cost. Checkpointing makes the long-window adjoint
+memory-feasible, but at the 30\,m mesh's CFL-limited
+$\Delta t = 0.25$\,s a full 36-hour Hurricane Harvey gradient still
+costs several forward sweeps over half a million steps, and a
+many-iteration per-cell calibration at that resolution is not a
+defensible allocation. The affordable path stacks three reductions,
+all enabled by capabilities already in place: fully implicit stepping
+at CFL-free time steps (ARK-IMEX keeps the explicit flux CFL;
+backward Euler with the assembled Jacobian does not, trading a global
+Newton--Krylov solve per step for $20$--$100\times$ fewer steps ---
+making that solver scale is the next solver problem);
+land-cover-class parameterization (tens of TAO evaluations instead of
+hundreds); and calibration on the storm peak rather than the full
+window.
 
 \section*{Open questions for internal review}
 \textcolor{red}{[This section will be removed before submission. Please
