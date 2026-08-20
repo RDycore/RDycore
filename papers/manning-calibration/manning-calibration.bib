@@ -1,0 +1,165 @@
+@article{zhang2022tsadjoint,
+  author  = {Zhang, Hong and Constantinescu, Emil M. and Smith, Barry F.},
+  title   = {{PETSc TSAdjoint}: A Discrete Adjoint {ODE} Solver for First-Order and Second-Order Sensitivity Analysis},
+  journal = {SIAM Journal on Scientific Computing},
+  volume  = {44},
+  number  = {1},
+  pages   = {C1--C24},
+  year    = {2022},
+  doi     = {10.1137/21M140078X}
+}
+
+@article{ding2004manning,
+  author  = {Ding, Yan and Jia, Yafei and Wang, Sam S. Y.},
+  title   = {Identification of {Manning}'s Roughness Coefficients in Shallow Water Flows},
+  journal = {Journal of Hydraulic Engineering},
+  volume  = {130},
+  number  = {6},
+  pages   = {501--510},
+  year    = {2004},
+  doi     = {10.1061/(ASCE)0733-9429(2004)130:6(501)}
+}
+
+@article{yan2014adjoint,
+  author  = {Chen, Xianqiang and others},
+  title   = {Adjoint Model of Shallow Water Equations Based on the Finite Volume Method and Unstructured Meshes},
+  journal = {Abstract and Applied Analysis},
+  volume  = {2014},
+  pages   = {407468},
+  year    = {2014},
+  note    = {Twin-experiment inversion of Manning roughness; velocity vs.\ stage observation sensitivity},
+  url     = {https://www.hindawi.com/journals/aaa/2014/407468/}
+}
+
+@article{lacasta2016gpu,
+  author  = {Lacasta, Asier and Morales-Hern{\'a}ndez, Mario and Garc{\'i}a-Navarro, Pilar and others},
+  title   = {A {GPU} Accelerated Adjoint-Based Optimizer for Inverse Modeling of the Two-Dimensional Shallow Water Equations},
+  journal = {Computers \& Fluids},
+  year    = {2016},
+  url     = {https://www.researchgate.net/publication/304617786}
+}
+
+@article{brisset2018swot,
+  author  = {Brisset, Pierre and Monnier, J{\'e}r{\^o}me and Garambois, Pierre-Andr{\'e} and Roux, H{\'e}l{\`e}ne},
+  title   = {River Discharge Estimation from Synthetic {SWOT}-Type Observations Using Variational Data Assimilation and the Full {Saint-Venant} Hydraulic Model},
+  journal = {Journal of Hydrology},
+  volume  = {558},
+  pages   = {176--195},
+  year    = {2018},
+  doi     = {10.1016/j.jhydrol.2018.01.017}
+}
+
+@misc{dassflow,
+  author       = {Monnier, J{\'e}r{\^o}me and others},
+  title        = {{DassFlow}: Data Assimilation for Free-Surface Flows ({DassHydro} platform)},
+  howpublished = {\url{https://dasshydro.github.io}},
+  note         = {2D finite-volume shallow water with variational DA; Manning, bathymetry, and discharge inference incl.\ {SWOT}/{AirSWOT} and video-derived surface velocity},
+  year         = {2025}
+}
+
+@article{karna2023baltic,
+  author  = {K{\"a}rn{\"a}, Tuomas and others},
+  title   = {Efficient Optimization of a Regional Water Elevation Model with an Automatically Generated Adjoint},
+  journal = {Journal of Advances in Modeling Earth Systems},
+  volume  = {15},
+  year    = {2023},
+  doi     = {10.1029/2022MS003169},
+  note    = {Spatially varying Manning friction calibrated for the Baltic Sea with Thetis/Firedrake/pyadjoint}
+}
+
+@article{warder2021storm,
+  author  = {Warder, Simon C. and Horsburgh, Kevin J. and Piggott, Matthew D.},
+  title   = {Adjoint-Based Sensitivity Analysis for a Numerical Storm Surge Model},
+  journal = {Ocean Modelling},
+  volume  = {160},
+  pages   = {101766},
+  year    = {2021},
+  doi     = {10.1016/j.ocemod.2021.101766}
+}
+
+@article{clare2022morpho,
+  author  = {Clare, Mariana C. A. and others},
+  title   = {Calibration, Inversion and Sensitivity Analysis for Hydro-Morphodynamic Models Through the Application of Adjoint Methods},
+  journal = {Computers \& Geosciences},
+  volume  = {163},
+  pages   = {105104},
+  year    = {2022},
+  url     = {https://www.sciencedirect.com/science/article/pii/S0098300422000644}
+}
+
+@misc{li2026inunda,
+  author        = {Li, Zhi},
+  title         = {Inunda: A {GPU}-Native, Agent-Enabled, Differentiable Solver for High-Resolution Flood Inundation Modeling},
+  howpublished  = {arXiv:2607.09614},
+  year          = {2026},
+  note          = {PyTorch local-inertial solver; roughness/bed/infiltration by gradient descent; Hurricane Harvey hindcast, Harris County TX}
+}
+
+@article{liu2025uswe,
+  author  = {Liu, Xiaofeng and others},
+  title   = {Scientific Machine Learning of Flow Resistance Using Universal Shallow Water Equations with Differentiable Programming},
+  journal = {Water Resources Research},
+  volume  = {61},
+  year    = {2025},
+  doi     = {10.1029/2025WR040265},
+  note    = {Hydrograd (Julia/SciML): AD-based Manning inversion and neural flow-resistance terms}
+}
+
+@misc{cardoso2026aegir,
+  author       = {Cardoso-Bihlo, Elsa and Bihlo, Alex},
+  title        = {A Solver-in-the-Loop Framework for End-to-End Differentiable Coastal Hydrodynamics},
+  howpublished = {arXiv:2604.07129},
+  year         = {2026},
+  note         = {AegirJAX: differentiable non-hydrostatic shallow-water solver in JAX}
+}
+
+@article{kang2026cama,
+  author  = {Kang, Shengyu and Yin, Jiabo and Yamazaki, Dai},
+  title   = {{CaMa-Flood-GPU}: A {GPU}-Based Hydrodynamic Model Implementation for Scalable Global Simulations},
+  journal = {Geoscientific Model Development},
+  volume  = {19},
+  pages   = {5623--5640},
+  year    = {2026},
+  doi     = {10.5194/gmd-19-5623-2026}
+}
+
+@article{bindas2024routing,
+  author  = {Bindas, Tadd and others},
+  title   = {Improving River Routing Using a Differentiable {Muskingum-Cunge} Model and Physics-Informed Machine Learning},
+  journal = {Water Resources Research},
+  volume  = {60},
+  year    = {2024},
+  note    = {Differentiable routing inferring Manning roughness and channel geometry with neural networks}
+}
+
+@article{libceed,
+  author  = {Brown, Jed and Abdelfattah, Ahmad and Barra, Valeria and Beams, Natalie and Camier, Jean-Sylvain and Dobrev, Veselin and Dudouit, Yohann and Ghaffari, Leila and Kolev, Tzanio and Medina, David and Pazner, Will and Ratnayaka, Thilina and Thompson, Jeremy and Tomov, Stanimire},
+  title   = {{libCEED}: Fast Algebra for High-Order Element-Based Discretizations},
+  journal = {Journal of Open Source Software},
+  volume  = {6},
+  number  = {63},
+  pages   = {2945},
+  year    = {2021},
+  doi     = {10.21105/joss.02945}
+}
+
+@article{kokkos,
+  author  = {Trott, Christian R. and others},
+  title   = {Kokkos 3: Programming Model Extensions for the Exascale Era},
+  journal = {IEEE Transactions on Parallel and Distributed Systems},
+  volume  = {33},
+  number  = {4},
+  pages   = {805--817},
+  year    = {2022},
+  doi     = {10.1109/TPDS.2021.3097283}
+}
+
+@techreport{benson2001blmvm,
+  author      = {Benson, Steven J. and Mor\'e, Jorge J.},
+  title       = {A Limited Memory Variable Metric Method in Subspaces and
+                 Bound Constrained Optimization Problems},
+  institution = {Argonne National Laboratory, Mathematics and Computer
+                 Science Division},
+  number      = {ANL/MCS-P909-0901},
+  year        = {2001}
+}

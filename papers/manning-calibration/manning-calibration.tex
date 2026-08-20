@@ -1,0 +1,643 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[hidelinks]{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\title{Adjoint Sensitivities and Gradient-Based Manning Roughness
+Calibration in RDycore\\[4pt]\large DRAFT for internal review}
+\author{Mark Adams$^1$, \todo{co-authors: Gautam Bisht, others TBD}\\
+\small $^1$Lawrence Berkeley National Laboratory}
+\date{Draft of August 18, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a discrete-adjoint capability for RDycore, the exascale river
+dynamical core of the Energy Exascale Earth System Model (E3SM), and use
+it for gradient-based calibration of spatially distributed Manning
+roughness. The capability comprises: an exact, assembled Jacobian of the
+finite-volume shallow-water right-hand side --- closed-form Roe-flux
+blocks obtained by hand-written forward-mode differentiation of the flux
+computation, including the entropy-fix branches, together with
+source-term and boundary-condition blocks; adjoint sensitivities of
+gauge-misfit functionals with respect to both the initial state and the
+Manning field via PETSc's \texttt{TSAdjoint}, at a cost of roughly one
+forward solve per gradient independent of the parameter count; and
+bound-constrained calibration with TAO. Every derivative is validated
+against finite differences of the full nonlinear solve at tight,
+pre-registered tolerances (Jacobian blocks to $10^{-8}$, gradients to
+$10^{-5}$). Twin experiments recover a two-zone roughness field to
+$4\times10^{-7}$ relative error, and a per-cell field to $8\%$ with
+multi-time observations and Tikhonov regularization. The same assembled
+Jacobian enables fully implicit backward-Euler stepping --- which we show
+is required in practice: the explicit treatment of Manning drag is
+unstable at the operational time step of a Hurricane Harvey test case,
+in quantitative agreement with a friction-stiffness stability analysis
+--- and the implicit integrator's adjoint passes the same
+finite-difference gates. On a Hurricane Harvey twin configuration
+(2{,}746 cells, implicit stepping) the calibrated Manning map recovers
+a two-zone truth field to $19.4\%$ with proper Tikhonov
+regularization, and the gauge-sparse setting exhibits --- and lets us
+dissect --- the classic semiconvergence of underdetermined friction
+estimation. To our knowledge this makes RDycore the
+first E3SM component model with built-in discrete-adjoint parameter
+estimation, without rewriting the solver in a machine-learning framework.
+\end{abstract}
+
+\section{Introduction}
+
+Manning roughness is the dominant tunable parameter of depth-averaged
+flood models, and its calibration is traditionally manual or ensemble
+based. Adjoint methods deliver the gradient of an observation misfit
+with respect to \emph{every} cell's roughness at the cost of about one
+extra forward solve, making distributed calibration tractable; the
+approach is well established in shallow-water modeling, from channel
+networks~\cite{ding2004manning} and unstructured finite-volume twin
+experiments~\cite{yan2014adjoint} to GPU-accelerated
+optimizers~\cite{lacasta2016gpu}, and is deployed in
+variational-assimilation platforms such as
+DassFlow~\cite{dassflow,brisset2018swot} and the Thetis coastal model,
+which calibrated a spatially varying Manning field for the Baltic
+Sea with an automatically generated adjoint~\cite{karna2023baltic}
+after storm-surge sensitivity studies that addressed the overfitting
+inherent in distributed friction estimation~\cite{warder2021storm}.
+
+A recent generation of \emph{differentiable} flood and hydrology codes
+obtains gradients by rewriting simplified solvers inside
+machine-learning frameworks: Inunda (PyTorch, local-inertial, calibrated on a Hurricane
+Harvey hindcast)~\cite{li2026inunda}, Hydrograd
+(Julia)~\cite{liu2025uswe}, AegirJAX~\cite{cardoso2026aegir},
+CaMa-Flood-GPU~\cite{kang2026cama}, and differentiable
+routing~\cite{bindas2024routing}. These demonstrate demand for exactly
+this capability, but none is a production Earth-system component: they
+trade the validated numerics, unstructured meshes, and coupling
+infrastructure of codes like RDycore for differentiability.
+
+This paper takes the complementary route: make the production code
+differentiable. RDycore is a finite-volume shallow-water dynamical core
+(Roe fluxes, well balancing, wetting and drying) validated at up to 471M
+cells. We add the missing derivative infrastructure --- an exact
+assembled Jacobian and TSAdjoint-based sensitivities
+\cite{zhang2022tsadjoint} --- entirely behind a configuration flag, with
+no impact on existing runs and no new dependencies.
+
+Contributions: (i) an exact, FD-verified Jacobian of the SWE right-hand
+side, including Roe dissipation, entropy-fix branches, wet/dry
+branches, and reflecting/Dirichlet/critical-outflow boundary
+conditions; (ii) adjoint gradients $dJ/du_0$ and $dJ/dn$ with
+respect to water-height observations at gauge locations at multiple
+observation times, FD-validated to $10^{-5}$ or better;
+(iii) TAO-based recovery of per-region and per-cell roughness fields in
+twin experiments, with a quantified observability study; (iv) implicit
+(backward Euler) stepping and its adjoint, enabled by the same
+Jacobian, with an empirical demonstration that explicit friction fails
+at operational time steps on a Hurricane Harvey configuration; and (v)
+a catalog of the nondifferentiable structures encountered --- useful,
+we believe, to anyone retrofitting adjoints onto an operational flood
+code.
+
+\section{Forward model}
+\label{sec:forward}
+
+RDycore solves the 2D shallow water equations in conservative variables
+$u = (h, q_x, q_y)$, $\mathbf{q} = h\mathbf{v}$:
+\begin{align}
+  \partial_t h + \nabla\!\cdot\!\mathbf{q} &= Q_r(x,t),\\
+  \partial_t \mathbf{q}
+    + \nabla\!\cdot\!\Big(\tfrac{\mathbf{q}\otimes\mathbf{q}}{h}
+    + \tfrac{g h^2}{2}\,\mathbb{I}\Big)
+  &= -\,g h \nabla z_b \;-\; g\, n^2 h^{-7/3}\,\mathbf{q}\,\lVert\mathbf{q}\rVert,
+  \label{eq:mom}
+\end{align}
+with cell-centered finite volumes on an unstructured mesh:
+\begin{equation}
+  \frac{du_i}{dt}
+  = -\frac{1}{|\Omega_i|}\sum_{e \in \partial\Omega_i}
+      \mathcal{F}\big(u_i, u_j, \mathbf{n}_e\big)\,L_e + S(u_i; n_i, t)
+  \equiv f_i(u, n),
+  \label{eq:semidiscrete}
+\end{equation}
+where $\mathcal{F}$ is the Roe flux with a critical-flow (entropy) fix,
+primitives are reconstructed with a regularized division and a dry
+cutoff $h_{\min}$, and $S$ contains bed slope, Manning drag, and
+external forcing.
+
+\paragraph{A differentiable right-hand side.}
+A prerequisite that deserves emphasis: RDycore's existing friction
+treatments (a semi-implicit splitting and the implicit scheme of Xia and
+Liang) embed the time step --- and, in the semi-implicit case, the flux
+divergence --- \emph{inside} the RHS callback. The resulting map is
+consistent only with forward Euler and admits no well-defined
+$\partial f/\partial u$. We therefore added a plain explicit source
+treatment (\texttt{source.method: explicit}), used on every adjoint
+path; Section~\ref{sec:implicit} shows how the resulting stiffness is
+then handled properly, by the integrator rather than inside $f$.
+
+\section{Exact Jacobian}
+\label{sec:jacobian}
+
+The RHS Jacobian is block sparse with $3\times3$ blocks on the
+cell-adjacency graph: each interior edge $(i,j)$ contributes
+$\mp(L_e/|\Omega_{i,j}|)\,\partial\mathcal{F}/\partial u_{L,R}$ to the
+two cell rows, local sources contribute diagonal blocks, and boundary
+edges contribute diagonal blocks through the ghost-state map of the
+boundary condition.
+
+\paragraph{Flux blocks by forward-mode differentiation.}
+Rather than deriving the dissipation-matrix derivatives symbolically, we
+differentiate the flux \emph{computation}: a hand-written forward-mode
+(tangent) version of the Roe flux routine propagates directionals
+through every intermediate --- Roe averages, eigenvectors, eigenvalues
+including both branches of the critical-flow fix, wave strengths, and
+physical fluxes --- taking the code's own branch at every $|\cdot|$ and
+switch (a consistent one-sided derivative). Seeding unit directions
+through the primitive-reconstruction chain rule yields the two
+conservative-space blocks in six tangent evaluations per edge. The
+approach mirrors the flux code line by line, which makes it reviewable
+and, in our experience, correct on first assembly against the
+verification harness below.
+
+\paragraph{Boundary blocks.}
+For a boundary edge, $F(u_{\mathrm{in}}, u_g(u_{\mathrm{in}}))$
+contributes $(\partial_L F + \partial_R F\, \partial u_g/\partial
+u_{\mathrm{in}})$. The reflecting map is a linear mirror; Dirichlet
+ghosts are constant; critical outflow has a closed-form ghost map
+$h_g = (q^2/g)^{1/3}$ with the code's inflow branch producing an
+identically zero flux.
+
+\paragraph{Parameter Jacobian.}
+Manning $n$ appears only in the drag term, so
+$\partial S_{\mathbf q}/\partial n = -2 g n h^{-7/3}\mathbf{q}\lVert\mathbf q\rVert$:
+two nonzeros per cell, supplied to \texttt{TSSetRHSJacobianP}.
+
+\paragraph{Verification.}
+Three layers, all against central finite differences with
+pre-registered tolerances (Table~\ref{tab:verification}): an edge-level
+harness that differences the flux routine itself on sampled states (with
+a Richardson self-check of the FD order); full-matrix comparisons of the
+assembled Jacobian against a matrix-coloring FD Jacobian of the actual
+RHS on three state/boundary combinations, boundary rows included; and
+end-to-end gradient checks through the adjoint (next section). A
+finite-difference coloring Jacobian (\texttt{numerics.jacobian: fd})
+remains available permanently as the verification baseline.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Check & Configuration & Result & Gate \\
+\midrule
+Edge flux blocks & wet jump $10\,\mathrm{m}/5\,\mathrm{m}$ & $7.6\times10^{-9}$ & $10^{-6}$ \\
+Edge flux blocks & transcritical (entropy-fix branch) & $2.4\times10^{-10}$ & $10^{-5}$ \\
+Source block & shallow flowing state & $<10^{-6}$ & $10^{-6}$ \\
+Assembled matrix & uniform flow, reflecting BCs & $1.6\times10^{-8}$ & $10^{-6}$ \\
+Assembled matrix & dam break, reflecting BCs & $1.5\times10^{-8}$ & $10^{-6}$ \\
+Assembled matrix & dam break, Dirichlet + critical outflow & $1.9\times10^{-8}$ & $10^{-6}$ \\
+$dJ/du_0$ (explicit RK) & 8 sampled components & $1.0\times10^{-8}$ & $10^{-5}$ \\
+$dJ/dn$ (explicit RK) & domain aggregate & $2.9\times10^{-6}$ & $10^{-5}$ \\
+$dJ/du_0$ (implicit BE) & tight inner tolerances & $1.4\times10^{-8}$ & $10^{-5}$ \\
+$dJ/dn$ (implicit BE) & tight inner tolerances & $5.3\times10^{-6}$ & $10^{-5}$ \\
+\bottomrule
+\end{tabular}
+\caption{Relative errors of analytic derivatives against central finite
+differences of the full nonlinear computation. All checks run in CI.}
+\label{tab:verification}
+\end{table}
+
+\section{Adjoint sensitivities}
+\label{sec:adjoint}
+
+For gauge observations $y_k$ at times $t_k$ with observation operator
+$H$ (one row per gauge, selecting water height) and error variance
+$\sigma^2$,
+\begin{equation}
+  J(n) = \tfrac{1}{2\sigma^2} \sum_k \lVert H u(t_k) - y_k\rVert^2 .
+\end{equation}
+\texttt{TSAdjoint}~\cite{zhang2022tsadjoint} differentiates the discrete
+time stepper, so gradients are exact to roundoff for the computed
+trajectory --- the property that makes the FD gates in
+Table~\ref{tab:verification} meaningful. Multi-time observations are
+handled by a segmented backward sweep: the adjoint is advanced between
+observation times with \texttt{TSAdjointSetSteps} and receives a jump
+$H^T\sigma^{-2} r_k$ at each $t_k$
+(Algorithm~\ref{alg:var4d} in Section~\ref{sec:calibration}). One sweep yields both $dJ/du_0$
+(state sensitivity) and $dJ/dn$ (per-cell parameter gradient, via the
+two-nonzero parameter Jacobian).
+
+Two integrator facts constrain the design. PETSc's plain forward-Euler
+integrator implements no adjoint, so adjoint-path configurations use the
+Runge--Kutta family. And for implicit integrators the discrete-adjoint
+gradient is only as exact as the inner solves: with default SNES/KSP
+tolerances the Manning gradient checked at $2\times10^{-4}$; tightening
+the tolerances recovered $5\times10^{-6}$
+(Table~\ref{tab:verification}).
+
+\section{Calibration twin experiments}
+\label{sec:calibration}
+
+The complete calibration loop is summarized in
+Algorithms~\ref{alg:var4d}--\ref{alg:blmvm}. It is a strong-constraint
+4D-Var iteration: the model is enforced exactly (the only controls are
+the Manning field and, optionally, the initial state), and each
+objective evaluation performs one checkpointed forward sweep that
+records the gauge residuals $r_k$ at the observation times, followed
+by one backward sweep of the discrete adjoint
+(Algorithm~\ref{alg:sweep}). The backward sweep carries two vectors
+with distinct roles. The \emph{adjoint state} $\lambda$ holds
+$\partial J_{\mathrm{mis}}/\partial u(t)$ at the current point of the
+backward traversal: it is seeded with the terminal observation
+sensitivity $\sigma^{-2}H^T r_K$, propagated one step at a time by the
+transposed Jacobian of the forward step map (the backward ``model
+step''), and incremented by a jump $\sigma^{-2}H^T r_k$ each time the
+sweep crosses an observation time, because the state at that time
+enters the misfit directly. The \emph{parameter sensitivity} $\mu$
+starts at zero and accumulates, at every step, the chain-rule
+contribution $(\partial\Phi_s/\partial n)^T\lambda$ of that step's
+Manning dependence; when the sweep reaches $t = 0$, $\mu$ is the
+complete misfit gradient $dJ_{\mathrm{mis}}/dn$ and $\lambda$ is
+$dJ_{\mathrm{mis}}/du_0$. Both transposed Jacobians are the analytic
+operators of Sections~\ref{sec:jacobian}--\ref{sec:adjoint}: the
+assembled RHS Jacobian for the state propagation and the two-nonzero
+parameter Jacobian for the $\mu$ accumulation, applied within
+\texttt{TSAdjoint}'s discrete adjoint of the chosen integrator. The
+per-iteration cost is therefore one forward plus one adjoint solve,
+independent of the number of parameters. The outer update is TAO's
+bound-constrained limited-memory quasi-Newton method
+BLMVM~\cite{benson2001blmvm} (Algorithm~\ref{alg:blmvm}), and the loop
+terminates on the standard bound-constrained test: the projected
+gradient $g^P$ --- the gradient with components pointing out of the
+feasible box zeroed --- drops below an absolute tolerance, or an
+iteration budget is reached. The same loop serves every
+parameterization in this paper: per-region, per-cell, and
+land-cover-class fields differ only in the expansion of the parameter
+vector onto cells (line~\ref{ln:apply} of Algorithm~\ref{alg:var4d})
+and the corresponding summation of $\mu$ back onto parameters.
+
+\begin{algorithm}
+\caption{Strong-constraint 4D-Var calibration of the Manning field, as
+implemented with TAO/BLMVM and \texttt{TSAdjoint}. The window map
+$M_{t_{k-1}\to t_k}$ is the composition of $m$ steps of the discrete
+forward stepper (explicit RK, backward Euler, or ARK-IMEX);
+Algorithm~\ref{alg:sweep} differentiates exactly this stepper, so the
+gradient is exact to roundoff (and inner-solver tolerance,
+Section~\ref{sec:adjoint}) for the computed trajectory.}
+\label{alg:var4d}
+\begin{algorithmic}[1]
+\Require prior/initial guess $n_0$, bounds $[n_{\min}, n_{\max}]$,
+observations $y_k$ at times $t_k = k\,m\,\Delta t$ ($k = 1,\dots,K$),
+gauge operator $H$, error $\sigma$, Tikhonov weight $\beta$, gradient
+tolerance $\varepsilon_g$, iteration budget $I_{\max}$
+\State $n \gets n_0$
+\Repeat
+  \State set the model's cellwise drag coefficient from $n$
+         \label{ln:apply}
+         \Comment{identity for per-cell $n$; constant over each region
+         or land-cover class for the reduced parameterizations}
+  \State $u \gets u_0$
+         \Comment{fixed initial state (strong constraint)}
+  \For{$k = 1, \dots, K$}
+     \Comment{forward sweep; every step checkpointed}
+     \State $u \gets M_{t_{k-1}\to t_k}(u;\, n)$
+     \State $r_k \gets H u - y_k$
+  \EndFor
+  \State $J \gets \dfrac{1}{2\sigma^2}\sum_{k=1}^{K}\lVert r_k\rVert^2
+          + \dfrac{\beta}{2}\lVert n - n_0\rVert^2$
+  \State $(\lambda, \mu) \gets \Call{AdjointSweep}{\{r_k\}}$
+         \Comment{Algorithm~\ref{alg:sweep}:
+         $\mu = dJ_{\mathrm{mis}}/dn$}
+  \State $g \gets \mu + \beta\,(n - n_0)$
+  \State $n \gets \Call{BlmvmStep}{n, J, g}$
+         \Comment{Algorithm~\ref{alg:blmvm}}
+\Until{$\lVert g^P \rVert \le \varepsilon_g$ or $I_{\max}$ iterations}
+\State \Return $n$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{\textsc{AdjointSweep}: segmented discrete-adjoint backward
+sweep (\texttt{TSAdjointSolve} with \texttt{TSAdjointSetSteps}).
+$\Phi_s$ denotes the forward map of step $s$, $u_s =
+\Phi_s(u_{s-1}; n)$; its transposed Jacobians are built from the
+assembled RHS Jacobian $\partial f/\partial u$
+(Section~\ref{sec:jacobian}) and the parameter Jacobian $\partial
+f/\partial n$ according to the integrator's discrete-adjoint formula.}
+\label{alg:sweep}
+\begin{algorithmic}[1]
+\Require checkpointed trajectory $\{u_s\}_{s=0}^{Km}$, residuals
+$\{r_k\}_{k=1}^{K}$ at steps $s = km$, gauge operator $H$, error
+$\sigma$
+\Ensure $\lambda = dJ_{\mathrm{mis}}/du_0$,\;
+$\mu = dJ_{\mathrm{mis}}/dn$
+\State $\lambda \gets \sigma^{-2} H^T r_K$
+       \Comment{$\lambda$ holds
+       $\partial J_{\mathrm{mis}}/\partial u(t_s)$ throughout}
+\State $\mu \gets 0$
+\For{$s = Km, \dots, 1$}
+   \State restore $u_{s-1}$ (and stage values) from the checkpointed
+          trajectory
+   \State $\mu \gets \mu +
+          \big(\partial\Phi_s/\partial n\big)^T \lambda$
+          \Comment{accumulate this step's Manning dependence}
+   \State $\lambda \gets
+          \big(\partial\Phi_s/\partial u_{s-1}\big)^T \lambda$
+          \Comment{backward model step (transposed step Jacobian)}
+   \If{$s - 1 = km$ for some $1 \le k < K$}
+      \State $\lambda \gets \lambda + \sigma^{-2} H^T r_{k}$
+      \Comment{observation jump: $u_{km}$ enters
+      $J_{\mathrm{mis}}$ directly}
+   \EndIf
+\EndFor
+\State \Return $(\lambda, \mu)$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{\textsc{BlmvmStep}: one iteration of TAO's bound-constrained
+limited-memory variable-metric method~\cite{benson2001blmvm}.
+$P_{[n_{\min},n_{\max}]}$ is componentwise clipping to the bound box;
+the curvature pairs $\{(s_i, y_i)\}$ persist across calls. The
+projected gradient used in the convergence test of
+Algorithm~\ref{alg:var4d} is $g^P_i = g_i$ for $n_i$ strictly inside
+the box, $\min(g_i, 0)$ at the lower bound, and $\max(g_i, 0)$ at the
+upper bound.}
+\label{alg:blmvm}
+\begin{algorithmic}[1]
+\Require iterate $n$, objective $J$, gradient $g$, stored pairs
+$\{(s_i, y_i)\}$, bounds $[n_{\min}, n_{\max}]$
+\State $d \gets -B\,g^P$
+       \Comment{$B \approx (\nabla^2 J)^{-1}$ by the L-BFGS two-loop
+       recursion over the stored pairs}
+\State find $\alpha > 0$ with a projected line search on
+       $n(\alpha) = P_{[n_{\min},n_{\max}]}(n + \alpha\, d)$
+       satisfying sufficient decrease of $J$
+       \Comment{each trial $\alpha$ costs one forward-plus-adjoint
+       evaluation (lines 3--11 of Algorithm~\ref{alg:var4d})}
+\State $n^{+} \gets n(\alpha)$; evaluate $g^{+}$ at $n^{+}$
+\State $s \gets n^{+} - n$;\; $y \gets g^{+} - g$; store $(s, y)$ if
+       $s^T y > 0$, discarding the oldest pair beyond the memory limit
+\State \Return $n^{+}$
+\end{algorithmic}
+\end{algorithm}
+
+All experiments use a wet planar dam-break configuration (50 cells,
+two regions; synthetic noise-free observations; TAO/BLMVM with bounds
+$n\in[0.01, 0.2]$).
+
+\paragraph{Per-region.}
+Truth $n = (0.03, 0.06)$ by region, initial guess $0.02$ uniform,
+terminal-time observations at every second cell. BLMVM recovers both
+values to $4.1\times10^{-7}$ maximum relative error.
+
+\paragraph{Per-cell with Tikhonov regularization.}
+Truth is a two-zone field split at the domain midline; parameters are
+per-cell (three per observation in the densest case), with
+$J \mathrel{+}= \tfrac{\beta}{2}\lVert n - n_0\rVert^2$ about a constant
+prior. Recovery is assessed over observable cells (wet and moving at
+the final time; dry cells are untouched by friction and correctly
+remain at the prior). The controlling factor is observability
+(Table~\ref{tab:percell}): a single terminal snapshot leaves the
+problem badly underdetermined ($39.5\%$ error at full convergence),
+while 20 observation times over the same window reach $8.0\%$, the
+remainder being genuine null space held by the prior. The exact
+analytic Jacobian reduced the cost of an adjoint sweep by roughly
+$6\times$ relative to the FD-coloring Jacobian, making the converged
+experiments interactive ($\sim$2 minutes on one laptop core).
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Observations & $\beta$ & TAO its & converged & rel.\ $L^2$ error \\
+\midrule
+terminal only & $10^{-4}$ & 688 & yes & $39.5\%$ \\
+8 times & $10^{-4}$ & 200 (cap) & no & $19.9\%$ \\
+20 times & $10^{-5}$ & 1864 & yes & $\mathbf{8.0\%}$ \\
+\bottomrule
+\end{tabular}
+\caption{Per-cell twin recovery vs.\ observability (planar dam break,
+50 gauges, 150 parameters, 40-step window).}
+\label{tab:percell}
+\end{table}
+
+\section{Implicit stepping, enabled and required}
+\label{sec:implicit}
+
+The explicit drag term is stiff in thin water: linearizing gives a
+stability limit $\Delta t \lesssim 2 h^{4/3}/(g n^2 |v|)$, which for
+sheet flow at centimeter depths is seconds --- far below the
+gravity-wave CFL limit of kilometer-scale meshes. Our Hurricane Harvey
+test configuration (Houston at 1\,km, $\Delta t = 30$\,s) confirms this
+empirically: the explicit source treatment produces NaN within the
+first objective evaluation, in quantitative agreement with the
+analysis.
+
+The assembled exact Jacobian makes the remedy nearly free: backward
+Euler via PETSc's theta method, with SNES driven by the same Jacobian,
+carries the Harvey window at $\Delta t = 30$\,s, and the theta-method
+adjoint passes the same FD gates (Table~\ref{tab:verification}).
+
+We also implemented the sharper tool: an ARK-IMEX splitting with the
+Manning drag as the stiff implicit part
+(\texttt{temporal: arkimex}). The implicit stage system is
+block-diagonal --- an independent $3\times3$ Newton per cell, no global
+solve --- while fluxes and bed slope remain explicit under the
+gravity-wave CFL limit. Its adjoint passes the same gates
+($2.0\times10^{-8}$ for $dJ/du_0$, $2.5\times10^{-6}$ for $dJ/dn$) and
+it carries the Harvey window at $\Delta t = 30$\,s at 6.7\,s per
+forward-plus-adjoint sweep, with gradients matching backward Euler to
+three digits. The splitting also runs under RDycore's libCEED operator
+backend --- the explicit side uses the friction-free source Q-functions
+prepared in PR \#359, and the two backends agree to machine precision
+($5\times10^{-16}$ relative) after 100 ARK-IMEX steps; a
+device-resident implicit part is the natural follow-up. Two implementation facts others will hit: PETSc's ARKIMEX
+adjoint dereferences \emph{both} the implicit- and explicit-part
+parameter Jacobians, so a zero explicit-part
+\texttt{TSSetRHSJacobianP} must be registered even when the parameter
+appears only implicitly; and the embedded step-size controller must be
+disabled for finite-difference gradient validation, since perturbed
+solves otherwise take different step sequences (an apparent
+$\sim$$10^{-4}$ gradient error that vanishes with fixed steps).
+
+\section{Hurricane Harvey demonstration}
+\label{sec:houston}
+
+The per-cell twin runs on the Houston 1\,km Hurricane Harvey mesh
+(2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s): truth is a
+two-zone field split at the domain midline, observed at 343 synthetic
+gauges over 14 observation times, calibrated with implicit stepping and
+Tikhonov regularization ($\beta = 10^{-5}$). Every cell is wet and
+moving in this configuration, so all 2{,}746 parameters are observable.
+This configuration is deliberately gauge-sparse --- 343 gauges for
+2{,}746 parameters, an 8:1 ratio --- and it exhibits the classic
+\emph{semiconvergence} of underdetermined inverse problems
+(Figure~\ref{fig:map}). At 300 BLMVM iterations ($\sim$22 minutes on
+one laptop core, $\sim$4.4\,s per forward-plus-adjoint) the recovered
+map shows the two-zone truth structure cleanly at $26.3\%$ relative
+$L^2$ error. Continuing the same weakly regularized optimization
+($\beta = 10^{-5}$) to 2000 iterations \emph{degrades} recovery to
+$38.0\%$: the misfit keeps decreasing while the parameters drift along
+observation-null directions, ultimately pinning cells against both
+bound constraints (Figure~\ref{fig:map}, right). Early stopping was
+acting as the effective regularizer. The behavior disappears when the
+problem is made well posed: the densely observed dam-break twin of
+Table~\ref{tab:percell} converges monotonically to $8\%$, and a
+properly regularized Houston run ($\beta = 10^{-4}$, 686 gauges)
+reaches $19.4\%$ at a 1000-iteration budget with no drift
+(Figure~\ref{fig:map}, right) --- the sharpest recovery of the three,
+with the zone boundary resolved at the truth midline. This is
+precisely the overfitting risk documented for distributed friction
+estimation~\cite{warder2021storm}, here reproduced in a controlled
+twin setting, and it motivates the regularization studies (total
+variation, land-cover priors, discrepancy-principle stopping) planned
+as follow-on work.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.32\linewidth]{houston_manning_300it.png}
+\includegraphics[width=0.32\linewidth]{houston_manning_2000it.png}
+\includegraphics[width=0.32\linewidth]{houston_manning_reg.png}
+\caption{Regularization and semiconvergence on the Houston twin
+(2{,}746 parameters; truth: $n = 0.03$ west, $n = 0.06$ east of the
+midline; implicit stepping, 14 observation times). Left: weak
+regularization ($\beta = 10^{-5}$, 343 gauges) stopped early at 300
+iterations --- $26.3\%$ error. Center: the same setup run to 2000
+iterations --- the misfit is lower but the field drifts along
+unobserved directions to $38.0\%$ error and saturates the bounds
+$[0.01, 0.2]$. Right: proper Tikhonov weight ($\beta = 10^{-4}$, 686
+gauges), 1000 iterations --- $19.4\%$ error, no drift, sharp zone
+boundary.}
+\label{fig:map}
+\end{figure} Real USGS Harvey gauges (746
+stage series already in hand, HydroShare DOI
+10.4211/hs.c037167e497546a1bc1508dfb32a9cff) require stage-datum QC and
+are deliberately out of scope for this draft.
+
+\section{Nondifferentiability catalog}
+\label{sec:nondiff}
+
+Retrofitting an adjoint onto an operational flood code surfaces
+nonsmooth structure worth documenting:
+\begin{itemize}
+  \item \textbf{Time step inside the RHS.} Operator-split friction
+        treatments (here: semi-implicit and XQ2018) make $f$ depend on
+        $\Delta t$ and on intermediate flux divergences; no consistent
+        $\partial f/\partial u$ exists. The remedy is an explicit $f$
+        plus a genuinely implicit integrator, not a smarter derivative.
+  \item \textbf{Entropy-fix branches.} The critical-flow fix is
+        piecewise smooth; branch-faithful one-sided derivatives pass FD
+        checks even on transcritical states
+        (Table~\ref{tab:verification}).
+  \item \textbf{Critical-outflow stagnation.} The outflow ghost map
+        $h_g = (q^2/g)^{1/3}$ has an unbounded one-sided derivative at
+        $q = 0$, and the inflow branch switches there: a genuine
+        subgradient point, benign in practice because outflow
+        boundaries carry outflow.
+  \item \textbf{Wet/dry branches.} The RHS's dry cutoffs are honored
+        branch-faithfully in every block; fully wet validation cases
+        keep FD comparisons clean, and dry cells are correctly
+        insensitive to their roughness.
+\end{itemize}
+
+\section{Conclusions and outlook}
+
+An exact, verified Jacobian turns out to be the single artifact from
+which everything else follows cheaply: adjoint state and parameter
+sensitivities, gradient-based calibration, and implicit stepping. The
+capability is production-ready in the sense that matters for an
+operational code --- behind a flag, FD-gated in CI, and with the
+verification baseline (FD coloring) kept alive in the configuration
+system.
+
+Next steps, in order: the Houston per-cell demonstration with real USGS
+Harvey gauges (datum QC pending); ARKIMEX friction splitting with its
+adjoint; regularization studies (total variation, land-cover priors)
+for the ill-posedness that our observability results quantify; and
+coupling the gradient path to PyTorch through the existing
+PETSc--PyTorch bridge for learned-physics and hybrid data-assimilation
+experiments.
+
+\section*{Open questions for internal review}
+\textcolor{red}{[This section will be removed before submission. Please
+reply inline or by email --- each question names who we think owns it.]}
+
+\subsection*{Software / engineering (Jeff)}
+\begin{enumerate}
+  \item \textbf{ARK-IMEX design intent.} PR \#359 prepped the
+        \texttt{SOURCE\_ARK\_IMEX} path (``bed friction moved to
+        LHS''). We completed it as: Manning drag \emph{alone} in the
+        IFunction (per-cell block-diagonal IJacobian), bed slope and
+        external sources explicit. Your CEED-side friction-free
+        Q-functions are wired in and the two backends agree to machine
+        precision. Does that match your intended split, do you have an
+        ARKIMEX scheme/order preference (we use the PETSc default), and
+        did you envision a device-resident (CEED Q-function) implicit
+        part as the follow-up?
+  \item \textbf{Code placement and naming.} New files
+        \texttt{swe\_jacobian\_petsc.c} and
+        \texttt{swe\_roe\_flux\_jacobian\_petsc.h} (static-function
+        header, mirroring \texttt{swe\_roe\_flux\_petsc.h});
+        config keys \texttt{numerics.jacobian: none|fd|analytic} and
+        \texttt{source.method: explicit|ark\_imex}. Naming/placement
+        objections before this hardens into a PR?
+  \item \textbf{Public API.} The adjoint driver currently reaches
+        through \texttt{private/rdycoreimpl.h} (LETKF-driver pattern).
+        Which calls deserve promotion to \texttt{rdycore.h}
+        (\texttt{RDySetObservations}, \texttt{RDyAdjointSolve},
+        \texttt{RDyGetSensitivities}?), and are Fortran bindings needed
+        at that point?
+  \item \textbf{Jacobian preallocation.} We use
+        \texttt{DMCreateMatrix} under the DM's closure-based adjacency,
+        a superset of FV edge adjacency (extra stored zeros). Accept,
+        or tighten the pattern?
+  \item \textbf{CI.} The 12 new tests need a PETSc with TSAdjoint (any
+        recent version) and run in seconds. Any CI-matrix concerns
+        (e.g., the CEED-only lanes correctly skip
+        \texttt{numerics.jacobian} configs)?
+\end{enumerate}
+
+\subsection*{Science (Gautam and team)}
+\begin{enumerate}
+  \item \textbf{Houston mesh CRS} (already asked): the projected
+        coordinate system of \texttt{Houston1km\_with\_z.exo} --- the
+        one blocker for real-gauge calibration.
+  \item \textbf{Drag formulation on the adjoint path.} The new
+        explicit treatment evaluates
+        $\tau_b = g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ at
+        the current state with the standard $h_{\min}$ cutoff and
+        \emph{plain} velocity reconstruction
+        ($h_{\mathrm{anuga}} = 0$ default). Physics sign-off? Should
+        the ANUGA regularization be active for calibration runs?
+  \item \textbf{Observation choices for real-gauge work (v2).} Which
+        of the 90 Houston-area USGS gauges do you trust for Harvey
+        (backwater/tidal contamination?); stage vs.\ discharge as the
+        misfit variable; and what observation error $\sigma$ is
+        realistic per gauge?
+  \item \textbf{Regularization prior.} Is a land-cover-derived
+        $n_0(x)$ field available (or easy to produce) for the Houston
+        mesh? The twin experiments use a constant prior.
+  \item \textbf{Truth-field realism.} Is the two-zone synthetic truth
+        adequate for the paper's twin experiments, or would you prefer
+        a more realistic synthetic field (e.g., channel-vs-overbank)?
+  \item \textbf{Calibration windows and wet/dry.} Our Harvey window
+        keeps the whole domain wet and moving. For longer or
+        rain-driven windows, which events/phases would you calibrate
+        on, given adjoint noise at drying fronts?
+  \item \textbf{Bounds.} Are $n \in [0.01, 0.2]$ physically sensible
+        limits for Houston land cover?
+  \item \textbf{Venue and authorship} (already asked): target journal
+        (WRR / JAMES / GMD) and the co-author list.
+\end{enumerate}
+
+\bibliographystyle{unsrt}
+\bibliography{manning-calibration}
+
+\end{document}
