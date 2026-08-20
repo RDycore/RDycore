@@ -272,13 +272,54 @@ static PetscErrorCode ResetTrajectory(TS ts) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// segmented forward solve with observations every `freq` steps (K =
-// total_steps/freq observation times, at steps freq, 2 freq, ..., K freq).
+// forward solve with observations every `freq` steps (K = total_steps/freq
+// observation times, at steps freq, 2 freq, ..., K freq).
 // mode "record": y_k = H u(t_k). mode "residual": r_k = H u(t_k) - y_k and
 // J = 1/2 sigma^-2 sum_k |r_k|^2. Optional w_k (0/1 per observation)
 // zero-weights missing data in both the misfit and (via r_k) the adjoint.
+//
+// The whole window is ONE TSSolve, with observations taken by a TS monitor.
+// The memory trajectory (checkpointing/revolve) cannot tolerate a segmented
+// forward: TSSolve sets ts->reason before the final TSTrajectorySet of every
+// call, and TSTrajectoryMemorySet_N treats reason != 0 as "end of the forward
+// run" -- it clobbers its total_steps, pops the second-last checkpoint, and
+// skips storing the boundary step, corrupting the checkpoint stack at every
+// interior observation time (SEGV in TSAdjointSolve). The segmented BACKWARD
+// sweep (TSAdjointSetSteps) is fine: no trajectory writes happen there.
+typedef struct {
+  Mat        H;
+  Vec       *y_k, *r_k, *w_k;
+  PetscInt   freq, K;
+  PetscReal  sigma;
+  PetscReal  J;       // accumulated misfit (residual mode)
+  PetscBool  active;  // record only during ForwardObserve's own TSSolve --
+                      // the trajectory's ReCompute replays also fire monitors
+} ObsMonitorCtx;
+
+static ObsMonitorCtx obs_mon;  // one TS per driver run; installed once
+
+static PetscErrorCode ObsMonitor(TS ts, PetscInt step, PetscReal t, Vec u, void *ctx) {
+  ObsMonitorCtx *m = ctx;
+  PetscFunctionBeginUser;
+  if (!m->active || step <= 0 || step % m->freq != 0) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscInt k = step / m->freq;
+  if (k > m->K) PetscFunctionReturn(PETSC_SUCCESS);
+  if (m->r_k) {  // residual mode
+    PetscCall(MatMult(m->H, u, m->r_k[k - 1]));
+    PetscCall(VecAXPY(m->r_k[k - 1], -1.0, m->y_k[k - 1]));
+    if (m->w_k) PetscCall(VecPointwiseMult(m->r_k[k - 1], m->r_k[k - 1], m->w_k[k - 1]));
+    PetscReal norm;
+    PetscCall(VecNorm(m->r_k[k - 1], NORM_2, &norm));
+    m->J += 0.5 * norm * norm / (m->sigma * m->sigma);
+  } else {  // record mode
+    PetscCall(MatMult(m->H, u, m->y_k[k - 1]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ForwardObserve(RDy rdy, Vec ic, PetscInt total_steps, PetscInt freq, Mat H, Vec *y_k, Vec *r_k, Vec *w_k,
                                      PetscReal sigma, PetscReal *J_out) {
+  static PetscBool obs_mon_installed = PETSC_FALSE;
   PetscFunctionBeginUser;
   PetscCall(ResetTrajectory(rdy->ts));
   PetscCall(VecCopy(ic, rdy->u_global));
@@ -288,23 +329,17 @@ static PetscErrorCode ForwardObserve(RDy rdy, Vec ic, PetscInt total_steps, Pets
   PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
   PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
   PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+  PetscCall(TSSetMaxSteps(rdy->ts, total_steps));
 
-  if (J_out) *J_out = 0.0;
-  PetscInt K = total_steps / freq;
-  for (PetscInt k = 1; k <= K; ++k) {
-    PetscCall(TSSetMaxSteps(rdy->ts, k * freq));
-    PetscCall(TSSolve(rdy->ts, rdy->u_global));
-    if (r_k) {  // residual mode
-      PetscCall(MatMult(H, rdy->u_global, r_k[k - 1]));
-      PetscCall(VecAXPY(r_k[k - 1], -1.0, y_k[k - 1]));
-      if (w_k) PetscCall(VecPointwiseMult(r_k[k - 1], r_k[k - 1], w_k[k - 1]));
-      PetscReal norm;
-      PetscCall(VecNorm(r_k[k - 1], NORM_2, &norm));
-      if (J_out) *J_out += 0.5 * norm * norm / (sigma * sigma);
-    } else {  // record mode
-      PetscCall(MatMult(H, rdy->u_global, y_k[k - 1]));
-    }
+  if (!obs_mon_installed) {
+    PetscCall(TSMonitorSet(rdy->ts, ObsMonitor, &obs_mon, NULL));
+    obs_mon_installed = PETSC_TRUE;
   }
+  obs_mon = (ObsMonitorCtx){.H = H, .y_k = y_k, .r_k = r_k, .w_k = w_k, .freq = freq, .K = total_steps / freq, .sigma = sigma};
+  obs_mon.active = PETSC_TRUE;
+  PetscCall(TSSolve(rdy->ts, rdy->u_global));
+  obs_mon.active = PETSC_FALSE;
+  if (J_out) *J_out = obs_mon.J;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
