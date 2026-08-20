@@ -580,3 +580,30 @@ would be ~36 PB -- revolve makes the full-window adjoint feasible; at
 Gradient-critical production runs should use tight inner tolerances
 (or -ts_trajectory_solution_only 0 to store stages instead of
 recomputing them).
+
+## BEULER large-dt study started; moved to Perlmutter (2026-08-20 evening)
+
+Laptop findings at 30 m (np=6, defaults GMRES+bjacobi/ILU):
+- dt=0.25: converges, ~7 Newton its/step, ~100 s/step (16x ARK-IMEX's
+  6.1 s/step at the same dt -- BEULER only pays off at large dt).
+- dt=5 (2-step probe, caps snes_max_it 8 / ksp_max_it 500): LINEAR
+  solves are fine (40-90 GMRES its, all CONVERGED_RTOL); the NEWTON
+  iteration hit DIVERGED_MAX_IT at 8 -- cap too tight, needs 15-50 its
+  or better globalization, not (yet) a stronger preconditioner.
+- dt=30: first linear solve grinds for many minutes at 2.93M cells --
+  at ~7x the gravity-wave CFL the default PC is not viable; this is
+  where the AMG/solver work lives.
+
+PERLMUTTER PIPELINE UP (allocation m1516_g, GPU-node CPUs, Mark's
+call): pinned PETSc transferred by git bundle (v3.25.3-362+1925fix) to
+~/Codes/petsc-rdycore, arch-perlmutter-rdycore-O-rev built WITH
+revolve (--download-revolve, --with-fc=0); RDycore worktree
+~/Codes/rdycore-manning on adams/manning-draft, build-rev built
+(-DENABLE_FORTRAN=OFF needed with fc=0 PETSc; module load cmake
+cray-hdf5-parallel for h5diff). Turning_30m mesh + IC found at
+/global/cfs/cdirs/m4267/shared/data/harvey/Turning_30m/. Run dir
+$SCRATCH/manning-beuler. SWEEP JOB 57325605 submitted: ark dt=0.25
+baseline; beuler dt=1,5,15,30 x 20 steps (snes_max_it 50,
+ksp_max_it 1000, -snes_ksp_ew, converged reasons, log_view); gamg
+variants at dt=15,30. Existing PM repos (~/Codes/petsc on
+adams/mat-cudss, ~/Codes/rdycore on a57c42e) untouched.
