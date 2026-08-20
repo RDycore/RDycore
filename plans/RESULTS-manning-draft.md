@@ -532,3 +532,51 @@ user-visible symptom: `KSP(preonly) + PCPBJACOBI` on a block-diagonal matrix
 returns a **silently wrong answer** after re-assembly (x = 1 where the exact
 answer is 0.5), for both AIJ and BAIJ. Issue draft ready:
 `plans/petsc-issue-pbjacobi-stale.md`.
+
+## Revolve/memory-trajectory checkpointing WORKING (2026-08-20)
+
+The memory-trajectory SEGV is root-caused and fixed driver-side (commit
+7da381d4). Root cause (real PETSc design limitation, re-verified on the
+clean arch): `TSTrajectoryMemorySet_N` treats `ts->reason != 0` as
+"end of the forward run", but TSSolve sets reason before the final
+TSTrajectorySet of EVERY call -- so a segmented forward (one TSSolve per
+observation window) clobbers the scheduler's total_steps, pops the
+second-last checkpoint, and skips the boundary step at every interior
+observation time; the backward sweep then walks off the corrupted stack
+(NULL StackElement in UpdateTS -> SEGV). Candidate PETSc issue #4
+(usage-limitation report; disk trajectory tolerates segmentation, memory
+cannot).
+
+Fix: ForwardObserve now runs ONE TSSolve over the whole window with a
+TSMonitor recording gauge residuals at observation steps, gated by an
+`active` flag (the trajectory's ReCompute replays also fire monitors).
+The segmented BACKWARD sweep is unchanged and compatible (no trajectory
+writes; Get sequence is monotone across TSAdjointSolve segments).
+
+Validation (dam break, all bit-identical to disk trajectory):
+- memory default + revolve (5/40 cps): calibration 1.986e-01, FD gates
+  1.0e-8 / 2.9e-6 (RK), np 1 and 2.
+- BEULER 9.75e-9 / 4.18e-6 and ARKIMEX 2.77e-8 / 5.17e-6 with tight
+  inner tolerances -- identical digits disk vs revolve (recompute with
+  tight SNES/KSP lands on the same iterates). With DEFAULT tolerances
+  implicit gradients degrade to ~1e-4-2e-4 (known inner-tolerance
+  effect, same as disk).
+- Full adjoint suite 14/14.
+
+FIRST 30 m ADJOINT (Turning 2.93M cells, ARK-IMEX, np=6, dt=0.25 s,
+10-step window, obs every step, per-cell twin, 1 TAO it):
+- disk:    J0 5753.65 |g0| 111367 -> J1 3772.38 |g1| 64904.5,
+           wall 1013.6 s, peak RSS 4.31 GB, traj ~150 MB/step on disk
+- revolve (max_cps_ram 3): IDENTICAL to all printed digits,
+           wall 951.9 s (revolve recompute is CHEAPER than disk I/O),
+           peak RSS 3.32 GB
+Config: build_rev/harvey_run/ark10.yaml (ark40.yaml minus stop/coupling).
+
+36 h window projection (518,400 steps): solution-only checkpoint =
+70 MB aggregate; c=200 cps (14 GB aggregate RAM) gives revolve
+recompute factor <= ~4x (C(203,3) = 1.37M >= 518k). Naive trajectory
+would be ~36 PB -- revolve makes the full-window adjoint feasible; at
+6.1 s/step the wall time is a Perlmutter job, not a laptop job.
+Gradient-critical production runs should use tight inner tolerances
+(or -ts_trajectory_solution_only 0 to store stages instead of
+recomputing them).
