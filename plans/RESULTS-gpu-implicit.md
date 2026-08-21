@@ -494,3 +494,48 @@ NOT made the default: the memory trajectory holds every step of the
 window (no disk spill), which is fine for 20-step gate windows but not
 for long Harvey windows on hosts; use the option on the GPU path (or
 revolve-style checkpointing when windows outgrow device memory).
+
+### KSP round: VecMDot was 96% of KSPSolve -- a KokkosBlas::gemv fallback, fixed in the fork
+
+Rank sweep first (gradient, memory trajectory): KSPSolve 37.3 s (n1) ->
+20.3 (n2) -> 10.3 (n4): clean throughput scaling, so per-iteration cost
+was bandwidth-shaped, not sync latency. pipefgmres at n4: 12.2 s (no
+win). Inside KSPSolve at n4, VecMDot was 9.9 of 10.3 s at 0.5 GF/s --
+~1000x off roofline for the FGMRES orthogonalization.
+
+Micro-benchmark (bench_mdot.c, $SCRATCH/gpu-implicit, single A100,
+n = 2.2M, nv = 16): the DEFAULT VecMDot path (-vec_mdot_use_gemv true,
+pooled work vectors -> KokkosBlas::gemv) runs at 36 GB/s; the
+parallel_reduce path (-vec_mdot_use_gemv 0) at 1050 GB/s; per-vector
+fallbacks at ~1000 GB/s. Root cause: PETSc's --download-kokkos-kernels
+builds with vendor TPLs OFF (KokkosKernels_ENABLE_TPL_CUBLAS=OFF), and
+KokkosBlas's NATIVE tall-skinny transpose gemv is ~30x off roofline.
+
+Fork fix (petsc-claude 90d0d174a34 laptop / ddac7cfaecd PM): default
+-vec_mdot_use_gemv to FALSE when the device exec space has no vendor
+BLAS TPL behind gemv (CUDA without cuBLAS TPL, HIP without rocBLAS);
+option still overrides. Host builds unchanged. Alternative long-term
+fix for the next full reconfigure: enable the cuBLAS TPL in the
+kokkos-kernels download.
+
+Effect at Turning n4 (dt=1 x20, fgmres+pbjacobi rtol 1e-3):
+- forward SNESSolve 6.94 -> 2.99 s (VecMDot 9.9 -> 0.40 s over the
+  gradient's 206 solves; KSPSolve 10.3 -> 1.08 s per-forward-pair
+  share). Now 39x vs the CPU n64 forward baseline.
+- gradient loop (2 forwards + trajectory + backward): 17.2 -> 8.1 s
+  (TSStep 5.9-6.3 + TSAdjointStep 2.1 + trajectory 0.11) = ~30x vs the
+  245.9 s CPU-n64 gradient. Gradient values identical throughout.
+- Verified the flipped DEFAULT (no flag): b2v_grad_default.log.
+
+Solver variants tested at n4 (same protocol, gemv fix on):
+- lgmres+pbjacobi: 625 its, SNESSolve 3.89 s -- no win over fgmres.
+- lgmres + gamg (-pc_gamg_agg_nsmooths 0 -mg_levels_pc_type pbjacobi
+  -pc_gamg_threshold -1): 1084 its, SNESSolve 32.4 s (PCSetUp 10.2,
+  PCApply 19.3) -- unsmoothed aggregation with pbjacobi level smoothing
+  is far too weak here; pbjacobi stays the production PC (per the
+  standing decision). Average its/solve is ~6, so nested KSP
+  preconditioning (-pc_type ksp) has no role at dt=1 either.
+
+Current n4 SNESSolve profile after all fixes: KSP 1.1 s + PCSetUp
+(pbjacobi block inversion, 103x) 1.2 s + JacEval 0.33 + RHS 0.23 --
+roughly balanced; further gains are diminishing-returns territory.
