@@ -423,3 +423,51 @@ exactly bitwise). Norms twin to 16 digits: gate met.
 
 Remaining for B2: PM-scale adjoint timing/residency (Turning-protocol
 backward sweep with device types vs host types).
+
+## B2 PM GATE: PASSED (2026-08-21) -- GPU adjoint at Turning 30 m
+
+Full gradient runs (rdycore_adjoint beuler_dt1.yaml: truth forward +
+perturbed forward + one TSAdjoint backward sweep), dt=1 x20,
+fgmres+pbjacobi, one GPU node, -adjoint_fd_samples 0 (FD correctness ran
+on the laptop at tight tolerances; see B2 progress above).
+
+Correctness at scale: with the SAME binary and partition (GPU binary,
+n64, parmetis) at ksp_rtol 1e-8 / snes_rtol 1e-10, host-types vs
+device-types (kokkos vec + baijkokkos) gradients are IDENTICAL to all
+printed digits: J = 143.434, |dJ/du0| = 1574->1564.37 both, sum(dJ/dn) =
+-446848 both. (An apparent 0.15%/2.8% host-vs-device discrepancy was the
+CPU binary's DIFFERENT PARTITION -- arch-perlmutter-claude-O has no
+parmetis -- combined with the driver's partition-dependent observation
+set; it persists at tight tolerance for that reason and vanishes under a
+matched partition. Each configuration's gradient is tolerance-stable from
+rtol 1e-3 to 1e-8 at <2e-4 relative.)
+
+Performance (rtol 1e-3 production protocol, logs b2i_*.log):
+
+| event (s)            | host n64 | device n4 | device n64 |
+|----------------------|----------|-----------|------------|
+| total wall           | 271.9    | 107.1     | 184.2      |
+| TSStep (2 forwards)  | 217.8    | 14.4      | 40.3       |
+| TSAdjointStep (20)   | 18.1     | 3.0       | 3.8        |
+| TSTrajectorySet (42) | 8.9      | 8.2       | 9.9        |
+| SNESJacobianEval(246)| 160.6    | 0.78      | --         |
+| MatMultTranspose(151)| 2.15     | 0.29      | --         |
+
+- Gradient loop (forwards + trajectory + backward) 245.9 -> 26.5 s at n4
+  (~9.3x); the backward sweep runs at GPU %F = 99 with the P3 device
+  assembly (246 assemblies in 0.78 s) and device transpose solves.
+- Remaining device-side hotspot: TSTrajectorySet ~8 s/window (a third of
+  the n4 gradient loop) -- the memory-trajectory staging (78 GpuToCpu,
+  1.37 GB, plus its MPI traffic); ~constant across host/device and rank
+  counts. Follow-up lead: device-resident or async trajectory staging.
+- The wall-total gap beyond the loop (~80 s) is one-time setup (mesh
+  distribution etc.), amortized across calibration iterations.
+- Fork gate ex337 (now with MatMultTranspose + KSPSolveTranspose/
+  PCApplyTranspose-pbjacobi cycles): All cycles OK on A100, seq and mpi.
+
+Session-2 charter status: B1 PASSED, B2 PASSED (all charter work items:
+hang gone, transpose verified + fork-gated, device assemblies engaged;
+gates: FD np1/2, calibrate ctest, scale twin). Full laptop ctest: green
+except PRE-EXISTING failures (6x swe_roe cgns: arch lacks CGNS;
+amr_c_np_3_basic: SEGV reproduced at parent commit 670062ee -- AMR is
+out of charter scope).
