@@ -635,3 +635,33 @@ Jobs on m1516_g: 57325605 (baseline dt sweep, petsc-rdycore stack) and
 {richardson,gmres(4)}+pbjacobi smoothers, fgmres outer, vs bjacobi
 ref; 5 steps each, srun -t 18:00 caps). The pbjacobi smoothers also
 exercise the freshly landed stale-cache fix.
+
+## PM jobs 57325605 + 57335153 results (2026-08-21)
+
+Node = 1 Perlmutter GPU-node socket, 64 ranks, Turning 30 m (2.93M).
+
+- ARK-IMEX dt=0.25 baseline: TSStep 11.3 s / 10 steps = **1.13 s/step**
+  (5.4x the laptop's 6.1 s/step at np=6).
+- BEULER dt=1 (EW, default bt line search): 20/20 steps, 4-5 Newton
+  its/step, **9.6 s/step**. log_view: SNESJacobianEval 107 s of 160 s
+  SNESSolve = **67% Jacobian assembly** (1.07 s/assembly); KSPSolve
+  only 17% (EW keeps GMRES at ~5 its); FunctionEval 12%.
+  => At PM scale the ANALYTIC JACOBIAN ASSEMBLY is the bottleneck, not
+  the linear solve. Assembly optimization (MatSetValues batching /
+  tighter preallocation) is a ~2x lever on everything implicit.
+  Net: dt=1 BEULER = 9.6/4 = 2.4x ark cost per unit time -> WORSE than
+  ark at dt=0.25. BEULER pays only from dt>=5.
+- BEULER dt>=5 (EW + bt line search): DIVERGED_LINE_SEARCH at Newton
+  it 11 on the FIRST step (dt=5, 15, 30). With EW the linear solves
+  "converge" in 1 it, so this is pure NEWTON GLOBALIZATION failure
+  (wet/dry nonsmooth merit function), not linear algebra.
+- GAMG matrix job (fixed ksp_rtol 1e-5, max_it 300, no EW): every
+  config -- bjacobi ref AND all 8 gamg variants (nsmooths x aggressive
+  x {richardson,gmres}+pbjacobi) -- DIVERGED_ITS 300 on the first
+  solve at dt=15 and 30. At tight tolerance nothing converges; the
+  meaningful GAMG comparison must be run under inexact-Newton (EW)
+  settings and judged by iteration counts.
+- Mark's call: try line search OFF. Job 57363443 submitted:
+  dt=5/15/30 bjacobi + EW + -snes_linesearch_type basic
+  (snes_max_it 50), plus gamg(ns0,agg0,gmres4+pbjacobi) columns at
+  dt=15/30 under the same settings.
