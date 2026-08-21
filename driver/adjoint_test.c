@@ -1633,8 +1633,14 @@ int main(int argc, char *argv[]) {
         PetscCall(VecDuplicate(u_ic_pert, &um));
         PetscCall(VecCopy(u_ic_pert, up));
         PetscCall(VecCopy(u_ic_pert, um));
-        PetscCall(VecSetValue(up, idx, eps, ADD_VALUES));
-        PetscCall(VecSetValue(um, idx, -eps, ADD_VALUES));
+        // perturb from ONE rank only: ADD_VALUES contributions are summed
+        // across ranks, so an every-rank call scales the FD slope by nproc
+        PetscMPIInt fd_rank;
+        PetscCallMPI(MPI_Comm_rank(comm, &fd_rank));
+        if (fd_rank == 0) {
+          PetscCall(VecSetValue(up, idx, eps, ADD_VALUES));
+          PetscCall(VecSetValue(um, idx, -eps, ADD_VALUES));
+        }
         PetscCall(VecAssemblyBegin(up));
         PetscCall(VecAssemblyEnd(up));
         PetscCall(VecAssemblyBegin(um));

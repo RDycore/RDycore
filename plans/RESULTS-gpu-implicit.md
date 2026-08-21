@@ -364,3 +364,62 @@ Laptop gates (arch-macosx-gnu-rdycore-kokkos-O, host Kokkos):
 PM gate (pending): dt=1 x20 Turning protocol, trajectory twin vs P3 dumps,
 TSFunctionEval GPU %F = 100, no per-eval GpuToCpu of the state, n4
 SNESSolve ~7.5 s expected.
+
+## B1 PM GATE: PASSED (2026-08-21) -- device RHS at Turning 30 m
+
+Protocol: dt=1 x20, baijkokkos + kokkos vecs, fgmres+pbjacobi rtol 1e-3,
+one GPU node. Newton path IDENTICAL across all runs (20 snes conv, 614
+converged-linear-iteration sum). Trajectories: n4 device-RHS vs n4
+host-RHS (same partition, only the RHS source differs) max rel diff
+2.5e-16; n64 device-RHS vs the P3 dump 2.4e-16 -- same ulp-level noise as
+the P3-vs-P2 "bit-identical" comparison (gcc host vs nvcc device FMA
+contraction; on the laptop, where one compiler builds both, the pair is
+exactly bitwise). Norms twin to 16 digits: gate met.
+
+| n4 (s)              | host RHS (P3) | device RHS (B1) |
+|---------------------|---------------|-----------------|
+| SNESSolve           | 28.6          | 6.94            |
+| TSFunctionEval (125)| 21.6          | 0.226  (96x)    |
+| KSPSolve            | 5.13          | 5.00            |
+| SNESJacobianEval    | 0.37          | 0.33            |
+
+- TSFunctionEval GPU %F = 100; CpuToGpu = 2 transfers / 23 MB TOTAL (the
+  one-time material-props + external-sources staging -- the state-change
+  caching works); GpuToCpu = 125 x 37 KB (boundary fluxes only). The
+  host-RHS baseline moved 2.2 GB up + 4.4 GB down per run in the same
+  event. "No per-eval GpuToCpu of the state": met.
+- n4 SNESSolve 6.94 s beats the charter estimate (~7.5 s): 16.8x vs the
+  CPU n64 116.7 s baseline. n64: 20.2 s (KSP-bound at 16 ranks/GPU as
+  before; n4 is the GPU-friendly rank count).
+- Runs/logs: $SCRATCH/gpu-implicit/b1i_{hostrhs_n4,devrhs_n4,devrhs_n64}.log,
+  usol.b1*.bin, b1_interactive.sh.
+
+## B2 progress (2026-08-21, same session)
+
+1. **TSTrajectory + kokkos vec hang: GONE at the current stacks.** The
+   charter repro (rdycore_adjoint adjoint_beuler.yaml -dm_vec_type kokkos,
+   tight tolerances) completes in ~0.4 s on the laptop -- as do
+   -rhs_jac_mat_type baijkokkos and full -dm_mat_type baijkokkos configs,
+   np 1-4. Most plausibly fixed by fdaf8ca (MatShift/MatNorm on device
+   BAIJKokkos: the backward sweep runs TSComputeIJacobianDefault's
+   MatScale+MatShift every step, and pre-fix MatShift destroyed the device
+   matrix). Not re-bisected; the symptom is unreproducible.
+2. **Adjoint FD gates with device forward+backward PASS at np 1 and 2**
+   (full-kokkos: dJ/du0 rel 1.25e-8 / 1.35e-8, Manning aggregate within
+   gate). Fixed a DRIVER FD-check bug exposed at np>1: every rank called
+   VecSetValue(ADD_VALUES) for the sampled-dof perturbation, scaling the
+   FD slope by nproc (fd was exactly 2x at np2 / 4x at np4 while the
+   ADJOINT gradients were identical to np1 all along). Perturbation now
+   applied from rank 0 only. ctest 14/14 after the fix.
+3. **Transpose PBJacobi verification**: end-to-end covered by the FD gates
+   above (KSPSolveTranspose + PCApplyTranspose on baijkokkos in the
+   backward sweep); fork gate ex337 EXTENDED with per-cycle
+   MatMultTranspose and KSPSolveTranspose(preonly+pbjacobi) checks vs the
+   AIJ reference (petsc-claude d1f202c9e6b laptop / e58c2dabe05 PM, 3/3 on
+   the laptop; GPU-node run pending with the next fork QA batch).
+4. The adjoint's per-step Jacobian assemblies take the P3 device path
+   type-driven, as predicted (device assembly PetscInfo confirmed in the
+   full-kokkos adjoint runs).
+
+Remaining for B2: PM-scale adjoint timing/residency (Turning-protocol
+backward sweep with device types vs host types).
