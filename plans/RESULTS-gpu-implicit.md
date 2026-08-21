@@ -140,3 +140,40 @@ on a GPU node.
 
 P2 job 57369566 held during the PM relink and released; queued with the
 fixed lib.
+
+## P2 GATE: PASSED (2026-08-21, interactive runs; batch 57369566 redundant/queued for n4 data)
+
+dt=1 x20 steps, n64 (4 A100s shared for device runs), fgmres+pbjacobi
+rtol 1e-3, no EW. All three runs take IDENTICAL Newton paths (20 snes
+conv, 717 total linear its) and identical state norms to 16 digits at
+every dumped step; aijkokkos vs baijkokkos trajectories are bit-identical
+(rel diff <= 2e-16). CPU-vs-device entry ORDER differs only because
+arch-perlmutter-claude-O has no parmetis (different partition) — compare
+norms, not raw dumps. Logs/dumps: $SCRATCH/gpu-implicit/p2i_*.log,
+usol.*.bin, compare_traj.py.
+
+| metric (s)          | CPU aij | aijkokkos | baijkokkos |
+|---------------------|---------|-----------|------------|
+| SNESSolve           | 116.7   | 60.6      | 29.5       |
+| SNESJacobianEval    | 80.1    | 24.2      | 8.9        |
+| KSPSolve            | 13.0    | 22.7      | 15.6       |
+| MatMult (717)       | 10.8    | 9.1 GPU100| 8.6 GPU100 |
+| PCApply (614)       | 1.31    | 0.039     | 0.019      |
+| MatSetValuesCOO(103)| 3.5     | 13.4      | 4.5        |
+| TSFunctionEval(125) | 20.5    | 10.1      | 3.7        |
+
+- Device residency: MatMult/PCApply GPU %F = 100; KSPSolve GpuToCpu =
+  511 transfers x 0.017 MB TOTAL (convergence scalars). Gate condition
+  "no per-iteration GpuToCpu in the solve" met.
+- Fork's device PBJacobi: 1.31 -> 0.019 s (~68x on the apply).
+- baijkokkos beats aijkokkos 2x overall: scalar COO uploads 23 MB/assembly
+  through a 9x larger index/perm scatter (logged 2.37 GB H2D total);
+  blocked COO's leaner scatter cuts JacEval 24.2 -> 8.9 s.
+- KSPSolve is SLOWER on device than CPU at n64 (context thrash: 16
+  ranks/GPU, no MPS) — the n4 batch runs + P3/P4 are where device KSP
+  perf gets its fair shot. CPU MatAssemblyEnd showed a 62 s / 23000x
+  imbalance spike in this interactive session (worse than the 7.7 s
+  charter number) — device runs sidestep it entirely.
+- CPU JacEval 80.1 s is the P3 target: values are still host-computed
+  (flux-tangent loop + DMGlobalToLocal + upload). P3 moves the fill to a
+  device kernel over the precomputed COO offsets.
