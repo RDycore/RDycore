@@ -665,3 +665,45 @@ Node = 1 Perlmutter GPU-node socket, 64 ranks, Turning 30 m (2.93M).
   dt=5/15/30 bjacobi + EW + -snes_linesearch_type basic
   (snes_max_it 50), plus gamg(ns0,agg0,gmres4+pbjacobi) columns at
   dt=15/30 under the same settings.
+
+## Interactive-node solver session: COO A/B + the large-dt verdict (2026-08-21)
+
+COO assembly A/B (dt=1 BEULER, 64 ranks, 20 steps, fixed ksp_rtol 1e-3,
+pbjacobi, both binaries on petsc-claude-main stack):
+  pre-COO: SNESSolve 203.8 s (JacEval 118.8 s = 1.15 s/assembly,
+           47M MatSetValues calls = 23.1 s, KSPSolve 53.0 s)
+  COO:     SNESSolve 134.6 s (JacEval  79.4 s = 0.77 s/assembly,
+           KSPSolve 25.6 s)  => 1.51x overall
+  The exact FV pattern halves stored nonzeros vs the closure superset --
+  that is what halved KSPSolve. Remaining assembly = flux-tangent loop
+  (host) + ghost update + COO scatter (7.7 s, 23x imbalance).
+
+Large-dt BEULER at 30 m from the Harvey IC (median depth 6 mm) -- the
+full diagnostic ladder at dt=5, rtol 1e-3:
+  - pbjacobi standalone: first solve converges in 394 its (not stagnant,
+    just weak); bjacobi/ILU(64 subdomains): 44 its.
+  - basic (no) line search: DIVERGED_FUNCTION_NANORINF at it 0 -- the
+    full Newton step drives thin cells to h<0 (NaN from h^{-7/3});
+    damping 0.5 also NaNs. The bt line search is the NaN guard.
+  - bt + accurate solves: progresses ~4 its, then late-Newton systems
+    blow past 500 its (they harden near wet/dry fronts); with cap 3000
+    it crawls to snes_max_it.
+  - Single-step, snes_max_it 300, monitors: norm 63.8 -> 61.4 over 66
+    its then STAGNATES to 12 digits; DIVERGED_LINE_SEARCH. Genuine
+    nonsmooth stagnation (wet/dry branch kinks; J locally inconsistent
+    with F across branch switches), not budget.
+  - dt continuation (-ts_adapt_type basic from dt=1, dt_max 5,
+    unlimited snes failures): all 62 Newton solves converge, but the
+    ERROR CONTROLLER settles at dt ~= 0.3 s (0.22-0.34 over 60 steps)
+    -- barely above the ark CFL dt of 0.25 s at default tolerances.
+
+VERDICT: BEULER large-dt at 30 m is blocked by BOTH nonsmooth Newton
+(cold/thin states) AND local-error control. Unlocking it is research:
+(a) SNES VI with h >= 0 bounds (principled for wetting/drying),
+(b) smoothed wet/dry + drag on the implicit path (h_anuga knob exists),
+(c) loosened -ts_rtol/-ts_atol (gauges only need hourly WSE accuracy)
+-- likely all three together. Until then the honest production stance:
+ARK-IMEX at dt=0.25 (1.13 s/step/node) is the workhorse, tier-A costs
+apply, and the GPU path's near-term value is device assembly + forward
+solve (+ per-cell implicit blocks), with device GAMG mattering only
+once large-dt implicit lands. Wednesday agenda item.
