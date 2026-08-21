@@ -86,22 +86,33 @@ static PetscErrorCode SWERHSJacobianFD(TS ts, PetscReal t, Vec u, Mat J, Mat P, 
 // closure-adjacency preallocation superset with the exact FV pattern.
 // ---------------------------------------------------------------------------
 
-// appends the scalar COO indices of the 3x3 block (brow, bcol) (local block
-// indices, ghosted cell numbering) to coo_i/coo_j at *cursor via the DM's
-// scalar local-to-global map
-static PetscErrorCode AppendBlockIndices(ISLocalToGlobalMapping l2g, PetscInt brow, PetscInt bcol, PetscInt *coo_i, PetscInt *coo_j,
-                                         PetscCount *cursor) {
+// appends the COO indices of the 3x3 block (brow, bcol) (local block indices,
+// ghosted cell numbering) to coo_i/coo_j at *cursor via the DM's scalar
+// local-to-global map: 9 scalar index pairs, or -- when blocked COO is in
+// effect (MatCOOUseBlockIndices, BAIJ types on the petsc-claude fork) -- one
+// block index pair
+static PetscErrorCode AppendBlockIndices(ISLocalToGlobalMapping l2g, PetscBool blocked, PetscInt brow, PetscInt bcol, PetscInt *coo_i,
+                                         PetscInt *coo_j, PetscCount *cursor) {
   PetscInt lrow[3] = {3 * brow, 3 * brow + 1, 3 * brow + 2}, grow[3];
   PetscInt lcol[3] = {3 * bcol, 3 * bcol + 1, 3 * bcol + 2}, gcol[3];
   PetscFunctionBegin;
   PetscCall(ISLocalToGlobalMappingApply(l2g, 3, lrow, grow));
   PetscCall(ISLocalToGlobalMappingApply(l2g, 3, lcol, gcol));
-  for (PetscInt i = 0; i < 3; ++i)
-    for (PetscInt j = 0; j < 3; ++j) {
-      coo_i[*cursor] = grow[i];
-      coo_j[*cursor] = gcol[j];
-      ++(*cursor);
-    }
+  if (blocked) {
+    // cells carry contiguous 3-dof blocks and rank offsets are multiples of 3,
+    // so the global block index is the first dof's scalar index / 3
+    PetscCheck(grow[0] % 3 == 0 && gcol[0] % 3 == 0, PETSC_COMM_SELF, PETSC_ERR_PLIB, "global dof index not 3-aligned in blocked COO pattern");
+    coo_i[*cursor] = grow[0] / 3;
+    coo_j[*cursor] = gcol[0] / 3;
+    ++(*cursor);
+  } else {
+    for (PetscInt i = 0; i < 3; ++i)
+      for (PetscInt j = 0; j < 3; ++j) {
+        coo_i[*cursor] = grow[i];
+        coo_j[*cursor] = gcol[j];
+        ++(*cursor);
+      }
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -119,39 +130,63 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   PetscCall(MatCreate(rdy->comm, &rdy->rhs_jac));
   PetscCall(MatSetSizes(rdy->rhs_jac, n_local, n_local, PETSC_DETERMINE, PETSC_DETERMINE));
   // honor -dm_mat_type (e.g. aijkokkos/baijkokkos for device solves): the DM's
-  // mat type defaults to MATAIJ, so CPU behavior is unchanged; MatSetFromOptions
-  // additionally allows a direct -mat_type override on this matrix
+  // mat type defaults to MATAIJ, so CPU behavior is unchanged. The prefixed
+  // MatSetFromOptions additionally allows -rhs_jac_mat_type to override the
+  // type of THIS matrix alone (a bare -mat_type would also be picked up by
+  // every DMCreateMatrix, e.g. the FD twin in the jacobian tests)
   MatType mat_type;
   PetscCall(DMGetMatType(rdy->dm, &mat_type));
   PetscCall(MatSetType(rdy->rhs_jac, mat_type));
   PetscCall(MatSetBlockSize(rdy->rhs_jac, 3));
+  PetscCall(MatSetOptionsPrefix(rdy->rhs_jac, "rhs_jac_"));
   PetscCall(MatSetFromOptions(rdy->rhs_jac));
 
   ISLocalToGlobalMapping l2g;
   PetscCall(DMGetLocalToGlobalMapping(rdy->dm, &l2g));
 
-  // count entries (same loop structure as the fill; only topology matters)
-  PetscCount ncoo = 0;
+  // BAIJ matrix types on the petsc-claude fork assemble by blocked COO:
+  // coo_i/coo_j are block indices (one pair per 3x3 block) and MatSetValuesCOO
+  // consumes one dense row-major 3x3 block per entry -- exactly the values
+  // layout the assembly loop already produces, so only the pattern differs.
+  // Only the types that implement blocked COO may opt in: the Kokkos/CUDA
+  // block classes and the MPIBAIJ host twin. Plain SEQBAIJ has no blocked-COO
+  // path -- it IGNORES the flag and would misread block indices as scalar --
+  // so it (and any type on a stock PETSc build) uses scalar COO.
+  PetscBool blocked = PETSC_FALSE;
+#if RDY_HAVE_MAT_COO_BLOCK_INDICES
+  {
+    MatType type;
+    PetscCall(MatGetType(rdy->rhs_jac, &type));
+    if (strstr(type, "baijkokkos") || strstr(type, "baijcuda") || !strcmp(type, MATMPIBAIJ)) {
+      PetscCall(MatCOOUseBlockIndices(rdy->rhs_jac, PETSC_TRUE));
+      blocked = PETSC_TRUE;
+    }
+  }
+#endif
+
+  // count blocks (same loop structure as the fill; only topology matters)
+  PetscCount nblocks = 0;
   for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
     PetscInt edge_id = edges->internal_edge_ids[e];
     PetscInt l       = edges->cell_ids[2 * edge_id];
     PetscInt r       = edges->cell_ids[2 * edge_id + 1];
     if (r == -1) continue;
-    if (cells->is_owned[l]) ncoo += 18;
-    if (cells->is_owned[r]) ncoo += 18;
+    if (cells->is_owned[l]) nblocks += 2;
+    if (cells->is_owned[r]) nblocks += 2;
   }
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary boundary = rdy->boundaries[b];
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       PetscInt l = edges->cell_ids[2 * boundary.edge_ids[e]];
-      if (cells->is_owned[l]) ncoo += 9;
+      if (cells->is_owned[l]) nblocks += 1;
     }
   }
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
-    if (cells->is_owned[c]) ncoo += 9;
+    if (cells->is_owned[c]) nblocks += 1;
   }
 
-  PetscInt *coo_i, *coo_j;
+  PetscCount ncoo = blocked ? nblocks : 9 * nblocks;  // index pairs registered with MatSetPreallocationCOO
+  PetscInt  *coo_i, *coo_j;
   PetscCall(PetscMalloc2(ncoo, &coo_i, ncoo, &coo_j));
   PetscCount cursor = 0;
   for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
@@ -160,12 +195,12 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
     PetscInt r       = edges->cell_ids[2 * edge_id + 1];
     if (r == -1) continue;
     if (cells->is_owned[l]) {
-      PetscCall(AppendBlockIndices(l2g, l, l, coo_i, coo_j, &cursor));
-      PetscCall(AppendBlockIndices(l2g, l, r, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, blocked, l, l, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, blocked, l, r, coo_i, coo_j, &cursor));
     }
     if (cells->is_owned[r]) {
-      PetscCall(AppendBlockIndices(l2g, r, r, coo_i, coo_j, &cursor));
-      PetscCall(AppendBlockIndices(l2g, r, l, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, blocked, r, r, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, blocked, r, l, coo_i, coo_j, &cursor));
     }
   }
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -176,20 +211,23 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       PetscInt l = edges->cell_ids[2 * boundary.edge_ids[e]];
       if (!cells->is_owned[l]) continue;
-      PetscCall(AppendBlockIndices(l2g, l, l, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, blocked, l, l, coo_i, coo_j, &cursor));
     }
   }
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (!cells->is_owned[c]) continue;
-    PetscCall(AppendBlockIndices(l2g, c, c, coo_i, coo_j, &cursor));
+    PetscCall(AppendBlockIndices(l2g, blocked, c, c, coo_i, coo_j, &cursor));
   }
   PetscCheck(cursor == ncoo, rdy->comm, PETSC_ERR_PLIB, "COO pattern cursor mismatch: %" PetscCount_FMT " != %" PetscCount_FMT, cursor, ncoo);
 
   PetscCall(MatSetPreallocationCOO(rdy->rhs_jac, ncoo, coo_i, coo_j));
   PetscCall(PetscFree2(coo_i, coo_j));
 
-  rdy->rhs_jac_ncoo = ncoo;
-  PetscCall(PetscMalloc1(ncoo, &rdy->rhs_jac_coo_v));
+  // the values buffer is 9 scalars per block in both modes (row-major blocks
+  // in pattern order), so the assembly fill and its final cursor check are
+  // mode-independent
+  rdy->rhs_jac_ncoo = 9 * nblocks;
+  PetscCall(PetscMalloc1(rdy->rhs_jac_ncoo, &rdy->rhs_jac_coo_v));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

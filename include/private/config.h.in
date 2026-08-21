@@ -19,4 +19,8 @@
 #define PETSC_ARCH           "@PETSC_ARCH@"
 #define CEED_VERSION         "@CEED_VERSION@"
 
+// 1 if PETSc provides MatCOOUseBlockIndices() (blocked COO assembly for BAIJ
+// matrix types -- the petsc-claude fork; 0 for upstream PETSc)
+#define RDY_HAVE_MAT_COO_BLOCK_INDICES @RDY_HAVE_MAT_COO_BLOCK_INDICES@
+
 #endif

@@ -52,6 +52,18 @@ list(APPEND CMAKE_INSTALL_RPATH ${PETSC_DIR}/${PETSC_ARCH}/lib)
 pkg_check_modules(CEED REQUIRED IMPORTED_TARGET ceed)
 include_directories(${CEED_INCLUDE_DIRS})
 
+# Detect the blocked-COO assembly API for BAIJ matrices (MatCOOUseBlockIndices,
+# provided by the petsc-claude fork; absent in upstream PETSc) by inspecting
+# petscmat.h, the same way we inspect petscconf.h below.
+file(READ "${PETSC_DIR}/include/petscmat.h" petscmat_h)
+string(FIND "${petscmat_h}" "MatCOOUseBlockIndices" coo_block_index)
+if (coo_block_index EQUAL -1)
+  set(RDY_HAVE_MAT_COO_BLOCK_INDICES 0)
+else()
+  message(STATUS "PETSc provides MatCOOUseBlockIndices (blocked COO assembly for BAIJ)")
+  set(RDY_HAVE_MAT_COO_BLOCK_INDICES 1)
+endif()
+
 # Determine PETSc's ID type (int32 or int64) by inspecting petscconf.h
 file(READ "${PETSC_DIR}/${PETSC_ARCH}/include/petscconf.h" petscconf_h)
 string(FIND ${petscconf_h} "#define PETSC_USE_64BIT_INDICES 1" index)
