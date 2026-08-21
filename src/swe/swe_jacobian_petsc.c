@@ -71,6 +71,122 @@ static PetscErrorCode SWERHSJacobianFD(TS ts, PetscReal t, Vec u, Mat J, Mat P, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// ---------------------------------------------------------------------------
+// COO assembly for the analytic Jacobian. The sparsity pattern is fixed by
+// mesh topology: per interior edge, up to four 3x3 blocks -- (l,l),(l,r) when
+// l is owned and (r,r),(r,l) when r is owned -- plus one (l,l) block per owned
+// boundary edge and one (c,c) source block per owned cell. The pattern is
+// registered once with MatSetPreallocationCOO (repeated index pairs are
+// summed by MatSetValuesCOO, reproducing the former ADD_VALUES semantics),
+// and every assembly fills one flat values array in the SAME loop order:
+// state-dependent skips (dry/dry edges, non-contributing outflow) write zero
+// blocks instead of skipping, so index and value cursors always agree. This
+// replaces ~4 MatSetValuesBlockedLocal calls per edge (the dominant cost of
+// assembly at scale) with a single MatSetValuesCOO, and replaces the
+// closure-adjacency preallocation superset with the exact FV pattern.
+// ---------------------------------------------------------------------------
+
+// appends the scalar COO indices of the 3x3 block (brow, bcol) (local block
+// indices, ghosted cell numbering) to coo_i/coo_j at *cursor via the DM's
+// scalar local-to-global map
+static PetscErrorCode AppendBlockIndices(ISLocalToGlobalMapping l2g, PetscInt brow, PetscInt bcol, PetscInt *coo_i, PetscInt *coo_j,
+                                         PetscCount *cursor) {
+  PetscInt lrow[3] = {3 * brow, 3 * brow + 1, 3 * brow + 2}, grow[3];
+  PetscInt lcol[3] = {3 * bcol, 3 * bcol + 1, 3 * bcol + 2}, gcol[3];
+  PetscFunctionBegin;
+  PetscCall(ISLocalToGlobalMappingApply(l2g, 3, lrow, grow));
+  PetscCall(ISLocalToGlobalMappingApply(l2g, 3, lcol, gcol));
+  for (PetscInt i = 0; i < 3; ++i)
+    for (PetscInt j = 0; j < 3; ++j) {
+      coo_i[*cursor] = grow[i];
+      coo_j[*cursor] = gcol[j];
+      ++(*cursor);
+    }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// creates rdy->rhs_jac with the exact FV sparsity and registers the COO
+// pattern; allocates the reusable values buffer
+static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscInt n_local;
+  PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
+  PetscCall(MatCreate(rdy->comm, &rdy->rhs_jac));
+  PetscCall(MatSetSizes(rdy->rhs_jac, n_local, n_local, PETSC_DETERMINE, PETSC_DETERMINE));
+  PetscCall(MatSetType(rdy->rhs_jac, MATAIJ));
+  PetscCall(MatSetBlockSize(rdy->rhs_jac, 3));
+
+  ISLocalToGlobalMapping l2g;
+  PetscCall(DMGetLocalToGlobalMapping(rdy->dm, &l2g));
+
+  // count entries (same loop structure as the fill; only topology matters)
+  PetscCount ncoo = 0;
+  for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l       = edges->cell_ids[2 * edge_id];
+    PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+    if (r == -1) continue;
+    if (cells->is_owned[l]) ncoo += 18;
+    if (cells->is_owned[r]) ncoo += 18;
+  }
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    RDyBoundary boundary = rdy->boundaries[b];
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      PetscInt l = edges->cell_ids[2 * boundary.edge_ids[e]];
+      if (cells->is_owned[l]) ncoo += 9;
+    }
+  }
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (cells->is_owned[c]) ncoo += 9;
+  }
+
+  PetscInt *coo_i, *coo_j;
+  PetscCall(PetscMalloc2(ncoo, &coo_i, ncoo, &coo_j));
+  PetscCount cursor = 0;
+  for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l       = edges->cell_ids[2 * edge_id];
+    PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+    if (r == -1) continue;
+    if (cells->is_owned[l]) {
+      PetscCall(AppendBlockIndices(l2g, l, l, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, l, r, coo_i, coo_j, &cursor));
+    }
+    if (cells->is_owned[r]) {
+      PetscCall(AppendBlockIndices(l2g, r, r, coo_i, coo_j, &cursor));
+      PetscCall(AppendBlockIndices(l2g, r, l, coo_i, coo_j, &cursor));
+    }
+  }
+  for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+    RDyBoundary      boundary = rdy->boundaries[b];
+    RDyConditionType bc_type  = rdy->boundary_conditions[b].flow->type;
+    PetscCheck(bc_type == CONDITION_DIRICHLET || bc_type == CONDITION_REFLECTING || bc_type == CONDITION_CRITICAL_OUTFLOW, rdy->comm,
+               PETSC_ERR_SUP, "numerics.jacobian: analytic does not support this boundary condition type yet");
+    for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+      PetscInt l = edges->cell_ids[2 * boundary.edge_ids[e]];
+      if (!cells->is_owned[l]) continue;
+      PetscCall(AppendBlockIndices(l2g, l, l, coo_i, coo_j, &cursor));
+    }
+  }
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (!cells->is_owned[c]) continue;
+    PetscCall(AppendBlockIndices(l2g, c, c, coo_i, coo_j, &cursor));
+  }
+  PetscCheck(cursor == ncoo, rdy->comm, PETSC_ERR_PLIB, "COO pattern cursor mismatch: %" PetscCount_FMT " != %" PetscCount_FMT, cursor, ncoo);
+
+  PetscCall(MatSetPreallocationCOO(rdy->rhs_jac, ncoo, coo_i, coo_j));
+  PetscCall(PetscFree2(coo_i, coo_j));
+
+  rdy->rhs_jac_ncoo = ncoo;
+  PetscCall(PetscMalloc1(ncoo, &rdy->rhs_jac_coo_v));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // TSRHSJacobianFn implementing numerics.jacobian: analytic -- assembles the
 // block-sparse Jacobian from closed-form per-edge flux blocks and per-cell
 // source blocks, mirroring the loops (and wet/dry branches) of
@@ -80,7 +196,9 @@ static PetscErrorCode SWERHSJacobianFD(TS ts, PetscReal t, Vec u, Mat J, Mat P, 
 // Roe flux, entropy-fix branches included) and boundary-edge contributions
 // are assembled for reflecting, Dirichlet, and critical-outflow conditions,
 // so the assembled matrix matches finite differences of the full RHS to FD
-// accuracy on interior and boundary rows alike.
+// accuracy on interior and boundary rows alike. Values are gathered into the
+// COO buffer laid out by CreateAnalyticJacobianCOO (identical loop order;
+// state-dependent skips write zeros) and set with one MatSetValuesCOO.
 static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, Mat J, Mat P, void *ctx) {
   RDy rdy = ctx;
   (void)t;  // the RHS state dependence is autonomous (forcing is state-independent)
@@ -93,7 +211,8 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
   const PetscReal tiny_h  = rdy->config.physics.flow.tiny_h;
   const PetscReal h_anuga = rdy->config.physics.flow.h_anuga_regular;
 
-  PetscCall(MatZeroEntries(P));
+  PetscScalar *v      = rdy->rhs_jac_coo_v;
+  PetscCount   cursor = 0;
 
   // ghosted state
   Vec u_local;
@@ -113,9 +232,15 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
     PetscInt r       = edges->cell_ids[2 * edge_id + 1];
     if (r == -1) continue;
 
+    PetscInt nblocks = (cells->is_owned[l] ? 2 : 0) + (cells->is_owned[r] ? 2 : 0);
+
     const PetscScalar *consL = &u_ptr[3 * l];
     const PetscScalar *consR = &u_ptr[3 * r];
-    if (consL[0] < tiny_h && consR[0] < tiny_h) continue;  // RHS skips dry/dry edges
+    if (consL[0] < tiny_h && consR[0] < tiny_h) {  // RHS skips dry/dry edges
+      PetscCall(PetscArrayzero(&v[cursor], 9 * nblocks));
+      cursor += 9 * nblocks;
+      continue;
+    }
 
     PetscReal dFdUL[3][3], dFdUR[3][3];
     PetscReal uL[3] = {consL[0], consL[1], consL[2]}, uR[3] = {consR[0], consR[1], consR[2]};
@@ -124,22 +249,21 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
     PetscReal len = edges->lengths[edge_id];
     PetscReal wl = -len / cells->areas[l], wr = len / cells->areas[r];
 
-    PetscReal block[9];
     if (cells->is_owned[l]) {
       for (PetscInt i = 0; i < 3; ++i)
-        for (PetscInt j = 0; j < 3; ++j) block[3 * i + j] = wl * dFdUL[i][j];
-      PetscCall(MatSetValuesBlockedLocal(P, 1, &l, 1, &l, block, ADD_VALUES));
+        for (PetscInt j = 0; j < 3; ++j) v[cursor + 3 * i + j] = wl * dFdUL[i][j];
+      cursor += 9;
       for (PetscInt i = 0; i < 3; ++i)
-        for (PetscInt j = 0; j < 3; ++j) block[3 * i + j] = wl * dFdUR[i][j];
-      PetscCall(MatSetValuesBlockedLocal(P, 1, &l, 1, &r, block, ADD_VALUES));
+        for (PetscInt j = 0; j < 3; ++j) v[cursor + 3 * i + j] = wl * dFdUR[i][j];
+      cursor += 9;
     }
     if (cells->is_owned[r]) {
       for (PetscInt i = 0; i < 3; ++i)
-        for (PetscInt j = 0; j < 3; ++j) block[3 * i + j] = wr * dFdUR[i][j];
-      PetscCall(MatSetValuesBlockedLocal(P, 1, &r, 1, &r, block, ADD_VALUES));
+        for (PetscInt j = 0; j < 3; ++j) v[cursor + 3 * i + j] = wr * dFdUR[i][j];
+      cursor += 9;
       for (PetscInt i = 0; i < 3; ++i)
-        for (PetscInt j = 0; j < 3; ++j) block[3 * i + j] = wr * dFdUL[i][j];
-      PetscCall(MatSetValuesBlockedLocal(P, 1, &r, 1, &l, block, ADD_VALUES));
+        for (PetscInt j = 0; j < 3; ++j) v[cursor + 3 * i + j] = wr * dFdUL[i][j];
+      cursor += 9;
     }
   }
 
@@ -160,6 +284,8 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
       PetscInt edge_id = boundary.edge_ids[e];
       PetscInt l       = edges->cell_ids[2 * edge_id];
       if (!cells->is_owned[l]) continue;
+      PetscCount block_at = cursor;  // this edge's (l,l) block in the COO layout
+      cursor += 9;
 
       const PetscScalar *consL_s = &u_ptr[3 * l];
       PetscReal          consL[3] = {PetscRealPart(consL_s[0]), PetscRealPart(consL_s[1]), PetscRealPart(consL_s[2])};
@@ -217,21 +343,21 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
         default:
           PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_SUP, "numerics.jacobian: analytic does not support this boundary condition type yet");
       }
-      if (!contribute) continue;
-      if (qL[0] < tiny_h && qR[0] < tiny_h) continue;  // RHS skips dry/dry boundary edges
+      if (!contribute || (qL[0] < tiny_h && qR[0] < tiny_h)) {  // zero flux / RHS skips dry/dry boundary edges
+        PetscCall(PetscArrayzero(&v[block_at], 9));
+        continue;
+      }
 
       // columns: conservative direction e_j -> primitive dir = P_L e_j,
       // ghost dir = G (P_L e_j); exact differential gives the column
-      PetscReal block[9];
       for (PetscInt j = 0; j < 3; ++j) {
         PetscReal dirL[3] = {PL[0][j], PL[1][j], PL[2][j]};
         PetscReal dirR[3];
         for (PetscInt i = 0; i < 3; ++i) dirR[i] = G[i][0] * dirL[0] + G[i][1] * dirL[1] + G[i][2] * dirL[2];
         PetscReal dF[3];
         PetscCall(SWERoeFluxDifferentialPrim(qL, qR, sn, cn, dirL, dirR, dF));
-        for (PetscInt i = 0; i < 3; ++i) block[3 * i + j] = wl * dF[i];
+        for (PetscInt i = 0; i < 3; ++i) v[block_at + 3 * i + j] = wl * dF[i];
       }
-      PetscCall(MatSetValuesBlockedLocal(P, 1, &l, 1, &l, block, ADD_VALUES));
     }
     if (bc_type == CONDITION_DIRICHLET) PetscCall(VecRestoreArray(rdy->operator->petsc.boundary_values[b], &bv_ptr));
   }
@@ -258,18 +384,18 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
       D[2][0] = -GRAVITY * cells->dz_dy[c];
     }
 
-    PetscReal block[9];
     for (PetscInt i = 0; i < 3; ++i)
-      for (PetscInt j = 0; j < 3; ++j) block[3 * i + j] = D[i][j];
-    PetscCall(MatSetValuesBlockedLocal(P, 1, &c, 1, &c, block, ADD_VALUES));
+      for (PetscInt j = 0; j < 3; ++j) v[cursor + 3 * i + j] = D[i][j];
+    cursor += 9;
   }
   PetscCall(VecRestoreArray(rdy->operator->petsc.material_properties, &mat_props_ptr));
 
   PetscCall(VecRestoreArrayRead(u_local, &u_ptr));
   PetscCall(DMRestoreLocalVector(rdy->dm, &u_local));
 
-  PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
+  PetscCheck(cursor == rdy->rhs_jac_ncoo, rdy->comm, PETSC_ERR_PLIB, "COO value cursor mismatch: %" PetscCount_FMT " != %" PetscCount_FMT, cursor,
+             rdy->rhs_jac_ncoo);
+  PetscCall(MatSetValuesCOO(P, v, INSERT_VALUES));
   if (J != P) {
     PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
@@ -583,15 +709,19 @@ PetscErrorCode RegisterSWERHSJacobian(RDy rdy) {
                "sparsity pattern does not cover the MUSCL stencil on non-simplicial cells");
   }
 
-  PetscCall(DMCreateMatrix(rdy->dm, &rdy->rhs_jac));
-  PetscCall(PetscObjectSetName((PetscObject)rdy->rhs_jac, "swe_rhs_jacobian"));
-  PetscCall(MatSetOption(rdy->rhs_jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-
   switch (rdy->config.numerics.jacobian) {
     case JACOBIAN_FD:
+      // FD coloring works from the DM's closure-adjacency pattern (a superset
+      // of the FV edge pattern -- and the full MUSCL stencil on triangles)
+      PetscCall(DMCreateMatrix(rdy->dm, &rdy->rhs_jac));
+      PetscCall(PetscObjectSetName((PetscObject)rdy->rhs_jac, "swe_rhs_jacobian"));
+      PetscCall(MatSetOption(rdy->rhs_jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
       PetscCall(TSSetRHSJacobian(rdy->ts, rdy->rhs_jac, rdy->rhs_jac, SWERHSJacobianFD, rdy));
       break;
     case JACOBIAN_ANALYTIC:
+      // exact FV pattern, COO-preallocated (see CreateAnalyticJacobianCOO)
+      PetscCall(CreateAnalyticJacobianCOO(rdy));
+      PetscCall(PetscObjectSetName((PetscObject)rdy->rhs_jac, "swe_rhs_jacobian"));
       PetscCall(TSSetRHSJacobian(rdy->ts, rdy->rhs_jac, rdy->rhs_jac, SWERHSJacobianAnalytic, rdy));
       break;
     default:
@@ -618,6 +748,7 @@ PetscErrorCode DestroySWERHSJacobian(RDy rdy) {
   PetscFunctionBegin;
   if (rdy->rhs_jac_fd_coloring) PetscCall(MatFDColoringDestroy(&rdy->rhs_jac_fd_coloring));
   if (rdy->rhs_jac) PetscCall(MatDestroy(&rdy->rhs_jac));
+  if (rdy->rhs_jac_coo_v) PetscCall(PetscFree(rdy->rhs_jac_coo_v));
   if (rdy->rhs_jac_p) PetscCall(MatDestroy(&rdy->rhs_jac_p));
   if (rdy->imex_ijac) PetscCall(MatDestroy(&rdy->imex_ijac));
   if (rdy->imex_jacp_rhs) PetscCall(MatDestroy(&rdy->imex_jacp_rhs));

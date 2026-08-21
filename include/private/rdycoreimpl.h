@@ -222,6 +222,13 @@ struct _p_RDy {
   MatFDColoring rhs_jac_fd_coloring;
   // time at which the RHS Jacobian was requested (used by the FD wrapper)
   PetscReal rhs_jac_time;
+  // COO assembly buffers for the analytic RHS Jacobian: the sparsity pattern
+  // is fixed by mesh topology (4 blocks per interior edge + boundary and
+  // source diagonal blocks), so it is registered once with
+  // MatSetPreallocationCOO and each assembly fills rhs_jac_coo_v and makes a
+  // single MatSetValuesCOO call (state-dependent skips write zero blocks)
+  PetscScalar *rhs_jac_coo_v;
+  PetscCount   rhs_jac_ncoo;
   // parameter Jacobian df/dn (n = per-cell Manning coefficient); allocated
   // alongside rhs_jac -- two nonzeros per cell (the momentum rows)
   Mat rhs_jac_p;
