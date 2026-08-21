@@ -26,6 +26,10 @@
 
 #include "swe_roe_flux_jacobian_petsc.h"
 
+#if RDY_HAVE_KOKKOS_JACOBIAN
+#include "swe_jacobian_kokkos.h"
+#endif
+
 // Wrapper with the calling convention MatFDColoringApply expects for its
 // function: the "sctx" slot carries the TS, and the user context carries the
 // RDy instance, whose rhs_jac_time field holds the time at which the TS
@@ -228,6 +232,143 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   // mode-independent
   rdy->rhs_jac_ncoo = 9 * nblocks;
   PetscCall(PetscMalloc1(rdy->rhs_jac_ncoo, &rdy->rhs_jac_coo_v));
+
+#if RDY_HAVE_KOKKOS_JACOBIAN
+  // Kokkos matrix type: build the device-assembly context (P3). The packing
+  // replays the fill loops once more, recording for every interior edge,
+  // boundary edge, and owned cell its scalar OFFSET into the values buffer,
+  // so the device kernels write in exactly the host loop's order.
+  {
+    MatType type;
+    PetscCall(MatGetType(rdy->rhs_jac, &type));
+    if (strstr(type, "kokkos")) {
+      SWEJacobianKokkosSetup s = {0};
+
+      PetscInt  *e_l, *e_r, *e_owned, *e_off, *b_cell, *b_type, *b_off, *c_id, *c_owned, *c_off;
+      PetscReal *e_sn, *e_cn, *e_wl, *e_wr, *b_sn, *b_cn, *b_wl, *c_dzdx, *c_dzdy;
+      PetscInt   n_e = 0, n_b = 0, n_c = 0;
+      PetscCall(PetscMalloc4(mesh->num_internal_edges, &e_l, mesh->num_internal_edges, &e_r, mesh->num_internal_edges, &e_owned,
+                             mesh->num_internal_edges, &e_off));
+      PetscCall(PetscMalloc4(mesh->num_internal_edges, &e_sn, mesh->num_internal_edges, &e_cn, mesh->num_internal_edges, &e_wl,
+                             mesh->num_internal_edges, &e_wr));
+
+      PetscCount voff = 0;
+      for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
+        PetscInt edge_id = edges->internal_edge_ids[e];
+        PetscInt l       = edges->cell_ids[2 * edge_id];
+        PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+        if (r == -1) continue;
+        PetscInt owned = (cells->is_owned[l] ? 1 : 0) | (cells->is_owned[r] ? 2 : 0);
+        if (!owned) continue;  // writes nothing: skip on device
+        PetscReal len = edges->lengths[edge_id];
+        e_l[n_e]      = l;
+        e_r[n_e]      = r;
+        e_owned[n_e]  = owned;
+        e_off[n_e]    = (PetscInt)voff;
+        e_sn[n_e]     = edges->sn[edge_id];
+        e_cn[n_e]     = edges->cn[edge_id];
+        e_wl[n_e]     = -len / cells->areas[l];
+        e_wr[n_e]     = len / cells->areas[r];
+        ++n_e;
+        voff += 9 * (2 * ((owned & 1) != 0) + 2 * ((owned & 2) != 0));
+      }
+
+      // flattened boundary edges + the (boundary, edge) back-map for the
+      // per-assembly Dirichlet gather
+      PetscInt total_bedges = 0;
+      for (PetscInt b = 0; b < rdy->num_boundaries; ++b) total_bedges += rdy->boundaries[b].num_edges;
+      PetscCall(PetscMalloc3(total_bedges, &b_cell, total_bedges, &b_type, total_bedges, &b_off));
+      PetscCall(PetscMalloc3(total_bedges, &b_sn, total_bedges, &b_cn, total_bedges, &b_wl));
+      PetscCall(PetscMalloc2(total_bedges, &rdy->rhs_jac_bedge_bnd, total_bedges, &rdy->rhs_jac_bedge_idx));
+      for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+        RDyBoundary      boundary = rdy->boundaries[b];
+        RDyConditionType bc_type  = rdy->boundary_conditions[b].flow->type;
+        for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+          PetscInt edge_id = boundary.edge_ids[e];
+          PetscInt l       = edges->cell_ids[2 * edge_id];
+          if (!cells->is_owned[l]) continue;
+          PetscReal len = edges->lengths[edge_id];
+          b_cell[n_b]   = l;
+          b_type[n_b]   = (bc_type == CONDITION_DIRICHLET)  ? SWE_JK_BC_DIRICHLET
+                          : (bc_type == CONDITION_REFLECTING) ? SWE_JK_BC_REFLECTING
+                                                              : SWE_JK_BC_CRITICAL_OUTFLOW;
+          b_off[n_b]    = (PetscInt)voff;
+          b_sn[n_b]     = edges->sn[edge_id];
+          b_cn[n_b]     = edges->cn[edge_id];
+          b_wl[n_b]     = -len / cells->areas[l];
+
+          rdy->rhs_jac_bedge_bnd[n_b] = b;
+          rdy->rhs_jac_bedge_idx[n_b] = e;
+          ++n_b;
+          voff += 9;
+        }
+      }
+
+      PetscCall(PetscMalloc3(mesh->num_cells, &c_id, mesh->num_cells, &c_owned, mesh->num_cells, &c_off));
+      PetscCall(PetscMalloc2(mesh->num_cells, &c_dzdx, mesh->num_cells, &c_dzdy));
+      for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+        if (!cells->is_owned[c]) continue;
+        c_id[n_c]    = c;
+        c_owned[n_c] = cells->local_to_owned[c];
+        c_off[n_c]   = (PetscInt)voff;
+        c_dzdx[n_c]  = cells->dz_dx[c];
+        c_dzdy[n_c]  = cells->dz_dy[c];
+        ++n_c;
+        voff += 9;
+      }
+      PetscCheck(voff == rdy->rhs_jac_ncoo, rdy->comm, PETSC_ERR_PLIB, "device-assembly offset replay mismatch: %" PetscCount_FMT " != %" PetscCount_FMT,
+                 voff, rdy->rhs_jac_ncoo);
+
+      PetscInt matprop_len;
+      PetscCall(VecGetLocalSize(rdy->operator->petsc.material_properties, &matprop_len));
+
+      s.n_edges         = n_e;
+      s.edge_l          = e_l;
+      s.edge_r          = e_r;
+      s.edge_owned      = e_owned;
+      s.edge_offset     = e_off;
+      s.edge_sn         = e_sn;
+      s.edge_cn         = e_cn;
+      s.edge_wl         = e_wl;
+      s.edge_wr         = e_wr;
+      s.n_bedges        = n_b;
+      s.bedge_cell      = b_cell;
+      s.bedge_type      = b_type;
+      s.bedge_offset    = b_off;
+      s.bedge_sn        = b_sn;
+      s.bedge_cn        = b_cn;
+      s.bedge_wl        = b_wl;
+      s.n_cells         = n_c;
+      s.cell_id         = c_id;
+      s.cell_owned_idx  = c_owned;
+      s.cell_offset     = c_off;
+      s.cell_dzdx       = c_dzdx;
+      s.cell_dzdy       = c_dzdy;
+      s.ncoo            = (PetscInt)rdy->rhs_jac_ncoo;
+      s.n_u_local       = 3 * mesh->num_cells;
+      s.matprop_len     = matprop_len;
+      s.matprop_stride  = NUM_MATERIAL_PROPERTIES;
+      s.matprop_manning = MATERIAL_PROPERTY_MANNINGS;
+      s.tiny_h          = rdy->config.physics.flow.tiny_h;
+      s.h_anuga         = rdy->config.physics.flow.h_anuga_regular;
+      s.friction_in_rhs = (rdy->config.physics.flow.source.method == SOURCE_EXPLICIT) ? PETSC_TRUE : PETSC_FALSE;
+
+      SWEJacobianKokkos *jk;
+      PetscCall(SWEJacobianKokkosCreate(&s, &jk));
+      PetscCall(PetscInfo(rdy->rhs_jac, "SWE analytic Jacobian: Kokkos device assembly enabled (%" PetscInt_FMT " edges, %" PetscInt_FMT " boundary edges, %" PetscInt_FMT " cells)\n", n_e, n_b, n_c));
+      rdy->rhs_jac_kokkos   = jk;
+      rdy->rhs_jac_n_bedges = n_b;
+      PetscCall(PetscCalloc1(3 * (n_b > 0 ? n_b : 1), &rdy->rhs_jac_dirichlet));
+
+      PetscCall(PetscFree4(e_l, e_r, e_owned, e_off));
+      PetscCall(PetscFree4(e_sn, e_cn, e_wl, e_wr));
+      PetscCall(PetscFree3(b_cell, b_type, b_off));
+      PetscCall(PetscFree3(b_sn, b_cn, b_wl));
+      PetscCall(PetscFree3(c_id, c_owned, c_off));
+      PetscCall(PetscFree2(c_dzdx, c_dzdy));
+    }
+  }
+#endif
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -263,6 +404,47 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
   PetscCall(DMGetLocalVector(rdy->dm, &u_local));
   PetscCall(DMGlobalToLocalBegin(rdy->dm, u_global, INSERT_VALUES, u_local));
   PetscCall(DMGlobalToLocalEnd(rdy->dm, u_global, INSERT_VALUES, u_local));
+
+#if RDY_HAVE_KOKKOS_JACOBIAN
+  // device assembly (P3): the kernels fill the COO values buffer on device
+  // (kokkos vec types hand over device pointers with no transfer; host
+  // pointers are staged) and MatSetValuesCOO consumes the device pointer.
+  // Only the Dirichlet ghost states cross to the host staging buffer.
+  if (rdy->rhs_jac_kokkos) {
+    PetscCall(PetscInfo(P, "SWE analytic Jacobian: device assembly\n"));
+    const PetscScalar *u_dev, *mp_ptr, *v_dev;
+    PetscMemType       u_memtype, mp_memtype;
+    PetscCall(VecGetArrayReadAndMemType(u_local, &u_dev, &u_memtype));
+    PetscCall(VecGetArrayReadAndMemType(rdy->operator->petsc.material_properties, &mp_ptr, &mp_memtype));
+
+    // gather Dirichlet ghost triples for the flattened boundary-edge list
+    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
+      if (rdy->boundary_conditions[b].flow->type != CONDITION_DIRICHLET) continue;
+      const PetscScalar *bv_ptr;
+      PetscCall(VecGetArrayRead(rdy->operator->petsc.boundary_values[b], &bv_ptr));
+      for (PetscInt k = 0; k < rdy->rhs_jac_n_bedges; ++k) {
+        if (rdy->rhs_jac_bedge_bnd[k] != b) continue;
+        PetscInt e = rdy->rhs_jac_bedge_idx[k];
+        for (PetscInt m = 0; m < 3; ++m) rdy->rhs_jac_dirichlet[3 * k + m] = bv_ptr[3 * e + m];
+      }
+      PetscCall(VecRestoreArrayRead(rdy->operator->petsc.boundary_values[b], &bv_ptr));
+    }
+
+    PetscCall(SWEJacobianKokkosAssemble(rdy->rhs_jac_kokkos, u_dev, u_memtype, mp_ptr, mp_memtype, rdy->rhs_jac_dirichlet, &v_dev));
+
+    PetscCall(VecRestoreArrayReadAndMemType(rdy->operator->petsc.material_properties, &mp_ptr));
+    PetscCall(VecRestoreArrayReadAndMemType(u_local, &u_dev));
+    PetscCall(DMRestoreLocalVector(rdy->dm, &u_local));
+
+    PetscCall(MatSetValuesCOO(P, v_dev, INSERT_VALUES));
+    if (J != P) {
+      PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
+    }
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+#endif
+
   const PetscScalar *u_ptr;
   PetscCall(VecGetArrayRead(u_local, &u_ptr));
 
@@ -793,6 +975,15 @@ PetscErrorCode DestroySWERHSJacobian(RDy rdy) {
   if (rdy->rhs_jac_fd_coloring) PetscCall(MatFDColoringDestroy(&rdy->rhs_jac_fd_coloring));
   if (rdy->rhs_jac) PetscCall(MatDestroy(&rdy->rhs_jac));
   if (rdy->rhs_jac_coo_v) PetscCall(PetscFree(rdy->rhs_jac_coo_v));
+#if RDY_HAVE_KOKKOS_JACOBIAN
+  if (rdy->rhs_jac_kokkos) {
+    SWEJacobianKokkos *jk = rdy->rhs_jac_kokkos;
+    PetscCall(SWEJacobianKokkosDestroy(&jk));
+    rdy->rhs_jac_kokkos = NULL;
+    PetscCall(PetscFree2(rdy->rhs_jac_bedge_bnd, rdy->rhs_jac_bedge_idx));
+    PetscCall(PetscFree(rdy->rhs_jac_dirichlet));
+  }
+#endif
   if (rdy->rhs_jac_p) PetscCall(MatDestroy(&rdy->rhs_jac_p));
   if (rdy->imex_ijac) PetscCall(MatDestroy(&rdy->imex_ijac));
   if (rdy->imex_jacp_rhs) PetscCall(MatDestroy(&rdy->imex_jacp_rhs));

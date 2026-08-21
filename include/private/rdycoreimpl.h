@@ -229,6 +229,14 @@ struct _p_RDy {
   // single MatSetValuesCOO call (state-dependent skips write zero blocks)
   PetscScalar *rhs_jac_coo_v;
   PetscCount   rhs_jac_ncoo;
+  // Kokkos device-assembly context for the analytic Jacobian (NULL when the
+  // matrix is not a Kokkos type or PETSc lacks Kokkos); the bedge arrays map
+  // the flattened boundary-edge list back to (boundary, edge) for gathering
+  // Dirichlet values into the host staging buffer each assembly
+  void        *rhs_jac_kokkos;
+  PetscInt     rhs_jac_n_bedges;
+  PetscInt    *rhs_jac_bedge_bnd, *rhs_jac_bedge_idx;
+  PetscScalar *rhs_jac_dirichlet;
   // parameter Jacobian df/dn (n = per-cell Manning coefficient); allocated
   // alongside rhs_jac -- two nonzeros per cell (the momentum rows)
   Mat rhs_jac_p;

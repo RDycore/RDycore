@@ -23,4 +23,8 @@
 // matrix types -- the petsc-claude fork; 0 for upstream PETSc)
 #define RDY_HAVE_MAT_COO_BLOCK_INDICES @RDY_HAVE_MAT_COO_BLOCK_INDICES@
 
+// 1 if PETSc is built with Kokkos: the SWE analytic Jacobian can assemble its
+// COO values buffer on device (swe_jacobian_kokkos.kokkos.cxx)
+#define RDY_HAVE_KOKKOS_JACOBIAN @RDY_HAVE_KOKKOS_JACOBIAN@
+
 #endif
