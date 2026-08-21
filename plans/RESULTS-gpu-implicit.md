@@ -177,3 +177,50 @@ usol.*.bin, compare_traj.py.
 - CPU JacEval 80.1 s is the P3 target: values are still host-computed
   (flux-tangent loop + DMGlobalToLocal + upload). P3 moves the fill to a
   device kernel over the precomputed COO offsets.
+
+## P3 GATE: PASSED (2026-08-21) -- device assembly
+
+Implementation (commit 375b9067 + this log): swe_jacobian_kokkos.kokkos.cxx
+fills the COO values buffer on device (interior-edge, boundary-edge, and
+cell kernels writing at setup-precomputed offsets; math shared verbatim
+with the host loop via RDY_MATH_FN); MatSetValuesCOO consumes the device
+pointer. TU compiled by PETSc's .kokkos.cxx rule (nvcc_wrapper) driven
+from CMake (src/swe/kokkos_compile.mk); host loop kept for non-Kokkos
+types. Laptop FD gates: jacobian_global FD-limited & digit-identical to
+host assembly, np 1/2, device path PetscInfo-confirmed; full BEULER
+solves 40/40 np 1/2/4; ctest 14/14; host adjoint gates unchanged.
+
+PM A/B (dt=1 x20, protocol of the P2 table; trajectory BIT-IDENTICAL to
+the P2 device runs, rel diff 2.3e-16; same 20 snes / 717 lin its):
+
+| SNESJacobianEval (103) | total  | per-assembly |
+|------------------------|--------|--------------|
+| CPU (P1 COO)           | 80.1 s | 0.78 s       |
+| P2 baijkokkos n64      | 8.9 s  | 86 ms        |
+| P3 baijkokkos n64      | 1.86 s | 18 ms        |
+| P3 aijkokkos n64       | 1.53 s | 15 ms        |
+| P3 baijkokkos n4       | 0.35 s | 3.4 ms       |
+
+- The charter's A/B target (0.77 s/assembly P1 baseline): 226x faster
+  per assembly at n4, 43x at n64. JacEval GPU %F = 100, ZERO CpuToGpu in
+  the event (only Dirichlet ghosts + material props are staged, ~KBs).
+- MatSetValuesCOO: 4.5 s (P2 host upload) -> 14 ms (device pointer).
+- SNESSolve n64: 116.7 (CPU) -> 29.5 (P2) -> 22.0 s (P3). At n4: 29.1 s,
+  now dominated by TSFunctionEval 21.6 s = the HOST RHS physics on 4
+  ranks -- the remaining host component (stays host per charter: no CEED
+  entanglement; at n64 it spreads to 3.6 s).
+- Known limitation (recorded in the P3 commit): TSAdjoint with kokkos VEC
+  types hangs in trajectory machinery -- adjoint stays on host types per
+  the charter invariant (forward-solve-first).
+- Batch job 57369566 cancelled as redundant (all gate data collected via
+  interactive runs).
+
+## P4 status: BLOCKED on the dt>=5 nonlinear robustness question
+
+Charter prerequisite not met: the other agent's morning runs show the
+FIRST Newton linear solve diverging at dt=5 (300 its, pbjacobi, basic LS)
+-- a linear-solver hardness problem upstream of the line-search question.
+P4's device-GAMG parameter menu waits for that CPU-side resolution.
+Useful P4 prep that can proceed: device GAMG machinery validation at dt=1
+(PtAP/smoother path), and the delegated cudss-on-CUDA-13 job for the
+coarse solve.
