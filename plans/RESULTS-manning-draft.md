@@ -607,3 +607,31 @@ baseline; beuler dt=1,5,15,30 x 20 steps (snes_max_it 50,
 ksp_max_it 1000, -snes_ksp_ew, converged reasons, log_view); gamg
 variants at dt=15,30. Existing PM repos (~/Codes/petsc on
 adams/mat-cudss, ~/Codes/rdycore on a57c42e) untouched.
+
+## GAMG study queued on the petsc-claude stack (2026-08-20 night)
+
+Real-gauge-geometry twin (paper): 17 USGS gauge cells, Houston 1 km,
+beta 1e-4, 1000 its -> J falls 2.1e7x (perfect data fit) but recovery
+only 44.9% (np=1; np=6 gave 45.4%) with both bounds saturated -- the
+real network cannot support per-cell estimation; class calibration is
+the real-data configuration. In the paper as the 4th figure panel
+(-adjoint_gauge_cells_file + gauge_cells_real17.txt).
+
+Perlmutter second stack for the dt=15/30 GAMG solver study, per Mark:
+his sandbox ~/Codes/petsc-claude (BAIJ-GAMG main line). Its stale
+block-diagonal cache fix existed only as UNCOMMITTED working-tree
+changes on PM; landed properly as commits ac2b27020b9 + 2c762d1cd42
+(cherry-picked from adams/fix-invert-block-diagonal-stale-cache via
+bundle) + 5d7d9997275 (Mark's main-line kokkos/ex322 adaptations,
+recovered from login29:/tmp -- NOTE: PM /tmp is per-login-node, use
+$HOME). PM petsc-claude main is now AHEAD of the laptop copy.
+CPU arch arch-perlmutter-claude-O: PM auto-loads cudatoolkit and the
+sandbox build then tries to CUDAC-compile agg_device.cuda.cu even with
+--with-cuda=0 -- must `module unload cudatoolkit gpu` before configure.
+RDycore build: ~/Codes/rdycore-manning/build-claude.
+
+Jobs on m1516_g: 57325605 (baseline dt sweep, petsc-rdycore stack) and
+57335153 (GAMG study: dt 15/30 x nsmooths 0/1 x aggressive 0/1 x
+{richardson,gmres(4)}+pbjacobi smoothers, fgmres outer, vs bjacobi
+ref; 5 steps each, srun -t 18:00 caps). The pbjacobi smoothers also
+exercise the freshly landed stale-cache fix.
