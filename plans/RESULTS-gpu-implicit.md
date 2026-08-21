@@ -224,3 +224,25 @@ P4's device-GAMG parameter menu waits for that CPU-side resolution.
 Useful P4 prep that can proceed: device GAMG machinery validation at dt=1
 (PtAP/smoother path), and the delegated cudss-on-CUDA-13 job for the
 coarse solve.
+
+### P4 prep: device GAMG machinery validation at dt=1 (n4, baijkokkos)
+
+Config: fgmres + gamg, gmres(4)+pbjacobi smoothers, nsmooths {0,1},
+aggressive_coarsening 0, coarse solve host LU (cudss pending), NO other
+gamg tuning. Logs: $SCRATCH/gpu-implicit/p4prep_gamg{0,1}_n4.log.
+
+- WORKS end-to-end: 20/20 Newton both variants, 206 total linear its
+  (pbjacobi: 717 -- GAMG already cuts iterations 3.5x at dt=1).
+- Device PtAP validated under per-Newton reassembly: PtAPSymbolic once
+  (14 products, 0.57 s), PtAPNumeric re-run 1442x in 1.63 s; the
+  Galerkin products show ~zero transfers.
+- SNESSolve 41.4/38.9 s vs pbjacobi's 29.1 at n4 -- GAMG loses at dt=1
+  as expected (easy problem); the machinery, not the crown, was the point.
+- FINDING for P4: PCSetUp moves ~82 MB/setup EACH WAY (8.5 GB per run,
+  1484 transfers) and PCApply logs GPU %F ~10 -- some hierarchy stage
+  still host-resident with the BARE option set. The elasticity canon adds
+  -pc_gamg_threshold 0.05 -pc_gamg_threshold_scale 0.5
+  -pc_gamg_prolongator_filter 0.03 -pc_gamg_aggressive_coarsening 1
+  -pc_gamg_process_eq_limit 1000; first move when P4 unblocks is to rerun
+  with the canon set + chase the remaining transfers (and wire cudss for
+  the coarse solve -- delegated).
