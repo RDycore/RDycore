@@ -533,19 +533,25 @@ as follow-on work.
 
 \begin{figure}
 \centering
-\includegraphics[width=0.32\linewidth]{houston_manning_300it.png}
-\includegraphics[width=0.32\linewidth]{houston_manning_2000it.png}
-\includegraphics[width=0.32\linewidth]{houston_manning_reg.png}
-\caption{Regularization and semiconvergence on the Houston twin
-(2{,}746 parameters; truth: $n = 0.03$ west, $n = 0.06$ east of the
-midline; implicit stepping, 14 observation times). Left: weak
-regularization ($\beta = 10^{-5}$, 343 gauges) stopped early at 300
-iterations --- $26.3\%$ error. Center: the same setup run to 2000
-iterations --- the misfit is lower but the field drifts along
-unobserved directions to $38.0\%$ error and saturates the bounds
-$[0.01, 0.2]$. Right: proper Tikhonov weight ($\beta = 10^{-4}$, 686
-gauges), 1000 iterations --- $19.4\%$ error, no drift, sharp zone
-boundary.}
+\includegraphics[width=0.24\linewidth]{houston_manning_300it.png}
+\includegraphics[width=0.24\linewidth]{houston_manning_2000it.png}
+\includegraphics[width=0.24\linewidth]{houston_manning_reg.png}
+\includegraphics[width=0.24\linewidth]{houston_manning_real17.png}
+\caption{Regularization, semiconvergence, and network density on the
+Houston twin (2{,}746 parameters; truth: $n = 0.03$ west, $n = 0.06$
+east of the midline; implicit stepping, 14 observation times). Far
+left: weak regularization ($\beta = 10^{-5}$, 343 gauges) stopped
+early at 300 iterations --- $26.3\%$ error. Center left: the same
+setup run to 2000 iterations --- the misfit is lower but the field
+drifts along unobserved directions to $38.0\%$ error and saturates the
+bounds $[0.01, 0.2]$. Center right: proper Tikhonov weight
+($\beta = 10^{-4}$, 686 gauges), 1000 iterations --- $19.4\%$ error,
+no drift, sharp zone boundary. Far right: the \emph{real} network ---
+the 17 in-mesh USGS gauges with Harvey stage records, same
+$\beta = 10^{-4}$, 1000 iterations --- the misfit falls
+$2\times10^{7}$-fold while the field recovers to only $44.9\%$: no
+trace of the two-zone truth, near-prior almost everywhere with
+null-space structure pinned against both bounds.}
 \label{fig:map}
 \end{figure} \paragraph{The real gauge network.}
 The synthetic gauge sets above are a controlled ramp; the network that
@@ -556,9 +562,8 @@ the same twin with the observation operator built at those seventeen
 gauge cells --- 238 observations (17 gauges $\times$ 14 times) against
 2{,}746 parameters --- is a sobering experiment: BLMVM drives the
 misfit down by a factor of $2\times10^{7}$, an essentially perfect fit
-of the observations, while the recovered field is $45.4\%$ from the
-truth and pinned against the bounds in places
-($n \in [0.010, 0.171]$). This is semiconvergence in its purest form:
+of the observations, while the recovered field is $44.9\%$ from the
+truth and saturates both bounds (Figure~\ref{fig:map}, far right). This is semiconvergence in its purest form:
 the real network's null space is so large that data fit says almost
 nothing about parameter recovery, and no Tikhonov weight or stopping
 rule rescues a per-cell field from 238 observations. The practical
