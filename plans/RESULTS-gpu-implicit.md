@@ -316,3 +316,51 @@ Decisions from the review:
   verification (MatMultTranspose on baijkokkos exists in the fork). Once
   trajectory works, the adjoint's assemblies get the P3 device path for
   free.
+
+## B1 -- device RHS (session 2, 2026-08-21): laptop gates PASSED
+
+Implementation (this commit): the PETSc-backend SWE RHS (interior flux +
+boundary flux + source) runs in Kokkos kernels that REUSE the P3 Jacobian
+context's geometry views (swe_jacobian_kokkos.kokkos.cxx gains SetupRHS/
+ApplyFlux/ApplySource; no duplicated tables). Key pieces:
+
+- swe_roe_flux_petsc.h converted with the RDY_MATH_FN pattern (071257a4
+  style): ComputeSWERoeEigenspectrum -> void, new per-edge
+  ComputeSWERoeFluxEdge + ComputeSWERiemannVelocity; the host array wrapper
+  keeps its signature, so every host caller (explicit, MUSCL, HR, tracer)
+  is source- and bitwise-unchanged.
+- Determinism: per-edge flux kernels write an edge-indexed buffer; a
+  per-owned-cell gather kernel accumulates in EXACTLY the host loops'
+  order (interior edges by ascending index, then boundary edges), built as
+  a CSR at setup. Device sums are bitwise identical to the host RHS.
+- Boundary fluxes: raw per-edge fluxes are D2H-copied (O(surface)) into
+  the per-boundary vecs each eval and accumulated as before (time-series
+  semantics preserved; non-owned entries -- never read -- stay zero).
+- Courant diagnostics via a MaxLoc reduction over amax*len/min(A) with
+  host-side id resolution (same update rule; per-eval reset unchanged).
+- Sources/material props: host seq vecs staged to device with
+  PetscObjectState change tracking (upload only when forcing updates, not
+  per eval). Dirichlet ghosts reuse the Jacobian's staging buffer.
+- Wiring: CreateAnalyticJacobianCOO attaches SWERHSKokkosData to
+  Operator.petsc when config is eligible (SWE, no sediment, non-HR, Roe,
+  first-order, source explicit|ark_imex); ApplyPetscOperator dispatches to
+  ApplySWEPetscOperatorsKokkos when the state Vec is a Kokkos type,
+  mirroring the flux -> flux_divergence copy -> source sequence. CEED path
+  untouched. `-swe_rhs_kokkos false` keeps the host RHS with device
+  matrices/vecs (the A/B baseline that isolates the RHS delta).
+
+Laptop gates (arch-macosx-gnu-rdycore-kokkos-O, host Kokkos):
+- ctest adjoint|calibrate|jacobian: 14/14; swe tests minus cgns: 97/97
+  (the 6 swe_roe cgns tests fail PRE-EXISTINGLY: this arch has no CGNS --
+  "Unknown PetscViewer type: cgns").
+- Bitwise A/B (same baijkokkos+kokkos-vec linear algebra, host RHS vs
+  device RHS): adjoint_beuler (reflecting BCs), a dirichlet +
+  critical-outflow variant, and adjoint_arkimex -- trajectories
+  BIT-IDENTICAL (cmp) at np 1 and 2; np 4 beuler solve 40/40.
+- NB an earlier aij-vs-baijkokkos comparison showed 2e-6 rel diffs -- that
+  is the LINEAR ALGEBRA delta (different MatMult/dot rounding), present
+  with the host RHS too; the -swe_rhs_kokkos A/B isolates the RHS proper.
+
+PM gate (pending): dt=1 x20 Turning protocol, trajectory twin vs P3 dumps,
+TSFunctionEval GPU %F = 100, no per-eval GpuToCpu of the state, n4
+SNESSolve ~7.5 s expected.

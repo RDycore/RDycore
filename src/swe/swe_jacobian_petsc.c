@@ -244,13 +244,14 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
     if (strstr(type, "kokkos")) {
       SWEJacobianKokkosSetup s = {0};
 
-      PetscInt  *e_l, *e_r, *e_owned, *e_off, *b_cell, *b_type, *b_off, *c_id, *c_owned, *c_off;
+      PetscInt  *e_l, *e_r, *e_owned, *e_off, *e_id, *b_cell, *b_type, *b_off, *c_id, *c_owned, *c_off;
       PetscReal *e_sn, *e_cn, *e_wl, *e_wr, *b_sn, *b_cn, *b_wl, *c_dzdx, *c_dzdy;
       PetscInt   n_e = 0, n_b = 0, n_c = 0;
       PetscCall(PetscMalloc4(mesh->num_internal_edges, &e_l, mesh->num_internal_edges, &e_r, mesh->num_internal_edges, &e_owned,
                              mesh->num_internal_edges, &e_off));
       PetscCall(PetscMalloc4(mesh->num_internal_edges, &e_sn, mesh->num_internal_edges, &e_cn, mesh->num_internal_edges, &e_wl,
                              mesh->num_internal_edges, &e_wr));
+      PetscCall(PetscMalloc1(mesh->num_internal_edges, &e_id));  // mesh edge ids, kept for RHS Courant diagnostics
 
       PetscCount voff = 0;
       for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
@@ -261,6 +262,7 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
         PetscInt owned = (cells->is_owned[l] ? 1 : 0) | (cells->is_owned[r] ? 2 : 0);
         if (!owned) continue;  // writes nothing: skip on device
         PetscReal len = edges->lengths[edge_id];
+        e_id[n_e]     = edge_id;
         e_l[n_e]      = l;
         e_r[n_e]      = r;
         e_owned[n_e]  = owned;
@@ -360,8 +362,101 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
       rdy->rhs_jac_n_bedges = n_b;
       PetscCall(PetscCalloc1(3 * (n_b > 0 ? n_b : 1), &rdy->rhs_jac_dirichlet));
 
+      // Device RHS (B1): when the configuration matches the paths the device
+      // kernels implement (first-order Roe fluxes, explicit or ARK-IMEX
+      // sources, no HR, no sediment), build the per-owned-cell gather CSR --
+      // interior edges by ascending compact index, then boundary edges, i.e.
+      // exactly the host loops' accumulation order, so device sums are
+      // bitwise identical -- and attach the RHS bookkeeping to the operator.
+      // ApplyPetscOperator dispatches to it when the state Vec is a Kokkos
+      // type; anything else keeps the host composite operators.
+      {
+        RDyFlowSourceMethod src_method = rdy->config.physics.flow.source.method;
+
+        PetscBool rhs_ok = (rdy->config.physics.flow.mode == FLOW_SWE) && (rdy->config.physics.sediment.num_classes == 0) &&
+                           (rdy->config.physics.flow.well_balancing != WELL_BALANCING_HR) && (rdy->config.numerics.riemann == RIEMANN_ROE) &&
+                           !rdy->config.numerics.second_order && (src_method == SOURCE_EXPLICIT || src_method == SOURCE_ARK_IMEX);
+        // -swe_rhs_kokkos false keeps the host RHS with device matrices/vecs
+        // (A/B baseline: isolates the RHS delta from the linear algebra)
+        PetscBool rhs_enabled = PETSC_TRUE;
+        PetscCall(PetscOptionsGetBool(NULL, NULL, "-swe_rhs_kokkos", &rhs_enabled, NULL));
+        if (rhs_ok && rhs_enabled) {
+          // inverse map: ghosted local cell id -> owned-cell list index
+          PetscInt *cell_ci, *gstart, *gidx, *gcur;
+          PetscReal *gw;
+          PetscCall(PetscMalloc1(mesh->num_cells, &cell_ci));
+          for (PetscInt c = 0; c < mesh->num_cells; ++c) cell_ci[c] = -1;
+          for (PetscInt ci = 0; ci < n_c; ++ci) cell_ci[c_id[ci]] = ci;
+
+          PetscCall(PetscCalloc1(n_c + 1, &gstart));
+          for (PetscInt k = 0; k < n_e; ++k) {
+            if (e_owned[k] & 1) ++gstart[cell_ci[e_l[k]] + 1];
+            if (e_owned[k] & 2) ++gstart[cell_ci[e_r[k]] + 1];
+          }
+          for (PetscInt m = 0; m < n_b; ++m) ++gstart[cell_ci[b_cell[m]] + 1];
+          for (PetscInt ci = 0; ci < n_c; ++ci) gstart[ci + 1] += gstart[ci];
+          PetscInt n_gather = gstart[n_c];
+
+          PetscCall(PetscMalloc3(n_gather, &gidx, n_gather, &gw, n_c, &gcur));
+          for (PetscInt ci = 0; ci < n_c; ++ci) gcur[ci] = gstart[ci];
+          for (PetscInt k = 0; k < n_e; ++k) {
+            if (e_owned[k] & 1) {
+              PetscInt ci = cell_ci[e_l[k]];
+              gidx[gcur[ci]] = k;
+              gw[gcur[ci]]   = e_wl[k];
+              ++gcur[ci];
+            }
+            if (e_owned[k] & 2) {
+              PetscInt ci = cell_ci[e_r[k]];
+              gidx[gcur[ci]] = k;
+              gw[gcur[ci]]   = e_wr[k];
+              ++gcur[ci];
+            }
+          }
+          for (PetscInt m = 0; m < n_b; ++m) {
+            PetscInt ci = cell_ci[b_cell[m]];
+            gidx[gcur[ci]] = n_e + m;
+            gw[gcur[ci]]   = b_wl[m];
+            ++gcur[ci];
+          }
+
+          PetscInt src_len;
+          PetscCall(VecGetLocalSize(rdy->operator->petsc.external_sources, &src_len));
+
+          SWERHSKokkosSetup rs = {
+              .n_gather      = n_gather,
+              .gather_start  = gstart,
+              .gather_idx    = gidx,
+              .gather_w      = gw,
+              .source_method = (src_method == SOURCE_EXPLICIT) ? 0 : 1,
+              .src_len       = src_len,
+          };
+          PetscCall(SWEKokkosSetupRHS(jk, &rs));
+
+          SWERHSKokkosData *rk;
+          PetscCall(PetscCalloc1(1, &rk));
+          rk->kokkos    = jk;
+          rk->n_edges   = n_e;
+          rk->n_bedges  = n_b;
+          rk->edge_id   = e_id;  // ownership transferred (freed in DestroySWERHSJacobian)
+          rk->bedge_bnd = rdy->rhs_jac_bedge_bnd;
+          rk->bedge_idx = rdy->rhs_jac_bedge_idx;
+          rk->dirichlet = rdy->rhs_jac_dirichlet;
+          PetscCall(PetscCalloc1(3 * (n_b > 0 ? n_b : 1), &rk->bflux));
+          rdy->swe_rhs_kokkos                    = rk;
+          rdy->operator->petsc.swe_rhs_kokkos = rk;
+          e_id                                   = NULL;
+          PetscCall(PetscInfo(rdy->rhs_jac, "SWE PETSc RHS: Kokkos device apply enabled (%" PetscInt_FMT " gather entries)\n", n_gather));
+
+          PetscCall(PetscFree(cell_ci));
+          PetscCall(PetscFree(gstart));
+          PetscCall(PetscFree3(gidx, gw, gcur));
+        }
+      }
+
       PetscCall(PetscFree4(e_l, e_r, e_owned, e_off));
       PetscCall(PetscFree4(e_sn, e_cn, e_wl, e_wr));
+      PetscCall(PetscFree(e_id));
       PetscCall(PetscFree3(b_cell, b_type, b_off));
       PetscCall(PetscFree3(b_sn, b_cn, b_wl));
       PetscCall(PetscFree3(c_id, c_owned, c_off));
@@ -628,6 +723,132 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+#if RDY_HAVE_KOKKOS_JACOBIAN
+/// Device (Kokkos) application of the composite SWE PETSc operators (B1).
+/// Mirrors ApplyPetscOperator's sequence -- flux operators, flux-divergence
+/// snapshot, source operator -- with the physics in the device kernels of
+/// swe_jacobian_kokkos.kokkos.cxx, which reuse the Jacobian context's
+/// geometry. Engages only when the state Vec is a Kokkos type (so its arrays
+/// live in Kokkos memory space); otherwise sets *applied = PETSC_FALSE and
+/// the caller falls back to the host composite operators.
+PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_local, Vec f_global, PetscBool *applied) {
+  SWERHSKokkosData *rk = op->petsc.swe_rhs_kokkos;
+
+  PetscFunctionBegin;
+  *applied = PETSC_FALSE;
+  VecType vec_type;
+  PetscCall(VecGetType(u_local, &vec_type));
+  if (!strstr(vec_type, "kokkos")) PetscFunctionReturn(PETSC_SUCCESS);
+
+  if (!rk->announced) {
+    PetscCall(PetscInfo(f_global, "SWE PETSc RHS: device apply (%" PetscInt_FMT " interior edges, %" PetscInt_FMT " boundary edges)\n", rk->n_edges,
+                        rk->n_bedges));
+    rk->announced = PETSC_TRUE;
+  }
+
+  // gather Dirichlet ghost triples for the flattened boundary-edge list (the
+  // same staging the Jacobian assembly uses)
+  for (PetscInt b = 0; b < op->num_boundaries; ++b) {
+    if (op->boundary_conditions[b].flow->type != CONDITION_DIRICHLET) continue;
+    const PetscScalar *bv_ptr;
+    PetscCall(VecGetArrayRead(op->petsc.boundary_values[b], &bv_ptr));
+    for (PetscInt k = 0; k < rk->n_bedges; ++k) {
+      if (rk->bedge_bnd[k] != b) continue;
+      PetscInt e = rk->bedge_idx[k];
+      for (PetscInt m = 0; m < 3; ++m) rk->dirichlet[3 * k + m] = bv_ptr[3 * e + m];
+    }
+    PetscCall(VecRestoreArrayRead(op->petsc.boundary_values[b], &bv_ptr));
+  }
+
+  //------------------
+  // Flux Calculation
+  //------------------
+
+  const PetscScalar *u_dev;
+  PetscScalar       *f_dev;
+  PetscReal          cfac_max;
+  PetscInt           cfac_loc;
+  PetscCall(VecGetArrayReadAndMemType(u_local, &u_dev, NULL));
+  PetscCall(VecGetArrayWriteAndMemType(f_global, &f_dev, NULL));
+  PetscCall(SWEKokkosApplyFlux(rk->kokkos, u_dev, rk->dirichlet, f_dev, rk->bflux, &cfac_max, &cfac_loc));
+  PetscCall(VecRestoreArrayWriteAndMemType(f_global, &f_dev));
+
+  // Courant diagnostics (the host loops update these inline; same semantics)
+  if (cfac_loc >= 0) {
+    PetscReal                 cnum = cfac_max * dt;
+    CourantNumberDiagnostics *cd   = &op->diagnostics.courant_number;
+    if (cnum > cd->max_courant_num) {
+      RDyEdges *edges = &op->mesh->edges;
+      RDyCells *cells = &op->mesh->cells;
+      PetscInt  edge_id, global_cell_id;
+      if (cfac_loc < rk->n_edges) {
+        edge_id    = rk->edge_id[cfac_loc];
+        PetscInt l = edges->cell_ids[2 * edge_id], r = edges->cell_ids[2 * edge_id + 1];
+        global_cell_id = (cells->areas[l] < cells->areas[r]) ? cells->global_ids[l] : cells->global_ids[r];
+      } else {
+        PetscInt m     = cfac_loc - rk->n_edges;
+        edge_id        = op->boundaries[rk->bedge_bnd[m]].edge_ids[rk->bedge_idx[m]];
+        global_cell_id = cells->global_ids[edges->cell_ids[2 * edge_id]];
+      }
+      cd->max_courant_num = cnum;
+      cd->global_edge_id  = edges->global_ids[edge_id];
+      cd->global_cell_id  = global_cell_id;
+    }
+  }
+
+  // scatter the raw boundary fluxes into the per-boundary vecs (owned edges;
+  // non-owned entries are never read downstream) and accumulate, mirroring
+  // ApplyBoundaryFlux
+  {
+    PetscInt k = 0;
+    for (PetscInt b = 0; b < op->num_boundaries; ++b) {
+      if (rk->n_bedges) {
+        PetscScalar *bf_ptr;
+        PetscCall(VecGetArray(op->petsc.boundary_fluxes[b], &bf_ptr));
+        for (; k < rk->n_bedges && rk->bedge_bnd[k] == b; ++k) {
+          PetscInt e = rk->bedge_idx[k];
+          for (PetscInt m = 0; m < 3; ++m) bf_ptr[3 * e + m] = rk->bflux[3 * k + m];
+        }
+        PetscCall(VecRestoreArray(op->petsc.boundary_fluxes[b], &bf_ptr));
+      }
+      PetscCall(VecAXPY(op->petsc.boundary_fluxes_accum[b], dt, op->petsc.boundary_fluxes[b]));
+    }
+  }
+
+  // flux-divergence snapshot for the source operator (device-to-device copy)
+  PetscCall(VecCopy(f_global, op->flux_divergence));
+
+  //--------------------
+  // Source Calculation
+  //--------------------
+
+  PetscObjectState mp_state, src_state;
+  PetscCall(PetscObjectStateGet((PetscObject)op->petsc.material_properties, &mp_state));
+  PetscCall(PetscObjectStateGet((PetscObject)op->petsc.external_sources, &src_state));
+  PetscBool mp_changed  = (!rk->primed || mp_state != rk->mp_state) ? PETSC_TRUE : PETSC_FALSE;
+  PetscBool src_changed = (!rk->primed || src_state != rk->src_state) ? PETSC_TRUE : PETSC_FALSE;
+
+  const PetscScalar *mp_ptr, *src_ptr;
+  PetscScalar       *f_rw, *pv_dev;
+  PetscCall(VecGetArrayRead(op->petsc.material_properties, &mp_ptr));
+  PetscCall(VecGetArrayRead(op->petsc.external_sources, &src_ptr));
+  PetscCall(VecGetArrayAndMemType(f_global, &f_rw, NULL));
+  PetscCall(VecGetArrayWriteAndMemType(op->primitive_variables, &pv_dev, NULL));
+  PetscCall(SWEKokkosApplySource(rk->kokkos, u_dev, mp_ptr, mp_changed, src_ptr, src_changed, f_rw, pv_dev));
+  PetscCall(VecRestoreArrayWriteAndMemType(op->primitive_variables, &pv_dev));
+  PetscCall(VecRestoreArrayAndMemType(f_global, &f_rw));
+  PetscCall(VecRestoreArrayRead(op->petsc.external_sources, &src_ptr));
+  PetscCall(VecRestoreArrayRead(op->petsc.material_properties, &mp_ptr));
+  PetscCall(VecRestoreArrayReadAndMemType(u_local, &u_dev));
+  rk->mp_state  = mp_state;
+  rk->src_state = src_state;
+  rk->primed    = PETSC_TRUE;
+
+  *applied = PETSC_TRUE;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif
 
 // TSRHSJacobianPFn: dF/dp for p = per-cell Manning n. Only the explicit drag
 // term depends on n:  S_q = -g n^2 h^{-7/3} q |q|, so
@@ -982,6 +1203,14 @@ PetscErrorCode DestroySWERHSJacobian(RDy rdy) {
     rdy->rhs_jac_kokkos = NULL;
     PetscCall(PetscFree2(rdy->rhs_jac_bedge_bnd, rdy->rhs_jac_bedge_idx));
     PetscCall(PetscFree(rdy->rhs_jac_dirichlet));
+  }
+  if (rdy->swe_rhs_kokkos) {
+    SWERHSKokkosData *rk = rdy->swe_rhs_kokkos;
+    PetscCall(PetscFree(rk->edge_id));
+    PetscCall(PetscFree(rk->bflux));
+    PetscCall(PetscFree(rk));
+    rdy->swe_rhs_kokkos = NULL;
+    if (rdy->operator) rdy->operator->petsc.swe_rhs_kokkos = NULL;
   }
 #endif
   if (rdy->rhs_jac_p) PetscCall(MatDestroy(&rdy->rhs_jac_p));

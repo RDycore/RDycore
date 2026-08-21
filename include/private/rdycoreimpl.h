@@ -237,6 +237,9 @@ struct _p_RDy {
   PetscInt     rhs_jac_n_bedges;
   PetscInt    *rhs_jac_bedge_bnd, *rhs_jac_bedge_idx;
   PetscScalar *rhs_jac_dirichlet;
+  // host-side bookkeeping for the Kokkos device RHS (SWERHSKokkosData; also
+  // referenced by operator->petsc.swe_rhs_kokkos, but owned here)
+  void        *swe_rhs_kokkos;
   // parameter Jacobian df/dn (n = per-cell Manning coefficient); allocated
   // alongside rhs_jac -- two nonzeros per cell (the momentum rows)
   Mat rhs_jac_p;

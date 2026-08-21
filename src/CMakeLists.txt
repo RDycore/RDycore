@@ -58,6 +58,9 @@ if (RDY_HAVE_KOKKOS_JACOBIAN)
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_jacobian_kokkos.kokkos.cxx
             ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_jacobian_kokkos.h
             ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_roe_flux_jacobian_petsc.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_roe_flux_petsc.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_types_petsc.h
+            ${PROJECT_SOURCE_DIR}/include/private/rdymathimpl.h
             ${CMAKE_CURRENT_SOURCE_DIR}/swe/kokkos_compile.mk
     COMMENT "Compiling swe_jacobian_kokkos.kokkos.cxx with PETSc's Kokkos rule"
     VERBATIM

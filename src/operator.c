@@ -656,6 +656,22 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
 static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
+#if RDY_HAVE_KOKKOS_JACOBIAN
+  // Kokkos device RHS (B1): when the SWE device context is attached and the
+  // state Vec is a Kokkos type, the whole flux + source sequence runs in
+  // device kernels (see ApplySWEPetscOperatorsKokkos); otherwise fall through
+  // to the host composite operators.
+  if (op->petsc.swe_rhs_kokkos) {
+    PetscBool applied;
+    PetscCall(ApplySWEPetscOperatorsKokkos(op, dt, u_local, f_global, &applied));
+    if (applied) {
+      // snapshot the external sources into src_inst for output
+      PetscCall(VecCopy(op->petsc.external_sources, op->src_inst));
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
+  }
+#endif
+
   // apply the composite PETSc flux operators
   PetscCall(PetscOperatorApply(op->petsc.flux, dt, u_local, f_global));
 

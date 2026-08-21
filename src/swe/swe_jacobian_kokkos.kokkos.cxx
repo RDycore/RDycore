@@ -13,7 +13,7 @@
 
 #define RDY_MATH_FN static KOKKOS_INLINE_FUNCTION
 #include "swe_jacobian_kokkos.h"
-#include "swe_roe_flux_jacobian_petsc.h"
+#include "swe_roe_flux_jacobian_petsc.h"  // also pulls in swe_roe_flux_petsc.h (ComputeSWERoeFluxEdge)
 
 namespace {
 using ExecSpace = Kokkos::DefaultExecutionSpace;
@@ -44,6 +44,15 @@ struct SWEJacobianKokkos {
   PetscInt          n_edges, n_bedges, n_cells, ncoo, n_u_local, matprop_len, matprop_stride, matprop_manning;
   PetscReal         tiny_h, h_anuga;
   PetscBool         friction_in_rhs;
+  // RHS machinery (B1, SWEKokkosSetupRHS; extents stay 0 until then)
+  View<PetscInt>    gather_start, gather_idx;  // CSR over the owned-cell list
+  View<PetscReal>   gather_w;
+  View<PetscScalar> fluxg;      // gather flux buffer: 3 * (n_edges + n_bedges)
+  View<PetscScalar> braw;       // raw boundary fluxes: 3 * n_bedges (D2H each eval)
+  View<PetscReal>   cfac;       // Courant factor candidates: n_edges + n_bedges
+  View<PetscScalar> src_stage;  // cached external sources (state-tracked by the caller)
+  PetscInt          rhs_source_method, src_len;
+  bool              rhs_ready = false, mp_primed = false, src_primed = false;
 };
 
 PetscErrorCode SWEJacobianKokkosCreate(const SWEJacobianKokkosSetup *s, SWEJacobianKokkos **jk_out)
@@ -252,6 +261,254 @@ PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScala
   PetscCallCXX(Kokkos::fence());
   PetscCall(PetscLogGpuTimeEnd());
   *coo_v = jk->v.data();
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// Device RHS (B1): the flux stage computes per-edge Roe fluxes (interior and
+// boundary kernels sharing ComputeSWERoeFluxEdge with the host loops) and a
+// deterministic per-owned-cell gather whose CSR lists contributions in the
+// host loops' accumulation order, so the sums are bitwise identical to the
+// host RHS. The source stage mirrors ApplySourceExplicit / ApplySourceARKImex.
+// ---------------------------------------------------------------------------
+
+PetscErrorCode SWEKokkosSetupRHS(SWEJacobianKokkos *jk, const SWERHSKokkosSetup *s)
+{
+  PetscFunctionBegin;
+  PetscCallCXX(jk->gather_start = ToDevice("swejk_gather_start", s->gather_start, jk->n_cells + 1));
+  if (s->n_gather) {
+    PetscCallCXX(jk->gather_idx = ToDevice("swejk_gather_idx", s->gather_idx, s->n_gather));
+    PetscCallCXX(jk->gather_w = ToDevice("swejk_gather_w", s->gather_w, s->n_gather));
+  }
+  PetscCallCXX(jk->fluxg = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_fluxg")), 3 * (jk->n_edges + jk->n_bedges)));
+  if (jk->n_bedges) PetscCallCXX(jk->braw = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_braw")), 3 * jk->n_bedges));
+  PetscCallCXX(jk->cfac = View<PetscReal>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_cfac")), jk->n_edges + jk->n_bedges));
+  jk->rhs_source_method = s->source_method;
+  jk->src_len           = s->src_len;
+  jk->rhs_ready         = true;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode SWEKokkosApplyFlux(SWEJacobianKokkos *jk, const PetscScalar *u_ptr, const PetscScalar *dirichlet, PetscScalar *f_ptr,
+                                  PetscScalar *bflux_host, PetscReal *cfac_max, PetscInt *cfac_loc)
+{
+  PetscFunctionBegin;
+  PetscCheck(jk->rhs_ready, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "SWEKokkosSetupRHS has not been called on this context");
+  Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> u(u_ptr, jk->n_u_local);
+  Kokkos::View<PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>       f(f_ptr, 3 * jk->n_cells);
+
+  if (jk->n_bedges) {
+    PetscCheck(dirichlet, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "boundary edges present but no dirichlet staging array");
+    PetscCallCXX(Kokkos::deep_copy(jk->dirichlet, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(dirichlet, 3 * jk->n_bedges)));
+  }
+
+  const PetscReal tiny_h = jk->tiny_h, h_anuga = jk->h_anuga;
+  const PetscInt  n_e = jk->n_edges, n_b = jk->n_bedges;
+  auto            fluxg = jk->fluxg;
+  auto            cfac  = jk->cfac;
+
+  PetscCall(PetscLogGpuTimeBegin());
+  {  // interior-edge fluxes (mirrors ApplyInteriorFlux)
+    auto edge_l = jk->edge_l, edge_r = jk->edge_r;
+    auto edge_sn = jk->edge_sn, edge_cn = jk->edge_cn, edge_wl = jk->edge_wl, edge_wr = jk->edge_wr;
+    PetscCallCXX(Kokkos::parallel_for(
+      "swejk_rhs_interior", Kokkos::RangePolicy<ExecSpace>(0, n_e), KOKKOS_LAMBDA(const PetscInt e) {
+        const PetscInt  l = edge_l(e), r = edge_r(e);
+        const PetscReal hl = PetscRealPart(u(3 * l)), hul = PetscRealPart(u(3 * l + 1)), hvl = PetscRealPart(u(3 * l + 2));
+        const PetscReal hr = PetscRealPart(u(3 * r)), hur = PetscRealPart(u(3 * r + 1)), hvr = PetscRealPart(u(3 * r + 2));
+        if (hr < tiny_h && hl < tiny_h) {  // host skips dry/dry edges: zero contribution, no Courant candidate
+          fluxg(3 * e) = fluxg(3 * e + 1) = fluxg(3 * e + 2) = 0.0;
+          cfac(e)                                            = -1.0;
+          return;
+        }
+        PetscReal ul, vl, ur, vr, fij[3], amax;
+        ComputeSWERiemannVelocity(hl, hul, hvl, tiny_h, h_anuga, &ul, &vl);
+        ComputeSWERiemannVelocity(hr, hur, hvr, tiny_h, h_anuga, &ur, &vr);
+        ComputeSWERoeFluxEdge(hl, ul, vl, hr, ur, vr, edge_sn(e), edge_cn(e), fij, &amax);
+        fluxg(3 * e)     = fij[0];
+        fluxg(3 * e + 1) = fij[1];
+        fluxg(3 * e + 2) = fij[2];
+        // amax * len/min(A_l, A_r): wl = -len/A_l, wr = +len/A_r
+        cfac(e) = amax * fmax(-edge_wl(e), edge_wr(e));
+      }));
+  }
+  if (n_b) {  // boundary-edge fluxes (mirrors ApplyBoundaryFlux and the BC appliers)
+    auto bedge_cell = jk->bedge_cell, bedge_type = jk->bedge_type;
+    auto bedge_sn = jk->bedge_sn, bedge_cn = jk->bedge_cn, bedge_wl = jk->bedge_wl;
+    auto dir  = jk->dirichlet;
+    auto braw = jk->braw;
+    PetscCallCXX(Kokkos::parallel_for(
+      "swejk_rhs_boundary", Kokkos::RangePolicy<ExecSpace>(0, n_b), KOKKOS_LAMBDA(const PetscInt m) {
+        const PetscInt  l = bedge_cell(m);
+        const PetscReal sn = bedge_sn(m), cn = bedge_cn(m);
+        PetscReal       hl = PetscRealPart(u(3 * l)), hul = PetscRealPart(u(3 * l + 1)), hvl = PetscRealPart(u(3 * l + 2));
+        PetscReal       ul, vl;
+        ComputeSWERiemannVelocity(hl, hul, hvl, tiny_h, h_anuga, &ul, &vl);
+
+        PetscReal hr = 0.0, ur = 0.0, vr = 0.0;
+        switch (bedge_type(m)) {
+          case SWE_JK_BC_DIRICHLET: {
+            hr = PetscRealPart(dir(3 * m));
+            ComputeSWERiemannVelocity(hr, PetscRealPart(dir(3 * m + 1)), PetscRealPart(dir(3 * m + 2)), tiny_h, h_anuga, &ur, &vr);
+          } break;
+          case SWE_JK_BC_REFLECTING: {
+            hr                   = hl;
+            const PetscReal dum1 = Square(sn) - Square(cn);
+            const PetscReal dum2 = 2.0 * sn * cn;
+            ur                   = ul * dum1 - vl * dum2;
+            vr                   = -ul * dum2 - vl * dum1;
+          } break;
+          case SWE_JK_BC_CRITICAL_OUTFLOW: {
+            const PetscReal uperp = ul * cn + vl * sn;
+            if (uperp < 0.0) {  // inflow: host zeroes BOTH states
+              hl = ul = vl = 0.0;
+            } else {
+              const PetscReal q = hl * fabs(uperp);
+              hr                = PetscPowReal(Square(q) / GRAVITY, 1.0 / 3.0);
+
+              const PetscReal velocity = PetscPowReal(GRAVITY * hr, 0.5);
+              ur                       = velocity * cn;
+              vr                       = velocity * sn;
+            }
+          } break;
+        }
+
+        PetscReal fij[3], amax;
+        ComputeSWERoeFluxEdge(hl, ul, vl, hr, ur, vr, sn, cn, fij, &amax);
+        braw(3 * m)     = fij[0];  // raw flux for the boundary-flux vec (matches host, which stores it unconditionally)
+        braw(3 * m + 1) = fij[1];
+        braw(3 * m + 2) = fij[2];
+        const bool wet  = !(hl < tiny_h && hr < tiny_h);  // host accumulation/Courant guard (post-BC states)
+        const PetscInt g = n_e + m;
+        fluxg(3 * g)     = wet ? fij[0] : 0.0;
+        fluxg(3 * g + 1) = wet ? fij[1] : 0.0;
+        fluxg(3 * g + 2) = wet ? fij[2] : 0.0;
+        cfac(g)          = wet ? amax * (-bedge_wl(m)) : -1.0;  // amax * len/A_l
+      }));
+  }
+  {  // deterministic per-owned-cell gather (host accumulation order; overwrites f, which arrives zeroed)
+    auto gather_start = jk->gather_start, gather_idx = jk->gather_idx;
+    auto gather_w       = jk->gather_w;
+    auto cell_owned_idx = jk->cell_owned_idx;
+    PetscCallCXX(Kokkos::parallel_for(
+      "swejk_rhs_gather", Kokkos::RangePolicy<ExecSpace>(0, jk->n_cells), KOKKOS_LAMBDA(const PetscInt ci) {
+        const PetscInt o = cell_owned_idx(ci);
+        PetscReal      val0 = 0.0, val1 = 0.0, val2 = 0.0;
+        for (PetscInt j = gather_start(ci); j < gather_start(ci + 1); ++j) {
+          const PetscInt  k = gather_idx(j);
+          const PetscReal w = gather_w(j);
+          val0 += PetscRealPart(fluxg(3 * k)) * w;
+          val1 += PetscRealPart(fluxg(3 * k + 1)) * w;
+          val2 += PetscRealPart(fluxg(3 * k + 2)) * w;
+        }
+        f(3 * o)     = val0;
+        f(3 * o + 1) = val1;
+        f(3 * o + 2) = val2;
+      }));
+  }
+  // max Courant factor and its location (for the diagnostics the host loops
+  // update inline); ties resolve to an arbitrary wet edge, which only affects
+  // the reported edge/cell ids, not the max
+  {
+    PetscReal maxval = -1.0;
+    PetscInt  maxloc = -1;
+    if (n_e + n_b > 0) {
+      Kokkos::MaxLoc<PetscReal, PetscInt>::value_type result;
+      PetscCallCXX(Kokkos::parallel_reduce(
+        "swejk_rhs_cfacmax", Kokkos::RangePolicy<ExecSpace>(0, n_e + n_b),
+        KOKKOS_LAMBDA(const PetscInt i, Kokkos::MaxLoc<PetscReal, PetscInt>::value_type &lmax) {
+          if (cfac(i) > lmax.val) {
+            lmax.val = cfac(i);
+            lmax.loc = i;
+          }
+        },
+        Kokkos::MaxLoc<PetscReal, PetscInt>(result)));
+      if (result.val > 0.0) {
+        maxval = result.val;
+        maxloc = result.loc;
+      }
+    }
+    *cfac_max = maxval;
+    *cfac_loc = maxloc;
+  }
+  PetscCallCXX(Kokkos::fence());
+  PetscCall(PetscLogGpuTimeEnd());
+
+  if (n_b) {  // raw boundary fluxes back to the host staging array
+    PetscCallCXX(Kokkos::deep_copy(Kokkos::View<PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(bflux_host, 3 * n_b), jk->braw));
+    PetscCall(PetscLogGpuToCpu(3.0 * n_b * sizeof(PetscScalar)));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u_ptr, const PetscScalar *mat_props, PetscBool mp_changed,
+                                    const PetscScalar *ext_src, PetscBool src_changed, PetscScalar *f_ptr, PetscScalar *pv_ptr)
+{
+  PetscFunctionBegin;
+  PetscCheck(jk->rhs_ready, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "SWEKokkosSetupRHS has not been called on this context");
+  Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> u(u_ptr, jk->n_u_local);
+  Kokkos::View<PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>       f(f_ptr, 3 * jk->n_cells);
+  Kokkos::View<PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>       pv(pv_ptr, 3 * jk->n_cells);
+
+  // stage host-resident inputs, re-uploading only when their content changed
+  if (jk->mp_stage.extent(0) == 0) PetscCallCXX(jk->mp_stage = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_mp_stage")), jk->matprop_len));
+  if (mp_changed || !jk->mp_primed) {
+    PetscCallCXX(Kokkos::deep_copy(jk->mp_stage, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(mat_props, jk->matprop_len)));
+    PetscCall(PetscLogCpuToGpu(1.0 * jk->matprop_len * sizeof(PetscScalar)));
+    jk->mp_primed = true;
+  }
+  if (jk->src_stage.extent(0) == 0) PetscCallCXX(jk->src_stage = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_src_stage")), jk->src_len));
+  if (src_changed || !jk->src_primed) {
+    PetscCallCXX(Kokkos::deep_copy(jk->src_stage, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(ext_src, jk->src_len)));
+    PetscCall(PetscLogCpuToGpu(1.0 * jk->src_len * sizeof(PetscScalar)));
+    jk->src_primed = true;
+  }
+
+  const PetscReal tiny_h = jk->tiny_h, h_anuga = jk->h_anuga;
+  const PetscInt  mp_stride = jk->matprop_stride, mp_manning = jk->matprop_manning;
+  const bool      friction = (jk->rhs_source_method == 0);  // explicit drag in the RHS; ark-imex keeps it implicit
+  auto            mp = jk->mp_stage;
+  auto            src = jk->src_stage;
+  auto            cell_id = jk->cell_id, cell_owned_idx = jk->cell_owned_idx;
+  auto            cell_dzdx = jk->cell_dzdx, cell_dzdy = jk->cell_dzdy;
+
+  PetscCall(PetscLogGpuTimeBegin());
+  PetscCallCXX(Kokkos::parallel_for(
+    "swejk_rhs_source", Kokkos::RangePolicy<ExecSpace>(0, jk->n_cells), KOKKOS_LAMBDA(const PetscInt ci) {
+      const PetscInt  c = cell_id(ci), o = cell_owned_idx(ci);
+      const PetscReal h = PetscRealPart(u(3 * c)), hu = PetscRealPart(u(3 * c + 1)), hv = PetscRealPart(u(3 * c + 2));
+
+      // bed slope (include_bed_slope is always true on the non-HR path)
+      const PetscReal bedx = cell_dzdx(ci) * GRAVITY * h;
+      const PetscReal bedy = cell_dzdy(ci) * GRAVITY * h;
+
+      PetscReal tbx = 0.0, tby = 0.0;
+      if (friction && h >= tiny_h) {  // mirrors ApplySourceExplicit's wet branch
+        const PetscReal uu = hu / h;
+        const PetscReal vv = hv / h;
+
+        const PetscReal N_mannings = PetscRealPart(mp(mp_stride * o + mp_manning));
+        const PetscReal Cd         = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
+
+        const PetscReal velocity = PetscSqrtReal(Square(uu) + Square(vv));
+        const PetscReal tb       = Cd * velocity / h;
+
+        tbx = tb * hu;
+        tby = tb * hv;
+      }
+
+      f(3 * o)     += src(3 * o);
+      f(3 * o + 1) += -bedx - tbx + PetscRealPart(src(3 * o + 1));
+      f(3 * o + 2) += -bedy - tby + PetscRealPart(src(3 * o + 2));
+
+      // primitive variables (h, u, v) with ANUGA regularization
+      const PetscReal denom = Square(h) + Square(h_anuga);
+      pv(3 * o)             = h;
+      pv(3 * o + 1)         = (h >= tiny_h) ? (hu * h / denom) : 0.0;
+      pv(3 * o + 2)         = (h >= tiny_h) ? (hv * h / denom) : 0.0;
+    }));
+  PetscCallCXX(Kokkos::fence());
+  PetscCall(PetscLogGpuTimeEnd());
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

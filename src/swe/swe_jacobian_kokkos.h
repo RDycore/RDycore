@@ -49,6 +49,23 @@ typedef struct {
   PetscBool friction_in_rhs;  // full source Jacobian vs bed-slope-only (ARK-IMEX)
 } SWEJacobianKokkosSetup;
 
+// setup-time description of the device RHS machinery, which reuses the
+// geometry views of an existing Jacobian context (B1: device RHS). All arrays
+// are HOST arrays copied to device views by SetupRHS (caller may free them
+// afterwards). The gather CSR runs over the SAME owned-cell list as the
+// Jacobian setup (cell_id order) and lists, for each cell, its flux-buffer
+// contributions in exactly the host accumulation order: interior edges by
+// ascending compact-edge index, then boundary edges by ascending flattened
+// index -- so the device sums are bitwise identical to the host loop's.
+typedef struct {
+  PetscInt         n_gather;                  // total gather entries
+  const PetscInt  *gather_start;              // [n_cells + 1] CSR offsets
+  const PetscInt  *gather_idx;                // flux-buffer block index: interior k in [0, n_edges), boundary n_edges + m
+  const PetscReal *gather_w;                  // -len/A or +len/A, matching the host expression
+  PetscInt         source_method;             // 0 = explicit (friction in RHS), 1 = ark-imex (bed slope only)
+  PetscInt         src_len;                   // length of the external-sources array (3 * owned cells)
+} SWERHSKokkosSetup;
+
 typedef struct SWEJacobianKokkos SWEJacobianKokkos;  // opaque C++ context
 
 #ifdef __cplusplus
@@ -56,6 +73,31 @@ extern "C" {
 #endif
 
 PetscErrorCode SWEJacobianKokkosCreate(const SWEJacobianKokkosSetup *setup, SWEJacobianKokkos **jk);
+
+// Adds the RHS machinery (flux buffers, gather CSR, staging views) to an
+// existing Jacobian context.
+PetscErrorCode SWEKokkosSetupRHS(SWEJacobianKokkos *jk, const SWERHSKokkosSetup *setup);
+
+// Flux stage of the device RHS: computes interior-edge and boundary-edge Roe
+// fluxes and gathers them into f (a Kokkos-memory-space pointer of length
+// 3 * owned cells, fully overwritten). u is the ghosted state in Kokkos
+// memory space; dirichlet is the HOST staging array of 3 scalars per
+// flattened boundary edge (as in Assemble). On return bflux_host (HOST,
+// 3 * n_bedges) holds the raw boundary fluxes (for the boundary-flux vecs),
+// and *cfac_max/*cfac_loc the maximum Courant factor amax*len/min(A) over wet
+// edges and its location (compact interior index, or n_edges + m for
+// boundary; *cfac_loc = -1 when no wet edge contributed).
+PetscErrorCode SWEKokkosApplyFlux(SWEJacobianKokkos *jk, const PetscScalar *u, const PetscScalar *dirichlet, PetscScalar *f,
+                                  PetscScalar *bflux_host, PetscReal *cfac_max, PetscInt *cfac_loc);
+
+// Source stage of the device RHS: f += sources (Kokkos memory space,
+// read-modify-write) and pv (Kokkos memory space, 3 * owned cells) is
+// overwritten with regularized primitive variables. mat_props and ext_src are
+// HOST arrays staged into cached device views; pass *_changed = PETSC_TRUE
+// when their content changed since the previous call (first call always
+// stages).
+PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u, const PetscScalar *mat_props, PetscBool mp_changed,
+                                    const PetscScalar *ext_src, PetscBool src_changed, PetscScalar *f, PetscScalar *pv);
 
 // u_local/mat_props may be host or device pointers (pass the memtype from
 // VecGetArrayReadAndMemType); dirichlet is a HOST array of 3 scalars per

@@ -183,6 +183,12 @@ typedef struct Operator {
 
       // domain-wide material property vector (# of components == # of scalar properties)
       Vec material_properties;
+
+      // Kokkos device RHS bookkeeping (SWERHSKokkosData, owned by the RDy and
+      // attached by CreateAnalyticJacobianCOO; NULL on host-only paths).
+      // When present and the state Vec is a Kokkos type, ApplyPetscOperator
+      // dispatches to the device RHS instead of the composite operators.
+      void *swe_rhs_kokkos;
     } petsc;
   };
 
