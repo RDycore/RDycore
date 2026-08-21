@@ -118,8 +118,14 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
   PetscCall(MatCreate(rdy->comm, &rdy->rhs_jac));
   PetscCall(MatSetSizes(rdy->rhs_jac, n_local, n_local, PETSC_DETERMINE, PETSC_DETERMINE));
-  PetscCall(MatSetType(rdy->rhs_jac, MATAIJ));
+  // honor -dm_mat_type (e.g. aijkokkos/baijkokkos for device solves): the DM's
+  // mat type defaults to MATAIJ, so CPU behavior is unchanged; MatSetFromOptions
+  // additionally allows a direct -mat_type override on this matrix
+  MatType mat_type;
+  PetscCall(DMGetMatType(rdy->dm, &mat_type));
+  PetscCall(MatSetType(rdy->rhs_jac, mat_type));
   PetscCall(MatSetBlockSize(rdy->rhs_jac, 3));
+  PetscCall(MatSetFromOptions(rdy->rhs_jac));
 
   ISLocalToGlobalMapping l2g;
   PetscCall(DMGetLocalToGlobalMapping(rdy->dm, &l2g));
