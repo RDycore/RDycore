@@ -471,3 +471,26 @@ gates: FD np1/2, calibrate ctest, scale twin). Full laptop ctest: green
 except PRE-EXISTING failures (6x swe_roe cgns: arch lacks CGNS;
 amr_c_np_3_basic: SEGV reproduced at parent commit 670062ee -- AMR is
 out of charter scope).
+
+### B2 follow-up: the TSTrajectorySet lead is CLOSED by -ts_trajectory_type memory
+
+The 8 s/window trajectory cost was the DEFAULT disk ("basic") trajectory:
+rank-0-gathered binary writes of every checkpoint (4.5 GB MPI + 1.37 GB
+D2H per gradient at n4) and reads on the backward sweep. With
+`-ts_trajectory_type memory` the checkpoints are Vec copies -- which for
+kokkos vecs live ON DEVICE -- and the driver already supports it
+(ResetTrajectory's stack handling exists for exactly this):
+
+- TSTrajectorySet 8.21 s -> 0.084 s (98x); TSTrajectoryGet 0.92 s ->
+  0.5 ms; zero MPI, zero D2H in either event.
+- Gradient identical to the disk-trajectory run to every printed digit.
+- Laptop FD gates with memory trajectory, full-kokkos, np 1/2: 1.25e-8 /
+  1.35e-8 (same values as disk).
+- Device n4 gradient loop: 26.5 -> 17.2 s (TSStep 14.1 + TSAdjointStep
+  3.0 + trajectory 0.09) = ~14.3x vs the 245.9 s CPU-n64 loop.
+  Log: $SCRATCH/gpu-implicit/b2m_dev_n4.log.
+
+NOT made the default: the memory trajectory holds every step of the
+window (no disk spill), which is fine for 20-step gate windows but not
+for long Harvey windows on hosts; use the option on the GPU path (or
+revolve-style checkpointing when windows outgrow device memory).
