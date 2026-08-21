@@ -272,3 +272,47 @@ gamg tuning. Logs: $SCRATCH/gpu-implicit/p4prep_gamg{0,1}_n4.log.
   fork follow-up). Working SWE canon: `-pc_gamg_threshold -1` (structure
   IS symmetric) + `-pc_gamg_prolongator_filter 0.03` + aggressive
   coarsening: 20/20 Newton, 206 its, PCSetUp 4.24 s/103 (vs 5.4 bare).
+
+## REVIEW: the full-GPU SWE Manning conversion (with Mark, 2026-08-21)
+
+Protocol everywhere: Turning 30 m (2.93M cells), dt=1 BEULER x20 steps,
+fgmres+pbjacobi, fixed ksp_rtol 1e-3, one GPU node.
+
+Correctness: identical Newton path (20 snes / 717 lin its) across all
+seven configurations; device-format and device-assembly trajectories
+bit-identical (2e-16); norms vs CPU identical to 16 digits every step
+(entry order differs only by partitioner availability); device assembly
+FD-limited (1.5-1.9e-8, digit-identical to host); ctest 14/14; host
+adjoint gates untouched.
+
+| SNESSolve (s)     | CPU n64 | P2 baij | P3 baij | P3 baij n4 |
+|-------------------|---------|---------|---------|------------|
+| total             | 116.7   | 29.5    | 22.0    | 29.1       |
+| JacobianEval      | 80.1    | 8.9     | 1.86    | 0.35       |
+| KSPSolve          | 13.0    | 15.6    | 13.1    | 5.6        |
+| TSFunctionEval    | 20.5    | 3.7     | 3.6     | 21.6       |
+
+- Assembly (the campaign target) is dead: 1.15 (pre-COO) -> 0.77 (P1) ->
+  0.086 (P2) -> 0.018/0.0034 s per assembly (P3, n64/n4). 5.3x end-to-end.
+- NOT yet on GPU, honestly: (1) the RHS -- now 74% of n4 SNESSolve; the
+  next increment (device RHS in the PETSc backend, reusing the P3 tables
+  + shared-math-header pattern on swe_roe_flux_petsc.h) takes n4
+  SNESSolve to ~7.5 s (~15x vs CPU n64). (2) adjoint (host by charter).
+  (3) GAMG coarse solve (host LU until cudss/cuda13).
+
+Decisions from the review:
+- **pbjacobi is the production PC for the working dt range.** At dt=1 the
+  shifted system is strongly diagonally dominant: pbjacobi 717 its /
+  KSP 5.6 s at n4, zero setup; GAMG 206 its but 4.2-5.4 s PCSetUp per run
+  (PtAP every Newton) -- net ~3x slower. GAMG stays shelved with P4 until
+  large-dt implicit research (SNES VI / smoothed wet-dry / ts tolerances)
+  lands.
+- **GPU adjoint is NOT technically out of scope -- only charter-deferred**
+  (forward-solve-first). After the device RHS lands, the host adjoint is
+  an estimated 70-80% of calibration gradient time (GPU forward ~7.5 s vs
+  host backward ~18-20 s per 20 steps: one assembly + one transpose solve
+  per backward step + trajectory I/O). Needed: TSTrajectory with device
+  vecs (the observed hang -- the real blocker), transpose PBJacobi
+  verification (MatMultTranspose on baijkokkos exists in the fork). Once
+  trajectory works, the adjoint's assemblies get the P3 device path for
+  free.
