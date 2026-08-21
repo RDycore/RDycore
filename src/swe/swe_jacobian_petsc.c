@@ -1161,6 +1161,19 @@ PetscErrorCode RegisterSWERHSJacobian(RDy rdy) {
       // FD coloring works from the DM's closure-adjacency pattern (a superset
       // of the FV edge pattern -- and the full MUSCL stencil on triangles)
       PetscCall(DMCreateMatrix(rdy->dm, &rdy->rhs_jac));
+      {
+        // MatColoring reads the host CSR arrays, which device-native matrix
+        // types only build at assembly -- SL coloring SEGVs on an empty
+        // BAIJKokkos. Fail with a message instead (use jacobian: analytic
+        // for device matrix types).
+        MatType mat_type;
+        PetscCall(MatGetType(rdy->rhs_jac, &mat_type));
+        PetscCheck(!strstr(mat_type, "kokkos") && !strstr(mat_type, "cusparse") && !strstr(mat_type, "cuda") && !strstr(mat_type, "hip"),
+                   rdy->comm, PETSC_ERR_SUP,
+                   "numerics.jacobian: fd requires a host matrix type (FD coloring reads host CSR data that device matrix type '%s' does not "
+                   "populate before assembly); use numerics.jacobian: analytic with device matrix types",
+                   mat_type);
+      }
       PetscCall(PetscObjectSetName((PetscObject)rdy->rhs_jac, "swe_rhs_jacobian"));
       PetscCall(MatSetOption(rdy->rhs_jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
       PetscCall(TSSetRHSJacobian(rdy->ts, rdy->rhs_jac, rdy->rhs_jac, SWERHSJacobianFD, rdy));

@@ -539,3 +539,25 @@ Solver variants tested at n4 (same protocol, gemv fix on):
 Current n4 SNESSolve profile after all fixes: KSP 1.1 s + PCSetUp
 (pbjacobi block inversion, 103x) 1.2 s + JacEval 0.33 + RHS 0.23 --
 roughly balanced; further gains are diminishing-returns territory.
+
+## Calibration validation (B1+B2 integration; 2026-08-21 evening)
+
+The full TAO calibration loop (gauge-twin mode) runs on device types --
+the first exercise of the Manning-update path (RDySetDomainManningsN ->
+material-properties state bump -> device re-upload in RHS and Jacobian)
+and of repeated memory-trajectory reset/reuse across TAO iterations.
+
+Laptop (adjoint_beuler.yaml + -adjoint_calibrate_gauges
+-adjoint_gauges_twin, 60 TAO its, np 1 and 2): host and device runs
+converge IDENTICALLY -- J reduction 9.02x and two-zone recovery rel err
+3.071e-01 to all printed digits; J endpoints agree to ~5 digits (the
+benign aij-vs-baijkokkos linear-algebra rounding).
+
+Config foot-gun found and hardened: the gauges CTEST config
+(adjoint_dam_break.yaml) uses numerics.jacobian: fd, and FD COLORING on a
+device-native matrix type SEGVs inside MatGetRowIJ_SeqBAIJ (coloring
+reads host CSR arrays that device matrices only build at assembly -- the
+known P2-era landmine, reached via -dm_mat_type this time).
+RegisterSWERHSJacobian now rejects jacobian: fd with device matrix types
+with an explanatory error. Device calibration uses the implicit config
+(beuler + analytic), which is the production path anyway.
