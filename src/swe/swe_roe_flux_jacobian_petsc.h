@@ -25,6 +25,16 @@
 
 #include "swe_roe_flux_petsc.h"  // ComputeSWERoeEigenspectrum, GRAVITY (via swe_types_petsc.h)
 
+// Qualifier for the flux-Jacobian math below, which is shared VERBATIM by the
+// host assembly loop and the Kokkos device-assembly kernels: plain C sees
+// static inline; the .kokkos.cxx TU defines RDY_MATH_FN to
+// `static KOKKOS_INLINE_FUNCTION` before including this header. The functions
+// are pure scalar math (no PETSc objects, no error paths), so they carry no
+// PetscErrorCode plumbing.
+#ifndef RDY_MATH_FN
+#define RDY_MATH_FN static inline
+#endif
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma clang diagnostic push
@@ -33,9 +43,8 @@
 // Computes primitives q = (h, u, v) and the reconstruction Jacobian
 // P = dq/d(h, hu, hv) for one cell state, mirroring ComputeRiemannVelocities()
 // in swe_petsc.c (ANUGA regularization with the tiny_h dry cutoff).
-static PetscErrorCode SWEReconstructPrimitiveWithJacobian(const PetscReal cons[3], PetscReal tiny_h, PetscReal h_anuga, PetscReal q[3],
+RDY_MATH_FN void SWEReconstructPrimitiveWithJacobian(const PetscReal cons[3], PetscReal tiny_h, PetscReal h_anuga, PetscReal q[3],
                                                           PetscReal P[3][3]) {
-  PetscFunctionBeginUser;
   PetscReal h = cons[0], hu = cons[1], hv = cons[2];
 
   for (PetscInt i = 0; i < 3; ++i)
@@ -58,14 +67,12 @@ static PetscErrorCode SWEReconstructPrimitiveWithJacobian(const PetscReal cons[3
     P[2][0] = hv * (Square(h_anuga) - Square(h)) / D2;
     P[2][2] = h / D;
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Computes B = dF_phys/dq for the physical (rotated) flux
 //   F_phys(q) = { h uperp, h u uperp + g h^2 cn / 2, h v uperp + g h^2 sn / 2 },
 // with uperp = u cn + v sn, as assembled in ComputeSWERoeFlux().
-static PetscErrorCode SWEPhysicalFluxJacobianPrim(const PetscReal q[3], PetscReal sn, PetscReal cn, PetscReal B[3][3]) {
-  PetscFunctionBeginUser;
+RDY_MATH_FN void SWEPhysicalFluxJacobianPrim(const PetscReal q[3], PetscReal sn, PetscReal cn, PetscReal B[3][3]) {
   PetscReal h = q[0], u = q[1], v = q[2];
   PetscReal uperp = u * cn + v * sn;
 
@@ -80,7 +87,6 @@ static PetscErrorCode SWEPhysicalFluxJacobianPrim(const PetscReal q[3], PetscRea
   B[2][0] = v * uperp + GRAVITY * h * sn;
   B[2][1] = h * v * cn;
   B[2][2] = h * (uperp + v * sn);
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Exact directional derivative of the Roe interface flux in PRIMITIVE
@@ -90,9 +96,8 @@ static PetscErrorCode SWEPhysicalFluxJacobianPrim(const PetscReal q[3], PetscRea
 // ComputeSWERoeEigenspectrum() and the flux assembly line by line; at |.|
 // kinks and entropy-fix branch switches the code's own branch is followed
 // (consistent one-sided derivative).
-static PetscErrorCode SWERoeFluxDifferentialPrim(const PetscReal qL[3], const PetscReal qR[3], PetscReal sn, PetscReal cn,
+RDY_MATH_FN void SWERoeFluxDifferentialPrim(const PetscReal qL[3], const PetscReal qR[3], PetscReal sn, PetscReal cn,
                                                  const PetscReal dqL[3], const PetscReal dqR[3], PetscReal dF[3]) {
-  PetscFunctionBeginUser;
   PetscReal hl = qL[0], ul = qL[1], vl = qL[2];
   PetscReal hr = qR[0], ur = qR[1], vr = qR[2];
   PetscReal dhl = dqL[0], dul = dqL[1], dvl = dqL[2];
@@ -209,7 +214,6 @@ static PetscErrorCode SWERoeFluxDifferentialPrim(const PetscReal qL[3], const Pe
     }
     dF[i] = 0.5 * (d_FL[i] + d_FR[i] - d_diss);
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Computes the two 3x3 Jacobian blocks of the Roe interface flux with respect
@@ -217,9 +221,8 @@ static PetscErrorCode SWERoeFluxDifferentialPrim(const PetscReal qL[3], const Pe
 //   dFdUL = dF/d(uL), dFdUR = dF/d(uR)   (exact; see header note).
 // Assembled column-by-column from the exact primitive-space differential,
 // chained through the primitive-reconstruction Jacobians P_L, P_R.
-static PetscErrorCode SWERoeFluxJacobian(const PetscReal consL[3], const PetscReal consR[3], PetscReal sn, PetscReal cn, PetscReal tiny_h,
+RDY_MATH_FN void SWERoeFluxJacobian(const PetscReal consL[3], const PetscReal consR[3], PetscReal sn, PetscReal cn, PetscReal tiny_h,
                                          PetscReal h_anuga, PetscReal dFdUL[3][3], PetscReal dFdUR[3][3]) {
-  PetscFunctionBeginUser;
 
   // both sides dry: no flux, no dependence (the RHS skips these edges)
   if (consL[0] < tiny_h && consR[0] < tiny_h) {
@@ -228,12 +231,12 @@ static PetscErrorCode SWERoeFluxJacobian(const PetscReal consL[3], const PetscRe
         dFdUL[i][j] = 0.0;
         dFdUR[i][j] = 0.0;
       }
-    PetscFunctionReturn(PETSC_SUCCESS);
+    return;
   }
 
   PetscReal qL[3], qR[3], PL[3][3], PR[3][3];
-  PetscCall(SWEReconstructPrimitiveWithJacobian(consL, tiny_h, h_anuga, qL, PL));
-  PetscCall(SWEReconstructPrimitiveWithJacobian(consR, tiny_h, h_anuga, qR, PR));
+  SWEReconstructPrimitiveWithJacobian(consL, tiny_h, h_anuga, qL, PL);
+  SWEReconstructPrimitiveWithJacobian(consR, tiny_h, h_anuga, qR, PR);
 
   const PetscReal zero[3] = {0.0, 0.0, 0.0};
   for (PetscInt j = 0; j < 3; ++j) {
@@ -242,14 +245,13 @@ static PetscErrorCode SWERoeFluxJacobian(const PetscReal consL[3], const PetscRe
     PetscReal dirL[3] = {PL[0][j], PL[1][j], PL[2][j]};
     PetscReal dirR[3] = {PR[0][j], PR[1][j], PR[2][j]};
     PetscReal dFL[3], dFR[3];
-    PetscCall(SWERoeFluxDifferentialPrim(qL, qR, sn, cn, dirL, zero, dFL));
-    PetscCall(SWERoeFluxDifferentialPrim(qL, qR, sn, cn, zero, dirR, dFR));
+    SWERoeFluxDifferentialPrim(qL, qR, sn, cn, dirL, zero, dFL);
+    SWERoeFluxDifferentialPrim(qL, qR, sn, cn, zero, dirR, dFR);
     for (PetscInt i = 0; i < 3; ++i) {
       dFdUL[i][j] = dFL[i];
       dFdUR[i][j] = dFR[i];
     }
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 // Computes the 3x3 diagonal Jacobian block D = dS/d(h, hu, hv) of the
@@ -261,8 +263,7 @@ static PetscErrorCode SWERoeFluxJacobian(const PetscReal consL[3], const PetscRe
 // derivative is zero there (the consistent one-sided value).
 // Friction-only part: D_f = d(S_fric)/d(h, hu, hv) with
 // S_fric = (0, -tbx, -tby), tb = g n^2 h^{-7/3} m, m = |(hu, hv)|.
-static PetscErrorCode SWEFrictionJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal tiny_h, PetscReal D[3][3]) {
-  PetscFunctionBeginUser;
+RDY_MATH_FN void SWEFrictionJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal tiny_h, PetscReal D[3][3]) {
   PetscReal h = cons[0], hu = cons[1], hv = cons[2];
 
   for (PetscInt i = 0; i < 3; ++i)
@@ -281,18 +282,15 @@ static PetscErrorCode SWEFrictionJacobian(const PetscReal cons[3], PetscReal n_m
       D[2][2] = -c * (m + Square(hv) / m);
     }
   }
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode SWESourceJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal dzdx, PetscReal dzdy, PetscReal tiny_h,
+RDY_MATH_FN void SWESourceJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal dzdx, PetscReal dzdy, PetscReal tiny_h,
                                         PetscReal D[3][3]) {
-  PetscFunctionBeginUser;
-  PetscCall(SWEFrictionJacobian(cons, n_manning, tiny_h, D));
+  SWEFrictionJacobian(cons, n_manning, tiny_h, D);
 
   // bed slope: -g dz/dx h contributes to the h column of the momentum rows
   D[1][0] += -GRAVITY * dzdx;
   D[2][0] += -GRAVITY * dzdy;
-  PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 #pragma GCC diagnostic pop

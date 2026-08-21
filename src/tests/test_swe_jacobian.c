@@ -27,8 +27,8 @@ static const PetscReal H_ANUGA = 0.0;   // matches the default physics.flow.h_an
 static PetscErrorCode EdgeFlux(const PetscReal consL[3], const PetscReal consR[3], PetscReal sn, PetscReal cn, PetscReal F[3]) {
   PetscFunctionBeginUser;
   PetscReal qL[3], qR[3], PL[3][3], PR[3][3];
-  PetscCall(SWEReconstructPrimitiveWithJacobian(consL, TINY_H, H_ANUGA, qL, PL));
-  PetscCall(SWEReconstructPrimitiveWithJacobian(consR, TINY_H, H_ANUGA, qR, PR));
+  SWEReconstructPrimitiveWithJacobian(consL, TINY_H, H_ANUGA, qL, PL);
+  SWEReconstructPrimitiveWithJacobian(consR, TINY_H, H_ANUGA, qR, PR);
 
   PetscReal        hl = qL[0], ul = qL[1], vl = qL[2];
   PetscReal        hr = qR[0], ur = qR[1], vr = qR[2];
@@ -105,7 +105,7 @@ static void TestAnalyticNearEqualStates(void **state) {
   PetscReal consR[3] = {2.0 * (1 + 1e-8), 1.2 * (1 - 1e-8), -0.4 * (1 + 1e-8)};
 
   PetscReal AL[3][3], AR[3][3], FL[3][3], FR[3][3];
-  assert_int_equal(0, SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR));
+  SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR);
   assert_int_equal(0, EdgeFluxJacobianFD(consL, consR, SN, CN, 1e-5, FL, FR));
 
   PetscReal err = BlockPairRelError(AL, AR, FL, FR);
@@ -119,7 +119,7 @@ static void TestAnalyticDistinctStates(void **state) {
   PetscReal consL[3] = {10.0, 0.0, 0.0}, consR[3] = {5.0, 0.0, 0.0};
 
   PetscReal AL[3][3], AR[3][3], FL[3][3], FR[3][3];
-  assert_int_equal(0, SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR));
+  SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR);
   assert_int_equal(0, EdgeFluxJacobianFD(consL, consR, SN, CN, 1e-5, FL, FR));
 
   PetscReal err = BlockPairRelError(AL, AR, FL, FR);
@@ -135,7 +135,7 @@ static void TestAnalyticTranscriticalStates(void **state) {
   PetscReal consL[3] = {1.0, 3.0, 0.4}, consR[3] = {2.0, 0.5, -0.2};
 
   PetscReal AL[3][3], AR[3][3], FL[3][3], FR[3][3];
-  assert_int_equal(0, SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR));
+  SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR);
   assert_int_equal(0, EdgeFluxJacobianFD(consL, consR, SN, CN, 1e-6, FL, FR));
 
   PetscReal err = BlockPairRelError(AL, AR, FL, FR);
@@ -149,7 +149,7 @@ static void TestDryDryStates(void **state) {
   PetscReal consL[3] = {1e-9, 0.0, 0.0}, consR[3] = {1e-9, 0.0, 0.0};
 
   PetscReal AL[3][3], AR[3][3];
-  assert_int_equal(0, SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR));
+  SWERoeFluxJacobian(consL, consR, SN, CN, TINY_H, H_ANUGA, AL, AR);
   for (PetscInt i = 0; i < 3; ++i)
     for (PetscInt j = 0; j < 3; ++j) {
       assert_true(AL[i][j] == 0.0);
@@ -184,7 +184,7 @@ static void TestSourceJacobian(void **state) {
   PetscReal       cons[3]   = {0.4, 0.25, -0.1};  // shallow, flowing: friction matters
 
   PetscReal D[3][3];
-  assert_int_equal(0, SWESourceJacobian(cons, n_manning, dzdx, dzdy, TINY_H, D));
+  SWESourceJacobian(cons, n_manning, dzdx, dzdy, TINY_H, D);
 
   PetscReal maxrel = 0.0, norm = 0.0;
   PetscReal FD[3][3];
@@ -208,7 +208,7 @@ static void TestSourceJacobian(void **state) {
 
   // zero-momentum state: friction Jacobian vanishes, bed slope remains
   PetscReal cons0[3] = {0.4, 0.0, 0.0}, D0[3][3];
-  assert_int_equal(0, SWESourceJacobian(cons0, n_manning, dzdx, dzdy, TINY_H, D0));
+  SWESourceJacobian(cons0, n_manning, dzdx, dzdy, TINY_H, D0);
   assert_true(D0[1][1] == 0.0 && D0[2][2] == 0.0);
   assert_true(PetscAbsReal(D0[1][0] + 9.806 * dzdx) < 1e-12);
 }

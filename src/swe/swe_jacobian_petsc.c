@@ -288,7 +288,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
 
     PetscReal dFdUL[3][3], dFdUR[3][3];
     PetscReal uL[3] = {consL[0], consL[1], consL[2]}, uR[3] = {consR[0], consR[1], consR[2]};
-    PetscCall(SWERoeFluxJacobian(uL, uR, edges->sn[edge_id], edges->cn[edge_id], tiny_h, h_anuga, dFdUL, dFdUR));
+    SWERoeFluxJacobian(uL, uR, edges->sn[edge_id], edges->cn[edge_id], tiny_h, h_anuga, dFdUL, dFdUR);
 
     PetscReal len = edges->lengths[edge_id];
     PetscReal wl = -len / cells->areas[l], wr = len / cells->areas[r];
@@ -338,7 +338,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
       PetscReal          wl  = -len / cells->areas[l];
 
       PetscReal qL[3], PL[3][3];
-      PetscCall(SWEReconstructPrimitiveWithJacobian(consL, tiny_h, h_anuga, qL, PL));
+      SWEReconstructPrimitiveWithJacobian(consL, tiny_h, h_anuga, qL, PL);
 
       // ghost primitive state and its map dG = dqR/dqL (primitive space)
       PetscReal qR[3], G[3][3] = {{0}};
@@ -347,7 +347,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
         case CONDITION_DIRICHLET: {
           PetscReal consR[3] = {PetscRealPart(bv_ptr[3 * e]), PetscRealPart(bv_ptr[3 * e + 1]), PetscRealPart(bv_ptr[3 * e + 2])};
           PetscReal PR_unused[3][3];
-          PetscCall(SWEReconstructPrimitiveWithJacobian(consR, tiny_h, h_anuga, qR, PR_unused));
+          SWEReconstructPrimitiveWithJacobian(consR, tiny_h, h_anuga, qR, PR_unused);
           // ghost independent of the interior state: dG stays zero
         } break;
         case CONDITION_REFLECTING: {
@@ -399,7 +399,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
         PetscReal dirR[3];
         for (PetscInt i = 0; i < 3; ++i) dirR[i] = G[i][0] * dirL[0] + G[i][1] * dirL[1] + G[i][2] * dirL[2];
         PetscReal dF[3];
-        PetscCall(SWERoeFluxDifferentialPrim(qL, qR, sn, cn, dirL, dirR, dF));
+        SWERoeFluxDifferentialPrim(qL, qR, sn, cn, dirL, dirR, dF);
         for (PetscInt i = 0; i < 3; ++i) v[block_at + 3 * i + j] = wl * dF[i];
       }
     }
@@ -420,7 +420,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
     PetscReal cons[3]   = {u_ptr[3 * c + 0], u_ptr[3 * c + 1], u_ptr[3 * c + 2]};
     PetscReal D[3][3];
     if (friction_in_rhs) {
-      PetscCall(SWESourceJacobian(cons, n_manning, cells->dz_dx[c], cells->dz_dy[c], tiny_h, D));
+      SWESourceJacobian(cons, n_manning, cells->dz_dx[c], cells->dz_dy[c], tiny_h, D);
     } else {
       for (PetscInt i = 0; i < 3; ++i)
         for (PetscInt j = 0; j < 3; ++j) D[i][j] = 0.0;
@@ -570,7 +570,7 @@ static PetscErrorCode SWEIJacobianFriction(TS ts, PetscReal t, Vec u_global, Vec
     PetscReal cons[3]   = {PetscRealPart(u_ptr[3 * o]), PetscRealPart(u_ptr[3 * o + 1]), PetscRealPart(u_ptr[3 * o + 2])};
     PetscReal n_manning = mat_props.values[MATERIAL_PROPERTY_MANNINGS][o];
     PetscReal D[3][3];
-    PetscCall(SWEFrictionJacobian(cons, n_manning, tiny_h, D));
+    SWEFrictionJacobian(cons, n_manning, tiny_h, D);
 
     PetscReal block[9];
     for (PetscInt i = 0; i < 3; ++i)
