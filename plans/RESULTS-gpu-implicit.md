@@ -246,3 +246,29 @@ gamg tuning. Logs: $SCRATCH/gpu-implicit/p4prep_gamg{0,1}_n4.log.
   -pc_gamg_process_eq_limit 1000; first move when P4 unblocks is to rerun
   with the canon set + chase the remaining transfers (and wire cudss for
   the coarse solve -- delegated).
+
+### P4 prep #2 + shared-arch QA (post-cert-renewal session)
+
+- **Shared-arch GPU QA: 66 ok / 0 fail** — the full cuda-gated fork suite
+  (ex311/313/314/316/319/320/322/334/335/337) on an A100 against
+  arch-perlmutter-opt-gcc-kokkos-cuda rebuilt at the reconciled main +
+  fdaf8ca fix. CAVEATS for anyone running it: (a) that arch is
+  CUDA-chimeric until reconfigured — needs `module load cudatoolkit/12.9`
+  AND 13.2's cuda/math lib64 appended to LD_LIBRARY_PATH; (b) its
+  configured python (~/cutile-venv) is gone — pass PYTHON=python3; (c) the
+  fork's query_tests chokes on multi-pattern search= — one pattern per
+  invocation, and use gmakefile.test directly (the top-level wrapper
+  dropped my search var); (d) generated test scripts honor $PETSCMPIEXEC
+  for redirecting mpiexec into an existing allocation.
+- **GAMG earlier "GPU %F ~10" was a TRUNCATION artifact in my log
+  extraction — KSPSolve/PCSetUp/PCApply all report GPU %F = 100.** The
+  genuine P4 lead is narrower: PCSetUp moves ~66-82 MB per Newton setup
+  (6.8-8.5 GB per 103-setup run) — chase in the aggregation/graph or
+  coarse-op construction path.
+- **SWE-vs-elasticity GAMG delta found**: `-pc_gamg_threshold 0.05` makes
+  the VALUE-filtered graph asymmetric on the upwinded SWE operator and
+  GAMG errors ("un-symmetric graph"); `-pc_gamg_sym_graph true` is NOT
+  honored on this path (likely the device CreateGraph lacks symmetrize —
+  fork follow-up). Working SWE canon: `-pc_gamg_threshold -1` (structure
+  IS symmetric) + `-pc_gamg_prolongator_filter 0.03` + aggressive
+  coarsening: 20/20 Newton, 206 its, PCSetUp 4.24 s/103 (vs 5.4 bare).
