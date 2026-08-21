@@ -123,6 +123,24 @@ foreach(np 1 2)
   endforeach()
 endforeach()
 
+# houston-harvey test with hydrostatic reconstruction + second-order MUSCL
+# (-hr_muscl). HR+MUSCL is only implemented on the PETSc/CPU backend, so this
+# runs "basic" config only (no -ceed).
+file (COPY
+      ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.hr.yaml
+      ${MESH_DIR}/Houston1km_with_z.exo
+      ${CONDITION_DIR}/Houston1km.ic.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/Houston1km.bc.${PETSC_ID_TYPE}.bin
+      ${CONDITION_DIR}/Houston1km.rain.${PETSC_ID_TYPE}.bin
+      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config basic)
+    foreach(lang ${supported_languages})
+      add_test(houston_hr_so_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} Houston1km.DirichletBC.hr.yaml -hr_muscl -homogeneous_rain_file Houston1km.rain.${PETSC_ID_TYPE}.bin -homogeneous_bc_file Houston1km.bc.${PETSC_ID_TYPE}.bin -temporally_interpolate_bc ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
 # houston-harvey test with spatially homogeneous rainfall with adaptive timestepping
 file (COPY
       ${CMAKE_CURRENT_SOURCE_DIR}/Houston1km.DirichletBC.adaptive_timestep.yaml
