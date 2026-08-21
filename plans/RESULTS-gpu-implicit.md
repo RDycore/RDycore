@@ -111,3 +111,32 @@ New PETSc arch `arch-macosx-gnu-rdycore-kokkos-O` of ~/Codes/petsc-claude
   -ts_monitor_solution binary dumps -> compare_traj.py (n64-vs-n64 is the
   apples-to-apples trajectory pair; n4 runs differ by partition/reductions
   at Newton-tolerance level, expected).
+
+### Fork bug found & fixed: MatShift/MatNorm on BAIJKokkos (fdaf8ca2c1a)
+
+PM baijkokkos smoke SEGV'd at startup; reproduced on the laptop (np>=2
+driver run, then a 60-line unit test). Root cause: the device-native
+BAIJKokkos classes INHERITED MatShift_SeqBAIJ(), which reads the base
+Mat_SeqBAIJ->nz (0 for device-built matrices), concludes the matrix is
+empty, and re-preallocates it 1 block/row -- destroying the device
+structure/values (serial: Jacobian degenerates to shift*I; parallel:
+dangling COO struct -> SEGV). Trigger: TSComputeIJacobianDefault() =
+MatScale+MatShift every Newton step of the BEULER path -- the fork's
+FE/SNES pipelines never called MatShift, so it went unseen. MatNorm was
+also inherited and silently returned 0 (reads empty base arrays).
+
+Fix (petsc-claude fdaf8ca2c1a, laptop+PM): device MatShift_SeqBAIJKokkos
+(in-place add on each block-row's diagonal block; SUP if a diagonal block
+is missing from the pattern), MatShift_MPIBAIJKokkos (delegates to the
+diag sub-block), MatNorm_SeqBAIJKokkos (frobenius from synced values;
+1/inf via temporary SEQAIJ), + lifecycle gate ex337 (blocked COO cycled
+with Norm/Scale/Shift/Mult vs an AIJ reference; seq, mpi, and the MPIBAIJ
+host twin). Verified: ex337 3/3, ex311/322/334/335 all ok, cycle repro
+np1-4 exact, RDycore ctest 14/14, adjoint_beuler full solve 40/40 at
+np1/2/4 baijkokkos, PM 4-GPU baijkokkos smoke converges. NB for the QA
+agent: the SHARED arch needs an incremental make to pick this up, and the
+cuda-gated blocked-COO tests (ex313/314/316/319/320) + ex337 should run
+on a GPU node.
+
+P2 job 57369566 held during the PM relink and released; queued with the
+fixed lib.
