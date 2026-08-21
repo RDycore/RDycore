@@ -83,3 +83,31 @@ New PETSc arch `arch-macosx-gnu-rdycore-kokkos-O` of ~/Codes/petsc-claude
 - MatSetValuesCOO with a device pointer (kokkos impls detect memtype).
 - State: -dm_vec_type kokkos + VecKokkosGetDeviceView of u_local after
   DMGlobalToLocal; manning via device view of material_properties.
+
+## Session updates (2026-08-21, later)
+
+- **petsc-claude reconciliation (now owned by this session)**: three
+  lineages — laptop main a5fbbf51c88 (33 ahead of GitLab 18bdd7fc26b, an
+  ancestor), PM main 5d7d9997275 (11ef47e1f04 + 3 recovered commits).
+  Verified: the two PM cache-fix commits are content-identical cherry-picks
+  of laptop's 9c4fd83f3fb/d10463c1824, and PM-unique 5d7d9997275 is a
+  content twin of laptop's 1f8484fdbe7 (MatFlatABSchedBuildDevice + ex322
+  gates present on both). Merge commit 6e627442cdd joins the histories
+  (tree == laptop main); laptop AND PM main fast-forwarded to it, so all
+  three PM commits are ancestors — nothing lost by construction. GitLab
+  push is fast-forward and PENDING (permission-blocked for the agent):
+  `cd ~/Codes/petsc-claude && git push origin main`.
+  Only source delta 5d7d9997275 -> merge: src/ksp/pc/impls/gamg/
+  agg_device.kokkos.cxx (the shared opt-gcc-kokkos-cuda arch needs an
+  incremental make for it; delegated as a QA job).
+- **arch-perlmutter-claude-kokkos-cuda-O BUILT** on the merged tree
+  (cuda 13.2, no cudss). RDycore `build-claude-gpu` built against it
+  (RDY_HAVE_MAT_COO_BLOCK_INDICES=1); CPU `build-claude` rebuilt at
+  054717cb on arch-perlmutter-claude-O.
+- **P2 gate job 57369566** submitted ($SCRATCH/gpu-implicit/p2_ab.sbatch):
+  dt=1 x20 steps, fgmres+pbjacobi rtol 1e-3, MPICH_GPU_SUPPORT_ENABLED=1;
+  runs: CPU baseline n64, GPU-binary/host-mats n64 (build sanity),
+  aijkokkos and baijkokkos each at n4 and n64 (-dm_vec_type kokkos);
+  -ts_monitor_solution binary dumps -> compare_traj.py (n64-vs-n64 is the
+  apples-to-apples trajectory pair; n4 runs differ by partition/reductions
+  at Newton-tolerance level, expected).
