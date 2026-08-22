@@ -646,6 +646,20 @@ static PetscErrorCode ApplyCeedOperator(Operator *op, PetscReal dt, Vec u_local,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// snapshot the external sources into src_inst for output, skipping the copy
+// when the forcing hasn't changed since the last snapshot (it changes at
+// forcing updates, e.g. hourly rain, not per RHS eval)
+static PetscErrorCode SnapshotExternalSources(Operator *op) {
+  PetscObjectState state;
+  PetscFunctionBegin;
+  PetscCall(PetscObjectStateGet((PetscObject)op->petsc.external_sources, &state));
+  if (state != op->src_inst_state) {
+    PetscCall(VecCopy(op->petsc.external_sources, op->src_inst));
+    op->src_inst_state = state;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief The two PETSc operators (flux and source) are applied to fill up the global
 ///        right hand side of the discretized equation
 /// @param [in] op         an Operator struct
@@ -665,8 +679,7 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
     PetscBool applied;
     PetscCall(ApplySWEPetscOperatorsKokkos(op, dt, u_local, f_global, &applied));
     if (applied) {
-      // snapshot the external sources into src_inst for output
-      PetscCall(VecCopy(op->petsc.external_sources, op->src_inst));
+      PetscCall(SnapshotExternalSources(op));
       PetscFunctionReturn(PETSC_SUCCESS);
     }
   }
@@ -681,8 +694,7 @@ static PetscErrorCode ApplyPetscOperator(Operator *op, PetscReal dt, Vec u_local
   // apply the composite PETSc source operators
   PetscCall(PetscOperatorApply(op->petsc.source, dt, u_local, f_global));
 
-  // snapshot the external sources into src_inst for output
-  PetscCall(VecCopy(op->petsc.external_sources, op->src_inst));
+  PetscCall(SnapshotExternalSources(op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

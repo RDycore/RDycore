@@ -203,6 +203,10 @@ typedef struct Operator {
   // source output snapshot and accumulation
   Vec src_inst;   // instantaneous source snapshot (PETSc backend)
   Vec src_accum;  // running sum for time averaging (PETSc backend)
+  // change tracking for the src_inst snapshot: external_sources' object state
+  // at the last copy, so the per-RHS-eval snapshot only runs when the forcing
+  // actually changed (src_inst_state == 0 means no snapshot taken yet)
+  PetscObjectState src_inst_state;
 
   //-------------------------------------------
   // diagnostics (used by both PETSc and CEED)

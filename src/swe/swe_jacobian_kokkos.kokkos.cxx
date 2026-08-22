@@ -53,6 +53,7 @@ struct SWEJacobianKokkos {
   View<PetscScalar> src_stage;  // cached external sources
   View<PetscScalar> jacp_v;     // dF/dn COO values buffer (2 per owned cell)
   PetscInt          rhs_source_method, src_len;
+  bool              has_dirichlet = false;  // any SWE_JK_BC_DIRICHLET boundary edge (else the dirichlet staging is never read)
   bool              rhs_ready = false, mp_primed = false, src_primed = false;
   PetscObjectState  mp_state = 0, src_state = 0;  // source-vec states of the staged copies (valid when *_primed)
 };
@@ -101,6 +102,7 @@ PetscErrorCode SWEJacobianKokkosCreate(const SWEJacobianKokkosSetup *s, SWEJacob
   PetscCallCXX(jk->edge_wl = ToDevice("swejk_edge_wl", s->edge_wl, s->n_edges));
   PetscCallCXX(jk->edge_wr = ToDevice("swejk_edge_wr", s->edge_wr, s->n_edges));
   if (s->n_bedges) {
+    for (PetscInt e = 0; e < s->n_bedges && !jk->has_dirichlet; ++e) jk->has_dirichlet = (s->bedge_type[e] == SWE_JK_BC_DIRICHLET);
     PetscCallCXX(jk->bedge_cell = ToDevice("swejk_bedge_cell", s->bedge_cell, s->n_bedges));
     PetscCallCXX(jk->bedge_type = ToDevice("swejk_bedge_type", s->bedge_type, s->n_bedges));
     PetscCallCXX(jk->bedge_offset = ToDevice("swejk_bedge_offset", s->bedge_offset, s->n_bedges));
@@ -142,9 +144,10 @@ PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScala
   } else {
     mp = Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(mat_props, jk->matprop_len);
   }
-  if (jk->n_bedges) {
-    PetscCheck(dirichlet, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "boundary edges present but no dirichlet staging array");
+  if (jk->has_dirichlet) {  // only Dirichlet edges read the staging; skip the per-assembly upload otherwise
+    PetscCheck(dirichlet, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "Dirichlet boundary edges present but no dirichlet staging array");
     PetscCallCXX(Kokkos::deep_copy(jk->dirichlet, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(dirichlet, 3 * jk->n_bedges)));
+    PetscCall(PetscLogCpuToGpu(3.0 * jk->n_bedges * sizeof(PetscScalar)));
   }
 
   const PetscReal tiny_h = jk->tiny_h, h_anuga = jk->h_anuga;
@@ -317,9 +320,10 @@ PetscErrorCode SWEKokkosApplyFlux(SWEJacobianKokkos *jk, const PetscScalar *u_pt
   Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> u(u_ptr, jk->n_u_local);
   Kokkos::View<PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>       f(f_ptr, 3 * jk->n_cells);
 
-  if (jk->n_bedges) {
-    PetscCheck(dirichlet, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "boundary edges present but no dirichlet staging array");
+  if (jk->has_dirichlet) {  // only Dirichlet edges read the staging; skip the per-eval upload otherwise
+    PetscCheck(dirichlet, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "Dirichlet boundary edges present but no dirichlet staging array");
     PetscCallCXX(Kokkos::deep_copy(jk->dirichlet, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(dirichlet, 3 * jk->n_bedges)));
+    PetscCall(PetscLogCpuToGpu(3.0 * jk->n_bedges * sizeof(PetscScalar)));
   }
 
   const PetscReal tiny_h = jk->tiny_h, h_anuga = jk->h_anuga;
