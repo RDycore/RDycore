@@ -51,7 +51,7 @@ static const char *help_str =
 static PetscErrorCode ObservationMatrixType(Vec state, MatType *type) {
   PetscBool is_kokkos;
   PetscFunctionBeginUser;
-  PetscCall(RDyVecIsKokkos(state, &is_kokkos));
+  PetscCall(PetscObjectTypeCompareAny((PetscObject)state, &is_kokkos, VECKOKKOS, VECSEQKOKKOS, VECMPIKOKKOS, ""));
   *type = is_kokkos ? MATAIJKOKKOS : MATAIJ;
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -240,7 +240,7 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   // so the device kernels write in exactly the host loop's order.
   {
     PetscBool is_kokkos;
-    PetscCall(RDyMatIsKokkos(rdy->rhs_jac, &is_kokkos));
+    PetscCall(PetscObjectTypeCompareAny((PetscObject)rdy->rhs_jac, &is_kokkos, MATSEQAIJKOKKOS, MATMPIAIJKOKKOS, MATSEQBAIJKOKKOS, MATMPIBAIJKOKKOS, ""));
     if (is_kokkos) {
       SWEJacobianKokkosSetup s = {0};
 
@@ -756,7 +756,7 @@ PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_lo
   PetscFunctionBegin;
   *applied = PETSC_FALSE;
   PetscBool is_kokkos;
-  PetscCall(RDyVecIsKokkos(u_local, &is_kokkos));
+  PetscCall(PetscObjectTypeCompareAny((PetscObject)u_local, &is_kokkos, VECKOKKOS, VECSEQKOKKOS, VECMPIKOKKOS, ""));
   if (!is_kokkos) PetscFunctionReturn(PETSC_SUCCESS);
 
   if (!rk->announced) {
@@ -1196,7 +1196,9 @@ PetscErrorCode RegisterSWERHSJacobian(RDy rdy) {
         MatType   mat_type;
         PetscBool is_device;
         PetscCall(MatGetType(rdy->rhs_jac, &mat_type));
-        PetscCall(RDyMatIsDeviceNative(rdy->rhs_jac, &is_device));
+        PetscCall(PetscObjectTypeCompareAny((PetscObject)rdy->rhs_jac, &is_device, MATSEQAIJKOKKOS, MATMPIAIJKOKKOS, MATSEQBAIJKOKKOS,
+                                            MATMPIBAIJKOKKOS, MATSEQAIJCUSPARSE, MATMPIAIJCUSPARSE, MATSEQAIJHIPSPARSE, MATMPIAIJHIPSPARSE,
+                                            MATSEQBAIJCUDA, MATMPIBAIJCUDA, ""));
         PetscCheck(!is_device, rdy->comm, PETSC_ERR_SUP,
                    "numerics.jacobian: fd requires a host matrix type (FD coloring reads host CSR data that device matrix type '%s' does not "
                    "populate before assembly); use numerics.jacobian: analytic with device matrix types",
