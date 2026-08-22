@@ -408,9 +408,11 @@ prior. Recovery is assessed over observable cells (wet and moving at
 the final time; dry cells are untouched by friction and correctly
 remain at the prior). The controlling factor is observability
 (Table~\ref{tab:percell}): a single terminal snapshot leaves the
-problem badly underdetermined ($39.5\%$ error at full convergence),
-while 20 observation times over the same window reach $8.0\%$, the
-remainder being genuine null space held by the prior. The exact
+problem badly underdetermined ($39.5\%$ error at full convergence);
+eight observation times already halve the error ($19.9\%$, and still
+descending when stopped at a 200-iteration cap); and 20 observation
+times over the same window reach $8.0\%$, the remainder being genuine
+null space held by the prior. The exact
 analytic Jacobian reduced the cost of an adjoint sweep by roughly
 $6\times$ relative to the FD-coloring Jacobian, making the converged
 experiments interactive ($\sim$2 minutes on one laptop core).
