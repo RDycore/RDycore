@@ -44,20 +44,35 @@ static const char *help_str =
 
 #define NDOF 3
 
+// observation-matrix type matching the state vec: a device (aijkokkos) H
+// keeps the per-observation-time MatMult / MatMultTranspose applies -- and,
+// via MatCreateVecs, the observation-space vecs -- off the host when the
+// solve runs on kokkos types
+static PetscErrorCode ObservationMatrixType(Vec state, MatType *type) {
+  VecType vt;
+  PetscFunctionBeginUser;
+  PetscCall(VecGetType(state, &vt));
+  *type = strstr(vt, "kokkos") ? MATAIJKOKKOS : MATAIJ;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // observation operator: height (DOF 0) at every obs_stride-th cell
 // (same layout as the LETKF driver's observation matrix)
-static PetscErrorCode CreateObservationMatrix(MPI_Comm comm, PetscInt ncells, PetscInt state_nlocal, PetscInt obs_stride, Mat *H,
+static PetscErrorCode CreateObservationMatrix(MPI_Comm comm, PetscInt ncells, Vec u_global, PetscInt obs_stride, Mat *H,
                                               PetscInt *nobs) {
   PetscInt state_size = ncells * NDOF;
-  PetscInt n_obs      = 0;
+  PetscInt n_obs      = 0, state_nlocal;
+  MatType  mat_type;
   PetscFunctionBeginUser;
   for (PetscInt i = 0; i < ncells; i++)
     if (i % obs_stride == 0) n_obs++;
+  PetscCall(VecGetLocalSize(u_global, &state_nlocal));
 
   PetscCall(MatCreate(comm, H));
   // the column layout must match u_global's (uneven) DMPlex distribution
   PetscCall(MatSetSizes(*H, PETSC_DECIDE, state_nlocal, n_obs, state_size));
-  PetscCall(MatSetType(*H, MATAIJ));
+  PetscCall(ObservationMatrixType(u_global, &mat_type));
+  PetscCall(MatSetType(*H, mat_type));
   PetscCall(MatSeqAIJSetPreallocation(*H, 1, NULL));
   PetscCall(MatMPIAIJSetPreallocation(*H, 1, NULL, 1, NULL));
 
@@ -89,10 +104,12 @@ static PetscErrorCode CreateGaugeObservationMatrix(RDy rdy, PetscInt ngauges, co
   PetscCall(VecGetSize(rdy->u_global, &state_size));
   PetscCall(VecGetLocalSize(rdy->u_global, &state_nlocal));
 
+  MatType mat_type;
   PetscCall(MatCreate(comm, H));
   // the column layout must match u_global's (uneven) DMPlex distribution
   PetscCall(MatSetSizes(*H, PETSC_DECIDE, state_nlocal, ngauges, state_size));
-  PetscCall(MatSetType(*H, MATAIJ));
+  PetscCall(ObservationMatrixType(rdy->u_global, &mat_type));
+  PetscCall(MatSetType(*H, mat_type));
   PetscCall(MatSeqAIJSetPreallocation(*H, 1, NULL));
   PetscCall(MatMPIAIJSetPreallocation(*H, 1, NULL, 1, NULL));
 
@@ -808,9 +825,8 @@ int main(int argc, char *argv[]) {
     PetscCall(SetupRainSchedule(rdy, t_final));
 
     Mat      H;
-    PetscInt nobs, state_nlocal;
-    PetscCall(VecGetLocalSize(rdy->u_global, &state_nlocal));
-    PetscCall(CreateObservationMatrix(comm, ncells_global, state_nlocal, obs_stride, &H, &nobs));
+    PetscInt nobs;
+    PetscCall(CreateObservationMatrix(comm, ncells_global, rdy->u_global, obs_stride, &H, &nobs));
 
     Vec y, r_work;
     PetscCall(MatCreateVecs(H, NULL, &y));
