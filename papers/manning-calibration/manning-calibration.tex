@@ -13,9 +13,28 @@
 
 \title{Adjoint Sensitivities and Gradient-Based Manning Roughness
 Calibration in RDycore\\[4pt]\large DRAFT for internal review}
-\author{Mark Adams$^1$, \todo{co-authors: Gautam Bisht, others TBD}\\
-\small $^1$Lawrence Berkeley National Laboratory}
-\date{Draft of August 18, 2026}
+% author roster and affiliations from the RDycore EMS paper (Bisht et al.,
+% Environ. Model. Softw. 197 (2026) 106804); order provisional pending the
+% venue/authorship decision
+\author{Mark Adams$^1$, Gautam Bisht$^2$, Donghui Xu$^2$, Jeffrey
+Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$, Dongyu Feng$^2$, Dalei
+Hao$^2$, Darren Engwirda$^{6,7}$, Mukesh Kumar$^8$, Zeli Tan$^2$\\[2pt]
+\small $^1$Applied Mathematics \& Computational Research Division,
+Lawrence Berkeley National Laboratory, Berkeley, CA, USA\\
+\small $^2$Atmospheric, Climate, \& Earth Sciences Division, Pacific
+Northwest National Laboratory, Richland, WA, USA\\
+\small $^3$Cohere Consulting, LLC, Seattle, WA, USA\\
+\small $^4$Department of Computer Science, University of Colorado
+Boulder, Boulder, CO, USA\\
+\small $^5$Computer Science and Engineering, University at Buffalo,
+Buffalo, NY, USA\\
+\small $^6$Fluid Dynamics and Solid Mechanics Group (T-3), Los Alamos
+National Laboratory, Los Alamos, NM, USA\\
+\small $^7$Environment, Commonwealth Scientific and Industrial Research
+Organisation, Hobart, TAS, Australia\\
+\small $^8$Civil, Construction and Environmental Engineering,
+University of Alabama, Tuscaloosa, AL, USA}
+\date{Draft of August 22, 2026}
 
 \begin{document}
 \maketitle
@@ -24,36 +43,38 @@ Calibration in RDycore\\[4pt]\large DRAFT for internal review}
 We present a discrete-adjoint capability for RDycore, the exascale river
 dynamical core of the Energy Exascale Earth System Model (E3SM), and use
 it for gradient-based calibration of spatially distributed Manning
-roughness. The capability comprises: an exact, assembled Jacobian of the
-finite-volume shallow-water right-hand side --- closed-form Roe-flux
-blocks obtained by hand-written forward-mode differentiation of the flux
-computation, including the entropy-fix branches, together with
-source-term and boundary-condition blocks; adjoint sensitivities of
-gauge-misfit functionals with respect to both the initial state and the
-Manning field via PETSc's \texttt{TSAdjoint}, at a cost of roughly one
-forward solve per gradient independent of the parameter count; and
-bound-constrained calibration with TAO. Every derivative is validated
-against finite differences of the full nonlinear solve at tight,
-pre-registered tolerances (Jacobian blocks to $10^{-8}$, gradients to
-$10^{-5}$). Twin experiments recover a two-zone roughness field to
+roughness. The capability has three parts. First, an exact assembled
+Jacobian of the finite-volume shallow-water right-hand side:
+closed-form Roe-flux blocks obtained by hand-written forward-mode
+differentiation of the flux computation, entropy-fix branches included,
+together with source-term and boundary-condition blocks. Second,
+adjoint sensitivities of gauge-misfit functionals with respect to both
+the initial state and the Manning field via PETSc's
+\texttt{TSAdjoint}; one gradient costs roughly one extra forward solve,
+independent of the parameter count. Third, bound-constrained
+calibration with TAO. Every derivative is validated against finite
+differences of the full nonlinear solve at tight, pre-registered
+tolerances (Jacobian blocks to $10^{-8}$, gradients to $10^{-5}$).
+Twin experiments recover a two-zone roughness field to
 $4\times10^{-7}$ relative error, and a per-cell field to $8\%$ with
-multi-time observations and Tikhonov regularization. The same assembled
-Jacobian enables fully implicit backward-Euler stepping --- which we show
-is required in practice: the explicit treatment of Manning drag is
-unstable at the operational time step of a Hurricane Harvey test case,
-in quantitative agreement with a friction-stiffness stability analysis
---- and the implicit integrator's adjoint passes the same
+multi-time observations and Tikhonov regularization. The same
+assembled Jacobian enables fully implicit backward-Euler stepping, and
+we show implicit stepping is required in practice: explicit Manning
+drag is unstable at the operational time step of a Hurricane Harvey
+test case, in quantitative agreement with a friction-stiffness
+stability analysis. The implicit integrator's adjoint passes the same
 finite-difference gates. On a Hurricane Harvey twin configuration
 (2{,}746 cells, implicit stepping) the calibrated Manning map recovers
 a two-zone truth field to $19.4\%$ with proper Tikhonov
-regularization, and the gauge-sparse setting exhibits --- and lets us
+regularization. The gauge-sparse setting exhibits --- and lets us
 dissect --- the classic semiconvergence of underdetermined friction
-estimation; a twin using the actual 17-gauge USGS network geometry
+estimation: a twin using the actual 17-gauge USGS network geometry
 fits its 238 observations essentially perfectly while recovering the
 field to only $45\%$, quantifying why real-data calibration must
-shrink the parameter space to match the network. To our knowledge this makes RDycore the
-first E3SM component model with built-in discrete-adjoint parameter
-estimation, without rewriting the solver in a machine-learning framework.
+shrink the parameter space to match the network. To our knowledge this
+makes RDycore the first E3SM component model with built-in
+discrete-adjoint parameter estimation, without rewriting the solver in
+a machine-learning framework.
 \end{abstract}
 
 \section{Introduction}
@@ -62,17 +83,18 @@ Manning roughness is the dominant tunable parameter of depth-averaged
 flood models, and its calibration is traditionally manual or ensemble
 based. Adjoint methods deliver the gradient of an observation misfit
 with respect to \emph{every} cell's roughness at the cost of about one
-extra forward solve, making distributed calibration tractable; the
+extra forward solve, making distributed calibration tractable. The
 approach is well established in shallow-water modeling, from channel
 networks~\cite{ding2004manning} and unstructured finite-volume twin
 experiments~\cite{yan2014adjoint} to GPU-accelerated
-optimizers~\cite{lacasta2016gpu}, and is deployed in
+optimizers~\cite{lacasta2016gpu}. It is deployed in
 variational-assimilation platforms such as
 DassFlow~\cite{dassflow,brisset2018swot} and the Thetis coastal model,
-which calibrated a spatially varying Manning field for the Baltic
-Sea with an automatically generated adjoint~\cite{karna2023baltic}
-after storm-surge sensitivity studies that addressed the overfitting
-inherent in distributed friction estimation~\cite{warder2021storm}.
+which calibrated a spatially varying Manning field for the Baltic Sea
+with an automatically generated adjoint~\cite{karna2023baltic},
+following storm-surge sensitivity studies that addressed the
+overfitting inherent in distributed friction
+estimation~\cite{warder2021storm}.
 
 A recent generation of \emph{differentiable} flood and hydrology codes
 obtains gradients by rewriting simplified solvers inside
@@ -250,14 +272,17 @@ the tolerances recovered $5\times10^{-6}$
 The complete calibration loop is summarized in
 Algorithms~\ref{alg:var4d}--\ref{alg:blmvm}. It is a strong-constraint
 4D-Var iteration: the model is enforced exactly (the only controls are
-the Manning field and, optionally, the initial state), and each
-objective evaluation performs one checkpointed forward sweep that
-records the gauge residuals $r_k$ at the observation times, followed
-by one backward sweep of the discrete adjoint
-(Algorithm~\ref{alg:sweep}). The backward sweep carries two vectors
-with distinct roles. The \emph{adjoint state} $\lambda$ holds
+the Manning field and, optionally, the initial state). Each objective
+evaluation performs one checkpointed forward sweep that records the
+gauge residuals $r_k$ at the observation times, followed by one
+backward sweep of the discrete adjoint (Algorithm~\ref{alg:sweep}).
+The per-iteration cost is therefore one forward plus one adjoint
+solve, independent of the number of parameters.
+
+The backward sweep carries two vectors with distinct roles. The
+\emph{adjoint state} $\lambda$ holds
 $\partial J_{\mathrm{mis}}/\partial u(t)$ at the current point of the
-backward traversal: it is seeded with the terminal observation
+backward traversal. It is seeded with the terminal observation
 sensitivity $\sigma^{-2}H^T r_K$, propagated one step at a time by the
 transposed Jacobian of the forward step map (the backward ``model
 step''), and incremented by a jump $\sigma^{-2}H^T r_k$ each time the
@@ -265,25 +290,25 @@ sweep crosses an observation time, because the state at that time
 enters the misfit directly. The \emph{parameter sensitivity} $\mu$
 starts at zero and accumulates, at every step, the chain-rule
 contribution $(\partial\Phi_s/\partial n)^T\lambda$ of that step's
-Manning dependence; when the sweep reaches $t = 0$, $\mu$ is the
+Manning dependence. When the sweep reaches $t = 0$, $\mu$ is the
 complete misfit gradient $dJ_{\mathrm{mis}}/dn$ and $\lambda$ is
 $dJ_{\mathrm{mis}}/du_0$. Both transposed Jacobians are the analytic
-operators of Sections~\ref{sec:jacobian}--\ref{sec:adjoint}: the
-assembled RHS Jacobian for the state propagation and the two-nonzero
-parameter Jacobian for the $\mu$ accumulation, applied within
-\texttt{TSAdjoint}'s discrete adjoint of the chosen integrator. The
-per-iteration cost is therefore one forward plus one adjoint solve,
-independent of the number of parameters. The outer update is TAO's
-bound-constrained limited-memory quasi-Newton method
-BLMVM~\cite{benson2001blmvm} (Algorithm~\ref{alg:blmvm}), and the loop
-terminates on the standard bound-constrained test: the projected
-gradient $g^P$ --- the gradient with components pointing out of the
-feasible box zeroed --- drops below an absolute tolerance, or an
-iteration budget is reached. The same loop serves every
-parameterization in this paper: per-region, per-cell, and
-land-cover-class fields differ only in the expansion of the parameter
-vector onto cells (line~\ref{ln:apply} of Algorithm~\ref{alg:var4d})
-and the corresponding summation of $\mu$ back onto parameters.
+operators of Sections~\ref{sec:jacobian}--\ref{sec:adjoint} --- the
+assembled RHS Jacobian for the state propagation, the two-nonzero
+parameter Jacobian for the $\mu$ accumulation --- applied within
+\texttt{TSAdjoint}'s discrete adjoint of the chosen integrator.
+
+The outer update is TAO's bound-constrained limited-memory
+quasi-Newton method BLMVM~\cite{benson2001blmvm}
+(Algorithm~\ref{alg:blmvm}). The loop terminates on the standard
+bound-constrained test: the projected gradient $g^P$ --- the gradient
+with components pointing out of the feasible box zeroed --- drops
+below an absolute tolerance, or an iteration budget is reached. The
+same loop serves every parameterization in this paper: per-region,
+per-cell, and land-cover-class fields differ only in the expansion of
+the parameter vector onto cells (line~\ref{ln:apply} of
+Algorithm~\ref{alg:var4d}) and the corresponding summation of $\mu$
+back onto parameters.
 
 \begin{algorithm}
 \caption{Strong-constraint 4D-Var calibration of the Manning field, as
@@ -308,7 +333,9 @@ tolerance $\varepsilon_g$, iteration budget $I_{\max}$
   \State $u \gets u_0$
          \Comment{fixed initial state (strong constraint)}
   \For{$k = 1, \dots, K$}
-     \Comment{forward sweep; every step checkpointed}
+     \Comment{forward sweep; trajectory checkpointed --- every step, or
+     a revolve schedule for long windows
+     (Section~\ref{sec:implicit})}
      \State $u \gets M_{t_{k-1}\to t_k}(u;\, n)$
      \State $r_k \gets H u - y_k$
   \EndFor
@@ -345,8 +372,9 @@ $\mu = dJ_{\mathrm{mis}}/dn$
        $\partial J_{\mathrm{mis}}/\partial u(t_s)$ throughout}
 \State $\mu \gets 0$
 \For{$s = Km, \dots, 1$}
-   \State restore $u_{s-1}$ (and stage values) from the checkpointed
-          trajectory
+   \State restore $u_{s-1}$ (and stage values): read the checkpoint,
+          or recompute forward from the nearest one when the
+          checkpoint schedule demands
    \State $\mu \gets \mu +
           \big(\partial\Phi_s/\partial n\big)^T \lambda$
           \Comment{accumulate this step's Manning dependence}
@@ -463,73 +491,80 @@ three digits. The splitting also runs under RDycore's libCEED operator
 backend --- the explicit side uses the friction-free source Q-functions
 prepared in PR \#359, and the two backends agree to machine precision
 ($5\times10^{-16}$ relative) after 100 ARK-IMEX steps; a
-device-resident implicit part is the natural follow-up. Three implementation facts others will hit: PETSc's ARKIMEX
-adjoint dereferences \emph{both} the implicit- and explicit-part
-parameter Jacobians, so a zero explicit-part
-\texttt{TSSetRHSJacobianP} must be registered even when the parameter
-appears only implicitly; the embedded step-size controller must be
-disabled for finite-difference gradient validation, since perturbed
-solves otherwise take different step sequences (an apparent
-$\sim$$10^{-4}$ gradient error that vanishes with fixed steps); and
-PETSc's in-memory checkpointing trajectory cannot tolerate a
-\emph{segmented} forward solve (one \texttt{TSSolve} per observation
-window): \texttt{TSSolve} sets its converged reason before the final
-trajectory write of every call, which the memory trajectory interprets
-as the end of the forward run, corrupting the checkpoint schedule at
-every interior observation time. The forward sweep must be a single
-\texttt{TSSolve} with observations recorded by a monitor; the
-segmented backward sweep is unaffected.
+device-resident implicit part is the natural follow-up.
+
+Three implementation facts others will hit:
+\begin{itemize}
+  \item PETSc's ARKIMEX adjoint dereferences \emph{both} the
+        implicit- and explicit-part parameter Jacobians, so a zero
+        explicit-part \texttt{TSSetRHSJacobianP} must be registered
+        even when the parameter appears only implicitly.
+  \item The embedded step-size controller must be disabled for
+        finite-difference gradient validation: perturbed solves
+        otherwise take different step sequences, which shows up as an
+        apparent $\sim$$10^{-4}$ gradient error that vanishes with
+        fixed steps.
+  \item PETSc's in-memory checkpointing trajectory cannot tolerate a
+        \emph{segmented} forward solve (one \texttt{TSSolve} per
+        observation window). \texttt{TSSolve} sets its converged
+        reason before the final trajectory write of every call, which
+        the memory trajectory interprets as the end of the forward
+        run, corrupting the checkpoint schedule at every interior
+        observation time. The forward sweep must be a single
+        \texttt{TSSolve} with observations recorded by a monitor; the
+        segmented backward sweep is unaffected.
+\end{itemize}
 
 \paragraph{Checkpointed adjoints for long windows.}
 A naive stored trajectory for a full 36-hour Hurricane Harvey window
 at the 30\,m mesh's CFL-limited $\Delta t = 0.25$\,s (518{,}400 steps,
 2.93M cells) would occupy tens of petabytes. PETSc's checkpointing
 trajectory (\texttt{-ts\_trajectory\_type memory} with the revolve
-optimal-schedule library) replaces storage with recomputation, and we
-validated it across the full hierarchy: on the dam-break twin it
+optimal-schedule library) replaces storage with recomputation. We
+validated it across the full hierarchy. On the dam-break twin it
 reproduces the disk-trajectory calibration and gradient gates
 bit-for-bit for explicit RK, backward Euler, and ARK-IMEX (the
 implicit integrators need the same tight inner tolerances as in
 Section~\ref{sec:adjoint}, since checkpoint recomputation re-solves
-the stage systems); and on the 30\,m mesh a forward-plus-adjoint sweep
+the stage systems). On the 30\,m mesh, a forward-plus-adjoint sweep
 with only \emph{three} states checkpointed in memory matches the
-disk-trajectory gradient to all printed digits while running slightly
-faster (recomputation is cheaper than trajectory I/O at this scale)
-and in less memory. For the full window, a few hundred checkpoints
-($\sim$14\,GB aggregate) bound the recompute overhead by a factor of
-about four, making the long-window adjoint memory-feasible; the
-remaining cost is the forward compute itself, addressed next.
+disk-trajectory gradient to all printed digits --- and runs slightly
+faster, because recomputation is cheaper than trajectory I/O at this
+scale. For the full window, a few hundred checkpoints ($\sim$14\,GB
+aggregate) bound the recompute overhead by a factor of about four,
+making the long-window adjoint memory-feasible; the remaining cost is
+the forward compute itself, addressed next.
 
 \section{Hurricane Harvey demonstration}
 \label{sec:houston}
 
 The per-cell twin runs on the Houston 1\,km Hurricane Harvey mesh
-(2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s): truth is a
+(2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s). Truth is a
 two-zone field split at the domain midline, observed at 343 synthetic
 gauges over 14 observation times, calibrated with implicit stepping and
 Tikhonov regularization ($\beta = 10^{-5}$). Every cell is wet and
 moving in this configuration, so all 2{,}746 parameters are observable.
-This configuration is deliberately gauge-sparse --- 343 gauges for
+The configuration is deliberately gauge-sparse --- 343 gauges for
 2{,}746 parameters, an 8:1 ratio --- and it exhibits the classic
 \emph{semiconvergence} of underdetermined inverse problems
 (Figure~\ref{fig:map}). At 300 BLMVM iterations ($\sim$22 minutes on
 one laptop core, $\sim$4.4\,s per forward-plus-adjoint) the recovered
 map shows the two-zone truth structure cleanly at $26.3\%$ relative
-$L^2$ error. Continuing the same weakly regularized optimization
-($\beta = 10^{-5}$) to 2000 iterations \emph{degrades} recovery to
-$38.0\%$: the misfit keeps decreasing while the parameters drift along
-observation-null directions, ultimately pinning cells against both
-bound constraints (Figure~\ref{fig:map}, right). Early stopping was
-acting as the effective regularizer. The behavior disappears when the
-problem is made well posed: the densely observed dam-break twin of
+$L^2$ error. Continuing the same weakly regularized optimization to
+2000 iterations \emph{degrades} recovery to $38.0\%$: the misfit keeps
+decreasing while the parameters drift along observation-null
+directions, ultimately pinning cells against both bound constraints
+(Figure~\ref{fig:map}, center left). Early stopping was acting as the
+effective regularizer. The behavior disappears when the problem is
+made well posed: the densely observed dam-break twin of
 Table~\ref{tab:percell} converges monotonically to $8\%$, and a
 properly regularized Houston run ($\beta = 10^{-4}$, 686 gauges)
 reaches $19.4\%$ at a 1000-iteration budget with no drift
-(Figure~\ref{fig:map}, right) --- the sharpest recovery of the three,
-with the zone boundary resolved at the truth midline. This is
+(Figure~\ref{fig:map}, center right) --- the sharpest recovery of the
+three, with the zone boundary resolved at the truth midline. This is
 precisely the overfitting risk documented for distributed friction
 estimation~\cite{warder2021storm}, here reproduced in a controlled
-twin setting, and it motivates the regularization studies (total
+twin setting. It motivates the regularization studies (total
 variation, land-cover priors, discrepancy-principle stopping) planned
 as follow-on work.
 
@@ -555,28 +590,32 @@ $2\times10^{7}$-fold while the field recovers to only $44.9\%$: no
 trace of the two-zone truth, near-prior almost everywhere with
 null-space structure pinned against both bounds.}
 \label{fig:map}
-\end{figure} \paragraph{The real gauge network.}
+\end{figure}
+
+\paragraph{The real gauge network.}
 The synthetic gauge sets above are a controlled ramp; the network that
 matters is the real one. Twenty USGS gauges fall inside the Houston
 mesh, seventeen with Hurricane Harvey stage records
-(HydroShare DOI 10.4211/hs.c037167e497546a1bc1508dfb32a9cff). Re-running
-the same twin with the observation operator built at those seventeen
-gauge cells --- 238 observations (17 gauges $\times$ 14 times) against
-2{,}746 parameters --- is a sobering experiment: BLMVM drives the
-misfit down by a factor of $2\times10^{7}$, an essentially perfect fit
-of the observations, while the recovered field is $44.9\%$ from the
-truth and saturates both bounds (Figure~\ref{fig:map}, far right). This is semiconvergence in its purest form:
-the real network's null space is so large that data fit says almost
-nothing about parameter recovery, and no Tikhonov weight or stopping
-rule rescues a per-cell field from 238 observations. The practical
-conclusion for real-data calibration is to shrink the parameter space
-to match the network --- the land-cover-class parameterization
-($\sim$13 NLCD classes for this domain, overdetermined $18\times$ by
-the same observations) is the planned configuration, with the per-cell
-map reserved for densely observed settings. Calibration against the
-actual stage records (rather than twin-synthetic values at the real
-gauge locations) additionally requires the stage-datum QC completed
-after this draft was frozen, and is deliberately deferred.
+(HydroShare DOI 10.4211/hs.c037167e497546a1bc1508dfb32a9cff).
+Re-running the same twin with the observation operator built at those
+seventeen gauge cells --- 238 observations (17 gauges $\times$ 14
+times) against 2{,}746 parameters --- is a sobering experiment. BLMVM
+drives the misfit down by a factor of $2\times10^{7}$, an essentially
+perfect fit of the observations, while the recovered field is
+$44.9\%$ from the truth and saturates both bounds
+(Figure~\ref{fig:map}, far right). This is semiconvergence in its
+purest form: the real network's null space is so large that data fit
+says almost nothing about parameter recovery, and no Tikhonov weight
+or stopping rule rescues a per-cell field from 238 observations. The
+practical conclusion for real-data calibration is to shrink the
+parameter space to match the network. The land-cover-class
+parameterization ($\sim$13 NLCD classes for this domain,
+overdetermined $18\times$ by the same observations) is the planned
+configuration, with the per-cell map reserved for densely observed
+settings. Calibration against the actual stage records (rather than
+twin-synthetic values at the real gauge locations) additionally
+requires the stage-datum QC completed after this draft was frozen, and
+is deliberately deferred.
 
 \section{Nondifferentiability catalog}
 \label{sec:nondiff}
@@ -624,17 +663,29 @@ and hybrid data-assimilation experiments.
 A closing note on cost. Checkpointing makes the long-window adjoint
 memory-feasible, but at the 30\,m mesh's CFL-limited
 $\Delta t = 0.25$\,s a full 36-hour Hurricane Harvey gradient still
-costs several forward sweeps over half a million steps, and a
-many-iteration per-cell calibration at that resolution is not a
-defensible allocation. The affordable path stacks three reductions,
-all enabled by capabilities already in place: fully implicit stepping
-at CFL-free time steps (ARK-IMEX keeps the explicit flux CFL;
-backward Euler with the assembled Jacobian does not, trading a global
-Newton--Krylov solve per step for $20$--$100\times$ fewer steps ---
-making that solver scale is the next solver problem);
-land-cover-class parameterization (tens of TAO evaluations instead of
-hundreds); and calibration on the storm peak rather than the full
-window.
+costs several forward sweeps over half a million steps. The
+affordable path stacks reductions that are all now in place. First,
+fully implicit stepping at CFL-free time steps: backward Euler with
+the assembled Jacobian carries the 30\,m, 2.93M-cell Harvey-region
+mesh at $\Delta t = 1$\,s --- four times the explicit limit, with
+Newton converging in about four iterations per step behind a
+block-Jacobi-preconditioned Krylov solve; larger implicit steps are
+under investigation. Second, GPU execution of the entire gradient
+pipeline: the right-hand side, the assembled Jacobian and its
+transpose solves, the preconditioner setup, the parameter Jacobian,
+the observation operator, and the revolve-checkpointed trajectory are
+all device-resident. On four A100 GPUs, a forward-plus-adjoint
+gradient of a one-simulated-hour window on that mesh (3{,}600
+implicit steps, 400 in-memory checkpoints) takes about nine minutes,
+and one TAO iteration of a dense-gauge twin calibration
+(418{,}076 gauges, 39-step window) takes 1.7\,s --- roughly
+$19\times$ one 64-core CPU node of the same system. Device and host
+runs produce bitwise-identical trajectories under a common compiler
+and gradients identical to every printed digit, so the
+finite-difference gates of Table~\ref{tab:verification} carry over
+unchanged. Third, land-cover-class parameterization (tens of TAO
+evaluations instead of hundreds) and calibration windows placed on
+the storm peak rather than the full event.
 
 \section*{Open questions for internal review}
 \textcolor{red}{[This section will be removed before submission. Please

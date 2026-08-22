@@ -670,3 +670,143 @@ natively via RDyAdvance, so the ARK reference needs no new wiring);
 (2) window placement on the rising limb per the observation-time
 sensitivity study (confirm at 30 m); (3) the scientists' answers on
 trusted gauges/window (dam-release influence) and WSE accuracy target.
+
+## Session 3 (2026-08-22): optimization pass -- pbjacobi setup, device Jacp/H, staging caches
+
+Scope: the measured leads from the session-2 profiles, in value order.
+Every step gated on ctest adjoint|calibrate|jacobian 14/14 + laptop
+bitwise A/B (device config with vs without each optimization) + PM
+A/B under the standing Turning protocols. RDycore commits 827ec4fb..
+4e854188; fork commit 5b4f3d82d1e (patch applied on PM via git am).
+
+### Lead 1 (fork 5b4f3d82d1e): pbjacobi PCSetUp device-pointer handoff
+
+Root cause of the 41.1 s / 2473 setups: PCSetUp_PBJacobi_Kokkos went
+through the host MatInvertBlockDiagonal() contract -- the BAIJKokkos
+implementation inverted ON DEVICE but copied the finished inverses D2H
+into a->idiag, and the PC pushed the same bytes H2D again: 2 x 52.7
+MB/rank/setup of PCIe plus a fresh 53 MB device allocation per call.
+Fix: Mat_SeqBAIJKokkos caches the inverse in a device view (idiag_d,
+state-keyed, allocation reused); new composed
+"MatInvertBlockDiagonalDevice_C" (mpi delegates to the diag block)
+returns the device pointer; PCSetUp_PBJacobi_Kokkos aliases it with
+zero host traffic. `-pc_pbjacobi_invert_device false` = the old path
+(A/B baseline). Bit-identical by construction (same inversion kernel).
+
+### Leads 3+4+6 (RDycore): device Jacp, device H, staging caches
+
+- **The "revolve checkpoints stage through host" lead was a
+  MISATTRIBUTION**: the b4_1hr log's per-event transfers show
+  TSTrajectorySet/Get move ~ZERO bytes (checkpoint vecs are device-
+  resident kokkos duplicates). The TBs of PCIe inside
+  TSStep/TSAdjointStep/TSTrajectoryGet were the NESTED pbjacobi
+  PCSetUps (45,445 calls, 2.39 TB EACH WAY per rank, 542 s = 32% of
+  the 1-hr wall) + the host Jacp path + unlogged mp staging. Nothing
+  to fix in the trajectory itself.
+- **Device parameter Jacobian dF/dn (ced890f2)**: SWERHSJacobianP ran
+  on host every backward step (full-state D2H, MatSetValue loop into
+  host AIJ, and Jacp^T applies pulling lambda D2H -- 17.6 MB x 3600
+  steps = 63 GB per 1-hr gradient). Device-assembly configs now get a
+  COO-preallocated MATAIJKOKKOS Jacp filled by a device kernel
+  (SWEKokkosJacobianP); assembly and MatMultTranspose(Jacp) stay on
+  device (0 transfers in the o3 profile).
+- **Observation operator H follows the state vec type (ebca3206)**:
+  aijkokkos on device runs; MatCreateVecs hands back kokkos obs-space
+  vecs, so per-observation MatMult/MatMultTranspose stay on device.
+- **Material-props staging unified + state-keyed (827ec4fb)**: the
+  Jacobian assembly deep_copied mp EVERY assembly (unlogged; ~530 GB
+  over the 1-hr gradient). Now one shared state-keyed cache
+  (StageTracked) serves Jacobian, RHS source, and Jacp. Read-only
+  VecGetArray uses of material_properties converted to VecGetArrayRead
+  (write-mode gets bumped the state and would have retired the cache).
+- **src_inst snapshot state-keyed + Dirichlet staging skip (2fe34b5e)**:
+  the per-RHS-eval VecCopy(external_sources -> src_inst) (~920 GB of
+  host memcpy per 1-hr gradient) now runs only when the forcing vec's
+  state changes; the 3*n_bedges Dirichlet upload is skipped when the
+  config has no Dirichlet boundary (has_dirichlet, computed at setup).
+
+### PM A/B (Turning 30 m, n4, standing protocols; logs o1..o6, opt_interactive.sh)
+
+Forward dt=1 x20 (vs `-pc_pbjacobi_invert_device false` -- bitwise
+pair, 20/20 Newton, 614 lin its both):
+
+| n4 forward (s)  | invert off | optimized |
+|-----------------|-----------|-----------|
+| SNESSolve       | 2.59      | 1.76      |
+| PCSetUp (103)   | 0.896     | 0.086     |
+| PCSetUp PCIe    | 5.4 GB x2 | 0         |
+
+Trajectories o1-vs-o2 cmp-BITWISE IDENTICAL. (NB comparisons against
+the STORED usol.b1.n4.bin now differ in late digits: that dump predates
+the fork's -vec_mdot_use_gemv default flip -- different FGMRES
+orthogonalization rounding. In-session A/B pairs are the valid check.)
+
+Gradient (20-step window, memory trajectory; J = 143.152, |dJ/du0| =
+1555.3, sum(dJ/dn) = -445566 -- IDENTICAL to b2v_grad_default to every
+printed digit, and identical between invert on/off):
+
+| n4 gradient (s)   | b2v (recorded) | optimized |
+|-------------------|----------------|-----------|
+| TSStep (2 fwd)    | 6.26           | 3.37      |
+| TSAdjointStep (20)| 2.08           | 0.31      |
+| PCSetUp (226)     | 2.99           | 0.19      |
+| KSPSolve (206)    | 2.39           | 2.01      |
+| gradient loop     | ~8.4           | ~3.8 (2.2x)|
+
+Calibration (gauges twin, 20 TAO its; J-trace identical: 1.283391e6 ->
+2.315231e4, 55.43x):
+
+| n4 calibration (s)  | b3cal (recorded) | optimized |
+|---------------------|------------------|-----------|
+| TaoSolve (20 its)   | 106.2 (5.3/it)   | 34.6 (1.73/it) |
+| PCSetUp (2473)      | 41.1             | 2.06      |
+| TSAdjointStep (440) | 45.8             | 5.81      |
+| TSStep (460)        | 66.2             | 30.7      |
+| KSPSolve (2033)     | 29.7             | 18.3      |
+
+Single-node honest device-vs-host is now ~19x per TAO iteration
+(33.1 s host-types n64 vs 1.73 s device n4).
+
+### Foot-gun found on PM: TAO/LMVM aborts on CUDA device solution vecs
+
+With the device Jacp, MatCreateVecs(rhs_jac_p) returns kokkos vecs;
+duplicating the TAO solution vec from mu put BLMVM's LMVM dense
+internals on device, where MatDenseGetColumnVecWrite hits a Kokkos
+DualView "concurrent modification" abort inside MatLMVMUpdate (o5;
+invisible on the laptop -- host-space Kokkos has no separate mirror).
+Fix 4e854188: TAO-side vecs (solution/bounds/prior/gradient) are
+explicit host-layout twins; the adjoint keeps its device mu. J-trace
+unchanged. FORK FOLLOW-UP LEAD: fix MatLMVM/densekokkos on CUDA.
+
+### Style pass (Mark review): PetscObjectTypeCompare everywhere
+
+Type-name strstr/strcmp sniffing replaced by PetscObjectTypeCompareAny
+against canonical type constants at: the device-assembly gate, the
+device-RHS dispatch, the FD-coloring guard, the blocked-COO opt-in,
+the driver's observation-matrix choice and trajectory-type check
+(de180e3c, 8cba778c). Simplify pass extracted the shared one-pass
+Dirichlet ghost gather (ddc9b618). MatSeqAIJGetCSRAndMemType noted as
+the sharper memtype query where a SEQ AIJ-family matrix is in hand
+(not applicable at these MPI/BAIJ/pre-assembly sites).
+
+### 1-hr revolve gradient re-verified (o6_1hr_opt_n4.log)
+
+b4 protocol exactly (3600 steps, revolve max_cps_ram 400, unforced):
+gradient IDENTICAL to b4 to every printed digit (J = 5330.22,
+|dJ/du0| = 9.32912e10, sum(dJ/dn) = -3.25331e12); wall 1638 -> 808 s
+(2.03x). TSStep (10399 incl. recomputes) 654 s (62.9 ms/step),
+TSAdjointStep 53.4 s (14.8 ms/step, was 101), PCSetUp 542 -> 37.7 s,
+KSPSolve 437 -> 401 s (now the dominant term -- the next lead if one
+is ever needed). Per-gradient at a 1-hr window: ~19 -> ~9.4 min at n4;
+6-hr window ~= 56 min/TAO-it; the campaign's 6-hr 20-iteration
+calibration drops from ~1.6 to ~0.8 GPU-node-days.
+
+### Deferred
+
+- DMPlexDistribute caching (lead 5): the mesh pipeline (options-driven
+  distribute -> refine -> overlap -> natural SF) would need
+  topology+distribution+natural-order save/load; the natural SF is
+  load-bearing for the gauge observation set (the known partition-
+  dependence trap). 60-90 s is one-time per job, amortized over a
+  calibration -- poor risk/benefit days before the campaign.
+- Fork GitLab push (Mark): main now also carries 5b4f3d82d1e.
