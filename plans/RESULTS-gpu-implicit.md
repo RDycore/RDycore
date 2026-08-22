@@ -650,3 +650,23 @@ dt=1, revolve max_cps_ram 50 => recomputes cross the hour switch):
 Data: full Harvey hourly MRMS (+ mswep/nldas/daymet) rasters at
 /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/
 mm-per-hr/*/bin (Aug 24-30); repo tree carries a 2-hour sample.
+
+### Turning 1-hr FORCED gradient: the campaign pipeline is complete
+
+b5_1hr_rain_n4.log: beuler_dt1_1hr.yaml + real MRMS hourly rain
+(-raster_rain_dir .../mm-per-hr/mrms/bin -raster_rain_start_date
+2017,8,26,0,0), device n4, memory trajectory with revolve (400 cps).
+Completed in 27.7 min wall -- same as the unforced run (rain adds no
+measurable cost). J(forced) = 3802.79 vs J(unforced) = 5330.22 (the rain
+demonstrably reshapes the trajectory); gradient finite
+(|dJ/du0| = 3.14e8, sum(dJ/dn) = -1.07e10).
+
+End-to-end status for the Wednesday campaign: real forcing + Turning
+30 m + device forward + checkpointed device adjoint all compose, at
+~19 min per gradient per simulated hour of window at n4. Next campaign
+steps: (1) dt-verification (BEULER dt=1 vs ARK dt=0.25 gauge
+hydrographs on a forced window -- the main rdycore driver applies rain
+natively via RDyAdvance, so the ARK reference needs no new wiring);
+(2) window placement on the rising limb per the observation-time
+sensitivity study (confirm at 30 m); (3) the scientists' answers on
+trusted gauges/window (dam-release influence) and WSE accuracy target.
