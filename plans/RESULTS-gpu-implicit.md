@@ -846,3 +846,26 @@ KSPSolve seconds; all 20/20 Newton unless noted):
 - RECOMMENDATION: -ksp_type gmres -ksp_pc_side right (rtol 1e-3 now;
   1e-2 pending gradient FD gates). PM logs: ksp_*_n4.log,
   grad_gmres_rtol*_n4.log in $SCRATCH/gpu-implicit.
+
+### rtol 1e-2 validation + rain-forced rerun (2026-08-22, later; Mark's node)
+
+- FD gates at ksp rtol 1e-2 (laptop, tight snes): adjoint-vs-FD
+  4.5e-3 / 6.2e-4 at np1/2 -- formally FAILS the 1e-5 gate, as expected
+  (gradient error is inner-solve-tolerance-limited; the gate is a
+  tight-tolerance instrument). The decision-level tests all pass:
+  laptop gauge-twin calibration at 1e-2 indistinguishable from 1e-3
+  (9.02x, J to 5-6 digits, same 30 its); Turning 20-it calibration at
+  gmres+right rtol 1e-2: J 1.283391e6 -> 2.313797e4 (55.47x vs 55.43x
+  at 1e-3), TaoSolve 34.6 -> 31.5 s (KSPSolve 18.3 -> 14.5).
+  o7_cal_gmres_rtol2_n4.log. Campaign recommendation: gmres+right
+  rtol 1e-2, one 1e-3 spot-check for the record.
+- Rain-forced 1-hr gradient RERUN on the optimized stack
+  (o8_1hr_rain_opt_n4.log, b5 protocol): J = 3802.79, |dJ/du0| =
+  3.14266e8, sum(dJ/dn) = -1.07497e10 -- the recorded b5 values
+  exactly; wall 27.7 -> 13.7 min (2.02x). Rain x optimizations
+  validated; the campaign pipeline is confirmed end-to-end on the
+  final stack.
+- Status vs campaign: real-gauge observations still UNUSED (all
+  Turning calibrations are twins) -- that is the campaign itself.
+  Plan for the Wednesday meeting: plans/campaign-wednesday.md
+  (supersedes campaign-tonight.md, whose no-revolve premise is dead).
