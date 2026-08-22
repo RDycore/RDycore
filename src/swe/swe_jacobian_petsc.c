@@ -509,8 +509,10 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
     PetscCall(PetscInfo(P, "SWE analytic Jacobian: device assembly\n"));
     const PetscScalar *u_dev, *mp_ptr, *v_dev;
     PetscMemType       u_memtype, mp_memtype;
+    PetscObjectState   mp_state;
     PetscCall(VecGetArrayReadAndMemType(u_local, &u_dev, &u_memtype));
     PetscCall(VecGetArrayReadAndMemType(rdy->operator->petsc.material_properties, &mp_ptr, &mp_memtype));
+    PetscCall(PetscObjectStateGet((PetscObject)rdy->operator->petsc.material_properties, &mp_state));
 
     // gather Dirichlet ghost triples for the flattened boundary-edge list
     for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
@@ -525,7 +527,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
       PetscCall(VecRestoreArrayRead(rdy->operator->petsc.boundary_values[b], &bv_ptr));
     }
 
-    PetscCall(SWEJacobianKokkosAssemble(rdy->rhs_jac_kokkos, u_dev, u_memtype, mp_ptr, mp_memtype, rdy->rhs_jac_dirichlet, &v_dev));
+    PetscCall(SWEJacobianKokkosAssemble(rdy->rhs_jac_kokkos, u_dev, u_memtype, mp_ptr, mp_memtype, mp_state, rdy->rhs_jac_dirichlet, &v_dev));
 
     PetscCall(VecRestoreArrayReadAndMemType(rdy->operator->petsc.material_properties, &mp_ptr));
     PetscCall(VecRestoreArrayReadAndMemType(u_local, &u_dev));
@@ -686,9 +688,9 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
   // per-cell source blocks: full (friction + bed slope) for the explicit
   // source treatment; bed slope only for ARK-IMEX, whose friction lives in
   // the implicit part (SWEIJacobianFriction)
-  PetscBool    friction_in_rhs = (rdy->config.physics.flow.source.method == SOURCE_EXPLICIT) ? PETSC_TRUE : PETSC_FALSE;
-  PetscScalar *mat_props_ptr;
-  PetscCall(VecGetArray(rdy->operator->petsc.material_properties, &mat_props_ptr));
+  PetscBool          friction_in_rhs = (rdy->config.physics.flow.source.method == SOURCE_EXPLICIT) ? PETSC_TRUE : PETSC_FALSE;
+  const PetscScalar *mat_props_ptr;
+  PetscCall(VecGetArrayRead(rdy->operator->petsc.material_properties, &mat_props_ptr));
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (!cells->is_owned[c]) continue;
     PetscInt owned = cells->local_to_owned[c];
@@ -709,7 +711,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
       for (PetscInt j = 0; j < 3; ++j) v[cursor + 3 * i + j] = D[i][j];
     cursor += 9;
   }
-  PetscCall(VecRestoreArray(rdy->operator->petsc.material_properties, &mat_props_ptr));
+  PetscCall(VecRestoreArrayRead(rdy->operator->petsc.material_properties, &mat_props_ptr));
 
   PetscCall(VecRestoreArrayRead(u_local, &u_ptr));
   PetscCall(DMRestoreLocalVector(rdy->dm, &u_local));
@@ -826,8 +828,6 @@ PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_lo
   PetscObjectState mp_state, src_state;
   PetscCall(PetscObjectStateGet((PetscObject)op->petsc.material_properties, &mp_state));
   PetscCall(PetscObjectStateGet((PetscObject)op->petsc.external_sources, &src_state));
-  PetscBool mp_changed  = (!rk->primed || mp_state != rk->mp_state) ? PETSC_TRUE : PETSC_FALSE;
-  PetscBool src_changed = (!rk->primed || src_state != rk->src_state) ? PETSC_TRUE : PETSC_FALSE;
 
   const PetscScalar *mp_ptr, *src_ptr;
   PetscScalar       *f_rw, *pv_dev;
@@ -835,15 +835,12 @@ PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_lo
   PetscCall(VecGetArrayRead(op->petsc.external_sources, &src_ptr));
   PetscCall(VecGetArrayAndMemType(f_global, &f_rw, NULL));
   PetscCall(VecGetArrayWriteAndMemType(op->primitive_variables, &pv_dev, NULL));
-  PetscCall(SWEKokkosApplySource(rk->kokkos, u_dev, mp_ptr, mp_changed, src_ptr, src_changed, f_rw, pv_dev));
+  PetscCall(SWEKokkosApplySource(rk->kokkos, u_dev, mp_ptr, mp_state, src_ptr, src_state, f_rw, pv_dev));
   PetscCall(VecRestoreArrayWriteAndMemType(op->primitive_variables, &pv_dev));
   PetscCall(VecRestoreArrayAndMemType(f_global, &f_rw));
   PetscCall(VecRestoreArrayRead(op->petsc.external_sources, &src_ptr));
   PetscCall(VecRestoreArrayRead(op->petsc.material_properties, &mp_ptr));
   PetscCall(VecRestoreArrayReadAndMemType(u_local, &u_dev));
-  rk->mp_state  = mp_state;
-  rk->src_state = src_state;
-  rk->primed    = PETSC_TRUE;
 
   *applied = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -871,8 +868,8 @@ static PetscErrorCode SWERHSJacobianP(TS ts, PetscReal t, Vec u_global, Mat Jacp
 
   const PetscScalar *u_ptr;
   PetscCall(VecGetArrayRead(u_global, &u_ptr));
-  PetscScalar *mat_props_ptr;
-  PetscCall(VecGetArray(rdy->operator->petsc.material_properties, &mat_props_ptr));
+  const PetscScalar *mat_props_ptr;
+  PetscCall(VecGetArrayRead(rdy->operator->petsc.material_properties, &mat_props_ptr));
 
   PetscInt num_owned = (rend - rstart) / 3;
   for (PetscInt o = 0; o < num_owned; ++o) {
@@ -891,7 +888,7 @@ static PetscErrorCode SWERHSJacobianP(TS ts, PetscReal t, Vec u_global, Mat Jacp
     PetscCall(MatSetValue(Jacp, row, col, coeff * hv, INSERT_VALUES));
   }
 
-  PetscCall(VecRestoreArray(rdy->operator->petsc.material_properties, &mat_props_ptr));
+  PetscCall(VecRestoreArrayRead(rdy->operator->petsc.material_properties, &mat_props_ptr));
   PetscCall(VecRestoreArrayRead(u_global, &u_ptr));
 
   PetscCall(MatAssemblyBegin(Jacp, MAT_FINAL_ASSEMBLY));

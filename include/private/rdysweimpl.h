@@ -34,8 +34,6 @@ typedef struct {
   PetscInt        *bedge_bnd, *bedge_idx; // borrowed from rdy->rhs_jac_bedge_*
   PetscScalar     *dirichlet;             // borrowed from rdy->rhs_jac_dirichlet
   PetscScalar     *bflux;                 // [3 * n_bedges] host staging for raw boundary fluxes
-  PetscObjectState mp_state, src_state;   // change tracking for the staged host vecs
-  PetscBool        primed;
   PetscBool        announced;             // one-time PetscInfo on first device apply
 } SWERHSKokkosData;
 

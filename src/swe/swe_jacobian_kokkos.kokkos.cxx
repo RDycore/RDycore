@@ -50,10 +50,28 @@ struct SWEJacobianKokkos {
   View<PetscScalar> fluxg;      // gather flux buffer: 3 * (n_edges + n_bedges)
   View<PetscScalar> braw;       // raw boundary fluxes: 3 * n_bedges (D2H each eval)
   View<PetscReal>   cfac;       // Courant factor candidates: n_edges + n_bedges
-  View<PetscScalar> src_stage;  // cached external sources (state-tracked by the caller)
+  View<PetscScalar> src_stage;  // cached external sources
   PetscInt          rhs_source_method, src_len;
   bool              rhs_ready = false, mp_primed = false, src_primed = false;
+  PetscObjectState  mp_state = 0, src_state = 0;  // source-vec states of the staged copies (valid when *_primed)
 };
+
+namespace {
+// Stage a host array into a cached device view, re-uploading only when the
+// source vec's object state changed since the copy was made (or on first use).
+static PetscErrorCode StageTracked(View<PetscScalar> &stage, const char *name, const PetscScalar *host, PetscInt len, PetscObjectState state,
+                                   bool *primed, PetscObjectState *primed_state) {
+  PetscFunctionBegin;
+  if (stage.extent(0) == 0) PetscCallCXX(stage = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string(name)), len));
+  if (!*primed || state != *primed_state) {
+    PetscCallCXX(Kokkos::deep_copy(stage, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(host, len)));
+    PetscCall(PetscLogCpuToGpu(1.0 * len * sizeof(PetscScalar)));
+    *primed       = true;
+    *primed_state = state;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+}  // namespace
 
 PetscErrorCode SWEJacobianKokkosCreate(const SWEJacobianKokkosSetup *s, SWEJacobianKokkos **jk_out)
 {
@@ -101,7 +119,8 @@ PetscErrorCode SWEJacobianKokkosCreate(const SWEJacobianKokkosSetup *s, SWEJacob
 }
 
 PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScalar *u_local, PetscMemType u_memtype, const PetscScalar *mat_props,
-                                         PetscMemType matprop_memtype, const PetscScalar *dirichlet, const PetscScalar **coo_v)
+                                         PetscMemType matprop_memtype, PetscObjectState matprop_state, const PetscScalar *dirichlet,
+                                         const PetscScalar **coo_v)
 {
   Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> u, mp;
 
@@ -116,8 +135,8 @@ PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScala
     u = Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(u_local, jk->n_u_local);
   }
   if (PetscMemTypeHost(matprop_memtype)) {
-    if (jk->mp_stage.extent(0) == 0) PetscCallCXX(jk->mp_stage = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_mp_stage")), jk->matprop_len));
-    PetscCallCXX(Kokkos::deep_copy(jk->mp_stage, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(mat_props, jk->matprop_len)));
+    // the same cached copy the RHS source stage uses; re-uploaded only when the vec changed
+    PetscCall(StageTracked(jk->mp_stage, "swejk_mp_stage", mat_props, jk->matprop_len, matprop_state, &jk->mp_primed, &jk->mp_state));
     mp = Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(jk->mp_stage.data(), jk->matprop_len);
   } else {
     mp = Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(mat_props, jk->matprop_len);
@@ -441,8 +460,8 @@ PetscErrorCode SWEKokkosApplyFlux(SWEJacobianKokkos *jk, const PetscScalar *u_pt
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u_ptr, const PetscScalar *mat_props, PetscBool mp_changed,
-                                    const PetscScalar *ext_src, PetscBool src_changed, PetscScalar *f_ptr, PetscScalar *pv_ptr)
+PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u_ptr, const PetscScalar *mat_props, PetscObjectState matprop_state,
+                                    const PetscScalar *ext_src, PetscObjectState src_state, PetscScalar *f_ptr, PetscScalar *pv_ptr)
 {
   PetscFunctionBegin;
   PetscCheck(jk->rhs_ready, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "SWEKokkosSetupRHS has not been called on this context");
@@ -450,19 +469,9 @@ PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u_
   Kokkos::View<PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>       f(f_ptr, 3 * jk->n_cells);
   Kokkos::View<PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>       pv(pv_ptr, 3 * jk->n_cells);
 
-  // stage host-resident inputs, re-uploading only when their content changed
-  if (jk->mp_stage.extent(0) == 0) PetscCallCXX(jk->mp_stage = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_mp_stage")), jk->matprop_len));
-  if (mp_changed || !jk->mp_primed) {
-    PetscCallCXX(Kokkos::deep_copy(jk->mp_stage, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(mat_props, jk->matprop_len)));
-    PetscCall(PetscLogCpuToGpu(1.0 * jk->matprop_len * sizeof(PetscScalar)));
-    jk->mp_primed = true;
-  }
-  if (jk->src_stage.extent(0) == 0) PetscCallCXX(jk->src_stage = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_src_stage")), jk->src_len));
-  if (src_changed || !jk->src_primed) {
-    PetscCallCXX(Kokkos::deep_copy(jk->src_stage, Kokkos::View<const PetscScalar *, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(ext_src, jk->src_len)));
-    PetscCall(PetscLogCpuToGpu(1.0 * jk->src_len * sizeof(PetscScalar)));
-    jk->src_primed = true;
-  }
+  // stage host-resident inputs, re-uploading only when their source vecs changed
+  PetscCall(StageTracked(jk->mp_stage, "swejk_mp_stage", mat_props, jk->matprop_len, matprop_state, &jk->mp_primed, &jk->mp_state));
+  PetscCall(StageTracked(jk->src_stage, "swejk_src_stage", ext_src, jk->src_len, src_state, &jk->src_primed, &jk->src_state));
 
   const PetscReal tiny_h = jk->tiny_h, h_anuga = jk->h_anuga;
   const PetscInt  mp_stride = jk->matprop_stride, mp_manning = jk->matprop_manning;

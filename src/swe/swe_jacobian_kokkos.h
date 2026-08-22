@@ -93,19 +93,22 @@ PetscErrorCode SWEKokkosApplyFlux(SWEJacobianKokkos *jk, const PetscScalar *u, c
 // Source stage of the device RHS: f += sources (Kokkos memory space,
 // read-modify-write) and pv (Kokkos memory space, 3 * owned cells) is
 // overwritten with regularized primitive variables. mat_props and ext_src are
-// HOST arrays staged into cached device views; pass *_changed = PETSC_TRUE
-// when their content changed since the previous call (first call always
-// stages).
-PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u, const PetscScalar *mat_props, PetscBool mp_changed,
-                                    const PetscScalar *ext_src, PetscBool src_changed, PetscScalar *f, PetscScalar *pv);
+// HOST arrays staged into cached device views keyed on their vecs' object
+// states (pass PetscObjectStateGet of the source vec; re-uploaded only when
+// the state changed).
+PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u, const PetscScalar *mat_props, PetscObjectState matprop_state,
+                                    const PetscScalar *ext_src, PetscObjectState src_state, PetscScalar *f, PetscScalar *pv);
 
 // u_local/mat_props may be host or device pointers (pass the memtype from
-// VecGetArrayReadAndMemType); dirichlet is a HOST array of 3 scalars per
-// flattened boundary edge (unused slots for non-Dirichlet edges), or NULL
-// when there are no boundary edges. On return *coo_v is a DEVICE pointer to
-// the filled values buffer, valid until the next Assemble/Destroy.
+// VecGetArrayReadAndMemType); a host mat_props is staged into the same
+// state-keyed cached device view the RHS source stage uses (pass the
+// material-properties vec's object state). dirichlet is a HOST array of 3
+// scalars per flattened boundary edge (unused slots for non-Dirichlet edges),
+// or NULL when there are no boundary edges. On return *coo_v is a DEVICE
+// pointer to the filled values buffer, valid until the next Assemble/Destroy.
 PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScalar *u_local, PetscMemType u_memtype, const PetscScalar *mat_props,
-                                         PetscMemType matprop_memtype, const PetscScalar *dirichlet, const PetscScalar **coo_v);
+                                         PetscMemType matprop_memtype, PetscObjectState matprop_state, const PetscScalar *dirichlet,
+                                         const PetscScalar **coo_v);
 
 PetscErrorCode SWEJacobianKokkosDestroy(SWEJacobianKokkos **jk);
 
