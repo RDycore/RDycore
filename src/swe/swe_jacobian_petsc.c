@@ -467,6 +467,32 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+#if RDY_HAVE_KOKKOS_JACOBIAN
+// gather Dirichlet ghost triples into the host staging array for the
+// flattened boundary-edge list (shared by the device Jacobian assembly and
+// the device RHS). One pass: the list is grouped by boundary in boundary
+// order, exactly like the boundary-flux scatter.
+static PetscErrorCode GatherDirichletGhosts(PetscInt num_boundaries, const RDyCondition *boundary_conditions, Vec *boundary_values,
+                                            PetscInt n_bedges, const PetscInt *bedge_bnd, const PetscInt *bedge_idx, PetscScalar *dirichlet) {
+  PetscInt k = 0;
+  PetscFunctionBegin;
+  for (PetscInt b = 0; b < num_boundaries; ++b) {
+    if (boundary_conditions[b].flow->type != CONDITION_DIRICHLET) {
+      while (k < n_bedges && bedge_bnd[k] == b) ++k;
+      continue;
+    }
+    const PetscScalar *bv_ptr;
+    PetscCall(VecGetArrayRead(boundary_values[b], &bv_ptr));
+    for (; k < n_bedges && bedge_bnd[k] == b; ++k) {
+      PetscInt e = bedge_idx[k];
+      for (PetscInt m = 0; m < 3; ++m) dirichlet[3 * k + m] = bv_ptr[3 * e + m];
+    }
+    PetscCall(VecRestoreArrayRead(boundary_values[b], &bv_ptr));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif
+
 // TSRHSJacobianFn implementing numerics.jacobian: analytic -- assembles the
 // block-sparse Jacobian from closed-form per-edge flux blocks and per-cell
 // source blocks, mirroring the loops (and wet/dry branches) of
@@ -514,18 +540,8 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
     PetscCall(VecGetArrayReadAndMemType(rdy->operator->petsc.material_properties, &mp_ptr, &mp_memtype));
     PetscCall(PetscObjectStateGet((PetscObject)rdy->operator->petsc.material_properties, &mp_state));
 
-    // gather Dirichlet ghost triples for the flattened boundary-edge list
-    for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
-      if (rdy->boundary_conditions[b].flow->type != CONDITION_DIRICHLET) continue;
-      const PetscScalar *bv_ptr;
-      PetscCall(VecGetArrayRead(rdy->operator->petsc.boundary_values[b], &bv_ptr));
-      for (PetscInt k = 0; k < rdy->rhs_jac_n_bedges; ++k) {
-        if (rdy->rhs_jac_bedge_bnd[k] != b) continue;
-        PetscInt e = rdy->rhs_jac_bedge_idx[k];
-        for (PetscInt m = 0; m < 3; ++m) rdy->rhs_jac_dirichlet[3 * k + m] = bv_ptr[3 * e + m];
-      }
-      PetscCall(VecRestoreArrayRead(rdy->operator->petsc.boundary_values[b], &bv_ptr));
-    }
+    PetscCall(GatherDirichletGhosts(rdy->num_boundaries, rdy->boundary_conditions, rdy->operator->petsc.boundary_values, rdy->rhs_jac_n_bedges,
+                                    rdy->rhs_jac_bedge_bnd, rdy->rhs_jac_bedge_idx, rdy->rhs_jac_dirichlet));
 
     PetscCall(SWEJacobianKokkosAssemble(rdy->rhs_jac_kokkos, u_dev, u_memtype, mp_ptr, mp_memtype, mp_state, rdy->rhs_jac_dirichlet, &v_dev));
 
@@ -751,17 +767,8 @@ PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_lo
 
   // gather Dirichlet ghost triples for the flattened boundary-edge list (the
   // same staging the Jacobian assembly uses)
-  for (PetscInt b = 0; b < op->num_boundaries; ++b) {
-    if (op->boundary_conditions[b].flow->type != CONDITION_DIRICHLET) continue;
-    const PetscScalar *bv_ptr;
-    PetscCall(VecGetArrayRead(op->petsc.boundary_values[b], &bv_ptr));
-    for (PetscInt k = 0; k < rk->n_bedges; ++k) {
-      if (rk->bedge_bnd[k] != b) continue;
-      PetscInt e = rk->bedge_idx[k];
-      for (PetscInt m = 0; m < 3; ++m) rk->dirichlet[3 * k + m] = bv_ptr[3 * e + m];
-    }
-    PetscCall(VecRestoreArrayRead(op->petsc.boundary_values[b], &bv_ptr));
-  }
+  PetscCall(GatherDirichletGhosts(op->num_boundaries, op->boundary_conditions, op->petsc.boundary_values, rk->n_bedges, rk->bedge_bnd,
+                                  rk->bedge_idx, rk->dirichlet));
 
   //------------------
   // Flux Calculation
