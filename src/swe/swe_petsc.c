@@ -875,23 +875,12 @@ static PetscErrorCode ApplySourceExplicit(void *context, PetscOperatorFields fie
       // momentum (factor = tb/(1 + dt*tb)), at the cost of embedding dt in the
       // RHS; the differentiable equivalent is `ark_imex`, which integrates this
       // same drag implicitly. Use explicit only where depths stay resolved.
-      PetscReal tbx = 0.0, tby = 0.0;
-      if (h >= tiny_h) {  // wet conditions
-        PetscReal u = hu / h;
-        PetscReal v = hv / h;
-
-        // Manning's coefficient
-        PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + MATERIAL_PROPERTY_MANNINGS];
-
-        // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
-        PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
-
-        PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
-        PetscReal tb       = Cd * velocity / h;  // = g n^2 h^{-4/3} |v|
-
-        tbx = tb * hu;  // = g n^2 h^{-7/3} q_x |q|
-        tby = tb * hv;
-      }
+      // With h_anuga > 0 the drag velocity is ANUGA-regularized (see
+      // ComputeSWEManningDrag), which also removes the tiny_h on/off residual
+      // discontinuity that stalls implicit Newton solves at NLCD-scale n.
+      PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + MATERIAL_PROPERTY_MANNINGS];
+      PetscReal tbx, tby;
+      ComputeSWEManningDrag(h, hu, hv, N_mannings, tiny_h, h_anuga, &tbx, &tby);
 
       // NOTE: we accumulate everything into the RHS vector by convention.
       f_ptr[n_dof * owned_cell_id + 0] += source_ptr[n_dof * owned_cell_id + 0];

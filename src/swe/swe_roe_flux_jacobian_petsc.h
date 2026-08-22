@@ -257,40 +257,97 @@ RDY_MATH_FN void SWERoeFluxJacobian(const PetscReal consL[3], const PetscReal co
 // Computes the 3x3 diagonal Jacobian block D = dS/d(h, hu, hv) of the
 // EXPLICIT source treatment (ApplySourceExplicit in swe_petsc.c):
 //   S = ( s_ext0,  -g dzdx h - tbx + s_ext1,  -g dzdy h - tby + s_ext2 ),
-//   tb = g n^2 h^{-7/3} m,  m = |(hu, hv)|,  tbx = tb hu,  tby = tb hv,
 // with the friction terms zero for h < tiny_h (and the external sources
-// independent of the state). At m = 0 the friction is O(m^2), so its
-// derivative is zero there (the consistent one-sided value).
-// Friction-only part: D_f = d(S_fric)/d(h, hu, hv) with
-// S_fric = (0, -tbx, -tby), tb = g n^2 h^{-7/3} m, m = |(hu, hv)|.
-RDY_MATH_FN void SWEFrictionJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal tiny_h, PetscReal D[3][3]) {
+// independent of the state). This is the exact derivative of the drag
+// evaluated by ComputeSWEManningDrag, in BOTH of its branches:
+//   h_anuga == 0:  tb = g n^2 h^{-7/3} m,  m = |(hu, hv)|,  tb* = tb (hu, hv)
+//   h_anuga  > 0:  tb* = c |w| w*,  c = g n^2 h^{-1/3},  w = (hu, hv) h / denom,
+//                  denom = h^2 + h_anuga^2
+// (the regularized velocity w matches SWEReconstructPrimitiveWithJacobian).
+// At zero momentum the friction is O(|q|^2), so its derivative is zero there
+// (the consistent one-sided value).
+// Friction-only part: D_f = d(S_fric)/d(h, hu, hv) with S_fric = (0, -tbx, -tby).
+RDY_MATH_FN void SWEFrictionJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal tiny_h, PetscReal h_anuga, PetscReal D[3][3]) {
   PetscReal h = cons[0], hu = cons[1], hv = cons[2];
 
   for (PetscInt i = 0; i < 3; ++i)
     for (PetscInt j = 0; j < 3; ++j) D[i][j] = 0.0;
 
   if (h >= tiny_h) {
-    PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
-    if (m > 0.0) {
-      PetscReal c = GRAVITY * Square(n_manning) * PetscPowReal(h, -7.0 / 3.0);
-      // d(tbx)/dh = -(7/3) c m hu / h, etc.; rows carry -d(tb*)/d(.)
-      D[1][0] = (7.0 / 3.0) * c * m * hu / h;
-      D[1][1] = -c * (m + Square(hu) / m);
-      D[1][2] = -c * hu * hv / m;
-      D[2][0] = (7.0 / 3.0) * c * m * hv / h;
-      D[2][1] = -c * hu * hv / m;
-      D[2][2] = -c * (m + Square(hv) / m);
+    if (h_anuga > 0.0) {
+      // regularized drag tb* = c |w| w*, w* = (hu, hv) phi, phi = h / denom:
+      //   d(phi)/dh = psi = (h_anuga^2 - h^2) / denom^2,  d(w*)/dh = (w*/phi) psi,
+      //   d|w|/dh = |w| psi / phi, d(c)/dh = -(1/3) c / h, so
+      //   d(tb*)/dh = c |w| w* (2 psi/phi - 1/(3h));  rows carry -d(tb*)/d(.)
+      PetscReal denom = Square(h) + Square(h_anuga);
+      PetscReal phi   = h / denom;
+      PetscReal u     = hu * phi;
+      PetscReal v     = hv * phi;
+      PetscReal w     = PetscSqrtReal(Square(u) + Square(v));
+      if (w > 0.0) {
+        PetscReal c      = GRAVITY * Square(n_manning) * PetscPowReal(h, -1.0 / 3.0);
+        PetscReal psi    = (Square(h_anuga) - Square(h)) / Square(denom);
+        PetscReal dh_fac = 1.0 / (3.0 * h) - 2.0 * psi / phi;  // = 7/(3h) at h_anuga = 0
+        D[1][0] = c * w * u * dh_fac;
+        D[1][1] = -c * phi * (w + Square(u) / w);
+        D[1][2] = -c * phi * u * v / w;
+        D[2][0] = c * w * v * dh_fac;
+        D[2][1] = -c * phi * u * v / w;
+        D[2][2] = -c * phi * (w + Square(v) / w);
+      }
+    } else {
+      PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
+      if (m > 0.0) {
+        PetscReal c = GRAVITY * Square(n_manning) * PetscPowReal(h, -7.0 / 3.0);
+        // d(tbx)/dh = -(7/3) c m hu / h, etc.; rows carry -d(tb*)/d(.)
+        D[1][0] = (7.0 / 3.0) * c * m * hu / h;
+        D[1][1] = -c * (m + Square(hu) / m);
+        D[1][2] = -c * hu * hv / m;
+        D[2][0] = (7.0 / 3.0) * c * m * hv / h;
+        D[2][1] = -c * hu * hv / m;
+        D[2][2] = -c * (m + Square(hv) / m);
+      }
     }
   }
 }
 
 RDY_MATH_FN void SWESourceJacobian(const PetscReal cons[3], PetscReal n_manning, PetscReal dzdx, PetscReal dzdy, PetscReal tiny_h,
-                                        PetscReal D[3][3]) {
-  SWEFrictionJacobian(cons, n_manning, tiny_h, D);
+                                        PetscReal h_anuga, PetscReal D[3][3]) {
+  SWEFrictionJacobian(cons, n_manning, tiny_h, h_anuga, D);
 
   // bed slope: -g dz/dx h contributes to the h column of the momentum rows
   D[1][0] += -GRAVITY * dzdx;
   D[2][0] += -GRAVITY * dzdy;
+}
+
+// Computes the two nonzeros of dS_fric/dn for one cell (momentum rows):
+//   (v1, v2) = -2 g n h^{-7/3} m (hu, hv)                     for h_anuga == 0
+//   (v1, v2) = -2 g n h^{-1/3} |w| (w_x, w_y),  w = q h/denom for h_anuga  > 0
+// -- the exact n-derivative of ComputeSWEManningDrag's drag (S_fric = -tb*,
+// tb* proportional to n^2). Zero for dry or motionless cells. Shared by the
+// host and device RHS parameter Jacobians and (negated) the ARK-IMEX
+// IJacobianP.
+RDY_MATH_FN void SWEFrictionDN(const PetscReal h, const PetscReal hu, const PetscReal hv, const PetscReal n_manning, const PetscReal tiny_h,
+                               const PetscReal h_anuga, PetscReal *v1, PetscReal *v2) {
+  *v1 = 0.0;
+  *v2 = 0.0;
+  if (h < tiny_h) return;
+  if (h_anuga > 0.0) {
+    PetscReal denom = Square(h) + Square(h_anuga);
+    PetscReal u     = hu * h / denom;
+    PetscReal v     = hv * h / denom;
+    PetscReal w     = PetscSqrtReal(Square(u) + Square(v));
+    if (w == 0.0) return;
+    PetscReal coeff = -2.0 * GRAVITY * n_manning * PetscPowReal(h, -1.0 / 3.0) * w;
+    *v1             = coeff * u;
+    *v2             = coeff * v;
+  } else {
+    PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
+    if (m == 0.0) return;
+    PetscReal coeff = -2.0 * GRAVITY * n_manning * PetscPowReal(h, -7.0 / 3.0) * m;
+    *v1             = coeff * hu;
+    *v2             = coeff * hv;
+  }
 }
 
 #pragma GCC diagnostic pop

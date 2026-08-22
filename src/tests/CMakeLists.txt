@@ -12,6 +12,8 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/swe_jacobian_global_fd.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/swe_jacobian_global_dam_analytic.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/swe_jacobian_global_bc_fd.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/swe_jacobian_global_bc_analytic.yaml
+          ${CMAKE_CURRENT_SOURCE_DIR}/swe_jacobian_global_anuga_fd.yaml
+          ${CMAKE_CURRENT_SOURCE_DIR}/swe_jacobian_global_anuga_analytic.yaml
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 foreach(exe_name

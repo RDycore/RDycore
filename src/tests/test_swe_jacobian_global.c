@@ -46,6 +46,14 @@ static void TestGlobalFDVsAnalyticBCTypes(void **state) {
   CompareConfigs("swe_jacobian_global_bc_fd.yaml", "swe_jacobian_global_bc_analytic.yaml", "dirichlet+outflow");
 }
 
+// ANUGA regularization active (h_anuga = 5 vs h = 10, n = 0.1): the analytic
+// Jacobian must carry the regularization terms in both the drag and the
+// primitive-reconstruction chain
+static void TestGlobalFDVsAnalyticAnugaRegularized(void **state) {
+  (void)state;
+  CompareConfigs("swe_jacobian_global_anuga_fd.yaml", "swe_jacobian_global_anuga_analytic.yaml", "anuga-regularized drag");
+}
+
 static void CompareConfigs(const char *fd_yaml, const char *an_yaml, const char *label) {
   RDy rdy_fd, rdy_an;
   Mat J_fd, J_an;
@@ -86,6 +94,7 @@ int main(int argc, char *argv[]) {
       cmocka_unit_test(TestGlobalFDVsAnalytic),
       cmocka_unit_test(TestGlobalFDVsAnalyticDamBreak),
       cmocka_unit_test(TestGlobalFDVsAnalyticBCTypes),
+      cmocka_unit_test(TestGlobalFDVsAnalyticAnugaRegularized),
   };
   return cmocka_run_group_tests(tests, Setup, Teardown);
 }

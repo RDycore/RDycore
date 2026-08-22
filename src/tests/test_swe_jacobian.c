@@ -158,59 +158,108 @@ static void TestDryDryStates(void **state) {
 }
 
 // pointwise explicit source map (friction + bed slope momentum rows),
-// replicating ApplySourceExplicit in swe_petsc.c (state-independent external
-// sources omitted -- they do not contribute to the Jacobian)
-static void SourceMap(const PetscReal cons[3], PetscReal n_manning, PetscReal dzdx, PetscReal dzdy, PetscReal S[3]) {
+// evaluating the ACTUAL drag implementation shared with ApplySourceExplicit
+// and the device source kernel (state-independent external sources omitted --
+// they do not contribute to the Jacobian)
+static void SourceMap(const PetscReal cons[3], PetscReal n_manning, PetscReal dzdx, PetscReal dzdy, PetscReal h_anuga, PetscReal S[3]) {
   PetscReal h = cons[0], hu = cons[1], hv = cons[2];
   PetscReal bedx = dzdx * 9.806 * h, bedy = dzdy * 9.806 * h;
-  PetscReal tbx = 0.0, tby = 0.0;
-  if (h >= TINY_H) {
-    PetscReal u = hu / h, v = hv / h;
-    PetscReal Cd       = 9.806 * Square(n_manning) * PetscPowReal(h, -1.0 / 3.0);
-    PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
-    PetscReal tb       = Cd * velocity / h;
-    tbx                = tb * hu;
-    tby                = tb * hv;
-  }
+  PetscReal tbx, tby;
+  ComputeSWEManningDrag(h, hu, hv, n_manning, TINY_H, h_anuga, &tbx, &tby);
   S[0] = 0.0;
   S[1] = -bedx - tbx;
   S[2] = -bedy - tby;
 }
 
 // analytic source block vs central FD of the pointwise source map
+static PetscReal SourceJacobianFDError(const PetscReal cons[3], PetscReal n_manning, PetscReal dzdx, PetscReal dzdy, PetscReal h_anuga,
+                                       PetscReal eps_scale) {
+  PetscReal D[3][3];
+  SWESourceJacobian(cons, n_manning, dzdx, dzdy, TINY_H, h_anuga, D);
+
+  PetscReal diff = 0.0, norm = 0.0;
+  PetscReal FD[3][3];
+  for (PetscInt j = 0; j < 3; ++j) {
+    PetscReal eps  = eps_scale * PetscMax(1.0, PetscAbsReal(cons[j]));
+    PetscReal p[3] = {cons[0], cons[1], cons[2]}, m[3] = {cons[0], cons[1], cons[2]};
+    p[j] += eps;
+    m[j] -= eps;
+    PetscReal Sp[3], Sm[3];
+    SourceMap(p, n_manning, dzdx, dzdy, h_anuga, Sp);
+    SourceMap(m, n_manning, dzdx, dzdy, h_anuga, Sm);
+    for (PetscInt i = 0; i < 3; ++i) FD[i][j] = (Sp[i] - Sm[i]) / (2.0 * eps);
+  }
+  for (PetscInt i = 0; i < 3; ++i)
+    for (PetscInt j = 0; j < 3; ++j) {
+      diff += Square(D[i][j] - FD[i][j]);
+      norm += Square(FD[i][j]);
+    }
+  return PetscSqrtReal(diff / PetscMax(norm, 1e-30));
+}
+
 static void TestSourceJacobian(void **state) {
   (void)state;
   const PetscReal n_manning = 0.03, dzdx = 0.02, dzdy = -0.01;
   PetscReal       cons[3]   = {0.4, 0.25, -0.1};  // shallow, flowing: friction matters
 
-  PetscReal D[3][3];
-  SWESourceJacobian(cons, n_manning, dzdx, dzdy, TINY_H, D);
-
-  PetscReal maxrel = 0.0, norm = 0.0;
-  PetscReal FD[3][3];
-  for (PetscInt j = 0; j < 3; ++j) {
-    PetscReal eps  = 1e-7 * PetscMax(1.0, PetscAbsReal(cons[j]));
-    PetscReal p[3] = {cons[0], cons[1], cons[2]}, m[3] = {cons[0], cons[1], cons[2]};
-    p[j] += eps;
-    m[j] -= eps;
-    PetscReal Sp[3], Sm[3];
-    SourceMap(p, n_manning, dzdx, dzdy, Sp);
-    SourceMap(m, n_manning, dzdx, dzdy, Sm);
-    for (PetscInt i = 0; i < 3; ++i) FD[i][j] = (Sp[i] - Sm[i]) / (2.0 * eps);
-  }
-  for (PetscInt i = 0; i < 3; ++i)
-    for (PetscInt j = 0; j < 3; ++j) {
-      maxrel += Square(D[i][j] - FD[i][j]);
-      norm += Square(FD[i][j]);
-    }
-  PetscReal err = PetscSqrtReal(maxrel / PetscMax(norm, 1e-30));
+  PetscReal err = SourceJacobianFDError(cons, n_manning, dzdx, dzdy, H_ANUGA, 1e-7);
   assert_true(err < 1e-6);
 
   // zero-momentum state: friction Jacobian vanishes, bed slope remains
   PetscReal cons0[3] = {0.4, 0.0, 0.0}, D0[3][3];
-  SWESourceJacobian(cons0, n_manning, dzdx, dzdy, TINY_H, D0);
+  SWESourceJacobian(cons0, n_manning, dzdx, dzdy, TINY_H, H_ANUGA, D0);
   assert_true(D0[1][1] == 0.0 && D0[2][2] == 0.0);
   assert_true(PetscAbsReal(D0[1][0] + 9.806 * dzdx) < 1e-12);
+}
+
+// ANUGA-regularized drag (h_anuga > 0): the source Jacobian must carry the
+// regularization terms exactly, across the depth range where the
+// regularization transitions (h >> h_anuga, h ~ h_anuga, h << h_anuga) and
+// at NLCD-scale Manning n
+static void TestSourceJacobianRegularized(void **state) {
+  (void)state;
+  const PetscReal h_anuga = 0.005, n_manning = 0.1, dzdx = 0.02, dzdy = -0.01;
+  const PetscReal states[][3] = {
+      {0.4, 0.25, -0.1},      // h >> h_anuga: near-plain drag
+      {0.008, 2e-4, -1e-4},   // h ~ h_anuga: regularization active
+      {0.002, 5e-5, 2e-5},    // h < h_anuga: drag heading smoothly to zero
+      {2.0e-7, 1e-6, -8e-7},  // just above tiny_h with retained momentum: the old discontinuity site
+  };
+  for (PetscInt s = 0; s < 4; ++s) {
+    PetscReal err = SourceJacobianFDError(states[s], n_manning, dzdx, dzdy, h_anuga, 1e-9);
+    assert_true(err < 1e-5);
+  }
+
+  // zero-momentum: friction block vanishes, bed slope remains
+  PetscReal cons0[3] = {0.01, 0.0, 0.0}, D0[3][3];
+  SWESourceJacobian(cons0, n_manning, dzdx, dzdy, TINY_H, h_anuga, D0);
+  assert_true(D0[1][1] == 0.0 && D0[2][2] == 0.0);
+  assert_true(PetscAbsReal(D0[1][0] + 9.806 * dzdx) < 1e-12);
+}
+
+// dS_fric/dn (both plain and regularized) vs central FD in n
+static void TestFrictionDN(void **state) {
+  (void)state;
+  const PetscReal n = 0.1, eps = 1e-7;
+  const PetscReal states[][3] = {{0.4, 0.25, -0.1}, {0.008, 2e-4, -1e-4}, {0.002, 5e-5, 2e-5}};
+  const PetscReal h_anugas[]  = {0.0, 0.005};
+  for (PetscInt a = 0; a < 2; ++a) {
+    for (PetscInt s = 0; s < 3; ++s) {
+      PetscReal h = states[s][0], hu = states[s][1], hv = states[s][2];
+      PetscReal v1, v2, p1, p2, m1;
+      SWEFrictionDN(h, hu, hv, n, TINY_H, h_anugas[a], &v1, &v2);
+      // FD of S_fric = -tb* in n
+      PetscReal tbx_p, tby_p, tbx_m, tby_m;
+      ComputeSWEManningDrag(h, hu, hv, n + eps, TINY_H, h_anugas[a], &tbx_p, &tby_p);
+      ComputeSWEManningDrag(h, hu, hv, n - eps, TINY_H, h_anugas[a], &tbx_m, &tby_m);
+      p1 = -(tbx_p - tbx_m) / (2.0 * eps);
+      p2 = -(tby_p - tby_m) / (2.0 * eps);
+      m1 = PetscMax(PetscAbsReal(p1), PetscAbsReal(p2));
+      assert_true(m1 > 0.0);  // states are wet and moving: derivative must be nonzero
+      assert_true(PetscAbsReal(v1 - p1) <= 1e-6 * m1);
+      assert_true(PetscAbsReal(v2 - p2) <= 1e-6 * m1);
+    }
+  }
 }
 
 static int    argc_ = 0;
@@ -230,6 +279,8 @@ int main(int argc, char *argv[]) {
       cmocka_unit_test(TestAnalyticTranscriticalStates),
       cmocka_unit_test(TestDryDryStates),
       cmocka_unit_test(TestSourceJacobian),
+      cmocka_unit_test(TestSourceJacobianRegularized),
+      cmocka_unit_test(TestFrictionDN),
   };
   return cmocka_run_group_tests(tests, Setup, Teardown);
 }

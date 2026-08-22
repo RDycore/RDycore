@@ -270,7 +270,7 @@ PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScala
         const PetscReal cons[3]   = {PetscRealPart(u(3 * c)), PetscRealPart(u(3 * c + 1)), PetscRealPart(u(3 * c + 2))};
         PetscReal       D[3][3];
         if (friction) {
-          SWESourceJacobian(cons, n_manning, cell_dzdx(ci), cell_dzdy(ci), tiny_h, D);
+          SWESourceJacobian(cons, n_manning, cell_dzdx(ci), cell_dzdy(ci), tiny_h, h_anuga, D);
         } else {
           for (PetscInt i = 0; i < 3; ++i)
             for (PetscInt j = 0; j < 3; ++j) D[i][j] = 0.0;
@@ -497,18 +497,9 @@ PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u_
       const PetscReal bedy = cell_dzdy(ci) * GRAVITY * h;
 
       PetscReal tbx = 0.0, tby = 0.0;
-      if (friction && h >= tiny_h) {  // mirrors ApplySourceExplicit's wet branch
-        const PetscReal uu = hu / h;
-        const PetscReal vv = hv / h;
-
+      if (friction) {  // mirrors ApplySourceExplicit (wet gate + ANUGA regularization inside)
         const PetscReal N_mannings = PetscRealPart(mp(mp_stride * o + mp_manning));
-        const PetscReal Cd         = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
-
-        const PetscReal velocity = PetscSqrtReal(Square(uu) + Square(vv));
-        const PetscReal tb       = Cd * velocity / h;
-
-        tbx = tb * hu;
-        tby = tb * hv;
+        ComputeSWEManningDrag(h, hu, hv, N_mannings, tiny_h, h_anuga, &tbx, &tby);
       }
 
       f(3 * o)     += src(3 * o);
@@ -535,6 +526,7 @@ PetscErrorCode SWEKokkosJacobianP(SWEJacobianKokkos *jk, const PetscScalar *u_pt
   Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> u(u_ptr, 3 * jk->n_cells);
 
   const PetscReal tiny_h    = jk->tiny_h;
+  const PetscReal h_anuga   = jk->h_anuga;
   const PetscInt  mp_stride = jk->matprop_stride, mp_manning = jk->matprop_manning;
   auto            mp = jk->mp_stage;
   auto            jv = jk->jacp_v;
@@ -543,16 +535,9 @@ PetscErrorCode SWEKokkosJacobianP(SWEJacobianKokkos *jk, const PetscScalar *u_pt
   PetscCallCXX(Kokkos::parallel_for(
     "swejk_jacp", Kokkos::RangePolicy<ExecSpace>(0, jk->n_cells), KOKKOS_LAMBDA(const PetscInt o) {
       const PetscReal h = PetscRealPart(u(3 * o)), hu = PetscRealPart(u(3 * o + 1)), hv = PetscRealPart(u(3 * o + 2));
-      PetscReal       v1 = 0.0, v2 = 0.0;
-      if (h >= tiny_h) {  // mirrors the host loop's dry / motionless skips (which leave zeros)
-        const PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
-        if (m != 0.0) {
-          const PetscReal n_manning = PetscRealPart(mp(mp_stride * o + mp_manning));
-          const PetscReal coeff     = -2.0 * GRAVITY * n_manning * PetscPowReal(h, -7.0 / 3.0) * m;
-          v1                        = coeff * hu;
-          v2                        = coeff * hv;
-        }
-      }
+      const PetscReal n_manning = PetscRealPart(mp(mp_stride * o + mp_manning));
+      PetscReal       v1, v2;  // zero for dry/motionless cells, mirroring the host loop's skips
+      SWEFrictionDN(h, hu, hv, n_manning, tiny_h, h_anuga, &v1, &v2);
       jv(2 * o)     = v1;
       jv(2 * o + 1) = v2;
     }));

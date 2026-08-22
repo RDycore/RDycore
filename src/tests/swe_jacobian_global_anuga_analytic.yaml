@@ -1,0 +1,78 @@
+# Uniform-lake twin of swe_jacobian_global_{fd,analytic}.yaml with the ANUGA
+# regularization ACTIVE (h_anuga_reg_parameter = 5, comparable to h = 10, and
+# NLCD-scale n = 0.1): the FD-coloring vs analytic full-matrix comparison then
+# verifies the regularization terms in the drag and reconstruction Jacobians.
+
+physics:
+  flow:
+    mode: swe
+    h_anuga_reg_parameter: 5.0
+    source:
+      method: explicit
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+  jacobian: analytic
+
+logging:
+  level: none
+
+time:
+  stop: 0.0005
+  unit: hours
+  stop_n: 10
+
+output:
+  format: none
+
+grid:
+  file: planar_dam_10x5.msh
+
+regions:
+  - name: upstream
+    grid_region_id: 1
+  - name: downstream
+    grid_region_id: 2
+
+surface_composition:
+  - region: upstream
+    material: smooth
+  - region: downstream
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.1
+
+initial_conditions:
+  - region: upstream
+    flow: lake_ic
+  - region: downstream
+    flow: lake_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+  - name: top_wall
+    grid_boundary_id: 2
+  - name: bottom_wall
+    grid_boundary_id: 3
+
+boundary_conditions:
+  - boundaries: [top_wall]
+    flow: reflecting_bc
+  - boundaries: [bottom_wall]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: lake_ic
+    type: dirichlet
+    height: 10
+    x_momentum: 2
+    y_momentum: 1
+  - name: reflecting_bc
+    type: reflecting

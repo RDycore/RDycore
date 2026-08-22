@@ -131,6 +131,46 @@ RDY_MATH_FN void ComputeSWERiemannVelocity(const PetscReal h, const PetscReal hu
   }
 }
 
+// Computes the Manning drag (tbx, tby) for one cell state -- the wet branch of
+// ApplySourceExplicit, shared verbatim with the device source kernel.
+//
+// With h_anuga == 0 this is the plain-velocity drag
+//   tb* = g n^2 h^{-7/3} q* |q|
+// evaluated with the historical operation sequence (BITWISE identical to the
+// pre-regularization code). With h_anuga > 0 the velocity inside the drag is
+// ANUGA-regularized, u = q h / (h^2 + h_anuga^2), the same regularization the
+// flux/primitive reconstruction uses:
+//   tb* = g n^2 h^{-1/3} |u| u*,
+// so the drag vanishes smoothly (~h^{5/3}) as h -> 0 instead of switching an
+// O(h^{-7/3}) term on/off at the tiny_h gate -- that discontinuity stalls
+// implicit Newton solves once n^2 is NLCD-scale (see RESULTS-gpu-implicit.md).
+// The tiny_h dry gate is kept in both branches: it protects h^{-1/3} (and
+// negative-h Newton iterates) and its residual jump is O((h/h_anuga)^4) here.
+RDY_MATH_FN void ComputeSWEManningDrag(const PetscReal h, const PetscReal hu, const PetscReal hv, const PetscReal n_manning,
+                                       const PetscReal tiny_h, const PetscReal h_anuga, PetscReal *tbx, PetscReal *tby) {
+  *tbx = 0.0;
+  *tby = 0.0;
+  if (h >= tiny_h) {  // wet conditions
+    // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+    PetscReal Cd = GRAVITY * Square(n_manning) * PetscPowReal(h, -1.0 / 3.0);
+    if (h_anuga > 0.0) {
+      PetscReal denom    = Square(h) + Square(h_anuga);
+      PetscReal u        = hu * h / denom;
+      PetscReal v        = hv * h / denom;
+      PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+      *tbx               = Cd * velocity * u;
+      *tby               = Cd * velocity * v;
+    } else {
+      PetscReal u        = hu / h;
+      PetscReal v        = hv / h;
+      PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+      PetscReal tb       = Cd * velocity / h;  // = g n^2 h^{-4/3} |v|
+      *tbx               = tb * hu;            // = g n^2 h^{-7/3} q_x |q|
+      *tby               = tb * hv;
+    }
+  }
+}
+
 /// Computes flux based on Roe solver
 /// @param [in] *datal A RiemannDataSWE for values left of the edges
 /// @param [in] *datar A RiemannDataSWE for values right of the edges

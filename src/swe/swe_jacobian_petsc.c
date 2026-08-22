@@ -710,7 +710,7 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
     PetscReal cons[3]   = {u_ptr[3 * c + 0], u_ptr[3 * c + 1], u_ptr[3 * c + 2]};
     PetscReal D[3][3];
     if (friction_in_rhs) {
-      SWESourceJacobian(cons, n_manning, cells->dz_dx[c], cells->dz_dy[c], tiny_h, D);
+      SWESourceJacobian(cons, n_manning, cells->dz_dx[c], cells->dz_dy[c], tiny_h, h_anuga, D);
     } else {
       for (PetscInt i = 0; i < 3; ++i)
         for (PetscInt j = 0; j < 3; ++j) D[i][j] = 0.0;
@@ -850,8 +850,8 @@ PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_lo
 #endif
 
 // TSRHSJacobianPFn: dF/dp for p = per-cell Manning n. Only the explicit drag
-// term depends on n:  S_q = -g n^2 h^{-7/3} q |q|, so
-//   dS_q/dn = -2 g n h^{-7/3} q |q|
+// term depends on n (tb* proportional to n^2; see SWEFrictionDN for both the
+// plain and the ANUGA-regularized velocity forms)
 // -- two nonzeros per cell (momentum rows), zero for dry or motionless cells.
 // Rows follow the global state layout (contiguous owned dofs); column c is
 // the owned-cell parameter index with the same distribution as the rows.
@@ -860,7 +860,8 @@ static PetscErrorCode SWERHSJacobianP(TS ts, PetscReal t, Vec u_global, Mat Jacp
   (void)t;
   PetscFunctionBegin;
 
-  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+  const PetscReal tiny_h  = rdy->config.physics.flow.tiny_h;
+  const PetscReal h_anuga = rdy->config.physics.flow.h_anuga_regular;
 
 #if RDY_HAVE_KOKKOS_JACOBIAN
   // device path: values computed in a kernel over owned cells and set with
@@ -899,18 +900,16 @@ static PetscErrorCode SWERHSJacobianP(TS ts, PetscReal t, Vec u_global, Mat Jacp
   PetscInt num_owned = (rend - rstart) / 3;
   for (PetscInt o = 0; o < num_owned; ++o) {
     PetscReal h = u_ptr[3 * o], hu = u_ptr[3 * o + 1], hv = u_ptr[3 * o + 2];
-    if (h < tiny_h) continue;
-    PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
-    if (m == 0.0) continue;
-
     PetscReal n_manning = mat_props_ptr[NUM_MATERIAL_PROPERTIES * o + MATERIAL_PROPERTY_MANNINGS];
-    PetscReal coeff     = -2.0 * GRAVITY * n_manning * PetscPowReal(h, -7.0 / 3.0) * m;
+    PetscReal v1, v2;
+    SWEFrictionDN(h, hu, hv, n_manning, tiny_h, h_anuga, &v1, &v2);
+    if (v1 == 0.0 && v2 == 0.0) continue;  // dry or motionless: keep the zero entries unset
 
     PetscInt col = cstart + o;
     PetscInt row = rstart + 3 * o + 1;
-    PetscCall(MatSetValue(Jacp, row, col, coeff * hu, INSERT_VALUES));
+    PetscCall(MatSetValue(Jacp, row, col, v1, INSERT_VALUES));
     row = rstart + 3 * o + 2;
-    PetscCall(MatSetValue(Jacp, row, col, coeff * hv, INSERT_VALUES));
+    PetscCall(MatSetValue(Jacp, row, col, v2, INSERT_VALUES));
   }
 
   PetscCall(VecRestoreArrayRead(rdy->operator->petsc.material_properties, &mat_props_ptr));
@@ -933,7 +932,8 @@ static PetscErrorCode SWEIFunctionFriction(TS ts, PetscReal t, Vec u_global, Vec
   (void)t;
   PetscFunctionBegin;
 
-  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+  const PetscReal tiny_h  = rdy->config.physics.flow.tiny_h;
+  const PetscReal h_anuga = rdy->config.physics.flow.h_anuga_regular;
 
   const PetscScalar *u_ptr, *udot_ptr;
   PetscScalar       *f_ptr;
@@ -950,12 +950,16 @@ static PetscErrorCode SWEIFunctionFriction(TS ts, PetscReal t, Vec u_global, Vec
     PetscReal h = PetscRealPart(u_ptr[3 * o]), hu = PetscRealPart(u_ptr[3 * o + 1]), hv = PetscRealPart(u_ptr[3 * o + 2]);
     PetscReal tbx = 0.0, tby = 0.0;
     if (h >= tiny_h) {
-      PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
-      if (m > 0.0) {
-        PetscReal n_manning = mat_props.values[MATERIAL_PROPERTY_MANNINGS][o];
-        PetscReal tb        = GRAVITY * Square(n_manning) * PetscPowReal(h, -7.0 / 3.0) * m;
-        tbx                 = tb * hu;
-        tby                 = tb * hv;
+      PetscReal n_manning = mat_props.values[MATERIAL_PROPERTY_MANNINGS][o];
+      if (h_anuga > 0.0) {  // ANUGA-regularized drag velocity (matches SWEFrictionJacobian)
+        ComputeSWEManningDrag(h, hu, hv, n_manning, tiny_h, h_anuga, &tbx, &tby);
+      } else {
+        PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
+        if (m > 0.0) {
+          PetscReal tb = GRAVITY * Square(n_manning) * PetscPowReal(h, -7.0 / 3.0) * m;
+          tbx          = tb * hu;
+          tby          = tb * hv;
+        }
       }
     }
     // F = Udot - S_fric, S_fric = (0, -tbx, -tby)
@@ -977,7 +981,8 @@ static PetscErrorCode SWEIJacobianFriction(TS ts, PetscReal t, Vec u_global, Vec
   (void)u_dot;
   PetscFunctionBegin;
 
-  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+  const PetscReal tiny_h  = rdy->config.physics.flow.tiny_h;
+  const PetscReal h_anuga = rdy->config.physics.flow.h_anuga_regular;
 
   // P is block diagonal with exactly one 3x3 block per owned cell, and every
   // block is INSERTed below, so no MatZeroEntries is needed.
@@ -995,7 +1000,7 @@ static PetscErrorCode SWEIJacobianFriction(TS ts, PetscReal t, Vec u_global, Vec
     PetscReal cons[3]   = {PetscRealPart(u_ptr[3 * o]), PetscRealPart(u_ptr[3 * o + 1]), PetscRealPart(u_ptr[3 * o + 2])};
     PetscReal n_manning = mat_props.values[MATERIAL_PROPERTY_MANNINGS][o];
     PetscReal D[3][3];
-    SWEFrictionJacobian(cons, n_manning, tiny_h, D);
+    SWEFrictionJacobian(cons, n_manning, tiny_h, h_anuga, D);
 
     PetscReal block[9];
     for (PetscInt i = 0; i < 3; ++i)
@@ -1030,7 +1035,7 @@ static PetscErrorCode SWERHSJacobianPZero(TS ts, PetscReal t, Vec u_global, Mat 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-// dF/dn = -dS_fric/dn = +2 g n h^{-7/3} m (hu, hv) in the momentum rows
+// dF/dn = -dS_fric/dn (momentum rows; see SWEFrictionDN for both velocity forms)
 static PetscErrorCode SWEIJacobianPFriction(TS ts, PetscReal t, Vec u_global, Vec u_dot, PetscReal shift, Mat Jacp, void *ctx) {
   RDy rdy = ctx;
   (void)t;
@@ -1038,7 +1043,8 @@ static PetscErrorCode SWEIJacobianPFriction(TS ts, PetscReal t, Vec u_global, Ve
   (void)shift;
   PetscFunctionBegin;
 
-  const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+  const PetscReal tiny_h  = rdy->config.physics.flow.tiny_h;
+  const PetscReal h_anuga = rdy->config.physics.flow.h_anuga_regular;
 
   PetscCall(MatZeroEntries(Jacp));
 
@@ -1054,16 +1060,14 @@ static PetscErrorCode SWEIJacobianPFriction(TS ts, PetscReal t, Vec u_global, Ve
   PetscInt num_owned = (rend - rstart) / 3;
   for (PetscInt o = 0; o < num_owned; ++o) {
     PetscReal h = PetscRealPart(u_ptr[3 * o]), hu = PetscRealPart(u_ptr[3 * o + 1]), hv = PetscRealPart(u_ptr[3 * o + 2]);
-    if (h < tiny_h) continue;
-    PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
-    if (m == 0.0) continue;
-
     PetscReal n_manning = mat_props.values[MATERIAL_PROPERTY_MANNINGS][o];
-    PetscReal coeff     = 2.0 * GRAVITY * n_manning * PetscPowReal(h, -7.0 / 3.0) * m;
+    PetscReal v1, v2;
+    SWEFrictionDN(h, hu, hv, n_manning, tiny_h, h_anuga, &v1, &v2);
+    if (v1 == 0.0 && v2 == 0.0) continue;  // dry or motionless
 
     PetscInt col = cstart + o;
-    PetscCall(MatSetValue(Jacp, rstart + 3 * o + 1, col, coeff * hu, INSERT_VALUES));
-    PetscCall(MatSetValue(Jacp, rstart + 3 * o + 2, col, coeff * hv, INSERT_VALUES));
+    PetscCall(MatSetValue(Jacp, rstart + 3 * o + 1, col, -v1, INSERT_VALUES));
+    PetscCall(MatSetValue(Jacp, rstart + 3 * o + 2, col, -v2, INSERT_VALUES));
   }
 
   PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, &mat_props));
