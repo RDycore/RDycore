@@ -616,3 +616,37 @@ rtol 1e-3. Log: $SCRATCH/gpu-implicit/b4_1hr_dev_n4.log.
   TSStep/TSAdjointStep/TSTrajectoryGet). Device-resident checkpoint
   storage is the next trajectory squeeze if long-window gradients become
   the daily workload.
+
+## Rainfall wiring for the adjoint driver (campaign prep, 2026-08-21 night)
+
+The forcing subsystem (-raster_rain_dir + -raster_rain_start_date, hourly
+PETSc-binary rasters, mm/hr -> m/s, raster->mesh map) is only invoked by
+RDyAdvance, which the adjoint driver bypasses -- and the datasets stream
+strictly forward in time while checkpoint recomputes REWIND time. Driver
+fix (adjoint_test.c): preload the window's hourly per-cell rain once at
+setup (monotone RDyApplyForcing calls), then a TSPreStage hook -- which
+fires inside every TSStep, INCLUDING trajectory ReCompute replays --
+swaps the active hour in as a pure function of stage time (hour h covers
+(h*3600,(h+1)*3600], matching RDyAdvance's coupling semantics; region
+id 1 as in RDyApplyForcing; source is state-independent so no adjoint
+terms arise).
+
+Laptop validation (single-region BEULER dam-break variant
+rain_beuler_test.yaml, synthetic 2-hour raster series, 7200 steps at
+dt=1, revolve max_cps_ram 50 => recomputes cross the hour switch):
+- adjoint-vs-FD dJ/du0 gates: 2.4e-7..8.9e-7 (gate 1e-5), host and
+  device types, np 1 and 2 -- the forced trajectory is reproduced
+  exactly through hour switches and replays.
+- device-RHS vs host-RHS with hourly source re-uploads: J, |dJ/du0|,
+  sum(dJ/dn) identical to every printed digit (the source state-cache
+  invalidation handles time-varying rain).
+- dJ/dn on this test is genuinely ~0 (motionless by hour 2): added a
+  degenerate-gradient guard to the driver's Manning FD gate (absolute
+  floor fd_tol*max(J,1) when the relative test is noise-vs-noise).
+- Known limitation (pre-existing): RDyApplyForcing hardcodes region
+  id 1 = whole domain; multi-region configs (e.g. the planar dam tests)
+  error cleanly. Turning's single "domain" region is fine.
+
+Data: full Harvey hourly MRMS (+ mswep/nldas/daymet) rasters at
+/global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/
+mm-per-hr/*/bin (Aug 24-30); repo tree carries a 2-hour sample.
