@@ -810,3 +810,39 @@ calibration drops from ~1.6 to ~0.8 GPU-node-days.
   dependence trap). 60-90 s is one-time per job, amortized over a
   calibration -- poor risk/benefit days before the campaign.
 - Fork GitLab push (Mark): main now also carries 5b4f3d82d1e.
+
+### KSP solver sweep (2026-08-22, with Mark; Mark's interactive node, forward dt=1 x20 n4)
+
+The solve under the microscope (logs/ksp_look_n4.log in the repo, full
+-ksp_view + -ksp_monitor): fgmres(30)+pbjacobi bs=3, right PC,
+unpreconditioned norm, rtol 1e-3 -- 81 of 103 solves take exactly 6
+iterations at a flat ~3.2x/iteration; VecMDot is ~40% of KSPSolve even
+post-gemv-fix (inherent to GMRES at 6 its). Variants (SNESSolve /
+KSPSolve seconds; all 20/20 Newton unless noted):
+
+| solver                | rtol | lin its | KSP    | SNES  |
+|-----------------------|------|---------|--------|-------|
+| fgmres (baseline)     | 1e-3 | 614     | 1.02   | 1.76  |
+| gmres right           | 1e-3 | 614     | 1.00   | 1.66  |
+| gmres right           | 1e-2 | 457     | 0.72   | 1.43  |
+| gmres right           | 1e-1 | DIVERGED step 1 (Newton 31 its -> NaN) |
+| gmres left            | 1e-3 | 625     | 1.02   | 1.68  |
+| gmres left            | 1e-2 | 476     | 0.75   | 1.44  |
+| bicg                  | 1e-3 | 721     | 2.13   | 2.76  |
+| bcgs                  | 1e-3 | 365     | 1.13   | 1.77  |
+| bcgs                  | 1e-2 | 290     | 0.92   | 1.60  |
+
+- fgmres's flexibility is unused (pbjacobi is stationary): gmres+right
+  is bit-equivalent at 1e-3 (identical 614-it path, traj 2.3e-16) and
+  ~5% faster -- a free swap.
+- rtol 1e-2: 19% faster forward SNESSolve, trajectory 1.2e-9 from
+  baseline, gradient moves 0.1-0.55% (|dJ/du0| 1555.3->1556.8,
+  sum(dJ/dn) -445566->-448015): likely fine for BLMVM but ~25x the
+  1e-3->1e-8 stability band -- run the laptop FD gates at 1e-2 before
+  making it the campaign default. rtol 1e-1 is unusable.
+- Left PC: within noise of right, slightly more its (predicted:
+  P^-1 ~ well-scaled here, only the test norm changes). bicg 2x slower
+  (2 matvecs/it incl. transpose, MORE its); bcgs no win over gmres.
+- RECOMMENDATION: -ksp_type gmres -ksp_pc_side right (rtol 1e-3 now;
+  1e-2 pending gradient FD gates). PM logs: ksp_*_n4.log,
+  grad_gmres_rtol*_n4.log in $SCRATCH/gpu-implicit.
