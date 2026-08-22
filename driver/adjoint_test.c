@@ -1005,6 +1005,7 @@ int main(int argc, char *argv[]) {
         PetscCall(VecRestoreArray(y_k[kk], &ya));
         PetscCall(VecRestoreArray(w_k[kk], &wa));
       }
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &n_present, 1, MPIU_INT, MPI_SUM, comm));  // each rank counted its owned rows
 
       cc.pc = (PerCellCtx){.base        = {.rdy = rdy, .H = Hg, .u_ic = u_ic, .sigma = sigma, .t_final = t_final},
                            .beta        = beta,

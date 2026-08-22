@@ -39,9 +39,13 @@ indistinguishably from 1e-3 (55.47x vs 55.43x, same J to 5–6 digits),
 TaoSolve 34.6 → 31.5 s. Caveat on the record: at rtol 1e-2 the
 adjoint-vs-FD mismatch is inner-solve-limited at ~6e-4–4e-3 (the 1e-5
 FD gate is a tight-tolerance instrument; gradient error does not affect
-BLMVM convergence in any test). Recommendation: run the campaign at
+BLMVM convergence in any test). DECIDED (Mark, 2026-08-22): campaign runs at
 **gmres+right rtol 1e-2**, with one 1e-3 spot-check calibration for the
 paper's reviewer-proofing. rtol 1e-1 diverges — do not go looser.
+WATCH ITEM: rtol 1e-2 costs ~13% more Newton iterations (~4.4 -> ~5.0
+per implicit step at Turning, net 2.5x cheaper). If forced-window
+Newton counts creep toward -snes_max_it 50 on hard steps, tighten back
+to 1e-3 rather than raising the cap.
 
 ## Run matrix (in order)
 
@@ -65,6 +69,16 @@ before trusting timing (tool README). Scientists' answers folded in:
 trusted-gauge list (their read: gauges likely avoid dam influence) and
 per-gauge σ.
 
+**Pre-campaign status (2026-08-22 evening)**: Turning NLCD per-cell
+class/manning maps GENERATED ($SCRATCH/gpu-implicit/turning30m_class.bin
+and _manning.bin, 0 uncovered cells, area-weighted mean n = 0.1005 ==
+the committed summary). Class-mode driver VALIDATED on the laptop
+dam-break twin (np1/2, device types: recovers both class values
+exactly, J -> 3e-14; observation-count report fixed to reduce across
+ranks). A Turning-scale class-mode smoke (o9) failed before TAO output
+with the sshproxy cert expired before the log could be read — FIRST
+PM ACTION next session: read o9_cal_classes_n4.log and rerun.
+
 **R3 — the calibration.** 6-hr MRMS-forced window on the rising limb,
 real-gauge observations, 20 TAO iterations, n4, revolve
 (`-ts_trajectory_max_cps_ram 400`). ~19 node-hr. Parameterization
@@ -73,6 +87,17 @@ the network — 21 gauges × K obs times vs 2.93M per-cell parameters is
 severely underdetermined, so the defensible primary run is
 **land-cover-class (NLCD) parameters** with the per-cell map as a
 Tikhonov-regularized secondary/appendix run.
+
+**R3' — the 12-hr paper window** (decided direction, Mark
+2026-08-22): the observability study says information accumulates
+superlinearly (1.4e3/hr at 1 h -> 5.3e3/hr at 12 h), so after the 6-hr
+shakeout the paper run is a 12-hr window. Cost at n4: 43,200 steps,
+gradient ≈ 2–2.2 hr (revolve with 400 cps is still in the
+two-recompute regime, capacity ~80,600 steps), 20 TAO its ≈ 40–44
+node-hr — fits the budget, but ~40 hr wall on one node. PREREQ:
+multi-node smoke (2 nodes x 4 GPUs, 1 rank/GPU, 366k cells/rank) — a
+15-min test that would make the paper run an overnight 2-node job.
+Everything to date is single-node.
 
 **R4 — contingency/extension** (remaining budget): 9-hr window, second
 rain product (mswep/nldas for forcing sensitivity), or a σ-sensitivity
