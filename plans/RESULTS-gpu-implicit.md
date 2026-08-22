@@ -869,3 +869,51 @@ KSPSolve seconds; all 20/20 Newton unless noted):
   Turning calibrations are twins) -- that is the campaign itself.
   Plan for the Wednesday meeting: plans/campaign-wednesday.md
   (supersedes campaign-tonight.md, whose no-revolve premise is dead).
+
+### FINDING: drag discontinuity at tiny_h blocks NLCD-prior implicit runs (2026-08-22 night)
+
+The Turning class-mode twin (NLCD prior applied as the Manning field,
+mean n = 0.1005, max 0.16) fails DIVERGED_NONLINEAR_SOLVE within the
+first few dt=1 BEULER steps (logs o9*-o13* in $SCRATCH/gpu-implicit).
+Diagnosis (o9c_diag.log, snes+linesearch monitors): Newton descends
+cleanly 903 -> 1.26e-3 in ~13 its, then the residual FREEZES; at the
+stall a lambda = 1e-13 step jumps the residual 8x (1.26e-3 -> 1.01e-2)
+-- the residual is DISCONTINUOUS at the iterate. Cause: the drag term
+g n^2 h^(-7/3) q|q| is gated by h >= tiny_h with tiny_h = 1e-7 and a
+PLAIN q/h velocity (h_anuga only regularizes the flux/primitive
+velocities, NOT the source kernel), so a cell crossing the cutoff with
+retained momentum switches an enormous drag contribution on/off
+discontinuously. NLCD-scale n^2 raised the jump amplitude ~100x above
+where the mild-field runs left it (invisible below solver tolerance).
+Confirmed NOT fixable by: rtol (1e-2/1e-3), snes_rtol 1e-5, bt/basic
+damped 0.7/newtontr, h_anuga 0.001/0.01 alone (moves the failing step
+only), tiny_h 1e-4 (WORSE - more cells at a fatter threshold), dt=0.5
+(fails step 1; the floor scales oddly with dt). The gauge-twin
+calibrations (n0 0.03, two-zone 0.03/0.06) never see it -- amplitude
+below tolerance. Related to but distinct from the other agent's dt>=5
+linear-solve hardness.
+
+DECISION (Mark): implement fix (2) -- regularize the drag itself with
+the ANUGA velocity (drag -> 0 smoothly as h -> 0), pending scientist
+OK Wednesday (the paper's open-questions section already asks exactly
+this). NEXT-SESSION TASK SPEC:
+- Touch points (keep host/device bitwise-twinned, RDY_MATH_FN style):
+  ApplySourceExplicit host loop (src/swe/swe_petsc.c), the device
+  source kernel swejk_rhs_source (swe_jacobian_kokkos.kokkos.cxx), the
+  source Jacobian SWESourceJacobian (swe_roe_flux_jacobian_petsc.h,
+  shared host+device), SWERHSJacobianP host loop + SWEKokkosJacobianP
+  device kernel (dS/dn changes), SWEIJacobianPFriction +
+  SWEIFunctionFriction (ARK-IMEX implicit part), and the CEED source
+  Q-functions if parity there matters (charter: CEED untouched -- gate
+  the change to the PETSc path or coordinate).
+- Semantics: with h_anuga_reg_parameter = 0 the new code must be
+  BITWISE identical to today (the regularized velocity reduces to q/h)
+  -- that is the A/B gate. With h_anuga > 0 re-run the FD gate suite
+  (jacobian + adjoint + calibrate ctests pass unchanged since configs
+  default h_anuga 0; add a laptop FD-gate run WITH h_anuga > 0 at
+  tight tolerances -- the derivative code must differentiate the
+  regularization too).
+- Then Turning class twin with h_anuga ~ 0.001-0.01 (sweep): expect
+  the stall floor to collapse; pick the smallest value that converges
+  cleanly and put it in the campaign configs + Wednesday agenda.
+- Config plumbing already exists (physics.flow.h_anuga_reg_parameter).
