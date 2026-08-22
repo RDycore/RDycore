@@ -591,3 +591,28 @@ Device per-iteration profile (TaoSolve 5.3 s/it): forward SNESSolve
 (pbjacobi block inversion, 2473 calls) 41 s total now rivals KSPSolve
 29.7 s -- a possible next squeeze, along with host-H observation
 applications. Diminishing returns.
+
+### 1-simulated-hour gradient (real-window check, device n4)
+
+beuler_dt1_1hr.yaml (Turning, spun-up Harvey IC draining through the
+critical-outflow outlet -- NO rain forcing in this config; storm-forced
+fidelity needs the calibration project's forcing files), 3600 steps at
+dt=1, FD-twin driver mode, -ts_trajectory_type memory
+-ts_trajectory_max_cps_ram 400 (revolve checkpointing), fgmres+pbjacobi
+rtol 1e-3. Log: $SCRATCH/gpu-implicit/b4_1hr_dev_n4.log.
+
+- COMPLETED in 27.3 min wall (includes the driver's extra truth
+  forward): forward 0.114 s/step -- Newton holds ~4 its/step across the
+  full hour -- and the checkpointed backward works: 3199 revolve
+  recompute steps (~0.89 extra forwards, near optimal for 400 cps),
+  TSAdjointStep 0.101 s/step, gradient finite and sane.
+- Per-gradient (1 forward + checkpointed backward) at a 1-hr window:
+  ~19 min at n4. Measured-basis extrapolation per TAO iteration:
+  3 hr ~= 57 min, 6 hr ~= 1.9 hr (n4). A 20-iteration calibration on a
+  6-hr window is ~1.6 GPU-node-days -- the economic case for multi-node
+  scaling, window design, and the dt>=5 research (5x on everything).
+- Follow-up lead: the revolve checkpoints stage through HOST memory
+  (hundreds of GB of PCIe across the sweep -- visible as GpuToCpu in
+  TSStep/TSAdjointStep/TSTrajectoryGet). Device-resident checkpoint
+  storage is the next trajectory squeeze if long-window gradients become
+  the daily workload.
