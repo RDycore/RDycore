@@ -49,10 +49,10 @@ static const char *help_str =
 // via MatCreateVecs, the observation-space vecs -- off the host when the
 // solve runs on kokkos types
 static PetscErrorCode ObservationMatrixType(Vec state, MatType *type) {
-  VecType vt;
+  PetscBool is_kokkos;
   PetscFunctionBeginUser;
-  PetscCall(VecGetType(state, &vt));
-  *type = strstr(vt, "kokkos") ? MATAIJKOKKOS : MATAIJ;
+  PetscCall(RDyVecIsKokkos(state, &is_kokkos));
+  *type = is_kokkos ? MATAIJKOKKOS : MATAIJ;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

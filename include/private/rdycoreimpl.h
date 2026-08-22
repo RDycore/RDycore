@@ -21,6 +21,37 @@ PETSC_INTERN PetscBool      CeedEnabled(void);
 PETSC_INTERN Ceed           CeedContext(void);
 PETSC_INTERN PetscErrorCode GetCeedVecType(VecType *);
 
+// device-type queries on PETSc objects (in place of type-name sniffing)
+
+// is the vector a Kokkos type?
+static inline PetscErrorCode RDyVecIsKokkos(Vec v, PetscBool *is_kokkos) {
+  PetscFunctionBegin;
+  PetscCall(PetscObjectTypeCompareAny((PetscObject)v, is_kokkos, VECKOKKOS, VECSEQKOKKOS, VECMPIKOKKOS, ""));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// is the matrix a Kokkos type? (device-native matrix types report their
+// device vec type from MatGetVecType)
+static inline PetscErrorCode RDyMatIsKokkos(Mat A, PetscBool *is_kokkos) {
+  VecType vt;
+  PetscFunctionBegin;
+  PetscCall(MatGetVecType(A, &vt));
+  PetscCall(PetscStrInList(vt, VECKOKKOS "," VECSEQKOKKOS "," VECMPIKOKKOS, ',', is_kokkos));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// is the matrix any device-native type (Kokkos, CUDA, HIP)? Such types build
+// their host CSR arrays only at assembly.
+static inline PetscErrorCode RDyMatIsDeviceNative(Mat A, PetscBool *is_device) {
+  VecType   vt;
+  PetscBool is_host;
+  PetscFunctionBegin;
+  PetscCall(MatGetVecType(A, &vt));
+  PetscCall(PetscStrInList(vt, VECSTANDARD "," VECSEQ "," VECMPI "," VECSHARED, ',', &is_host));
+  *is_device = (PetscBool)!is_host;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // This type keeps track of accumulated time series data appended periodically
 // to files.
 typedef struct {

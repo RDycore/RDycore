@@ -239,9 +239,9 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   // boundary edge, and owned cell its scalar OFFSET into the values buffer,
   // so the device kernels write in exactly the host loop's order.
   {
-    MatType type;
-    PetscCall(MatGetType(rdy->rhs_jac, &type));
-    if (strstr(type, "kokkos")) {
+    PetscBool is_kokkos;
+    PetscCall(RDyMatIsKokkos(rdy->rhs_jac, &is_kokkos));
+    if (is_kokkos) {
       SWEJacobianKokkosSetup s = {0};
 
       PetscInt  *e_l, *e_r, *e_owned, *e_off, *e_id, *b_cell, *b_type, *b_off, *c_id, *c_owned, *c_off;
@@ -755,9 +755,9 @@ PetscErrorCode ApplySWEPetscOperatorsKokkos(Operator *op, PetscReal dt, Vec u_lo
 
   PetscFunctionBegin;
   *applied = PETSC_FALSE;
-  VecType vec_type;
-  PetscCall(VecGetType(u_local, &vec_type));
-  if (!strstr(vec_type, "kokkos")) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscBool is_kokkos;
+  PetscCall(RDyVecIsKokkos(u_local, &is_kokkos));
+  if (!is_kokkos) PetscFunctionReturn(PETSC_SUCCESS);
 
   if (!rk->announced) {
     PetscCall(PetscInfo(f_global, "SWE PETSc RHS: device apply (%" PetscInt_FMT " interior edges, %" PetscInt_FMT " boundary edges)\n", rk->n_edges,
@@ -1193,10 +1193,11 @@ PetscErrorCode RegisterSWERHSJacobian(RDy rdy) {
         // types only build at assembly -- SL coloring SEGVs on an empty
         // BAIJKokkos. Fail with a message instead (use jacobian: analytic
         // for device matrix types).
-        MatType mat_type;
+        MatType   mat_type;
+        PetscBool is_device;
         PetscCall(MatGetType(rdy->rhs_jac, &mat_type));
-        PetscCheck(!strstr(mat_type, "kokkos") && !strstr(mat_type, "cusparse") && !strstr(mat_type, "cuda") && !strstr(mat_type, "hip"),
-                   rdy->comm, PETSC_ERR_SUP,
+        PetscCall(RDyMatIsDeviceNative(rdy->rhs_jac, &is_device));
+        PetscCheck(!is_device, rdy->comm, PETSC_ERR_SUP,
                    "numerics.jacobian: fd requires a host matrix type (FD coloring reads host CSR data that device matrix type '%s' does not "
                    "populate before assembly); use numerics.jacobian: analytic with device matrix types",
                    mat_type);
