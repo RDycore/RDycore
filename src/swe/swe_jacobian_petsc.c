@@ -158,14 +158,9 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   // so it (and any type on a stock PETSc build) uses scalar COO.
   PetscBool blocked = PETSC_FALSE;
 #if RDY_HAVE_MAT_COO_BLOCK_INDICES
-  {
-    MatType type;
-    PetscCall(MatGetType(rdy->rhs_jac, &type));
-    if (strstr(type, "baijkokkos") || strstr(type, "baijcuda") || !strcmp(type, MATMPIBAIJ)) {
-      PetscCall(MatCOOUseBlockIndices(rdy->rhs_jac, PETSC_TRUE));
-      blocked = PETSC_TRUE;
-    }
-  }
+  PetscCall(PetscObjectTypeCompareAny((PetscObject)rdy->rhs_jac, &blocked, MATSEQBAIJKOKKOS, MATMPIBAIJKOKKOS, MATSEQBAIJCUDA, MATMPIBAIJCUDA,
+                                      MATMPIBAIJ, ""));
+  if (blocked) PetscCall(MatCOOUseBlockIndices(rdy->rhs_jac, PETSC_TRUE));
 #endif
 
   // count blocks (same loop structure as the fill; only topology matters)

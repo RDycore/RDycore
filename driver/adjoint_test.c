@@ -271,10 +271,8 @@ static PetscErrorCode ResetTrajectory(TS ts) {
   PetscCall(TSGetTrajectory(ts, &tj));
   if (!tj) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(TSTrajectoryReset(tj));
-  TSTrajectoryType type;
-  PetscCall(TSTrajectoryGetType(tj, ts, &type));
   PetscBool is_basic;
-  PetscCall(PetscStrcmp(type, TSTRAJECTORYBASIC, &is_basic));
+  PetscCall(PetscObjectTypeCompare((PetscObject)tj, TSTRAJECTORYBASIC, &is_basic));
   if (is_basic) {
     MPI_Comm    comm;
     PetscMPIInt rank;
