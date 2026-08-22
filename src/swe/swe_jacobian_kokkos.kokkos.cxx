@@ -51,6 +51,7 @@ struct SWEJacobianKokkos {
   View<PetscScalar> braw;       // raw boundary fluxes: 3 * n_bedges (D2H each eval)
   View<PetscReal>   cfac;       // Courant factor candidates: n_edges + n_bedges
   View<PetscScalar> src_stage;  // cached external sources
+  View<PetscScalar> jacp_v;     // dF/dn COO values buffer (2 per owned cell)
   PetscInt          rhs_source_method, src_len;
   bool              rhs_ready = false, mp_primed = false, src_primed = false;
   PetscObjectState  mp_state = 0, src_state = 0;  // source-vec states of the staged copies (valid when *_primed)
@@ -518,6 +519,42 @@ PetscErrorCode SWEKokkosApplySource(SWEJacobianKokkos *jk, const PetscScalar *u_
     }));
   PetscCallCXX(Kokkos::fence());
   PetscCall(PetscLogGpuTimeEnd());
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode SWEKokkosJacobianP(SWEJacobianKokkos *jk, const PetscScalar *u_ptr, const PetscScalar *mat_props, PetscObjectState matprop_state,
+                                  const PetscScalar **vals)
+{
+  PetscFunctionBegin;
+  PetscCall(StageTracked(jk->mp_stage, "swejk_mp_stage", mat_props, jk->matprop_len, matprop_state, &jk->mp_primed, &jk->mp_state));
+  if (jk->jacp_v.extent(0) == 0) PetscCallCXX(jk->jacp_v = View<PetscScalar>(Kokkos::view_alloc(Kokkos::WithoutInitializing, std::string("swejk_jacp_v")), 2 * jk->n_cells));
+  Kokkos::View<const PetscScalar *, MemSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged>> u(u_ptr, 3 * jk->n_cells);
+
+  const PetscReal tiny_h    = jk->tiny_h;
+  const PetscInt  mp_stride = jk->matprop_stride, mp_manning = jk->matprop_manning;
+  auto            mp = jk->mp_stage;
+  auto            jv = jk->jacp_v;
+
+  PetscCall(PetscLogGpuTimeBegin());
+  PetscCallCXX(Kokkos::parallel_for(
+    "swejk_jacp", Kokkos::RangePolicy<ExecSpace>(0, jk->n_cells), KOKKOS_LAMBDA(const PetscInt o) {
+      const PetscReal h = PetscRealPart(u(3 * o)), hu = PetscRealPart(u(3 * o + 1)), hv = PetscRealPart(u(3 * o + 2));
+      PetscReal       v1 = 0.0, v2 = 0.0;
+      if (h >= tiny_h) {  // mirrors the host loop's dry / motionless skips (which leave zeros)
+        const PetscReal m = PetscSqrtReal(Square(hu) + Square(hv));
+        if (m != 0.0) {
+          const PetscReal n_manning = PetscRealPart(mp(mp_stride * o + mp_manning));
+          const PetscReal coeff     = -2.0 * GRAVITY * n_manning * PetscPowReal(h, -7.0 / 3.0) * m;
+          v1                        = coeff * hu;
+          v2                        = coeff * hv;
+        }
+      }
+      jv(2 * o)     = v1;
+      jv(2 * o + 1) = v2;
+    }));
+  PetscCallCXX(Kokkos::fence());
+  PetscCall(PetscLogGpuTimeEnd());
+  *vals = jk->jacp_v.data();
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

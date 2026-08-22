@@ -860,6 +860,29 @@ static PetscErrorCode SWERHSJacobianP(TS ts, PetscReal t, Vec u_global, Mat Jacp
 
   const PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
 
+#if RDY_HAVE_KOKKOS_JACOBIAN
+  // device path: values computed in a kernel over owned cells and set with
+  // MatSetValuesCOO (the COO-preallocated aijkokkos Jacp), so neither the
+  // state nor the adjoint's Jacp^T applies round-trip through the host
+  if (rdy->rhs_jac_kokkos) {
+    const PetscScalar *u_dev;
+    PetscMemType       u_memtype;
+    PetscCall(VecGetArrayReadAndMemType(u_global, &u_dev, &u_memtype));
+    if (PetscMemTypeDevice(u_memtype)) {
+      const PetscScalar *mp_ptr, *vals;
+      PetscObjectState   mp_state;
+      PetscCall(VecGetArrayRead(rdy->operator->petsc.material_properties, &mp_ptr));
+      PetscCall(PetscObjectStateGet((PetscObject)rdy->operator->petsc.material_properties, &mp_state));
+      PetscCall(SWEKokkosJacobianP(rdy->rhs_jac_kokkos, u_dev, mp_ptr, mp_state, &vals));
+      PetscCall(VecRestoreArrayRead(rdy->operator->petsc.material_properties, &mp_ptr));
+      PetscCall(VecRestoreArrayReadAndMemType(u_global, &u_dev));
+      PetscCall(MatSetValuesCOO(Jacp, vals, INSERT_VALUES));
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
+    PetscCall(VecRestoreArrayReadAndMemType(u_global, &u_dev));
+  }
+#endif
+
   PetscCall(MatZeroEntries(Jacp));
 
   PetscInt rstart, rend, cstart, cend;
@@ -1193,7 +1216,33 @@ PetscErrorCode RegisterSWERHSJacobian(RDy rdy) {
     PetscInt n_local;
     PetscCall(VecGetLocalSize(rdy->u_global, &n_local));
     PetscInt num_owned = n_local / 3;
-    PetscCall(MatCreateAIJ(rdy->comm, n_local, num_owned, PETSC_DETERMINE, PETSC_DETERMINE, 1, NULL, 0, NULL, &rdy->rhs_jac_p));
+#if RDY_HAVE_KOKKOS_JACOBIAN
+    if (rdy->rhs_jac_kokkos) {
+      // device-assembly configs get a COO-preallocated aijkokkos Jacp so the
+      // adjoint's per-step dF/dn assembly and Jacp^T applies stay on device
+      // (structural pattern: momentum rows (3o+1, 3o+2) x parameter column o)
+      PetscInt rstart, cstart, *coo_i, *coo_j;
+      PetscCallMPI(MPI_Scan(&n_local, &rstart, 1, MPIU_INT, MPI_SUM, rdy->comm));
+      PetscCallMPI(MPI_Scan(&num_owned, &cstart, 1, MPIU_INT, MPI_SUM, rdy->comm));
+      rstart -= n_local;
+      cstart -= num_owned;
+      PetscCall(MatCreate(rdy->comm, &rdy->rhs_jac_p));
+      PetscCall(MatSetSizes(rdy->rhs_jac_p, n_local, num_owned, PETSC_DETERMINE, PETSC_DETERMINE));
+      PetscCall(MatSetType(rdy->rhs_jac_p, MATAIJKOKKOS));
+      PetscCall(PetscMalloc2(2 * num_owned, &coo_i, 2 * num_owned, &coo_j));
+      for (PetscInt o = 0; o < num_owned; ++o) {
+        coo_i[2 * o]     = rstart + 3 * o + 1;
+        coo_i[2 * o + 1] = rstart + 3 * o + 2;
+        coo_j[2 * o]     = cstart + o;
+        coo_j[2 * o + 1] = cstart + o;
+      }
+      PetscCall(MatSetPreallocationCOO(rdy->rhs_jac_p, 2 * num_owned, coo_i, coo_j));
+      PetscCall(PetscFree2(coo_i, coo_j));
+    } else
+#endif
+    {
+      PetscCall(MatCreateAIJ(rdy->comm, n_local, num_owned, PETSC_DETERMINE, PETSC_DETERMINE, 1, NULL, 0, NULL, &rdy->rhs_jac_p));
+    }
     PetscCall(PetscObjectSetName((PetscObject)rdy->rhs_jac_p, "swe_rhs_jacobian_dn"));
     PetscCall(TSSetRHSJacobianP(rdy->ts, rdy->rhs_jac_p, SWERHSJacobianP, rdy));
   }

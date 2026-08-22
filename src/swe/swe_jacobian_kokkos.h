@@ -110,6 +110,15 @@ PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScala
                                          PetscMemType matprop_memtype, PetscObjectState matprop_state, const PetscScalar *dirichlet,
                                          const PetscScalar **coo_v);
 
+// Device values for the explicit-drag parameter Jacobian dF/dn (COO order:
+// for owned cell o, entries (3o+1, o) then (3o+2, o)). u_owned is the GLOBAL
+// (owned-dof) state as a device pointer; mat_props is the HOST array staged
+// through the shared state-keyed cache. On return *vals is a DEVICE pointer
+// (2 scalars per owned cell) for MatSetValuesCOO, valid until the next
+// call/Destroy.
+PetscErrorCode SWEKokkosJacobianP(SWEJacobianKokkos *jk, const PetscScalar *u_owned, const PetscScalar *mat_props, PetscObjectState matprop_state,
+                                  const PetscScalar **vals);
+
 PetscErrorCode SWEJacobianKokkosDestroy(SWEJacobianKokkos **jk);
 
 #ifdef __cplusplus
