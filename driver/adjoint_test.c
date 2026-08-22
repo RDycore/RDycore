@@ -583,6 +583,21 @@ typedef struct {
 } PerCellCtx;
 
 // J = multi-time misfit + beta/2 |p - n0|^2;  g = mu + beta (p - n0)
+// host vec with the same layout as x: the TAO solution/gradient vecs stay on
+// host types even when the adjoint's mu is a device vec (it follows the
+// device Jacp) -- PETSc's LMVM dense internals abort on CUDA device solution
+// vecs, and the optimizer update cost is negligible next to the solves
+static PetscErrorCode VecDuplicateHostLayout(Vec x, Vec *y) {
+  PetscInt n, N;
+  PetscFunctionBeginUser;
+  PetscCall(VecGetLocalSize(x, &n));
+  PetscCall(VecGetSize(x, &N));
+  PetscCall(VecCreate(PetscObjectComm((PetscObject)x), y));
+  PetscCall(VecSetSizes(*y, n, N));
+  PetscCall(VecSetType(*y, VECSTANDARD));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode FormObjectiveAndGradientPerCell(Tao tao, Vec p, PetscReal *J, Vec g, void *ctx) {
   PerCellCtx     *pc  = ctx;
   CalibrationCtx *cal = &pc->base;
@@ -610,7 +625,19 @@ static PetscErrorCode FormObjectiveAndGradientPerCell(Tao tao, Vec p, PetscReal 
   PetscReal reg_norm;
   PetscCall(VecNorm(g, NORM_2, &reg_norm));
   *J += 0.5 * pc->beta * reg_norm * reg_norm;
-  PetscCall(VecAYPX(g, pc->beta, cal->mu));
+  // mu may be a device vec while g follows the host TAO types, so combine
+  // through host arrays (same g[i] = beta*g[i] + mu[i] as the former VecAYPX)
+  {
+    const PetscScalar *mu_ptr;
+    PetscScalar       *g_ptr;
+    PetscInt           n;
+    PetscCall(VecGetLocalSize(g, &n));
+    PetscCall(VecGetArrayRead(cal->mu, &mu_ptr));
+    PetscCall(VecGetArray(g, &g_ptr));
+    for (PetscInt i = 0; i < n; ++i) g_ptr[i] = mu_ptr[i] + pc->beta * g_ptr[i];
+    PetscCall(VecRestoreArray(g, &g_ptr));
+    PetscCall(VecRestoreArrayRead(cal->mu, &mu_ptr));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1332,12 +1359,12 @@ int main(int argc, char *argv[]) {
       PetscCall(MatCreateVecs(Hg, NULL, &pc.base.r_work));
       PetscCall(VecDuplicate(rdy->u_global, &pc.base.lambda));
       PetscCall(MatCreateVecs(rdy->rhs_jac_p, &pc.base.mu, NULL));
-      PetscCall(VecDuplicate(pc.base.mu, &pc.n_prior));
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &pc.n_prior));
       PetscCall(VecSet(pc.n_prior, n0));
 
       Tao tao;
       Vec p, lb, ub, g_scratch;
-      PetscCall(VecDuplicate(pc.base.mu, &p));
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &p));
       PetscCall(VecCopy(pc.n_prior, p));
       PetscCall(VecDuplicate(p, &lb));
       PetscCall(VecDuplicate(p, &ub));
@@ -1505,12 +1532,12 @@ int main(int argc, char *argv[]) {
                        .r_k         = r_k};
       PetscCall(VecDuplicate(rdy->u_global, &pc.base.lambda));
       PetscCall(MatCreateVecs(rdy->rhs_jac_p, &pc.base.mu, NULL));
-      PetscCall(VecDuplicate(pc.base.mu, &pc.n_prior));
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &pc.n_prior));
       PetscCall(VecSet(pc.n_prior, 0.03));
 
       Tao tao;
       Vec p, lb, ub;
-      PetscCall(VecDuplicate(pc.base.mu, &p));
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &p));
       PetscCall(VecCopy(pc.n_prior, p));
       PetscCall(VecDuplicate(p, &lb));
       PetscCall(VecDuplicate(p, &ub));
