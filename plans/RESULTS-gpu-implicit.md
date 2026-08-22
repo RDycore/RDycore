@@ -561,3 +561,33 @@ known P2-era landmine, reached via -dm_mat_type this time).
 RegisterSWERHSJacobian now rejects jacobian: fd with device matrix types
 with an explanatory error. Device calibration uses the implicit config
 (beuler + analytic), which is the production path anyway.
+
+### Turning-scale calibration (gauge twin) + an honest-baseline correction
+
+PM runs (beuler_dt1.yaml + gauges twin: 39-step windows, 13 obs times,
+418,076 twin gauges, 2,926,532 per-cell Manning parameters, BLMVM,
+fgmres+pbjacobi rtol 1e-3, memory trajectory):
+
+- Device n4 (kokkos types): 20 TAO its, J 1.283e6 -> 2.315e4 (55.4x),
+  TaoSolve 106.2 s = 5.3 s per TAO iteration. Total wall 414.7 s
+  (~60 s of that is one-time DMPlexDistribute).
+- Host types n64 (SAME binary and parmetis partition): 5 TAO its,
+  TaoSolve 165.5 s = 33.1 s per iteration. J-trace IDENTICAL to the
+  device run to every printed digit through the common iterations
+  (gauge sets are natural-ordered, hence partition-independent).
+- Single-node apples-to-apples (4 A100s vs 64 cores of the same node):
+  ~6.2x per TAO iteration; recovery converging identically.
+
+CORRECTION to the morning's baselines: the "CPU n64" figures used the
+CPU-arch binary, which has NO PARMETIS -- its native partition inflates
+host times ~4x (e.g. TSAdjointStep 0.90 s/step there vs 0.247 s/step for
+host types on the parmetis partition). The honest single-node
+host-vs-device ratios at Turning are ~6-8x (gradient ~50 s -> 8.1 s per
+20-step window), not the ~30x implied by the no-parmetis baseline. The
+device-side numbers themselves are unaffected.
+
+Device per-iteration profile (TaoSolve 5.3 s/it): forward SNESSolve
+~3.3 s + adjoint sweep ~2.3 s per window-pair share; inside them PCSetUp
+(pbjacobi block inversion, 2473 calls) 41 s total now rivals KSPSolve
+29.7 s -- a possible next squeeze, along with host-H observation
+applications. Diminishing returns.
