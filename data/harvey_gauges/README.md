@@ -83,18 +83,37 @@ independently confirms 63.94 ft on 2017-08-27 as the water-year
 maximum gage height). So **CSV timestamps are local CDT = UTC-5**;
 `--t0` must be given on that clock.
 
-STILL TO CONFIRM -- the rain clock. The MRMS hourly rasters are named
-`YYYY-MM-DD:HH-00.int32.bin` and the series begins at
-`2017-08-24:19-00`. A 19:00 start is exactly 00:00 UTC of the next
-day under CDT labelling, which HINTS the raster names are already
-local CDT (in which case `--t0` equals the date passed to
-`-raster_rain_start_date` and NO shift is needed). This is a hint,
-not proof -- the dataset could simply begin mid-afternoon UTC.
-Confirm before the real-gauge production run, either by asking the
-dataset's producer or empirically: run one short forced window both
-ways (0 h and +5 h) and keep the alignment whose modelled rise
-matches the observed hydrograph rise. A 5-hour misalignment on a
-rising limb is large enough to be obvious in the misfit, so this is
-self-diagnosing rather than a silent error -- but it MUST be checked,
-since a wrong clock would bias the calibrated Manning field to
-compensate for a timing error.
+## RAIN CLOCK: RESOLVED (2026-08-23) -- MRMS rasters are ALSO local CDT
+
+The MRMS hourly rasters are named `YYYY-MM-DD:HH-00.int32.bin`. Their
+labels are on the SAME local CDT clock as the gauge CSVs, so **no
+shift is needed**: `--t0` for `make_obs_table.py` equals the date
+passed to `-raster_rain_start_date`.
+
+Established empirically, at zero compute cost, by cross-correlating
+the basin-mean MRMS rain rate against the gauge-average rate of stage
+rise d(stage)/dt (the quantity rain actually drives), scanning the
+offset between the two clocks over the Aug 25-28 storm:
+
+| offset applied to rain clock | correlation |
+|---|---|
+| -1 h | +0.32 |
+| **0 h (labels are CDT)** | **+0.65** |
+| +1 h | +0.56 |
+| +2 h | +0.27 |
+| +5 h (labels would be UTC) | **-0.09** |
+
+The peak is sharp and sits at 0-1 h, exactly the physical expectation
+for these flashy urban catchments (Brickhouse Gully, Cole Creek etc.
+respond in about an hour). The UTC hypothesis is not merely worse, it
+is uncorrelated -- it would require a 5-6 hour catchment lag that
+these basins do not have. Consistent with the series beginning at
+`2017-08-24:19-00`, i.e. 00:00 UTC Aug 25 relabelled to local time.
+
+Reproduce with the snippet in `plans/RESULTS-manning-draft.md` (reads
+the rasters as PETSc binary Vecs: 5-value header ncols, nrows, xlc,
+ylc, cellsize, then row-major data, big-endian float64).
+
+NOTE this was worth checking rather than assuming: a wrong clock would
+not have crashed anything -- the optimizer would have quietly biased
+the calibrated Manning field to compensate for a timing error.
