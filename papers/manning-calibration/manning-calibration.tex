@@ -515,6 +515,41 @@ Three implementation facts others will hit:
         segmented backward sweep is unaffected.
 \end{itemize}
 
+\paragraph{Newton robustness is set by residual discontinuities, not
+by conditioning.}
+\textcolor{red}{[Pre-Wednesday note: the two items below are new
+findings from the land-cover-prior runs; the drag fix is implemented
+and gated, the boundary fix awaits a scheme decision
+(open question~2--3). Paper numbers reported elsewhere are unaffected
+--- they come from smooth-$n$ configurations that never trigger
+either --- but this is the honest account of what implicit stepping
+costs on a real roughness field.]}
+Where implicit stepping fails on this problem, it fails for a reason
+that is invisible in the smooth twin experiments: the residual is
+discontinuous, so Newton has nothing to converge \emph{to}. At the
+land-cover roughness prior ($\bar n = 0.10$) rather than the twins'
+smooth $n \approx 0.03$, backward Euler descends cleanly for a dozen
+iterations and then freezes, with an $O(10^{-13})$ line-search step
+changing the residual norm by a factor of eight --- the signature of
+a jump, not of ill-conditioning. Two mechanisms are responsible, both
+catalogued in Section~\ref{sec:nondiff}: the drag's wet/dry cutoff,
+whose amplitude scales as $n^2$ and therefore only becomes disabling
+at realistic roughness, and the critical-outflow boundary's
+stagnation switch. Regularizing the drag velocity removes the first
+and restores honest convergence over the early transient; the second
+remains, and we currently absorb it by accepting the pinned iterate
+at a relative nonlinear tolerance of $10^{-3}$. That this is
+tolerable rather than merely expedient is worth stating precisely: a
+land-cover-class twin calibration under this setting recovers all
+fifteen class values to machine precision (objective reduced from
+$1.5\times10^{7}$ to $6\times10^{-7}$ in twenty quasi-Newton
+iterations), so the gradient path is unimpaired by the loosened
+inner solve. The general lesson for adjoint retrofits is that
+nonsmoothness in an operational flood code is not only a
+differentiability question --- it is a nonlinear-solver question, and
+the two discontinuities that mattered here were both invisible until
+the parameter field was realistic.
+
 \paragraph{Checkpointed adjoints for long windows.}
 A naive stored trajectory for a full 36-hour Hurricane Harvey window
 at the 30\,m mesh's CFL-limited $\Delta t = 0.25$\,s (518{,}400 steps,
@@ -635,8 +670,28 @@ nonsmooth structure worth documenting:
   \item \textbf{Critical-outflow stagnation.} The outflow ghost map
         $h_g = (q^2/g)^{1/3}$ has an unbounded one-sided derivative at
         $q = 0$, and the inflow branch switches there: a genuine
-        subgradient point, benign in practice because outflow
-        boundaries carry outflow.
+        subgradient point. Unlike the others in this list it is not
+        merely a derivative subtlety --- the branch switch is a
+        discontinuity of the \emph{residual} itself, since the
+        $u_\perp < 0$ branch zeroes both states (a wall) while the
+        $u_\perp \ge 0$ branch imposes the critical ghost, so the edge
+        flux jumps by the full wet-onto-dry Roe flux, $O(g h^2/2)$, as
+        a boundary cell crosses stagnation. With an implicit
+        integrator this stalls Newton outright: the line search
+        collapses to $\lambda \sim 10^{-6}$ with the residual pinned
+        at a floor of $10^{-4}$--$10^{-5}$ relative
+        (Section~\ref{sec:implicit}). Explicit stepping never sees it.
+  \item \textbf{Drag at the wet/dry cutoff.} The drag
+        $g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ gated at
+        $h_{\min}$ with a plain $\mathbf{q}/h$ velocity is likewise
+        residual-discontinuous: a cell crossing the cutoff with
+        retained momentum switches an $O(h^{-7/3})$ term on and off.
+        The amplitude scales with $n^2$, so it is invisible in
+        smooth-$n$ twin experiments and disabling at land-cover
+        roughness. Evaluating the drag with the ANUGA-regularized
+        velocity $\mathbf{u} = \mathbf{q}h/(h^2 + h_{\rm anuga}^2)$
+        removes it (the drag then vanishes as $h^{5/3}$), and reduces
+        identically to the plain form at $h_{\rm anuga} = 0$.
   \item \textbf{Wet/dry branches.} The RHS's dry cutoffs are honored
         branch-faithfully in every block; fully wet validation cases
         keep FD comparisons clean, and dry cells are correctly
@@ -731,13 +786,44 @@ reply inline or by email --- each question names who we think owns it.]}
   \item \textbf{Houston mesh CRS} (already asked): the projected
         coordinate system of \texttt{Houston1km\_with\_z.exo} --- the
         one blocker for real-gauge calibration.
-  \item \textbf{Drag formulation on the adjoint path.} The new
-        explicit treatment evaluates
+  \item \textbf{Drag formulation on the adjoint path
+        (\emph{retroactive sign-off requested --- this is now
+        implemented}).} The explicit treatment evaluates
         $\tau_b = g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ at
-        the current state with the standard $h_{\min}$ cutoff and
-        \emph{plain} velocity reconstruction
-        ($h_{\mathrm{anuga}} = 0$ default). Physics sign-off? Should
-        the ANUGA regularization be active for calibration runs?
+        the current state with the standard $h_{\min}$ cutoff. With
+        the \emph{plain} $\mathbf{q}/h$ velocity this is discontinuous
+        at the cutoff (Section~\ref{sec:nondiff}), and at land-cover
+        roughness ($\bar n = 0.10$ from NLCD) the jump is large enough
+        that every implicit Newton solve stalls --- no
+        land-cover-prior calibration could start. We therefore
+        evaluate the drag with the ANUGA-regularized velocity, active
+        when $h_{\mathrm{anuga}} > 0$ and reducing bitwise to the
+        previous code at the $h_{\mathrm{anuga}} = 0$ default.
+        Calibration runs use $h_{\mathrm{anuga}} = 0.001$\,m, the
+        smallest value that clears the stall; $0.003$\,m gives an
+        indistinguishable objective trace, so the physics sensitivity
+        at this scale appears nil, while $0.01$\,m is unstable.
+        \emph{Is this the regularization you want in the friction
+        source, and is $0.001$\,m the right value?} (The alternative
+        we did not take: raising $h_{\min}$, which is worse --- it
+        widens the affected band.)
+  \item \textbf{Critical-outflow boundary at stagnation
+        (\emph{new, and the remaining Newton hazard}).} The
+        $u_\perp = 0$ branch switch in the critical-outflow BC is a
+        residual discontinuity of size $O(g h^2/2)$
+        (Section~\ref{sec:nondiff}); it, not the drag, is what
+        ultimately pins Newton on the Harvey mesh, and we confirmed
+        this by swapping the outlet to a reflecting wall, after which
+        every step converges. We currently accept the pinned iterate
+        with a loosened nonlinear tolerance
+        ($\texttt{snes\_rtol} = 10^{-3}$), which is adequate --- the
+        land-cover-class twin still recovers every class value to
+        machine precision --- but it is a workaround, not a fix.
+        \emph{Which continuous formulation do you want?} A smooth
+        blend across $u_\perp = 0$, a Froude-limited ghost, or
+        something else standard in the flood-modeling literature. The
+        choice affects outlet physics, so we would rather not pick it
+        ourselves.
   \item \textbf{Observation choices for real-gauge work (v2).} Which
         of the 90 Houston-area USGS gauges do you trust for Harvey
         (backwater/tidal contamination?); stage vs.\ discharge as the
