@@ -135,12 +135,74 @@ Known limitation: RDyApplyForcing hardcodes region 1 = whole domain
 (fine for Turning). Never compare J across binaries with different
 partitioners (observation set is partition-dependent).
 
+## BLOCKER FOUND (2026-08-23): gauges sit in channels the 30 m mesh does not resolve
+
+**Real-gauge calibration against ABSOLUTE water-surface elevation cannot
+work on the Turning 30 m mesh as it stands.** Found for ~15 min of GPU
+time (o20) rather than in the 19-node-hour 6-hr shakeout.
+
+Ran a 1-hr rain-forced forward from 2017-08-26 18:00 CDT and dumped the
+MODEL WSE at the 13 canonical rain-driven gauge cells (twin mode over
+the real gauge geometry), then compared against the USGS stage:
+
+| gauge | cell bed (m) | model WSE | observed WSE | model − obs |
+|---|---|---|---|---|
+| 08072300 Buffalo Bayou nr Katy | 33.27 | 33.97 | 32.05 | **+1.92** |
+| 08072730 Bear Ck nr Barker | 34.73 | 34.76 | 31.99 | **+2.77** |
+| 08074150 Cole Ck at Deihl Rd | 25.30 | 25.32 | 19.56 | **+5.76** |
+| 08074250 Brickhouse Gully | 20.40 | 20.43 | 14.85 | **+5.57** |
+| 08074500 Whiteoak Bayou at Houston | 15.03 | 15.04 | 4.10 | **+10.93** |
+| 08074598 Whiteoak Bayou at Main St | 11.80 | 11.80 | 2.06 | **+9.74** |
+
+All 13 gauges differ by more than 1 m; the Whiteoak sites by 8–11 m.
+The structure is unambiguous: **the model WSE sits essentially AT the
+cell bed** (a thin film, bed + 0.01–0.7 m) **while the observed stage
+is 1–11 m BELOW the cell bed.** The gauges measure stage in incised
+bayou channels; a 30 m cell's mean elevation is the surrounding
+floodplain/bank. The model's ground surface is above the water level
+the gauge reports, so the misfit carries a structural bias no Manning
+field can remove — a calibration would drive n to its bounds and
+"converge" to a meaningless field. Confirmed independently from the
+data alone: only **1 of 13** gauges has observed WSE above its cell bed
+through the whole rising limb, rising to only 3 of 13 near the peak.
+
+Options (Wednesday decision, new agenda item 4b):
+1. **Anomaly misfit** — calibrate on Δ(WSE) from the window start, not
+   absolute WSE. Removes the per-gauge offset; standard for coarse
+   meshes. Modest driver change. Caveat: where the model cell is a dry
+   floodplain, its dynamics are not the channel's, so the anomaly is
+   still not the observed quantity.
+2. **Per-gauge datum/bias correction** from a documented channel invert
+   — same effect as (1), better justified where inverts exist.
+3. **Hydro-condition the DEM** (burn channels) — the real fix, but a
+   mesh-generation change, out of scope for this paper's timeline.
+4. **Restrict to floodplain-inundation periods/gauges** — physically
+   clean but leaves ~3 usable gauges; too few for 15 classes.
+5. **Discharge instead of stage** — needs a rating curve/cross-section
+   we do not have.
+
+Overnight job 57480313 (submitted 2026-08-23) addresses the empirical
+half: (A) a 12-hr forward through the flood peak dumping model WSE
+hourly at the gauge cells, to see whether the floodplain ever inundates
+enough for model and observation to become comparable, and (B) a 6-hr
+TWIN class calibration at the real 13-site geometry — unaffected by the
+bathymetry problem and a direct answer to the observability question
+(can a real sparse network constrain 15 NLCD classes, where the dense
+418k-gauge twin recovers all 15 exactly?).
+
 ## Questions to settle at the meeting
 
 1. WSE accuracy target (drives R0 acceptance and σ in the misfit).
 2. Trusted-gauge list — confirm the rain-driven subset / dam question.
 3. Window choice sign-off (rising limb, 6 vs 9 hr).
 4. Parameterization for the primary run: NLCD classes vs per-cell.
+4b. **NEW AND URGENT — unresolved channels at the gauges.** The 30 m
+   mesh puts the gauge cells' bed 1–11 m ABOVE the observed stage
+   (evidence above), so absolute-WSE calibration is structurally
+   impossible. Which remedy: anomaly misfit, per-gauge invert
+   correction, DEM hydro-conditioning, or a restricted gauge/time
+   subset? This decides whether the paper's real-gauge run happens on
+   this mesh at all.
 5. Solver config sign-off: gmres+right rtol 1e-2 (evidence above),
    plus the NLCD recipe h_anuga 0.001 + snes_rtol 1e-3.
 6. ANUGA-regularized drag: retroactive sign-off (h_anuga = 0.001;
