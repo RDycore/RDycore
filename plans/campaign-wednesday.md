@@ -205,11 +205,32 @@ bathymetry problem and a direct answer to the observability question
 | 08072800 Langham Ck nr Addicks | 28.2 | −1.0 | −0.7 | −0.5 | −0.2 | **+0.0** |
 
 The structural bias is **not static** — it collapses from 5–11 m early
-to 0.6–3 m by hours 10–12, exactly as the floodplain inundates and the
-model cell becomes genuinely wet rather than a thin film. Three gauges
-come within 1 m at some point in the window (08072800 to 0.05 m,
-08074020 to 0.64 m, 08072760 to 0.75 m); the median closest approach
-across all 13 is ~1.4 m.
+to 0.6–3 m by hours 10–12. Three gauges come within 1 m at some point
+(08072800 to 0.05 m, 08074020 to 0.64 m, 08072760 to 0.75 m); the
+median closest approach across all 13 is ~1.4 m.
+
+**CAUTION on reading that as model skill.** The convergence is only
+partly the model wetting up. Per-gauge model depth at hour 12 shows 11
+of 13 cells genuinely wet (Buffalo Bayou nr Katy 2.78 m, Buffalo Bayou
+at Houston 1.99 m, Langham Ck 1.70 m) — but the two Whiteoak sites that
+show the largest *apparent* improvement are the ones where the model
+stays essentially DRY:
+
+| Whiteoak at Main St | h+1 | h+6 | h+12 |
+|---|---|---|---|
+| model WSE (m) | 11.80 | 11.81 | 11.82 |
+| model depth (m) | **0.00** | **0.01** | **0.02** |
+| observed WSE (m) | 2.06 | 6.93 | 10.15 |
+| model − obs | +9.74 | +4.88 | +1.67 |
+
+There the gap closes because the *real river rose 8 m to meet a static
+model surface*, not because the model reproduced the flood. So the
+selection criterion cannot be the window alone — it must be per gauge
+AND per time: require the model cell genuinely wet AND the observation
+above the cell bed. And because the offset varies in time (9.7 → 1.7 m
+at this gauge), a FIXED per-gauge datum correction or a plain anomaly
+misfit will not remove it — remedies 1 and 2 above are weaker than they
+first appear.
 
 **This overturns the R1 window assumption.** The observability study
 said "rising limb" (information accumulates fastest there), but the
