@@ -143,9 +143,17 @@ time (o20) rather than in the 19-node-hour 6-hr shakeout.
 
 Ran a 1-hr rain-forced forward from 2017-08-26 18:00 CDT and dumped the
 MODEL WSE at the 13 canonical rain-driven gauge cells (twin mode over
-the real gauge geometry), then compared against the USGS stage:
+the real gauge geometry), then compared against the USGS stage.
 
-| gauge | cell bed (m) | model WSE | observed WSE | model − obs |
+NOTATION: "WSE" = water-surface elevation (bed elevation + water
+depth), in metres on the NAVD88 datum — the same datum the USGS stage
+is converted to, so the two are directly subtractable. The last column
+is **the model's WSE minus the gauge's observed WSE**; a POSITIVE value
+means the model's water surface sits that many metres ABOVE where the
+gauge says the real water was. "cell bed" = the single mean ground
+elevation the 30 m mesh stores for that cell.
+
+| gauge | cell bed (m) | model WSE | observed WSE | model minus obs (m) |
 |---|---|---|---|---|
 | 08072300 Buffalo Bayou nr Katy | 33.27 | 33.97 | 32.05 | **+1.92** |
 | 08072730 Bear Ck nr Barker | 34.73 | 34.76 | 31.99 | **+2.77** |
@@ -192,7 +200,7 @@ bathymetry problem and a direct answer to the observability question
 
 ### (A) RESULT: the bias COLLAPSES as the floodplain inundates — calibrate at the PEAK, not the rising limb
 
-12-hr forward from 2017-08-26 18:00 CDT, model−observed WSE (m) at the
+12-hr forward from 2017-08-26 18:00 CDT, model-minus-observed WSE (m) at the
 13 canonical rain-driven gauges:
 
 | gauge | bed | +1 h | +4 h | +7 h | +10 h | +12 h |
@@ -221,7 +229,7 @@ stays essentially DRY:
 | model WSE (m) | 11.80 | 11.81 | 11.82 |
 | model depth (m) | **0.00** | **0.01** | **0.02** |
 | observed WSE (m) | 2.06 | 6.93 | 10.15 |
-| model − obs | +9.74 | +4.88 | +1.67 |
+| model minus obs (m) | +9.74 | +4.88 | +1.67 |
 
 There the gap closes because the *real river rose 8 m to meet a static
 model surface*, not because the model reproduced the flood. So the
