@@ -917,3 +917,91 @@ this). NEXT-SESSION TASK SPEC:
   the stall floor to collapse; pick the smallest value that converges
   cleanly and put it in the campaign configs + Wednesday agenda.
 - Config plumbing already exists (physics.flow.h_anuga_reg_parameter).
+
+### ANUGA-regularized drag LANDED (2026-08-22 night; RDycore 3110ac50 laptop / 0d9e0d0d PM)
+
+Implementation exactly per the spec above. ComputeSWEManningDrag (new,
+swe_roe_flux_petsc.h) is the shared residual drag -- host
+ApplySourceExplicit, device swejk_rhs_source, and the ARK-IMEX
+SWEIFunctionFriction all call it; SWEFrictionJacobian/SWESourceJacobian
+take h_anuga and carry the exact regularization derivatives (host +
+device assembly + ARK-IMEX IJacobian); SWEFrictionDN (new) is the
+shared dS_fric/dn for SWERHSJacobianP (host), SWEKokkosJacobianP
+(device), and SWEIJacobianPFriction. With h_anuga = 0 every touched
+path keeps its historical operation sequence VERBATIM (branch on
+h_anuga > 0). CEED, semi_implicit, and XQ2018 paths untouched.
+
+Laptop gates (both PASSED):
+1. h_anuga = 0 bitwise: ctest adjoint|calibrate|jacobian 14/14;
+   adjoint_beuler AND adjoint_arkimex kokkos-type trajectory dumps
+   cmp-BITWISE IDENTICAL to a pre-change build at np 1/2, FD-gate log
+   lines (dJ/du0, dJ/dn) identical to every digit. (Full ctest: only
+   the 6 pre-existing cgns failures + amr_c_np_3_basic, which SEGVs
+   identically on the pre-change build -- verified, not ours.)
+2. h_anuga > 0 FD gates: new unit twins in test_swe_jacobian (source
+   Jacobian across h >> ha / h ~ ha / h < ha / h ~ tiny_h at n = 0.1;
+   SWEFrictionDN both branches), a new global FD-coloring-vs-analytic
+   twin pair (swe_jacobian_global_anuga_*.yaml: h_anuga = 5 vs h = 10,
+   n = 0.1) at 1.7e-8 (gate 1e-6) np 1/2, and driver FD gates
+   (h_anuga = 4, n = 0.1): dJ/du0 1.2e-8..4.6e-8, dJ/dn 2.7e-7..5.9e-6
+   (gate 1e-5) for {beuler, arkimex} x {host, kokkos types} x np {1,2}.
+   J and dJ/dn confirmed to genuinely move under the regularization
+   (dJ/dn changes 3.4x at h_anuga = 4), so the gates are not vacuous.
+
+### FINDING (PM): the SECOND discontinuity -- critical-outflow uperp switch (2026-08-22 night)
+
+With the drag fix in, the Turning class twin's early steps now converge
+honestly (FNORM_RELATIVE in 5-12 its, where pre-fix they only escaped
+by SNORM with a stalled residual) -- but EVERY h_anuga in {0.001, 0.003,
+0.01} still died at forward step 4, Newton crawling at lambda = 0.1
+(0.9x contraction/it) to a floor of 1.158e-3 and then line-search
+collapse with the residual JUMPING 1.158e-3 -> 1.019e-2 at
+lambda = 1e-13 (o14_*, o15_diag_anuga01.log). That jump target is
+numerically the SAME as the pre-fix diagnosis (1.26e-3 -> 1.01e-2, o9c)
+-- same discontinuity, unaffected by the drag regularization. Root
+cause CONFIRMED by BC swap: with the outlet's critical-outflow BC
+replaced by reflecting (diagnostic only), all 20 forward steps converge
+cleanly at the NLCD prior (o16_reflect_anuga01.log). The
+CONDITION_CRITICAL_OUTFLOW branch zeroes BOTH states when uperp < 0
+(wall) and otherwise imposes the critical ghost -- at the uperp = 0
+crossing the flux jumps by the full wet-onto-dry Roe flux, O(g h^2/2)
+~ 1e-2 in residual norm. The drag-gate discontinuity was real (it
+gated steps 1-3) but the o9 stall was this BC switch. WEDNESDAY AGENDA:
+a continuous critical-outflow variant is a scheme decision for the
+scientists (smooth blend across uperp = 0, or Froude-limited ghost).
+
+Practical mitigation, MEASURED: the BC pin floor is state-dependent --
+rel ~2.7e-5 of the step's initial residual at the NLCD prior (o9d's
+snes_rtol 1e-5 just missed it), rel ~1.17e-4 at a TAO trial field
+(o18c: floor 5.04e-3 / F0 42.9, lambda pinned at ~1e-6 with the
+residual RISING for any larger step). -snes_rtol 1e-3 clears every pin
+seen; 1e-4 clears the prior's pin but dies at TAO it 7's trial point
+(o18/o18b, and snes_max_it 100 does NOT rescue a lambda = 1e-6 pin).
+This is a BC-discontinuity tolerance, not sloppiness: steps away from
+the pin converge at 2-8 Newton its.
+
+### h_anuga sweep + 20-it class calibration (o17/o18*, gmres+right ksp rtol 1e-2)
+
+3-TAO-it class twin at snes_rtol 1e-4 (NLCD truth, uniform 0.03 start,
+15 classes, 418076 obs cells x 20 times):
+- h_anuga 0.001: CLEAN. 140/140 solves converge (28x2, 90x3, 10x4,
+  6x6, 6x8 Newton its), J 1.45342e7 -> 7.47493e6, TaoSolve 6.03 s.
+- h_anuga 0.003: CLEAN, J-trace nearly identical (7.46462e6) --
+  the regularization at this size barely perturbs the physics.
+- h_anuga 0.01: truth forward clean (2-6 its) but the calibration
+  forward from the uniform-0.03 start hits DIVERGED_FUNCTION_NANORINF
+  at Newton it 33 on step 1 -- bigger is NOT safer (weaker drag
+  damping lets an iterate excurse to h < 0 -> pow NaN in the flux).
+- 20-it calibration at h_anuga 0.001: snes_rtol 1e-4 dies at TAO it 7
+  (J already 1.45e7 -> 1.00e5) on a trial-field pin (above); at
+  **snes_rtol 1e-3 the full 20 its COMPLETE: J 1.45342e7 -> 6.42e-7,
+  EXACT class recovery (rel L2 vs prior 0.0000, max class rel err
+  0.0000), TaoSolve 20.7 s** (o18d_cal20_n4.log). The machine-level
+  twin convergence is also an end-to-end gradient-quality check at
+  this solver tolerance.
+- DECISION: NLCD/class-mode recipe = h_anuga_reg_parameter 0.001
+  (smallest clean value) + -snes_rtol 1e-3 (BC pins) + gmres+right
+  ksp rtol 1e-2. Recorded in beuler_dt1_anuga.yaml and
+  beuler_dt1_1hr_anuga.yaml on PM and in campaign-wednesday.md.
+  The snes_rtol 1e-3 crutch retires if/when the critical-outflow
+  switch is smoothed (Wednesday agenda).

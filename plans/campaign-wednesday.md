@@ -75,9 +75,23 @@ and _manning.bin, 0 uncovered cells, area-weighted mean n = 0.1005 ==
 the committed summary). Class-mode driver VALIDATED on the laptop
 dam-break twin (np1/2, device types: recovers both class values
 exactly, J -> 3e-14; observation-count report fixed to reduce across
-ranks). A Turning-scale class-mode smoke (o9) failed before TAO output
-with the sshproxy cert expired before the log could be read — FIRST
-PM ACTION next session: read o9_cal_classes_n4.log and rerun.
+ranks).
+
+**NLCD-prior blocker RESOLVED (2026-08-22 night, commit 3110ac50 +
+o14–o18 logs)**: the o9 class-twin failures were TWO residual
+discontinuities. (1) The Manning drag's tiny_h gate — FIXED by the
+ANUGA-regularized drag (scientist item, Mark pre-approved; bitwise
+identical at h_anuga = 0, full FD-gate suite passed). (2) The
+critical-outflow BC's uperp < 0 switch (flux jumps by the wet-onto-dry
+Roe flux at the crossing) — root-caused via a reflecting-outlet
+diagnostic; smoothing it is a NEW Wednesday agenda item (scheme
+decision). Working recipe until then, VALIDATED END-TO-END: 
+`h_anuga_reg_parameter: 0.001` (beuler_dt1_anuga.yaml /
+beuler_dt1_1hr_anuga.yaml) + `-snes_rtol 1e-3` + gmres+right rtol 1e-2.
+**Turning 20-it class-mode twin calibration COMPLETES: J 1.45e7 →
+6.4e-7, EXACT class recovery, TaoSolve 20.7 s on one GPU node**
+(o18d_cal20_n4.log). h_anuga sweep: 0.001 and 0.003 clean and nearly
+identical J-traces; 0.01 NaNs (weaker drag damping) — do not go bigger.
 
 **R3 — the calibration.** 6-hr MRMS-forced window on the rising limb,
 real-gauge observations, 20 TAO iterations, n4, revolve
@@ -127,6 +141,13 @@ partitioners (observation set is partition-dependent).
 2. Trusted-gauge list — confirm the rain-driven subset / dam question.
 3. Window choice sign-off (rising limb, 6 vs 9 hr).
 4. Parameterization for the primary run: NLCD classes vs per-cell.
-5. Solver config sign-off: gmres+right rtol 1e-2 (evidence above).
-6. Paper: venue (WRR / JAMES / GMD) and author order (roster now in
+5. Solver config sign-off: gmres+right rtol 1e-2 (evidence above),
+   plus the NLCD recipe h_anuga 0.001 + snes_rtol 1e-3.
+6. ANUGA-regularized drag: retroactive sign-off (h_anuga = 0.001;
+   0.001-vs-0.003 J-traces indistinguishable — physics impact nil at
+   this size) — the paper's open-questions section asked exactly this.
+7. NEW: critical-outflow BC discontinuity (uperp < 0 wall switch) —
+   the remaining Newton hazard; smoothing it (blend or Froude-limited
+   ghost) would retire the snes_rtol 1e-3 crutch. Scheme decision.
+8. Paper: venue (WRR / JAMES / GMD) and author order (roster now in
    the draft from the RDycore EMS 2026 paper).
