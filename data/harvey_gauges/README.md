@@ -59,3 +59,42 @@ Preprocessing needed before the misfit can consume this:
   ft NAVD88. WSE_m = stage_ft * 0.3048, directly comparable to model
   h + z_b. The NGVD29/VERTCON item only affects east-side gauges
   outside this mesh.
+
+## Turning 30 m mesh (the campaign mesh)
+
+- `turning30m_gauges_cells.csv`: 21 in-mesh gauges (Buffalo Bayou /
+  Whiteoak Bayou system) with Turning-mesh natural cell IDs;
+  `turning30m_observations_sites_snippet.yaml` is the paste-ready
+  sites list. `make_obs_table.py --cells-csv` takes it directly.
+- Verified working 2026-08-23: a 12-hour hourly table from
+  2017-08-26 00:00 yields 13 rain-driven gauges (after excluding the 8
+  DAM_AFFECTED sites) with 156/156 observations present -- no gaps to
+  work around.
+
+## CSV CLOCK: RESOLVED (2026-08-23) -- the HydroShare export is LOCAL CDT
+
+The HydroShare CSVs carry no timezone column, which left `--t0`
+ambiguous by up to 5 hours. Settled by measurement, not assumption:
+the Piney Point (08073700) series peaks at exactly 63.94 ft at
+`2017-08-27 13:00:00` on the CSV clock; USGS NWIS instantaneous
+values requested WITH an explicit timezone offset return the same
+63.94 ft at `2017-08-27 13:00 CDT` (and the USGS annual peak file
+independently confirms 63.94 ft on 2017-08-27 as the water-year
+maximum gage height). So **CSV timestamps are local CDT = UTC-5**;
+`--t0` must be given on that clock.
+
+STILL TO CONFIRM -- the rain clock. The MRMS hourly rasters are named
+`YYYY-MM-DD:HH-00.int32.bin` and the series begins at
+`2017-08-24:19-00`. A 19:00 start is exactly 00:00 UTC of the next
+day under CDT labelling, which HINTS the raster names are already
+local CDT (in which case `--t0` equals the date passed to
+`-raster_rain_start_date` and NO shift is needed). This is a hint,
+not proof -- the dataset could simply begin mid-afternoon UTC.
+Confirm before the real-gauge production run, either by asking the
+dataset's producer or empirically: run one short forced window both
+ways (0 h and +5 h) and keep the alignment whose modelled rise
+matches the observed hydrograph rise. A 5-hour misalignment on a
+rising limb is large enough to be obvious in the misfit, so this is
+self-diagnosing rather than a silent error -- but it MUST be checked,
+since a wrong clock would bias the calibrated Manning field to
+compensate for a timing error.
