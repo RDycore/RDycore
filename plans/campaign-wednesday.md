@@ -190,6 +190,39 @@ bathymetry problem and a direct answer to the observability question
 (can a real sparse network constrain 15 NLCD classes, where the dense
 418k-gauge twin recovers all 15 exactly?).
 
+### (A) RESULT: the bias COLLAPSES as the floodplain inundates — calibrate at the PEAK, not the rising limb
+
+12-hr forward from 2017-08-26 18:00 CDT, model−observed WSE (m) at the
+13 canonical rain-driven gauges:
+
+| gauge | bed | +1 h | +4 h | +7 h | +10 h | +12 h |
+|---|---|---|---|---|---|---|
+| 08074500 Whiteoak at Houston | 15.0 | +10.9 | +7.9 | +4.3 | +3.5 | — |
+| 08074598 Whiteoak at Main St | 11.8 | +9.7 | +8.5 | +4.0 | +2.8 | **+1.7** |
+| 08074540 Little Whiteoak | 14.5 | +7.9 | +5.9 | +1.9 | +1.7 | **+1.4** |
+| 08074250 Brickhouse Gully | 20.4 | +5.6 | +1.4 | +1.8 | +1.8 | **+1.6** |
+| 08074020 Whiteoak at Alabonson | 23.6 | +4.4 | +2.6 | +1.4 | +0.7 | **+0.6** |
+| 08072800 Langham Ck nr Addicks | 28.2 | −1.0 | −0.7 | −0.5 | −0.2 | **+0.0** |
+
+The structural bias is **not static** — it collapses from 5–11 m early
+to 0.6–3 m by hours 10–12, exactly as the floodplain inundates and the
+model cell becomes genuinely wet rather than a thin film. Three gauges
+come within 1 m at some point in the window (08072800 to 0.05 m,
+08074020 to 0.64 m, 08072760 to 0.75 m); the median closest approach
+across all 13 is ~1.4 m.
+
+**This overturns the R1 window assumption.** The observability study
+said "rising limb" (information accumulates fastest there), but the
+datum reality says the rising limb is exactly where the model and the
+gauges are least comparable. The defensible window is at or after peak
+inundation. R1 should be re-decided on this basis — and it makes the
+12-hr window (R3') attractive for a second reason beyond information
+content: it spans the interval where the observations become usable.
+
+A residual 1–3 m offset remains at most gauges even at peak, so an
+anomaly/bias-corrected misfit (option 1 or 2 above) is still likely
+required — but the problem is far from hopeless at the right window.
+
 ## Questions to settle at the meeting
 
 1. WSE accuracy target (drives R0 acceptance and σ in the misfit).
