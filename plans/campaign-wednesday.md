@@ -288,6 +288,44 @@ purposes), which is why the crutch works, but the BC smoothing
 
 Interim: snes_rtol 3e-3 for NLCD+rain configurations.
 
+## OBSERVABILITY ANSWERED (o25, 2026-08-23): 13 real gauges CANNOT constrain 15 NLCD classes
+
+The experiment the campaign rests on. Identical configuration in every
+respect (unforced recession IC, h_anuga 0.001, snes_rtol 1e-3, 20-step
+window, 15 NLCD classes, uniform n = 0.03 start, 20 TAO its) — the ONLY
+change is the gauge set:
+
+| gauge set | observations | J start → final | rel L2 vs truth | max class err |
+|---|---|---|---|---|
+| dense, 418,076 strided cells (o18d) | 8,361,520 | 1.45e7 → **6.4e-7** | **0.0000** | **0.0000** |
+| **real 13-site network (o25i)** | **260** | 493.3 → **3.85** | **0.66** | **0.81** |
+
+**Textbook semiconvergence.** With the real network the objective still
+falls 128x — the model fits its 13 gauges well — while the recovered
+class values are 66% wrong in L2 and the worst class is off by 81%. A
+good fit is NOT evidence of a good parameter field here.
+
+This is the Turning/NLCD analogue of the Houston result already in the
+paper's abstract (17-gauge twin: fits 238 observations essentially
+perfectly, recovers the field to only 45%). It is a stronger statement,
+because reducing the parameter count to 15 was supposed to be the fix:
+**even matched to the network scale, 13 gauges x 20 times is not enough
+to identify 15 land-cover classes.** Directly relevant to meeting
+question 4 (classes vs per-cell) — the honest answer is that neither is
+identified by this network without regularization or more information.
+
+Follow-ups this opens (none run yet):
+- How many gauges/times WOULD suffice? Bisect the strided gauge set
+  (e.g. 100 / 1000 / 10000) to find where recovery degrades — that curve
+  is a genuine paper figure and cheap to produce.
+- Fewer classes: are 15 classes over-parameterized for 13 gauges? Try
+  merging to the 4-5 dominant NLCD classes by area.
+- Prior weighting: beta = 1e-4 here. A stronger prior would trade fit
+  for parameter sanity; the beta-sweep is the standard L-curve.
+- NB o25(ii) (600-step unforced window, 10 obs times) FAILED with a
+  nonlinear solve failure — the longer unforced window hits a solver
+  problem of its own, not yet diagnosed. Only the 20-step result stands.
+
 ## Questions to settle at the meeting
 
 1. WSE accuracy target (drives R0 acceptance and σ in the misfit).
