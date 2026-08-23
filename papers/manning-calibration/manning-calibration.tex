@@ -845,10 +845,21 @@ for a cell.]}
         switches abruptly at zero normal velocity: below it the boundary
         acts as a wall, above it it imposes critical outflow. The flux
         therefore jumps by roughly $gh^2/2$ as a boundary cell crosses
-        stagnation, which stalls the implicit solver. We confirmed the
-        diagnosis by replacing the outlet with a reflecting wall, after
-        which every step converges. Today we absorb it by loosening the
-        nonlinear tolerance, which works but is a patch.
+        stagnation, which stalls the implicit solver. We have isolated
+        this to the boundary condition and nothing else: in otherwise
+        identical 600-step runs, replacing the outlet with a reflecting
+        wall completes all 600 steps with no failures, while making the
+        friction regularization five times stronger changes nothing at
+        all --- the run fails at the very same step. The failure is a
+        \emph{pin} rather than a divergence: the residual sticks at
+        about $10^{-3}$ of the step's initial value and any Newton step
+        longer than $\lambda \approx 10^{-5}$ raises it by a factor of
+        24. Today we absorb it by loosening the nonlinear tolerance,
+        which works --- a residual pinned at $10^{-3}$ relative is a
+        converged solve for any practical purpose --- but the pin level
+        is set by the local flow state, so each new configuration can
+        pin just above whatever tolerance we pick. That is a treadmill,
+        not a fix.
         \emph{Which continuous form do you want} --- a smooth blend
         across zero velocity, a Froude-limited ghost state, or a
         standard treatment we should copy? The choice changes outlet

@@ -252,6 +252,42 @@ A residual 1–3 m offset remains at most gauges even at peak, so an
 anomaly/bias-corrected misfit (option 1 or 2 above) is still likely
 required — but the problem is far from hopeless at the right window.
 
+## o21B FAILURE ROOT-CAUSED (o22, 2026-08-23): the outflow BC alone, and the pin sits at 1.05e-3
+
+o21 part B (NLCD prior + rain + 6-hr window — the first run combining
+all three, and exactly the R3 configuration) died at forward step 498:
+Newton ran 2 its/step, jumped to 25, then DIVERGED_MAX_IT at 50.
+
+Three 600-step controls, identical except for one change each
+(o22_diag.sh; base reproduces o21B exactly at 498 solves / 1 failure):
+
+| variant | steps | failures | verdict |
+|---|---|---|---|
+| base: critical-outflow, h_anuga 0.001 | 498 | 1 | fails |
+| **outlet swapped to reflecting** | **600** | **0** | **clean** |
+| h_anuga 0.005 (5x drag regularization) | 498 | 1 | fails identically |
+
+**The critical-outflow BC is solely responsible; the drag is
+exonerated** — raising h_anuga 5x changes nothing, not even the step at
+which it dies, while swapping the outlet fixes it completely.
+
+The failure signature is a textbook discontinuity pin, not divergence:
+the residual sits at 7.8888e-5 and refuses to move (7.888900e-5 ->
+7.888832e-5 over its 46-50) while ANY step past lambda ~ 1e-5 raises it
+~24x (to 1.885e-3). The step's initial residual is 7.502e-2, so the pin
+is at **1.05e-3 relative — it misses snes_rtol 1e-3 by 5%.**
+
+This is the same state-dependent pin seen before (o9d missed at 2.7e-5
+with rtol 1e-5; o18 missed at 1.17e-4 with rtol 1e-4; now 1.05e-3 with
+rtol 1e-3). The pin level tracks the tolerance because it is set by the
+local flow state, so **chasing it with tolerance is a treadmill** — each
+new configuration can pin just above whatever we pick. It is harmless
+physically (a 1e-3 relative residual is a converged solve for practical
+purposes), which is why the crutch works, but the BC smoothing
+(question 3 for the scientists) is the actual fix.
+
+Interim: snes_rtol 3e-3 for NLCD+rain configurations.
+
 ## Questions to settle at the meeting
 
 1. WSE accuracy target (drives R0 acceptance and σ in the misfit).
