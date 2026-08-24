@@ -71,10 +71,14 @@ dissect --- the classic semiconvergence of underdetermined friction
 estimation: a twin using the actual 17-gauge USGS network geometry
 fits its 238 observations essentially perfectly while recovering the
 field to only $45\%$, quantifying why real-data calibration must
-shrink the parameter space to match the network. To our knowledge this
-makes RDycore the first E3SM component model with built-in
-discrete-adjoint parameter estimation, without rewriting the solver in
-a machine-learning framework.
+shrink the parameter space to match the network. Within E3SM,
+adjoint-based parameter optimization is established in the land-ice
+component MALI, whose velocity solver inverts for basal friction by
+automatic differentiation of the \emph{steady} momentum balance;
+RDycore's capability is, to our knowledge, the first \emph{transient}
+discrete adjoint in an E3SM component --- differentiated through the
+time integrator itself --- and it is obtained without rewriting the
+solver in a machine-learning framework.
 \end{abstract}
 
 \section{Introduction}
@@ -108,7 +112,14 @@ trade the validated numerics, unstructured meshes, and coupling
 infrastructure of codes like RDycore for differentiability.
 
 This paper takes the complementary route: make the production code
-differentiable. RDycore is a finite-volume shallow-water dynamical core
+differentiable. The route has precedent inside E3SM itself: the
+land-ice component MALI~\cite{hoffman2018mali} routinely inverts for
+basal friction with an adjoint obtained by automatic differentiation of
+its Albany velocity solver~\cite{perego2014initialization} --- but that
+is the adjoint of a \emph{steady} nonlinear solve, used for
+initialization; no E3SM component has, to our knowledge, a discrete
+adjoint of its transient time stepper. RDycore is a finite-volume
+shallow-water dynamical core
 (Roe fluxes, well balancing, wetting and drying) validated at up to 471M
 cells. We add the missing derivative infrastructure --- an exact
 assembled Jacobian and TSAdjoint-based sensitivities
@@ -264,7 +275,18 @@ Runge--Kutta family. And for implicit integrators the discrete-adjoint
 gradient is only as exact as the inner solves: with default SNES/KSP
 tolerances the Manning gradient checked at $2\times10^{-4}$; tightening
 the tolerances recovered $5\times10^{-6}$
-(Table~\ref{tab:verification}).
+(Table~\ref{tab:verification}). We state the production side of this
+plainly, because the verification numbers are otherwise easy to
+over-read: at the loose inner tolerance used for the large implicit
+runs (Krylov relative tolerance $10^{-2}$, chosen because it is
+$\sim$2.5$\times$ cheaper end to end), the gradient is
+inner-solve-limited at $6\times10^{-4}$--$4\times10^{-3}$ relative.
+In every calibration we have run, the loose- and tight-tolerance
+settings converge indistinguishably (same objective to 5--6 digits),
+consistent with the tolerance of quasi-Newton methods to bounded
+gradient error; our policy is to run campaigns loose and repeat one
+calibration at Krylov tolerance $10^{-3}$ --- where the $10^{-5}$
+gates pass --- as a spot check.
 
 \section{Calibration twin experiments}
 \label{sec:calibration}
@@ -582,7 +604,8 @@ aggregate) bound the recompute overhead by a factor of about four,
 making the long-window adjoint memory-feasible; the remaining cost is
 the forward compute itself, addressed next.
 
-\section{Hurricane Harvey demonstration}
+\section{Hurricane Harvey twin experiments: regularization and the
+real-network limit}
 \label{sec:houston}
 
 The per-cell twin runs on the Houston 1\,km Hurricane Harvey mesh
@@ -808,12 +831,12 @@ cross-references are given as Q$n$.]}
         configuration runs the inner Krylov solver at
         \texttt{rtol}~$10^{-2}$, where the adjoint-vs-FD mismatch is
         inner-solve-limited at $6\times10^{-4}$--$4\times10^{-3}$. In
-        every test this does not affect BLMVM convergence, but the
-        paper currently reports the tight-tolerance numbers and stays
-        silent about the tolerance actually used at scale. State both,
-        and give the inexactness a principled footing (inexact-gradient
-        quasi-Newton has known sufficient conditions) or a measured
-        one. (Q3)
+        every test this does not affect BLMVM convergence.
+        \emph{Partially addressed:} Section~\ref{sec:adjoint} now
+        states the production tolerance, the measured gradient error,
+        and the spot-check policy. Still open: a principled footing
+        (inexact-gradient quasi-Newton has known sufficient
+        conditions) rather than an empirical one. (Q3)
   \item \textbf{``Implicit stepping is required'' is conditional on a
         choice we made.} The production code handles drag stiffness
         with operator-split friction treatments; they are unusable for
@@ -840,13 +863,15 @@ cross-references are given as Q$n$.]}
         than physics. Sensitivity of the calibrated field to
         $h_{\rm anuga}$ and to the outlet choice should be
         demonstrated, not asserted. (Q4, Q5)
-  \item \textbf{The ``Hurricane Harvey demonstration'' is a
-        2{,}746-cell twin.} All 30\,m-mesh, 2.93M-cell content in the
-        paper is cost measurement; no calibration at 30\,m is shown.
-        The section title oversells, and a reviewer comparing against
-        the 471M-cell forward-validation claim in the introduction
-        will notice the gap. Retitle, or land one 30\,m calibration
-        (the class twin already runs end to end on one GPU node).
+  \item \textbf{The Hurricane Harvey section is a 2{,}746-cell twin.}
+        All 30\,m-mesh, 2.93M-cell content in the paper is cost
+        measurement; no calibration at 30\,m is shown, and a reviewer
+        comparing against the 471M-cell forward-validation claim in
+        the introduction will notice the gap. \emph{Partially
+        addressed:} the section is retitled to say what it is. Still
+        open: land one 30\,m calibration in the paper (the class twin
+        already runs end to end on one GPU node; the HWM
+        identifiability run now queued would serve).
   \item \textbf{All twins are noise-free.} $\sigma$ enters only as a
         scale factor; no experiment adds observation noise, so the
         semiconvergence story (early stopping, Tikhonov weights) is
@@ -869,11 +894,19 @@ cross-references are given as Q$n$.]}
         stock PETSc (AIJ path, at some cost), the artifact story is
         weaker than the ``behind a flag, FD-gated in CI'' framing
         suggests. (Q8)
-  \item \textbf{The novelty claim needs a literature sweep.} ``First
-        E3SM component model with built-in discrete-adjoint parameter
-        estimation'' is plausible but unaudited against, e.g., MALI and
-        ocean-model adjoint efforts inside and around E3SM. Cheap to
-        check, embarrassing to get wrong.
+  \item \textbf{The novelty claim needed --- and got --- a literature
+        sweep.} The original ``first E3SM component model with built-in
+        discrete-adjoint parameter estimation'' was wrong as stated:
+        MALI routinely inverts for basal friction with an
+        automatic-differentiation adjoint of its Albany velocity
+        solver~\cite{perego2014initialization,hoffman2018mali}. The
+        claim is now narrowed to the first \emph{transient} discrete
+        adjoint (differentiated through the time integrator) in an
+        E3SM component, with MALI cited in the abstract and
+        introduction. Remaining check before submission: ocean/MPAS
+        adjoint efforts, and whether any E3SM land-model calibration
+        uses a true adjoint rather than ensemble or surrogate
+        gradients.
 \end{enumerate}
 
 \section*{Open questions for internal review, in order of importance}
