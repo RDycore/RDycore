@@ -600,9 +600,12 @@ improvement but a cure: a rain-forced control that Newton could not
 carry past step 498 under critical outflow (residual pinned at
 $1.05\times10^{-3}$ relative, tolerance relief buying steps linearly)
 completes the same window with \emph{zero} failures, 598 of 600
-solves converging in two Newton iterations, and a one-hour rain-forced
+solves converging in two Newton iterations; a one-hour rain-forced
 calibration window --- forward, adjoint, and quasi-Newton line search
---- runs clean end to end. Before the replacement we absorbed the pin
+--- runs clean end to end; and a 72-hour rain-forced forward through
+the Hurricane Harvey crest (259{,}200 implicit steps on the 2.93M-cell
+mesh) completes without a single Newton failure. Before the
+replacement we absorbed the pin
 by accepting the iterate at a relative nonlinear tolerance of
 $10^{-3}$; that this was tolerable rather than merely expedient is
 worth stating precisely: a land-cover-class twin calibration under
@@ -791,6 +794,24 @@ gate). The remaining scientific choice --- confirmed or corrected by
 the domain team --- is the calibration window, which for marks that
 record the event maximum must cover the flood peak.
 
+\paragraph{The uncalibrated baseline against the real survey.}
+Because the marks record the event maximum, the honest baseline
+evaluation must simulate through the crest: a 72-hour rain-forced
+forward from the available initial state (2017-08-26 18:00, reaching
+past the Buffalo Bayou crest), NLCD-prior Manning, free outflow,
+backward Euler at $\Delta t = 1$\,s on the 2.93M-cell mesh ---
+259{,}200 implicit steps, \emph{zero} Newton failures, two hours on
+one GPU node. The model wets all 108 marks, and the uncalibrated
+peak-WSE MAE against the surveyed values is $3.41$\,m. That number is
+reported as a starting point, not a result: it bundles roughness
+error together with initial-condition, rainfall, mesh-elevation, and
+datum error, and the per-mark decomposition (signed bias, quantiles,
+and modeled crest times --- the last of which also places the
+calibration window) is the next diagnostic. What the calibration
+must demonstrate is how much of the 3.41\,m a Manning field can
+close; the literature's calibrated benchmark on this event is
+$0.67$\,m MAE~\cite{li2026inunda}.
+
 \section{Nondifferentiability catalog}
 \label{sec:nondiff}
 
@@ -924,13 +945,17 @@ cross-references are given as Q$n$.]}
         in progress:} the USGS high-water-mark archive is acquired and
         QC'd (2{,}364 marks; 324 in-domain; 108 usable after the
         below-bed and quality filters), a peak-WSE misfit with an exact
-        argmax-time adjoint is implemented and FD-gated, and the
-        identifiability twin at the real 108-mark geometry now appears
-        in Section~\ref{sec:identifiability}. Still missing: a
-        calibration against the \emph{surveyed} mark values (which
-        requires a window covering the flood peak) and the MAE number
-        to put beside Inunda's. Until then the paper claims the
-        capability, not the application. (Q1, Q2)
+        argmax-time adjoint is implemented and FD-gated, the
+        identifiability twin at the real 108-mark geometry appears in
+        Section~\ref{sec:identifiability}, and the \emph{uncalibrated}
+        real-data baseline is now measured
+        (Section~\ref{sec:hwm}: $3.41$\,m MAE over a crest-covering
+        72-hour forward). Still missing: the calibrated number ---
+        which requires the window-placement decision and, likely, a
+        checkpointed peak-time initial state --- and a bias
+        decomposition separating roughness error from IC/rain/mesh
+        error. Until then the paper claims the capability and the
+        baseline, not the closed loop. (Q1, Q2)
   \item \textbf{The semiconvergence cure is asserted by a counting
         argument our own evidence undercuts.}
         Section~\ref{sec:houston} proposes the
