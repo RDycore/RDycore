@@ -518,12 +518,12 @@ Three implementation facts others will hit:
 \paragraph{Newton robustness is set by residual discontinuities, not
 by conditioning.}
 \textcolor{red}{[Pre-Wednesday note: the two items below are new
-findings from the land-cover-prior runs; the drag fix is implemented
-and gated, the boundary fix awaits a scheme decision
-(open question~2--3). Paper numbers reported elsewhere are unaffected
---- they come from smooth-$n$ configurations that never trigger
-either --- but this is the honest account of what implicit stepping
-costs on a real roughness field.]}
+findings from the land-cover-prior runs; both fixes are now
+implemented and gated (the boundary fix as an opt-in transmissive
+condition, open for correction --- open question~2--3). Paper numbers
+reported elsewhere are unaffected --- they come from smooth-$n$
+configurations that never trigger either --- but this is the honest
+account of what implicit stepping costs on a real roughness field.]}
 Where implicit stepping fails on this problem, it fails for a reason
 that is invisible in the smooth twin experiments: the residual is
 discontinuous, so Newton has nothing to converge \emph{to}. At the
@@ -536,16 +536,28 @@ catalogued in Section~\ref{sec:nondiff}: the drag's wet/dry cutoff,
 whose amplitude scales as $n^2$ and therefore only becomes disabling
 at realistic roughness, and the critical-outflow boundary's
 stagnation switch. Regularizing the drag velocity removes the first
-and restores honest convergence over the early transient; the second
-remains, and we currently absorb it by accepting the pinned iterate
-at a relative nonlinear tolerance of $10^{-3}$. That this is
-tolerable rather than merely expedient is worth stating precisely: a
-land-cover-class twin calibration under this setting recovers all
-fifteen class values to machine precision (objective reduced from
-$1.5\times10^{7}$ to $6\times10^{-7}$ in twenty quasi-Newton
-iterations), so the gradient path is unimpaired by the loosened
-inner solve. The general lesson for adjoint retrofits is that
-nonsmoothness in an operational flood code is not only a
+and restores honest convergence over the early transient. The second
+we removed by replacing the outlet condition itself: a transmissive
+(zero-gradient) free outflow --- the ghost state copies the interior
+state, the convention of most finite-volume shallow-water codes ---
+is continuous in the interior state by construction, and its ghost
+map is the identity, so the analytic Jacobian and adjoint carry it
+exactly (FD-gated like every other block). The effect is not an
+improvement but a cure: a rain-forced control that Newton could not
+carry past step 498 under critical outflow (residual pinned at
+$1.05\times10^{-3}$ relative, tolerance relief buying steps linearly)
+completes the same window with \emph{zero} failures, 598 of 600
+solves converging in two Newton iterations, and a one-hour rain-forced
+calibration window --- forward, adjoint, and quasi-Newton line search
+--- runs clean end to end. Before the replacement we absorbed the pin
+by accepting the iterate at a relative nonlinear tolerance of
+$10^{-3}$; that this was tolerable rather than merely expedient is
+worth stating precisely: a land-cover-class twin calibration under
+that setting recovers all fifteen class values to machine precision
+(objective reduced from $1.5\times10^{7}$ to $6\times10^{-7}$ in
+twenty quasi-Newton iterations), so the gradient path was unimpaired
+by the loosened inner solve. The general lesson for adjoint retrofits
+is that nonsmoothness in an operational flood code is not only a
 differentiability question --- it is a nonlinear-solver question, and
 the two discontinuities that mattered here were both invisible until
 the parameter field was realistic.
@@ -681,6 +693,13 @@ nonsmooth structure worth documenting:
         collapses to $\lambda \sim 10^{-6}$ with the residual pinned
         at a floor of $10^{-4}$--$10^{-5}$ relative
         (Section~\ref{sec:implicit}). Explicit stepping never sees it.
+        The cure is to change the boundary condition, not the solver:
+        a transmissive (zero-gradient) free outflow --- ghost state
+        equal to the interior state, the standard free outflow of
+        finite-volume shallow-water codes --- is continuous by
+        construction, has an identity ghost map in the Jacobian, and
+        removes the stall entirely (Section~\ref{sec:implicit}). We
+        provide it as an opt-in condition alongside the original.
   \item \textbf{Drag at the wet/dry cutoff.} The drag
         $g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ gated at
         $h_{\min}$ with a plain $\mathbf{q}/h$ velocity is likewise
@@ -840,30 +859,32 @@ for a cell.]}
         unstable. \emph{Is this the right regularization to put in the
         friction source, and is $0.001$\,m acceptable?}
 
-  \item \textbf{Outflow boundary at zero velocity --- we need a
-        formulation, not a workaround.} Our critical-outflow condition
-        switches abruptly at zero normal velocity: below it the boundary
-        acts as a wall, above it it imposes critical outflow. The flux
-        therefore jumps by roughly $gh^2/2$ as a boundary cell crosses
-        stagnation, which stalls the implicit solver. We have isolated
-        this to the boundary condition and nothing else: in otherwise
-        identical 600-step runs, replacing the outlet with a reflecting
-        wall completes all 600 steps with no failures, while making the
-        friction regularization five times stronger changes nothing at
-        all --- the run fails at the very same step. The failure is a
-        \emph{pin} rather than a divergence: the residual sticks at
-        about $10^{-3}$ of the step's initial value and any Newton step
-        longer than $\lambda \approx 10^{-5}$ raises it by a factor of
-        24. Today we absorb it by loosening the nonlinear tolerance,
-        which works --- a residual pinned at $10^{-3}$ relative is a
-        converged solve for any practical purpose --- but the pin level
-        is set by the local flow state, so each new configuration can
-        pin just above whatever tolerance we pick. That is a treadmill,
-        not a fix.
-        \emph{Which continuous form do you want} --- a smooth blend
-        across zero velocity, a Froude-limited ghost state, or a
-        standard treatment we should copy? The choice changes outlet
-        physics, so we would rather not pick it ourselves.
+  \item \textbf{Outflow boundary at zero velocity --- we implemented a
+        standard fix; please correct the choice if it is wrong.} Our
+        critical-outflow condition switches abruptly at zero normal
+        velocity: below it the boundary acts as a wall, above it it
+        imposes critical outflow. The flux therefore jumps by roughly
+        $gh^2/2$ as a boundary cell crosses stagnation, which stalls
+        the implicit solver. We isolated this to the boundary condition
+        and nothing else: in otherwise identical 600-step runs,
+        replacing the outlet with a reflecting wall completes all 600
+        steps with no failures, while making the friction
+        regularization five times stronger changes nothing at all ---
+        the run fails at the very same step. Loosening the nonlinear
+        tolerance is a treadmill (the pin level follows the local flow
+        state), so we implemented the least clever standard treatment:
+        a \emph{transmissive} (zero-gradient) free outflow, ghost state
+        equal to the interior state, as in ANUGA's transmissive
+        boundary and Clawpack's zero-order extrapolation. It is
+        continuous by construction, differentiated exactly through
+        host and device Jacobians, and it cures the stall: the failing
+        control completes with zero failures and two-iteration Newton
+        solves. It is opt-in (\texttt{type: free-outflow}); the
+        original condition remains the default. Known caveats: it is
+        exactly non-reflecting only for supercritical outflow, and it
+        does not prevent inflow if the interior velocity points inward.
+        \emph{Is a transmissive outlet acceptable for Buffalo Bayou, or
+        do you want a Froude-limited or blended form instead?}
 
   \item \textbf{Which gauges do you trust, and how accurate are they?}
         We currently exclude eight reservoir-influenced sites
