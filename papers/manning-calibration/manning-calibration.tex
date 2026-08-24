@@ -488,6 +488,32 @@ terminal only & $10^{-4}$ & 688 & yes & $39.5\%$ \\
 \label{tab:percell}
 \end{table}
 
+\paragraph{What noise-free twins do and do not establish.}
+The recoveries above are statements about the \emph{machinery} ---
+gradient correctness end to end --- and it is important to be precise
+about why they are not statements about calibratability. On this
+40-step ($1.8$\,s) window, the entire Manning-induced observation
+signal --- the RMS difference between the truth run's observations and
+the prior run's --- is about $5\,\mu\mathrm{m}$ of water height
+(measured from the initial misfit). Noise-free, the optimizer can
+descend on a micrometer signal indefinitely; with synthetic Gaussian
+observation noise (a deterministic, decomposition-independent
+perturbation of the twin observations), $0.1$\,mm of noise destroys
+the per-cell recovery ($0.20 \to 1.8$ relative $L^2$ at the same
+iteration budget) and $1$\,mm destroys even the two-parameter
+per-region recovery ($4\times10^{-7} \to 0.83$, the optimizer driving
+both values to a bound); no Tikhonov weight in a sweep up to
+$\beta = 1$ rescues it. The lesson is not that the method is fragile
+--- it is that observation noise turns calibratability into a
+signal-to-noise question, and friction must act long enough to imprint
+a signal above the noise floor. On the basin-scale configuration of
+Section~\ref{sec:identifiability} the parameter-induced peak-WSE
+signal is $\sim$$0.1$\,m after one simulated hour --- five orders of
+magnitude above the toy twins' --- which is the regime where
+survey-grade noise ($0.1$--$0.3$\,m for high-water marks) becomes a
+fair fight. \todo{o30: noisy (0.15\,m) basin-scale HWM twin --- runs
+queued, numbers to follow.}
+
 \section{Implicit stepping, enabled and required}
 \label{sec:implicit}
 
@@ -976,8 +1002,15 @@ cross-references are given as Q$n$.]}
         scale factor; no experiment adds observation noise, so the
         semiconvergence story (early stopping, Tikhonov weights) is
         undisturbed by the noise level that in practice sets where
-        semiconvergence turns over. One noisy twin would close this.
-        (Q7)
+        semiconvergence turns over. \emph{Partially addressed:} a
+        deterministic noise option now exists and
+        Section~\ref{sec:calibration} quantifies the toy twins'
+        $5\,\mu$m signal and its collapse under $0.1$--$1$\,mm noise
+        --- reframing the toy recoveries as machinery verification and
+        the noise question as a signal-to-noise (window length)
+        question. Still open: the noisy basin-scale HWM twin (queued)
+        and, eventually, noise-consistent regularization
+        (discrepancy-principle stopping). (Q7)
   \item \textbf{The peak-WSE observable, if adopted, is nonsmooth in a
         new way.} The argmax-time adjoint is exact wherever the peak
         time is locally constant, and ties have measure zero --- but
