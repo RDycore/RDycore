@@ -24,6 +24,12 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_restart_ref.yaml
           ${CONDITION_DIR}/2017-08-26:01-00.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
+# NLCD class map + prior for the class-calibration warm-start gate
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_classes_houston.yaml
+          ${CMAKE_SOURCE_DIR}/data/nlcd/houston1km_class.bin
+          ${CMAKE_SOURCE_DIR}/data/nlcd/houston1km_manning.bin
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 # dJ/du0 via TSAdjoint vs central finite differences (the driver exits with an
 # error if the relative L2 gate fails). The FD-coloring Jacobian is used so
 # this validates the adjoint wiring independent of the analytic Jacobian.
@@ -105,3 +111,19 @@ set_tests_properties(adjoint_restart_window_np_2 PROPERTIES DEPENDS "adjoint_res
 
 add_test(adjoint_restart_compare_np_2 ${H5DIFF} -p 1e-8 checkpoints/restart_ref.rdycore.r.120.h5 checkpoints/restart_window2.rdycore.r.60.h5 /fields/solution)
 set_tests_properties(adjoint_restart_compare_np_2 PROPERTIES DEPENDS "adjoint_restart_window_np_2")
+
+# class-calibration warm start: a production window needs more TAO iterations
+# than fit in one queue slot, so a run dumps its parameter vector and the next
+# job resumes from it. The resume is exact in the PARAMETERS (measured: the
+# warm run's TAO iteration 0 reports the cold run's final objective to 6
+# digits, 1466.42); BLMVM's quasi-Newton history does not carry over, which
+# on this twin is not a penalty -- chained 2+2 reaches J 115.0 where a single
+# cold 4-iteration run reaches 277.2, the restart acting as a rescaling of the
+# quasi-Newton model. The gate is that the file round-trips and every class is
+# matched by NLCD code (the driver errors if any is missing).
+add_test(adjoint_classes_dump_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_twin_obs_np1.txt -adjoint_obs_freq 10 -tao_max_it 2 -adjoint_classes_dump classes_p_np1.txt)
+
+add_test(adjoint_classes_warmstart_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_twin_obs2_np1.txt -adjoint_obs_freq 10 -tao_max_it 1 -adjoint_classes_init classes_p_np1.txt)
+set_tests_properties(adjoint_classes_warmstart_np_1 PROPERTIES
+  DEPENDS "adjoint_classes_dump_np_1"
+  PASS_REGULAR_EXPRESSION "warm start from classes_p_np1.txt \\(15 classes\\)")

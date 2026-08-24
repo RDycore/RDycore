@@ -48,7 +48,10 @@ static const char *help_str =
     "  -adjoint_jred_gate <real>   gauge mode: require J_final < gate*J_init (0 = off)\n"
     "  -adjoint_rain_start_hour <int>  event hour the window's rain starts at (default: 0);\n"
     "                              use with RDycore's -restart to run a mid-event window\n"
-    "  -adjoint_forward_only       one forward over the window, then exit (no adjoint/FD/TAO)\n";
+    "  -adjoint_forward_only       one forward over the window, then exit (no adjoint/FD/TAO)\n"
+    "  -adjoint_classes_dump <path>  classes mode: write the solution (NLCD code, n) per line\n"
+    "  -adjoint_classes_init <path>  classes mode: warm-start TAO from such a file, so a\n"
+    "                              calibration too long for one queue slot can be continued\n";
 
 #define NDOF 3
 
@@ -1681,6 +1684,57 @@ int main(int argc, char *argv[]) {
       PetscCall(VecSet(lb, 0.005));
       PetscCall(VecSet(ub, 0.30));
 
+      // -adjoint_classes_init <file>: start TAO from a previously dumped
+      // parameter vector instead of the uniform n0. A production calibration
+      // window needs more TAO iterations than fit in one queue slot, so a run
+      // dumps its solution (-adjoint_classes_dump) and the next job resumes
+      // from it. This is a warm start in the PARAMETERS only -- BLMVM's
+      // quasi-Newton history does not survive, so a chain of jobs is not
+      // step-for-step identical to one long run. Values are matched by NLCD
+      // code, not by position, so a differing class ordering is not silently
+      // misapplied.
+      {
+        char      init_file[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_init                     = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_init", init_file, sizeof(init_file), &have_init));
+        if (have_init) {
+          PetscReal *pin;
+          PetscCall(PetscCalloc1(nclass, &pin));
+          PetscInt   nread = 0;
+          PetscMPIInt rank;
+          PetscCallMPI(MPI_Comm_rank(comm, &rank));
+          if (rank == 0) {
+            FILE *fp = fopen(init_file, "r");
+            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot open -adjoint_classes_init file %s", init_file);
+            char line[256];
+            while (fgets(line, sizeof(line), fp)) {
+              if (line[0] == '#' || line[0] == '\n') continue;
+              int    code;
+              double val;
+              if (sscanf(line, "%d %lf", &code, &val) != 2) continue;
+              for (PetscInt kk = 0; kk < nclass; ++kk) {
+                if (cc.class_codes[kk] == code) {
+                  pin[kk] = val;
+                  ++nread;
+                  break;
+                }
+              }
+            }
+            fclose(fp);
+          }
+          PetscCallMPI(MPI_Bcast(pin, (int)nclass, MPIU_REAL, 0, comm));
+          PetscCallMPI(MPI_Bcast(&nread, 1, MPIU_INT, 0, comm));
+          PetscCheck(nread == nclass, comm, PETSC_ERR_USER, "%s supplied %" PetscInt_FMT " of %" PetscInt_FMT " classes", init_file, nread, nclass);
+          PetscInt lo, hi;
+          PetscCall(VecGetOwnershipRange(p, &lo, &hi));
+          for (PetscInt kk = lo; kk < hi; ++kk) PetscCall(VecSetValue(p, kk, pin[kk], INSERT_VALUES));
+          PetscCall(VecAssemblyBegin(p));
+          PetscCall(VecAssemblyEnd(p));
+          PetscCall(PetscFree(pin));
+          PetscCall(PetscPrintf(comm, "class calibration: warm start from %s (%" PetscInt_FMT " classes)\n", init_file, nclass));
+        }
+      }
+
       if (have_hwm_file) {
         PetscCall(PetscPrintf(comm,
                               "class calibration (hwm peaks): %" PetscInt_FMT " classes, %" PetscInt_FMT " marks, start n = %g, beta = %.1e\n",
@@ -1757,6 +1811,27 @@ int main(int argc, char *argv[]) {
         PetscCall(PetscPrintf(comm, "  %4d  %7.4f  %10.4f  %8.3f  %6.0f\n", (int)cc.class_codes[kk], (double)pr, (double)rc, (double)rel,
                               (double)pcnt[kk]));
       }
+      // -adjoint_classes_dump <file>: the solution in the form
+      // -adjoint_classes_init reads back, so a calibration too long for one
+      // queue slot can be continued by the next job.
+      {
+        char      dump_p[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_dump_p                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_dump", dump_p, sizeof(dump_p), &have_dump_p));
+        if (have_dump_p) {
+          PetscMPIInt rank;
+          PetscCallMPI(MPI_Comm_rank(comm, &rank));
+          if (rank == 0) {
+            FILE *fp = fopen(dump_p, "w");
+            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_dump file %s", dump_p);
+            fprintf(fp, "# NLCD_code  manning_n   (after %d TAO iterations, J %.6e)\n", (int)its, (double)J_final);
+            for (PetscInt kk = 0; kk < nclass; ++kk) fprintf(fp, "%d %.10g\n", (int)cc.class_codes[kk], (double)PetscRealPart(pa[kk]));
+            fclose(fp);
+          }
+          PetscCall(PetscPrintf(comm, "class calibration: solution written to %s\n", dump_p));
+        }
+      }
+
       PetscCall(VecRestoreArrayRead(p_all, &pa));
       PetscCall(VecRestoreArrayRead(prior_all, &pp));
       PetscCall(VecDestroy(&p_all));
