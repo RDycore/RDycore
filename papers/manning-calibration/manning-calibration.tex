@@ -1002,7 +1002,18 @@ cross-references are given as Q$n$.]}
         modest and should be printed, not implied. Larger implicit
         steps ($\Delta t \ge 5$\,s), which would make the case
         decisive, are currently blocked by a linear-solver failure the
-        draft does not mention. (Q6)
+        draft does not mention.
+        \emph{Partially addressed:} the comparison was run, and the
+        premise was wrong --- explicit stepping of the
+        \emph{differentiable} right-hand side diverges at $0.25$,
+        $0.125$ and $0.05$\,s, because the $\Delta t$-free drag is
+        stiff on thin films ($\Delta t \lesssim 2.4$\,ms) well below
+        the CFL limit. The modest factor holds only against the
+        operator-split discretization, which is not the one being
+        differentiated; both readings are now stated in
+        Section~\ref{sec:implicit}. The $\Delta t \ge 5$\,s
+        linear-solver failure is now stated there too. Still open:
+        making $\Delta t \ge 5$\,s work. (Q6)
   \item \textbf{We changed the physics to fix the solver, and the
         changes await domain sign-off.} The regularized drag velocity
         ($h_{\rm anuga} = 0.001$\,m, chosen as ``smallest that cures
@@ -1179,18 +1190,25 @@ mark, the peak WSE reached at a point during the event.]}
         \texttt{pbjacobi}-preconditioned GMRES; at $\Delta t = 5$\,s
         the very first Newton \emph{linear} solve diverges (300 GMRES
         iterations, \texttt{pbjacobi}) --- a preconditioner failure
-        before nonlinearity even enters. We deliberately do not quote
-        an implicit-vs-explicit wall-clock ratio: forward Euler at
-        $\Delta t = 0.25$\,s over the same window, on a configuration
-        differing from the implicit run in the integrator and step
-        size alone, produces a \emph{non-finite} state (every one of
-        the 108 marks reads dry), so $0.25$\,s is not the explicit
-        limit and any ratio measured against it is meaningless. The
-        advective CFL there is only $\approx 0.04$ at $h \sim 2$\,m, so
-        the binding constraint is not the wave speed; we suspect the
-        explicit friction source on rain-wetted thin cells, which is
-        precisely the stiffness the implicit path exists to absorb.
-        Locating the true explicit limit is in progress.
+        before nonlinearity even enters. A wall-clock ratio against
+        \emph{explicit stepping of the same right-hand side} is not
+        the modest number one might expect: with the $\Delta t$-free
+        drag the adjoint requires, forward Euler is limited by the
+        friction rate, $\Delta t < 1/t_b$ with
+        $t_b = g n^2 h^{-4/3} |v|$, and not by the CFL. On the
+        spun-up 30\,m state ($99.9\%$ wet, median depth 6\,mm,
+        $t_b$ up to $420\,\mathrm{s}^{-1}$) that is
+        $\Delta t \lesssim 2.4$\,ms against a CFL-limited $0.25$\,s ---
+        a factor $\sim$400 in step count, in the implicit path's
+        favour. Confirmed end to end on the rain-forced window: forward
+        Euler returns a non-finite state at $\Delta t = 0.25$, $0.125$
+        \emph{and} $0.05$\,s, on configurations differing from the
+        backward-Euler run in the integrator and step size alone, while
+        backward Euler at $\Delta t = 1$\,s completes cleanly. The
+        comparison that \emph{would} be modest --- explicit stepping at
+        $0.25$\,s using the operator-split friction --- is a comparison
+        against a different, non-differentiable discretization, and we
+        note it as such rather than quoting it as this method's cost.
         \emph{Questions: what would you try first for
         $\Delta t \ge 5$\,s --- a stronger preconditioner (AMG on a
         reduced system? block ILU? field-split?), pseudo-transient

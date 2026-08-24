@@ -1193,28 +1193,41 @@ the NLCD prior field are identical.
 | o29f | explicit euler | 0.25 s | **J inf, MAE inf, 108/108 marks dry** |
 
 So dt = 0.25 s is NOT the explicit CFL limit at 30 m -- the explicit run
-at that step produces a non-finite state. Two consequences:
+at that step produces a non-finite state. o32 walked it down: dt 0.125
+and dt 0.05 (advective CFL ~0.007) are ALSO non-finite, J inf, 108/108
+dry, with the observation frequency scaled so every rung samples peaks
+at o29g's 300 s interval.
+
+**This confirms a limit the project already measured and the code already
+documents** (see the NOTE in `AddSourceExplicit` in src/swe/swe_petsc.c,
+plans/RESULTS-manning-draft.md:273, plans/note-to-team-manning-config.md):
+with the dt-FREE drag that the adjoint requires, the binding constraint
+is the friction rate, not the CFL --
+`dt < 1/tb`, `tb = g n^2 h^{-4/3} |v|`. On the spun-up 30 m state (99.9%
+wet, median depth 6 mm) tb reaches 420/s => dt < ~2.4 ms, vs the CFL's
+0.25 s; 90k cells violate dt*tb > 1 at 0.25 s. o29f/o32 add the
+end-to-end confirmation at three step sizes. I ran the ladder before
+grepping for the known result -- the code comment would have predicted
+all three outcomes.
+
+Consequences that DO matter:
 
 1. **The o29 wall-clock comparison is void as written.** "Explicit euler
-   dt 0.25 = 130 s vs beuler dt 1 = 221 s, so implicit costs ~1.7x" timed
-   a run that produces garbage. The honest factor is unknown until the
-   explicit stability limit is measured, and it can only move in the
-   implicit path's favour.
-2. **The paper's W4 text is wrong** where it calls dt = 1 s "4x the
-   explicit CFL limit" (red-team item 4, sec:implicit). Do not quote a
-   forward ratio until the dt ladder below lands.
-
-Mechanism (conjecture, untested): the advective CFL at dt 0.25 is only
-~0.04 for h ~ 2 m, so this is very unlikely to be a wave-speed limit.
-The suspect is the explicit friction source on rain-wetted thin cells
-(`source: method: explicit`, drag ~ n^2 |u| u / h^(4/3)), which is the
-stiffness the implicit path exists to absorb.
-
-Next: dt ladder (explicit euler at dt 0.125 / 0.05 / 0.02, eval-only,
-same window) to find the largest dt that stays finite, using the new
-`-adjoint_forward_only` fingerprint (|u|_2 and the h range make a
-blowup unambiguous). That converts "explicit blew up" into a real cost
-ratio for the paper.
+   dt 0.25 = 130 s vs beuler dt 1 = 221 s, so implicit costs ~1.7x"
+   timed a run that produces a non-finite state. Against explicit
+   stepping of the SAME differentiable RHS, the implicit path wins by
+   ~400x in step count, not loses by 1.7x.
+2. **The paper's W4 text was wrong** where it called dt = 1 s "4x the
+   explicit CFL limit" and inferred a modest implicit-vs-explicit
+   factor: that conflates the CFL limit with the stability limit of the
+   source method the adjoint actually requires. Both the W4 item and
+   red-team item Q6 now state the measurement and the distinction.
+3. The genuinely modest comparison -- explicit at 0.25 s with the
+   operator-split (`semi_implicit`) friction -- is against a
+   NON-DIFFERENTIABLE discretization (it buries dt in the RHS, which is
+   why the adjoint cannot use it). Quote it only as such. The
+   differentiable equivalent is `ark_imex`, which at 30 m did not
+   finish in 100 min (>= 27x beuler dt 1, o29) and needs tuning.
 
 ### Mid-event window IC: solved with no conversion machinery (2026-08-24)
 
