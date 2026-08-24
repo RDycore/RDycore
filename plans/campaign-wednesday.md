@@ -383,3 +383,34 @@ Follow-ups this opens (none run yet):
    ghost) would retire the snes_rtol 1e-3 crutch. Scheme decision.
 8. Paper: venue (WRR / JAMES / GMD) and author order (roster now in
    the draft from the RDycore EMS 2026 paper).
+
+## ADDENDUM (2026-08-24, day before the meeting): both blockers now have machinery in place
+
+**Blocker A (outflow BC) is FIXED, not just diagnosed.** A transmissive
+free-outflow condition (`type: free-outflow`, ghost = interior state --
+the ANUGA/Clawpack convention) is implemented across host RHS, device
+RHS, host + device analytic Jacobians, and the CEED path; FD-gated on
+laptop (twin pair 1.8e-8, driver dJ/du0 + dJ/dn 2e-8..8e-7 across
+integrators x backends x np); default behaviour bitwise unchanged.
+Acceptance on PM (o26): the o22 base control that pinned at solve 499
+completes 600/600 with 598 solves at 2 Newton its; the unchanged
+control still fails at the same step with the same binary. o27: the
+1-hr rain-forced classes-twin window runs clean end to end (17,198
+solves, 0 failures, 15 min wall at n4) -- forward, adjoint, and TAO
+line search. The snes_rtol 1e-3 crutch is no longer needed on
+free-outflow runs. Paper updated (implicit section, catalog, open
+question 2 now in acted-invite-correction form).
+
+**Blocker B (observable) has data + misfit machinery ready.** USGS STN
+Harvey HWMs acquired and QC'd (data/harvey_hwm/): 2,364 marks, 324 in
+the Turning domain, 62.3% below cell bed (the gauge trap, now
+measured), 108 usable at quality <= fair. Peak-WSE misfit mode landed
+in rdycore_adjoint (-adjoint_hwm_file, per-cell + classes modes,
+argmax-time adjoint injection, FD-gated at 9e-7, MAE reported at init
+and solution -- the Inunda-comparable number). o28 (submitted, PM
+57521605): identifiability twin at the 108 real mark cells, 1-hr
+window, 15 TAO its -- the o25i re-ask with the new observable.
+
+Cost note: the o27 measurement (15 min for truth forward + adjoint +
+1 TAO it at n4, 1-hr window) is ~4x cheaper than the campaign table's
+extrapolation; the 6-hr 20-it calibration estimate drops accordingly.
