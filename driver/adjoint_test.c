@@ -22,6 +22,7 @@
 #include <private/rdymathimpl.h>
 #include <private/rdymeshimpl.h>
 #include <rdycore.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -40,6 +41,7 @@ static const char *help_str =
     "  -adjoint_hwm_file <path>    high-water-mark table (cell + peak WSE; see data/harvey_hwm/):\n"
     "                              switches the gauge/class misfit to peak WSE at the marks\n"
     "  -adjoint_hwm_twin           synthesize the mark WSE values from the truth forward's peaks\n"
+    "  -adjoint_obs_noise <real>   twin modes: N(0, stddev) noise added to synthesized observations\n"
     "  -adjoint_gauges_twin        first synthesize the table from a two-zone truth\n"
     "  -adjoint_gauge_stride <int> twin: gauges at every Nth natural cell (default: 7)\n"
     "  -adjoint_n0 <real>          gauge mode: constant prior/initial n (default: 0.03)\n"
@@ -600,6 +602,38 @@ static PetscErrorCode ForwardSolve(RDy rdy, Vec ic, PetscReal t_final) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// deterministic, decomposition-independent Gaussian observation noise for
+// twin experiments (-adjoint_obs_noise <stddev>, applied to the SYNTHESIZED
+// observations only): each (observation time, global row) pair gets an
+// independent N(0, stddev) draw from a counter-based generator (splitmix64
+// finalizer + Box-Muller), so the noisy twin is bitwise reproducible at any
+// process count.
+static uint64_t SplitMix64(uint64_t z) {
+  z += 0x9E3779B97F4A7C15ULL;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  return z ^ (z >> 31);
+}
+
+static PetscErrorCode AddObservationNoise(Vec *y_k, PetscInt K, PetscReal stddev) {
+  PetscFunctionBeginUser;
+  if (stddev <= 0.0) PetscFunctionReturn(PETSC_SUCCESS);
+  for (PetscInt k = 0; k < K; ++k) {
+    PetscInt     rlo, rhi;
+    PetscScalar *ya;
+    PetscCall(VecGetOwnershipRange(y_k[k], &rlo, &rhi));
+    PetscCall(VecGetArray(y_k[k], &ya));
+    for (PetscInt g = rlo; g < rhi; ++g) {
+      uint64_t  ctr = (uint64_t)(k + 1) * 0x51ED2701ULL + (uint64_t)g;
+      PetscReal u1  = ((SplitMix64(ctr) >> 11) + 1.0) / 9007199254740993.0;  // (0, 1]
+      PetscReal u2  = (SplitMix64(ctr ^ 0xDEADBEEFCAFEF00DULL) >> 11) / 9007199254740992.0;
+      ya[g - rlo] += stddev * PetscSqrtReal(-2.0 * PetscLogReal(u1)) * PetscCosReal(2.0 * PETSC_PI * u2);
+    }
+    PetscCall(VecRestoreArray(y_k[k], &ya));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // J = 1/2 sigma^-2 |H u - y|^2; optionally returns the residual r = H u - y
 static PetscErrorCode Misfit(Mat H, Vec u, Vec y, PetscReal sigma, Vec r_work, PetscReal *J) {
   PetscFunctionBeginUser;
@@ -879,9 +913,9 @@ static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal 
 // identical file path real data uses. Builds the observation operator, the
 // per-mark target h (WSE - zb, clamped at 0 with zero weight below bed), and
 // the K per-time scratch/residual vecs.
-static PetscErrorCode SetupHWMObservations(RDy rdy, Vec u_ic, const char *hwm_file, PetscBool twin, PetscInt stride, PetscInt total_steps,
-                                           PetscInt obs_freq, PetscReal sigma, PetscInt *K_out, Mat *Hg_out, Vec *y_hwm, Vec *w_hwm,
-                                           Vec **h_k, Vec **r_k, PetscInt *nmarks_out) {
+static PetscErrorCode SetupHWMObservations(RDy rdy, Vec u_ic, const char *hwm_file, PetscBool twin, PetscReal twin_noise, PetscInt stride,
+                                           PetscInt total_steps, PetscInt obs_freq, PetscReal sigma, PetscInt *K_out, Mat *Hg_out,
+                                           Vec *y_hwm, Vec *w_hwm, Vec **h_k, Vec **r_k, PetscInt *nmarks_out) {
   MPI_Comm comm;
   PetscFunctionBeginUser;
   PetscCall(PetscObjectGetComm((PetscObject)u_ic, &comm));
@@ -921,6 +955,7 @@ static PetscErrorCode SetupHWMObservations(RDy rdy, Vec u_ic, const char *hwm_fi
     PetscCall(MatCreateVecs(Hg, NULL, &hpeak));
     PetscCall(VecCopy(ht[0], hpeak));
     for (PetscInt k = 1; k < K; ++k) PetscCall(VecPointwiseMax(hpeak, hpeak, ht[k]));
+    PetscCall(AddObservationNoise(&hpeak, 1, twin_noise));
     Vec        hp_all;
     VecScatter sc;
     PetscCall(VecScatterCreateToZero(hpeak, &sc, &hp_all));
@@ -1214,6 +1249,8 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_hwm_file", hwm_file, sizeof(hwm_file), &have_hwm_file));
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_twin", &hwm_twin, NULL));
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_fd", &hwm_fd, NULL));
+    PetscReal obs_noise = 0.0;  // twin modes: N(0, stddev) noise added to the synthesized observations
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_noise", &obs_noise, NULL));
 
     // NOTE: the memory/revolve trajectory requires the single-TSSolve
     // forward in ForwardObserve (see the comment there); both disk and
@@ -1338,8 +1375,8 @@ int main(int argc, char *argv[]) {
           PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
         }
         if (obs_freq <= 0) obs_freq = PetscMax(1, total_steps / 12);
-        PetscCall(SetupHWMObservations(rdy, u_ic, hwm_file, hwm_twin, gauge_stride, total_steps, obs_freq, sigma, &K, &Hg, &y_hwm, &w_hwm,
-                                       &y_k, &r_k, &ngauges));
+        PetscCall(SetupHWMObservations(rdy, u_ic, hwm_file, hwm_twin, obs_noise, gauge_stride, total_steps, obs_freq, sigma, &K, &Hg,
+                                       &y_hwm, &w_hwm, &y_k, &r_k, &ngauges));
         total_steps = (total_steps / obs_freq) * obs_freq;  // stop at the last sample
       } else if (classes_twin) {
         // synthesise the observation table from the NLCD map itself. If the
@@ -1372,6 +1409,7 @@ int main(int argc, char *argv[]) {
         PetscCall(PetscMalloc1(Kt, &yt));
         for (PetscInt i = 0; i < Kt; ++i) PetscCall(MatCreateVecs(Hg, NULL, &yt[i]));
         PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, yt, NULL, NULL, sigma, NULL));
+        PetscCall(AddObservationNoise(yt, Kt, obs_noise));
         PetscCall(WriteObsTable(comm, obs_file, ng, gc, Kt, obs_freq * rdy->dt, yt, zbg));
         PetscCall(PetscPrintf(comm, "classes twin: wrote %" PetscInt_FMT " gauges x %" PetscInt_FMT " times to %s\n", ng, Kt, obs_file));
         for (PetscInt i = 0; i < Kt; ++i) PetscCall(VecDestroy(&yt[i]));
@@ -1729,6 +1767,7 @@ int main(int argc, char *argv[]) {
         PetscCall(PetscMalloc1(K, &y_rec));
         for (PetscInt k = 0; k < K; ++k) PetscCall(MatCreateVecs(Hg, NULL, &y_rec[k]));
         PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, y_rec, NULL, NULL, sigma, NULL));
+        PetscCall(AddObservationNoise(y_rec, K, obs_noise));
         PetscCall(WriteObsTable(comm, obs_file, ng, gcells, K, obs_freq * rdy->dt, y_rec, zbg));
         PetscCall(PetscPrintf(comm, "gauges twin: wrote %" PetscInt_FMT " gauges x %" PetscInt_FMT " obs times to %s\n", ng, K, obs_file));
         for (PetscInt k = 0; k < K; ++k) PetscCall(VecDestroy(&y_rec[k]));
@@ -1749,8 +1788,8 @@ int main(int argc, char *argv[]) {
       Mat        Hg_hwm = NULL;
       Vec       *yk_hwm = NULL, *rk_hwm = NULL;
       if (have_hwm_file) {
-        PetscCall(SetupHWMObservations(rdy, u_ic, hwm_file, hwm_twin, gauge_stride, total_steps, obs_freq, sigma, &K, &Hg_hwm, &y_hwm,
-                                       &w_hwm, &yk_hwm, &rk_hwm, &ngauges));
+        PetscCall(SetupHWMObservations(rdy, u_ic, hwm_file, hwm_twin, obs_noise, gauge_stride, total_steps, obs_freq, sigma, &K, &Hg_hwm,
+                                       &y_hwm, &w_hwm, &yk_hwm, &rk_hwm, &ngauges));
         total_steps = (total_steps / obs_freq) * obs_freq;  // stop at the last sample
       } else {
       PetscCall(ReadObsTable(comm, obs_file, &ngauges, &gauge_cells, &K, &obs_times, &obs_wse));
@@ -1990,6 +2029,7 @@ int main(int argc, char *argv[]) {
 
       PetscCall(RDySetDomainManningsN(rdy, n_owned, n_true));
       PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, H, y_k, NULL, NULL, sigma, NULL));  // record y_k
+      PetscCall(AddObservationNoise(y_k, K, obs_noise));
 
       // observability mask from the truth terminal state: wet and moving
       PetscBool *observable;
@@ -2114,7 +2154,8 @@ int main(int argc, char *argv[]) {
       for (PetscInt r = 0; r < n_regions; ++r) n_true[r] = 0.03 + 0.03 * r;  // 0.03, 0.06, ...
       PetscCall(ApplyRegionManning(rdy, n_true));
       PetscCall(ForwardSolve(rdy, u_ic, t_final));
-      PetscCall(MatMult(H, rdy->u_global, y));  // synthetic observations (noise-free twin)
+      PetscCall(MatMult(H, rdy->u_global, y));  // synthetic observations (noise-free unless -adjoint_obs_noise)
+      PetscCall(AddObservationNoise(&y, 1, obs_noise));
 
       CalibrationCtx cal = {.rdy = rdy, .H = H, .y = y, .r_work = r_work, .u_ic = u_ic, .sigma = sigma, .t_final = t_final};
       PetscCall(VecDuplicate(rdy->u_global, &cal.lambda));
