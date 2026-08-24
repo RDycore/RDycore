@@ -1475,6 +1475,28 @@ int main(int argc, char *argv[]) {
       PetscCall(VecDuplicate(rdy->u_global, &cc.pc.base.lambda));
       PetscCall(MatCreateVecs(rdy->rhs_jac_p, &cc.pc.base.mu, NULL));
 
+      // -adjoint_hwm_eval_only: evaluate the PRIOR field (e.g. the NLCD
+      // Manning map) against the mark table -- one forward, peak extraction,
+      // MAE -- with no adjoint and no optimization. This is how the
+      // uncalibrated model's peak-WSE MAE against the real survey is
+      // measured (the number reported beside calibrated benchmarks).
+      PetscBool hwm_eval_only = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_eval_only", &hwm_eval_only, NULL));
+      if (have_hwm_file && hwm_eval_only) {
+        for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
+        PetscReal Jp, mae;
+        PetscInt  ndry;
+        PetscCall(ForwardObservePeak(rdy, u_ic, total_steps, obs_freq, Hg, K, y_k, y_hwm, w_hwm, sigma, r_k, &Jp, &mae, &ndry));
+        PetscCall(PetscPrintf(comm,
+                              "hwm eval (prior field): J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT
+                              " marks (%" PetscInt_FMT " obs times over %" PetscInt_FMT " steps)\n",
+                              (double)Jp, (double)mae, ndry, ngauges, K, total_steps));
+        PetscCall(RDyDestroy(&rdy));
+        PetscCall(RDyFinalize());
+        return 0;
+      }
+
       Vec p, lb, ub;
       PetscCall(VecCreate(comm, &p));
       PetscCall(VecSetSizes(p, PETSC_DECIDE, nclass));
