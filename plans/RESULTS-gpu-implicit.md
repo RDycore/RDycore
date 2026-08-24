@@ -1258,3 +1258,36 @@ Gated as ctests on the rain-forced Houston 1 km mesh (`adjoint_restart_*`,
 from the 1-hr checkpoint is **bitwise identical** at matched
 decomposition and 2.4e-10 max relative across np1->np2; dropping the rain
 offset moves it 2.3e-2 relative L2, so the gate discriminates.
+
+### o33: the mid-event window IC path, validated on the PRODUCTION config (2026-08-24)
+
+The `adjoint_restart_*` ctests gate the restart + rain-offset logic on
+CPU, on a 2,746-cell mesh. The calibrated run restarts a window on the
+GPU at 2.93M cells, so o33 repeats the same three-leg experiment there:
+30 m Turning mesh, kokkos vecs + baijkokkos, real MRMS rain, beuler
+dt 1, free-outflow, n4.
+
+| leg | final \|u\|_2 | h range |
+| --- | --- | --- |
+| A: continuous 0-2 h | 7.8231705568e+02 | [4.9016634538e-05, 8.7983908048e+00] |
+| B: hour 2 restarted from A's 1-h checkpoint, `-adjoint_rain_start_hour 1` | **7.8231705568e+02** | **[4.9016634538e-05, 8.7983908048e+00]** |
+| C: control, same restart with NO rain offset | 7.3088366533e+02 | [1.2901825470e-06, 8.7472719399e+00] |
+
+B reproduces A in all three quantities to every printed digit; the
+control C is off by 7% in |u|_2 and 40x in min depth. So on the exact
+production configuration a mid-event window is indistinguishable from
+the corresponding stretch of a continuous run. Checkpoint write also
+works from this driver on the GPU path despite its
+`DMSetUseNatural(PETSC_FALSE)` (the natural SF survives the flag).
+
+The calibrated real-data run is no longer blocked on IC machinery.
+
+### o34 (submitted): initial conditions for every candidate window
+
+Repeats the o31 72-hr eval-only forward with HOURLY checkpoints (72
+files, ~70 MB each) plus the per-mark dump. Decouples window placement
+from IC production: once o31d/o34's crest histogram picks the window,
+no further forward is needed, and several placements can be tried for
+free (paper Q7). Its "hwm eval" line doubles as a regression check that
+the new build reproduces o31's uncalibrated MAE 3.41 m -- both new
+options are default-off, so it should match exactly.
