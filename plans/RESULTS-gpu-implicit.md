@@ -1138,3 +1138,43 @@ Next: the real-data HWM calibration needs a window covering the
 actual flood peak (marks record the event maximum) -- window placement
 is question Q7 for the scientists, and the long-window cost basis is
 now measured (o27).
+
+### o29/o30/o31: wall-clock truths, a robustness hole fixed, and the FIRST REAL-DATA NUMBER (2026-08-24)
+
+**o31 -- the uncalibrated model vs the real survey.** 72-hr rain-forced
+forward from the only IC (2017-08-26 18:00) through the Buffalo Bayou
+crest, NLCD-prior Manning, free-outflow outlet, beuler dt 1, n4:
+**259,200/259,200 implicit solves converged, ZERO failures, 2h05m
+wall.** Every one of the 108 QC-passed marks goes wet, and the
+uncalibrated model's peak-WSE MAE against the REAL surveyed marks is
+**3.41 m** (J 1.24e7). The 1-hr fingerprint (o29g: MAE 1.65 m, 22/108
+dry) shows peaks still growing into the window -- crest timing
+matters, as expected. Caveats: single hot-start IC, no signed-bias
+decomposition yet (o31d dump rerun pending), rain/mesh/datum error
+unseparated from roughness error. This is the honest "before" number
+to put beside Inunda's calibrated 0.67 m.
+
+**o29 -- measured integrator wall-clocks at 30 m (1-hr forward, n4):**
+beuler dt=1: 221 s. Explicit euler dt=0.25: 130 s (exit 0; finiteness
+fingerprint run o29f pending -- its first attempt tripped our own
+guard: numerics.jacobian: fd is refused with device matrix types, use
+analytic). ARK-IMEX dt=0.25: did NOT finish in 100 min => >= 27x
+slower than beuler dt1 at this scale; the o19-era 1-km arkimex
+numbers do not transfer, needs tuning before quoting. So the honest
+implicit-vs-explicit forward factor at 30 m is ~1.7x wall for 4x
+fewer steps -- the implicit case rests on robustness (drag stiffness
+at trial fields, larger dt headroom), not on this forward ratio.
+
+**o30 -- noisy (0.15 m) HWM twin: found a robustness hole.** Init
+with noise: J 361.8, MAE 0.2336 m (clean twin: 0.1034) -- then at TAO
+it ~3-4 a trial field hit DIVERGED_MAX_IT(50) and TSStep HARD-ABORTED
+the run (exit 91). Fix committed: TSSetErrorIfStepFails disabled;
+objectives grade a diverged trial with J=1e30 + zero gradient (line
+search backs off); all data-producing forwards explicitly verified
+(CheckTruthForward). Rerun pending cert refresh.
+
+**BLOCKED: sshproxy cert expired ~12:30 PT.** Pending PM work, ready
+to fire on refresh: (1) o29f explicit fingerprint (yaml fixed to
+analytic), (2) o30 rerun with failure-tolerant trials, (3) o31d dump
+rerun (-adjoint_hwm_dump o31_marks.txt) for signed bias + per-mark
+crest times (window placement for the 12-hr calibration).
