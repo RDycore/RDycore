@@ -1,0 +1,7 @@
+USGS STN HWM Data for Hurricane Harvey
+Event: 2017 Harvey
+Event ID: 180
+Fetched: 2026-08-24T08:32:27.617133
+API Base: https://stn.wim.usgs.gov/STNServices
+Records (Harvey-only): 2364
+Records (API total): 2364 (filtered from full response)
