@@ -1059,3 +1059,41 @@ CONSEQUENCES:
   caveats (weak reflections for subcritical outflow; inflow not
   prevented); critical-outflow remains the default -- invite
   correction per the working model.
+
+### o27 + peak-WSE misfit mode: the 1-hr rain-forced window is CLEAN (2026-08-24)
+
+**o27 (PM job 57520315, n4, 15 min wall):** the o22-class run at 6x the
+window -- 1-hr rain-forced NLCD classes twin, free-outflow outlet,
+beuler dt 1 s, snes_rtol 1e-3 -- completed with **17,198 converged
+solves and ZERO failures**: the 3600-step truth forward, the adjoint
+sweeps, and a TAO iteration's line-search forwards all clean. The
+rain-forced program is unblocked in practice, not just at o26's 600 s.
+Cost calibration: the WHOLE tao_max_it-1 run (~4.8 forward passes +
+adjoint recomputes) took 15 min at n4 -- far below the old ~1 hr per
+TAO-it per simulated hour estimate; budget accordingly.
+
+**Peak-WSE (HWM) misfit mode landed (commit 934d8304).** New
+`-adjoint_hwm_file` observation mode in rdycore_adjoint for both
+per-cell and NLCD-class calibration: J compares each mark cell's PEAK
+sampled WSE against the surveyed mark; the adjoint reuses
+AdjointSweepMulti unchanged by placing each mark's residual in the r_k
+of its own argmax time (exact gradient a.e.; ties measure-zero).
+Below-bed marks are zero-weighted with a printed count; peak-WSE MAE
+(the Inunda-comparable number) and the model-dry mark count print at
+start and at the TAO solution. `-adjoint_hwm_twin` synthesizes mark
+values from the truth forward through the real file path;
+`-adjoint_hwm_fd` gates the parameter gradient against central
+differences at the all-ones + largest-|g| directions (probe step 1e-3
+relative = measured V-curve optimum; smaller steps drown in the forward
+solve's noise floor -- 4e-5 at 1e-5 vs 8.6e-7 at 1e-3). Gates: ctests
+adjoint_hwm_fd_np_{1,2} at 8.9e-7 (gate 1e-5); classes+hwm smoke at
+6.5e-7 with a synthetic 2-class map. Real table:
+data/harvey_hwm/turning30m_hwm_obs.txt (108 QC-passed marks) via
+make_hwm_obs.py; ALSO staged to PM $SCRATCH/gpu-implicit.
+
+**o28 SUBMITTED (PM job 57521605, regular q, 3 hr):** the
+identifiability re-ask -- NLCD-truth twin observed at the 108 real mark
+cells' peaks, 1-hr window, 15 TAO its, on a COPY (o28_hwm_twin.txt;
+the twin overwrites the table's values -- NEVER point -adjoint_hwm_twin
+at the real turning30m_hwm_obs.txt). Compare against o25i (13 gauges /
+20 s: rel L2 0.66, worst class 0.81).
