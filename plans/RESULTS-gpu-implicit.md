@@ -1097,3 +1097,44 @@ cells' peaks, 1-hr window, 15 TAO its, on a COPY (o28_hwm_twin.txt;
 the twin overwrites the table's values -- NEVER point -adjoint_hwm_twin
 at the real turning30m_hwm_obs.txt). Compare against o25i (13 gauges /
 20 s: rel L2 0.66, worst class 0.81).
+
+### o28: HWM identifiability -- the observable changes the answer (2026-08-24)
+
+PM job 57521605, n4, 100 min wall, 173,575 converged solves, ZERO
+failures. NLCD-truth twin observed at the 108 QC-passed real mark
+cells' peaks (12 samples over a 1-hr rain-forced window,
+free-outflow outlet), uniform 0.03 start, 15 TAO its, beta 1e-4.
+
+J 7.48e4 -> 926 (81x); peak-WSE MAE 0.103 m -> 0.017 m; model-dry
+marks 32 -> 19 of 108.
+
+Per-class recovery (rel err): the AREA-DOMINANT classes recover well
+-- 22 dev-low 0.7%, 23 dev-med 10.5%, 24 dev-high 8.6%, 81 pasture
+1.9%, 82 crops 8.6% -- together 2.43M of 2.93M cells (83% of the
+domain in classes recovered to <= 10.5%). Failures concentrate in
+small-area classes: 41 deciduous forest pinned at the UPPER bound
+(100% err), 52 shrub pinned at the LOWER bound (96%), 95 emergent
+wetland 115%, 42 evergreen 52%, 21 dev-open 47%. Unweighted rel L2
+0.58; AREA-WEIGHTED rel L2 0.20.
+
+Read against o25i (13 gauges, 20-s window: rel L2 0.66, worst 0.81,
+distant classes NEVER MOVED from the start value): with 108 marks and
+a 1-hr window the small classes now MOVE -- they are sensitive but
+weakly constrained, overshooting to the bounds (semiconvergence along
+weak directions; more Tikhonov or longer windows are the obvious
+levers) -- while the classes that cover the domain are identified.
+The o25i conclusion ("13 gauges cannot constrain 15 classes") does
+NOT carry over to the HWM observable: most of the field, by area, is
+constrained even by 1 hour of early-transient dynamics.
+
+Caveats for the paper: (1) 1-hr window peaks are early transients,
+not flood peaks -- the real 6-12-hr windows should only help; (2) 15
+its is not converged (J still falling); (3) twin marks are synthesized
+from the truth run (inverse crime -- no representation error), so
+this is an identifiability statement, an upper bound on real-data
+performance.
+
+Next: the real-data HWM calibration needs a window covering the
+actual flood peak (marks record the event maximum) -- window placement
+is question Q7 for the scientists, and the long-window cost basis is
+now measured (o27).
