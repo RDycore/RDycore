@@ -1005,3 +1005,57 @@ the pin converge at 2-8 Newton its.
   beuler_dt1_1hr_anuga.yaml on PM and in campaign-wednesday.md.
   The snes_rtol 1e-3 crutch retires if/when the critical-outflow
   switch is smoothed (Wednesday agenda).
+
+### o26: free-outflow BC lands -- the o22 pin is FIXED (2026-08-24)
+
+Implemented `CONDITION_FREE_OUTFLOW` (yaml `type: free-outflow`): a
+transmissive / zero-gradient ghost (qR = qL in primitive space), the
+standard "free outflow" of FV SWE codes (ANUGA transmissive, Clawpack
+zero-order extrapolation) and exactly option (c) from the design sketch
+in next-phase-strategy.md. Checked first, per the plan: RDycore's CEED
+path has NO transmissive option -- its `SWEBoundaryFlux_Outflow` is the
+same critical ghost with the same q >= 0 switch -- so nothing existed to
+match; we added the QFunction there too. The BC is continuous in the
+interior state by construction; the Jacobian ghost map is the identity,
+wired through host AND device analytic Jacobians (commit 7d2b07fe, all
+four solver paths + CEED + docs; default behaviour bitwise unchanged --
+new enum value, new switch cases only).
+
+FD gates (laptop, arch-macosx-gnu-rdycore-kokkos-O), all PASSED:
+- new global FD-coloring twin pair swe_jacobian_global_freebc_*:
+  full-matrix rel err 1.8e-8 (gate 1e-6), np 1/2.
+- new driver gates adjoint_{beuler,arkimex}_freeflow.yaml: dJ/du0 and
+  dJ/dn vs FD 2e-8..8e-7 (gate 1e-5) across {beuler, arkimex} x
+  {host, kokkos vecs} x np {1,2}; arkimex also through the aijkokkos
+  DEVICE Jacobian assembly. J differs from the reflecting baseline
+  (7.02394 vs 7.03713), so the gates are not vacuous.
+- full ctest: only the 7 pre-existing failures (6 cgns, amr_np3).
+- CAVEAT (laptop only): adjoint_beuler + -dm_mat_type aijkokkos
+  crashes (SEGV/TRAP) for the PRE-EXISTING reflecting baseline too --
+  never reaches new code; check on PM at some point. The PM acceptance
+  below ran the device Jacobian (baijkokkos) cleanly.
+
+ACCEPTANCE (PM, jobs 57519697/8, debug q, n4 A100): the o22 base
+control with ONLY `critical-outflow -> free-outflow` in the yaml
+(o26_freeflow.yaml) completes **600/600 steps, zero failures, 598 of
+600 solves at 2 Newton its** (1x3, 1x5) in ~6 min wall. The unmodified
+o22 base rerun with the SAME new binary still dies at solve 499
+(DIVERGED_MAX_IT 50 after 5 solves grinding at 25 its) -- the exact
+o22 signature, so the rebuild changed nothing else and the BC swap
+alone is the fix. The 25-it grinding phase is entirely absent under
+free-outflow. Both jobs then hit a HARMLESS post-forward error: the
+2026-08-20 PETSc rebuild rejects `-tao_max_it 0` (o22's "forward-only"
+idiom) at TaoSetFromOptions -- use `-tao_max_it 1` or drop the
+calibrate flags for future forward-only controls.
+
+CONSEQUENCES:
+- Rain-forced NLCD runs are UNBLOCKED. The snes_rtol 1e-3 crutch can
+  retire on free-outflow runs (the o26 histogram suggests honest
+  convergence; verify on the first long window).
+- Long-window configs must switch the outlet yaml to
+  `type: free-outflow` (beuler_dt1_*_anuga.yaml etc. on PM still say
+  critical-outflow).
+- Documented for the scientists in docs/common/input.md with the
+  caveats (weak reflections for subcritical outflow; inflow not
+  prevented); critical-outflow remains the default -- invite
+  correction per the working model.
