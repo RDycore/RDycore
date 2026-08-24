@@ -523,12 +523,12 @@ static const cyaml_schema_value_t boundary_condition_spec_entry = {
 // flow_conditions section
 // -----------------------
 // - name: <name-of-flow-condition-1>
-//   type: <dirichlet|neumann|reflecting|critical-outflow>
+//   type: <dirichlet|neumann|reflecting|critical-outflow|free-outflow>
 //   height: <h>  # used only by initial conditions + dirichlet bcs
 //   x_momentum: <px> # used only by initial conditions + dirichlet bcs
 //   y_momentum: <py> # used only by initial conditions + dirichlet bcs
 // - name: <name-of-flow-condition-2>
-//   type: <dirichlet|neumann|reflecting|critical-outflow>
+//   type: <dirichlet|neumann|reflecting|critical-outflow|free-outflow>
 //   file: <filename>      # used only by initial conditions + dirichlet bcs
 //   format: <binary|hdf5> # used only by initial conditions + dirichlet bcs
 //   ...
@@ -548,6 +548,7 @@ static const cyaml_strval_t condition_types[] = {
     {"reflecting",       CONDITION_REFLECTING      },
     {"critical-outflow", CONDITION_CRITICAL_OUTFLOW},
     {"runoff",           CONDITION_RUNOFF},
+    {"free-outflow",     CONDITION_FREE_OUTFLOW},
 };
 
 // schema for flow condition fields
@@ -1076,7 +1077,7 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig *config, PetscBool
   for (PetscInt i = 0; i < config->num_flow_conditions; ++i) {
     const RDyFlowCondition *flow_cond = &config->flow_conditions[i];
     PetscCheck(flow_cond->type >= 0, comm, PETSC_ERR_USER, "Flow condition type not set in flow_conditions.%s", flow_cond->name);
-    if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW) {
+    if (flow_cond->type != CONDITION_REFLECTING && flow_cond->type != CONDITION_CRITICAL_OUTFLOW && flow_cond->type != CONDITION_FREE_OUTFLOW) {
       PetscCheck(flow_cond->height_expression[0] || flow_cond->file[0] || flow_cond->value_expression[0], comm, PETSC_ERR_USER,
                  "Missing or incomplete height specification for flow_conditions.%s", flow_cond->name);
       PetscCheck(flow_cond->file[0] || (flow_cond->x_momentum_expression[0] && flow_cond->y_momentum_expression[0]) || flow_cond->value_expression[0],

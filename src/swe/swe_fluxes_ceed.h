@@ -269,6 +269,64 @@ CEED_QFUNCTION(SWEBoundaryFlux_Outflow_Roe)(void *ctx, CeedInt Q, const CeedScal
   return SWEBoundaryFlux_Outflow(ctx, Q, in, out, RIEMANN_FLUX_ROE);
 }
 
+// SWE boundary flux operator Q-function (free-outflow condition): the ghost
+// state copies the interior state (transmissive / zero-gradient), so the edge
+// flux reduces to the physical flux F(q_interior). Unlike the critical-outflow
+// condition, this is continuous in the interior state (no inflow/outflow
+// switch).
+CEED_QFUNCTION_HELPER int SWEBoundaryFlux_FreeOutflow(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
+                                                      RiemannFluxType flux_type) {
+  const CeedScalar(*geom)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[0];  // sn, cn, weight_L
+  const CeedScalar(*q_L)[CEED_Q_VLA]          = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  const CeedScalar(*eta_vert_beg)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2];
+  const CeedScalar(*eta_vert_end)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  CeedScalar(*cell_L)[CEED_Q_VLA]             = (CeedScalar(*)[CEED_Q_VLA])out[0];
+  CeedScalar(*inst_flux)[CEED_Q_VLA]          = (CeedScalar(*)[CEED_Q_VLA])out[1];
+  CeedScalar(*courant_num)[CEED_Q_VLA]        = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  const SWEContext context                    = (SWEContext)ctx;
+
+  const CeedScalar dt      = context->dtime;
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
+  const CeedScalar gravity = context->gravity;
+
+  for (CeedInt i = 0; i < Q; i++) {
+    CeedScalar sn = geom[0][i], cn = geom[1][i];
+    SWEState   qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState   qR = qL;  // transmissive ghost
+
+    // compute change in water depth along the edge
+    CeedScalar dhv = ComputeDhv(geom[3][i], geom[4][i], eta_vert_beg[0][i], eta_vert_end[0][i]);
+
+    if (qL.h > tiny_h) {
+      CeedScalar flux[3], amax;
+      switch (flux_type) {
+        case RIEMANN_FLUX_ROE:
+          SWERiemannFlux_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, dhv, flux, &amax);
+          break;
+        default:
+          return 1;
+      }
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i]    = flux[j] * geom[2][i];
+        inst_flux[j][i] = flux[j];
+      }
+      courant_num[0][i] = -amax * geom[2][i] * dt;
+    } else {
+      for (CeedInt j = 0; j < 3; j++) {
+        cell_L[j][i]    = 0.0;
+        inst_flux[j][i] = 0.0;
+      }
+      courant_num[0][i] = 0.0;
+    }
+  }
+  return 0;
+}
+
+CEED_QFUNCTION(SWEBoundaryFlux_FreeOutflow_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEBoundaryFlux_FreeOutflow(ctx, Q, in, out, RIEMANN_FLUX_ROE);
+}
+
 #pragma GCC diagnostic   pop
 #pragma clang diagnostic pop
 

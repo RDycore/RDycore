@@ -205,8 +205,9 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
   for (PetscInt b = 0; b < rdy->num_boundaries; ++b) {
     RDyBoundary      boundary = rdy->boundaries[b];
     RDyConditionType bc_type  = rdy->boundary_conditions[b].flow->type;
-    PetscCheck(bc_type == CONDITION_DIRICHLET || bc_type == CONDITION_REFLECTING || bc_type == CONDITION_CRITICAL_OUTFLOW, rdy->comm,
-               PETSC_ERR_SUP, "numerics.jacobian: analytic does not support this boundary condition type yet");
+    PetscCheck(bc_type == CONDITION_DIRICHLET || bc_type == CONDITION_REFLECTING || bc_type == CONDITION_CRITICAL_OUTFLOW ||
+                   bc_type == CONDITION_FREE_OUTFLOW,
+               rdy->comm, PETSC_ERR_SUP, "numerics.jacobian: analytic does not support this boundary condition type yet");
     for (PetscInt e = 0; e < boundary.num_edges; ++e) {
       PetscInt l = edges->cell_ids[2 * boundary.edge_ids[e]];
       if (!cells->is_owned[l]) continue;
@@ -286,9 +287,10 @@ static PetscErrorCode CreateAnalyticJacobianCOO(RDy rdy) {
           if (!cells->is_owned[l]) continue;
           PetscReal len = edges->lengths[edge_id];
           b_cell[n_b]   = l;
-          b_type[n_b]   = (bc_type == CONDITION_DIRICHLET)  ? SWE_JK_BC_DIRICHLET
-                          : (bc_type == CONDITION_REFLECTING) ? SWE_JK_BC_REFLECTING
-                                                              : SWE_JK_BC_CRITICAL_OUTFLOW;
+          b_type[n_b]   = (bc_type == CONDITION_DIRICHLET)      ? SWE_JK_BC_DIRICHLET
+                          : (bc_type == CONDITION_REFLECTING)   ? SWE_JK_BC_REFLECTING
+                          : (bc_type == CONDITION_FREE_OUTFLOW) ? SWE_JK_BC_FREE_OUTFLOW
+                                                                : SWE_JK_BC_CRITICAL_OUTFLOW;
           b_off[n_b]    = (PetscInt)voff;
           b_sn[n_b]     = edges->sn[edge_id];
           b_cn[n_b]     = edges->cn[edge_id];
@@ -673,6 +675,15 @@ static PetscErrorCode SWERHSJacobianAnalytic(TS ts, PetscReal t, Vec u_global, M
               }
             }
           }
+        } break;
+        case CONDITION_FREE_OUTFLOW: {
+          // transmissive ghost: qR = qL, so dG is the identity (primitive space)
+          qR[0]   = qL[0];
+          qR[1]   = qL[1];
+          qR[2]   = qL[2];
+          G[0][0] = 1.0;
+          G[1][1] = 1.0;
+          G[2][2] = 1.0;
         } break;
         default:
           PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_SUP, "numerics.jacobian: analytic does not support this boundary condition type yet");

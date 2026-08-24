@@ -16,6 +16,7 @@ typedef enum {
   SWE_JK_BC_DIRICHLET        = 0,
   SWE_JK_BC_REFLECTING       = 1,
   SWE_JK_BC_CRITICAL_OUTFLOW = 2,
+  SWE_JK_BC_FREE_OUTFLOW     = 3,
 } SWEJacobianKokkosBCType;
 
 // setup-time description; all arrays are HOST arrays copied to device views

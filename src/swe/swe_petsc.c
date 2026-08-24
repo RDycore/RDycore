@@ -502,6 +502,32 @@ static PetscErrorCode ApplyCriticalOutflowBC(RDyMesh *mesh, RDyBoundary boundary
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// applies a free (transmissive / zero-gradient) outflow boundary condition:
+// the ghost state copies the interior state, so the edge flux reduces to the
+// physical flux F(q_interior). Unlike the critical-outflow condition, this is
+// continuous in the interior state (no inflow/outflow switch), which matters
+// for Newton solvers and for the adjoint.
+static PetscErrorCode ApplyFreeOutflowBC(RDyMesh *mesh, RDyBoundary boundary, RiemannStateData *datal, RiemannStateData *datar) {
+  PetscFunctionBeginUser;
+
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  // compute h/u/v for right cells
+  for (PetscInt e = 0; e < boundary.num_edges; ++e) {
+    PetscInt edge_id            = boundary.edge_ids[e];
+    PetscInt left_local_cell_id = edges->cell_ids[2 * edge_id];
+
+    if (cells->is_owned[left_local_cell_id]) {
+      datar->h[e] = datal->h[e];
+      datar->u[e] = datal->u[e];
+      datar->v[e] = datal->v[e];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // application of boundary flux operator for its specific boundary
 static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
@@ -563,6 +589,9 @@ static PetscErrorCode ApplyBoundaryFlux(void *context, PetscOperatorFields field
       break;
     case CONDITION_CRITICAL_OUTFLOW:
       PetscCall(ApplyCriticalOutflowBC(boundary_flux_op->mesh, boundary, datal, datar, data_edge));
+      break;
+    case CONDITION_FREE_OUTFLOW:
+      PetscCall(ApplyFreeOutflowBC(boundary_flux_op->mesh, boundary, datal, datar));
       break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);

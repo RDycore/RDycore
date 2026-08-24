@@ -135,7 +135,8 @@ typedef enum {
   CONDITION_NEUMANN,           // Neumann condition (derivative is specified)
   CONDITION_REFLECTING,        // Reflecting condition
   CONDITION_CRITICAL_OUTFLOW,  // Critical flow
-  CONDITION_RUNOFF             // Runoff that is a source to the dh/dt equation
+  CONDITION_RUNOFF,            // Runoff that is a source to the dh/dt equation
+  CONDITION_FREE_OUTFLOW       // Transmissive (zero-gradient) outflow: ghost state copies the interior state
 } RDyConditionType;
 
 #endif

@@ -361,6 +361,21 @@ static PetscErrorCode CreateBoundaryFluxQFunction(Ceed ceed, const RDyConfig con
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not implemented for tracers");
       }
       break;
+    case CONDITION_FREE_OUTFLOW:
+      if (num_tracers == 0) {  // flow only
+        switch (config.numerics.riemann) {
+          case RIEMANN_ROE:
+            PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEBoundaryFlux_FreeOutflow_Roe, SWEBoundaryFlux_FreeOutflow_Roe_loc, qf));
+            PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+            break;
+          default:
+            PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Only RIEMANN_ROE Riemann solver support for SWE with no tracers");
+            break;
+        }
+      } else {  // flow + tracers
+        PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "CONDITION_FREE_OUTFLOW not implemented for tracers");
+      }
+      break;
     default:
       PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
                  boundary.id);

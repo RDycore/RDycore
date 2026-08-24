@@ -244,6 +244,15 @@ PetscErrorCode SWEJacobianKokkosAssemble(SWEJacobianKokkos *jk, const PetscScala
               }
             }
           } break;
+          case SWE_JK_BC_FREE_OUTFLOW: {
+            // transmissive ghost: qR = qL, so dG is the identity (primitive space)
+            qR[0]   = qL[0];
+            qR[1]   = qL[1];
+            qR[2]   = qL[2];
+            G[0][0] = 1.0;
+            G[1][1] = 1.0;
+            G[2][2] = 1.0;
+          } break;
         }
         if (!contribute || (qL[0] < tiny_h && qR[0] < tiny_h)) {  // zero flux / dry/dry boundary edge
           for (PetscInt k = 0; k < 9; ++k) v(off + k) = 0.0;
@@ -394,6 +403,11 @@ PetscErrorCode SWEKokkosApplyFlux(SWEJacobianKokkos *jk, const PetscScalar *u_pt
               ur                       = velocity * cn;
               vr                       = velocity * sn;
             }
+          } break;
+          case SWE_JK_BC_FREE_OUTFLOW: {  // transmissive ghost: copy the interior state
+            hr = hl;
+            ur = ul;
+            vr = vl;
           } break;
         }
 

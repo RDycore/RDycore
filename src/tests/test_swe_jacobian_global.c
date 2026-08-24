@@ -54,6 +54,14 @@ static void TestGlobalFDVsAnalyticAnugaRegularized(void **state) {
   CompareConfigs("swe_jacobian_global_anuga_fd.yaml", "swe_jacobian_global_anuga_analytic.yaml", "anuga-regularized drag");
 }
 
+// Dirichlet + free-outflow (transmissive) boundaries on the dam-break state:
+// the free-outflow ghost copies the interior state, so its ghost map is the
+// identity in primitive space
+static void TestGlobalFDVsAnalyticFreeOutflow(void **state) {
+  (void)state;
+  CompareConfigs("swe_jacobian_global_freebc_fd.yaml", "swe_jacobian_global_freebc_analytic.yaml", "dirichlet+free-outflow");
+}
+
 static void CompareConfigs(const char *fd_yaml, const char *an_yaml, const char *label) {
   RDy rdy_fd, rdy_an;
   Mat J_fd, J_an;
@@ -95,6 +103,7 @@ int main(int argc, char *argv[]) {
       cmocka_unit_test(TestGlobalFDVsAnalyticDamBreak),
       cmocka_unit_test(TestGlobalFDVsAnalyticBCTypes),
       cmocka_unit_test(TestGlobalFDVsAnalyticAnugaRegularized),
+      cmocka_unit_test(TestGlobalFDVsAnalyticFreeOutflow),
   };
   return cmocka_run_group_tests(tests, Setup, Teardown);
 }

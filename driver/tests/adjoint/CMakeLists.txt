@@ -6,6 +6,8 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_dam_break.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_dam_break_analytic.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_beuler.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_arkimex.yaml
+          ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_beuler_freeflow.yaml
+          ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_arkimex_freeflow.yaml
           ${MESH_DIR}/planar_dam_10x5.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -37,6 +39,12 @@ add_test(adjoint_beuler_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} 
 # fixed steps (the embedded controller otherwise varies the step sequence
 # under FD perturbations) and tight inner tolerances
 add_test(adjoint_arkimex_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_arkimex.yaml -ts_adapt_type none -snes_rtol 1e-12 -snes_atol 1e-50 -ksp_rtol 1e-12)
+
+# same FD gates with a free-outflow (transmissive) boundary on the bottom
+# wall: validates the free-outflow ghost's identity Jacobian map through the
+# implicit solves and the adjoint chain
+add_test(adjoint_beuler_freeflow_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_beuler_freeflow.yaml -snes_rtol 1e-12 -snes_atol 1e-50 -ksp_rtol 1e-12)
+add_test(adjoint_arkimex_freeflow_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_arkimex_freeflow.yaml -ts_adapt_type none -snes_rtol 1e-12 -snes_atol 1e-50 -ksp_rtol 1e-12)
 
 # gauge-observation calibration (the real-data path): a synthetic WSE table
 # is written from a two-zone truth at strided gauge cells, read back through

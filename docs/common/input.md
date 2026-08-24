@@ -264,7 +264,20 @@ elsewhere in the file. The parameters that define a flow condition are
       Useful only for boundary conditions.
     * `critical-outflow`: the condition specifies that flow through a boundary
       is defined by a critical outflow condition. Useful only for boundary
-      conditions.
+      conditions. Note that this condition switches between a critical ghost
+      state (outflow) and a dry wall (inflow) at zero normal velocity, so the
+      boundary flux is discontinuous in the interior state there; for implicit
+      time integration or adjoint runs, prefer `free-outflow`.
+    * `free-outflow`: a transmissive (zero-gradient) outflow condition: the
+      ghost state copies the interior state, so the boundary flux is the
+      physical flux evaluated at the interior state. This is the conventional
+      "free outflow" of finite-volume shallow-water codes (e.g. ANUGA's
+      transmissive boundary, Clawpack's zero-order extrapolation). It is
+      continuous in the interior state, which makes it the right choice for
+      Newton-based implicit solvers and adjoint/calibration runs. It is exactly
+      non-reflecting only for supercritical outflow; subcritical outflow may
+      produce weak reflections, and it does not prevent inflow if the interior
+      velocity points inward. Useful only for boundary conditions.
 
 In the case of a Dirichlet condition, flow is prescribed by providing parameters
 to set the water height and momentum. This can be done in one of two ways:

@@ -1247,6 +1247,8 @@ PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
         break;
       case CONDITION_CRITICAL_OUTFLOW:
         break;
+      case CONDITION_FREE_OUTFLOW:
+        break;
       default:
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
                    boundary.id);
