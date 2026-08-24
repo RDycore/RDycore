@@ -305,6 +305,40 @@ falls 128x — the model fits its 13 gauges well — while the recovered
 class values are 66% wrong in L2 and the worst class is off by 81%. A
 good fit is NOT evidence of a good parameter field here.
 
+**CLAIM NARROWED (2026-08-24) — the window, not just the network.**
+The mechanism is not "260 observations is too few for 15 unknowns"
+(that is over-determined 17:1). Two things actually cause it:
+
+1. The 13 gauge cells occupy only **6 of the 15 NLCD classes**
+   (23x5, 24x3, 22x2, 81, 52, 90). The nine unrepresented classes
+   include all three forest classes (41/42/43), which finished at
+   EXACTLY the 0.0300 start — zero gradient, never moved.
+2. **The window is 20 SECONDS** (`stop: 20.0`, dt = 1 s). Information
+   travels at the gravity-wave speed sqrt(g h): ~3 m/s at 1 m depth and
+   only ~0.24 m/s at the ~6 mm depths of this spun-up state. In 20 s
+   that is a fraction of a cell to about two cells. So no distant cell
+   is DYNAMICALLY CONNECTED to any gauge: perturbing forest roughness
+   cannot move a gauge reading within the window, and the optimizer
+   correctly leaves it alone. It is not that water never crosses
+   forest — it is that the window is far too short for it to matter.
+
+So the honest claim is: **13 gauges with a 20-second window cannot
+identify 15 classes.** It does NOT establish that 13 gauges over a
+realistic 6–12 hr window would fail — which is what the campaign needs
+to know. The dense case is immune to this locality (418k observation
+cells put observations on top of every class), which is why the two
+differ so starkly. Note also that gauge count per class does not
+explain the pattern: class 52 has ONE gauge and recovers to 3%, while
+class 23 has FIVE and lands 35% off and class 24 has three and is the
+worst at 81% — depth/flow at those cells matters more than count.
+
+RIGHT NEXT EXPERIMENT (supersedes the gauge-count bisection): the SAME
+13 gauges over progressively LONGER windows. That is the axis that
+decides whether distant classes ever become observable. Obstacle: long
+windows want rain forcing, which is blocked by the outflow BC; a long
+UNFORCED window is the intermediate test, and o25(ii) at 600 steps
+already failed undiagnosed — worth diagnosing rather than shelving.
+
 This is the Turning/NLCD analogue of the Houston result already in the
 paper's abstract (17-gauge twin: fits 238 observations essentially
 perfectly, recovers the field to only 45%). It is a stronger statement,
