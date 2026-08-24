@@ -1174,15 +1174,23 @@ mark, the peak WSE reached at a point during the event.]}
   \item \textbf{[Numerics: Jed, Matt] Implicit solver headroom: bigger
         steps and better preconditioning.} Backward Euler with the
         assembled Jacobian carries the 2.93M-cell mesh at
-        $\Delta t = 1$\,s ($4\times$ the explicit CFL limit) at
+        $\Delta t = 1$\,s at
         $\sim$4--5 Newton iterations per step with
         \texttt{pbjacobi}-preconditioned GMRES; at $\Delta t = 5$\,s
         the very first Newton \emph{linear} solve diverges (300 GMRES
         iterations, \texttt{pbjacobi}) --- a preconditioner failure
-        before nonlinearity even enters. The honest
-        implicit-vs-explicit wall-clock factor at $\Delta t = 1$\,s is
-        therefore modest, and the case for the implicit path
-        strengthens directly with step size.
+        before nonlinearity even enters. We deliberately do not quote
+        an implicit-vs-explicit wall-clock ratio: forward Euler at
+        $\Delta t = 0.25$\,s over the same window, on a configuration
+        differing from the implicit run in the integrator and step
+        size alone, produces a \emph{non-finite} state (every one of
+        the 108 marks reads dry), so $0.25$\,s is not the explicit
+        limit and any ratio measured against it is meaningless. The
+        advective CFL there is only $\approx 0.04$ at $h \sim 2$\,m, so
+        the binding constraint is not the wave speed; we suspect the
+        explicit friction source on rain-wetted thin cells, which is
+        precisely the stiffness the implicit path exists to absorb.
+        Locating the true explicit limit is in progress.
         \emph{Questions: what would you try first for
         $\Delta t \ge 5$\,s --- a stronger preconditioner (AMG on a
         reduced system? block ILU? field-split?), pseudo-transient

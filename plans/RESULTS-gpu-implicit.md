@@ -1178,3 +1178,70 @@ to fire on refresh: (1) o29f explicit fingerprint (yaml fixed to
 analytic), (2) o30 rerun with failure-tolerant trials, (3) o31d dump
 rerun (-adjoint_hwm_dump o31_marks.txt) for signed bias + per-mark
 crest times (window placement for the 12-hr calibration).
+
+### o29f: the explicit path does NOT survive dt 0.25 at 30 m (2026-08-24)
+
+Eval-only forward over the same 1-hr rain-forced window as o29g, on the
+same real 108-mark table, n4. The two configs differ in **exactly two
+lines** (`diff o27_1hr_freeflow.yaml o29f.yaml`: `temporal` and
+`time_step`); mesh, IC, free-outflow BC, ANUGA regularization, rain and
+the NLCD prior field are identical.
+
+| run | integrator | dt | result |
+| --- | --- | --- | --- |
+| o29g | beuler | 1.0 s | J 3.429e6, peak-WSE MAE 1.6479 m, 22/108 marks dry |
+| o29f | explicit euler | 0.25 s | **J inf, MAE inf, 108/108 marks dry** |
+
+So dt = 0.25 s is NOT the explicit CFL limit at 30 m -- the explicit run
+at that step produces a non-finite state. Two consequences:
+
+1. **The o29 wall-clock comparison is void as written.** "Explicit euler
+   dt 0.25 = 130 s vs beuler dt 1 = 221 s, so implicit costs ~1.7x" timed
+   a run that produces garbage. The honest factor is unknown until the
+   explicit stability limit is measured, and it can only move in the
+   implicit path's favour.
+2. **The paper's W4 text is wrong** where it calls dt = 1 s "4x the
+   explicit CFL limit" (red-team item 4, sec:implicit). Do not quote a
+   forward ratio until the dt ladder below lands.
+
+Mechanism (conjecture, untested): the advective CFL at dt 0.25 is only
+~0.04 for h ~ 2 m, so this is very unlikely to be a wave-speed limit.
+The suspect is the explicit friction source on rain-wetted thin cells
+(`source: method: explicit`, drag ~ n^2 |u| u / h^(4/3)), which is the
+stiffness the implicit path exists to absorb.
+
+Next: dt ladder (explicit euler at dt 0.125 / 0.05 / 0.02, eval-only,
+same window) to find the largest dt that stays finite, using the new
+`-adjoint_forward_only` fingerprint (|u|_2 and the h range make a
+blowup unambiguous). That converts "explicit blew up" into a real cost
+ratio for the paper.
+
+### Mid-event window IC: solved with no conversion machinery (2026-08-24)
+
+The 12-hr calibration window over the crest cannot start at the only IC
+(Aug 26 18:00). Investigated the handoff's option (a) and it is simpler
+than feared -- no checkpoint->IC-file conversion is needed:
+
+- `-restart <file>` is already a `RDySetup` option, and `ReadCheckpointFile`
+  overwrites `u_global` AFTER the yaml IC is applied; the driver stashes
+  `u_ic` straight from `u_global` right after `RDySetup`. So a checkpoint
+  IS the window's IC.
+- Checkpoints are written in NATURAL order, so the window need not run on
+  the rank count of the forward that produced it (verified np1 -> np2).
+- `DMSetUseNatural(FALSE)` in the adjoint driver does not block checkpoint
+  write/read: the natural-SF entry points key off `dm->sfNatural`, which
+  survives the flag (only errors when the SF is missing AND useNatural is
+  set).
+
+The one real gap was the rain clock: every forward restarts the TS clock
+at 0, so a mid-event window replayed rain from the event's first hour.
+Fixed by `-adjoint_rain_start_hour <h0>`. Also added
+`-adjoint_forward_only` (one forward, then exit) -- without it the
+checkpoint on disk is from whichever extra forward ran last (perturbed
+IC, optimizer trial), not the window's answer.
+
+Gated as ctests on the rain-forced Houston 1 km mesh (`adjoint_restart_*`,
+5 tests, ~2 s): hour 2 of a continuous run vs the same hour restarted
+from the 1-hr checkpoint is **bitwise identical** at matched
+decomposition and 2.4e-10 max relative across np1->np2; dropping the rain
+offset moves it 2.3e-2 relative L2, so the gate discriminates.
