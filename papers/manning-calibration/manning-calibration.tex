@@ -71,7 +71,12 @@ dissect --- the classic semiconvergence of underdetermined friction
 estimation: a twin using the actual 17-gauge USGS network geometry
 fits its 238 observations essentially perfectly while recovering the
 field to only $45\%$, quantifying why real-data calibration must
-shrink the parameter space to match the network. Within E3SM,
+shrink the parameter space to match the network --- and, re-asking
+identifiability at basin scale, that the observable matters as much as
+the parameterization: peak water-surface elevations at 108 surveyed
+high-water-mark locations identify the land-cover roughness classes
+covering $83\%$ of a 2.93M-cell Hurricane Harvey domain, where 13
+stream gauges identify almost none. Within E3SM,
 adjoint-based parameter optimization is established in the land-ice
 component MALI, whose velocity solver inverts for basal friction by
 automatic differentiation of the \emph{steady} momentum balance;
@@ -678,14 +683,87 @@ purest form: the real network's null space is so large that data fit
 says almost nothing about parameter recovery, and no Tikhonov weight
 or stopping rule rescues a per-cell field from 238 observations. The
 practical conclusion for real-data calibration is to shrink the
-parameter space to match the network. The land-cover-class
-parameterization ($\sim$13 NLCD classes for this domain,
-overdetermined $18\times$ by the same observations) is the planned
-configuration, with the per-cell map reserved for densely observed
-settings. Calibration against the actual stage records (rather than
-twin-synthetic values at the real gauge locations) additionally
-requires the stage-datum QC completed after this draft was frozen, and
-is deliberately deferred.
+parameter space to match the network --- but, as the next subsection
+measures, shrinking the parameter space is necessary and not
+sufficient: whether a reduced parameterization is identifiable depends
+on the observation geometry and window, not on the ratio of
+observation to parameter counts.
+
+\subsection{Identifiability is a property of the observable: gauges
+versus high-water marks at 30\,m}
+\label{sec:identifiability}
+
+The natural reduced parameterization for this domain is one Manning
+value per NLCD land-cover class (15 classes at the 30\,m Turning mesh,
+2.93M cells), with the published NLCD lookup as prior and truth for
+twins. Counting is deceptively favourable: even the sparse real
+network supplies an order of magnitude more observations than
+parameters. Measurement says otherwise. In a class twin on the 30\,m
+mesh at the real 13-gauge geometry (260 observations, a short
+early-transient window), the objective falls $128\times$ while the
+recovered class values remain $66\%$ wrong in relative $L^2$, worst
+class $81\%$ --- and the failure is structural: classes whose cells
+are dynamically distant from every gauge (the three forest classes)
+never move from the starting value, because within the window nothing
+their roughness does can reach a gauge. The identical configuration
+observed at 418{,}076 strided cells recovers all fifteen classes to
+machine precision, so the failure is the network, not the method.
+Fifteen parameters, thirteen gauges, and an ``overdetermined''
+observation count: still unidentifiable.
+
+The same question re-asked with the peak observable comes out
+differently. Observing the same NLCD-truth twin at the 108
+QC-passed high-water-mark cells (peak WSE sampled over a one-hour
+rain-forced window, implicit stepping, free-outflow outlet;
+Section~\ref{sec:hwm}) and calibrating fifteen classes from a uniform
+start: the objective falls $81\times$, the peak-WSE error at the marks
+drops from $0.103$\,m to $0.017$\,m MAE, and the area-dominant classes
+are identified --- the three developed-intensity classes, pasture, and
+crops recover to $0.7$--$10.5\%$, together $83\%$ of the domain's
+cells; area-weighted relative $L^2$ error is $0.20$ (unweighted
+$0.58$). The residual errors concentrate in small-area classes
+(forests, shrub, emergent wetland, $\sim$5\% of cells), which now
+\emph{move} --- they are sensitive, unlike in the gauge experiment ---
+but overshoot to the bounds along weakly constrained directions:
+ordinary semiconvergence, treatable with regularization and longer
+windows rather than a structural absence of signal. Three caveats
+keep this honest: the one-hour window samples early-transient peaks,
+not flood peaks (the real calibration windows are $6$--$12$ hours and
+should only help); the run was capped at 15 quasi-Newton iterations;
+and twin marks synthesized from the truth trajectory carry no
+representation error, so this is an identifiability statement --- an
+upper bound on real-data performance, not a forecast of it.
+
+\subsection{Changing the observable: high-water marks}
+\label{sec:hwm}
+
+Calibration against the actual stage records is blocked by geometry,
+not software: at all 13 rain-driven USGS gauges in the 30\,m domain,
+modelled water-surface elevation sits 1--11\,m \emph{above} observed
+stage, because a 30\,m cell stores one mean ground elevation ---
+essentially the bank of an incised bayou --- while the gauge hangs in
+the channel below it; the offset is time-varying as the real channel
+fills, so no per-gauge datum correction can repair it. We therefore
+changed the observable to the USGS high-water-mark archive: surveyed
+\emph{peak} water-surface elevations on structures and debris lines,
+i.e.\ on the floodplain surfaces a 30\,m cell does represent, and the
+benchmark currency of the flood-modeling literature (Inunda reports
+$0.67$\,m MAE against Harvey high-water marks~\cite{li2026inunda}).
+Of 2{,}364 Harvey marks, 324 fall in the Turning domain; applying to
+the marks the same QC that disqualified the gauges --- is the surveyed
+elevation above the containing cell's bed? --- rejects $62\%$ of them
+(they are channel surveys), leaving 108 marks of quality fair or
+better. The misfit compares each mark cell's peak simulated WSE over
+the window, $\max_k H u(t_k)$, against the surveyed value; its
+adjoint needs no new machinery, because each mark's residual can be
+injected at its own argmax time in the segmented backward sweep of
+Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
+peak time is locally constant (Section~\ref{sec:nondiff}). The
+parameter gradient of the peak misfit passes the same central-difference
+gates as every other block ($9\times10^{-7}$ against a $10^{-5}$
+gate). The remaining scientific choice --- confirmed or corrected by
+the domain team --- is the calibration window, which for marks that
+record the event maximum must cover the flood peak.
 
 \section{Nondifferentiability catalog}
 \label{sec:nondiff}
@@ -738,6 +816,20 @@ nonsmooth structure worth documenting:
         branch-faithfully in every block; fully wet validation cases
         keep FD comparisons clean, and dry cells are correctly
         insensitive to their roughness.
+  \item \textbf{The argmax in the peak-WSE observable.} The
+        high-water-mark misfit (Section~\ref{sec:hwm}) depends on the
+        state through $\max_k H u(t_k)$: piecewise smooth, with kinks
+        where two sampled times tie for a mark's peak. The adjoint
+        injects each mark's residual at its recorded argmax time,
+        which is the exact gradient away from ties (a measure-zero
+        set); but the peak time \emph{moves} across optimizer
+        iterates, so the objective the quasi-Newton method sees is
+        only piecewise smooth and its line search can straddle kinks.
+        Practice is untroubled --- the FD gates pass away from ties
+        and the twin calibrations descend monotonically --- but this
+        sits on the same practice-ahead-of-theory footing as every
+        $\max$-type observable in calibration, and we say so rather
+        than hide it.
 \end{itemize}
 
 \section{Conclusions and outlook}
@@ -806,10 +898,13 @@ cross-references are given as Q$n$.]}
         in progress:} the USGS high-water-mark archive is acquired and
         QC'd (2{,}364 marks; 324 in-domain; 108 usable after the
         below-bed and quality filters), a peak-WSE misfit with an exact
-        argmax-time adjoint is implemented and FD-gated, and the first
-        identifiability run against the real 108-mark geometry is
-        queued. The paper should either include that number or claim
-        only the capability, not the application. (Q1, Q2)
+        argmax-time adjoint is implemented and FD-gated, and the
+        identifiability twin at the real 108-mark geometry now appears
+        in Section~\ref{sec:identifiability}. Still missing: a
+        calibration against the \emph{surveyed} mark values (which
+        requires a window covering the flood peak) and the MAE number
+        to put beside Inunda's. Until then the paper claims the
+        capability, not the application. (Q1, Q2)
   \item \textbf{The semiconvergence cure is asserted by a counting
         argument our own evidence undercuts.}
         Section~\ref{sec:houston} proposes the
@@ -822,9 +917,15 @@ cross-references are given as Q$n$.]}
         water reachable from their cells crosses a gauge in the window.
         The honest statement is that identifiability depends on the
         observation \emph{geometry and window}, and must be measured,
-        not counted. Either include the class-identifiability study
-        (gauge and high-water-mark variants) or delete the
-        ``overdetermined $18\times$'' sentence. (Q2)
+        not counted. \emph{Addressed:} the counting argument is gone;
+        Section~\ref{sec:identifiability} now reports the measured
+        study --- 13 gauges fail (classes distant from every gauge
+        never move), 108 high-water marks identify the classes
+        covering $83\%$ of the domain --- with its caveats (short
+        window, iteration cap, no representation error) stated.
+        Remaining exposure: the caveats themselves; a reviewer may ask
+        for the 6--12-hour-window version, which is exactly the
+        planned production run. (Q2)
   \item \textbf{The verified gradients are not the production
         gradients.} Every FD gate in Table~\ref{tab:verification} is
         passed at tight inner tolerances; the planned production
@@ -867,11 +968,10 @@ cross-references are given as Q$n$.]}
         All 30\,m-mesh, 2.93M-cell content in the paper is cost
         measurement; no calibration at 30\,m is shown, and a reviewer
         comparing against the 471M-cell forward-validation claim in
-        the introduction will notice the gap. \emph{Partially
-        addressed:} the section is retitled to say what it is. Still
-        open: land one 30\,m calibration in the paper (the class twin
-        already runs end to end on one GPU node; the HWM
-        identifiability run now queued would serve).
+        the introduction will notice the gap. \emph{Addressed:} the
+        section is retitled, and Section~\ref{sec:identifiability} now
+        contains two 30\,m, 2.93M-cell class calibrations (gauge and
+        high-water-mark twins) run end to end on one GPU node.
   \item \textbf{All twins are noise-free.} $\sigma$ enters only as a
         scale factor; no experiment adds observation noise, so the
         semiconvergence story (early stopping, Tikhonov weights) is
@@ -884,9 +984,9 @@ cross-references are given as Q$n$.]}
         the peak time \emph{moves} across optimizer iterates, so $J$
         is only piecewise smooth and BLMVM's line search can straddle
         kinks. Practice (and our FD gates away from ties) supports it;
-        theory does not, and the draft should say so in the
-        nondifferentiability catalog when the observable is added.
-        (Q2, Q9)
+        theory does not. \emph{Addressed:} the nondifferentiability
+        catalog now carries this entry explicitly; the theoretical
+        footing remains open by construction. (Q2, Q3)
   \item \textbf{Reproducibility currently rests on an unmerged PETSc
         fork.} The device-resident assembled-Jacobian path (blocked-COO
         BAIJ assembly on GPU) exists only on our PETSc branch. Until it
