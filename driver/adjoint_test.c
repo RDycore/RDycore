@@ -45,7 +45,10 @@ static const char *help_str =
     "  -adjoint_gauges_twin        first synthesize the table from a two-zone truth\n"
     "  -adjoint_gauge_stride <int> twin: gauges at every Nth natural cell (default: 7)\n"
     "  -adjoint_n0 <real>          gauge mode: constant prior/initial n (default: 0.03)\n"
-    "  -adjoint_jred_gate <real>   gauge mode: require J_final < gate*J_init (0 = off)\n";
+    "  -adjoint_jred_gate <real>   gauge mode: require J_final < gate*J_init (0 = off)\n"
+    "  -adjoint_rain_start_hour <int>  event hour the window's rain starts at (default: 0);\n"
+    "                              use with RDycore's -restart to run a mid-event window\n"
+    "  -adjoint_forward_only       one forward over the window, then exit (no adjoint/FD/TAO)\n";
 
 #define NDOF 3
 
@@ -401,28 +404,43 @@ static PetscErrorCode PreStageApplyRain(TS ts, PetscReal stage_time) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// -adjoint_rain_start_hour <h0> shifts the window's rain to event hour h0: the
+// TS clock always restarts at 0 (ForwardObserve/ForwardSolve), so a window that
+// begins mid-event -- e.g. one started from a checkpoint via -restart -- would
+// otherwise replay the rain from the event's first hour. The raster dataset
+// advances exactly ONE file per RDyForcingSetRasterData call whose clock has
+// passed the current file (rdyforcing_dataset.c), so the skipped hours must
+// still be streamed through; only hours >= h0 are retained.
 static PetscErrorCode SetupRainSchedule(RDy rdy, PetscReal t_final) {
   MPI_Comm comm;
   PetscFunctionBeginUser;
   rain_sched = (RainSchedule){.rdy = rdy, .cur_bucket = -1};
-  RDyForcing forcing = rdy->forcing;
+  RDyForcing forcing    = rdy->forcing;
+  PetscInt   start_hour = 0;
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_rain_start_hour", &start_hour, NULL));
   if (!forcing || forcing->source.type == FORCING_DATASET_UNSET || !forcing->source.ndata) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(PetscObjectGetComm((PetscObject)rdy->ts, &comm));
+  PetscCheck(start_hour >= 0, comm, PETSC_ERR_USER, "-adjoint_rain_start_hour must be >= 0");
 
   PetscInt nhours = (PetscInt)PetscCeilReal(t_final / 3600.0);
   if (nhours < 1) nhours = 1;
   rain_sched.nhours = nhours;
   rain_sched.ndata  = forcing->source.ndata;
   PetscCall(PetscMalloc1(nhours, &rain_sched.hours));
-  for (PetscInt h = 0; h < nhours; ++h) {
+  for (PetscInt h = 0; h < start_hour + nhours; ++h) {
     PetscCall(RDyApplyForcing(rdy, forcing, 3600.0 * h));  // streams dataset files forward
-    PetscCall(PetscMalloc1(rain_sched.ndata, &rain_sched.hours[h]));
-    for (PetscInt i = 0; i < rain_sched.ndata; ++i) rain_sched.hours[h][i] = forcing->source.data_for_rdycore[i];
+    if (h < start_hour) continue;                          // streamed past: before the window
+    PetscInt hw = h - start_hour;
+    PetscCall(PetscMalloc1(rain_sched.ndata, &rain_sched.hours[hw]));
+    for (PetscInt i = 0; i < rain_sched.ndata; ++i) rain_sched.hours[hw][i] = forcing->source.data_for_rdycore[i];
   }
   PetscCall(RDySetRegionalWaterSource(rdy, 1, rain_sched.ndata, rain_sched.hours[0]));
   rain_sched.cur_bucket = 0;
   PetscCall(TSSetPreStage(rdy->ts, PreStageApplyRain));
-  PetscCall(PetscPrintf(comm, "rain schedule: %" PetscInt_FMT " hourly datasets preloaded for the %.0f s window\n", nhours, (double)t_final));
+  PetscCall(PetscPrintf(comm,
+                        "rain schedule: %" PetscInt_FMT " hourly datasets preloaded for the %.0f s window (event hours %" PetscInt_FMT "-%" PetscInt_FMT
+                        ")\n",
+                        nhours, (double)t_final, start_hour, start_hour + nhours - 1));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1411,6 +1429,35 @@ int main(int argc, char *argv[]) {
     Vec u_ic, u_ic_pert;
     PetscCall(VecDuplicate(rdy->u_global, &u_ic));
     PetscCall(VecCopy(rdy->u_global, u_ic));
+
+    // -adjoint_forward_only: exactly ONE forward over the window, then exit.
+    // Every other mode runs several forwards (a perturbed IC, optimizer
+    // trials, ...), so this is the only mode whose end state -- and whose
+    // yaml `checkpoint:` output -- is the window's forward answer. Used to
+    // produce the restart checkpoint for a mid-event calibration window, and
+    // to compare a restarted window against a continuous run.
+    {
+      PetscBool forward_only = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_forward_only", &forward_only, NULL));
+      if (forward_only) {
+        PetscCall(ForwardSolve(rdy, u_ic, t_final));
+        PetscCall(CheckTruthForward(rdy, "forward-only"));
+        PetscReal unorm, hmin, hmax;
+        PetscCall(VecNorm(rdy->u_global, NORM_2, &unorm));
+        PetscCall(VecStrideMax(rdy->u_global, 0, NULL, &hmax));
+        PetscCall(VecStrideMin(rdy->u_global, 0, NULL, &hmin));
+        PetscCall(PetscPrintf(comm, "forward only: t_final %.1f s  |u|_2 %.10e  h in [%.10e, %.10e]\n", (double)t_final, (double)unorm, (double)hmin,
+                              (double)hmax));
+        PetscCall(VecDestroy(&u_ic));
+        PetscCall(VecDestroy(&y));
+        PetscCall(VecDestroy(&r_work));
+        PetscCall(MatDestroy(&H));
+        PetscCall(DestroyRainSchedule());
+        PetscCall(RDyDestroy(&rdy));
+        PetscCall(RDyFinalize());
+        return 0;
+      }
+    }
 
     if (calibrate_classes) {
       // ------------------------------------------------------------------

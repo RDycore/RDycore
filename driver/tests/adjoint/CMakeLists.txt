@@ -2,6 +2,9 @@
 # Tests for the adjoint sensitivity driver (rdycore_adjoint)
 #----------------------------------------------------------
 
+find_program(H5DIFF h5diff REQUIRED
+             PATHS ${PETSC_DIR}/${PETSC_ARCH}/bin)
+
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_dam_break.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_dam_break_analytic.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_beuler.yaml
@@ -9,6 +12,16 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_dam_break.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_beuler_freeflow.yaml
           ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_arkimex_freeflow.yaml
           ${MESH_DIR}/planar_dam_10x5.msh
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+# data for the checkpoint/restart consistency gate (rain-forced Houston 1 km)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_restart_ref.yaml
+          ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_restart_window.yaml
+          ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_restart_window_np2.yaml
+          ${MESH_DIR}/Houston1km_with_z.exo
+          ${CONDITION_DIR}/Houston1km.ic.${PETSC_ID_TYPE}.bin
+          ${CONDITION_DIR}/2017-08-26:00-00.${PETSC_ID_TYPE}.bin
+          ${CONDITION_DIR}/2017-08-26:01-00.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # dJ/du0 via TSAdjoint vs central finite differences (the driver exits with an
@@ -61,3 +74,34 @@ add_test(adjoint_hwm_fd_np_2 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 2 ${adjoint_driver} 
 # misfit reduction (np_1 and np_2 measure ~10.5x, identical to 6 digits).
 add_test(calibrate_manning_gauges_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_dam_break.yaml -adjoint_calibrate_gauges -adjoint_gauges_twin -adjoint_obs_file gauge_twin_obs_np1.txt -adjoint_jred_gate 0.5 -tao_max_it 60)
 add_test(calibrate_manning_gauges_np_2 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 2 ${adjoint_driver} adjoint_dam_break.yaml -adjoint_calibrate_gauges -adjoint_gauges_twin -adjoint_obs_file gauge_twin_obs_np2.txt -adjoint_jred_gate 0.5 -tao_max_it 60)
+
+# checkpoint/restart consistency: the mid-event calibration window's IC path.
+# A calibration window that does not start at the event's only initial
+# condition is started from a checkpoint of a longer forward instead, and its
+# rain has to be re-aligned with the event clock because the driver restarts
+# the TS clock at 0 for every forward. The gate: hour 2 of a continuous
+# 2-hour rain-forced run must equal the same hour computed from the 1-hour
+# checkpoint with -adjoint_rain_start_hour 1. Dropping the rain offset moves
+# the answer by 2.3e-2 relative L2, so both comparisons below discriminate.
+# -adjoint_forward_only is what makes the checkpointed state well defined --
+# every other driver mode runs several forwards over the window.
+add_test(adjoint_restart_ref_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_restart_ref.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -adjoint_forward_only)
+
+# same decomposition as the reference: the restarted window must reproduce it
+# BITWISE (measured: 0 differences over all 8238 dofs)
+add_test(adjoint_restart_window_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_restart_window.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -adjoint_forward_only -restart checkpoints/restart_ref.rdycore.r.060.h5 -adjoint_rain_start_hour 1)
+set_tests_properties(adjoint_restart_window_np_1 PROPERTIES DEPENDS "adjoint_restart_ref_np_1")
+
+add_test(adjoint_restart_compare_np_1 ${H5DIFF} checkpoints/restart_ref.rdycore.r.120.h5 checkpoints/restart_window.rdycore.r.60.h5 /fields/solution)
+set_tests_properties(adjoint_restart_compare_np_1 PROPERTIES DEPENDS "adjoint_restart_window_np_1")
+
+# a DIFFERENT decomposition than the checkpoint's: checkpoints are written in
+# natural order, so the calibration window need not use the node count of the
+# forward that produced its IC. Only reduction order changes, so this one is
+# compared with a relative tolerance (measured: 6 dofs above 1e-10, max 2.4e-10,
+# all of them small momentum components).
+add_test(adjoint_restart_window_np_2 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 2 ${adjoint_driver} adjoint_restart_window_np2.yaml -raster_rain_start_date 2017,8,26,0,0 -raster_rain_dir ./ -adjoint_forward_only -restart checkpoints/restart_ref.rdycore.r.060.h5 -adjoint_rain_start_hour 1)
+set_tests_properties(adjoint_restart_window_np_2 PROPERTIES DEPENDS "adjoint_restart_ref_np_1")
+
+add_test(adjoint_restart_compare_np_2 ${H5DIFF} -p 1e-8 checkpoints/restart_ref.rdycore.r.120.h5 checkpoints/restart_window2.rdycore.r.60.h5 /fields/solution)
+set_tests_properties(adjoint_restart_compare_np_2 PROPERTIES DEPENDS "adjoint_restart_window_np_2")
