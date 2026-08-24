@@ -761,161 +761,295 @@ unchanged. Third, land-cover-class parameterization (tens of TAO
 evaluations instead of hundreds) and calibration windows placed on
 the storm peak rather than the full event.
 
-\section*{Open questions for internal review}
-\textcolor{red}{[This section will be removed before submission. Please
-reply inline or by email --- each question names who we think owns it.]}
+\section*{Red/tiger-team review: the weakest parts of this draft}
+\textcolor{red}{[Temporary section, removed before submission. This is
+our own adversarial read of the draft --- the places a hostile reviewer
+(or a careful friend) will push, ranked by how much damage they could
+do. Most map directly onto the numbered questions in the next section;
+cross-references are given as Q$n$.]}
 
-\subsection*{Software / engineering (Jeff)}
 \begin{enumerate}
-  \item \textbf{ARK-IMEX design intent.} PR \#359 prepped the
-        \texttt{SOURCE\_ARK\_IMEX} path (``bed friction moved to
-        LHS''). We completed it as: Manning drag \emph{alone} in the
-        IFunction (per-cell block-diagonal IJacobian), bed slope and
-        external sources explicit. Your CEED-side friction-free
-        Q-functions are wired in and the two backends agree to machine
-        precision. Does that match your intended split, do you have an
-        ARKIMEX scheme/order preference (we use the PETSc default), and
-        did you envision a device-resident (CEED Q-function) implicit
-        part as the follow-up?
-  \item \textbf{Code placement and naming.} New files
-        \texttt{swe\_jacobian\_petsc.c} and
-        \texttt{swe\_roe\_flux\_jacobian\_petsc.h} (static-function
-        header, mirroring \texttt{swe\_roe\_flux\_petsc.h});
-        config keys \texttt{numerics.jacobian: none|fd|analytic} and
-        \texttt{source.method: explicit|ark\_imex}. Naming/placement
-        objections before this hardens into a PR?
-  \item \textbf{Public API.} The adjoint driver currently reaches
-        through \texttt{private/rdycoreimpl.h} (LETKF-driver pattern).
-        Which calls deserve promotion to \texttt{rdycore.h}
-        (\texttt{RDySetObservations}, \texttt{RDyAdjointSolve},
-        \texttt{RDyGetSensitivities}?), and are Fortran bindings needed
-        at that point?
-  \item \textbf{Jacobian preallocation.} We use
-        \texttt{DMCreateMatrix} under the DM's closure-based adjacency,
-        a superset of FV edge adjacency (extra stored zeros). Accept,
-        or tighten the pattern?
-  \item \textbf{CI.} The 12 new tests need a PETSc with TSAdjoint (any
-        recent version) and run in seconds. Any CI-matrix concerns
-        (e.g., the CEED-only lanes correctly skip
-        \texttt{numerics.jacobian} configs)?
+  \item \textbf{There is no real-data result in the paper.} The
+        abstract's differentiator --- production code made
+        differentiable, versus reduced solvers rewritten in ML
+        frameworks --- invites the comparison the paper cannot yet win:
+        Inunda reports 0.67\,m MAE against \emph{surveyed} Harvey
+        high-water marks; every calibration here is a twin. The
+        real-gauge experiment we do report (17-gauge network, misfit
+        down $2\times10^{7}$-fold, field $45\%$ wrong) is honest and
+        instructive, but it is a negative result about the network, not
+        a demonstration of skill. Until a real-observation number
+        exists, the introduction's framing overdraws. \emph{Mitigation
+        in progress:} the USGS high-water-mark archive is acquired and
+        QC'd (2{,}364 marks; 324 in-domain; 108 usable after the
+        below-bed and quality filters), a peak-WSE misfit with an exact
+        argmax-time adjoint is implemented and FD-gated, and the first
+        identifiability run against the real 108-mark geometry is
+        queued. The paper should either include that number or claim
+        only the capability, not the application. (Q1, Q2)
+  \item \textbf{The semiconvergence cure is asserted by a counting
+        argument our own evidence undercuts.}
+        Section~\ref{sec:houston} proposes the
+        land-cover-class parameterization because 238 observations
+        ``overdetermine'' $\sim$13 classes $18\times$. But observation
+        \emph{count} is not information content: in an internal
+        class-parameterization twin at the real 13-gauge geometry (short
+        window), the objective fell $128\times$ while the class values
+        finished $66\%$ wrong --- three classes never moved because no
+        water reachable from their cells crosses a gauge in the window.
+        The honest statement is that identifiability depends on the
+        observation \emph{geometry and window}, and must be measured,
+        not counted. Either include the class-identifiability study
+        (gauge and high-water-mark variants) or delete the
+        ``overdetermined $18\times$'' sentence. (Q2)
+  \item \textbf{The verified gradients are not the production
+        gradients.} Every FD gate in Table~\ref{tab:verification} is
+        passed at tight inner tolerances; the planned production
+        configuration runs the inner Krylov solver at
+        \texttt{rtol}~$10^{-2}$, where the adjoint-vs-FD mismatch is
+        inner-solve-limited at $6\times10^{-4}$--$4\times10^{-3}$. In
+        every test this does not affect BLMVM convergence, but the
+        paper currently reports the tight-tolerance numbers and stays
+        silent about the tolerance actually used at scale. State both,
+        and give the inexactness a principled footing (inexact-gradient
+        quasi-Newton has known sufficient conditions) or a measured
+        one. (Q3)
+  \item \textbf{``Implicit stepping is required'' is conditional on a
+        choice we made.} The production code handles drag stiffness
+        with operator-split friction treatments; they are unusable for
+        the adjoint because they bury $\Delta t$ inside the RHS, and
+        \emph{that} is why the adjoint path needs an explicit source
+        plus an implicit integrator. The section title claims more
+        than this. Also missing is the honest wall-clock comparison at
+        30\,m: backward Euler at $\Delta t = 1$\,s costs $\sim$4--5
+        Newton iterations per step behind a Krylov solve versus
+        explicit RK at the CFL-limited $0.25$\,s --- the net factor is
+        modest and should be printed, not implied. Larger implicit
+        steps ($\Delta t \ge 5$\,s), which would make the case
+        decisive, are currently blocked by a linear-solver failure the
+        draft does not mention. (Q6)
+  \item \textbf{We changed the physics to fix the solver, and the
+        changes await domain sign-off.} The regularized drag velocity
+        ($h_{\rm anuga} = 0.001$\,m, chosen as ``smallest that cures
+        the stall''; $0.01$\,m observed unstable and the mechanism only
+        conjectured) and the transmissive outlet (replacing critical
+        outflow; alters outlet physics; weakly reflective for
+        subcritical flow) are both defensible and both flagged opt-in,
+        but a reviewer can fairly ask whether the calibrated $n$
+        compensates for boundary and regularization choices rather
+        than physics. Sensitivity of the calibrated field to
+        $h_{\rm anuga}$ and to the outlet choice should be
+        demonstrated, not asserted. (Q4, Q5)
+  \item \textbf{The ``Hurricane Harvey demonstration'' is a
+        2{,}746-cell twin.} All 30\,m-mesh, 2.93M-cell content in the
+        paper is cost measurement; no calibration at 30\,m is shown.
+        The section title oversells, and a reviewer comparing against
+        the 471M-cell forward-validation claim in the introduction
+        will notice the gap. Retitle, or land one 30\,m calibration
+        (the class twin already runs end to end on one GPU node).
+  \item \textbf{All twins are noise-free.} $\sigma$ enters only as a
+        scale factor; no experiment adds observation noise, so the
+        semiconvergence story (early stopping, Tikhonov weights) is
+        undisturbed by the noise level that in practice sets where
+        semiconvergence turns over. One noisy twin would close this.
+        (Q7)
+  \item \textbf{The peak-WSE observable, if adopted, is nonsmooth in a
+        new way.} The argmax-time adjoint is exact wherever the peak
+        time is locally constant, and ties have measure zero --- but
+        the peak time \emph{moves} across optimizer iterates, so $J$
+        is only piecewise smooth and BLMVM's line search can straddle
+        kinks. Practice (and our FD gates away from ties) supports it;
+        theory does not, and the draft should say so in the
+        nondifferentiability catalog when the observable is added.
+        (Q2, Q9)
+  \item \textbf{Reproducibility currently rests on an unmerged PETSc
+        fork.} The device-resident assembled-Jacobian path (blocked-COO
+        BAIJ assembly on GPU) exists only on our PETSc branch. Until it
+        is upstreamed or the paper's results are reproducible with
+        stock PETSc (AIJ path, at some cost), the artifact story is
+        weaker than the ``behind a flag, FD-gated in CI'' framing
+        suggests. (Q8)
+  \item \textbf{The novelty claim needs a literature sweep.} ``First
+        E3SM component model with built-in discrete-adjoint parameter
+        estimation'' is plausible but unaudited against, e.g., MALI and
+        ocean-model adjoint efforts inside and around E3SM. Cheap to
+        check, embarrassing to get wrong.
 \end{enumerate}
 
-\subsection*{Science (Gautam and team)}
-
-\textcolor{red}{[Each item says what we assumed and what we did, then
-asks one question. Where we already acted we flag it --- we would much
-rather be corrected now than after the production runs. Nomenclature:
-``WSE'' is water-surface elevation (bed elevation plus water depth),
-which is what a stage gauge reports once put on the NAVD88 datum;
-``cell bed'' is the single mean ground elevation our 30\,m mesh stores
-for a cell.]}
+\section*{Open questions for internal review, in order of importance}
+\textcolor{red}{[Temporary section, removed before submission. Please
+reply inline or by email --- each question names who we think owns it:
+the science team (Gautam, Donghui, and colleagues), the numerics team
+(Matt, Jed), or engineering (Jeff). Where we already acted we flag it
+--- we would much rather be corrected now than after the production
+runs. Nomenclature: ``WSE'' is water-surface elevation (bed elevation
+plus water depth), which is what a stage gauge reports once put on the
+NAVD88 datum; ``cell bed'' is the single mean ground elevation our
+30\,m mesh stores for a cell; ``HWM'' is a USGS-surveyed high-water
+mark, the peak WSE reached at a point during the event.]}
 
 \begin{enumerate}
-  \item \textbf{The gauges sit in channels our mesh cannot see. This
-        currently blocks real-gauge calibration --- we need your call on
-        the fix.}
-        At all 13 rain-driven USGS gauges in the Turning domain, our
-        modelled WSE sits \emph{1--11\,m above} the observed stage. We
-        believe this is geometric rather than a modelling error: a 30\,m
-        cell stores one mean ground elevation, which for an incised
-        bayou is essentially the bank, while the gauge measures water
-        down in the channel. Only 1 of 13 gauges has observed water
-        standing above its own cell's bed elevation during the rising
-        limb (3 of 13 near the peak). The offset is also not fixed: at
-        Whiteoak Bayou at Main St it shrinks from 9.7\,m to 1.7\,m over
-        twelve hours as the real channel fills --- and at that gauge our
-        cell stays essentially dry throughout, so the apparent
-        convergence is the river rising to meet a static model surface,
-        not model skill.
-        \emph{Our assumption, which may be the wrong one:} that gauge
-        stage and modelled WSE are meant to be compared directly on a
-        common datum.
-        \emph{Question: how should the misfit be defined so it measures
-        something physical?} Candidates we see: (a) compare only where
-        and when the model cell is genuinely wet \emph{and} the
-        observation stands above that cell's bed; (b) compare
-        \emph{changes} in stage instead of absolute WSE --- noting that
-        a single fixed offset per gauge will not work, because the
-        offset varies with time; (c) hydro-condition the DEM so the
-        channels exist in the mesh; (d) a different observable
-        altogether. This decides whether the paper's real-gauge
-        calibration is possible on this mesh at all.
-
-  \item \textbf{Bed-friction regularization --- implemented, retroactive
-        sign-off requested.} Our friction term
-        $\tau_b = g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ is
-        switched off below a depth cutoff $h_{\min}$. With the plain
-        $\mathbf{q}/h$ velocity that switch makes the equations
-        \emph{jump} as a cell crosses the cutoff. The jump grows like
-        $n^2$, so it is invisible at the smooth $n \approx 0.03$ of our
-        twin tests but disabling at land-cover roughness
-        ($\bar n = 0.10$ from NLCD): every implicit solve stalled and no
-        land-cover-prior calibration could start. We now compute the
-        friction with the ANUGA-regularized velocity, so drag fades
-        smoothly to zero as depth does. It is off by default and our
-        runs use $h_{\rm anuga} = 0.001$\,m, the smallest value that
-        cures the stall; $0.003$\,m gives an indistinguishable result
-        (so sensitivity to the value looks nil) and $0.01$\,m is
-        unstable. \emph{Is this the right regularization to put in the
+  \item \textbf{[Science: Gautam, Donghui] What observable should the
+        real-data calibration stand on? We have pivoted to high-water
+        marks --- please veto or confirm.}
+        The stream gauges sit in channels our mesh cannot see: at all
+        13 rain-driven USGS gauges in the Turning domain, modelled WSE
+        sits \emph{1--11\,m above} observed stage, only 1 of 13 gauges
+        has observed water above its own cell's bed on the rising limb,
+        and the offset is time-varying (9.7\,m $\to$ 1.7\,m over twelve
+        hours at Whiteoak/Main St, where our cell stays essentially
+        dry) --- so no fixed per-gauge datum correction can work.
+        \emph{What we did:} acquired the USGS Harvey high-water-mark
+        archive (2{,}364 marks; 324 in the Turning domain), applied the
+        same below-bed QC that disqualified the gauges ($62\%$ of
+        in-domain marks fail it --- they are channel surveys), keeping
+        108 marks at quality $\le$ fair, and implemented a peak-WSE
+        misfit (exact argmax-time adjoint, FD-gated). HWMs record the
+        peak, sit on floodplains and structures the 30\,m cell can
+        represent, need no hydrograph timing, and are the benchmark
+        currency of the field (Inunda: 0.67\,m MAE).
+        \emph{Questions: is peak WSE at HWMs acceptable as the primary
+        observable for the paper? Should gauge stage be retained as a
+        secondary misfit restricted to times when model and observation
+        are both above the cell bed? And is flood-extent (wet/dry)
+        agreement worth adding as a third?}
+  \item \textbf{[Science + numerics: Gautam, Matt, Jed] What
+        identifiability claim do we make, and which parameterization
+        does the data support?} Our evidence so far: 238 gauge
+        observations fit essentially perfectly while a per-cell field
+        is $45\%$ wrong; a class-parameterized twin at the real
+        13-gauge geometry (short window) drove the objective down
+        $128\times$ with class values still $66\%$ wrong; the same
+        experiment at the 108 HWM locations is queued. The draft's
+        counting argument (``overdetermined $18\times$'') is
+        indefensible as is. \emph{Questions: do we include the full
+        identifiability study (which classes are observable from which
+        networks and windows) as a paper contribution --- we think it
+        is one of the strongest things we have --- and is
+        NLCD-class-plus-Tikhonov-to-prior the parameterization you
+        want for the production calibration?}
+  \item \textbf{[Numerics: Jed, Matt] Inexact gradients at production
+        solver tolerances.} At the planned campaign setting
+        (\texttt{gmres}, right preconditioning, \texttt{ksp\_rtol}
+        $10^{-2}$, \texttt{pbjacobi}) the adjoint gradient differs from
+        FD by $6\times10^{-4}$--$4\times10^{-3}$ relative ---
+        inner-solve-limited, not a bug; the same configuration at
+        \texttt{rtol} $10^{-3}$ passes the $10^{-5}$ gates. BLMVM
+        converges indistinguishably in every test (same $J$ to 5--6
+        digits). \emph{Questions: is a fixed loose inner tolerance with
+        a spot-check at $10^{-3}$ an acceptable published methodology,
+        or do you want principled inexactness control (e.g., forcing
+        terms tied to the line-search decrease)? And should the
+        adjoint solves use a tighter tolerance than the forward
+        solves, given the gradient inherits both?}
+  \item \textbf{[Science: Gautam + team] Outflow boundary at zero
+        velocity --- we implemented a standard fix; please correct the
+        choice if it is wrong.} Our critical-outflow condition
+        switches abruptly at zero normal velocity: below it the
+        boundary acts as a wall, above it it imposes critical outflow,
+        so the flux jumps by roughly $gh^2/2$ as a boundary cell
+        crosses stagnation, which pins the implicit solver (isolated
+        by controls: a reflecting outlet completes the identical run;
+        $5\times$ stronger friction regularization changes nothing;
+        tolerance relief is a treadmill because the pin level follows
+        the local flow state). We implemented the least clever
+        standard treatment: a \emph{transmissive} (zero-gradient) free
+        outflow --- ghost state equal to the interior state, as in
+        ANUGA and Clawpack --- continuous by construction,
+        differentiated exactly through host and device Jacobians. It
+        cures the stall: the failing control completes with zero
+        failures and two-iteration Newton solves, and a one-hour
+        rain-forced calibration window runs clean end to end. It is
+        opt-in (\texttt{type: free-outflow}); the original remains the
+        default. Caveats: exactly non-reflecting only for
+        supercritical outflow; does not prevent inflow if the interior
+        velocity points inward. \emph{Is a transmissive outlet
+        acceptable for Buffalo Bayou, or do you want a Froude-limited
+        or blended form instead?}
+  \item \textbf{[Science: Gautam + team] Bed-friction regularization
+        --- implemented, retroactive sign-off requested.} Our friction
+        term $\tau_b = g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$
+        switched off below the depth cutoff makes the equations jump
+        as a cell crosses it; the jump grows like $n^2$, invisible in
+        the twins but disabling at land-cover roughness
+        ($\bar n = 0.10$). We now evaluate the friction with the
+        ANUGA-regularized velocity, so drag fades smoothly to zero
+        with depth. Off by default; runs use
+        $h_{\rm anuga} = 0.001$\,m, the smallest value that cures the
+        stall; $0.003$\,m is indistinguishable; $0.01$\,m is unstable
+        (mechanism conjectured: weaker damping lets an iterate reach
+        $h < 0$). \emph{Is this the right regularization to put in the
         friction source, and is $0.001$\,m acceptable?}
-
-  \item \textbf{Outflow boundary at zero velocity --- we implemented a
-        standard fix; please correct the choice if it is wrong.} Our
-        critical-outflow condition switches abruptly at zero normal
-        velocity: below it the boundary acts as a wall, above it it
-        imposes critical outflow. The flux therefore jumps by roughly
-        $gh^2/2$ as a boundary cell crosses stagnation, which stalls
-        the implicit solver. We isolated this to the boundary condition
-        and nothing else: in otherwise identical 600-step runs,
-        replacing the outlet with a reflecting wall completes all 600
-        steps with no failures, while making the friction
-        regularization five times stronger changes nothing at all ---
-        the run fails at the very same step. Loosening the nonlinear
-        tolerance is a treadmill (the pin level follows the local flow
-        state), so we implemented the least clever standard treatment:
-        a \emph{transmissive} (zero-gradient) free outflow, ghost state
-        equal to the interior state, as in ANUGA's transmissive
-        boundary and Clawpack's zero-order extrapolation. It is
-        continuous by construction, differentiated exactly through
-        host and device Jacobians, and it cures the stall: the failing
-        control completes with zero failures and two-iteration Newton
-        solves. It is opt-in (\texttt{type: free-outflow}); the
-        original condition remains the default. Known caveats: it is
-        exactly non-reflecting only for supercritical outflow, and it
-        does not prevent inflow if the interior velocity points inward.
-        \emph{Is a transmissive outlet acceptable for Buffalo Bayou, or
-        do you want a Froude-limited or blended form instead?}
-
-  \item \textbf{Which gauges do you trust, and how accurate are they?}
-        We currently exclude eight reservoir-influenced sites
-        (Addicks/Barker pools, outlets, and Buffalo Bayou downstream of
-        them) on the grounds that gate releases are unmodelled. That
-        leaves 13. \emph{Is that exclusion list right, is stage or
-        discharge the better misfit variable, and what observation
-        error $\sigma$ should we assume per gauge?} $\sigma$ sets the
-        relative weight of gauges against the prior, so it directly
-        shapes the calibrated field.
-
-  \item \textbf{Which window should we calibrate on?} Our observability
-        study favours the rising limb, where information accumulates
-        fastest. The datum problem in item 1 pushes the other way: early
-        in the storm the model and the gauges are least comparable.
-        \emph{Given both, which phase of Harvey would you calibrate
-        on?}
-
-  \item \textbf{Are the twin experiments realistic enough?} They use a
-        two-zone synthetic truth and a constant prior. We now also have
-        an NLCD-derived per-cell $n_0(x)$ for this domain (mean 0.10).
-        \emph{Is the two-zone truth adequate for the paper, or would you
-        prefer something more realistic (channel vs.\ overbank), and
-        should the NLCD field be the prior throughout?}
-
-  \item \textbf{Bounds.} \emph{Are $n \in [0.01, 0.2]$ sensible limits
-        for Houston land cover?} We clip the calibrated field to this
-        range.
-
-  \item \textbf{Venue and authorship} (already asked): target journal
-        (WRR / JAMES / GMD) and the co-author list.
+  \item \textbf{[Numerics: Jed, Matt] Implicit solver headroom: bigger
+        steps and better preconditioning.} Backward Euler with the
+        assembled Jacobian carries the 2.93M-cell mesh at
+        $\Delta t = 1$\,s ($4\times$ the explicit CFL limit) at
+        $\sim$4--5 Newton iterations per step with
+        \texttt{pbjacobi}-preconditioned GMRES; at $\Delta t = 5$\,s
+        the very first Newton \emph{linear} solve diverges (300 GMRES
+        iterations, \texttt{pbjacobi}) --- a preconditioner failure
+        before nonlinearity even enters. The honest
+        implicit-vs-explicit wall-clock factor at $\Delta t = 1$\,s is
+        therefore modest, and the case for the implicit path
+        strengthens directly with step size.
+        \emph{Questions: what would you try first for
+        $\Delta t \ge 5$\,s --- a stronger preconditioner (AMG on a
+        reduced system? block ILU? field-split?), pseudo-transient
+        continuation or other globalization once the linear solve
+        holds, or accepting more Krylov iterations --- and is per-step
+        Jacobian reassembly (our current policy) the right default, or
+        should we lag it?}
+  \item \textbf{[Science: Gautam + team] Production-run design:
+        window, observation error, gauge trust.} (a) Which phase of
+        Harvey do we calibrate on? Our observability study favours the
+        rising limb; the peak-agreement result and the HWM observable
+        favour the peak. (b) What observation error $\sigma$ per
+        observable --- USGS quality codes give 0.1--0.3\,m for HWMs;
+        what for stage? $\sigma$ sets the data-vs-prior weight
+        directly. (c) We exclude eight reservoir-influenced sites
+        (Addicks/Barker and Buffalo Bayou downstream) because gate
+        releases are unmodelled --- is that exclusion list right? (d)
+        Are $n \in [0.01, 0.2]$ sensible bounds for Houston land
+        cover, and should the NLCD field be the prior throughout
+        (replacing the two-zone twins' constant prior)?
+  \item \textbf{[Numerics: Jed, Matt; engineering: Jeff] Upstreaming
+        the PETSc-side pieces.} The device-resident assembled-Jacobian
+        path relies on our PETSc branch: blocked-COO assembly for BAIJ
+        matrices on GPU (\texttt{MatCOOUseBlockIndices};
+        \texttt{baijkokkos}/\texttt{baijcuda} classes) plus small
+        TSAdjoint fixes. \emph{Do you want this upstreamed as-is (we
+        think it is generally useful --- one index pair per block is
+        the natural COO for FV systems), and does the API need
+        changes before it hardens? Until it lands, should the paper's
+        artifact claim be scoped to the stock-PETSc AIJ path?}
+  \item \textbf{[Engineering: Jeff; numerics: Matt] ARK-IMEX design
+        intent and code placement.} We completed PR \#359's
+        \texttt{SOURCE\_ARK\_IMEX} path as: Manning drag \emph{alone}
+        in the IFunction (per-cell block-diagonal IJacobian), bed
+        slope and external sources explicit; your CEED-side
+        friction-free Q-functions are wired in and the two backends
+        agree to machine precision. Does that match the intended
+        split, do you have an ARKIMEX scheme/order preference (we use
+        the PETSc default), and did you envision a device-resident
+        implicit part as the follow-up? Also flag any objections to
+        the new file/config naming
+        (\texttt{swe\_jacobian\_petsc.c},
+        \texttt{numerics.jacobian: none|fd|analytic},
+        \texttt{source.method: explicit|ark\_imex}) and to the
+        closure-based Jacobian preallocation (superset of FV edge
+        adjacency; the COO path already tightens it) before this
+        hardens into a PR.
+  \item \textbf{[Engineering: Jeff] Public API and CI.} The adjoint
+        driver reaches through \texttt{private/rdycoreimpl.h} (the
+        LETKF-driver pattern). Which calls deserve promotion to
+        \texttt{rdycore.h} (\texttt{RDySetObservations},
+        \texttt{RDyAdjointSolve}, \texttt{RDyGetSensitivities}?), and
+        are Fortran bindings needed at that point? The new tests need
+        a TSAdjoint-capable PETSc and run in seconds --- any CI-matrix
+        concerns (the CEED-only lanes correctly skip
+        \texttt{numerics.jacobian} configs)?
+  \item \textbf{[All] Venue and authorship} (already asked): target
+        journal (WRR / JAMES / GMD) and the co-author list.
 \end{enumerate}
 
 \bibliographystyle{unsrt}
