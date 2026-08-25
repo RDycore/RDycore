@@ -34,7 +34,7 @@ National Laboratory, Los Alamos, NM, USA\\
 Organisation, Hobart, TAS, Australia\\
 \small $^8$Civil, Construction and Environmental Engineering,
 University of Alabama, Tuscaloosa, AL, USA}
-\date{Draft of August 22, 2026}
+\date{Draft of August 26, 2026}
 
 \begin{document}
 \maketitle
@@ -67,17 +67,21 @@ stability analysis. The implicit integrator's adjoint passes the same
 finite-difference gates. On a Hurricane Harvey twin configuration
 (2{,}746 cells, implicit stepping) the calibrated Manning map recovers
 a two-zone truth field to $19.4\%$ with proper Tikhonov
-regularization. The gauge-sparse setting exhibits --- and lets us
-dissect --- the classic semiconvergence of underdetermined friction
-estimation: a twin using the actual 17-gauge USGS network geometry
-fits its 238 observations essentially perfectly while recovering the
-field to only $45\%$, quantifying why real-data calibration must
-shrink the parameter space to match the network --- and, re-asking
-identifiability at basin scale, that the observable matters as much as
-the parameterization: peak water-surface elevations at 108 surveyed
-high-water-mark locations identify the land-cover roughness classes
-covering $83\%$ of a 2.93M-cell Hurricane Harvey domain, where 13
-stream gauges identify almost none. Within E3SM,
+regularization. A twin using the actual 17-gauge USGS
+network geometry fits its 238 observations essentially perfectly while
+recovering the field to only $45\%$ --- the classic semiconvergence of
+underdetermined friction estimation, and the quantitative reason
+real-data calibration must shrink the parameter space to match the
+network. Re-asking identifiability at basin scale shows the observable
+matters as much as the parameterization: peak water-surface elevations
+at 108 surveyed high-water-mark locations identify the land-cover
+roughness classes covering $83\%$ of a 2.93M-cell Hurricane Harvey
+domain, where 13 stream gauges identify almost none. Against the real
+survey, the uncalibrated model reads $1.51$\,m mean peak-WSE error
+over the marks in reaches it can drain --- and the same evaluation
+isolates a downstream reach the model cannot drain at all, a
+conveyance defect no roughness value can absorb, as a finding in its
+own right. Within E3SM,
 adjoint-based parameter optimization is established in the land-ice
 component MALI, whose velocity solver inverts for basal friction by
 automatic differentiation of the \emph{steady} momentum balance;
@@ -199,6 +203,17 @@ edges contribute diagonal blocks through the ghost-state map of the
 boundary condition.
 
 \paragraph{Flux blocks by forward-mode differentiation.}
+Throughout this paper a \emph{branch} is one of the alternative
+closed-form expressions a piecewise-defined function takes, selected at
+run time by a state-dependent condition --- the two formulas of $|x|$
+are the prototype. The right-hand side is full of them: the entropy fix
+replaces $|\lambda|$ by a smoothed quadratic when a wave speed falls
+below a threshold, the wet/dry cutoff switches drag and flux terms on
+and off at $h_{\min}$, and boundary ghost maps switch with the flow
+direction. Away from a switching surface the function equals its active
+branch and is smooth there; \emph{branch-faithful} differentiation
+evaluates the derivative of the branch the condition actually selected
+--- the correct one-sided derivative.
 Rather than deriving the dissipation-matrix derivatives symbolically, we
 differentiate the flux \emph{computation}: a hand-written forward-mode
 (tangent) version of the Roe flux routine propagates directionals
@@ -289,16 +304,18 @@ tolerances the Manning gradient checked at $2\times10^{-4}$; tightening
 the tolerances recovered $5\times10^{-6}$
 (Table~\ref{tab:verification}). We state the production side of this
 plainly, because the verification numbers are otherwise easy to
-over-read: at the loose inner tolerance used for the large implicit
-runs (Krylov relative tolerance $10^{-2}$, chosen because it is
-$\sim$2.5$\times$ cheaper end to end), the gradient is
-inner-solve-limited at $6\times10^{-4}$--$4\times10^{-3}$ relative.
-In every calibration we have run, the loose- and tight-tolerance
-settings converge indistinguishably (same objective to 5--6 digits),
-consistent with the tolerance of quasi-Newton methods to bounded
-gradient error; our policy is to run campaigns loose and repeat one
-calibration at Krylov tolerance $10^{-3}$ --- where the $10^{-5}$
-gates pass --- as a spot check.
+over-read. Loose inner tolerances turned out to be a false economy on
+this problem: tightening the Krylov tolerance from $10^{-2}$ to
+$10^{-3}$ makes the implicit forward \emph{faster} (better linear
+solves let Newton converge in one iteration instead of two), and the
+production setting --- Krylov $10^{-4}$, nonlinear $10^{-5}$ ---
+reproduces the fully converged answer to every printed digit at about
+$25\%$ more wall time than the loosest usable setting. Campaigns
+therefore run at converged inner tolerances, and the verified gradients
+\emph{are} the production gradients. What the FD gates cannot certify
+at production scale is a different matter entirely --- the objective's
+own nonsmoothness over long windows --- quantified in
+Section~\ref{sec:hwm}.
 
 \section{The calibration algorithm: strong-constraint 4D-Var}
 \label{sec:calibration}
@@ -480,7 +497,15 @@ gravity-wave CFL limit of kilometer-scale meshes. Our Hurricane Harvey
 test configuration (Houston at 1\,km, $\Delta t = 30$\,s) confirms this
 empirically: the explicit source treatment produces NaN within the
 first objective evaluation, in quantitative agreement with the
-analysis.
+analysis. The same holds at basin scale, where the margin is far
+wider: on the spun-up 30\,m, 2.93M-cell Harvey mesh ($99.9\%$ wet,
+median depth 6\,mm) the friction-rate limit is
+$\Delta t \lesssim 2.4$\,ms, and forward Euler of the differentiable
+right-hand side returns a non-finite state at every tested step
+($\Delta t = 0.25$, $0.125$, $0.05$\,s) while backward Euler at
+$\Delta t = 1$\,s completes a 72-hour window without a single Newton
+failure. There is no viable explicit path for the differentiable
+right-hand side at this resolution.
 
 The assembled exact Jacobian makes the remedy nearly free: backward
 Euler via PETSc's theta method, with SNES driven by the same Jacobian,
@@ -663,19 +688,13 @@ remains open.
         dry cutoffs are honored branch-faithfully in every block; fully
         wet validation cases keep FD comparisons clean, and dry cells
         are correctly insensitive to their roughness. At basin scale
-        the branches do something no per-block check sees: over long
-        rain-forced windows the trajectory crosses so many per-cell
-        depth-cutoff surfaces that the \emph{objective} is dense with
-        kinks, and a finite-step central difference measures a smoothed
-        slope several percent from the exact one-branch derivative the
-        adjoint returns. This is measured, not conjectured: the gap is
-        $9\times10^{-5}$ (inner-solve floor) over a 60-step window and
-        grows to $10^{-1}$-scale over 3600 steps on identical
-        machinery, while the FD value is stable across a decade of
-        probe step (Section~\ref{sec:hwm}). The practical reading:
-        FD-validate on short windows, where the gate is clean; on long
-        windows the gate measures the objective's nonsmoothness, not
-        the gradient's error.
+        the branches also make the \emph{objective} nonsmooth: over
+        long rain-forced windows the trajectory crosses so many
+        per-cell depth-cutoff surfaces that a finite-step central
+        difference measures a smoothed slope rather than the
+        one-branch derivative the adjoint returns --- quantified, with
+        the verification policy it implies, in
+        Section~\ref{sec:hwm}.
   \item \textbf{The argmax in the peak-WSE observable.}
         \emph{(Open --- the one entry we have not closed.)} The
         high-water-mark misfit (Section~\ref{sec:hwm}) depends on the
@@ -980,12 +999,15 @@ operational code --- behind a flag, FD-gated in CI, and with the
 verification baseline (FD coloring) kept alive in the configuration
 system.
 
-Next steps, in order: the Houston per-cell demonstration with real USGS
-Harvey gauges (datum QC pending); regularization studies (total
-variation, land-cover priors) for the ill-posedness that our
-observability results quantify; and coupling the gradient path to
-PyTorch through the existing PETSc--PyTorch bridge for learned-physics
-and hybrid data-assimilation experiments.
+Next steps, in order: the calibrated real-data number --- the
+land-cover-class calibration against the 71 admissible high-water
+marks, for which every piece of machinery is staged and only the
+window-placement decision remains; regularization studies
+(discrepancy-principle stopping, total variation) for the
+ill-posedness and noise response our observability results quantify;
+and coupling the gradient path to PyTorch through the existing
+PETSc--PyTorch bridge for learned-physics and hybrid data-assimilation
+experiments.
 
 A closing note on cost. Checkpointing makes the long-window adjoint
 memory-feasible, but at the 30\,m mesh's CFL-limited
@@ -994,10 +1016,11 @@ costs several forward sweeps over half a million steps. The
 affordable path stacks reductions that are all now in place. First,
 fully implicit stepping at CFL-free time steps: backward Euler with
 the assembled Jacobian carries the 30\,m, 2.93M-cell Harvey-region
-mesh at $\Delta t = 1$\,s --- four times the explicit limit, with
-Newton converging in about four iterations per step behind a
-block-Jacobi-preconditioned Krylov solve; larger implicit steps are
-under investigation. Second, GPU execution of the entire gradient
+mesh at $\Delta t = 1$\,s --- a step the differentiable explicit path
+cannot take at any tested size (Section~\ref{sec:implicit}) --- with
+Newton converging in about two iterations per step behind a
+block-Jacobi-preconditioned Krylov solve at converged inner
+tolerances; larger implicit steps are under investigation. Second, GPU execution of the entire gradient
 pipeline: the right-hand side, the assembled Jacobian and its
 transpose solves, the preconditioner setup, the parameter Jacobian,
 the observation operator, and the revolve-checkpointed trajectory are
@@ -1015,98 +1038,54 @@ evaluations instead of hundreds) and calibration windows placed on
 the storm peak rather than the full event.
 
 \section*{Red/tiger-team review: the weakest parts of this draft}
-\textcolor{red}{[Temporary section, removed before submission. This is
-our own adversarial read of the draft --- the places a hostile reviewer
-(or a careful friend) will push, ranked by how much damage they could
-do. Most map directly onto the numbered issues in the next section;
-cross-references are given as Q$n$.]}
+\textcolor{red}{[Temporary section, removed before submission. Our own
+adversarial read of the draft --- the places a hostile reviewer (or a
+careful friend) will push, ranked by how much damage they could do,
+each stated as of today. Cross-references Q$n$ point into the numbered
+issues of the next section.]}
 
 \begin{enumerate}
-  \item \textbf{There is no real-data result in the paper.} The
-        abstract's differentiator --- production code made
+  \item \textbf{There is no real-data \emph{calibration} in the
+        paper.} The abstract's differentiator --- production code made
         differentiable, versus reduced solvers rewritten in ML
-        frameworks --- invites the comparison the paper cannot yet win:
-        Inunda reports 0.67\,m MAE against \emph{surveyed} Harvey
-        high-water marks; every calibration here is a twin. The
-        real-gauge experiment we do report (17-gauge network, misfit
-        down $2\times10^{7}$-fold, field $45\%$ wrong) is honest and
-        instructive, but it is a negative result about the network, not
-        a demonstration of skill. Until a real-observation number
-        exists, the introduction's framing overdraws. \emph{Mitigation
-        in progress:} the USGS high-water-mark archive is acquired and
-        QC'd (2{,}364 marks; 324 in-domain; 108 usable after the
-        below-bed and quality filters), a peak-WSE misfit with an exact
-        argmax-time adjoint is implemented and FD-gated, the
-        identifiability twin at the real 108-mark geometry appears in
-        Section~\ref{sec:identifiability}, and the \emph{uncalibrated}
-        real-data baseline is now measured and decomposed
-        (Section~\ref{sec:hwm}: $3.41$\,m MAE over a crest-covering
-        72-hour forward; $1.51$\,m over the 71 marks in reaches the
-        model can drain, with the other 37 isolated as a conveyance
-        defect). The checkpointed mid-event initial state the
-        calibration window needs is implemented and validated
-        bit-exactly. Still missing: only the calibrated number itself,
-        which waits on the window-placement decision. Until then the
-        paper claims the capability, the baseline and its
-        decomposition, not the closed loop. (Q1, Q2)
-  \item \textbf{The semiconvergence cure is asserted by a counting
-        argument our own evidence undercuts.}
-        Section~\ref{sec:houston} proposes the
-        land-cover-class parameterization because 238 observations
-        ``overdetermine'' $\sim$13 classes $18\times$. But observation
-        \emph{count} is not information content: in an internal
-        class-parameterization twin at the real 13-gauge geometry (short
-        window), the objective fell $128\times$ while the class values
-        finished $66\%$ wrong --- three classes never moved because no
-        water reachable from their cells crosses a gauge in the window.
-        The honest statement is that identifiability depends on the
-        observation \emph{geometry and window}, and must be measured,
-        not counted. \emph{Addressed:} the counting argument is gone;
-        Section~\ref{sec:identifiability} now reports the measured
-        study --- 13 gauges fail (classes distant from every gauge
-        never move), 108 high-water marks identify the classes
-        covering $83\%$ of the domain --- with its caveats (short
-        window, iteration cap, no representation error) stated.
-        Remaining exposure: the caveats themselves; a reviewer may ask
-        for the 6--12-hour-window version, which is exactly the
-        planned production run. (Q2)
-  \item \textbf{The verified gradients are not the production
-        gradients.} Every FD gate in Table~\ref{tab:verification} is
-        passed at tight inner tolerances; the planned production
-        configuration runs the inner Krylov solver at
-        \texttt{rtol}~$10^{-2}$, where the adjoint-vs-FD mismatch is
-        inner-solve-limited at $6\times10^{-4}$--$4\times10^{-3}$. In
-        every test this does not affect BLMVM convergence.
-        \emph{Partially addressed:} Section~\ref{sec:adjoint} now
-        states the production tolerance, the measured gradient error,
-        and the spot-check policy. Still open: a principled footing
-        (inexact-gradient quasi-Newton has known sufficient
-        conditions) rather than an empirical one. (Q3)
-  \item \textbf{``Implicit stepping is required'' is conditional on a
-        choice we made.} The production code handles drag stiffness
-        with operator-split friction treatments; they are unusable for
-        the adjoint because they bury $\Delta t$ inside the RHS, and
-        \emph{that} is why the adjoint path needs an explicit source
-        plus an implicit integrator. The section title claims more
-        than this. Also missing is the honest wall-clock comparison at
-        30\,m: backward Euler at $\Delta t = 1$\,s costs $\sim$4--5
-        Newton iterations per step behind a Krylov solve versus
-        explicit RK at the CFL-limited $0.25$\,s --- the net factor is
-        modest and should be printed, not implied. Larger implicit
-        steps ($\Delta t \ge 5$\,s), which would make the case
-        decisive, are currently blocked by a linear-solver failure the
-        draft does not mention.
-        \emph{Partially addressed:} the comparison was run, and the
-        premise was wrong --- explicit stepping of the
-        \emph{differentiable} right-hand side diverges at $0.25$,
-        $0.125$ and $0.05$\,s, because the $\Delta t$-free drag is
-        stiff on thin films ($\Delta t \lesssim 2.4$\,ms) well below
-        the CFL limit. The modest factor holds only against the
-        operator-split discretization, which is not the one being
-        differentiated; both readings are now stated in
-        Section~\ref{sec:implicit}. The $\Delta t \ge 5$\,s
-        linear-solver failure is now stated there too. Still open:
-        making $\Delta t \ge 5$\,s work. (Q6)
+        frameworks --- invites comparison with Inunda's calibrated
+        $0.67$\,m MAE against surveyed Harvey high-water marks. What
+        exists today is the uncalibrated baseline and its decomposition
+        ($3.41$\,m over all 108 marks; $1.51$\,m over the 71 in
+        reaches the model drains), the identifiability twin at the
+        real mark geometry, and a bit-exactly validated mid-event
+        restart for the calibration window. The calibrated number
+        waits only on the window-placement decision; until it lands,
+        the paper claims capability, baseline, and decomposition, not
+        the closed loop. (Q1, Q2)
+  \item \textbf{The identifiability caveats are the remaining
+        exposure.} The measured study carries
+        Section~\ref{sec:identifiability} --- 13 gauges fail, 108
+        marks identify the classes covering $83\%$ of the domain ---
+        but its stated caveats (one-hour window, 15-iteration cap, no
+        representation error) are exactly where a reviewer will push,
+        and the answer is the planned 6--12-hour production run. (Q2)
+  \item \textbf{Long-window FD gates measure the objective's
+        nonsmoothness, not gradient error --- and the paper must not
+        be read as claiming more.} The gradient is verified to the
+        inner-solve floor on short windows at the production
+        tolerances (which are now converged tolerances, closing the
+        old verified-versus-production gap), and the long-window
+        failure of the naive gate is measured and explained
+        (Section~\ref{sec:hwm}). The exposure is a reviewer reading
+        ``FD-gated in CI'' as covering production window lengths.
+        (Q3)
+  \item \textbf{``Implicit stepping is required'' means required for
+        the differentiable right-hand side.} The operator-split
+        friction the forward-only code uses is stable under explicit
+        stepping but buries $\Delta t$ inside the RHS; the
+        differentiable RHS is friction-stiff
+        ($\Delta t \lesssim 2.4$\,ms on the spun-up 30\,m state) and
+        diverged at every tested explicit step. Any wall-clock
+        comparison against operator-split explicit stepping compares
+        different discretizations and is labeled as such. Still open:
+        $\Delta t \ge 5$\,s is blocked by a preconditioner failure.
+        (Q6)
   \item \textbf{We changed the physics to fix the solver, and the
         changes await domain sign-off.} The regularized drag velocity
         ($h_{\rm anuga} = 0.001$\,m, chosen as ``smallest that cures
@@ -1119,43 +1098,19 @@ cross-references are given as Q$n$.]}
         than physics. Sensitivity of the calibrated field to
         $h_{\rm anuga}$ and to the outlet choice should be
         demonstrated, not asserted. (Q4, Q5)
-  \item \textbf{The Hurricane Harvey section is a 2{,}746-cell twin.}
-        As originally drafted, all 30\,m-mesh, 2.93M-cell content was
-        cost measurement --- no calibration at 30\,m was shown, a gap a
-        reviewer comparing against the 471M-cell forward-validation
-        claim in the introduction would notice. \emph{Addressed:} the
-        section is retitled, and Section~\ref{sec:identifiability} and
-        Table~\ref{tab:snr} now contain three 30\,m, 2.93M-cell class
-        calibrations run end to end on one GPU node (the 13-gauge
-        twin, the 108-high-water-mark twin, and the noisy HWM twin).
-        What remains true: no \emph{real-data} calibration at any
-        resolution (item 1), and no \emph{per-cell} calibration at
-        30\,m --- only the class parameterization, which the
-        identifiability evidence says is the right one anyway.
-  \item \textbf{All twins are noise-free.} $\sigma$ enters only as a
-        scale factor; no experiment adds observation noise, so the
-        semiconvergence story (early stopping, Tikhonov weights) is
-        undisturbed by the noise level that in practice sets where
-        semiconvergence turns over. \emph{Partially addressed:} a
-        deterministic noise option now exists and
-        Table~\ref{tab:snr} sets the parameter-induced signal against
-        the observation error for both regimes --- reframing the
-        noise-free recoveries as machinery verification and the noise
-        question as a signal-to-noise (window length) question. The
-        noisy basin-scale HWM twin is now measured (misfit falls
-        $9.4\times$ while five classes pin to bounds ---
-        Table~\ref{tab:snr} and Section~\ref{sec:identifiability}).
-        Still open: noise-consistent regularization
-        (discrepancy-principle stopping). (Q7)
-  \item \textbf{The peak-WSE observable, if adopted, is nonsmooth in a
-        new way.} The argmax-time adjoint is exact wherever the peak
-        time is locally constant, and ties have measure zero --- but
-        the peak time \emph{moves} across optimizer iterates, so $J$
-        is only piecewise smooth and BLMVM's line search can straddle
-        kinks. Practice (and our FD gates away from ties) supports it;
-        theory does not. \emph{Addressed:} the nondifferentiability
-        catalog now carries this entry explicitly; the theoretical
-        footing remains open by construction. (Q2, Q3)
+  \item \textbf{Noise response is measured but not yet built into the
+        method.} The basin-scale noisy twin shows the failure mode
+        (misfit falls $9.4\times$ while five classes pin to bounds,
+        Table~\ref{tab:snr}); noise-consistent regularization
+        (discrepancy-principle stopping) does not exist yet, so the
+        production run leans on a Tikhonov weight chosen by judgment.
+        (Q7)
+  \item \textbf{The peak-WSE argmax remains formally open.} Its kinks
+        are measured absent at this geometry (no argmax moved across
+        any FD probe), a remedy is proposed (frozen-argmax outer
+        iteration) but not implemented, and the theoretical footing is
+        the standard one for $\max$-type observables rather than a
+        theorem. (Q2, Q3)
   \item \textbf{Reproducibility currently rests on an unmerged PETSc
         fork.} The device-resident assembled-Jacobian path (blocked-COO
         BAIJ assembly on GPU) exists only on our PETSc branch. Until it
@@ -1163,19 +1118,16 @@ cross-references are given as Q$n$.]}
         stock PETSc (AIJ path, at some cost), the artifact story is
         weaker than the ``behind a flag, FD-gated in CI'' framing
         suggests. (Q8)
-  \item \textbf{The novelty claim needed --- and got --- a literature
-        sweep.} The original ``first E3SM component model with built-in
-        discrete-adjoint parameter estimation'' was wrong as stated:
-        MALI routinely inverts for basal friction with an
-        automatic-differentiation adjoint of its Albany velocity
-        solver~\cite{perego2014initialization,hoffman2018mali}. The
-        claim is now narrowed to the first \emph{transient} discrete
-        adjoint (differentiated through the time integrator) in an
-        E3SM component, with MALI cited in the abstract and
-        introduction. Remaining check before submission: ocean/MPAS
-        adjoint efforts, and whether any E3SM land-model calibration
-        uses a true adjoint rather than ensemble or surrogate
-        gradients.
+  \item \textbf{The novelty claim is narrowed, with one sweep left.}
+        ``First E3SM component with built-in discrete-adjoint parameter
+        estimation'' was wrong (MALI inverts for basal friction with an
+        AD adjoint of its steady velocity
+        solver~\cite{perego2014initialization,hoffman2018mali}); the
+        claim now reads first \emph{transient} discrete adjoint in an
+        E3SM component, with MALI cited. Remaining check before
+        submission: ocean/MPAS adjoint efforts, and whether any E3SM
+        land-model calibration uses a true adjoint rather than
+        ensemble or surrogate gradients.
 \end{enumerate}
 
 \section*{Open issues and current positions, in order of importance}
@@ -1194,27 +1146,16 @@ the event.]}
 \begin{enumerate}
   \item \textbf{[Science] The real-data calibration stands on
         high-water marks, not stage.}
-        The stream gauges sit in channels our mesh cannot see: at all
-        13 rain-driven USGS gauges in the Turning domain, modelled WSE
-        sits \emph{1--11\,m above} observed stage, only 1 of 13 gauges
-        has observed water above its own cell's bed on the rising limb,
-        and the offset is time-varying (9.7\,m $\to$ 1.7\,m over twelve
-        hours at Whiteoak/Main St, where our cell stays essentially
-        dry) --- so no fixed per-gauge datum correction can work.
-        \emph{What we did:} acquired the USGS Harvey high-water-mark
-        archive (2{,}364 marks; 324 in the Turning domain), applied the
-        same below-bed QC that disqualified the gauges ($62\%$ of
-        in-domain marks fail it --- they are channel surveys), keeping
-        108 marks at quality $\le$ fair, and implemented a peak-WSE
-        misfit (exact argmax-time adjoint, FD-gated). HWMs record the
-        peak, sit on floodplains and structures the 30\,m cell can
-        represent, need no hydrograph timing, and are the benchmark
-        currency of the field (Inunda: 0.67\,m MAE).
-        \emph{Position:} peak WSE at the marks is the primary
-        observable. Gauge stage stays available as a secondary misfit
-        restricted to times when model and observation are both above
-        the cell bed, and flood-extent (wet/dry) agreement is a
-        candidate third; neither is needed for the headline number.
+        The gauges are unusable at this resolution: modelled WSE sits
+        1--11\,m above observed stage with a time-varying offset,
+        because a 30\,m cell stores the floodplain's mean elevation
+        while the gauge hangs in the incised channel below it
+        (Section~\ref{sec:hwm} has the full account and the mark QC).
+        \emph{Position:} peak WSE at the 108 QC-passed marks is the
+        primary observable. Gauge stage stays available as a secondary
+        misfit restricted to times when model and observation are both
+        above the cell bed, and flood-extent agreement is a candidate
+        third; neither is needed for the headline number.
   \item \textbf{[Science + numerics] Which parameterization the data
         actually supports.} The evidence: 238 gauge
         observations fit essentially perfectly while a per-cell field
@@ -1229,20 +1170,19 @@ the event.]}
         are observable from which networks and windows --- is a paper
         contribution in its own right, and NLCD-class with Tikhonov to
         the NLCD prior is the production parameterization.
-  \item \textbf{[Numerics] Inexact gradients at production
-        solver tolerances.} At the campaign setting
-        (\texttt{gmres}, right preconditioning, \texttt{ksp\_rtol}
-        $10^{-2}$, \texttt{pbjacobi}) the adjoint gradient differs from
-        FD by $6\times10^{-4}$--$4\times10^{-3}$ relative ---
-        inner-solve-limited, not a bug; the same configuration at
-        \texttt{rtol} $10^{-3}$ passes the $10^{-5}$ gates. BLMVM
-        converges indistinguishably in every test (same $J$ to 5--6
-        digits). \emph{Position:} publish the production tolerance
-        alongside the measured gradient error and the spot-check
-        policy. Principled inexactness control --- forcing terms tied
-        to the line-search decrease, and possibly a tighter tolerance
-        on the adjoint solves than the forward ones, since the gradient
-        inherits both --- is the obvious refinement and is not done.
+  \item \textbf{[Numerics] Inner tolerances and gradient fidelity.}
+        Resolved by measurement: loose Krylov tolerances were a false
+        economy (tightening $10^{-2} \to 10^{-3}$ is \emph{faster};
+        the converged setting \texttt{ksp} $10^{-4}$ / \texttt{snes}
+        $10^{-5}$ reproduces the fully converged 72-hour answer to
+        every printed digit at $\sim$$25\%$ extra cost), so campaigns
+        now run at converged tolerances and the verified gradients are
+        the production gradients (Section~\ref{sec:adjoint}). The
+        long-window FD-gate question is the objective's nonsmoothness,
+        not tolerance (Section~\ref{sec:hwm}). \emph{Open:} principled
+        handling of the remaining inexactness --- forcing terms tied
+        to line-search decrease, and nonsmooth-aware stopping for the
+        quasi-Newton outer loop.
   \item \textbf{[Science] Outflow boundary at zero velocity.}
         The critical-outflow condition
         switches abruptly at zero normal velocity: below it the
