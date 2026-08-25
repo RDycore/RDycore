@@ -17,22 +17,23 @@ Calibration in RDycore\\[4pt]\large DRAFT for internal review}
 % Environ. Model. Softw. 197 (2026) 106804); order provisional pending the
 % venue/authorship decision
 \author{Mark Adams$^1$, Gautam Bisht$^2$, Donghui Xu$^2$, Jeffrey
-Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$, Dongyu Feng$^2$, Dalei
-Hao$^2$, Darren Engwirda$^{6,7}$, Mukesh Kumar$^8$, Zeli Tan$^2$\\[2pt]
-\small $^1$Applied Mathematics \& Computational Research Division,
+Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$,\\
+Dongyu Feng$^2$, Dalei Hao$^2$, Darren Engwirda$^{6,7}$, Mukesh
+Kumar$^8$, Zeli Tan$^2$\\[2pt]
+\footnotesize $^1$Applied Mathematics \& Computational Research Division,
 Lawrence Berkeley National Laboratory, Berkeley, CA, USA\\
-\small $^2$Atmospheric, Climate, \& Earth Sciences Division, Pacific
+\footnotesize $^2$Atmospheric, Climate, \& Earth Sciences Division, Pacific
 Northwest National Laboratory, Richland, WA, USA\\
-\small $^3$Cohere Consulting, LLC, Seattle, WA, USA\\
-\small $^4$Department of Computer Science, University of Colorado
+\footnotesize $^3$Cohere Consulting, LLC, Seattle, WA, USA\\
+\footnotesize $^4$Department of Computer Science, University of Colorado
 Boulder, Boulder, CO, USA\\
-\small $^5$Computer Science and Engineering, University at Buffalo,
+\footnotesize $^5$Computer Science and Engineering, University at Buffalo,
 Buffalo, NY, USA\\
-\small $^6$Fluid Dynamics and Solid Mechanics Group (T-3), Los Alamos
+\footnotesize $^6$Fluid Dynamics and Solid Mechanics Group (T-3), Los Alamos
 National Laboratory, Los Alamos, NM, USA\\
-\small $^7$Environment, Commonwealth Scientific and Industrial Research
+\footnotesize $^7$Environment, Commonwealth Scientific and Industrial Research
 Organisation, Hobart, TAS, Australia\\
-\small $^8$Civil, Construction and Environmental Engineering,
+\footnotesize $^8$Civil, Construction and Environmental Engineering,
 University of Alabama, Tuscaloosa, AL, USA}
 \date{Draft of August 26, 2026}
 
@@ -40,58 +41,35 @@ University of Alabama, Tuscaloosa, AL, USA}
 \maketitle
 
 \begin{abstract}
-We present a discrete-adjoint capability for RDycore, the exascale river
-dynamical core of the Energy Exascale Earth System Model (E3SM), and use
-it for gradient-based calibration of spatially distributed Manning
-roughness. The capability has three parts. First, an exact assembled
-Jacobian of the finite-volume shallow-water right-hand side:
-closed-form Roe-flux blocks obtained by hand-written forward-mode
-differentiation of the flux computation, entropy-fix branches included,
-together with source-term and boundary-condition blocks. Second,
-adjoint sensitivities of gauge-misfit functionals with respect to both
-the initial state and the Manning field via PETSc's
-\texttt{TSAdjoint}; one gradient costs roughly one extra forward solve,
-independent of the parameter count. Third, bound-constrained
-calibration with TAO. Every derivative is validated against finite
-differences of the full nonlinear solve at tight, pre-registered
-tolerances (Jacobian blocks to $10^{-8}$, gradients to $10^{-5}$).
-Twin experiments recover a two-zone roughness field to
-$4\times10^{-7}$ relative error under noise-free observations --- a
-statement about gradient correctness, not about calibratability, and we
-quantify the difference. The same
-assembled Jacobian enables fully implicit backward-Euler stepping, and
-we show implicit stepping is required in practice: explicit Manning
-drag is unstable at the operational time step of a Hurricane Harvey
-test case, in quantitative agreement with a friction-stiffness
-stability analysis. The implicit integrator's adjoint passes the same
-finite-difference gates. On a Hurricane Harvey twin configuration
-(2{,}746 cells, implicit stepping) the calibrated Manning map recovers
-a two-zone truth field to $19.4\%$ with proper Tikhonov
-regularization. A twin using the actual 17-gauge USGS
-network geometry fits its 238 observations essentially perfectly while
-recovering the field to only $45\%$ --- the classic semiconvergence of
-underdetermined friction estimation, and the quantitative reason
-real-data calibration must shrink the parameter space to match the
-network. Re-asking identifiability at basin scale shows the observable
-matters as much as the parameterization: peak water-surface elevations
-at 108 surveyed high-water-mark locations identify the land-cover
+We present a discrete-adjoint capability for RDycore, the exascale
+river dynamical core of the Energy Exascale Earth System Model (E3SM),
+and use it for gradient-based calibration of spatially distributed
+Manning roughness. An exact assembled Jacobian of the finite-volume
+shallow-water right-hand side --- closed-form Roe-flux blocks by
+hand-written forward-mode differentiation, with source-term and
+boundary-condition blocks --- drives adjoint sensitivities through
+PETSc's \texttt{TSAdjoint}, bound-constrained calibration with TAO,
+and fully implicit time stepping; one gradient costs about one extra
+forward solve, independent of the parameter count, and every
+derivative is validated against finite differences of the full
+nonlinear solve at pre-registered tolerances. Implicit stepping proves
+not merely enabled but required: the differentiable form of Manning
+drag is friction-stiff and unstable under explicit stepping at
+operational time steps. Twin calibrations show that identifiability is
+a property of the observing geometry and the observable, not of
+observation counts: surveyed high-water marks identify the land-cover
 roughness classes covering $83\%$ of a 2.93M-cell Hurricane Harvey
-domain, where 13 stream gauges identify almost none. Against the real
-survey, the uncalibrated model reads $1.51$\,m mean peak-WSE error
-over the marks in reaches it can drain --- and the same evaluation
-isolates a downstream reach the model cannot drain at all, a
+domain, where the real stream-gauge network identifies almost none.
+Against the real survey, the uncalibrated model errs by $1.51$\,m mean
+peak water-surface elevation over the marks in reaches it can drain
+--- and the same evaluation isolates a reach the model cannot drain, a
 conveyance defect no roughness value can absorb, as a finding in its
-own right. Within E3SM,
-adjoint-based parameter optimization is established in the land-ice
-component MALI, whose velocity solver inverts for basal friction by
-automatic differentiation of the \emph{steady} momentum balance;
-RDycore's capability is, to our knowledge, the first \emph{transient}
-discrete adjoint in an E3SM component --- differentiated through the
-time integrator itself. It is obtained by differentiating the existing
-solver in place: the production discretization, its data structures and
-its GPU backends are the ones being differentiated, not a
-reimplementation of the model in a differentiable-programming
-framework.
+own right. This is, to our knowledge, the first \emph{transient}
+discrete adjoint in an E3SM component (the land-ice component inverts
+a \emph{steady} solve), obtained by differentiating the production
+solver in place --- its discretization, data structures, and GPU
+backends --- rather than rewriting the model in a
+differentiable-programming framework.
 \end{abstract}
 
 \section{Introduction}
@@ -181,6 +159,22 @@ primitives are reconstructed with a regularized division and a dry
 cutoff $h_{\min}$, and $S$ contains bed slope, Manning drag, and
 external forcing.
 
+One piece of vocabulary recurs throughout the paper. The flux and
+source terms are piecewise-defined: alternative closed-form
+expressions --- \emph{branches}, in the sense that $|x|$ has a
+positive and a negative branch --- selected at run time by conditions
+on the state. The Roe flux's dissipation is built from the moduli
+$|\lambda_p|$ of its characteristic wave speeds, so it switches branch
+wherever a wave speed changes sign, and the entropy fix substitutes a
+third, smoothed expression when a wave speed is near zero (a
+transcritical state); the dry cutoff switches drag and flux terms on
+and off at $h_{\min}$; boundary ghost maps switch with the flow
+direction. Away from a switching surface the map is smooth and equals
+its active branch, and the derivative machinery of
+Sections~\ref{sec:jacobian}--\ref{sec:adjoint} is
+\emph{branch-faithful}: it differentiates the expression the condition
+actually selected --- the correct one-sided derivative.
+
 \paragraph{A differentiable right-hand side.}
 A prerequisite that deserves emphasis: RDycore's existing friction
 treatments (a semi-implicit splitting and the implicit scheme of Xia and
@@ -203,17 +197,6 @@ edges contribute diagonal blocks through the ghost-state map of the
 boundary condition.
 
 \paragraph{Flux blocks by forward-mode differentiation.}
-Throughout this paper a \emph{branch} is one of the alternative
-closed-form expressions a piecewise-defined function takes, selected at
-run time by a state-dependent condition --- the two formulas of $|x|$
-are the prototype. The right-hand side is full of them: the entropy fix
-replaces $|\lambda|$ by a smoothed quadratic when a wave speed falls
-below a threshold, the wet/dry cutoff switches drag and flux terms on
-and off at $h_{\min}$, and boundary ghost maps switch with the flow
-direction. Away from a switching surface the function equals its active
-branch and is smooth there; \emph{branch-faithful} differentiation
-evaluates the derivative of the branch the condition actually selected
---- the correct one-sided derivative.
 Rather than deriving the dissipation-matrix derivatives symbolically, we
 differentiate the flux \emph{computation}: a hand-written forward-mode
 (tangent) version of the Roe flux routine propagates directionals
@@ -299,22 +282,19 @@ two-nonzero parameter Jacobian).
 Two integrator facts constrain the design. PETSc's plain forward-Euler
 integrator implements no adjoint, so adjoint-path configurations use the
 Runge--Kutta family. And for implicit integrators the discrete-adjoint
-gradient is only as exact as the inner solves: with default SNES/KSP
-tolerances the Manning gradient checked at $2\times10^{-4}$; tightening
-the tolerances recovered $5\times10^{-6}$
-(Table~\ref{tab:verification}). We state the production side of this
-plainly, because the verification numbers are otherwise easy to
-over-read. Loose inner tolerances turned out to be a false economy on
-this problem: tightening the Krylov tolerance from $10^{-2}$ to
-$10^{-3}$ makes the implicit forward \emph{faster} (better linear
-solves let Newton converge in one iteration instead of two), and the
-production setting --- Krylov $10^{-4}$, nonlinear $10^{-5}$ ---
-reproduces the fully converged answer to every printed digit at about
-$25\%$ more wall time than the loosest usable setting. Campaigns
-therefore run at converged inner tolerances, and the verified gradients
-\emph{are} the production gradients. What the FD gates cannot certify
-at production scale is a different matter entirely --- the objective's
-own nonsmoothness over long windows --- quantified in
+gradient is only as exact as the inner solves: the Manning gradient
+fails its gate at default inner tolerances and passes once they are
+tightened (Table~\ref{tab:verification}, implicit rows). Loose inner
+tolerances also turned out to be a false economy on this problem: a
+tighter Krylov tolerance makes the implicit forward \emph{faster},
+because better linear solves let Newton converge in fewer iterations,
+and the production setting (Krylov $10^{-4}$, nonlinear $10^{-5}$)
+reproduces the fully converged answer to every printed digit for about
+a quarter more wall time than the loosest usable setting. Campaigns
+therefore run at converged inner tolerances, and the verified
+gradients \emph{are} the production gradients. What the FD gates
+cannot certify at production scale is a different matter entirely ---
+the objective's own nonsmoothness over long windows --- quantified in
 Section~\ref{sec:hwm}.
 
 \section{The calibration algorithm: strong-constraint 4D-Var}
@@ -551,50 +531,55 @@ Three implementation facts others will hit:
 
 \paragraph{Newton robustness is set by residual discontinuities, not
 by conditioning.}
-Both items below come from the land-cover-prior runs rather than the
-smooth-$n$ configurations behind the numbers reported elsewhere, which
-never trigger either; both fixes are implemented and gated, the
-boundary fix as an opt-in condition (open issues~4--5).
 Where implicit stepping fails on this problem, it fails for a reason
 that is invisible in the smooth twin experiments: the residual is
 discontinuous, so Newton has nothing to converge \emph{to}. At the
-land-cover roughness prior ($\bar n = 0.10$) rather than the twins'
-smooth $n \approx 0.03$, backward Euler descends cleanly for a dozen
-iterations and then freezes, with an $O(10^{-13})$ line-search step
-changing the residual norm by a factor of eight --- the signature of
-a jump, not of ill-conditioning. Two mechanisms are responsible, both
-catalogued in Section~\ref{sec:nondiff}: the drag's wet/dry cutoff,
-whose amplitude scales as $n^2$ and therefore only becomes disabling
-at realistic roughness, and the critical-outflow boundary's
-stagnation switch. Regularizing the drag velocity removes the first
-and restores honest convergence over the early transient. The second
-we removed by replacing the outlet condition itself: a transmissive
-(zero-gradient) free outflow --- the ghost state copies the interior
-state, the convention of most finite-volume shallow-water codes ---
-is continuous in the interior state by construction, and its ghost
-map is the identity, so the analytic Jacobian and adjoint carry it
-exactly (FD-gated like every other block). The effect is not an
-improvement but a cure: a rain-forced control that Newton could not
-carry past step 498 under critical outflow (residual pinned at
-$1.05\times10^{-3}$ relative, tolerance relief buying steps linearly)
-completes the same window with \emph{zero} failures, 598 of 600
-solves converging in two Newton iterations; a one-hour rain-forced
-calibration window --- forward, adjoint, and quasi-Newton line search
---- runs clean end to end; and a 72-hour rain-forced forward through
-the Hurricane Harvey crest (259{,}200 implicit steps on the 2.93M-cell
-mesh) completes without a single Newton failure. Before the
-replacement we absorbed the pin
-by accepting the iterate at a relative nonlinear tolerance of
-$10^{-3}$; that this was tolerable rather than merely expedient is
-worth stating precisely: a land-cover-class twin calibration under
-that setting recovers all fifteen class values to machine precision
-(objective reduced from $1.5\times10^{7}$ to $6\times10^{-7}$ in
-twenty quasi-Newton iterations), so the gradient path was unimpaired
-by the loosened inner solve. The general lesson for adjoint retrofits
-is that nonsmoothness in an operational flood code is not only a
-differentiability question --- it is a nonlinear-solver question, and
-the two discontinuities that mattered here were both invisible until
-the parameter field was realistic.
+land-cover roughness prior, rather than the twins' smooth low-$n$
+fields, backward Euler descends cleanly for a dozen iterations and
+then freezes --- a vanishingly small line-search step changes the
+residual norm severalfold, the signature of a jump, not of
+ill-conditioning. Two mechanisms are responsible, both catalogued in
+Section~\ref{sec:nondiff} and both invisible until the parameter field
+is realistic: the drag's wet/dry cutoff, whose amplitude scales as
+$n^2$, and the critical-outflow boundary's stagnation switch.
+
+Both fixes are implemented, gated, and opt-in (open issues~4--5).
+Regularizing the drag velocity removes the first and restores honest
+convergence over the early transient. The second we removed by
+replacing the outlet condition itself: a transmissive (zero-gradient)
+free outflow --- the ghost state copies the interior state, the
+convention of most finite-volume shallow-water codes --- is continuous
+in the interior state by construction, and its ghost map is the
+identity, so the analytic Jacobian and adjoint carry it exactly,
+FD-gated like every other block. The effect is not an improvement but
+a cure (Table~\ref{tab:cure}): the identical failing control completes
+with zero nonlinear failures, and the fix holds through the longest
+windows we run. Before the replacement we absorbed the pin by
+loosening the nonlinear tolerance; a class-twin calibration under that
+crutch still recovered all fifteen class values to machine precision,
+so the gradient path was unimpaired --- tolerable, but a crutch. The
+general lesson for adjoint retrofits is that nonsmoothness in an
+operational flood code is not only a differentiability question ---
+it is a nonlinear-solver question.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Rain-forced configuration (land-cover prior) & Outlet & Outcome \\
+\midrule
+600-step control & critical outflow & Newton pinned from step 498 \\
+600-step control & free outflow & zero failures; 598/600 solves in two iterations \\
+1-h calibration window (forward + adjoint + line search) & free outflow & clean end to end \\
+72-h forward through the Harvey crest (2.93M cells) & free outflow & 259{,}200 solves, zero failures \\
+\bottomrule
+\end{tabular}
+\caption{The outlet replacement is a cure, not an improvement. Under
+critical outflow, tolerance relief bought steps only linearly; the
+transmissive outlet completes the identical window and every longer
+one attempted.}
+\label{tab:cure}
+\end{table}
 
 \paragraph{Checkpointed adjoints for long windows.}
 A naive stored trajectory for a full 36-hour Hurricane Harvey window
@@ -927,35 +912,54 @@ injected at its own argmax time in the segmented backward sweep of
 Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
 peak time is locally constant (Section~\ref{sec:nondiff}). The
 parameter gradient of the peak misfit passes the same central-difference
-gates as every other block on the smooth verification twin
-($9\times10^{-7}$ against a $10^{-5}$ gate). At basin scale the naive
-check fails --- up to $2\times10^{-1}$ on a domain-wide direction ---
-and a set of instrumented measurements pins down why, in a way that
-validates the gradient rather than the check. First, an instrumented
-gate that counts argmax movement and wet/dry flips at the marks finds
-\emph{zero} of either across every probe: the discrepancy lives below
-the observable. Second, the evaluations are reproducible to nine
-digits and the FD value is \emph{stable across a decade of probe step}
-while disagreeing with the adjoint --- excluding noise, curvature
-truncation ($\varepsilon^2$), and sparse kinks ($\varepsilon^1$).
-Third, and decisively, the gap \emph{accumulates with trajectory
-length}: on the same basin, rain, marks and machinery, the domain-wide
-direction errs by $9\times10^{-5}$ (the inner-solve floor) over a
-60-step window, $8\times10^{-3}$ over 300 steps, and
-$10^{-1}$-scale over 1800--3600 steps, while single-class directions
-decay cleanly with probe step. A proportional defect in
-$\partial f/\partial n$ or the adjoint accumulation would err the same
-fraction at any window length; trajectory-accumulated branch crossings
---- the probe shifts which cells cross the depth cutoff at some step
---- predict exactly this profile. The measured conclusion: the adjoint
-returns the exact one-branch derivative; over long windows the
-objective is dense with wet/dry branch surfaces, and a finite-step
-central difference converges to a locally \emph{smoothed} slope that
-sits several percent from any one branch. The quasi-Newton iteration
-consumes one-branch derivatives of a piecewise-smooth objective ---
-standard practice for $\max$-type and switching systems --- and its
-observed descent (Section~\ref{sec:identifiability}) is consistent
-with that footing (Section~\ref{sec:nondiff}). The remaining scientific choice --- confirmed or corrected by
+gates as every other block on the smooth verification twin. At basin
+scale the naive check fails, and a set of instrumented measurements
+pins down why, in a way that validates the gradient rather than the
+check (Table~\ref{tab:fdwindow}). No mark's argmax moves and none
+flips wet/dry across any probe, so the discrepancy lives below the
+observable; the evaluations are deterministic to nine digits and the
+FD value is stable across a decade of probe step, which excludes
+noise, curvature truncation, and sparse kinks. Decisively, the gap
+\emph{accumulates with trajectory length}: at the shortest window the
+gate passes at the inner-solve floor with every piece of machinery
+engaged, and it grows three orders of magnitude by basin window
+lengths. A proportional defect in $\partial f/\partial n$ or the
+adjoint accumulation would err the same fraction at any window length;
+trajectory-accumulated branch crossings --- the probe shifts which
+cells cross the depth cutoff at some step --- predict exactly this
+profile. The measured conclusion: the adjoint returns the exact
+one-branch derivative; over long windows the objective is dense with
+wet/dry branch surfaces, and a finite-step central difference
+converges to a locally \emph{smoothed} slope that sits several percent
+from any one branch. The quasi-Newton iteration consumes one-branch
+derivatives of a piecewise-smooth objective --- standard practice for
+$\max$-type and switching systems --- and its observed descent
+(Section~\ref{sec:identifiability}) is consistent with that footing
+(Section~\ref{sec:nondiff}).
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Window & Steps & FD-vs-adjoint gap, domain-wide direction \\
+\midrule
+smooth verification twin & 40 & $9\times10^{-7}$ (gate $10^{-5}$: pass) \\
+basin, 1 min & 60 & $9\times10^{-5}$ (inner-solve floor: pass) \\
+basin, 5 min & 300 & $8\times10^{-3}$ \\
+basin, 15 min & 900 & $2\times10^{-2}$ \\
+basin, 30 min & 1800 & $2\times10^{-1}$ \\
+basin, 1 h & 3600 & $7\times10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\caption{The FD gate's failure accumulates with trajectory length on
+identical basin, rain, marks, and converged tolerances --- the
+signature of branch crossings along the trajectory, not of gradient
+error. The 30-minute and 1-hour rows sample peaks over different
+horizons, so strict monotonicity across them is not expected;
+single-class directions sit one to three orders lower at every
+window.}
+\label{tab:fdwindow}
+\end{table} The remaining scientific choice --- confirmed or corrected by
 the domain team --- is the calibration window, which for marks that
 record the event maximum must cover the flood peak.
 
@@ -967,27 +971,42 @@ past the Buffalo Bayou crest), NLCD-prior Manning, free outflow,
 backward Euler at $\Delta t = 1$\,s on the 2.93M-cell mesh ---
 259{,}200 implicit steps, \emph{zero} Newton failures, two hours on
 one GPU node. The model wets all 108 marks, and the uncalibrated
-peak-WSE MAE against the surveyed values is $3.41$\,m (confirmed
-unchanged, mark for mark, at fully converged inner tolerances). The
-per-mark decomposition splits that number into two distinct
-populations. Seventy-one marks crest inside the window; against them
-the model reads $1.51$\,m MAE with a $+1.20$\,m median-high bias ---
-error a Manning field can plausibly address. The other 37 never crest
-at all: their cells fill monotonically through all 72 hours ---
-\emph{every one} peaks at the final hour with exactly zero recession,
-still rising at $0.02$--$0.06$\,m/hr while the other population is
-already draining --- accumulating a mean $10.7$\,m of standing water,
-$+7.1$\,m above every surveyed value. Those cells sit in the
-downstream Buffalo Bayou reach, and their late-window inflow arrives
-laterally after the rain has ended: the model cannot drain that reach,
-a conveyance/outlet defect that no roughness value can absorb and that
-would corrupt any calibration asked to fit it. The calibration target
-is therefore the 71 admissible marks and their $1.51$\,m, the drainage
-defect is reported as a finding in its own right, and the remaining
-bundle (initial-condition, rainfall, mesh-elevation, and datum error)
-is what the calibration must be prevented from absorbing along with
-the roughness signal. The literature's calibrated benchmark on this
-event is $0.67$\,m MAE~\cite{li2026inunda}.
+peak-WSE error decomposes into two distinct populations
+(Table~\ref{tab:baseline}; confirmed mark for mark at fully converged
+inner tolerances). The marks that crest inside the window carry the
+error a Manning field can plausibly address. The others never crest at
+all: their cells fill monotonically through the entire window ---
+every one peaks at the final hour with zero recession, still rising
+while the first population is already draining --- accumulating some
+ten metres of standing water whose late-window inflow arrives
+laterally, after the rain has ended. Those cells sit in the downstream
+Buffalo Bayou reach: the model cannot drain it, a conveyance/outlet
+defect that no roughness value can absorb and that would corrupt any
+calibration asked to fit it. The calibration target is therefore the
+71 admissible marks; the drainage defect is reported as a finding in
+its own right; and the remaining bundle (initial-condition, rainfall,
+mesh-elevation, and datum error) is what the calibration must be
+prevented from absorbing along with the roughness signal. The
+literature's calibrated benchmark on this event is $0.67$\,m
+MAE~\cite{li2026inunda}.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Marks & $n$ & MAE & bias \\
+\midrule
+crest inside the 72-h window & 71 & $1.51$\,m & $+1.20$\,m \\
+never crest (reach cannot drain) & 37 & $7.06$\,m & $+7.06$\,m \\
+all & 108 & $3.41$\,m & $+3.21$\,m \\
+\bottomrule
+\end{tabular}
+\caption{The uncalibrated baseline against the 108 surveyed high-water
+marks, decomposed. The second population is model-high at every single
+mark and identifies a reach with no working exit; the first is the
+calibration target.}
+\label{tab:baseline}
+\end{table}
 
 \section{Conclusions and outlook}
 
