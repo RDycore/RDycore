@@ -832,7 +832,14 @@ survey-grade high-water-mark error becomes a fair fight rather than a
 foregone conclusion. The lesson is not that the method is fragile: it
 is that friction must act long enough to imprint a signal above the
 noise floor, which makes window length a first-class calibration
-decision rather than a cost parameter.
+decision rather than a cost parameter. The basin-scale noisy row shows
+what marginal signal-to-noise looks like in practice: with
+$\sim$$0.1$\,m of signal against $0.15$\,m of noise the optimizer still
+cuts the misfit $9.4\times$ --- while driving a third of the classes
+onto their bounds (pasture, $428$k cells, to the $0.30$ ceiling). The
+misfit improves because the noise is being fit; the bound-pinning is
+the visible symptom, and it is the concrete argument for stronger
+regularization and a longer window in the production run.
 
 \begin{table}
 \centering\small
@@ -845,7 +852,7 @@ Verification twin & $5\,\mu$m & none & per-region recovery $4\times10^{-7}$ \\
 $1.8$\,s) & height & $1$\,mm & per-region destroyed ($4\times10^{-7} \to 0.83$, both at bounds) \\
 \midrule
 30\,m basin, 1\,h & $\sim$$0.1$\,m & none & area-weighted rel.\ $L^2$ $0.20$; MAE $0.103 \to 0.017$\,m \\
-rain-forced, 108 marks & peak WSE & $0.15$\,m (HWM grade) & \todo{o30: queued, numbers to follow} \\
+rain-forced, 108 marks & peak WSE & $0.15$\,m (HWM grade) & misfit falls $9.4\times$, MAE $0.23 \to 0.12$\,m --- but 5 of 15 classes pin to bounds \\
 \bottomrule
 \end{tabular}
 \caption{Parameter-induced observation signal versus observation error.
@@ -883,8 +890,12 @@ injected at its own argmax time in the segmented backward sweep of
 Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
 peak time is locally constant (Section~\ref{sec:nondiff}). The
 parameter gradient of the peak misfit passes the same central-difference
-gates as every other block ($9\times10^{-7}$ against a $10^{-5}$
-gate). The remaining scientific choice --- confirmed or corrected by
+gates as every other block on the smooth verification twin
+($9\times10^{-7}$ against a $10^{-5}$ gate); at basin scale the check is
+confounded by the observable's own kinks --- probe steps move argmax
+times and flip marks wet/dry --- and an instrumented gate that separates
+kink effects from gradient error is part of the verification suite
+(Section~\ref{sec:nondiff}). The remaining scientific choice --- confirmed or corrected by
 the domain team --- is the calibration window, which for marks that
 record the event maximum must cover the flood peak.
 
@@ -896,15 +907,27 @@ past the Buffalo Bayou crest), NLCD-prior Manning, free outflow,
 backward Euler at $\Delta t = 1$\,s on the 2.93M-cell mesh ---
 259{,}200 implicit steps, \emph{zero} Newton failures, two hours on
 one GPU node. The model wets all 108 marks, and the uncalibrated
-peak-WSE MAE against the surveyed values is $3.41$\,m. That number is
-reported as a starting point, not a result: it bundles roughness
-error together with initial-condition, rainfall, mesh-elevation, and
-datum error, and the per-mark decomposition (signed bias, quantiles,
-and modeled crest times --- the last of which also places the
-calibration window) is the next diagnostic. What the calibration
-must demonstrate is how much of the 3.41\,m a Manning field can
-close; the literature's calibrated benchmark on this event is
-$0.67$\,m MAE~\cite{li2026inunda}.
+peak-WSE MAE against the surveyed values is $3.41$\,m (confirmed
+unchanged, mark for mark, at fully converged inner tolerances). The
+per-mark decomposition splits that number into two distinct
+populations. Seventy-one marks crest inside the window; against them
+the model reads $1.51$\,m MAE with a $+1.20$\,m median-high bias ---
+error a Manning field can plausibly address. The other 37 never crest
+at all: their cells fill monotonically through all 72 hours ---
+\emph{every one} peaks at the final hour with exactly zero recession,
+still rising at $0.02$--$0.06$\,m/hr while the other population is
+already draining --- accumulating a mean $10.7$\,m of standing water,
+$+7.1$\,m above every surveyed value. Those cells sit in the
+downstream Buffalo Bayou reach, and their late-window inflow arrives
+laterally after the rain has ended: the model cannot drain that reach,
+a conveyance/outlet defect that no roughness value can absorb and that
+would corrupt any calibration asked to fit it. The calibration target
+is therefore the 71 admissible marks and their $1.51$\,m, the drainage
+defect is reported as a finding in its own right, and the remaining
+bundle (initial-condition, rainfall, mesh-elevation, and datum error)
+is what the calibration must be prevented from absorbing along with
+the roughness signal. The literature's calibrated benchmark on this
+event is $0.67$\,m MAE~\cite{li2026inunda}.
 
 \section{Conclusions and outlook}
 
@@ -1251,7 +1274,13 @@ the event.]}
         weight directly --- USGS quality codes give 0.1--0.3\,m for
         HWMs, and we are using 0.15\,m. (c) The exclusion of eight
         reservoir-influenced sites (Addicks/Barker and Buffalo Bayou
-        downstream), on the grounds that gate releases are unmodelled.
+        downstream), on the grounds that gate releases are unmodelled
+        --- now backed by a measurement on the mark side: the 37
+        downstream marks that never crest sit in cells the model
+        demonstrably cannot drain (monotone filling through all 72
+        hours, zero recession, $+7.1$\,m above every surveyed value;
+        Section~\ref{sec:hwm}), so scoring or calibrating against them
+        would fold a conveyance defect into the roughness field.
         (d) The bounds $n \in [0.01, 0.2]$ and the use of the NLCD
         field as the prior throughout, replacing the two-zone twins'
         constant prior.
