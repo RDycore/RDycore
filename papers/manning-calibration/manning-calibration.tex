@@ -1039,14 +1039,16 @@ cross-references are given as Q$n$.]}
         argmax-time adjoint is implemented and FD-gated, the
         identifiability twin at the real 108-mark geometry appears in
         Section~\ref{sec:identifiability}, and the \emph{uncalibrated}
-        real-data baseline is now measured
+        real-data baseline is now measured and decomposed
         (Section~\ref{sec:hwm}: $3.41$\,m MAE over a crest-covering
-        72-hour forward). Still missing: the calibrated number ---
-        which requires the window-placement decision and, likely, a
-        checkpointed peak-time initial state --- and a bias
-        decomposition separating roughness error from IC/rain/mesh
-        error. Until then the paper claims the capability and the
-        baseline, not the closed loop. (Q1, Q2)
+        72-hour forward; $1.51$\,m over the 71 marks in reaches the
+        model can drain, with the other 37 isolated as a conveyance
+        defect). The checkpointed mid-event initial state the
+        calibration window needs is implemented and validated
+        bit-exactly. Still missing: only the calibrated number itself,
+        which waits on the window-placement decision. Until then the
+        paper claims the capability, the baseline and its
+        decomposition, not the closed loop. (Q1, Q2)
   \item \textbf{The semiconvergence cure is asserted by a counting
         argument our own evidence undercuts.}
         Section~\ref{sec:houston} proposes the
@@ -1118,13 +1120,18 @@ cross-references are given as Q$n$.]}
         $h_{\rm anuga}$ and to the outlet choice should be
         demonstrated, not asserted. (Q4, Q5)
   \item \textbf{The Hurricane Harvey section is a 2{,}746-cell twin.}
-        All 30\,m-mesh, 2.93M-cell content in the paper is cost
-        measurement; no calibration at 30\,m is shown, and a reviewer
-        comparing against the 471M-cell forward-validation claim in
-        the introduction will notice the gap. \emph{Addressed:} the
-        section is retitled, and Section~\ref{sec:identifiability} now
-        contains two 30\,m, 2.93M-cell class calibrations (gauge and
-        high-water-mark twins) run end to end on one GPU node.
+        As originally drafted, all 30\,m-mesh, 2.93M-cell content was
+        cost measurement --- no calibration at 30\,m was shown, a gap a
+        reviewer comparing against the 471M-cell forward-validation
+        claim in the introduction would notice. \emph{Addressed:} the
+        section is retitled, and Section~\ref{sec:identifiability} and
+        Table~\ref{tab:snr} now contain three 30\,m, 2.93M-cell class
+        calibrations run end to end on one GPU node (the 13-gauge
+        twin, the 108-high-water-mark twin, and the noisy HWM twin).
+        What remains true: no \emph{real-data} calibration at any
+        resolution (item 1), and no \emph{per-cell} calibration at
+        30\,m --- only the class parameterization, which the
+        identifiability evidence says is the right one anyway.
   \item \textbf{All twins are noise-free.} $\sigma$ enters only as a
         scale factor; no experiment adds observation noise, so the
         semiconvergence story (early stopping, Tikhonov weights) is
@@ -1134,8 +1141,11 @@ cross-references are given as Q$n$.]}
         Table~\ref{tab:snr} sets the parameter-induced signal against
         the observation error for both regimes --- reframing the
         noise-free recoveries as machinery verification and the noise
-        question as a signal-to-noise (window length) question. Still open: the noisy basin-scale HWM twin (queued)
-        and, eventually, noise-consistent regularization
+        question as a signal-to-noise (window length) question. The
+        noisy basin-scale HWM twin is now measured (misfit falls
+        $9.4\times$ while five classes pin to bounds ---
+        Table~\ref{tab:snr} and Section~\ref{sec:identifiability}).
+        Still open: noise-consistent regularization
         (discrepancy-principle stopping). (Q7)
   \item \textbf{The peak-WSE observable, if adopted, is nonsmooth in a
         new way.} The argmax-time adjoint is exact wherever the peak
