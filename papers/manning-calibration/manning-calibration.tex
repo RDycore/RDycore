@@ -939,11 +939,16 @@ lengths. A proportional defect in $\partial f/\partial n$ or the
 adjoint accumulation would err the same fraction at any window length;
 trajectory-accumulated branch crossings --- the probe shifts which
 cells cross the depth cutoff at some step --- predict exactly this
-profile. The measured conclusion: the adjoint returns the exact
-one-branch derivative; over long windows the objective is dense with
-wet/dry branch surfaces, and a finite-step central difference
-converges to a locally \emph{smoothed} slope that sits several percent
-from any one branch. The quasi-Newton iteration consumes one-branch
+profile. Two further checks close it: as the probe shrinks, the FD
+converges to the adjoint direction by direction --- the largest
+single-class direction passes the $10^{-5}$ gate outright at the
+smallest probe --- and the fifteen per-class gaps \emph{sum} to the
+domain-wide gap, the additivity that independent per-cell branch
+crossings predict and no plausible defect would arrange. The measured
+conclusion: the adjoint returns the exact one-branch derivative; over
+long windows the objective is dense with wet/dry branch surfaces, and
+a finite-step central difference converges to a locally
+\emph{smoothed} slope that sits several percent from any one branch. The quasi-Newton iteration consumes one-branch
 derivatives of a piecewise-smooth objective --- standard practice for
 $\max$-type and switching systems --- and its observed descent
 (Section~\ref{sec:identifiability}) is consistent with that footing
