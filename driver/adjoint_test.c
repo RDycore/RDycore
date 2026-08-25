@@ -1365,8 +1365,11 @@ static PetscErrorCode FDCheckParamGradient(PetscErrorCode (*obj)(Tao, Vec, Petsc
     PetscReal fd  = (Jp - Jm) / (2.0 * eps);
     PetscReal rel = PetscAbsReal(fd - gdotd) / PetscMax(PetscAbsReal(gdotd), 1e-12);
     if (rel > max_rel) max_rel = rel;
-    PetscCall(PetscPrintf(comm, "  %s fd check dir %s: adjoint %.8e  fd %.8e  rel %.3e\n", label, s < 0 ? "ones" : "e_s", (double)gdotd,
-                          (double)fd, (double)rel));
+    char dirname[32];
+    if (s < 0) PetscCall(PetscSNPrintf(dirname, sizeof(dirname), "ones"));
+    else PetscCall(PetscSNPrintf(dirname, sizeof(dirname), "e_%" PetscInt_FMT, s));
+    PetscCall(PetscPrintf(comm, "  %s fd check dir %s: adjoint %.8e  fd %.8e  rel %.3e\n", label, dirname, (double)gdotd, (double)fd,
+                          (double)rel));
 
     if (probe) {
       // classify the weighted marks: argmax moved / wet-dry flipped / smooth,
