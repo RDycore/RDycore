@@ -1351,3 +1351,48 @@ lives. o37 (72-hr baseline + fresh hourly checkpoints) and any subsequent
 calibration run at **ksp 1e-4 / snes 1e-5**; the checkpoints a calibration
 window restarts from must come from the same tolerance the calibration
 runs at, which is why o37 regenerates them rather than reusing o34's.
+
+### o37 drainage analysis: the 37 censored marks are a structural drainage failure, not late crests (2026-08-25)
+
+P2 of the Fable brief, run against o37's 73 hourly checkpoints (direct
+seeks at the 108 mark cells; script `o37_drainage.py` on PM). The
+question: are the marks that never crest in the 72-h window merely
+late-cresting (argues for a longer window), or can their cells not drain
+at all (argues they are inadmissible for roughness calibration)?
+
+| | censored 37 | genuine-crest 71 (control) |
+| --- | --- | --- |
+| peak location | ALL at hour 72 (window end) | interior |
+| recession from peak | **0.000 -- every single mark** | 52/71 recede > 5% |
+| dh/dt over last 12 h | +0.016..+0.060 m/hr, ALL positive | median -0.008 m/hr (draining) |
+| mean water column | 0.52 m -> **10.7 m and still rising** | peaks ~1.95 m at h54, then declines |
+
+The control group is already receding in the late window while the
+censored cells keep accumulating ~+0.05 m/hr -- that late-window mass is
+arriving laterally (the genuine group's decline shows the rain has
+effectively ended), i.e. the domain's runoff converges on the downstream
+reach and never exits. At the observed fill rates those cells are WEEKS
+from cresting: this is not "the window is too short."
+
+Physical reading: the model cannot drain the Buffalo-Bayou/downstream
+reach -- either the 30 m mesh's conveyance through the incised channel
+is under-resolved or the outlet connectivity is wrong for these cells --
+and it piles a mean 10.7 m of standing water there (individual cells to
+18 m, vs surveyed h_obs down to ~1 m: marks 27/72 are 11-17 m over).
+**No Manning field can repair a reach whose water has no exit**, so the
+37 marks are inadmissible for roughness calibration on physical grounds.
+Beside that, they are the entire difference between the 3.41 m headline
+MAE and 1.51 m on the admissible 71 (bias +1.20 m).
+
+For the scientists (this evidence reframes yesterday's Q1): the
+exclusion is no longer "should we drop inconvenient marks?" but "these
+sit in a reach the model demonstrably cannot drain; calibrating
+roughness against them would absorb a drainage defect into n." The
+drainage defect itself is a finding worth reporting -- and worth a look
+at the outlet placement/conveyance before any longer-window run.
+
+Units note for reproducers: `turning30m_hwm_obs.txt` column 2 is WSE
+(NAVD88 m); the driver converts to water column against the cell bed.
+The per-mark dump's h_obs is the converted value. (A first cut of the
+drainage script compared raw WSE to model h -- the model-side
+classification above never used obs values, so it is unaffected.)
