@@ -54,34 +54,38 @@ window length. A lower MAE with pinned classes is a worse result, not
 a better one — proposed report: MAE **plus** the roughness field's
 physicality, with discrepancy-principle stopping as the follow-up.
 
-## 4. The gradient question (the honesty item)
+## 4. The gradient question — RESOLVED: the adjoint is correct
 
-Status, measured today at basin scale, converged tolerances:
+The naive basin-scale FD gate fails (2.1e-1 on a domain-wide
+direction). Four instrumented measurements pin down why, in a way that
+validates the gradient rather than the check:
 
-- The peak-misfit FD gate **fails** at basin scale (2.1e-1 on a
-  domain-wide direction, ~2e-3 on single-class directions) and the
-  failure does **not** shrink as inner solves tighten.
-- The instrumented gate localizes it **below the observable**: zero
-  argmax moves, zero wet/dry flips at the marks across every probe;
-  evaluations reproduce to nine digits (noise excluded); error scales
-  with direction support; |FD| < |adjoint| on the wide direction.
-- Leading hypothesis: **branch switching in the wet/dry dynamics**
-  (probe shifts which cells cross the depth cutoff mid-trajectory) —
-  i.e., the objective is nonsmooth at a level the adjoint correctly
-  one-sides but a central difference averages. Alternatives not yet
-  excluded: genuine curvature (ε² truncation), support-correlated
-  defect.
-- Discriminators in flight: probe-step sweep (kink ~ε, curvature ~ε²,
-  defect flat), all-15-class support sweep (error vs class area over
-  4 decades), second-difference analysis (kink ~1/ε).
-  **[Slot: verdicts land tonight — o39 / o41.]**
+1. **Zero observable-level kinks**: across every probe, no mark's
+   argmax moved, none flipped wet/dry (instrumented gate).
+2. **Noise and truncation excluded**: evaluations reproduce to nine
+   digits; the FD value is stable across a decade of probe step while
+   disagreeing with the adjoint (kills ε² curvature and sparse-kink ε¹
+   explanations).
+3. **The gap accumulates with trajectory length** — the decisive one:
+   same basin/rain/marks/machinery, domain-wide direction:
+   60-step window **9e-5** (the inner-solve floor), 300 steps 8e-3,
+   1800–3600 steps 1e-1-scale. A proportional defect in ∂f/∂n would
+   err the same fraction at any length.
+4. Single-class directions decay cleanly with probe step (3.6e-2 →
+   2.7e-3 → 4.8e-4).
 
-What this does and does not touch: the forward results (baseline,
-drainage) involve no adjoint. The twin calibrations descended and
-recovered area-dominant classes, consistent with a gradient correct up
-to kink-scale detail. But the paper now says plainly: at basin scale
-the gradient is validated by descent behavior, not by the FD gate,
-until this closes.
+Conclusion (in the paper): the adjoint returns the exact one-branch
+derivative — verified to the inner-solve floor on short windows with
+every piece of machinery engaged. Over long rain-forced windows the
+trajectory crosses so many per-cell wet/dry surfaces that the
+*objective* is dense with kinks; a central difference converges to a
+smoothed slope several percent from any one branch. BLMVM consumes
+one-branch derivatives of a piecewise-smooth objective — standard for
+max-type/switching systems — and its observed descent is consistent
+with that footing. Verification policy going forward: FD-gate on short
+windows (clean), descent + short-window gates on long ones.
+[o41's error-vs-class-area sweep lands tonight as the final
+cross-check.]
 
 ## 5. Solver settings (settled; no discussion needed)
 

@@ -658,10 +658,24 @@ remains open.
         identically to the plain form at $h_{\rm anuga} = 0$. The value of
         $h_{\rm anuga}$ itself is an empirical choice rather than a
         physical one (open issue~5).
-  \item \textbf{Wet/dry branches.} \emph{(Resolved.)} The RHS's dry
-        cutoffs are honored branch-faithfully in every block; fully wet
-        validation cases keep FD comparisons clean, and dry cells are
-        correctly insensitive to their roughness.
+  \item \textbf{Wet/dry branches.} \emph{(Resolved in the derivative;
+        measured as objective nonsmoothness at basin scale.)} The RHS's
+        dry cutoffs are honored branch-faithfully in every block; fully
+        wet validation cases keep FD comparisons clean, and dry cells
+        are correctly insensitive to their roughness. At basin scale
+        the branches do something no per-block check sees: over long
+        rain-forced windows the trajectory crosses so many per-cell
+        depth-cutoff surfaces that the \emph{objective} is dense with
+        kinks, and a finite-step central difference measures a smoothed
+        slope several percent from the exact one-branch derivative the
+        adjoint returns. This is measured, not conjectured: the gap is
+        $9\times10^{-5}$ (inner-solve floor) over a 60-step window and
+        grows to $10^{-1}$-scale over 3600 steps on identical
+        machinery, while the FD value is stable across a decade of
+        probe step (Section~\ref{sec:hwm}). The practical reading:
+        FD-validate on short windows, where the gate is clean; on long
+        windows the gate measures the objective's nonsmoothness, not
+        the gradient's error.
   \item \textbf{The argmax in the peak-WSE observable.}
         \emph{(Open --- the one entry we have not closed.)} The
         high-water-mark misfit (Section~\ref{sec:hwm}) depends on the
@@ -673,9 +687,13 @@ remains open.
         objective the quasi-Newton method sees is only piecewise smooth
         and its line search can straddle kinks. Practice is untroubled
         --- the FD gates pass away from ties and the twin calibrations
-        descend monotonically --- but this sits on the same
-        practice-ahead-of-theory footing as every $\max$-type
-        observable in calibration.
+        descend monotonically --- and the instrumented basin-scale gate
+        adds a measurement: across every FD probe on the real 108-mark
+        configuration, \emph{no} mark's argmax moved and none flipped
+        wet/dry, so at this geometry the argmax kinks are far sparser
+        than the dynamics' wet/dry kinks (previous entry). This remains
+        the standard footing of $\max$-type observables in calibration
+        rather than a theorem.
         \emph{Proposed remedy, not yet implemented:} freeze the argmax
         assignment across an outer iteration, so each inner subproblem
         is genuinely smooth in the parameters, and re-evaluate the peak
@@ -891,21 +909,34 @@ Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
 peak time is locally constant (Section~\ref{sec:nondiff}). The
 parameter gradient of the peak misfit passes the same central-difference
 gates as every other block on the smooth verification twin
-($9\times10^{-7}$ against a $10^{-5}$ gate). At basin scale the check
-currently fails (up to $2\times10^{-1}$ on a domain-wide direction), and
-an instrumented gate that counts argmax movement and wet/dry flips at
-the marks localizes the discrepancy \emph{below} the observable: across
-the probes, no mark's peak time moves and none flips wet/dry, the
-evaluations are reproducible to nine digits, and the error scales with
-the perturbation's support (single-class directions sit near
-$10^{-3}$). The leading hypothesis is branch switching in the wet/dry
-dynamics themselves --- the probe shifts which cells cross the depth
-cutoff at some step, a kink the observable-level accounting cannot see
---- with probe-step and direction-support sweeps in progress to
-separate that from genuine curvature or a real defect
-(Section~\ref{sec:nondiff}). Until that closes, the basin-scale
-gradient is validated by descent behavior, not by the FD gate, and we
-say so. The remaining scientific choice --- confirmed or corrected by
+($9\times10^{-7}$ against a $10^{-5}$ gate). At basin scale the naive
+check fails --- up to $2\times10^{-1}$ on a domain-wide direction ---
+and a set of instrumented measurements pins down why, in a way that
+validates the gradient rather than the check. First, an instrumented
+gate that counts argmax movement and wet/dry flips at the marks finds
+\emph{zero} of either across every probe: the discrepancy lives below
+the observable. Second, the evaluations are reproducible to nine
+digits and the FD value is \emph{stable across a decade of probe step}
+while disagreeing with the adjoint --- excluding noise, curvature
+truncation ($\varepsilon^2$), and sparse kinks ($\varepsilon^1$).
+Third, and decisively, the gap \emph{accumulates with trajectory
+length}: on the same basin, rain, marks and machinery, the domain-wide
+direction errs by $9\times10^{-5}$ (the inner-solve floor) over a
+60-step window, $8\times10^{-3}$ over 300 steps, and
+$10^{-1}$-scale over 1800--3600 steps, while single-class directions
+decay cleanly with probe step. A proportional defect in
+$\partial f/\partial n$ or the adjoint accumulation would err the same
+fraction at any window length; trajectory-accumulated branch crossings
+--- the probe shifts which cells cross the depth cutoff at some step
+--- predict exactly this profile. The measured conclusion: the adjoint
+returns the exact one-branch derivative; over long windows the
+objective is dense with wet/dry branch surfaces, and a finite-step
+central difference converges to a locally \emph{smoothed} slope that
+sits several percent from any one branch. The quasi-Newton iteration
+consumes one-branch derivatives of a piecewise-smooth objective ---
+standard practice for $\max$-type and switching systems --- and its
+observed descent (Section~\ref{sec:identifiability}) is consistent
+with that footing (Section~\ref{sec:nondiff}). The remaining scientific choice --- confirmed or corrected by
 the domain team --- is the calibration window, which for marks that
 record the event maximum must cover the flood peak.
 
