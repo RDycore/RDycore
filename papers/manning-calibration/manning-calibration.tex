@@ -860,13 +860,20 @@ foregone conclusion. The lesson is not that the method is fragile: it
 is that friction must act long enough to imprint a signal above the
 noise floor, which makes window length a first-class calibration
 decision rather than a cost parameter. The basin-scale noisy row shows
-what marginal signal-to-noise looks like in practice: with
-$\sim$$0.1$\,m of signal against $0.15$\,m of noise the optimizer still
-cuts the misfit $9.4\times$ --- while driving a third of the classes
-onto their bounds (pasture, $428$k cells, to the $0.30$ ceiling). The
-misfit improves because the noise is being fit; the bound-pinning is
-the visible symptom, and it is the concrete argument for stronger
-regularization and a longer window in the production run.
+what marginal signal-to-noise looks like in practice, and why misfit
+at the marks is the objective but not the result. With $0.15$\,m of
+observation noise, even the \emph{true} field cannot beat a mark MAE
+of about $\sigma\sqrt{2/\pi} \approx 0.12$\,m against the noisy
+values --- and the optimizer reaches exactly that floor while driving
+a third of the classes onto their bounds (pasture, $428$k cells, to
+the ceiling) and ending far from the true field it was supposed to
+recover. The data fit is as good as truth could achieve; the
+parameters that achieve it are wrong, because the last of the misfit
+was removed by matching noise. On real data the parameter error is
+invisible and the bound-pinning is its symptom --- which is the
+concrete argument for stronger regularization, a longer window, and
+discrepancy-principle stopping (stop at the noise level, do not
+descend past it) in the production run.
 
 \begin{table}
 \centering\small
