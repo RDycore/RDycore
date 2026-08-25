@@ -56,8 +56,9 @@ calibration with TAO. Every derivative is validated against finite
 differences of the full nonlinear solve at tight, pre-registered
 tolerances (Jacobian blocks to $10^{-8}$, gradients to $10^{-5}$).
 Twin experiments recover a two-zone roughness field to
-$4\times10^{-7}$ relative error, and a per-cell field to $8\%$ with
-multi-time observations and Tikhonov regularization. The same
+$4\times10^{-7}$ relative error under noise-free observations --- a
+statement about gradient correctness, not about calibratability, and we
+quantify the difference. The same
 assembled Jacobian enables fully implicit backward-Euler stepping, and
 we show implicit stepping is required in practice: explicit Manning
 drag is unstable at the operational time step of a Hurricane Harvey
@@ -82,8 +83,11 @@ component MALI, whose velocity solver inverts for basal friction by
 automatic differentiation of the \emph{steady} momentum balance;
 RDycore's capability is, to our knowledge, the first \emph{transient}
 discrete adjoint in an E3SM component --- differentiated through the
-time integrator itself --- and it is obtained without rewriting the
-solver in a machine-learning framework.
+time integrator itself. It is obtained by differentiating the existing
+solver in place: the production discretization, its data structures and
+its GPU backends are the ones being differentiated, not a
+reimplementation of the model in a differentiable-programming
+framework.
 \end{abstract}
 
 \section{Introduction}
@@ -137,8 +141,9 @@ branches, and reflecting/Dirichlet/critical-outflow boundary
 conditions; (ii) adjoint gradients $dJ/du_0$ and $dJ/dn$ with
 respect to water-height observations at gauge locations at multiple
 observation times, FD-validated to $10^{-5}$ or better;
-(iii) TAO-based recovery of per-region and per-cell roughness fields in
-twin experiments, with a quantified observability study; (iv) implicit
+(iii) TAO-based recovery of per-region, per-cell and land-cover-class
+roughness fields, with a quantified study of when the observing network
+makes them identifiable at all; (iv) implicit
 (backward Euler) stepping and its adjoint, enabled by the same
 Jacobian, with an empirical demonstration that explicit friction fails
 at operational time steps on a Hurricane Harvey configuration; and (v)
@@ -250,7 +255,9 @@ $dJ/dn$ (implicit BE) & tight inner tolerances & $5.3\times10^{-6}$ & $10^{-5}$ 
 \bottomrule
 \end{tabular}
 \caption{Relative errors of analytic derivatives against central finite
-differences of the full nonlinear computation. All checks run in CI.}
+differences of the full nonlinear computation. Every check in this
+table is an automated test in RDycore's \texttt{ctest} suite, run on
+every change to the repository.}
 \label{tab:verification}
 \end{table}
 
@@ -293,7 +300,7 @@ gradient error; our policy is to run campaigns loose and repeat one
 calibration at Krylov tolerance $10^{-3}$ --- where the $10^{-5}$
 gates pass --- as a spot check.
 
-\section{Calibration twin experiments}
+\section{The calibration algorithm: strong-constraint 4D-Var}
 \label{sec:calibration}
 
 The complete calibration loop is summarized in
@@ -446,73 +453,22 @@ $\{(s_i, y_i)\}$, bounds $[n_{\min}, n_{\max}]$
 \end{algorithmic}
 \end{algorithm}
 
-All experiments use a wet planar dam-break configuration (50 cells,
-two regions; synthetic noise-free observations; TAO/BLMVM with bounds
-$n\in[0.01, 0.2]$).
-
-\paragraph{Per-region.}
-Truth $n = (0.03, 0.06)$ by region, initial guess $0.02$ uniform,
-terminal-time observations at every second cell. BLMVM recovers both
-values to $4.1\times10^{-7}$ maximum relative error.
-
-\paragraph{Per-cell with Tikhonov regularization.}
-Truth is a two-zone field split at the domain midline; parameters are
-per-cell (three per observation in the densest case), with
-$J \mathrel{+}= \tfrac{\beta}{2}\lVert n - n_0\rVert^2$ about a constant
-prior. Recovery is assessed over observable cells (wet and moving at
-the final time; dry cells are untouched by friction and correctly
-remain at the prior). The controlling factor is observability
-(Table~\ref{tab:percell}): a single terminal snapshot leaves the
-problem badly underdetermined ($39.5\%$ error at full convergence);
-eight observation times already halve the error ($19.9\%$, and still
-descending when stopped at a 200-iteration cap); and 20 observation
-times over the same window reach $8.0\%$, the remainder being genuine
-null space held by the prior. The exact
-analytic Jacobian reduced the cost of an adjoint sweep by roughly
-$6\times$ relative to the FD-coloring Jacobian, making the converged
-experiments interactive ($\sim$2 minutes on one laptop core).
-
-\begin{table}
-\centering\small
-\begin{tabular}{@{}lllll@{}}
-\toprule
-Observations & $\beta$ & TAO its & converged & rel.\ $L^2$ error \\
-\midrule
-terminal only & $10^{-4}$ & 688 & yes & $39.5\%$ \\
-8 times & $10^{-4}$ & 200 (cap) & no & $19.9\%$ \\
-20 times & $10^{-5}$ & 1864 & yes & $\mathbf{8.0\%}$ \\
-\bottomrule
-\end{tabular}
-\caption{Per-cell twin recovery vs.\ observability (planar dam break,
-50 gauges, 150 parameters, 40-step window).}
-\label{tab:percell}
-\end{table}
-
-\paragraph{What noise-free twins do and do not establish.}
-The recoveries above are statements about the \emph{machinery} ---
-gradient correctness end to end --- and it is important to be precise
-about why they are not statements about calibratability. On this
-40-step ($1.8$\,s) window, the entire Manning-induced observation
-signal --- the RMS difference between the truth run's observations and
-the prior run's --- is about $5\,\mu\mathrm{m}$ of water height
-(measured from the initial misfit). Noise-free, the optimizer can
-descend on a micrometer signal indefinitely; with synthetic Gaussian
-observation noise (a deterministic, decomposition-independent
-perturbation of the twin observations), $0.1$\,mm of noise destroys
-the per-cell recovery ($0.20 \to 1.8$ relative $L^2$ at the same
-iteration budget) and $1$\,mm destroys even the two-parameter
-per-region recovery ($4\times10^{-7} \to 0.83$, the optimizer driving
-both values to a bound); no Tikhonov weight in a sweep up to
-$\beta = 1$ rescues it. The lesson is not that the method is fragile
---- it is that observation noise turns calibratability into a
-signal-to-noise question, and friction must act long enough to imprint
-a signal above the noise floor. On the basin-scale configuration of
-Section~\ref{sec:identifiability} the parameter-induced peak-WSE
-signal is $\sim$$0.1$\,m after one simulated hour --- five orders of
-magnitude above the toy twins' --- which is the regime where
-survey-grade noise ($0.1$--$0.3$\,m for high-water marks) becomes a
-fair fight. \todo{o30: noisy (0.15\,m) basin-scale HWM twin --- runs
-queued, numbers to follow.}
+\paragraph{Practical execution.}
+One objective evaluation costs one checkpointed forward sweep plus one
+adjoint sweep, independent of the number of parameters; each trial step
+of the BLMVM line search costs one such evaluation. A basin-scale
+window needs more iterations than a single batch allocation provides,
+so a run writes its parameter vector on exit and the next reads it back
+as its starting iterate, matched by land-cover class rather than by
+position. The resume is exact in the parameters --- the continuing
+run's first objective reproduces the previous run's last to six digits
+--- but BLMVM's stored curvature pairs do not survive it, so a chain of
+jobs is not step-for-step identical to one long run. On a twin at the
+Houston mesh the restart was not a penalty: a chained $2 + 2$ iteration
+run reached a lower objective than a single cold four-iteration run,
+the restart acting as a rescaling of the quasi-Newton model. That is
+one twin, not a rule; the point for planning is that chaining did not
+cost convergence there.
 
 \section{Implicit stepping, enabled and required}
 \label{sec:implicit}
@@ -570,13 +526,10 @@ Three implementation facts others will hit:
 
 \paragraph{Newton robustness is set by residual discontinuities, not
 by conditioning.}
-\textcolor{red}{[Pre-Wednesday note: the two items below are new
-findings from the land-cover-prior runs; both fixes are now
-implemented and gated (the boundary fix as an opt-in transmissive
-condition, open for correction --- open question~2--3). Paper numbers
-reported elsewhere are unaffected --- they come from smooth-$n$
-configurations that never trigger either --- but this is the honest
-account of what implicit stepping costs on a real roughness field.]}
+Both items below come from the land-cover-prior runs rather than the
+smooth-$n$ configurations behind the numbers reported elsewhere, which
+never trigger either; both fixes are implemented and gated, the
+boundary fix as an opt-in condition (open questions~2--3).
 Where implicit stepping fails on this problem, it fails for a reason
 that is invisible in the smooth twin experiments: the residual is
 discontinuous, so Newton has nothing to converge \emph{to}. At the
@@ -638,6 +591,104 @@ aggregate) bound the recompute overhead by a factor of about four,
 making the long-window adjoint memory-feasible; the remaining cost is
 the forward compute itself, addressed next.
 
+\subsection{Nondifferentiability catalog}
+\label{sec:nondiff}
+
+\textcolor{red}{[Reviewers: do we want this subsection at all? It is
+the least conventional part of the paper. Five of its six entries are
+now resolved with gated fixes, which is an argument for keeping it as
+the record of what retrofitting an adjoint onto an operational flood
+code actually costs --- and the counter-argument is that a resolved
+catalog is engineering detail that belongs in an issue tracker. Cut,
+keep here, or move to an appendix.]}
+
+Retrofitting an adjoint onto an operational flood code surfaces
+nonsmooth structure worth documenting. Every entry below is annotated
+with its status: five are resolved and gated in the test suite, and one
+remains open.
+
+\begin{itemize}
+  \item \textbf{Time step inside the RHS.} \emph{(Resolved.)}
+        Operator-split friction treatments (here: semi-implicit and
+        XQ2018) make $f$ depend on $\Delta t$ and on intermediate flux
+        divergences; no consistent $\partial f/\partial u$ exists. The
+        remedy is an explicit $f$ plus a genuinely implicit
+        integrator, not a smarter derivative --- which is the
+        architectural choice this section exists to justify, and the
+        reason the implicit-versus-explicit cost comparison above is
+        not the one a forward-only code would make.
+  \item \textbf{Entropy-fix branches.} \emph{(Resolved.)} The
+        critical-flow fix is piecewise smooth; branch-faithful
+        one-sided derivatives pass FD checks even on transcritical
+        states (Table~\ref{tab:verification}).
+  \item \textbf{Critical-outflow stagnation.} \emph{(Resolved by
+        changing the boundary condition.)} The outflow ghost map
+        $h_g = (q^2/g)^{1/3}$ has an unbounded one-sided derivative at
+        $q = 0$, and the inflow branch switches there: a genuine
+        subgradient point. Unlike the others in this list it is not
+        merely a derivative subtlety --- the branch switch is a
+        discontinuity of the \emph{residual} itself, since the
+        $u_\perp < 0$ branch zeroes both states (a wall) while the
+        $u_\perp \ge 0$ branch imposes the critical ghost, so the edge
+        flux jumps by the full wet-onto-dry Roe flux, $O(g h^2/2)$, as
+        a boundary cell crosses stagnation. With an implicit
+        integrator this stalls Newton outright: the line search
+        collapses to $\lambda \sim 10^{-6}$ with the residual pinned
+        at a floor of $10^{-4}$--$10^{-5}$ relative. Explicit stepping
+        never sees it. The cure is to change the boundary condition,
+        not the solver: a transmissive (zero-gradient) free outflow ---
+        ghost state equal to the interior state, the standard free
+        outflow of finite-volume shallow-water codes --- is continuous
+        by construction, has an identity ghost map in the Jacobian,
+        and removes the stall entirely. Provided as an opt-in
+        condition alongside the original, and gated: a 72-hour
+        rain-forced basin forward completed $259{,}200$ implicit solves
+        with zero nonlinear failures.
+  \item \textbf{Drag at the wet/dry cutoff.} \emph{(Resolved by
+        regularizing the drag velocity.)} The drag
+        $g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ gated at
+        $h_{\min}$ with a plain $\mathbf{q}/h$ velocity is likewise
+        residual-discontinuous: a cell crossing the cutoff with
+        retained momentum switches an $O(h^{-7/3})$ term on and off.
+        The amplitude scales with $n^2$, so it is invisible in
+        smooth-$n$ twin experiments and disabling at land-cover
+        roughness. Evaluating the drag with the ANUGA-regularized
+        velocity $\mathbf{u} = \mathbf{q}h/(h^2 + h_{\rm anuga}^2)$
+        removes it (the drag then vanishes as $h^{5/3}$), and reduces
+        identically to the plain form at $h_{\rm anuga} = 0$. The
+        regularization parameter itself still awaits domain sign-off
+        (open question~4).
+  \item \textbf{Wet/dry branches.} \emph{(Resolved.)} The RHS's dry
+        cutoffs are honored branch-faithfully in every block; fully wet
+        validation cases keep FD comparisons clean, and dry cells are
+        correctly insensitive to their roughness.
+  \item \textbf{The argmax in the peak-WSE observable.}
+        \emph{(Open --- the one entry we have not closed.)} The
+        high-water-mark misfit (Section~\ref{sec:hwm}) depends on the
+        state through $\max_k H u(t_k)$: piecewise smooth, with kinks
+        where two sampled times tie for a mark's peak. The adjoint
+        injects each mark's residual at its recorded argmax time, which
+        is the exact gradient away from ties (a measure-zero set); but
+        the peak time \emph{moves} across optimizer iterates, so the
+        objective the quasi-Newton method sees is only piecewise smooth
+        and its line search can straddle kinks. Practice is untroubled
+        --- the FD gates pass away from ties and the twin calibrations
+        descend monotonically --- but this sits on the same
+        practice-ahead-of-theory footing as every $\max$-type
+        observable in calibration.
+        \emph{Proposed remedy, not yet implemented:} freeze the argmax
+        assignment across an outer iteration, so each inner subproblem
+        is genuinely smooth in the parameters, and re-evaluate the peak
+        times between outer iterations --- a fixed point on peak times,
+        converged when the assignment stops changing. This costs one
+        extra forward per outer iteration and makes the smoothness
+        assumption the line search relies on true by construction
+        rather than true in practice. A smooth surrogate
+        (softmax over the sampled times, tempered toward the true
+        maximum) is the alternative, at the cost of biasing the peak
+        it calibrates against.
+\end{itemize}
+
 \section{Hurricane Harvey twin experiments: regularization and the
 real-network limit}
 \label{sec:houston}
@@ -660,9 +711,8 @@ decreasing while the parameters drift along observation-null
 directions, ultimately pinning cells against both bound constraints
 (Figure~\ref{fig:map}, center left). Early stopping was acting as the
 effective regularizer. The behavior disappears when the problem is
-made well posed: the densely observed dam-break twin of
-Table~\ref{tab:percell} converges monotonically to $8\%$, and a
-properly regularized Houston run ($\beta = 10^{-4}$, 686 gauges)
+made well posed: a properly regularized Houston run
+($\beta = 10^{-4}$, 686 gauges)
 reaches $19.4\%$ at a 1000-iteration budget with no drift
 (Figure~\ref{fig:map}, center right) --- the sharpest recovery of the
 three, with the zone boundary resolved at the truth midline. This is
@@ -763,6 +813,50 @@ and twin marks synthesized from the truth trajectory carry no
 representation error, so this is an identifiability statement --- an
 upper bound on real-data performance, not a forecast of it.
 
+\paragraph{Noise turns identifiability into a signal-to-noise question.}
+Every recovery above is noise-free, as are the verification twins
+behind Section~\ref{sec:calibration}. Such experiments establish that
+the gradient is right and that the observable carries the information;
+they do not establish that a field can be calibrated from real data.
+What separates the two is the size of the parameter-induced signal
+relative to observation error, and that ratio moves by orders of
+magnitude with the configuration (Table~\ref{tab:snr}). On a short
+verification window the entire Manning-induced observation signal is a
+few microns of water height, so a noise-free optimizer descends on it
+indefinitely while a tenth of a millimetre of observation noise
+destroys the recovery outright --- and no Tikhonov weight in a sweep
+up to $\beta = 1$ rescues it. At basin scale the same quantity is
+$\sim$$0.1$\,m of peak water-surface elevation after one simulated
+hour, five orders of magnitude larger, which is the regime in which
+survey-grade high-water-mark error becomes a fair fight rather than a
+foregone conclusion. The lesson is not that the method is fragile: it
+is that friction must act long enough to imprint a signal above the
+noise floor, which makes window length a first-class calibration
+decision rather than a cost parameter.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Configuration & Signal & Observation noise & Outcome \\
+\midrule
+Verification twin & $5\,\mu$m & none & per-region recovery $4\times10^{-7}$ \\
+(planar, 40 steps, & water & $0.1$\,mm & per-cell recovery destroyed ($0.20 \to 1.8$) \\
+$1.8$\,s) & height & $1$\,mm & per-region destroyed ($4\times10^{-7} \to 0.83$, both at bounds) \\
+\midrule
+30\,m basin, 1\,h & $\sim$$0.1$\,m & none & area-weighted rel.\ $L^2$ $0.20$; MAE $0.103 \to 0.017$\,m \\
+rain-forced, 108 marks & peak WSE & $0.15$\,m (HWM grade) & \todo{o30: queued, numbers to follow} \\
+\bottomrule
+\end{tabular}
+\caption{Parameter-induced observation signal versus observation error.
+The noise-free recoveries differ by seven orders of magnitude in the
+signal they descend on; only the basin-scale row is a fair test against
+survey-grade error ($0.1$--$0.3$\,m for high-water marks). Noise is a
+deterministic, decomposition-independent perturbation of the twin
+observations, so the comparison is reproducible across rank counts.}
+\label{tab:snr}
+\end{table}
+
 \subsection{Changing the observable: high-water marks}
 \label{sec:hwm}
 
@@ -811,73 +905,6 @@ calibration window) is the next diagnostic. What the calibration
 must demonstrate is how much of the 3.41\,m a Manning field can
 close; the literature's calibrated benchmark on this event is
 $0.67$\,m MAE~\cite{li2026inunda}.
-
-\section{Nondifferentiability catalog}
-\label{sec:nondiff}
-
-Retrofitting an adjoint onto an operational flood code surfaces
-nonsmooth structure worth documenting:
-\begin{itemize}
-  \item \textbf{Time step inside the RHS.} Operator-split friction
-        treatments (here: semi-implicit and XQ2018) make $f$ depend on
-        $\Delta t$ and on intermediate flux divergences; no consistent
-        $\partial f/\partial u$ exists. The remedy is an explicit $f$
-        plus a genuinely implicit integrator, not a smarter derivative.
-  \item \textbf{Entropy-fix branches.} The critical-flow fix is
-        piecewise smooth; branch-faithful one-sided derivatives pass FD
-        checks even on transcritical states
-        (Table~\ref{tab:verification}).
-  \item \textbf{Critical-outflow stagnation.} The outflow ghost map
-        $h_g = (q^2/g)^{1/3}$ has an unbounded one-sided derivative at
-        $q = 0$, and the inflow branch switches there: a genuine
-        subgradient point. Unlike the others in this list it is not
-        merely a derivative subtlety --- the branch switch is a
-        discontinuity of the \emph{residual} itself, since the
-        $u_\perp < 0$ branch zeroes both states (a wall) while the
-        $u_\perp \ge 0$ branch imposes the critical ghost, so the edge
-        flux jumps by the full wet-onto-dry Roe flux, $O(g h^2/2)$, as
-        a boundary cell crosses stagnation. With an implicit
-        integrator this stalls Newton outright: the line search
-        collapses to $\lambda \sim 10^{-6}$ with the residual pinned
-        at a floor of $10^{-4}$--$10^{-5}$ relative
-        (Section~\ref{sec:implicit}). Explicit stepping never sees it.
-        The cure is to change the boundary condition, not the solver:
-        a transmissive (zero-gradient) free outflow --- ghost state
-        equal to the interior state, the standard free outflow of
-        finite-volume shallow-water codes --- is continuous by
-        construction, has an identity ghost map in the Jacobian, and
-        removes the stall entirely (Section~\ref{sec:implicit}). We
-        provide it as an opt-in condition alongside the original.
-  \item \textbf{Drag at the wet/dry cutoff.} The drag
-        $g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ gated at
-        $h_{\min}$ with a plain $\mathbf{q}/h$ velocity is likewise
-        residual-discontinuous: a cell crossing the cutoff with
-        retained momentum switches an $O(h^{-7/3})$ term on and off.
-        The amplitude scales with $n^2$, so it is invisible in
-        smooth-$n$ twin experiments and disabling at land-cover
-        roughness. Evaluating the drag with the ANUGA-regularized
-        velocity $\mathbf{u} = \mathbf{q}h/(h^2 + h_{\rm anuga}^2)$
-        removes it (the drag then vanishes as $h^{5/3}$), and reduces
-        identically to the plain form at $h_{\rm anuga} = 0$.
-  \item \textbf{Wet/dry branches.} The RHS's dry cutoffs are honored
-        branch-faithfully in every block; fully wet validation cases
-        keep FD comparisons clean, and dry cells are correctly
-        insensitive to their roughness.
-  \item \textbf{The argmax in the peak-WSE observable.} The
-        high-water-mark misfit (Section~\ref{sec:hwm}) depends on the
-        state through $\max_k H u(t_k)$: piecewise smooth, with kinks
-        where two sampled times tie for a mark's peak. The adjoint
-        injects each mark's residual at its recorded argmax time,
-        which is the exact gradient away from ties (a measure-zero
-        set); but the peak time \emph{moves} across optimizer
-        iterates, so the objective the quasi-Newton method sees is
-        only piecewise smooth and its line search can straddle kinks.
-        Practice is untroubled --- the FD gates pass away from ties
-        and the twin calibrations descend monotonically --- but this
-        sits on the same practice-ahead-of-theory footing as every
-        $\max$-type observable in calibration, and we say so rather
-        than hide it.
-\end{itemize}
 
 \section{Conclusions and outlook}
 
@@ -1040,11 +1067,10 @@ cross-references are given as Q$n$.]}
         undisturbed by the noise level that in practice sets where
         semiconvergence turns over. \emph{Partially addressed:} a
         deterministic noise option now exists and
-        Section~\ref{sec:calibration} quantifies the toy twins'
-        $5\,\mu$m signal and its collapse under $0.1$--$1$\,mm noise
-        --- reframing the toy recoveries as machinery verification and
-        the noise question as a signal-to-noise (window length)
-        question. Still open: the noisy basin-scale HWM twin (queued)
+        Table~\ref{tab:snr} sets the parameter-induced signal against
+        the observation error for both regimes --- reframing the
+        noise-free recoveries as machinery verification and the noise
+        question as a signal-to-noise (window length) question. Still open: the noisy basin-scale HWM twin (queued)
         and, eventually, noise-consistent regularization
         (discrepancy-principle stopping). (Q7)
   \item \textbf{The peak-WSE observable, if adopted, is nonsmooth in a
