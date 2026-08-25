@@ -1368,8 +1368,12 @@ static PetscErrorCode FDCheckParamGradient(PetscErrorCode (*obj)(Tao, Vec, Petsc
     char dirname[32];
     if (s < 0) PetscCall(PetscSNPrintf(dirname, sizeof(dirname), "ones"));
     else PetscCall(PetscSNPrintf(dirname, sizeof(dirname), "e_%" PetscInt_FMT, s));
-    PetscCall(PetscPrintf(comm, "  %s fd check dir %s: adjoint %.8e  fd %.8e  rel %.3e\n", label, dirname, (double)gdotd, (double)fd,
-                          (double)rel));
+    // Jp and Jm are printed so logs support one-sided-difference and
+    // second-difference analysis: (Jp - 2 J0 + Jm)/eps^2 is bounded for
+    // genuine curvature but grows ~1/eps when a branch surface sits inside
+    // the probe interval -- the cheap kink-vs-curvature discriminator.
+    PetscCall(PetscPrintf(comm, "  %s fd check dir %s: adjoint %.8e  fd %.8e  rel %.3e  (Jp %.10e  Jm %.10e  eps %.3e)\n", label, dirname,
+                          (double)gdotd, (double)fd, (double)rel, (double)Jp, (double)Jm, (double)eps));
 
     if (probe) {
       // classify the weighted marks: argmax moved / wet-dry flipped / smooth,
