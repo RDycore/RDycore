@@ -1514,3 +1514,55 @@ exact (verified at the inner-solve floor with all machinery engaged);
 the long-window FD gate measures the objective's dense wet/dry
 nonsmoothness, not gradient error. Verification policy: FD-gate on
 short windows; descent plus short-window gates on long ones.
+
+### o39/o40/o41 complete: the gradient closure, confirmed three more ways (2026-08-25)
+
+**o39 full eps ladder (1-hr window, converged tolerances), by direction:**
+
+| direction | eps 1e-2 | 1e-3 | 1e-4 | 1e-5 |
+| --- | --- | --- | --- | --- |
+| ones | 5.24 | 7.64e-2 | 7.47e-2 | 4.38e-2 |
+| coord A (class 24) | 3.59e-2 | 2.67e-3 | 4.82e-4 | **8.28e-6 -- PASSES the 1e-5 gate** |
+| coord B (class 23) | 7.97e-3 | 1.53e-2 | 1.57e-2 | 5.54e-4 |
+| coord C | 8.87e-2 | 6.49e-2 | 6.79e-2 | 2.31e-2 |
+
+Every direction falls toward the gate as the probe shrinks; sparse
+directions get clean first. (The e5 rung is meaningful because the
+determinism is far better than estimated: o41 resolved a class with
+|g| = 249 -- a J-difference of 0.015 on 3.5e6, i.e. ~4e-9 relative --
+to 2.4e-5, so reproducibility is ~1e-10/1e-11 relative.)
+
+**o41 all-15-class support sweep (30-min window):** the FD-adjoint gap
+per class, mapped to class area, is NOT proportional to area -- it
+concentrates in the developed-intensity and wetland classes:
+
+| slot | NLCD | cells | rel gap |
+| --- | --- | --- | --- |
+| e_1 | 21 developed-open | 178k | 1.10e-1 |
+| e_2 | 22 developed-low | 439k | 7.99e-2 |
+| e_7 | 42 evergreen | 43k | 2.86e-2 |
+| e_3 | 23 developed-med | 928k | 2.60e-2 |
+| e_13 | 90 woody wetland | 122k | 6.76e-3 |
+| e_4 | 24 developed-high | 552k | 2.34e-3 |
+| e_11 | 81 pasture | 428k | 2.48e-4 |
+| others | | 12k-86k | 2e-6..2.5e-4 |
+
+What matters is a class's MARGINAL-WETNESS exposure (cells crossing
+the depth cutoff during the window), not its size: urban classes flood
+progressively, pasture is mostly decisively wet or dry.
+
+**Superposition (from the same o41 data):** the signed per-class gaps
+SUM to the domain-wide gap (2.35e5 vs 2.33e5, ~1%). The gap is
+additive over classes -- exactly what independent per-cell branch
+crossings predict, and what no plausible wiring bug would arrange.
+
+**o40 (full 1-hr probe)** reproduces o38C/o39 with the restricted
+machinery engaged: zero observable-level flips, smooth-subset error ==
+full error, verdict unchanged.
+
+With the window-length ladder (o42), the mechanism now has four
+independent confirmations: eps-convergence per direction,
+window-length accumulation, class-support structure with additivity,
+and zero observable-level kinks. CLOSED: the adjoint is correct; the
+long-window FD gate measures dense wet/dry branch structure in the
+objective.
