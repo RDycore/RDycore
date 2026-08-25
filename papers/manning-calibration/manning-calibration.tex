@@ -52,19 +52,22 @@ PETSc's \texttt{TSAdjoint}, bound-constrained calibration with TAO,
 and fully implicit time stepping; one gradient costs about one extra
 forward solve, independent of the parameter count, and every
 derivative is validated against finite differences of the full
-nonlinear solve at pre-registered tolerances. Implicit stepping proves
-not merely enabled but required: the differentiable form of Manning
-drag is friction-stiff and unstable under explicit stepping at
-operational time steps. Twin calibrations show that identifiability is
-a property of the observing geometry and the observable, not of
-observation counts: surveyed high-water marks identify the land-cover
-roughness classes covering $83\%$ of a 2.93M-cell Hurricane Harvey
-domain, where the real stream-gauge network identifies almost none.
-Against the real survey, the uncalibrated model errs by $1.51$\,m mean
-peak water-surface elevation over the marks in reaches it can drain
---- and the same evaluation isolates a reach the model cannot drain, a
-conveyance defect no roughness value can absorb, as a finding in its
-own right. This is, to our knowledge, the first \emph{transient}
+nonlinear solve. Implicit time stepping, which the
+same Jacobian makes practical, also proves necessary: the
+differentiable form of Manning drag is friction-stiff, and explicit
+stepping is unstable at operational time steps. Twin calibrations --- which use model
+output from a known synthetic roughness field as the observations, so
+that recovery can be scored against the truth --- show that whether
+the field can be recovered at all depends on the observing geometry
+and on the observable, not on observation counts: surveyed high-water
+marks recover the land-cover roughness classes covering $83\%$ of a
+2.93M-cell Hurricane Harvey domain, where the real stream-gauge
+network recovers almost none.
+Against the real survey, the same evaluation isolates a downstream
+region the model cannot drain --- a defect no roughness value can
+absorb, and a finding in its own right --- and over the rest of the
+domain the uncalibrated model errs by $1.51$\,m in mean peak
+water-surface elevation. This is, to our knowledge, the first \emph{transient}
 discrete adjoint in an E3SM component (the land-ice component inverts
 a \emph{steady} solve), obtained by differentiating the production
 solver in place --- its discretization, data structures, and GPU
@@ -224,8 +227,9 @@ $\partial S_{\mathbf q}/\partial n = -2 g n h^{-7/3}\mathbf{q}\lVert\mathbf q\rV
 two nonzeros per cell, supplied to \texttt{TSSetRHSJacobianP}.
 
 \paragraph{Verification.}
-Three layers, all against central finite differences with
-pre-registered tolerances (Table~\ref{tab:verification}): an edge-level
+Three layers, all against central finite differences, with the
+pass/fail tolerances fixed in advance of the runs
+(Table~\ref{tab:verification}): an edge-level
 harness that differences the flux routine itself on sampled states (with
 a Richardson self-check of the FD order); full-matrix comparisons of the
 assembled Jacobian against a matrix-coloring FD Jacobian of the actual
