@@ -1396,3 +1396,59 @@ Units note for reproducers: `turning30m_hwm_obs.txt` column 2 is WSE
 The per-mark dump's h_obs is the converted value. (A first cut of the
 drainage script compared raw WSE to model h -- the model-side
 classification above never used obs values, so it is unaffected.)
+
+### o40d: the observable-kink hypothesis is REFUTED -- the FD gap lives below the observable (2026-08-25)
+
+The kink-probe instrumentation (commit c51e5063) decomposes the FD gate
+exactly over marks, J = J_S + J_flip, counting per probe direction the
+marks whose argmax time moves or whose wet/dry state flips, and re-running
+the comparison restricted to the non-flipping set (snapshot-reconstructed
+FD vs a zero-weighted adjoint re-evaluation; validated on the smooth twin,
+where it reproduces the full check to the last digit with zero flips).
+
+Basin scale (debug variant: 30-min window, 108 real marks, classes mode,
+converged tolerances ksp 1e-4 / snes 1e-5):
+
+| direction | adjoint g.d | FD | rel err | argmax moved | wet/dry flipped |
+| --- | --- | --- | --- | --- | --- |
+| ones (all 15 classes) | -1.1256e6 | -8.9248e5 | **2.07e-1** | **0** | **0** |
+| e_s (one class) | 3.0650e6 | 3.0721e6 | 2.34e-3 | 0 | 0 |
+
+**Zero observable-level flips, yet the ones direction errs by 21%.** The
+smooth-subset error equals the full error because the "smooth" subset is
+all 108 marks. Three sharp facts:
+
+1. **Determinism to ~9 digits**: two independent evaluations at the base
+   point printed identical J and g.d. Noise is excluded; the ones-direction
+   FD difference (dJ ~ 53 on J ~ 3.5e6) is three orders above the
+   reproducibility floor. The discrepancy is real and well-resolved.
+2. **Error scales with direction support**: domain-wide 2.1e-1 vs
+   single-class 2.3e-3 (o38C's coordinate directions: 2.7e-3..6.5e-2).
+   A wiring bug has no natural reason to care about sparsity; branch
+   switching in the wet/dry DYNAMICS does -- a wider perturbation crosses
+   more tiny_h surfaces along the trajectory.
+3. **|FD| < |adjoint|** on the ones direction -- the signature of a
+   central difference averaging slopes across branch surfaces.
+
+Remaining candidate mechanisms, and the running discriminators:
+- (a) dynamics-level wet/dry branch switching: FD error falls ~ eps^1
+  as the probe shrinks (fewer surfaces inside the interval);
+- (b) genuine curvature (central-difference truncation): falls ~ eps^2;
+- (c) a support-correlated defect: flat in eps, systematic in class area.
+o39 (eps sweep at converged tolerances, RUNNING) separates (a)/(b) from
+(c); o41 (all-15-class coordinate sweep on the 30-min window, gpu4 build
+with the direction index printed) measures error vs class area across
+four orders of magnitude of support.
+
+Noise-floor arithmetic for reading o39: the base J reproduces to ~1e-7
+relative, so the FD noise contribution at probe eps_rel is roughly
+0.35/(2 * eps_rel * 0.03 * |g.d|); for the ones direction that is ~5e-3
+at eps 1e-3 and ~5e-2 at eps 1e-5 -- the V-curve's left branch is noise,
+only the descent from eps 1e-2 -> 1e-3 -> 1e-4 is signal.
+
+Consequence, already in the paper (19c4ed18 wording corrected after this
+run): the basin-scale gradient is currently validated by descent
+behavior, not by the FD gate, and the paper says so explicitly. What
+this does NOT touch: the forward results (o37 baseline, drainage
+finding) involve no adjoint; and o28/o30's calibrations descended --
+consistent with a gradient that is right up to kink-scale detail.

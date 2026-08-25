@@ -891,11 +891,21 @@ Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
 peak time is locally constant (Section~\ref{sec:nondiff}). The
 parameter gradient of the peak misfit passes the same central-difference
 gates as every other block on the smooth verification twin
-($9\times10^{-7}$ against a $10^{-5}$ gate); at basin scale the check is
-confounded by the observable's own kinks --- probe steps move argmax
-times and flip marks wet/dry --- and an instrumented gate that separates
-kink effects from gradient error is part of the verification suite
-(Section~\ref{sec:nondiff}). The remaining scientific choice --- confirmed or corrected by
+($9\times10^{-7}$ against a $10^{-5}$ gate). At basin scale the check
+currently fails (up to $2\times10^{-1}$ on a domain-wide direction), and
+an instrumented gate that counts argmax movement and wet/dry flips at
+the marks localizes the discrepancy \emph{below} the observable: across
+the probes, no mark's peak time moves and none flips wet/dry, the
+evaluations are reproducible to nine digits, and the error scales with
+the perturbation's support (single-class directions sit near
+$10^{-3}$). The leading hypothesis is branch switching in the wet/dry
+dynamics themselves --- the probe shifts which cells cross the depth
+cutoff at some step, a kink the observable-level accounting cannot see
+--- with probe-step and direction-support sweeps in progress to
+separate that from genuine curvature or a real defect
+(Section~\ref{sec:nondiff}). Until that closes, the basin-scale
+gradient is validated by descent behavior, not by the FD gate, and we
+say so. The remaining scientific choice --- confirmed or corrected by
 the domain team --- is the calibration window, which for marks that
 record the event maximum must cover the flood peak.
 
