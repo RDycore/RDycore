@@ -1494,3 +1494,23 @@ Discriminators in flight:
   contamination ACCUMULATES with trajectory length (a 60-step window
   crosses ~60x fewer surfaces); under (b) the relative gap is
   window-independent. This is the cleanest bug-vs-structure separator.
+
+### o42 (complete): the window-length ladder, ones direction (2026-08-25)
+
+| window | rel FD error | note |
+| --- | --- | --- |
+| 60 s | 8.923e-5 | inner-solve floor: the gate effectively PASSES |
+| 300 s | 8.082e-3 | |
+| 900 s | 2.375e-2 | |
+| 1800 s | 2.071e-1 | o40d (30-min config) |
+| 3600 s | 7.470e-2 | o39/o38C (1-hr config) |
+
+Monotone accumulation through 1800 s; the 3600-s point is a different
+J (peaks over a longer horizon), so strict monotonicity across configs
+is not expected. Single-class directions stay 1-3 orders cleaner at
+every window (e_3: 2.7e-5 at 60 s, 1.7e-5 at 300 s; e_4: 3.0e-3 at
+900 s). The verdict stands as committed in 346217b3: the adjoint is
+exact (verified at the inner-solve floor with all machinery engaged);
+the long-window FD gate measures the objective's dense wet/dry
+nonsmoothness, not gradient error. Verification policy: FD-gate on
+short windows; descent plus short-window gates on long ones.
