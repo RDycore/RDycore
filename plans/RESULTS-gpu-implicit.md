@@ -1291,3 +1291,63 @@ no further forward is needed, and several placements can be tried for
 free (paper Q7). Its "hwm eval" line doubles as a regression check that
 the new build reproduces o31's uncalibrated MAE 3.41 m -- both new
 options are default-off, so it should match exactly.
+
+### o36: inner-tolerance ladder -- the loose settings did NOT corrupt the forward (2026-08-25)
+
+Mark's concern: `ksp_rtol 1e-2` could be causing a problem that is hard
+to see, and `snes_rtol 1e-3` likewise. Both were adopted while the
+critical-outflow BC was stalling Newton -- a stall free-outflow removed
+-- so neither is paying for anything any more.
+
+**First, the WATCH ITEM from the 2026-08-22 solver decision is not
+tripping.** In the completed 72-hr forward at rtol 1e-2, 259,197 of
+259,200 steps converge in **2 Newton iterations** (2 steps at 3, 1 at 5;
+cap 50). The o30 calibration runs 2-7, plus exactly one pathological
+trial field that hit DIVERGED_MAX_IT and was absorbed by the
+failure-tolerant machinery. Nothing is visibly stressed.
+
+**Ladder** (1-hr rain-forced window, eval-only vs the real 108 marks, n4):
+
+| rung | ksp / snes | wall | KSP solves | its/solve | total KSP | J | MAE | dry |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A (campaign) | 1e-2 / 1e-3 | 231 s | 7204 | 5.27 | 37,965 | 3.429246e6 | 1.6479 | 22 |
+| B | 1e-3 / 1e-3 | **203 s** | **3986** | 7.49 | **29,855** | 3.429268e6 | 1.6479 | 22 |
+| C | 1e-4 / 1e-5 | 291 s | 7227 | 9.67 | 69,885 | **3.429274e6** | 1.6479 | 22 |
+| D (reference) | 1e-6 / 1e-8 | 348 s | 7581 | 13.96 | 105,832 | **3.429274e6** | 1.6479 | 22 |
+
+Three findings:
+
+1. **C reproduces the converged answer D exactly**, so C is converged to
+   printed precision. The campaign setting A is off by **8.2e-6 relative
+   in J**, with peak-WSE MAE and dry count identical. The forward science
+   answer is insensitive to all of this -- the 3.41 m baseline and the
+   crest-censoring result are not tolerance artifacts, at least over
+   3,600 steps. o37 repeats the 259,200-step run at C to confirm at scale.
+2. **Tightening 1e-2 -> 1e-3 makes the run FASTER** (203 s vs 231 s) on
+   21% less linear work. Better linear solves let Newton finish in ONE
+   iteration at 3,218 of 3,600 steps instead of two, so the number of KSP
+   solves nearly halves (3986 vs 7204) even though each costs more
+   iterations. There is no speed argument for 1e-2.
+3. **The laptop does not predict Turning.** On the 50-cell free-outflow
+   twin, KSP iterations are quantized -- two iterations satisfy both 1e-2
+   and 1e-3 (mean 1.97 vs 2.01), both returning the same gradient
+   (6.4e-4 adjoint-vs-FD, both FAILING the 1e-5 gate); only 1e-4 adds a
+   third iteration and drops the error to 7.2e-6. At Turning the Newton
+   behaviour is the opposite (1e-3 needs FEWER Newton iterations), so the
+   laptop ladder cannot be used to set the production tolerance. o38
+   measures the gradient at production scale.
+
+**Discrepancy to resolve.** `plans/campaign-wednesday.md` and the paper's
+open issue 3 both state that "the same configuration at rtol 1e-3 passes
+the 1e-5 gates". On the laptop free-outflow beuler twin it does not
+(6.4e-4, failing). That claim was measured 2026-08-22, before
+free-outflow existed, so it may be configuration-specific rather than
+wrong -- o38 settles it at production scale. Do not repeat the claim in
+the paper until it does.
+
+**Decision.** Forward/eval work has no gradient in it at all, so its only
+requirement is forward accuracy; calibration is where gradient error
+lives. o37 (72-hr baseline + fresh hourly checkpoints) and any subsequent
+calibration run at **ksp 1e-4 / snes 1e-5**; the checkpoints a calibration
+window restarts from must come from the same tolerance the calibration
+runs at, which is why o37 regenerates them rather than reusing o34's.
