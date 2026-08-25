@@ -502,6 +502,55 @@ static PetscErrorCode ForwardObserve(RDy rdy, Vec ic, PetscInt total_steps, Pets
 
 // peak-WSE (high-water-mark) observation: one forward pass recording
 // h_k = H u(t_k) at every observation time, then per mark m the peak sample
+// --- peak-probe introspection (kink diagnosis for the FD gate) --------------
+// The peak-WSE objective is only piecewise smooth: an FD probe step can move a
+// mark's argmax time or flip its wet/dry state, and a central difference that
+// straddles such a kink measures a divided difference across two BRANCHES of
+// J, not the one-branch derivative the adjoint computes (the catalog's one
+// open entry). When enabled, ForwardObservePeak deposits each evaluation's
+// per-mark argmax sample and peak height here, and FDCheckParamGradient uses
+// the +/- snapshots to (a) count the marks that flip across each probe pair
+// and (b) rerun the comparison RESTRICTED to the non-flipping marks S. Both
+// FD and the adjoint are linear over marks (J = J_S + J_flip), so on S the
+// objective is branch-constant at the observable level and the two must agree
+// to inner-solve accuracy -- unless a kink BELOW the observable (a wet/dry
+// branch flip in the dynamics itself) is in play, which is what a residual
+// restricted failure would indicate. The restricted adjoint is obtained by
+// zero-weighting the flipped marks and re-evaluating at the base point; the
+// restricted FD comes free from the +/- snapshots.
+typedef struct {
+  PetscBool  enabled;
+  PetscInt   nloc;   // owned marks
+  Vec        y, w;   // borrowed: observations and the LIVE weights vec
+  PetscReal  sigma;
+  PetscInt  *kstar;  // [nloc] argmax sample of the last evaluation
+  PetscReal *hpeak;  // [nloc] model peak h of the last evaluation
+} HwmProbeCtx;
+
+static HwmProbeCtx hwm_probe;  // one TS per driver run, like obs_mon
+
+static PetscErrorCode HwmProbeEnable(Vec y_hwm, Vec w_hwm, PetscReal sigma) {
+  PetscInt rlo, rhi;
+  PetscFunctionBeginUser;
+  PetscCall(VecGetOwnershipRange(y_hwm, &rlo, &rhi));
+  hwm_probe.enabled = PETSC_TRUE;
+  hwm_probe.nloc    = rhi - rlo;
+  hwm_probe.y       = y_hwm;
+  hwm_probe.w       = w_hwm;
+  hwm_probe.sigma   = sigma;
+  PetscCall(PetscMalloc1(PetscMax(hwm_probe.nloc, 1), &hwm_probe.kstar));
+  PetscCall(PetscMalloc1(PetscMax(hwm_probe.nloc, 1), &hwm_probe.hpeak));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode HwmProbeDisable(void) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscFree(hwm_probe.kstar));
+  PetscCall(PetscFree(hwm_probe.hpeak));
+  hwm_probe = (HwmProbeCtx){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // k*_m = argmax_k h_k[m] defines the misfit
 //   J = 1/2 sigma^-2 sum_m ( w_m (h_{k*_m}[m] - y_hwm[m]) )^2
 // and the residual vecs r_k are filled with that residual at k*_m and zero
@@ -544,6 +593,14 @@ static PetscErrorCode ForwardObservePeak(RDy rdy, Vec ic, PetscInt total_steps, 
       }
     }
     PetscCall(VecRestoreArrayRead(h_k[k], &ha));
+  }
+
+  // deposit this evaluation's argmax/peak snapshot for the FD kink diagnosis
+  if (hwm_probe.enabled && hwm_probe.nloc == nloc) {
+    for (PetscInt i = 0; i < nloc; ++i) {
+      hwm_probe.kstar[i] = kstar[i];
+      hwm_probe.hpeak[i] = hpeak[i];
+    }
   }
 
   PetscReal sums[3] = {0.0, 0.0, 0.0};  // J, sum |err|, n_weighted; dry count separate
@@ -1163,13 +1220,37 @@ static PetscErrorCode SetupHWMObservations(RDy rdy, Vec u_ic, const char *hwm_fi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// g . d for the FD directions: d = ones (s < 0) or the coordinate e_s
+static PetscErrorCode DirDot(Vec g, PetscInt s, PetscReal *out) {
+  PetscFunctionBeginUser;
+  if (s < 0) {
+    PetscCall(VecSum(g, out));
+  } else {
+    MPI_Comm comm;
+    PetscInt lo, hi;
+    PetscCall(PetscObjectGetComm((PetscObject)g, &comm));
+    PetscCall(VecGetOwnershipRange(g, &lo, &hi));
+    PetscReal gl = 0.0;
+    if (s >= lo && s < hi) {
+      const PetscScalar *ga;
+      PetscCall(VecGetArrayRead(g, &ga));
+      gl = PetscRealPart(ga[s - lo]);
+      PetscCall(VecRestoreArrayRead(g, &ga));
+    }
+    PetscCallMPI(MPIU_Allreduce(&gl, out, 1, MPIU_REAL, MPIU_SUM, comm));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // directional FD gate on a TAO parameter gradient: for the all-ones direction
 // and the `nsamp` coordinate directions with the LARGEST |g| (components with
 // negligible gradient are pure central-difference roundoff and say nothing),
 // compare (J(p+eps d)-J(p-eps d)) / (2 eps) against g.d. Each probe evaluates
 // the full objective (the gradient it also computes is discarded). The step is
 // the central-difference optimum cbrt(eps_mach) * scale(p); for the peak-WSE
-// observable the argmax must also not move across the probe.
+// observable the argmax must also not move across the probe -- when it can
+// (basin-scale runs), enable hwm_probe and the check reports, per direction,
+// the flip counts and the comparison restricted to the non-flipping marks.
 static PetscErrorCode FDCheckParamGradient(PetscErrorCode (*obj)(Tao, Vec, PetscReal *, Vec, void *), void *ctx, Vec p, Vec g_ref,
                                            PetscInt nsamp, PetscReal eps_scale, PetscReal tol, const char *label) {
   MPI_Comm comm;
@@ -1230,25 +1311,30 @@ static PetscErrorCode FDCheckParamGradient(PetscErrorCode (*obj)(Tao, Vec, Petsc
   PetscCall(VecDuplicate(p, &pp));
   PetscCall(VecDuplicate(p, &gs));
 
-  PetscReal max_rel = 0.0;
+  // kink diagnosis: snapshots of the +/- evaluations' per-mark peak state,
+  // and a pristine copy of the weights (each direction's restricted eval
+  // zeroes the flipped marks' weights and must put them back)
+  const PetscBool probe = hwm_probe.enabled;
+  const PetscReal dry_h = 0.01;  // matches ForwardObservePeak
+  PetscInt       *ks_p = NULL, *ks_m = NULL;
+  PetscReal      *hp_p = NULL, *hp_m = NULL;
+  Vec             w_saved = NULL;
+  if (probe) {
+    const PetscInt nl = PetscMax(hwm_probe.nloc, 1);
+    PetscCall(PetscMalloc1(nl, &ks_p));
+    PetscCall(PetscMalloc1(nl, &ks_m));
+    PetscCall(PetscMalloc1(nl, &hp_p));
+    PetscCall(PetscMalloc1(nl, &hp_m));
+    PetscCall(VecDuplicate(hwm_probe.w, &w_saved));
+    PetscCall(VecCopy(hwm_probe.w, w_saved));
+  }
+
+  PetscReal max_rel = 0.0, max_rel_smooth = 0.0;
   for (PetscInt si = -1; si < nsamp; ++si) {
     // si = -1: all-ones direction; si >= 0: coordinate direction e_{samp_idx[si]}
     PetscInt  s = (si < 0) ? -1 : samp_idx[si];
     PetscReal gdotd;
-    if (s < 0) {
-      PetscCall(VecSum(g_ref, &gdotd));
-    } else {
-      PetscInt lo, hi;
-      PetscCall(VecGetOwnershipRange(g_ref, &lo, &hi));
-      PetscReal gl = 0.0;
-      if (s >= lo && s < hi) {
-        const PetscScalar *ga;
-        PetscCall(VecGetArrayRead(g_ref, &ga));
-        gl = PetscRealPart(ga[s - lo]);
-        PetscCall(VecRestoreArrayRead(g_ref, &ga));
-      }
-      PetscCallMPI(MPIU_Allreduce(&gl, &gdotd, 1, MPIU_REAL, MPIU_SUM, comm));
-    }
+    PetscCall(DirDot(g_ref, s, &gdotd));
     PetscInt plo, phi;
     PetscCall(VecGetOwnershipRange(pp, &plo, &phi));
     PetscReal Jp, Jm;
@@ -1258,17 +1344,105 @@ static PetscErrorCode FDCheckParamGradient(PetscErrorCode (*obj)(Tao, Vec, Petsc
     PetscCall(VecAssemblyBegin(pp));
     PetscCall(VecAssemblyEnd(pp));
     PetscCall(obj(NULL, pp, &Jp, gs, ctx));
+    if (probe) {
+      for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+        ks_p[i] = hwm_probe.kstar[i];
+        hp_p[i] = hwm_probe.hpeak[i];
+      }
+    }
     PetscCall(VecCopy(p, pp));
     if (s < 0) PetscCall(VecShift(pp, -eps));
     else if (s >= plo && s < phi) PetscCall(VecSetValue(pp, s, -eps, ADD_VALUES));
     PetscCall(VecAssemblyBegin(pp));
     PetscCall(VecAssemblyEnd(pp));
     PetscCall(obj(NULL, pp, &Jm, gs, ctx));
+    if (probe) {
+      for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+        ks_m[i] = hwm_probe.kstar[i];
+        hp_m[i] = hwm_probe.hpeak[i];
+      }
+    }
     PetscReal fd  = (Jp - Jm) / (2.0 * eps);
     PetscReal rel = PetscAbsReal(fd - gdotd) / PetscMax(PetscAbsReal(gdotd), 1e-12);
     if (rel > max_rel) max_rel = rel;
     PetscCall(PetscPrintf(comm, "  %s fd check dir %s: adjoint %.8e  fd %.8e  rel %.3e\n", label, s < 0 ? "ones" : "e_s", (double)gdotd,
                           (double)fd, (double)rel));
+
+    if (probe) {
+      // classify the weighted marks: argmax moved / wet-dry flipped / smooth,
+      // zero the flipped marks' weights, and accumulate the restricted FD
+      // difference from the snapshots (the same forwards as the full check)
+      PetscInt rlo2, rhi2;
+      PetscCall(VecGetOwnershipRange(hwm_probe.w, &rlo2, &rhi2));
+      const PetscScalar *ya, *wa;
+      PetscCall(VecGetArrayRead(hwm_probe.y, &ya));
+      PetscCall(VecGetArrayRead(w_saved, &wa));
+      // n_argmax, n_wetdry, n_smooth, J_S(+), J_S(-)
+      PetscReal acc[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+      for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+        PetscReal w = PetscRealPart(wa[i]);
+        if (w == 0.0) continue;
+        PetscBool arg_flip = (PetscBool)(ks_p[i] != ks_m[i]);
+        PetscBool wd_flip  = (PetscBool)((hp_p[i] >= dry_h) != (hp_m[i] >= dry_h));
+        if (arg_flip) acc[0] += 1.0;
+        if (wd_flip) acc[1] += 1.0;
+        if (arg_flip || wd_flip) {
+          PetscCall(VecSetValue(hwm_probe.w, rlo2 + i, 0.0, INSERT_VALUES));
+        } else {
+          acc[2] += 1.0;
+          PetscReal rp = w * (hp_p[i] - PetscRealPart(ya[i]));
+          PetscReal rm = w * (hp_m[i] - PetscRealPart(ya[i]));
+          acc[3] += 0.5 * rp * rp / (hwm_probe.sigma * hwm_probe.sigma);
+          acc[4] += 0.5 * rm * rm / (hwm_probe.sigma * hwm_probe.sigma);
+        }
+      }
+      PetscCall(VecRestoreArrayRead(hwm_probe.y, &ya));
+      PetscCall(VecRestoreArrayRead(w_saved, &wa));
+      PetscCall(VecAssemblyBegin(hwm_probe.w));
+      PetscCall(VecAssemblyEnd(hwm_probe.w));
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, acc, 5, MPIU_REAL, MPIU_SUM, comm));
+
+      // restricted adjoint: one evaluation at the BASE point with the flipped
+      // marks zero-weighted -- the gradient of J_S
+      PetscReal J_S, gdotd_S;
+      PetscCall(obj(NULL, p, &J_S, gs, ctx));
+      PetscCall(DirDot(gs, s, &gdotd_S));
+
+      // the endpoints agreeing does not guarantee the BASE argmax matches
+      // them (the argmax can move non-monotonically inside the probe); the
+      // base eval just computed every mark's argmax, so count the exceptions
+      // -- the smooth-subset comparison is only exact where this is zero
+      PetscReal base_mismatch = 0.0;
+      {
+        const PetscScalar *wa2;
+        PetscCall(VecGetArrayRead(w_saved, &wa2));
+        for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+          if (PetscRealPart(wa2[i]) == 0.0) continue;
+          if (ks_p[i] == ks_m[i] && (hp_p[i] >= dry_h) == (hp_m[i] >= dry_h) && hwm_probe.kstar[i] != ks_p[i]) base_mismatch += 1.0;
+        }
+        PetscCall(VecRestoreArrayRead(w_saved, &wa2));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &base_mismatch, 1, MPIU_REAL, MPIU_SUM, comm));
+      }
+      PetscCall(VecCopy(w_saved, hwm_probe.w));  // restore for the next direction
+
+      PetscReal fd_S  = (acc[3] - acc[4]) / (2.0 * eps);
+      PetscReal rel_S = PetscAbsReal(fd_S - gdotd_S) / PetscMax(PetscAbsReal(gdotd_S), 1e-12);
+      if (rel_S > max_rel_smooth) max_rel_smooth = rel_S;
+      PetscCall(PetscPrintf(comm,
+                            "    kink probe: argmax moved %d, wet/dry flipped %d of %d weighted marks; smooth subset %d (base argmax differs "
+                            "at %d): J_S %.6e  adjoint %.8e  fd %.8e  rel %.3e\n",
+                            (int)acc[0], (int)acc[1], (int)(acc[0] + acc[1] + acc[2]), (int)acc[2], (int)base_mismatch, (double)J_S,
+                            (double)gdotd_S, (double)fd_S, (double)rel_S));
+    }
+  }
+  if (probe) {
+    PetscCall(PetscPrintf(comm, "  %s kink-probe verdict: max rel error %.3e full, %.3e on the smooth subsets\n", label, (double)max_rel,
+                          (double)max_rel_smooth));
+    PetscCall(PetscFree(ks_p));
+    PetscCall(PetscFree(ks_m));
+    PetscCall(PetscFree(hp_p));
+    PetscCall(PetscFree(hp_m));
+    PetscCall(VecDestroy(&w_saved));
   }
   PetscCall(VecDestroy(&pp));
   PetscCall(VecDestroy(&gs));
@@ -1757,7 +1931,11 @@ int main(int argc, char *argv[]) {
         if (have_hwm_file)
           PetscCall(PetscPrintf(comm, "hwm init: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
                                 (double)J0, (double)cc.pc.hwm_mae, cc.pc.hwm_ndry, ngauges));
-        if (hwm_fd) PetscCall(FDCheckParamGradient(FormObjectiveAndGradientClasses, &cc, p, g0, fd_samples, fd_eps, fd_tol, "hwm-classes"));
+        if (hwm_fd) {
+          if (have_hwm_file) PetscCall(HwmProbeEnable(cc.pc.y_hwm, cc.pc.w_hwm, sigma));  // kink diagnosis (peak observable only)
+          PetscCall(FDCheckParamGradient(FormObjectiveAndGradientClasses, &cc, p, g0, fd_samples, fd_eps, fd_tol, "hwm-classes"));
+          if (have_hwm_file) PetscCall(HwmProbeDisable());
+        }
         PetscCall(VecDestroy(&g0));
       }
 
@@ -2150,7 +2328,11 @@ int main(int argc, char *argv[]) {
       if (have_hwm_file) {
         PetscCall(PetscPrintf(comm, "hwm init: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
                               (double)J_init, (double)pc.hwm_mae, pc.hwm_ndry, ngauges));
-        if (hwm_fd) PetscCall(FDCheckParamGradient(FormObjectiveAndGradientPerCell, &pc, p, g_scratch, fd_samples, fd_eps, fd_tol, "hwm-percell"));
+        if (hwm_fd) {
+          PetscCall(HwmProbeEnable(pc.y_hwm, pc.w_hwm, sigma));  // kink diagnosis
+          PetscCall(FDCheckParamGradient(FormObjectiveAndGradientPerCell, &pc, p, g_scratch, fd_samples, fd_eps, fd_tol, "hwm-percell"));
+          PetscCall(HwmProbeDisable());
+        }
       }
 
       PetscCall(TaoCreate(comm, &tao));
