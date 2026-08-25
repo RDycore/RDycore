@@ -1452,3 +1452,45 @@ behavior, not by the FD gate, and the paper says so explicitly. What
 this does NOT touch: the forward results (o37 baseline, drainage
 finding) involve no adjoint; and o28/o30's calibrations descended --
 consistent with a gradient that is right up to kink-scale detail.
+
+### o39 (partial): FD is CONVERGED in the probe step and still 7.5% from the adjoint (2026-08-25)
+
+Probe-step ladder at converged tolerances (1-hr window, classes mode,
+real marks; o38C supplies the eps 1e-3 point). Ones = all 15 classes
+shifted together; coordinates are the 3 largest-|g| classes, same rows
+across rungs.
+
+| direction | eps 1e-2 | eps 1e-3 | eps 1e-4 |
+| --- | --- | --- | --- |
+| ones | 5.244e+0 (FD sign-flips) | 7.635e-2 | 7.470e-2 |
+| coord A | 3.587e-2 | 2.668e-3 | (pending) |
+| coord B | 7.972e-3 | 1.527e-2 | (pending) |
+| coord C | 8.869e-2 | 6.488e-2 | (pending) |
+
+Readings:
+- eps 1e-2 (3e-4 absolute in n) is outside the linear regime entirely.
+- **The ones-direction FD is stable across a decade** (1.3607e6 at 1e-3,
+  1.3586e6 at 1e-4) while the adjoint says 1.2642e6: FD has converged to
+  a value 7.5% from the adjoint. Noise bands: ~0.5% at eps 1e-3 (solid),
+  ~4.6% at 1e-4 (consistent with flat). So neither pure curvature
+  (would fall eps^2) nor sparse kinks (would fall eps^1) explains it.
+- The coordinate directions move NON-MONOTONICALLY with eps (one falls
+  ~eps, one rises, one is flat) -- characteristic of discrete branch
+  surfaces entering/leaving the probe interval, not of a smooth error.
+
+Surviving hypotheses, now sharply posed:
+(a) DENSE wet/dry branch structure in the dynamics: so many (cell,step)
+    tiny_h crossings inside any reachable interval that FD converges to
+    a smoothed (Clarke-type averaged) slope while the adjoint returns
+    the exact one-branch derivative -- both stable, persistently apart.
+    Property of the objective, not a bug.
+(b) A branch-related defect in df/dn or the adjoint accumulation.
+
+Discriminators in flight:
+- o41 (all-15-class support sweep, 30-min window): under (a) the gap
+  scales with class area; also tests FD superposition
+  (sum_s FD(e_s) vs FD(ones)) and carries Jp/Jm for second differences.
+- o42 (window ladder 60/300/900 s, debug queue): under (a) the
+  contamination ACCUMULATES with trajectory length (a 60-step window
+  crosses ~60x fewer surfaces); under (b) the relative gap is
+  window-independent. This is the cleanest bug-vs-structure separator.
