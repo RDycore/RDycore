@@ -61,7 +61,9 @@ static const char *help_str =
     "                              quasi-Newton unit step is a sane roughness change\n"
     "  -adjoint_classes_alpha_min/max <real>  relative mode: bounds on alpha (0.3, 3.0)\n"
     "  -adjoint_classes_grad_dump <path>  classes mode: write (code, n, dJ/dn) at the\n"
-    "                              start point, for an explicit line search along -g\n";
+    "                              start point, for an explicit line search along -g\n"
+    "  -adjoint_ic_scale <real>    multiply the initial state by this factor (velocities\n"
+    "                              unchanged); the IC analogue of the uniform roughness scan\n";
 
 #define NDOF 3
 
@@ -1062,6 +1064,39 @@ static PetscErrorCode WriteClassSolution(const ClassCtx *cc, Vec p, const char *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// Reads a "<NLCD code> <manning n>" table (the form WriteClassSolution emits)
+// into per-class values, matched by code rather than by position so a
+// differing class ordering is not silently misapplied.
+static PetscErrorCode ReadClassTable(MPI_Comm comm, const char *path, PetscInt nclass, const PetscInt *class_codes, PetscReal *out) {
+  PetscInt    nread = 0;
+  PetscMPIInt rank;
+  PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (rank == 0) {
+    FILE *fp = fopen(path, "r");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot open class table %s", path);
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+      if (line[0] == '#' || line[0] == '\n') continue;
+      int    code;
+      double val;
+      if (sscanf(line, "%d %lf", &code, &val) != 2) continue;
+      for (PetscInt kk = 0; kk < nclass; ++kk) {
+        if (class_codes[kk] == code) {
+          out[kk] = val;
+          ++nread;
+          break;
+        }
+      }
+    }
+    fclose(fp);
+  }
+  PetscCallMPI(MPI_Bcast(out, (int)nclass, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Bcast(&nread, 1, MPIU_INT, 0, comm));
+  PetscCheck(nread == nclass, comm, PETSC_ERR_USER, "%s supplied %" PetscInt_FMT " of %" PetscInt_FMT " classes", path, nread, nclass);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ClassDumpMonitor(Tao tao, void *ctx) {
   ClassCtx *cc = ctx;
   Vec       p;
@@ -1694,6 +1729,32 @@ int main(int argc, char *argv[]) {
     PetscCall(VecDuplicate(rdy->u_global, &u_ic));
     PetscCall(VecCopy(rdy->u_global, u_ic));
 
+    // -adjoint_ic_scale <a>: multiply the whole initial state by a, which
+    // scales antecedent water volume while leaving every velocity unchanged
+    // (h, hu, hv all scale, so u = hu/h does not). This is the initial
+    // condition's analogue of the uniform roughness scan: one physically
+    // interpretable direction along which to measure how much of the
+    // model-vs-survey discrepancy the antecedent state could ever explain,
+    // before committing to a control vector with 3 unknowns per cell against
+    // a few dozen observations. Applied AFTER -restart has loaded the
+    // checkpoint, so it perturbs the mid-event state a calibration window
+    // actually starts from.
+    {
+      PetscReal ic_scale = 1.0;
+      PetscBool have_ic_scale = PETSC_FALSE;
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_ic_scale", &ic_scale, &have_ic_scale));
+      if (have_ic_scale) {
+        PetscCheck(ic_scale > 0.0, comm, PETSC_ERR_USER, "-adjoint_ic_scale must be positive");
+        PetscReal h_before, h_after;
+        PetscCall(VecStrideMax(u_ic, 0, NULL, &h_before));
+        PetscCall(VecScale(u_ic, ic_scale));
+        PetscCall(VecCopy(u_ic, rdy->u_global));  // keep the model state in step
+        PetscCall(VecStrideMax(u_ic, 0, NULL, &h_after));
+        PetscCall(PetscPrintf(comm, "ic scale: state x %g (max h %.4f -> %.4f m), velocities unchanged\n", (double)ic_scale,
+                              (double)h_before, (double)h_after));
+      }
+    }
+
     // -adjoint_forward_only: exactly ONE forward over the window, then exit.
     // Every other mode runs several forwards (a perturbed IC, optimizer
     // trials, ...), so this is the only mode whose end state -- and whose
@@ -1917,7 +1978,23 @@ int main(int argc, char *argv[]) {
       PetscBool hwm_eval_only = PETSC_FALSE;
       PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_eval_only", &hwm_eval_only, NULL));
       if (have_hwm_file && hwm_eval_only) {
-        for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        // by default this evaluates the PRIOR field; with -adjoint_classes_init
+        // it evaluates a dumped calibration solution instead, so the MAE at any
+        // iterate can be had for one forward (~a third of an objective+gradient)
+        // without regenerating a per-cell Manning file
+        char      eval_init[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_eval_init                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_init", eval_init, sizeof(eval_init), &have_eval_init));
+        if (have_eval_init) {
+          PetscReal *nk;
+          PetscCall(PetscCalloc1(nclass, &nk));
+          PetscCall(ReadClassTable(comm, eval_init, nclass, cc.class_codes, nk));
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = nk[cc.cell_class[i]];
+          PetscCall(PetscPrintf(comm, "hwm eval: evaluating the class table %s, not the prior field\n", eval_init));
+          PetscCall(PetscFree(nk));
+        } else {
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        }
         PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
         PetscReal Jp, mae;
         PetscInt  ndry;
@@ -1928,9 +2005,10 @@ int main(int argc, char *argv[]) {
                                      have_dump ? dump_file : NULL));
         PetscCall(CheckTruthForward(rdy, "hwm eval"));
         PetscCall(PetscPrintf(comm,
-                              "hwm eval (prior field): J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT
+                              "hwm eval (%s): J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT
                               " marks (%" PetscInt_FMT " obs times over %" PetscInt_FMT " steps)\n",
-                              (double)Jp, (double)mae, ndry, ngauges, K, total_steps));
+                              have_eval_init ? "class table" : "prior field", (double)Jp, (double)mae, ndry, ngauges, K,
+                              total_steps));
         PetscCall(RDyDestroy(&rdy));
         PetscCall(RDyFinalize());
         return 0;
@@ -2024,31 +2102,7 @@ int main(int argc, char *argv[]) {
         if (have_init) {
           PetscReal *pin;
           PetscCall(PetscCalloc1(nclass, &pin));
-          PetscInt   nread = 0;
-          PetscMPIInt rank;
-          PetscCallMPI(MPI_Comm_rank(comm, &rank));
-          if (rank == 0) {
-            FILE *fp = fopen(init_file, "r");
-            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot open -adjoint_classes_init file %s", init_file);
-            char line[256];
-            while (fgets(line, sizeof(line), fp)) {
-              if (line[0] == '#' || line[0] == '\n') continue;
-              int    code;
-              double val;
-              if (sscanf(line, "%d %lf", &code, &val) != 2) continue;
-              for (PetscInt kk = 0; kk < nclass; ++kk) {
-                if (cc.class_codes[kk] == code) {
-                  pin[kk] = val;
-                  ++nread;
-                  break;
-                }
-              }
-            }
-            fclose(fp);
-          }
-          PetscCallMPI(MPI_Bcast(pin, (int)nclass, MPIU_REAL, 0, comm));
-          PetscCallMPI(MPI_Bcast(&nread, 1, MPIU_INT, 0, comm));
-          PetscCheck(nread == nclass, comm, PETSC_ERR_USER, "%s supplied %" PetscInt_FMT " of %" PetscInt_FMT " classes", init_file, nread, nclass);
+          PetscCall(ReadClassTable(comm, init_file, nclass, cc.class_codes, pin));
           PetscInt lo, hi;
           PetscCall(VecGetOwnershipRange(p, &lo, &hi));
           // the file is in physical Manning units whatever the optimizer's
