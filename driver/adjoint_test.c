@@ -1024,10 +1024,56 @@ typedef struct {
   // everything printed stay in physical Manning units.
   PetscBool relative;
   PetscReal Jscale;  // 1 = off; otherwise 1/J at the start point
+  char      dump_path[PETSC_MAX_PATH_LEN];  // -adjoint_classes_dump; "" = off
 } ClassCtx;
 
 // class parameter p_k -> Manning n_k (identity, or alpha_k * prior_k)
 static inline PetscReal ClassN(const ClassCtx *cc, PetscInt k, PetscReal p_k) { return cc->relative ? p_k * cc->prior_k[k] : p_k; }
+
+// The solution in physical Manning units, in the form -adjoint_classes_init
+// reads back, so a calibration too long for one queue slot can be continued by
+// the next job. Written after every TAO iteration and not only at the end: a
+// production window fits only a few iterations in a 12-hour slot, and a job
+// stopped by the wall used to leave nothing to resume from.
+static PetscErrorCode WriteClassSolution(const ClassCtx *cc, Vec p, const char *path, PetscInt its, PetscReal J) {
+  Vec                p_all;
+  VecScatter         sc;
+  const PetscScalar *pa;
+  PetscMPIInt        rank;
+  MPI_Comm           comm;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectGetComm((PetscObject)p, &comm));
+  PetscCall(VecScatterCreateToAll(p, &sc, &p_all));
+  PetscCall(VecScatterBegin(sc, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(sc, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(p_all, &pa));
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (rank == 0) {
+    FILE *fp = fopen(path, "w");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_dump file %s", path);
+    fprintf(fp, "# NLCD_code  manning_n   (after %d TAO iterations, J %.6e)\n", (int)its, (double)J);
+    for (PetscInt kk = 0; kk < cc->nclass; ++kk)
+      fprintf(fp, "%d %.10g\n", (int)cc->class_codes[kk], (double)ClassN(cc, kk, PetscRealPart(pa[kk])));
+    fclose(fp);
+  }
+  PetscCall(VecRestoreArrayRead(p_all, &pa));
+  PetscCall(VecScatterDestroy(&sc));
+  PetscCall(VecDestroy(&p_all));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ClassDumpMonitor(Tao tao, void *ctx) {
+  ClassCtx *cc = ctx;
+  Vec       p;
+  PetscInt  its;
+  PetscReal J;
+  PetscFunctionBeginUser;
+  PetscCall(TaoGetSolution(tao, &p));
+  PetscCall(TaoGetIterationNumber(tao, &its));
+  PetscCall(TaoGetSolutionStatus(tao, NULL, &J, NULL, NULL, NULL, NULL));
+  PetscCall(WriteClassSolution(cc, p, cc->dump_path, its, J / cc->Jscale));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 // J = multi-time gauge misfit + beta/2 |n - n_prior|^2;  g_k = sum_{c in k} mu_c
 static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal *J, Vec g, void *ctx) {
@@ -2036,7 +2082,9 @@ int main(int argc, char *argv[]) {
 
       char      grad_file[PETSC_MAX_PATH_LEN] = {0};
       PetscBool have_grad_dump                = PETSC_FALSE;
+      PetscBool have_dump_p                   = PETSC_FALSE;
       PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_grad_dump", grad_file, sizeof(grad_file), &have_grad_dump));
+      PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_dump", cc.dump_path, sizeof(cc.dump_path), &have_dump_p));
 
       PetscReal J_class_init = -1.0;  // < 0 = not evaluated (no reduction gate)
       if (have_hwm_file || hwm_fd || cc.relative || have_grad_dump) {
@@ -2115,6 +2163,10 @@ int main(int argc, char *argv[]) {
       PetscCall(TaoSetObjectiveAndGradient(tao, NULL, FormObjectiveAndGradientClasses, &cc));
       PetscCall(TaoSetTolerances(tao, 1e-12, 1e-12, 1e-12));
       PetscCall(TaoSetMaximumIterations(tao, 100));
+      // dump after every iteration, not only at the end: a production window
+      // fits ~3 iterations in a 12-hour slot and each one costs ~2 hours, so a
+      // job stopped by the queue wall must still leave the chain a start point
+      if (have_dump_p) PetscCall(TaoMonitorSet(tao, ClassDumpMonitor, &cc, NULL));
       PetscCall(TaoSetFromOptions(tao));
       PetscCall(TaoSolve(tao));
 
@@ -2158,26 +2210,9 @@ int main(int argc, char *argv[]) {
         PetscCall(PetscPrintf(comm, "  %4d  %7.4f  %10.4f  %8.3f  %6.0f\n", (int)cc.class_codes[kk], (double)pr, (double)rc, (double)rel,
                               (double)pcnt[kk]));
       }
-      // -adjoint_classes_dump <file>: the solution in the form
-      // -adjoint_classes_init reads back, so a calibration too long for one
-      // queue slot can be continued by the next job.
-      {
-        char      dump_p[PETSC_MAX_PATH_LEN] = {0};
-        PetscBool have_dump_p                = PETSC_FALSE;
-        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_dump", dump_p, sizeof(dump_p), &have_dump_p));
-        if (have_dump_p) {
-          PetscMPIInt rank;
-          PetscCallMPI(MPI_Comm_rank(comm, &rank));
-          if (rank == 0) {
-            FILE *fp = fopen(dump_p, "w");
-            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_dump file %s", dump_p);
-            fprintf(fp, "# NLCD_code  manning_n   (after %d TAO iterations, J %.6e)\n", (int)its, (double)J_final);
-            for (PetscInt kk = 0; kk < nclass; ++kk)
-              fprintf(fp, "%d %.10g\n", (int)cc.class_codes[kk], (double)ClassN(&cc, kk, PetscRealPart(pa[kk])));
-            fclose(fp);
-          }
-          PetscCall(PetscPrintf(comm, "class calibration: solution written to %s\n", dump_p));
-        }
+      if (have_dump_p) {  // final rewrite of the per-iteration dump
+        PetscCall(WriteClassSolution(&cc, p, cc.dump_path, its, J_final));
+        PetscCall(PetscPrintf(comm, "class calibration: solution written to %s\n", cc.dump_path));
       }
 
       PetscCall(VecRestoreArrayRead(p_all, &pa));
