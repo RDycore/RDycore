@@ -27,6 +27,8 @@ to that directory to use.
 | `o52_linesearch.sh` | More-Thuente vs armijo, one iteration each, 7200-step window | ~2.5 hr, 1 node |
 | `o53_production_gradient.sh` | the production start-point gradient at n16, recorded from an interactive run | ~2.5 hr, 4 nodes |
 | `o54_ic_authority.sh` | MAE at a dumped calibration iterate, and the initial-condition authority scan | ~90 min, 4 nodes |
+| `o55_continue_calibration.sh` | continues a calibration from a dumped iterate, with the armijo line search | 4-hr session, 4 nodes |
+| `o56_hessian_spectrum.sh` + `o56_hessian.py` | the 15x15 class Hessian by columns, and its prior-preconditioned spectrum | ~100 min, 4 nodes |
 
 ## Staged inputs these expect in `$SCRATCH/gpu-implicit`
 
@@ -40,9 +42,12 @@ to that directory to use.
   is `sed`-derived from
 - `scale_manning.py`, `scale_manning_classes.py` --- from `data/nlcd/`
 - a build with `-adjoint_classes_relative` (i.e. at or after commit
-  `48485e24`), and for `o54` one with `-adjoint_ic_scale` (`fda6f09e`);
-  the scripts check for the option they need and refuse to run against a
-  stale binary
+  `48485e24`); for `o54` one with `-adjoint_ic_scale` (`fda6f09e`); for
+  `o56` one with `-adjoint_classes_grad_only` (`e3c9ecde`). Each script
+  checks for the option it needs and refuses to run against a stale
+  binary.
+- `o43_p_nlcd.txt` --- the published NLCD lookup as a class table, which
+  is both the calibration's start point and `o56`'s base point
 
 ## Conventions worth keeping
 
