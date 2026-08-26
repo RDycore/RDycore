@@ -1748,3 +1748,80 @@ so this is not a production result -- but it is the expected
 over-parameterization behaviour (o28/o30/o47) and the cue to read the
 production run's per-class table before believing any per-class number.
 
+
+### o51: the mesh does scale to 4 nodes -- 2.42x, bit-identical (2026-08-26)
+
+Eval-only forward of the production 43,200-step window at three node
+counts, in one interactive allocation:
+
+| ranks | nodes | forward | speedup | node-hr | efficiency |
+| --- | --- | --- | --- | --- | --- |
+| 4 | 1 | 36m21s | 1.00x | 0.606 | -- |
+| 8 | 2 | 21m55s | 1.66x | 0.731 | 83% |
+| 16 | 4 | 15m01s | **2.42x** | 1.001 | 61% |
+
+**All three reproduce `J 8.082566e+02, peak-WSE MAE 0.7188 m, 0 of 46
+dry` to every printed digit.** That is the result that mattered most:
+no decomposition dependence in the peak-WSE observable across a 4x
+change in rank count, which also re-validates the argmax bookkeeping
+under different partitioning.
+
+This CORRECTS an inference drawn earlier the same day from the b2i
+benchmarks, where 64 ranks ran 2.8x slower than 4 and we concluded the
+mesh does not scale past one node. It does not scale to 64; it scales
+usefully to 16.
+
+Production choice: **n16**, despite 61% parallel efficiency, because
+queue wait rather than node-hours is the binding constraint. A
+~10-evaluation calibration is 8.3 hr at n16 -- one 12-hr slot with
+margin for line-search retries -- against 20 hr at n4, a two-link chain
+whose second link may sit pending for hours. The extra ~13 node-hr is
+negligible against the ~265 remaining. Forward+adjoint should scale
+like the forward, because its cost is dominated by revolve
+recomputation, which is forward work.
+
+### o52: the prior is losing to the misfit, and the line search is not the lever (2026-08-26)
+
+One BLMVM iteration on a 7200-step (2 event-hour) window, relative
+variables, sigma_n = 0.015, More-Thuente line search. J 741.38 ->
+713.45, peak-WSE MAE 0.6837 -> 0.6096, **residual 0.0906 -> 0.1343**.
+
+| NLCD | class | prior n | recovered n | alpha | % cells |
+| --- | --- | --- | --- | --- | --- |
+| 23 | developed med | 0.1200 | 0.0360 | **0.300** | 31.7% |
+| 24 | developed high | 0.1600 | 0.0480 | **0.300** | 18.9% |
+| 90 | woody wetland | 0.0980 | 0.0294 | **0.300** | 4.2% |
+| 22 | developed low | 0.0900 | 0.2358 | **2.620** | 15.0% |
+
+**69.7% of the domain sits at or against a bound after ONE step**, and
+the step direction matches the start-point gradient signs exactly -- so
+the direction is right and the magnitude is not.
+
+Decomposing the step at sigma_n = 0.015 (beta 4444): the prior charged
+**118.5** units and the misfit paid **146.5** (-19.8%), for a net -27.9.
+The Tikhonov term is working; it is simply losing. The weight that
+would make this exact step net-worse is beta 5492, i.e.
+**sigma_n < 0.0135** -- so 0.015 sits just above the threshold, which
+sharpens the earlier "loosest prior with an interior minimum" estimate
+from inference into measurement.
+
+**Mechanism.** 22 rises 2.6x while 23 falls to the floor: two adjacent,
+spatially interleaved developed classes moving in opposition. For a
+path-integrated observable that is a near-null-space direction -- it
+barely changes total conveyance while driving both parameters somewhere
+indefensible (developed-medium urban at n = 0.036, smoother than
+concrete; developed-low at n = 0.236, rougher than forest). This is the
+o30 noise-fitting pathology reproduced on **real data at basin scale**
+rather than on a synthetic twin, which is a stronger statement than the
+paper currently makes.
+
+**Consequence for the production run.** A gentler line search changes
+the path, not the minimizer; armijo would walk toward the same place
+more slowly. The levers are sigma_n and the number of free parameters,
+not `-tao_ls_type`.
+
+CAUTION: 7200 steps is two event-hours. At the production window the
+alpha scan puts the ENTIRE uniform authority at ~135 J units while
+redistribution bought 146 here, so whether the prior holds at 43,200
+steps is genuinely open and is what the production run measures.
+
