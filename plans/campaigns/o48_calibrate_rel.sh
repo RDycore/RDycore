@@ -49,6 +49,14 @@
 # is a stopping rule rather than a lost slot.
 # Chain: this job dumps o48_p_<jobid>.txt from iteration 1 onward; pass it
 # to the next.
+#
+# LINE SEARCH: -tao_ls_type armijo, on measurement (o52). BLMVM's default
+# More-Thuente search EXPANDS past -g on this problem and overshoots: at one
+# iteration it bought 15.8 units of extra misfit for 50.5 units of prior
+# violation, ending at a HIGHER total objective (713.45 vs armijo's 678.73)
+# with the gradient norm RISEN 48% and 69.7% of the domain on or against a
+# bound. Backtracking-only lands a lower objective with a falling gradient
+# and half the pinning.
 # NO -adjoint_hwm_twin: the table is real data.
 set -u
 TAO_ITS=${1:?need TAO_ITS}
@@ -93,7 +101,7 @@ echo "    its this job: $TAO_ITS | dump: $DUMP | grad: $GRAD"
 srun -N $NODES -n $RANKS -c 32 --cpu-bind=cores -G $RANKS --gpu-bind=none \
   $ADJ o43_window.yaml $COM $CAL $RESUME \
   -restart $CKPT -adjoint_rain_start_hour $START_HOUR \
-  -tao_max_it $TAO_ITS -tao_monitor \
+  -tao_max_it $TAO_ITS -tao_monitor -tao_ls_type armijo \
   -adjoint_classes_dump $DUMP -adjoint_classes_grad_dump $GRAD \
   -raster_rain_dir $RAIN -raster_rain_start_date 2017,8,26,18,0 > o48_${SLURM_JOB_ID}.log 2>&1
 echo "exit=$? $(date)"

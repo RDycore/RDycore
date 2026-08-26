@@ -1825,3 +1825,65 @@ alpha scan puts the ENTIRE uniform authority at ~135 J units while
 redistribution bought 146 here, so whether the prior holds at 43,200
 steps is genuinely open and is what the production run measures.
 
+
+### o52 addendum: armijo beats More-Thuente, and the reason is the trade (2026-08-26)
+
+Both line searches, one BLMVM iteration, identical start point
+(J 741.38, MAE 0.6837, |g|/J0 0.0906 -- reproduced to every digit):
+
+| | misfit | + prior | = J | residual | pinned at alpha 0.3 | near alpha 3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| mt | 594.9 | **118.5** | 713.45 | 0.1343 (+48%) | 23, 24, 90 = **54.8%** of cells | 22 = 15.0% |
+| armijo | 610.7 | **68.0** | **678.73** | **0.0849 (-6.3%)** | 23, 90 = **35.9%** | none |
+
+More-Thuente expands past -g, and the expansion is a bad trade: it buys
+15.8 units of extra misfit for 50.5 units of prior violation, ending at
+a HIGHER total objective than the shorter step, with the gradient norm
+risen 48% and 69.7% of the domain on or against a bound.
+Backtracking-only reaches a lower objective with a falling gradient and
+half the pinning. Production uses `-tao_ls_type armijo`.
+
+This corrects the reading recorded above ("the line search changes the
+path, not the minimizer"). Asymptotically that stands -- both minimize
+the same objective, and if the unconstrained optimum lies past a bound
+both will eventually pin. But within the ~10-iteration budget a 12-hour
+slot buys, the path is most of what we get, and armijo's is
+qualitatively healthier.
+
+### o53: the production start-point gradient (2026-08-26)
+
+Run at n16 on an otherwise-idle interactive allocation while the batch
+queue was saturated. `hwm init: J 8.082566e+02, MAE 0.7188` -- exactly
+the alpha = 1 reference, confirming again that relative mode's start
+point reproduces the NLCD prior field. First trial step
+`|g|/J0 = 0.1575` in alpha.
+
+Classes ranked by |dJ/dn| * n_prior, the gradient in the variable the
+optimizer actually moves:
+
+| # | NLCD | class | dJ/dn | share | cum | push | rank at 2 h |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 23 | developed med | +755.9 | 28.8% | 28.8% | lower | 1 |
+| 2 | 90 | woody wetland | +675.3 | 21.0% | 49.7% | lower | 2 |
+| 3 | 81 | pasture | **-898.4** | 10.8% | 60.6% | RAISE | 7 |
+| 4 | 22 | developed low | -327.9 | 9.4% | 69.9% | RAISE | 3 |
+| 5 | 21 | developed open | -568.3 | 7.2% | 77.1% | RAISE | 5 |
+| 6 | 24 | developed high | +135.7 | 6.9% | 84.0% | lower | 4 |
+
+The top two are stable across a 6x change in window length and carry
+half the gradient. Below rank 2 the 7200-step proxy is unreliable:
+pasture moves 7th -> 3rd (its raw |dJ/dn| is the largest in the field;
+it ranked low only because its prior n is small) and developed-high
+drops 4th -> 6th. Designing the reduced-parameter run on the proxy
+would have picked the wrong third parameter.
+
+**Active set for o50: 23, 90, 81** (60.6% of the gradient). Adding 22
+buys 9.4% but reintroduces the 22/23 compensating pair -- two
+interleaved developed classes pulling opposite ways, which is nearly
+null-space for a path-integrated observable and is what blew up in o52.
+
+Note the gradient is relatively STRONGER at the production window
+(|g|/J0 0.1575 vs 0.0906 at two hours), so sigma_n = 0.015 is more
+likely to lose here, not less. Expect pinning in the 15-class control;
+the defensible number should come from the reduced-parameter run.
+
