@@ -1401,12 +1401,14 @@ $0.80$ & $6.652\times10^{2}$ & $0.6434$ & --- \\
 $0.90$ & $7.284\times10^{2}$ & $0.6796$ & $+0.0362$ \\
 $1.00$ (checkpoint) & $8.083\times10^{2}$ & $0.7188$ & $+0.0392$ \\
 $1.10$ & $9.071\times10^{2}$ & $0.7610$ & $+0.0422$ \\
+$1.20$ & $1.025\times10^{3}$ & $0.8174$ & $+0.0564$ \\
 \bottomrule
 \end{tabular}
 \caption{Peak-WSE misfit against antecedent water storage. The response
-is monotone and nearly linear over the range scanned, with no interior
-optimum: the model holds systematically too much water at hour 29. No
-mark is dry at any point.}
+is monotone over the whole range with no interior optimum, straight to
+about $1\%$ between $a = 0.8$ and $1.1$ and convex above it: adding
+water hurts at an accelerating rate. The model holds systematically too
+much water at hour 29. No mark is dry at any point.}
 \label{tab:ic}
 \end{table}
 
@@ -1414,20 +1416,24 @@ Three things follow, and they matter more than the roughness result.
 
 \textbf{The initial state has about four times the authority of
 roughness.} Per unit fractional change, $\mathrm{d}\,\mathrm{MAE}$ is
-$0.392$ for the initial condition against $0.098$ for a uniform
-roughness scale. Like for like at a $20\%$ perturbation: $0.075$\,m
+$0.392$ for the initial condition over its well-sampled range
+($a \in [0.8, 1.1]$) against $0.098$ for a uniform roughness scale. Like for like at a $20\%$ perturbation: $0.075$\,m
 versus $0.020$\,m. And the plausibility runs the same way --- a $20\%$
 error in water stored after a 29-hour spin-up under radar-derived
 rainfall is far easier to defend than Manning values at $30\%$ of the
 published table.
 
-\textbf{The response is monotone and linear, which roughness's is not.}
-$J(\alpha)$ for roughness is concave and saturating, consistent with a
-parameter acting indirectly through path-integrated conveyance.
-$J(a)$ for the initial state is straight over $\pm 20\%$ and does not
-turn over, which is the signature of a systematic bias rather than a
-poorly-tuned parameter. The model does not hold slightly the wrong
-\emph{distribution} of water at hour 29; it holds too much.
+\textbf{The response has the opposite curvature to roughness's.}
+$J(\alpha)$ for roughness is concave and saturating --- the knob runs
+out --- consistent with a parameter acting indirectly through
+path-integrated conveyance. $J(a)$ for the initial state is straight to
+about $1\%$ between $a = 0.8$ and $1.1$ and \emph{convex} above,
+steepening as water is added, and it does not turn over anywhere in the
+range. Neither the slope nor the sign gives any indication of an
+optimum near the checkpoint value. That is the signature of a
+systematic bias rather than a poorly-tuned parameter: the model does not
+hold slightly the wrong \emph{distribution} of water at hour 29, it
+holds too much of it.
 
 \textbf{It is a diagnosis, not a knob.} We are not proposing to
 calibrate the initial condition against these marks. Over this window
