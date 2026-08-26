@@ -63,12 +63,24 @@ and on the observable, not on observation counts: surveyed high-water
 marks recover the land-cover roughness classes covering $83\%$ of a
 2.93M-cell Hurricane Harvey domain, where the real stream-gauge
 network recovers almost none.
-Against the real survey, the same evaluation isolates a downstream
-region the model cannot drain --- a defect no roughness value can
-absorb, and a finding in its own right --- and over the rest of the
-domain the model, run with textbook roughness values looked up from
-the land-cover table and no calibration at all, errs by $1.51$\,m in
-mean peak water-surface elevation. This is, to our knowledge, the first \emph{transient}
+Against the real survey we then ask a question calibration studies
+rarely ask: not how much misfit an optimizer removed, but how much of
+the model's error the parameter is \emph{able} to explain. Scanning
+the dominant roughness direction bounds it, before any optimizer runs,
+at $0.08$\,m of a $0.72$\,m peak-elevation discrepancy --- and only at
+roughness $30\%$ of published values; within defensible values, three
+centimetres. A calibration over fifteen land-cover classes beats every
+global scaling, at $0.095$\,m, so spatial redistribution reaches
+authority a single scale cannot; but that is still only $13\%$ of the
+error. Applying the identical measurement to the initial condition
+finds more: a $20\%$ reduction in antecedent water storage is worth
+$0.075$\,m, from a perturbation far easier to defend than the roughness
+one. The same evaluation isolates a downstream reach the model cannot
+drain --- a defect no roughness value can absorb, and a finding in its
+own right. We suggest this bound as a routine precondition for
+calibration studies, which commonly report the misfit reduction
+achieved without establishing the ceiling it was approaching.
+This is, to our knowledge, the first \emph{transient}
 discrete adjoint in an E3SM component (the land-ice component inverts
 a \emph{steady} solve), obtained by differentiating the production
 solver in place --- its discretization, data structures, and GPU
@@ -533,9 +545,41 @@ independently in every experiment, spanning six orders of magnitude.
 Against the measured $J(\alpha)$ curve, $\sigma_n = 0.015$ places the
 minimum of the dominant identifiable direction at $\alpha \approx 0.70$,
 while $\sigma_n = 0.020$ leaves no interior minimum there at all --- the
-same pathology the hand-chosen weight had. Stating the prior turns the
-choice into an arithmetic consequence of a quantity the domain team can
-argue about.
+same pathology the hand-chosen weight had. The prediction is measured:
+the scan point at $\alpha = 0.70$ was run afterwards and returned MAE
+$0.6894$ against the $0.6895$ the balance implied
+(Table~\ref{tab:alpha}). Stating the prior turns the choice into an
+arithmetic consequence of a quantity the domain team can argue about.
+
+\paragraph{Absolute or fractional prior --- not a cosmetic choice.}
+Equation~\eqref{eq:sigman} states the prior as an absolute departure in
+$n$, and for a land-cover table that is the wrong statement. A single
+$\sigma_n = 0.015$ over an NLCD lookup spanning $n = 0.027$ (barren) to
+$n = 0.16$ (developed high) asserts a $\pm 56\%$ prior on one class and
+$\pm 9\%$ on another; and because the penalty scales as
+$n_{\rm prior}^2$, a small-$n$ class buys a large \emph{fractional}
+excursion cheaply. The iterates show exactly that signature: at the
+production configuration's first quasi-Newton step, every class driven
+to the upper bound was small-$n$ (pasture $0.038$, developed-open
+$0.040$, developed-low $0.090$) and every class driven to the lower
+bound was large-$n$ (developed-high $0.160$, developed-medium $0.120$,
+shrub $0.115$, woody wetland $0.098$) --- an ordering by prior value,
+not by hydrology. Penalizing the fractional departure
+$n_k/n_{{\rm prior},k} - 1$ with a width $\sigma_\alpha$ instead treats
+the classes alike, and asks the domain expert a question they can
+answer: how far can the lookup be wrong, in percent?
+
+The tension survives the reformulation, and that is the substantive
+result rather than an implementation detail. Holding the first step's
+excursion requires $\sigma_\alpha \approx 0.15$: one must believe the
+NLCD values are good to $\pm 15\%$ for the calibration to stay
+physical, while at $\pm 30\%$ the data drives it somewhere no
+hydrologist would defend. \emph{Within a prior wide enough to be
+honest, this observable does not support a defensible distributed
+roughness field.} We report the prior width used with every number and
+regard its value as an open question for the domain team --- it heads
+the list of questions at the end of this draft --- not as a tuning
+parameter.
 
 The diagnosis is worth separating from the fix, because the failure
 mode is not specific to this model: an optimizer that takes zero steps
@@ -1171,14 +1215,20 @@ $0.20$ & $0.005$--$0.032$ & \multicolumn{3}{l}{implicit solve diverges} \\
 $0.30$ & $0.008$--$0.048$ & $6.737\times10^{2}$ & $0.6392$ & 1/46 \\
 $0.45$ & $0.012$--$0.072$ & $7.038\times10^{2}$ & $0.6614$ & 1/46 \\
 $0.60$ & $0.016$--$0.096$ & $7.406\times10^{2}$ & $0.6776$ & 1/46 \\
+$0.70$ & $0.019$--$0.112$ & $7.655\times10^{2}$ & $0.6894$ & 1/46 \\
+$0.80$ & $0.022$--$0.128$ & $7.813\times10^{2}$ & $0.6991$ & 0/46 \\
 $1.00$ (NLCD) & $0.027$--$0.160$ & $8.083\times10^{2}$ & $0.7188$ & 0/46 \\
 \bottomrule
 \end{tabular}
 \caption{Uniform roughness scan on the production configuration
-(12-hour window, 46 cluster-A marks). The entire uniform-roughness knob
-is worth $0.08$\,m against a $0.72$\,m error, and only at roughness
-$30\%$ of published values. The limit at $\alpha = 0.2$ is numerical,
-not drying --- one mark stays dry throughout.}
+(12-hour window, 46 cluster-A marks). $J$ falls monotonically toward
+lower roughness with no interior minimum: the entire uniform-roughness
+knob is worth $0.08$\,m against a $0.72$\,m error, and only at roughness
+$30\%$ of published values, where $n$ reaches $0.008$ and smooth
+concrete is $\approx 0.012$. Within a defensible range it is worth about
+$3$\,cm ($\alpha = 0.70$, itself the optimum implied by the prior width
+of Section~\ref{sec:calibration}). The limit at $\alpha = 0.2$ is
+numerical, not drying --- one mark stays dry throughout.}
 \label{tab:alpha}
 \end{table}
 
@@ -1269,6 +1319,140 @@ routine precondition for calibration studies, which commonly report the
 misfit reduction achieved without establishing the ceiling it was
 approaching.
 
+\subsection{The calibration against the real survey}
+\label{sec:calibrated}
+
+The scan sets the bar a multi-parameter calibration must clear to
+justify its parameters. Running the class calibration of
+Section~\ref{sec:calibration} on the same configuration --- fifteen NLCD
+classes, relative variables, prior width as discussed below, starting
+from the NLCD lookup --- clears it (Table~\ref{tab:ladder}).
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+Manning field & MAE & $\Delta$ & physically defensible? \\
+\midrule
+NLCD lookup (uncalibrated) & $0.7188$ & --- & yes, by construction \\
+uniform $\alpha = 0.70$ & $0.6894$ & $-0.029$ & yes \\
+uniform $\alpha = 0.30$ & $0.6392$ & $-0.080$ & no ($n$ to $0.008$) \\
+\textbf{calibrated, 15 classes} & $\mathbf{0.6242}$ & $\mathbf{-0.095}$ & mostly; one class at a bound \\
+\bottomrule
+\end{tabular}
+\caption{Peak-WSE MAE against the 46 cluster-A marks. The calibration
+beats the entire uniform-roughness knob --- including its physically
+indefensible end --- and beats the best \emph{defensible} uniform field
+by $0.065$\,m. Spatial redistribution is therefore worth roughly three
+times what a single global scale can reach.}
+\label{tab:ladder}
+\end{table}
+
+Two things about this number deserve emphasis, one supporting and one
+limiting.
+
+Supporting: the comparison that matters is against
+$\alpha = 0.70$, not $\alpha = 0.30$. The latter is the misfit's
+unconstrained preference and reaches $n = 0.008$, which no one would
+defend; the former is the optimum implied by the same prior the
+calibration itself uses, and is the honest one-parameter competitor.
+Against it the calibration wins by $0.065$\,m, so the fifteen
+parameters are not decoration --- \emph{spatial redistribution accesses
+authority that global scaling cannot}, which is a stronger statement
+than the scan alone supports and the one the half-domain experiment
+(Table~\ref{tab:halves}) would not have predicted.
+
+Limiting: the objective and the MAE do not move together. A
+\emph{uniform} field with the calibrated field's misfit would score
+$0.6135$\,m; the calibrated field scores $0.6242$. Redistribution
+therefore buys objective slightly less MAE-efficiently than scaling
+does --- it is reducing the weighted misfit in ways that mean absolute
+error weights less --- so the two should not be quoted
+interchangeably. The run is also not converged, and one class sits at
+its lower bound; Section~\ref{sec:calibration} discusses why that bound
+is partly an artifact of how the prior was stated.
+
+Set against the error budget: the model--survey discrepancy on these
+marks is $0.72$\,m and roughness, calibrated as well as we can
+currently calibrate it, accounts for $13\%$ of it. The remaining
+$87\%$ is rainfall forcing, mesh elevation, datum, and representation
+error at 30\,m --- and Section~\ref{sec:icauthority} shows that one of
+those is measurable with the same method, and larger.
+
+\subsection{The same measurement, pointed at the initial condition}
+\label{sec:icauthority}
+
+Nothing in Section~\ref{sec:authority} is specific to roughness, so we
+applied it to the other parameter a calibration window has: the state it
+starts from. Our window begins at event hour 29 from a checkpoint of the
+72-hour forward, and the natural single direction is the amount of water
+that checkpoint holds. Scaling all three conserved variables by a common
+factor $a$ changes antecedent storage while leaving every velocity
+unchanged, since $u = (hu)/h$ is invariant. Each point is one forward
+(Table~\ref{tab:ic}).
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+IC scale $a$ & $J$ & MAE & $\Delta$MAE per $0.1$ \\
+\midrule
+$0.80$ & $6.652\times10^{2}$ & $0.6434$ & --- \\
+$0.90$ & $7.284\times10^{2}$ & $0.6796$ & $+0.0362$ \\
+$1.00$ (checkpoint) & $8.083\times10^{2}$ & $0.7188$ & $+0.0392$ \\
+$1.10$ & $9.071\times10^{2}$ & $0.7610$ & $+0.0422$ \\
+\bottomrule
+\end{tabular}
+\caption{Peak-WSE misfit against antecedent water storage. The response
+is monotone and nearly linear over the range scanned, with no interior
+optimum: the model holds systematically too much water at hour 29. No
+mark is dry at any point.}
+\label{tab:ic}
+\end{table}
+
+Three things follow, and they matter more than the roughness result.
+
+\textbf{The initial state has about four times the authority of
+roughness.} Per unit fractional change, $\mathrm{d}\,\mathrm{MAE}$ is
+$0.392$ for the initial condition against $0.098$ for a uniform
+roughness scale. Like for like at a $20\%$ perturbation: $0.075$\,m
+versus $0.020$\,m. And the plausibility runs the same way --- a $20\%$
+error in water stored after a 29-hour spin-up under radar-derived
+rainfall is far easier to defend than Manning values at $30\%$ of the
+published table.
+
+\textbf{The response is monotone and linear, which roughness's is not.}
+$J(\alpha)$ for roughness is concave and saturating, consistent with a
+parameter acting indirectly through path-integrated conveyance.
+$J(a)$ for the initial state is straight over $\pm 20\%$ and does not
+turn over, which is the signature of a systematic bias rather than a
+poorly-tuned parameter. The model does not hold slightly the wrong
+\emph{distribution} of water at hour 29; it holds too much.
+
+\textbf{It is a diagnosis, not a knob.} We are not proposing to
+calibrate the initial condition against these marks. Over this window
+the initial state carries $3$ unknowns on each of 2.93M cells against
+46 peak observations, and everything Section~\ref{sec:authority}
+establishes about identifiability applies with three more orders of
+magnitude of freedom: such a calibration would fit the marks essentially
+exactly and mean nothing. What the scan supports is the weaker and more
+useful claim that the residual these marks measure lives substantially
+in the water balance --- in the rainfall forcing or the antecedent state
+--- rather than in the friction, which is where a roughness calibration
+alone would have kept looking.
+
+One caveat bounds all three. The checkpoint is a \emph{model} state, not
+an observation, so it already contains accumulated forcing and elevation
+error; the scan perturbs that state rather than an independent
+measurement of it. A calibration of the initial condition would
+therefore absorb such error rather than correct it, and could quietly
+launder the downstream drainage defect of Section~\ref{sec:hwm} into a
+``corrected'' initial state --- the same trap as scoring against the 37
+marks the model cannot drain. Establishing whether a $20\%$
+water-balance error at hour 29 is physically plausible is a question for
+the forcing data, not for the optimizer, and it heads our list of
+questions at the end of this draft.
+
 \section{Conclusions and outlook}
 
 An exact, verified Jacobian turns out to be the single artifact from
@@ -1281,24 +1465,35 @@ system.
 
 The second artifact is a measurement rather than a capability, and it
 is the one we would most like others to copy. Asking what fraction of
-a model's error a parameter is \emph{able} to explain --- here, at
-basin scale, $\sim 10\%$ at the edge of physical plausibility and
-$\sim 4\%$ within it (Section~\ref{sec:authority}) --- is cheap,
+a model's error a parameter is \emph{able} to explain is cheap,
 optimizer-independent, and it reframes what a calibration result
-means. It also told us where the leverage actually is: the same
-machinery, pointed at the residual rather than at the roughness,
-isolated a reach the model cannot drain.
+means. Here it bounded roughness at $4\%$ of the error within
+defensible values and $11\%$ at the edge of plausibility; the
+calibration then reached $13\%$, beating every global scaling and
+confirming that spatial redistribution accesses authority a single
+scale cannot. What makes the measurement worth copying is not that
+number but the two it led to. Pointed at the residual instead of the
+parameter, the same machinery isolated a reach the model cannot drain;
+pointed at the initial condition, it found more authority than
+roughness has. A calibration study that had only reported its misfit
+reduction would have found neither.
 
-Next steps, in order: the converged real-data calibration ---
-land-cover-class parameters against the marks that crest inside the
-window, with the scaled optimization problem of
-Section~\ref{sec:calibration} and a stated $\sigma_n$, whose expected
-landing point the $\alpha$-scan already predicts; calibrating the
-number of parameters the observable actually supports rather than the
-number the land-cover map offers, which our own evidence puts at one
-to three; the conveyance and outlet representation that the drainage
-finding implicates, to which the adjoint machinery applies unchanged;
-and coupling the gradient path to PyTorch through the existing
+Next steps, in order. First, converge and cross-validate the
+calibration reported here --- two quasi-Newton iterations with one
+class on a bound is a result, not a converged one, and out-of-sample
+skill has to be tested within the upstream band because the middle band
+carries the drainage defect. Second, calibrate the number of parameters
+the observable supports rather than the number the land-cover map
+offers; the spectrum of the prior-preconditioned Hessian would settle
+that count directly, and at fifteen parameters it is a small dense
+eigenproblem rather than a research project. Third, the water balance:
+the initial-condition scan says the antecedent state carries more of
+this residual than the friction does, which makes the forcing and the
+initial condition --- not the roughness --- the next thing to
+calibrate or diagnose, with the machinery applying unchanged and
+$dJ/du_0$ already verified. Fourth, the conveyance and outlet
+representation the drainage finding implicates. Finally, coupling the
+gradient path to PyTorch through the existing
 PETSc--PyTorch bridge for learned-physics and hybrid data-assimilation
 experiments.
 
@@ -1338,31 +1533,30 @@ each stated as of today. Cross-references Q$n$ point into the numbered
 issues of the next section.]}
 
 \begin{enumerate}
-  \item \textbf{There is no converged real-data \emph{calibration} in
-        the paper yet.} The abstract's differentiator --- production
-        code made differentiable, versus reduced solvers rewritten in
-        ML frameworks --- invites comparison with Inunda's calibrated
-        $0.67$\,m MAE against surveyed Harvey high-water marks. What
-        exists today is the uncalibrated baseline and its decomposition
-        ($3.41$\,m over all 108 marks; $1.51$\,m over the 71 in
-        reaches the model drains), the identifiability twin at the real
-        mark geometry, a bit-exactly validated mid-event restart, and
-        --- new since the last draft --- an optimizer-independent
-        measurement of how much of the residual roughness could ever
-        explain (Section~\ref{sec:authority}). The first production
-        calibration attempt took \emph{zero} steps; the cause was a
-        scaling defect in the optimization problem, not in the
-        gradient, and it is diagnosed, fixed, and gated
-        (Section~\ref{sec:calibration}, ``Scaling the optimization
-        problem''). A reviewer is entitled to ask whether the negative
-        identifiability result is a property of the problem or of an
-        optimizer we never got working; the honest answer is that the
-        $\alpha$-scan is optimizer-independent and settles it, but the
-        argument is materially stronger with a converged run that lands
-        where the scan predicts, and that run is in flight rather than
-        in the paper. Until it lands, the paper claims capability,
-        baseline, decomposition, and an authority bound --- not the
-        closed loop. (Q1, Q2)
+  \item \textbf{The calibration is real but not converged.} The
+        abstract's differentiator --- production code made
+        differentiable, versus reduced solvers rewritten in ML
+        frameworks --- invites comparison with Inunda's calibrated
+        $0.67$\,m MAE against surveyed Harvey high-water marks, and that
+        comparison must not be made: the mark sets differ, and ours is a
+        favourable upstream subset chosen because the model drains it.
+        What now exists is a calibrated field that beats every uniform
+        alternative (Table~\ref{tab:ladder}), reached from the NLCD
+        prior by the scaled optimization problem of
+        Section~\ref{sec:calibration}. The first attempt took
+        \emph{zero} steps --- a scaling defect in the optimization
+        problem, not in the gradient, diagnosed, fixed and gated --- and
+        the exposure that leaves is worth stating plainly: a reviewer
+        may reasonably ask whether the negative identifiability result
+        is a property of the problem or of an optimizer we could not
+        drive. The $\alpha$-scan answers that independently of any
+        optimizer, and the calibration now lands where the scan implies
+        it should. What is still missing is convergence: the reported
+        field is two quasi-Newton iterations in, one class rests on a
+        bound, and there is no out-of-sample test --- which must be
+        cross-validation \emph{within} the upstream band, since the
+        middle band carries the drainage defect
+        (Table~\ref{tab:bands}). (Q1, Q2)
   \item \textbf{The identifiability caveats are weaker than they were,
         but the twins still carry them.} The measured study
         (Section~\ref{sec:identifiability}) --- 13 gauges fail, 108
@@ -1463,6 +1657,75 @@ issues of the next section.]}
         (iii). Remaining check before submission: ocean/MPAS adjoint
         efforts, and whether any E3SM land-model calibration uses a
         true adjoint rather than ensemble or surrogate gradients.
+\end{enumerate}
+
+\section*{Questions we need domain guidance on}
+\textcolor{red}{[Temporary section, removed before submission. Five
+questions where a domain judgment, not another run, is what is missing.
+Each states what we measured, what we need, and what changes depending
+on the answer. The longer list of open issues, tagged by team, follows.]}
+
+\begin{enumerate}
+  \item \textbf{How far can the NLCD Manning lookup be wrong, in
+        percent?} \emph{This one sets a number in the method directly.}
+        The prior width is the regularization: $\beta = \sigma^{-2}$.
+        We measured that holding the calibration to a physically
+        defensible field requires believing the lookup is good to
+        $\pm 15\%$; allow $\pm 30\%$ and the data drives developed-medium
+        urban to $n = 0.036$ (smoother than concrete) while
+        developed-low, interleaved with it, goes to $0.27$. We are
+        currently using a width at the tight end of that range and
+        saying so. \emph{If $\pm 15\%$ is defensible}, the calibration
+        stands as reported. \emph{If the honest width is $\pm 30\%$ or
+        more}, then the headline result is that this observable cannot
+        support a defensible distributed roughness field at all --- a
+        stronger negative claim than the paper currently makes, and one
+        we would want to make deliberately.
+  \item \textbf{Is $13\%$ of peak-WSE error being roughness-attributable
+        what you would expect} for a 30\,m model of this event?
+        Calibrated, roughness accounts for $0.095$\,m of a $0.72$\,m
+        discrepancy (Table~\ref{tab:ladder}); a global scale within
+        defensible values accounts for $0.029$\,m. \emph{If that is
+        unsurprising}, the paper's framing --- measure what a parameter
+        can explain, then report it --- is the contribution. \emph{If it
+        is far lower than expected}, the forcing or the DEM deserves
+        scrutiny before any further calibration work, because it would
+        mean the error budget is dominated by something we have not
+        looked at.
+  \item \textbf{Does the downstream reach's failure to drain match known
+        behaviour of this mesh and outlet configuration?} Thirty-seven
+        of 108 surveyed marks sit in cells that fill monotonically for
+        72 hours with zero recession, ending $+7.1$\,m above every
+        surveyed value while the upstream marks are already draining
+        (Table~\ref{tab:bands}). We have excluded them from calibration
+        and report the defect as a finding. We need to know whether this
+        is understood, whether it is a mesh, outlet-placement or
+        bathymetry issue, and who owns it --- because the bias is a
+        smooth gradient across the domain, so it is contaminating the
+        middle band as well, not only the reach we excluded.
+  \item \textbf{Is a $20\%$ error in antecedent water storage plausible
+        at event hour 29?} Scaling the initial state down by $20\%$
+        improves peak-WSE MAE by $0.075$\,m
+        (Section~\ref{sec:icauthority}) --- more than the entire
+        physically defensible roughness range, from a perturbation that
+        seems far easier to defend given MRMS rainfall uncertainty over
+        a 29-hour spin-up. \emph{If a $20\%$ water-balance error is
+        plausible}, the next study is the forcing and the initial
+        state, not the friction, and we would want to know whether the
+        rainfall product or the antecedent condition is the more likely
+        source. \emph{If it is not plausible}, then something else is
+        producing a systematic high bias and the scan has found a
+        symptom rather than a cause.
+  \item \textbf{Is the calibrated field itself acceptable?} We can
+        report a field that fits better than any global scaling, but it
+        raises pasture and developed-open roughness above twice their
+        NLCD values and holds developed-medium at its lower bound. We
+        would rather be told that this is uninterpretable than publish
+        it as a calibrated roughness map. A judgment on which classes
+        have credible ranges --- as opposed to a single width applied to
+        all fifteen --- would let us calibrate the ones the data
+        constrains and freeze the rest on physical grounds rather than
+        on gradient magnitude.
 \end{enumerate}
 
 \section*{Open issues and current positions, in order of importance}
