@@ -751,9 +751,16 @@ remains open.
         adds a measurement: across every FD probe on the real 108-mark
         configuration, \emph{no} mark's argmax moved and none flipped
         wet/dry, so at this geometry the argmax kinks are far sparser
-        than the dynamics' wet/dry kinks (previous entry). This remains
-        the standard footing of $\max$-type observables in calibration
-        rather than a theorem.
+        than the dynamics' wet/dry kinks (previous entry). A second,
+        independent measurement points the same way: evaluating the
+        production window on 4, 8 and 16 MPI ranks --- three different
+        domain decompositions, hence three different reduction orders
+        --- reproduces the peak-WSE objective and MAE to every printed
+        digit ($J = 8.082566\times10^{2}$, MAE $0.7188$\,m), so no
+        mark's recorded peak time is sensitive to partitioning at the
+        level roundoff perturbs it. This remains the standard footing
+        of $\max$-type observables in calibration rather than a
+        theorem.
         \emph{Proposed remedy, not yet implemented:} freeze the argmax
         assignment across an outer iteration, so each inner subproblem
         is genuinely smooth in the parameters, and re-evaluate the peak
@@ -1316,13 +1323,20 @@ issues of the next section.]}
         in the paper. Until it lands, the paper claims capability,
         baseline, decomposition, and an authority bound --- not the
         closed loop. (Q1, Q2)
-  \item \textbf{The identifiability caveats are the remaining
-        exposure.} The measured study carries
-        Section~\ref{sec:identifiability} --- 13 gauges fail, 108
+  \item \textbf{The identifiability caveats are weaker than they were,
+        but the twins still carry them.} The measured study
+        (Section~\ref{sec:identifiability}) --- 13 gauges fail, 108
         marks identify the classes covering $83\%$ of the domain ---
-        but its stated caveats (one-hour window, 15-iteration cap, no
-        representation error) are exactly where a reviewer will push,
-        and the answer is the planned 6--12-hour production run. (Q2)
+        rests on a one-hour window, a 15-iteration cap and no
+        representation error, which is exactly where a reviewer will
+        push. Section~\ref{sec:authority} now answers that push from a
+        different direction: the $\alpha$ and half-domain scans are on
+        the \emph{production} 12-hour window against \emph{real}
+        survey data, carry no iteration cap because no optimizer is
+        involved, and reach the same conclusion the twins did. The
+        remaining exposure is narrower --- the twins are still the only
+        evidence about \emph{which} classes are recoverable, as opposed
+        to how many. (Q2)
   \item \textbf{Long-window FD gates measure the objective's
         nonsmoothness, not gradient error --- and the paper must not
         be read as claiming more.} The gradient is verified to the
@@ -1372,11 +1386,12 @@ issues of the next section.]}
         than the $0.15$\,m survey error, so the floor must be reported
         as measured rather than assumed. (Q7)
   \item \textbf{The peak-WSE argmax remains formally open.} Its kinks
-        are measured absent at this geometry (no argmax moved across
-        any FD probe), a remedy is proposed (frozen-argmax outer
-        iteration) but not implemented, and the theoretical footing is
-        the standard one for $\max$-type observables rather than a
-        theorem. (Q2, Q3)
+        are measured absent at this geometry twice over --- no argmax
+        moved across any FD probe, and the production objective is
+        bit-identical across three domain decompositions --- but a
+        remedy is proposed (frozen-argmax outer iteration) and not
+        implemented, and the theoretical footing is the standard one
+        for $\max$-type observables rather than a theorem. (Q2, Q3)
   \item \textbf{Reproducibility currently rests on an unmerged PETSc
         fork.} The device-resident assembled-Jacobian path (blocked-COO
         BAIJ assembly on GPU) exists only on our PETSc branch. Until it
@@ -1431,11 +1446,27 @@ the event.]}
         experiment at the 108 HWM locations identifies the classes
         covering $83\%$ of the domain (Section~\ref{sec:identifiability}).
         The draft's counting argument (``overdetermined $18\times$'')
-        is indefensible and is gone.
+        is indefensible and is gone. Three further measurements on the
+        production configuration settle the question quantitatively:
+        the uniform-$\alpha$ scan bounds the whole roughness knob at
+        $0.08$\,m of a $0.72$\,m error; the half-domain scans show the
+        modes are not separable, each half alone making the fit worse
+        (Section~\ref{sec:authority}); and one BLMVM step with all
+        fifteen classes free drives $69.7\%$ of the domain onto or
+        against a bound, with developed-low rising $2.6\times$ while
+        developed-medium falls to the floor --- a compensating pair of
+        interleaved classes that is nearly null-space for a
+        path-integrated observable.
         \emph{Position:} the identifiability study --- which classes
         are observable from which networks and windows --- is a paper
-        contribution in its own right, and NLCD-class with Tikhonov to
-        the NLCD prior is the production parameterization.
+        contribution in its own right. The production parameterization
+        is \emph{not} all fifteen NLCD classes: the observable supports
+        roughly one degree of freedom, so the production run
+        calibrates one to three parameters with the remainder frozen at
+        the NLCD prior, and reports the fifteen-class run as the
+        control that shows why. Freezing weakly-constrained parameters
+        is the structural fix; leaning on the Tikhonov weight to
+        suppress them after the fact is not.
   \item \textbf{[Numerics] Inner tolerances and gradient fidelity.}
         Resolved by measurement: loose Krylov tolerances were a false
         economy (tightening $10^{-2} \to 10^{-3}$ is \emph{faster};
@@ -1522,11 +1553,18 @@ the event.]}
         more Krylov iterations; whether to keep reassembling the
         Jacobian every step is open alongside it.
   \item \textbf{[Science] Production-run design:
-        window, observation error, gauge trust.} Four choices remain.
-        (a) Which phase of Harvey to calibrate on: the observability
-        study favours the rising limb, while the peak-agreement result
-        and the HWM observable favour the peak; the per-mark crest
-        times now being measured decide it. (b) The observation error
+        window, observation error, gauge trust.} Four choices remain,
+        two of them now settled by measurement.
+        (a) \emph{Settled.} Which phase of Harvey to calibrate on: the
+        per-mark crest times decide it, and they are bimodal (hours
+        29--42 and 60--72) with an empty gap, so no 12-hour window
+        covers both. The window is the upstream cluster, event hours
+        29--41, whose 46 marks are the only population in a reach the
+        model drains correctly (Table~\ref{tab:bands}); the middle
+        band carries the same defect at intermediate strength and so
+        cannot serve as held-out data either, which forces
+        cross-validation \emph{within} the upstream band.
+        (b) The observation error
         $\sigma$ per observable, which sets the data-versus-prior
         weight directly --- USGS quality codes give 0.1--0.3\,m for
         HWMs, and we are using 0.15\,m. (c) The exclusion of eight
@@ -1538,9 +1576,28 @@ the event.]}
         hours, zero recession, $+7.1$\,m above every surveyed value;
         Section~\ref{sec:hwm}), so scoring or calibrating against them
         would fold a conveyance defect into the roughness field.
-        (d) The bounds $n \in [0.01, 0.2]$ and the use of the NLCD
-        field as the prior throughout, replacing the two-zone twins'
-        constant prior.
+        (d) \emph{Superseded.} The bounds are no longer stated in
+        physical $n$: the production problem optimizes
+        $\alpha = n / n_{\rm prior}$ with $\alpha \in [0.3, 3]$
+        (Section~\ref{sec:calibration}), which is both a physical
+        statement about how wrong the NLCD lookup can be and a bound
+        that excludes the region where the implicit solve fails --- a
+        box in $n$ did neither. The NLCD field remains the prior
+        throughout, replacing the two-zone twins' constant prior.
+        \emph{Newly open, and the most consequential of the four:} the
+        prior width $\sigma_n$, which now sets the regularization
+        directly through $\beta = \sigma_n^{-2}$. It is not a free
+        knob: at $\sigma_n = 0.015$ the misfit still outbids the prior
+        on the fifteen-class problem (the prior charged $118.5$ units
+        of objective and the misfit paid $146.5$), and the value that
+        would make that step net-unfavourable is $\sigma_n < 0.0135$,
+        while $\sigma_n = 0.010$ leaves the dominant direction with an
+        optimum at $\alpha \approx 0.88$ --- a well-posed problem worth
+        almost nothing. That tension is the result, not a tuning
+        difficulty: within a defensible prior the observable cannot
+        support a defensible roughness field. How wrong the NLCD
+        lookup can plausibly be is a question for the domain team, and
+        it now has a number attached to it.
   \item \textbf{[Numerics + engineering] Upstreaming
         the PETSc-side pieces.} The device-resident assembled-Jacobian
         path relies on our PETSc branch: blocked-COO assembly for BAIJ
