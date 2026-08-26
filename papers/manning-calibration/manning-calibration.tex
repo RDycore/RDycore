@@ -472,6 +472,57 @@ the restart acting as a rescaling of the quasi-Newton model. That is
 one twin, not a rule; the point for planning is that chaining did not
 cost convergence there.
 
+\paragraph{Scaling the optimization problem.}
+Algorithm~\ref{alg:var4d} is written in physical Manning units, and at
+basin scale that is not a usable parameterization. The quasi-Newton
+step of Algorithm~\ref{alg:blmvm} begins from $B = I$, so the first
+trial point is $n - g$; on the production window
+$\lVert g\rVert \approx 1.5\times10^{3}$ while $n \approx 0.05$, five
+orders apart. The projection onto $[n_{\min}, n_{\max}]$ then sends
+every component to the lower bound --- which is exactly where the model
+cannot solve, since a uniform $\alpha = 0.2$ diverges
+(Table~\ref{tab:alpha}) --- so every line-search trial fails and the
+optimizer terminates having taken no step at all. Nothing is wrong
+with the gradient when this happens; the finite-difference gates pass
+throughout.
+
+Two changes make the problem well scaled, and both have physical
+readings rather than being tuning constants. First, optimize the
+\emph{relative} field $\alpha_k = n_k / n_{{\rm prior},k}$ and the
+relative objective $J / J(n_{\rm prior})$. Both are then $O(1)$ and the
+unit quasi-Newton step becomes a roughness change of order $10\%$: at
+the NLCD start point of the production configuration, over a shortened
+window that reproduces the zero-step failure exactly,
+$\lVert g\rVert / J_0 = 0.10$, and the same start point that took no
+step in physical units takes one that lowers the objective and the
+peak-WSE MAE together. The bounds become statements about relative
+roughness,
+$\alpha \in [0.3, 3]$, which additionally excludes the region where the
+implicit solve fails. Second, set the Tikhonov weight from a prior
+standard deviation on Manning $n$ rather than by hand,
+\begin{equation}
+J = \frac{1}{2\sigma^2}\sum_k \lVert r_k\rVert^2
+  + \frac{1}{2\sigma_n^2}\lVert n - n_{\rm prior}\rVert^2 ,
+  \qquad \beta = \sigma_n^{-2},
+\label{eq:sigman}
+\end{equation}
+and report $\sigma_n$. This matters because $\beta$ is dimensional: a
+bare value is uninterpretable across problems, and ours had been chosen
+independently in every experiment, spanning six orders of magnitude.
+Against the measured $J(\alpha)$ curve, $\sigma_n = 0.015$ places the
+minimum of the dominant identifiable direction at $\alpha \approx 0.70$,
+while $\sigma_n = 0.020$ leaves no interior minimum there at all --- the
+same pathology the hand-chosen weight had. Stating the prior turns the
+choice into an arithmetic consequence of a quantity the domain team can
+argue about.
+
+The diagnosis is worth separating from the fix, because the failure
+mode is not specific to this model: an optimizer that takes zero steps
+on a problem whose gradient passes every verification gate is a
+scaling defect, and the cheapest test is to compare
+$\lVert g \rVert$ against the scale of the variable before suspecting
+the derivative.
+
 \section{Implicit stepping, enabled and required}
 \label{sec:implicit}
 
@@ -1025,6 +1076,152 @@ calibration target.}
 \label{tab:baseline}
 \end{table}
 
+\paragraph{The defect is a gradient, not a switch.}
+Sorting the marks by crest time splits them into three groups, and
+those groups turn out to be three \emph{spatial bands} whose bias
+increases monotonically downstream (Table~\ref{tab:bands}). The
+never-crest population is the end of a continuum, not a separate
+pathology: the intermediate band already carries $+2.85$\,m of the
+same model-high signature. Two consequences follow. First, a
+calibration window has to be placed on the upstream band, where the
+model is physically sound --- crests there fall in event hours
+29--41, and the 46 marks in that band are the target of every
+production number below. Second, the intermediate band is
+\emph{not} clean held-out data, which rules out the obvious
+validation design; out-of-sample skill has to be tested by
+cross-validation within the upstream band instead.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Group & $n$ & mean lon. & bias & MAE \\
+\midrule
+crest h29--41 (upstream) & 46 & $-95.695$ & $+0.30$\,m & $0.72$\,m \\
+crest h48--72 (middle) & 25 & $-95.568$ & $+2.85$\,m & $2.96$\,m \\
+never crest (downstream) & 37 & $-95.440$ & $+7.06$\,m & $7.06$\,m \\
+\bottomrule
+\end{tabular}
+\caption{The crest-timing groups are spatial bands, and the model-high
+bias grows monotonically downstream toward the reach with no working
+exit. The upstream band is the calibration target; the middle band is
+contaminated by the same defect at intermediate strength and cannot
+serve as held-out data.}
+\label{tab:bands}
+\end{table}
+
+\subsection{How much of the error can roughness explain?}
+\label{sec:authority}
+
+Before asking an optimizer to fit fifteen land-cover classes it is
+worth asking what any roughness field could achieve, and that question
+has an optimizer-independent answer. Scaling the entire NLCD field by
+a single factor $\alpha$ traverses the most identifiable direction of
+the problem; evaluating the peak-WSE misfit along it bounds the
+authority of roughness over this observable without reference to how,
+or whether, a calibration converges.
+
+We ran that scan on the production configuration: a 12-hour window over
+the upstream crest cluster (event hours 29--41), initialized from an
+hourly checkpoint of the 72-hour forward and with the rain re-aligned
+to the window start (both validated bit-exactly), scored against the 46
+surveyed marks whose modelled crest falls inside the window. Each point
+is one forward with no adjoint (Table~\ref{tab:alpha}).
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lllrr@{}}
+\toprule
+$\alpha$ & $n$ range & $J$ & MAE & dry \\
+\midrule
+$0.20$ & $0.005$--$0.032$ & \multicolumn{3}{l}{implicit solve diverges} \\
+$0.30$ & $0.008$--$0.048$ & $6.737\times10^{2}$ & $0.6392$ & 1/46 \\
+$0.45$ & $0.012$--$0.072$ & $7.038\times10^{2}$ & $0.6614$ & 1/46 \\
+$0.60$ & $0.016$--$0.096$ & $7.406\times10^{2}$ & $0.6776$ & 1/46 \\
+$1.00$ (NLCD) & $0.027$--$0.160$ & $8.083\times10^{2}$ & $0.7188$ & 0/46 \\
+\bottomrule
+\end{tabular}
+\caption{Uniform roughness scan on the production configuration
+(12-hour window, 46 cluster-A marks). The entire uniform-roughness knob
+is worth $0.08$\,m against a $0.72$\,m error, and only at roughness
+$30\%$ of published values. The limit at $\alpha = 0.2$ is numerical,
+not drying --- one mark stays dry throughout.}
+\label{tab:alpha}
+\end{table}
+
+\textbf{The entire uniform-roughness knob is worth $0.08$\,m against a
+$0.72$\,m error} --- about $11\%$ --- and it reaches that only at
+$\alpha = 0.3$, i.e.\ Manning values $30\%$ of the published NLCD
+lookup, as low as $n = 0.008$ where smooth concrete is $\approx 0.012$.
+Over a physically defensible range ($\alpha \gtrsim 0.7$) the knob is
+worth about three centimetres. The curve is mildly concave with no
+interior minimum: $J$ falls monotonically toward lower roughness until
+the implicit solve fails.
+
+That number is corroborated from an independent direction. The
+identifiability twin of Section~\ref{sec:identifiability} measured the
+peak-WSE signal induced by a large class perturbation at
+$\sim 0.1$\,m --- the same authority scale, from a different
+experiment. So $85$--$90\%$ of the model-versus-survey residual is not
+roughness at all: it is rainfall forcing, mesh elevation, datum, and
+representation error at 30\,m.
+
+\paragraph{The observable constrains one mode, not fifteen.}
+A natural objection is that spatial redistribution should beat uniform
+scaling --- that fifteen classes have freedom a single $\alpha$ does
+not. We tested it directly by scaling only part of the domain to
+$\alpha = 0.45$ and leaving the rest at the NLCD prior
+(Table~\ref{tab:halves}).
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Field & $J$ & $\Delta J$ & MAE & $\Delta$MAE \\
+\midrule
+NLCD prior & $808.3$ & --- & $0.7188$ & --- \\
+developed classes 21--24 only ($71.6\%$ of cells) & $786.8$ & $-21.5$ & $0.7306$ & $+0.0118$ \\
+everything else ($28.4\%$) & $827.5$ & $+19.2$ & $0.7268$ & $+0.0080$ \\
+both (= uniform $\alpha = 0.45$) & $703.8$ & $-104.5$ & $0.6614$ & $-0.0574$ \\
+\bottomrule
+\end{tabular}
+\caption{Each half of the domain scaled alone makes the fit
+\emph{worse}; scaled together they help by $45\times$ the sum of the
+parts. Peaks are set by path-integrated conveyance along flow paths
+that cross both groups, so only domain-coherent changes drain them.}
+\label{tab:halves}
+\end{table}
+
+Each half alone makes the fit \emph{worse}, and the two together help
+by $45\times$ the sum of the parts --- a strong positive interaction,
+not two competing signs. The mechanism is consistent with every other
+measurement: a mark's peak is set by the \emph{path-integrated}
+conveyance from upstream to that mark, and those paths cross both
+groups. Speeding part of a path does not drain it; the resulting
+fast/slow junction ponds water, so partial changes \emph{raise} peaks.
+Only a domain-coherent change lowers them.
+
+The conclusion is a design finding, not a tuning observation. The
+peak-WSE observable at these marks constrains essentially \emph{one}
+roughness degree of freedom --- the domain-scale, path-integrated
+conveyance --- worth $\sim 10\%$ of the model--survey discrepancy. It
+does not carry fifteen classes' worth of information. This unifies the
+earlier evidence rather than sitting beside it: the perfect-data twin
+recovers only the classes that move the domain mean, and the noisy twin
+pins the others to bounds precisely because they carry no signal to
+fit, so the optimizer fits noise in those directions instead.
+
+\paragraph{Why this generalizes.}
+The measurement above uses nothing specific to roughness. Given a
+parameter, an observable, and a model error to explain, the same three
+steps --- scan the dominant parameter direction, check whether
+sub-domain changes are separable, and compare the resulting authority
+against the residual --- bound what calibrating that parameter can
+ever accomplish, before any optimizer is written. We suggest it as a
+routine precondition for calibration studies, which commonly report the
+misfit reduction achieved without establishing the ceiling it was
+approaching.
+
 \section{Conclusions and outlook}
 
 An exact, verified Jacobian turns out to be the single artifact from
@@ -1035,12 +1232,25 @@ operational code --- behind a flag, FD-gated in CI, and with the
 verification baseline (FD coloring) kept alive in the configuration
 system.
 
-Next steps, in order: the calibrated real-data number --- the
-land-cover-class calibration against the 71 admissible high-water
-marks, for which every piece of machinery is staged and only the
-window-placement decision remains; regularization studies
-(discrepancy-principle stopping, total variation) for the
-ill-posedness and noise response our observability results quantify;
+The second artifact is a measurement rather than a capability, and it
+is the one we would most like others to copy. Asking what fraction of
+a model's error a parameter is \emph{able} to explain --- here, at
+basin scale, $\sim 10\%$ at the edge of physical plausibility and
+$\sim 4\%$ within it (Section~\ref{sec:authority}) --- is cheap,
+optimizer-independent, and it reframes what a calibration result
+means. It also told us where the leverage actually is: the same
+machinery, pointed at the residual rather than at the roughness,
+isolated a reach the model cannot drain.
+
+Next steps, in order: the converged real-data calibration ---
+land-cover-class parameters against the marks that crest inside the
+window, with the scaled optimization problem of
+Section~\ref{sec:calibration} and a stated $\sigma_n$, whose expected
+landing point the $\alpha$-scan already predicts; calibrating the
+number of parameters the observable actually supports rather than the
+number the land-cover map offers, which our own evidence puts at one
+to three; the conveyance and outlet representation that the drainage
+finding implicates, to which the adjoint machinery applies unchanged;
 and coupling the gradient path to PyTorch through the existing
 PETSc--PyTorch bridge for learned-physics and hybrid data-assimilation
 experiments.
@@ -1081,19 +1291,31 @@ each stated as of today. Cross-references Q$n$ point into the numbered
 issues of the next section.]}
 
 \begin{enumerate}
-  \item \textbf{There is no real-data \emph{calibration} in the
-        paper.} The abstract's differentiator --- production code made
-        differentiable, versus reduced solvers rewritten in ML
-        frameworks --- invites comparison with Inunda's calibrated
+  \item \textbf{There is no converged real-data \emph{calibration} in
+        the paper yet.} The abstract's differentiator --- production
+        code made differentiable, versus reduced solvers rewritten in
+        ML frameworks --- invites comparison with Inunda's calibrated
         $0.67$\,m MAE against surveyed Harvey high-water marks. What
         exists today is the uncalibrated baseline and its decomposition
         ($3.41$\,m over all 108 marks; $1.51$\,m over the 71 in
-        reaches the model drains), the identifiability twin at the
-        real mark geometry, and a bit-exactly validated mid-event
-        restart for the calibration window. The calibrated number
-        waits only on the window-placement decision; until it lands,
-        the paper claims capability, baseline, and decomposition, not
-        the closed loop. (Q1, Q2)
+        reaches the model drains), the identifiability twin at the real
+        mark geometry, a bit-exactly validated mid-event restart, and
+        --- new since the last draft --- an optimizer-independent
+        measurement of how much of the residual roughness could ever
+        explain (Section~\ref{sec:authority}). The first production
+        calibration attempt took \emph{zero} steps; the cause was a
+        scaling defect in the optimization problem, not in the
+        gradient, and it is diagnosed, fixed, and gated
+        (Section~\ref{sec:calibration}, ``Scaling the optimization
+        problem''). A reviewer is entitled to ask whether the negative
+        identifiability result is a property of the problem or of an
+        optimizer we never got working; the honest answer is that the
+        $\alpha$-scan is optimizer-independent and settles it, but the
+        argument is materially stronger with a converged run that lands
+        where the scan predicts, and that run is in flight rather than
+        in the paper. Until it lands, the paper claims capability,
+        baseline, decomposition, and an authority bound --- not the
+        closed loop. (Q1, Q2)
   \item \textbf{The identifiability caveats are the remaining
         exposure.} The measured study carries
         Section~\ref{sec:identifiability} --- 13 gauges fail, 108
@@ -1134,13 +1356,21 @@ issues of the next section.]}
         than physics. Sensitivity of the calibrated field to
         $h_{\rm anuga}$ and to the outlet choice should be
         demonstrated, not asserted. (Q4, Q5)
-  \item \textbf{Noise response is measured but not yet built into the
-        method.} The basin-scale noisy twin shows the failure mode
+  \item \textbf{Noise response is measured but only partly built into
+        the method.} The basin-scale noisy twin shows the failure mode
         (misfit falls $9.4\times$ while five classes pin to bounds,
-        Table~\ref{tab:snr}); noise-consistent regularization
-        (discrepancy-principle stopping) does not exist yet, so the
-        production run leans on a Tikhonov weight chosen by judgment.
-        (Q7)
+        Table~\ref{tab:snr}). The Tikhonov weight is no longer chosen
+        by judgment --- it is $\sigma_n^{-2}$ for a stated prior
+        standard deviation on Manning $n$, Eq.~\eqref{eq:sigman} ---
+        but that only relocates the judgment into $\sigma_n$, which the
+        domain team has not yet fixed, and the value we are using
+        ($0.015$) is close to the largest that leaves the dominant
+        direction with an interior minimum. Discrepancy-principle
+        stopping still does not exist, and in any case the discrepancy
+        target $J \approx N/2$ is unreachable here: the achievable
+        floor is set by structural error an order of magnitude larger
+        than the $0.15$\,m survey error, so the floor must be reported
+        as measured rather than assumed. (Q7)
   \item \textbf{The peak-WSE argmax remains formally open.} Its kinks
         are measured absent at this geometry (no argmax moved across
         any FD probe), a remedy is proposed (frozen-argmax outer
