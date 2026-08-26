@@ -1566,3 +1566,51 @@ window-length accumulation, class-support structure with additivity,
 and zero observable-level kinks. CLOSED: the adjoint is correct; the
 long-window FD gate measures dense wet/dry branch structure in the
 objective.
+
+### o44/o45: how much of the error can Manning roughness reach? (2026-08-25)
+
+Uniform scale scan on the production configuration (12-hr cluster-A
+window h29-41, 46 real marks, IC = o37 h29 checkpoint, converged
+tolerances), evaluating J and peak-WSE MAE at alpha * n_NLCD:
+
+| alpha | n range | J | MAE | dry |
+| --- | --- | --- | --- | --- |
+| 0.2 | 0.005-0.032 | **DIVERGED_NONLINEAR_SOLVE** | -- | -- |
+| 0.3 | 0.008-0.048 | 6.7367e2 | **0.6392** | 1/46 |
+| 0.45 | 0.012-0.072 | 7.0380e2 | 0.6614 | 1/46 |
+| 0.6 | 0.016-0.096 | 7.4056e2 | 0.6776 | 1/46 |
+| 1.0 (NLCD) | 0.027-0.160 | 8.0826e2 | 0.7188 | 0/46 |
+
+**The entire uniform-roughness knob is worth 0.08 m against a 0.72 m
+error (11%)** -- and only at alpha 0.3, i.e. roughness at 30% of the
+published NLCD values (n as low as 0.008; smooth concrete is ~0.012),
+which no one would defend physically. Over a defensible range
+(alpha >~ 0.7) it is worth about 3 cm.
+
+Shape: mildly concave, slope steepening toward low alpha (0.103, 0.108,
+0.148 m per unit alpha over the three intervals). The limit is NOT
+drying (1/46 dry throughout) but numerical: at alpha 0.2 the implicit
+solve diverges.
+
+Cross-check: the identifiability twin measured the parameter-induced
+peak-WSE signal at ~0.1 m for a large class perturbation -- the same
+authority scale, from an independent measurement. So ~85-90% of the
+model-vs-survey residual is NOT roughness (rain, DEM, datum,
+representation error at 30 m).
+
+Consequences:
+1. No Manning calibration against these marks can close the gap to
+   Inunda's calibrated 0.67 m (which is on a DIFFERENT mark set --
+   never compare the two directly).
+2. The paper's claim shifts from "calibration closes the gap" to the
+   stronger and more defensible "we can measure, at basin scale, how
+   much of a flood model's error a parameter is capable of explaining"
+   -- here 11% at the edge of physical plausibility, ~4% within it.
+3. The multi-class calibration is still worth running: spatial
+   redistribution can beat uniform scaling, and how much it beats it by
+   is the quantitative question o43 (running) answers. The alpha curve
+   is the one-parameter bar it must clear to justify 15 parameters.
+4. Discrepancy stopping at J ~ N/2 ~ 23 is unreachable (J stalls near
+   ~670 at best); sigma = 0.15 m is survey error only, and the
+   achievable floor is set by structural error an order of magnitude
+   larger. Report the floor as measured.
