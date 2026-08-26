@@ -1614,3 +1614,46 @@ Consequences:
    ~670 at best); sigma = 0.15 m is survey error only, and the
    achievable floor is set by structural error an order of magnitude
    larger. Report the floor as measured.
+
+### o47: the peak observable constrains ONE roughness mode, not fifteen (2026-08-25)
+
+Half-scans at alpha 0.45 on the production configuration, splitting the
+domain by land-cover group (same window, marks, IC as o44/o45):
+
+| field | J | dJ | MAE | dMAE |
+| --- | --- | --- | --- | --- |
+| NLCD baseline | 808.3 | -- | 0.7188 | -- |
+| developed 21-24 only (71.6% of cells) | 786.8 | -21.5 | 0.7306 | **+0.0118** |
+| everything else (28.4%) | 827.5 | +19.2 | 0.7268 | **+0.0080** |
+| both (= global alpha 0.45) | 703.8 | **-104.5** | 0.6614 | **-0.0574** |
+
+**Each half alone makes the fit WORSE; together they help by 45x the
+sum of the parts.** A strong positive interaction, not two opposing
+signs (an intermediate reading of the developed-only point alone, since
+refuted by the second half).
+
+Mechanism consistent with all four points: a mark's peak is set by the
+PATH-INTEGRATED conveyance from upstream to that mark, and the paths
+cross both groups. Speeding part of a path does not drain it, and the
+resulting fast/slow junction ponds water -- so partial changes raise
+peaks. Only a domain-coherent change lowers them.
+
+**Consequence -- the key design finding.** The peak-WSE observable at
+these marks constrains essentially ONE roughness degree of freedom (the
+domain-scale, path-integrated conveyance), worth ~0.08 m against a
+0.72 m error. It does not carry fifteen classes' worth of information.
+This unifies the earlier evidence: o28 identified only the area-dominant
+classes (the ones that move the domain mean), and o30 pinned five
+classes under realistic noise (the other directions have no signal to
+fit, so the optimizer fits noise instead).
+
+Production design follows structurally, not by tuning: calibrate ONE or
+TWO parameters rather than fifteen (-adjoint_classes_active, commit
+456524dc). o43 (15-class, running) is the control that demonstrates
+why -- expect it to descend to roughly the alpha-curve level and then
+begin pinning weakly constrained classes.
+
+CAUTION on the alpha-scan bound: it measures the uniform mode, which
+this result shows IS the dominant identifiable mode -- so ~0.08 m is a
+fair estimate of accessible roughness authority, not merely a lower
+bound on one arbitrary direction.
