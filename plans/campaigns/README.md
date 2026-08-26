@@ -26,6 +26,7 @@ to that directory to use.
 | `o51_scaling.sh` | forward at 4, 8 and 16 ranks on the production window | ~75 min, 4 nodes |
 | `o52_linesearch.sh` | More-Thuente vs armijo, one iteration each, 7200-step window | ~2.5 hr, 1 node |
 | `o53_production_gradient.sh` | the production start-point gradient at n16, recorded from an interactive run | ~2.5 hr, 4 nodes |
+| `o54_ic_authority.sh` | MAE at a dumped calibration iterate, and the initial-condition authority scan | ~90 min, 4 nodes |
 
 ## Staged inputs these expect in `$SCRATCH/gpu-implicit`
 
@@ -39,7 +40,8 @@ to that directory to use.
   is `sed`-derived from
 - `scale_manning.py`, `scale_manning_classes.py` --- from `data/nlcd/`
 - a build with `-adjoint_classes_relative` (i.e. at or after commit
-  `48485e24`); the scripts check for it and refuse to run against a
+  `48485e24`), and for `o54` one with `-adjoint_ic_scale` (`fda6f09e`);
+  the scripts check for the option they need and refuse to run against a
   stale binary
 
 ## Conventions worth keeping
