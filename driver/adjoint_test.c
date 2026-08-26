@@ -65,7 +65,9 @@ static const char *help_str =
     "  -adjoint_classes_grad_dump <path>  classes mode: write (code, n, dJ/dn) at the\n"
     "                              start point, for an explicit line search along -g\n"
     "  -adjoint_ic_scale <real>    multiply the initial state by this factor (velocities\n"
-    "                              unchanged); the IC analogue of the uniform roughness scan\n";
+    "                              unchanged); the IC analogue of the uniform roughness scan\n"
+    "  -adjoint_classes_grad_only  write the start-point gradient and exit (one objective+\n"
+    "                              gradient per run; for assembling a Hessian by columns)\n";
 
 #define NDOF 3
 
@@ -2215,6 +2217,21 @@ int main(int argc, char *argv[]) {
             PetscCall(VecScatterDestroy(&gsc));
             PetscCall(VecDestroy(&g_all));
             PetscCall(PetscPrintf(comm, "class calibration: start-point gradient written to %s\n", grad_file));
+          }
+        }
+        // -adjoint_classes_grad_only: stop here, having written the gradient.
+        // A Gauss-Newton Hessian over K classes is K+1 gradients, and without
+        // this each one would also pay TAO's own start-point evaluation and a
+        // line search -- three evaluations where one is wanted.
+        {
+          PetscBool grad_only = PETSC_FALSE;
+          PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_classes_grad_only", &grad_only, NULL));
+          if (grad_only) {
+            PetscCall(PetscPrintf(comm, "class calibration: gradient-only, exiting after the dump\n"));
+            PetscCall(VecDestroy(&g0));
+            PetscCall(RDyDestroy(&rdy));
+            PetscCall(RDyFinalize());
+            return 0;
           }
         }
         // the FD probe moves the evaluation point, so it comes after anything
