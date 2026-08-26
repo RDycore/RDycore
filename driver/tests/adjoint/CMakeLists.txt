@@ -146,3 +146,13 @@ add_test(adjoint_classes_relative_fd_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adj
 # this twin: J 3.101e1 -> 1.263e1 in 3 iterations (0.41x), every iteration
 # accepted. -adjoint_sigma_n sets the Tikhonov weight as 1/sigma_n^2.
 add_test(adjoint_classes_relative_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_rel_np1.txt -adjoint_obs_freq 10 -tao_max_it 3 -adjoint_classes_relative -adjoint_sigma_n 0.015 -adjoint_jred_gate 0.6)
+
+# -adjoint_sigma_alpha: the prior stated as a fraction of the prior value
+# rather than an absolute offset in n. This gate has to be taken at a point
+# where alpha != 1, because at the prior BOTH prior forms contribute exactly
+# zero to the objective and its gradient, so a check there cannot tell them
+# apart -- it warm-starts from the dump of adjoint_classes_dump_np_1 instead.
+# Measured: 4.9e-7 for the relative prior and 4.2e-7 for the absolute one at
+# the same point (eps 1e-4).
+add_test(adjoint_classes_relprior_fd_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_relprior_np1.txt -adjoint_obs_freq 10 -tao_max_it 1 -adjoint_classes_relative -adjoint_classes_init classes_p_np1.txt -adjoint_sigma_alpha 0.3 -adjoint_hwm_fd -adjoint_fd_samples 3 -adjoint_fd_eps 1e-4)
+set_tests_properties(adjoint_classes_relprior_fd_np_1 PROPERTIES DEPENDS "adjoint_classes_dump_np_1")

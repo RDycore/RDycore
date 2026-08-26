@@ -56,6 +56,8 @@ static const char *help_str =
     "                              holding the rest at their prior (comma-separated)\n"
     "  -adjoint_sigma_n <real>     prior std dev on Manning n; sets the Tikhonov weight\n"
     "                              beta = 1/sigma_n^2 (overrides -adjoint_beta)\n"
+    "  -adjoint_sigma_alpha <real> the same prior as a FRACTION of the prior value: penalizes\n"
+    "                              n/n_prior - 1, so every class is treated alike\n"
     "  -adjoint_classes_relative   classes mode: optimize alpha_k = n_k/n_prior_k with the\n"
     "                              objective scaled by 1/J(start) -- both O(1), so the\n"
     "                              quasi-Newton unit step is a sane roughness change\n"
@@ -1025,6 +1027,7 @@ typedef struct {
   // that projects onto the bounds. The parameter files, the bounds in n, and
   // everything printed stay in physical Manning units.
   PetscBool relative;
+  PetscBool rel_prior;  // -adjoint_sigma_alpha: penalize fractional, not absolute, departure
   PetscReal Jscale;  // 1 = off; otherwise 1/J at the start point
   char      dump_path[PETSC_MAX_PATH_LEN];  // -adjoint_classes_dump; "" = off
 } ClassCtx;
@@ -1159,12 +1162,27 @@ static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal 
   PetscCall(VecRestoreArrayRead(cal->mu, &mu));
   PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, gk, cc->nclass, MPIU_REAL, MPIU_SUM, comm));
 
-  // Tikhonov toward the NLCD class values, in physical Manning units so that
-  // sigma_n means the same thing whichever variable the optimizer works in
+  // Tikhonov toward the NLCD class values. Two forms, and the choice is not
+  // cosmetic. An ABSOLUTE prior (sigma_n, in metres^(-1/3) s) says every class
+  // is known to the same +/- in n -- which for an NLCD table spanning 0.027 to
+  // 0.16 means +/-56% for barren and +/-9% for developed-high, and lets a
+  // small-n class make a large RELATIVE excursion cheaply because the penalty
+  // scales as n_prior^2. That is measurable in the iterates: every class that
+  // ran to the upper bound was small-n and every one that ran to the lower
+  // bound was large-n, which is the prior's signature rather than a statement
+  // about the basin. A RELATIVE prior (sigma_alpha) penalizes fractional
+  // departure instead, which is what "the lookup could be 30% wrong" means and
+  // is the question a domain expert can actually answer.
   for (PetscInt k = 0; k < cc->nclass; ++k) {
-    PetscReal d = cc->n_k[k] - cc->prior_k[k];
-    *J += 0.5 * cc->pc.beta * d * d;
-    gk[k] += cc->pc.beta * d;
+    if (cc->rel_prior) {
+      PetscReal d = cc->n_k[k] / cc->prior_k[k] - 1.0;  // fractional departure
+      *J += 0.5 * cc->pc.beta * d * d;
+      gk[k] += cc->pc.beta * d / cc->prior_k[k];  // dJ/dn_k
+    } else {
+      PetscReal d = cc->n_k[k] - cc->prior_k[k];
+      *J += 0.5 * cc->pc.beta * d * d;
+      gk[k] += cc->pc.beta * d;
+    }
   }
   // chain rule dJ/dalpha_k = prior_k dJ/dn_k, and the objective scaling
   if (cc->relative)
@@ -1660,6 +1678,18 @@ int main(int argc, char *argv[]) {
       PetscCheck(sigma_n > 0.0, comm, PETSC_ERR_USER, "-adjoint_sigma_n must be positive");
       beta = 1.0 / (sigma_n * sigma_n);
     }
+    // -adjoint_sigma_alpha <s>: the same prior stated as a FRACTION of the
+    // prior value rather than an absolute offset -- "the lookup could be s*100
+    // percent wrong", which is the form a domain expert can answer and the form
+    // that treats a class at n = 0.027 and one at n = 0.16 alike.
+    PetscReal sigma_alpha      = 0.0;
+    PetscBool have_sigma_alpha = PETSC_FALSE;
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_sigma_alpha", &sigma_alpha, &have_sigma_alpha));
+    if (have_sigma_alpha) {
+      PetscCheck(sigma_alpha > 0.0, comm, PETSC_ERR_USER, "-adjoint_sigma_alpha must be positive");
+      PetscCheck(!have_sigma_n, comm, PETSC_ERR_USER, "give -adjoint_sigma_n or -adjoint_sigma_alpha, not both");
+      beta = 1.0 / (sigma_alpha * sigma_alpha);
+    }
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_map_file", map_file, sizeof(map_file), &have_map_file));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_stride", &obs_stride, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_error", &sigma, NULL));
@@ -1817,7 +1847,7 @@ int main(int argc, char *argv[]) {
       for (PetscInt c = 0; c < 256; ++c) nclass += present[c];
       PetscCheck(nclass > 0, comm, PETSC_ERR_USER, "no land-cover classes found in %s", class_file);
 
-      ClassCtx cc = {.nclass = nclass, .n_owned = n_owned, .Jscale = 1.0};
+      ClassCtx cc = {.nclass = nclass, .n_owned = n_owned, .Jscale = 1.0, .rel_prior = have_sigma_alpha};
       PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_classes_relative", &cc.relative, NULL));
       PetscCall(PetscMalloc1(nclass, &cc.class_codes));
       PetscCall(PetscMalloc1(nclass, &cc.prior_k));
@@ -2118,8 +2148,8 @@ int main(int argc, char *argv[]) {
       }
 
       // beta is dimensional, so report the prior std dev it corresponds to
-      PetscCall(PetscPrintf(comm, "class calibration: prior sigma_n = %.4f (beta = %.4e)%s\n", (double)(1.0 / PetscSqrtReal(beta)),
-                            (double)beta,
+      PetscCall(PetscPrintf(comm, "class calibration: prior sigma_%s = %.4f (beta = %.4e)%s\n", cc.rel_prior ? "alpha" : "n",
+                            (double)(1.0 / PetscSqrtReal(beta)), (double)beta,
                             cc.relative ? ", relative variables alpha = n/n_prior" : ""));
       if (cc.relative)
         PetscCall(PetscPrintf(comm, "class calibration: alpha bounds [%.3f, %.3f]\n", (double)alpha_min, (double)alpha_max));
