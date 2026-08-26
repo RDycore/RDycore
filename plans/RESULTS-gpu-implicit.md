@@ -1657,3 +1657,94 @@ CAUTION on the alpha-scan bound: it measures the uniform mode, which
 this result shows IS the dominant identifiable mode -- so ~0.08 m is a
 fair estimate of accessible roughness authority, not merely a lower
 bound on one arbitrary direction.
+
+### o48: the calibration was a scaling problem, and it is fixed (2026-08-26)
+
+o43 did zero TAO iterations. The diagnosis in
+`plans/PROJECT-STATE-2026-08-26.md` S4 is confirmed and now demonstrated
+rather than argued: the failure reproduces in five minutes and the fix
+is measured on the production wiring.
+
+**The control.** `o48_smoke.sh` runs the exact production configuration
+-- 2.93M cells, GPU types, the 46 real cluster-A marks, the h29
+checkpoint, the rain offset -- over a 600-step window instead of 43,200.
+Case A is the o43 setup (Manning n as the variable, beta = 1e2, start at
+the NLCD prior):
+
+    hwm init: J 7.022047e+02, MAE 0.6630 m, 0 of 46 dry
+      0 TAO,  Function value: 702.205,  Residual: 667.459
+    class recovery: 0 TAO its, J_final 7.022047e+02
+
+Zero iterations, J_final = J_init, on a window costing five minutes.
+The o43 failure was never about the long window or the real data.
+
+**The fix.** Case B is the same start point with
+`-adjoint_classes_relative -adjoint_sigma_n 0.015`:
+
+    hwm init: J 7.022047e+02, MAE 0.6630 m, 0 of 46 dry
+    objective scaled by 1/J0 = 1.4241e-03; first trial step |g|/J0 = 0.1036 in alpha
+      0 TAO,  Function value: 1.,         Residual: 0.103623
+      1 TAO,  Function value: 0.970516,   Residual: 0.123666
+    hwm final: J 6.815011e+02, MAE 0.6127 m
+    class recovery: 1 TAO its, J_final 6.815011e+02
+
+Identical J at the start point to every digit -- alpha = 1 reproduces
+the NLCD prior field exactly, so the two cases differ only in the
+optimization problem. The first trial step is 0.10 in alpha (a 10%
+roughness change) where before it was five orders too large.
+
+**Why it works.** BLMVM's first trial is x - g. With n as the variable
+and |g| = 1554 where n ~ 0.05 that lands on the lower bound everywhere,
+and uniform alpha 0.2 is measured to diverge (o44), so every trial
+failed and the line search gave up. Making the variable alpha_k =
+n_k/n_prior_k and the objective J/J(start) puts both at O(1). The bounds
+become alpha in [0.3, 3.0] -- a physical statement that also excludes
+the divergent region, which a bound of n > 0.005 did not.
+
+**Regularization on principle.** `-adjoint_sigma_n <s>` sets
+beta = 1/s^2 from a prior standard deviation on n, and the run reports
+sigma_n. Against the measured J(alpha) curve (o44/o45) with
+sum_k n_prior_k^2 = 0.1399 over the 15 classes:
+
+| sigma_n | beta | uniform-mode minimum | J_mis | reg | MAE |
+| --- | --- | --- | --- | --- | --- |
+| 0.010 | 10000 | alpha 0.88 | 790.0 | 9.7 | ~0.708 |
+| **0.015** | **4444** | **alpha 0.70** | **757.3** | **28.6** | **~0.690** |
+| 0.020 | 2500 | alpha 0.33 (bound) | 678.6 | 79.5 | ~0.643 |
+
+So sigma_n = 0.015 is about the loosest prior that leaves an interior
+minimum in the dominant identifiable direction; at 0.020 the problem
+runs to the bound again, which is what beta = 1e2 was doing at a
+relative roughness change of 13.6. Report sigma_n, never a bare beta.
+
+**Verification** (commit 48485e24, all 21 adjoint/calibration ctests
+pass -- 19 previous plus 2 new):
+- the alpha gradient passes the central-difference gate at 2.3e-6 (new
+  ctest `adjoint_classes_relative_fd_np_1`, eps 1e-4; the default 1e-3
+  probe is truncation-limited at 3e-5 and the error scales as eps^2
+  across the whole sweep 3e-5..3e-2, which is what says truncation
+  rather than a wrong chain rule)
+- the dJ/dn recovered from the alpha gradient equals the absolute
+  mode's gradient at the same point to 1e-8, the dump's 10-digit
+  precision, class by class
+- dump/init round-trips exactly and across modes: a relative run's
+  dump, read back by either mode, reproduces its J_final to all digits
+- `-adjoint_jred_gate` now applies to the classes branch as well, so a
+  run that reports a "final" objective equal to its initial one fails
+  CI instead of passing quietly
+
+**Also added.** `-adjoint_classes_grad_dump <file>` writes
+(code, n, dJ/dn) at the start point before TAO runs. It is the fallback
+if the optimizer still struggles -- a line search along -g can then be
+run as eval-only forwards (~36 min) instead of trial points (~2 hr) --
+and it is a diagnostic in its own right: it says which classes carry
+the misfit gradient, which is what `-adjoint_classes_active` needs.
+
+**Caution, from the smoke's one iteration.** Classes 23 and 24 reached
+the alpha 0.3 bound on the first accepted step (BLMVM's line search
+expanded well past -g), while the objective fell only 3% and the
+gradient norm rose. On a 600-step window the peaks are barely resolved,
+so this is not a production result -- but it is the expected
+over-parameterization behaviour (o28/o30/o47) and the cue to read the
+production run's per-class table before believing any per-class number.
+
