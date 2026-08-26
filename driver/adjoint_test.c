@@ -45,7 +45,7 @@ static const char *help_str =
     "  -adjoint_gauges_twin        first synthesize the table from a two-zone truth\n"
     "  -adjoint_gauge_stride <int> twin: gauges at every Nth natural cell (default: 7)\n"
     "  -adjoint_n0 <real>          gauge mode: constant prior/initial n (default: 0.03)\n"
-    "  -adjoint_jred_gate <real>   gauge mode: require J_final < gate*J_init (0 = off)\n"
+    "  -adjoint_jred_gate <real>   gauge/classes mode: require J_final < gate*J_init (0 = off)\n"
     "  -adjoint_rain_start_hour <int>  event hour the window's rain starts at (default: 0);\n"
     "                              use with RDycore's -restart to run a mid-event window\n"
     "  -adjoint_forward_only       one forward over the window, then exit (no adjoint/FD/TAO)\n"
@@ -53,7 +53,15 @@ static const char *help_str =
     "  -adjoint_classes_init <path>  classes mode: warm-start TAO from such a file, so a\n"
     "                              calibration too long for one queue slot can be continued\n"
     "  -adjoint_classes_active <codes>  classes mode: calibrate only these NLCD classes,\n"
-    "                              holding the rest at their prior (comma-separated)\n";
+    "                              holding the rest at their prior (comma-separated)\n"
+    "  -adjoint_sigma_n <real>     prior std dev on Manning n; sets the Tikhonov weight\n"
+    "                              beta = 1/sigma_n^2 (overrides -adjoint_beta)\n"
+    "  -adjoint_classes_relative   classes mode: optimize alpha_k = n_k/n_prior_k with the\n"
+    "                              objective scaled by 1/J(start) -- both O(1), so the\n"
+    "                              quasi-Newton unit step is a sane roughness change\n"
+    "  -adjoint_classes_alpha_min/max <real>  relative mode: bounds on alpha (0.3, 3.0)\n"
+    "  -adjoint_classes_grad_dump <path>  classes mode: write (code, n, dJ/dn) at the\n"
+    "                              start point, for an explicit line search along -g\n";
 
 #define NDOF 3
 
@@ -1006,10 +1014,22 @@ typedef struct {
   PetscInt  *cell_class;    // [n_owned] parameter index for each owned cell
   PetscInt   n_owned;
   Vec        p_prior;       // [nclass] prior value per class (NLCD table)
+  PetscReal *prior_k;       // [nclass] the same, replicated on every rank
+  PetscReal *n_k;           // [nclass] Manning n of the point last evaluated
   PetscReal *n_scratch;     // [n_owned]
+  // -adjoint_classes_relative: the optimizer's variable is alpha_k = n_k/prior_k
+  // and its objective is J/J_start. Both are then O(1) and the quasi-Newton
+  // unit step is a ~10% roughness change instead of a 5-orders-too-large one
+  // that projects onto the bounds. The parameter files, the bounds in n, and
+  // everything printed stay in physical Manning units.
+  PetscBool relative;
+  PetscReal Jscale;  // 1 = off; otherwise 1/J at the start point
 } ClassCtx;
 
-// J = multi-time gauge misfit + beta/2 |p - p_prior|^2;  g_k = sum_{c in k} mu_c
+// class parameter p_k -> Manning n_k (identity, or alpha_k * prior_k)
+static inline PetscReal ClassN(const ClassCtx *cc, PetscInt k, PetscReal p_k) { return cc->relative ? p_k * cc->prior_k[k] : p_k; }
+
+// J = multi-time gauge misfit + beta/2 |n - n_prior|^2;  g_k = sum_{c in k} mu_c
 static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal *J, Vec g, void *ctx) {
   ClassCtx       *cc  = ctx;
   CalibrationCtx *cal = &cc->pc.base;
@@ -1026,8 +1046,9 @@ static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal 
   PetscCall(VecScatterBegin(scatter, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
   PetscCall(VecScatterEnd(scatter, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
   PetscCall(VecGetArrayRead(p_all, &pa));
-  for (PetscInt i = 0; i < cc->n_owned; ++i) cc->n_scratch[i] = PetscRealPart(pa[cc->cell_class[i]]);
+  for (PetscInt k = 0; k < cc->nclass; ++k) cc->n_k[k] = ClassN(cc, k, PetscRealPart(pa[k]));
   PetscCall(VecRestoreArrayRead(p_all, &pa));
+  for (PetscInt i = 0; i < cc->n_owned; ++i) cc->n_scratch[i] = cc->n_k[cc->cell_class[i]];
   PetscCall(RDySetDomainManningsN(rdy, cc->n_owned, cc->n_scratch));
 
   if (cc->pc.hwm) {
@@ -1042,6 +1063,8 @@ static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal 
   if (diverged) {  // broken trial field: huge J, zero gradient -> line search backs off
     *J = 1e30;
     PetscCall(VecZeroEntries(g));
+    PetscCall(VecScatterDestroy(&scatter));
+    PetscCall(VecDestroy(&p_all));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   PetscCall(AdjointSweepMulti(rdy, cal->H, cal->sigma, cc->pc.obs_freq, cc->pc.K, cc->pc.r_k, cal->r_work, cal->lambda, cal->mu));
@@ -1055,24 +1078,20 @@ static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal 
   PetscCall(VecRestoreArrayRead(cal->mu, &mu));
   PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, gk, cc->nclass, MPIU_REAL, MPIU_SUM, comm));
 
-  // Tikhonov toward the NLCD class values
-  const PetscScalar *pp;
-  PetscCall(VecScatterBegin(scatter, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(scatter, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecGetArrayRead(p_all, &pa));
-  Vec prior_all;
-  PetscCall(VecScatterCreateToAll(cc->p_prior, &scatter, &prior_all));
-  PetscCall(VecScatterBegin(scatter, cc->p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(scatter, cc->p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
-  PetscCall(VecGetArrayRead(prior_all, &pp));
+  // Tikhonov toward the NLCD class values, in physical Manning units so that
+  // sigma_n means the same thing whichever variable the optimizer works in
   for (PetscInt k = 0; k < cc->nclass; ++k) {
-    PetscReal d = PetscRealPart(pa[k]) - PetscRealPart(pp[k]);
+    PetscReal d = cc->n_k[k] - cc->prior_k[k];
     *J += 0.5 * cc->pc.beta * d * d;
     gk[k] += cc->pc.beta * d;
   }
-  PetscCall(VecRestoreArrayRead(prior_all, &pp));
-  PetscCall(VecRestoreArrayRead(p_all, &pa));
-  PetscCall(VecDestroy(&prior_all));
+  // chain rule dJ/dalpha_k = prior_k dJ/dn_k, and the objective scaling
+  if (cc->relative)
+    for (PetscInt k = 0; k < cc->nclass; ++k) gk[k] *= cc->prior_k[k];
+  if (cc->Jscale != 1.0) {
+    *J *= cc->Jscale;
+    for (PetscInt k = 0; k < cc->nclass; ++k) gk[k] *= cc->Jscale;
+  }
   PetscCall(VecScatterDestroy(&scatter));
   PetscCall(VecDestroy(&p_all));
 
@@ -1547,6 +1566,19 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_obs_file", obs_file, sizeof(obs_file), &have_obs_file));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_freq", &obs_freq, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_beta", &beta, NULL));
+    // -adjoint_sigma_n <s>: the Tikhonov weight set on principle rather than by
+    // hand. beta is dimensional (units of 1/n^2), so a bare value means nothing
+    // across problems and was picked ad hoc in every earlier experiment. Writing
+    // the objective as J = (1/2 sigma^2) sum r^2 + (1/2 sigma_n^2) |n - n_prior|^2
+    // makes the second term a prior with a stated uncertainty on Manning n, so
+    // beta = 1/sigma_n^2 and what gets reported is sigma_n.
+    PetscReal sigma_n      = 0.0;
+    PetscBool have_sigma_n = PETSC_FALSE;
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_sigma_n", &sigma_n, &have_sigma_n));
+    if (have_sigma_n) {
+      PetscCheck(sigma_n > 0.0, comm, PETSC_ERR_USER, "-adjoint_sigma_n must be positive");
+      beta = 1.0 / (sigma_n * sigma_n);
+    }
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_map_file", map_file, sizeof(map_file), &have_map_file));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_stride", &obs_stride, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_error", &sigma, NULL));
@@ -1678,8 +1710,11 @@ int main(int argc, char *argv[]) {
       for (PetscInt c = 0; c < 256; ++c) nclass += present[c];
       PetscCheck(nclass > 0, comm, PETSC_ERR_USER, "no land-cover classes found in %s", class_file);
 
-      ClassCtx cc = {.nclass = nclass, .n_owned = n_owned};
+      ClassCtx cc = {.nclass = nclass, .n_owned = n_owned, .Jscale = 1.0};
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_classes_relative", &cc.relative, NULL));
       PetscCall(PetscMalloc1(nclass, &cc.class_codes));
+      PetscCall(PetscMalloc1(nclass, &cc.prior_k));
+      PetscCall(PetscMalloc1(nclass, &cc.n_k));
       PetscCall(PetscMalloc1(n_owned, &cc.cell_class));
       PetscCall(PetscMalloc1(n_owned, &cc.n_scratch));
       PetscInt idx_of_code[256], k = 0;
@@ -1703,6 +1738,12 @@ int main(int argc, char *argv[]) {
       }
       PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, psum, nclass, MPIU_REAL, MPIU_SUM, comm));
       PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, pcnt, nclass, MPIU_REAL, MPIU_SUM, comm));
+      for (PetscInt kk = 0; kk < nclass; ++kk) {
+        cc.prior_k[kk] = psum[kk] / PetscMax(pcnt[kk], 1.0);
+        PetscCheck(!cc.relative || cc.prior_k[kk] > 0.0, comm, PETSC_ERR_USER,
+                   "-adjoint_classes_relative needs a positive prior; NLCD class %" PetscInt_FMT " has n = %g", cc.class_codes[kk],
+                   (double)cc.prior_k[kk]);
+      }
 
       // observation table -> gauge operator and per-time data/weights
       PetscInt   ngauges, K;
@@ -1859,13 +1900,27 @@ int main(int argc, char *argv[]) {
       {
         PetscInt lo, hi;
         PetscCall(VecGetOwnershipRange(p, &lo, &hi));
-        for (PetscInt kk = lo; kk < hi; ++kk) PetscCall(VecSetValue(cc.p_prior, kk, psum[kk] / PetscMax(pcnt[kk], 1.0), INSERT_VALUES));
+        for (PetscInt kk = lo; kk < hi; ++kk) PetscCall(VecSetValue(cc.p_prior, kk, cc.prior_k[kk], INSERT_VALUES));
         PetscCall(VecAssemblyBegin(cc.p_prior));
         PetscCall(VecAssemblyEnd(cc.p_prior));
       }
-      PetscCall(VecSet(p, n0));  // start from a uniform guess (default 0.03)
-      PetscCall(VecSet(lb, 0.005));
-      PetscCall(VecSet(ub, 0.30));
+      // relative mode: the variable is alpha = n/n_prior, so the start point IS
+      // the prior (alpha = 1) and the bounds are relative roughness changes. A
+      // bound in alpha is a physically meaningful statement -- and it keeps the
+      // optimizer out of the region where the implicit solve fails, which a
+      // bound in n (0.005 everywhere) did not: a uniform alpha of 0.2 diverges.
+      PetscReal alpha_min = 0.3, alpha_max = 3.0;
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_classes_alpha_min", &alpha_min, NULL));
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_classes_alpha_max", &alpha_max, NULL));
+      if (cc.relative) {
+        PetscCall(VecSet(p, 1.0));
+        PetscCall(VecSet(lb, alpha_min));
+        PetscCall(VecSet(ub, alpha_max));
+      } else {
+        PetscCall(VecSet(p, n0));  // start from a uniform guess (default 0.03)
+        PetscCall(VecSet(lb, 0.005));
+        PetscCall(VecSet(ub, 0.30));
+      }
 
       // -adjoint_classes_active <code,code,...>: calibrate ONLY the listed
       // land-cover classes and hold the rest at their prior, by pinning
@@ -1882,14 +1937,7 @@ int main(int argc, char *argv[]) {
         PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-adjoint_classes_active", active, &nactive, &have_active));
         if (have_active) {
           PetscCheck(nactive > 0, comm, PETSC_ERR_USER, "-adjoint_classes_active needs at least one class code");
-          const PetscScalar *pr;
-          PetscInt           lo, hi, nfroz = 0;
-          Vec                prior_all;
-          VecScatter         sc;
-          PetscCall(VecScatterCreateToAll(cc.p_prior, &sc, &prior_all));
-          PetscCall(VecScatterBegin(sc, cc.p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
-          PetscCall(VecScatterEnd(sc, cc.p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
-          PetscCall(VecGetArrayRead(prior_all, &pr));
+          PetscInt lo, hi, nfroz = 0;
           PetscCall(VecGetOwnershipRange(p, &lo, &hi));
           for (PetscInt kk = 0; kk < nclass; ++kk) {
             PetscBool on = PETSC_FALSE;
@@ -1898,15 +1946,12 @@ int main(int argc, char *argv[]) {
             if (on) continue;
             ++nfroz;
             if (kk >= lo && kk < hi) {
-              PetscReal v = PetscRealPart(pr[kk]);
+              PetscReal v = cc.relative ? 1.0 : cc.prior_k[kk];  // the prior, in the optimizer's variable
               PetscCall(VecSetValue(lb, kk, v, INSERT_VALUES));
               PetscCall(VecSetValue(ub, kk, v, INSERT_VALUES));
               PetscCall(VecSetValue(p, kk, v, INSERT_VALUES));
             }
           }
-          PetscCall(VecRestoreArrayRead(prior_all, &pr));
-          PetscCall(VecScatterDestroy(&sc));
-          PetscCall(VecDestroy(&prior_all));
           Vec fixed_vecs[3] = {lb, ub, p};
           for (PetscInt v = 0; v < 3; ++v) {
             PetscCall(VecAssemblyBegin(fixed_vecs[v]));
@@ -1960,7 +2005,11 @@ int main(int argc, char *argv[]) {
           PetscCheck(nread == nclass, comm, PETSC_ERR_USER, "%s supplied %" PetscInt_FMT " of %" PetscInt_FMT " classes", init_file, nread, nclass);
           PetscInt lo, hi;
           PetscCall(VecGetOwnershipRange(p, &lo, &hi));
-          for (PetscInt kk = lo; kk < hi; ++kk) PetscCall(VecSetValue(p, kk, pin[kk], INSERT_VALUES));
+          // the file is in physical Manning units whatever the optimizer's
+          // variable is, so a chain of jobs and the NLCD prior table are
+          // interchangeable across the two modes
+          for (PetscInt kk = lo; kk < hi; ++kk)
+            PetscCall(VecSetValue(p, kk, cc.relative ? pin[kk] / cc.prior_k[kk] : pin[kk], INSERT_VALUES));
           PetscCall(VecAssemblyBegin(p));
           PetscCall(VecAssemblyEnd(p));
           PetscCall(PetscFree(pin));
@@ -1968,6 +2017,12 @@ int main(int argc, char *argv[]) {
         }
       }
 
+      // beta is dimensional, so report the prior std dev it corresponds to
+      PetscCall(PetscPrintf(comm, "class calibration: prior sigma_n = %.4f (beta = %.4e)%s\n", (double)(1.0 / PetscSqrtReal(beta)),
+                            (double)beta,
+                            cc.relative ? ", relative variables alpha = n/n_prior" : ""));
+      if (cc.relative)
+        PetscCall(PetscPrintf(comm, "class calibration: alpha bounds [%.3f, %.3f]\n", (double)alpha_min, (double)alpha_max));
       if (have_hwm_file) {
         PetscCall(PetscPrintf(comm,
                               "class calibration (hwm peaks): %" PetscInt_FMT " classes, %" PetscInt_FMT " marks, start n = %g, beta = %.1e\n",
@@ -1979,21 +2034,75 @@ int main(int argc, char *argv[]) {
                               nclass, ngauges, K, obs_freq, (int)n_present, (double)n0, (double)beta));
       }
 
-      if (have_hwm_file || hwm_fd) {
+      char      grad_file[PETSC_MAX_PATH_LEN] = {0};
+      PetscBool have_grad_dump                = PETSC_FALSE;
+      PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_grad_dump", grad_file, sizeof(grad_file), &have_grad_dump));
+
+      PetscReal J_class_init = -1.0;  // < 0 = not evaluated (no reduction gate)
+      if (have_hwm_file || hwm_fd || cc.relative || have_grad_dump) {
         // initial misfit + peak-WSE MAE (the HWM benchmark number), and the
         // optional FD gate on the class-parameter gradient (valid for either
-        // observation mode)
+        // observation mode). Relative mode always evaluates here: it needs
+        // J(start) to scale the objective.
         Vec       g0;
         PetscReal J0;
         PetscCall(VecDuplicate(p, &g0));
         PetscCall(FormObjectiveAndGradientClasses(NULL, p, &J0, g0, &cc));
+        J_class_init = J0;
         if (have_hwm_file)
           PetscCall(PetscPrintf(comm, "hwm init: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
                                 (double)J0, (double)cc.pc.hwm_mae, cc.pc.hwm_ndry, ngauges));
+        // -adjoint_classes_grad_dump <file>: the start point and its gradient,
+        // in physical Manning units. An objective+gradient costs a forward plus
+        // an adjoint sweep while a forward alone is a third of that, so with
+        // this in hand a line search along -g can be run as a series of cheap
+        // -adjoint_hwm_eval_only forwards instead of full TAO trial points.
+        {
+          if (have_grad_dump) {
+            Vec                g_all;
+            VecScatter         gsc;
+            const PetscScalar *ga;
+            PetscMPIInt        rank;
+            PetscCall(VecScatterCreateToAll(g0, &gsc, &g_all));
+            PetscCall(VecScatterBegin(gsc, g0, g_all, INSERT_VALUES, SCATTER_FORWARD));
+            PetscCall(VecScatterEnd(gsc, g0, g_all, INSERT_VALUES, SCATTER_FORWARD));
+            PetscCall(VecGetArrayRead(g_all, &ga));
+            PetscCallMPI(MPI_Comm_rank(comm, &rank));
+            if (rank == 0) {
+              FILE *fp = fopen(grad_file, "w");
+              PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_grad_dump file %s", grad_file);
+              fprintf(fp, "# NLCD_code  manning_n  dJ/dn   (J %.6e, peak-WSE MAE %.4f m)\n", (double)J0, (double)cc.pc.hwm_mae);
+              for (PetscInt kk = 0; kk < nclass; ++kk) {
+                // g0 is in the optimizer's variable; report dJ/dn either way
+                PetscReal gn = PetscRealPart(ga[kk]) / (cc.relative ? cc.prior_k[kk] : 1.0);
+                fprintf(fp, "%d %.10g %.10g\n", (int)cc.class_codes[kk], (double)cc.n_k[kk], (double)gn);
+              }
+              fclose(fp);
+            }
+            PetscCall(VecRestoreArrayRead(g_all, &ga));
+            PetscCall(VecScatterDestroy(&gsc));
+            PetscCall(VecDestroy(&g_all));
+            PetscCall(PetscPrintf(comm, "class calibration: start-point gradient written to %s\n", grad_file));
+          }
+        }
+        // the FD probe moves the evaluation point, so it comes after anything
+        // that reports the start point
         if (hwm_fd) {
           if (have_hwm_file) PetscCall(HwmProbeEnable(cc.pc.y_hwm, cc.pc.w_hwm, sigma));  // kink diagnosis (peak observable only)
           PetscCall(FDCheckParamGradient(FormObjectiveAndGradientClasses, &cc, p, g0, fd_samples, fd_eps, fd_tol, "hwm-classes"));
           if (have_hwm_file) PetscCall(HwmProbeDisable());
+        }
+        // scale the objective by 1/J(start) so that it, like the relative
+        // variables, is O(1). BLMVM's first trial point is x - g (its initial
+        // inverse-Hessian estimate is the identity), which is only a sensible
+        // step if g is O(1) in the units of x; unscaled it was 5 orders too
+        // large and projected onto the bounds, where the model cannot solve.
+        if (cc.relative && J0 > 0.0) {
+          cc.Jscale = 1.0 / J0;
+          PetscReal gnorm;
+          PetscCall(VecNorm(g0, NORM_2, &gnorm));
+          PetscCall(PetscPrintf(comm, "class calibration: objective scaled by 1/J0 = %.4e; first trial step |g|/J0 = %.4f in alpha\n",
+                                (double)cc.Jscale, (double)(gnorm * cc.Jscale)));
         }
         PetscCall(VecDestroy(&g0));
       }
@@ -2013,6 +2122,7 @@ int main(int argc, char *argv[]) {
       PetscReal J_final;
       PetscCall(TaoGetIterationNumber(tao, &its));
       PetscCall(TaoGetSolutionStatus(tao, NULL, &J_final, NULL, NULL, NULL, NULL));
+      J_final /= cc.Jscale;  // report J in the units the misfit is defined in
 
       if (have_hwm_file) {  // re-evaluate AT the solution for the final MAE
         Vec       gf;
@@ -2020,7 +2130,7 @@ int main(int argc, char *argv[]) {
         PetscCall(VecDuplicate(p, &gf));
         PetscCall(FormObjectiveAndGradientClasses(NULL, p, &Jf, gf, &cc));
         PetscCall(PetscPrintf(comm, "hwm final: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
-                              (double)Jf, (double)cc.pc.hwm_mae, cc.pc.hwm_ndry, ngauges));
+                              (double)(Jf / cc.Jscale), (double)cc.pc.hwm_mae, cc.pc.hwm_ndry, ngauges));
         PetscCall(VecDestroy(&gf));
       }
 
@@ -2040,7 +2150,7 @@ int main(int argc, char *argv[]) {
       PetscCall(PetscPrintf(comm, "  NLCD  prior_n  recovered_n   rel_err   cells\n"));
       PetscReal max_rel = 0.0, l2num = 0.0, l2den = 0.0;
       for (PetscInt kk = 0; kk < nclass; ++kk) {
-        PetscReal pr = PetscRealPart(pp[kk]), rc = PetscRealPart(pa[kk]);
+        PetscReal pr = PetscRealPart(pp[kk]), rc = ClassN(&cc, kk, PetscRealPart(pa[kk]));
         PetscReal rel = PetscAbsReal(rc - pr) / PetscMax(pr, 1e-12);
         l2num += Square(rc - pr);
         l2den += Square(pr);
@@ -2062,7 +2172,8 @@ int main(int argc, char *argv[]) {
             FILE *fp = fopen(dump_p, "w");
             PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_dump file %s", dump_p);
             fprintf(fp, "# NLCD_code  manning_n   (after %d TAO iterations, J %.6e)\n", (int)its, (double)J_final);
-            for (PetscInt kk = 0; kk < nclass; ++kk) fprintf(fp, "%d %.10g\n", (int)cc.class_codes[kk], (double)PetscRealPart(pa[kk]));
+            for (PetscInt kk = 0; kk < nclass; ++kk)
+              fprintf(fp, "%d %.10g\n", (int)cc.class_codes[kk], (double)ClassN(&cc, kk, PetscRealPart(pa[kk])));
             fclose(fp);
           }
           PetscCall(PetscPrintf(comm, "class calibration: solution written to %s\n", dump_p));
@@ -2076,6 +2187,19 @@ int main(int argc, char *argv[]) {
       PetscCall(VecScatterDestroy(&sc));
       PetscCall(PetscPrintf(comm, "class recovery: %d TAO its, J_final %.6e, rel L2 vs prior %.4f, max class rel err %.4f\n", (int)its,
                             (double)J_final, (double)PetscSqrtReal(l2num / PetscMax(l2den, 1e-30)), (double)max_rel));
+
+      // -adjoint_jred_gate: require the optimizer to have actually moved. The
+      // first real-data calibration did zero TAO iterations -- every trial
+      // point was rejected -- and reported a "final" objective equal to its
+      // initial one, which no test then caught.
+      {
+        PetscReal jred_gate = 0.0;
+        PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_jred_gate", &jred_gate, NULL));
+        if (jred_gate > 0.0 && J_class_init > 0.0)
+          PetscCheck(J_final < jred_gate * J_class_init, comm, PETSC_ERR_PLIB,
+                     "class calibration misfit reduction too small: %g -> %g over %d TAO iterations", (double)J_class_init,
+                     (double)J_final, (int)its);
+      }
 
       if (have_map_file) {
         Vec p_cells;
@@ -2108,6 +2232,8 @@ int main(int argc, char *argv[]) {
       PetscCall(PetscFree(class_field));
       PetscCall(PetscFree(prior_field));
       PetscCall(PetscFree(cc.class_codes));
+      PetscCall(PetscFree(cc.prior_k));
+      PetscCall(PetscFree(cc.n_k));
       PetscCall(PetscFree(cc.cell_class));
       PetscCall(PetscFree(cc.n_scratch));
       PetscCall(TaoDestroy(&tao));

@@ -127,3 +127,22 @@ add_test(adjoint_classes_warmstart_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoi
 set_tests_properties(adjoint_classes_warmstart_np_1 PROPERTIES
   DEPENDS "adjoint_classes_dump_np_1"
   PASS_REGULAR_EXPRESSION "warm start from classes_p_np1.txt \\(15 classes\\)")
+
+# -adjoint_classes_relative: the optimizer's variable is alpha = n/n_prior and
+# its objective is J/J(start), both O(1). The chain rule dJ/dalpha = n_prior
+# dJ/dn is what this gates, against central differences on alpha (measured
+# 2.3e-6 at eps 1e-4; the default 1e-3 probe is truncation-limited here at
+# 3e-5 because a step in alpha is a larger step in n than the absolute mode's
+# probe, and the error scales as eps^2 through the whole sweep 3e-5..3e-2).
+# Cross-checked separately: the dJ/dn recovered from the alpha gradient agrees
+# with the absolute mode's gradient at the same point to 1e-8, the dump's
+# 10-digit precision.
+add_test(adjoint_classes_relative_fd_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_rel_fd_np1.txt -adjoint_obs_freq 10 -tao_max_it 1 -adjoint_classes_relative -adjoint_sigma_n 0.015 -adjoint_hwm_fd -adjoint_fd_samples 3 -adjoint_fd_eps 1e-4)
+
+# and that the scaling does what it is for: BLMVM must actually take steps.
+# The first real-data calibration did ZERO iterations -- the unscaled first
+# trial point projected onto the bounds and every line-search trial failed --
+# so the gate here is a misfit reduction, not just a clean exit. Measured on
+# this twin: J 3.101e1 -> 1.263e1 in 3 iterations (0.41x), every iteration
+# accepted. -adjoint_sigma_n sets the Tikhonov weight as 1/sigma_n^2.
+add_test(adjoint_classes_relative_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_rel_np1.txt -adjoint_obs_freq 10 -tao_max_it 3 -adjoint_classes_relative -adjoint_sigma_n 0.015 -adjoint_jred_gate 0.6)
