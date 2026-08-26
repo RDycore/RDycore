@@ -1887,3 +1887,80 @@ Note the gradient is relatively STRONGER at the production window
 likely to lose here, not less. Expect pinning in the 15-class control;
 the defensible number should come from the reduced-parameter run.
 
+
+### o49/o53/o54: the calibration clears the bar, and the IC beats it (2026-08-26)
+
+**The uniform-alpha curve, completed.** o49 filled the gap at the two
+alphas that matter, and the sigma_n = 0.015 balance had predicted the
+first one before it was run:
+
+| alpha | 0.30 | 0.45 | 0.60 | **0.70** | **0.80** | 1.00 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J | 673.67 | 703.80 | 740.56 | **765.48** | **781.29** | 808.26 |
+| MAE | 0.6392 | 0.6614 | 0.6776 | **0.6894** | **0.6991** | 0.7188 |
+
+Monotone throughout, no interior minimum in the misfit. The predicted
+optimum for sigma_n = 0.015 was alpha 0.697 at MAE **0.6895**; the
+measured point at 0.70 is **0.6894**. A forward prediction from a
+quadratic fit through points on either side, landing within 0.0001 m.
+
+**The first calibrated real-data number (o53, scored by o54).** Two
+BLMVM iterations from the NLCD prior on the production window, relative
+variables, sigma_n 0.015, default line search:
+
+| field | MAE | vs NLCD | defensible |
+| --- | --- | --- | --- |
+| NLCD lookup | 0.7188 | -- | yes |
+| uniform alpha 0.70 (prior-consistent optimum) | 0.6894 | -0.029 | yes |
+| uniform alpha 0.30 (unregularized floor) | 0.6392 | -0.080 | no, n to 0.008 |
+| **calibrated, 15 classes, 2 its** | **0.6242** | **-0.095** | mostly; 1 class pinned |
+
+**The calibration clears the one-parameter bar it was built to clear.**
+Against the honest competitor -- alpha 0.70, the optimum the
+calibration's own prior implies, not the indefensible 0.30 -- it wins by
+0.065 m. Spatial redistribution reaches authority global scaling cannot,
+which the half-domain experiment (o47) would not have predicted.
+
+Two cautions. J and MAE do NOT move together: a uniform field with this
+misfit would score 0.6135, so redistribution buys objective slightly
+less MAE-efficiently than scaling does. And the run is two iterations in
+with class 23 at its lower bound.
+
+FREE VERIFICATION: the calibration reported J_total 6.849004e+02; the
+prior term computes to 46.2, implying misfit 638.7. An independent
+eval-only forward through a different code path returned
+**6.387436e+02**. That validates the sigma_n arithmetic, the Jscale
+physical-J conversion, and the new eval-only-on-a-class-table path at
+once.
+
+**The initial condition has ~4x the authority of roughness (o54).**
+Scaling the whole restart state by a (velocities unchanged, so only
+antecedent storage moves):
+
+| a | 0.80 | 0.90 | 1.00 | 1.10 | 1.20 |
+| --- | --- | --- | --- | --- | --- |
+| J | 665.17 | 728.43 | 808.26 | 907.11 | 1024.51 |
+| MAE | 0.6434 | 0.6796 | 0.7188 | 0.7610 | 0.8174 |
+
+dMAE per unit fractional change is **0.392** (over the well-sampled
+[0.8, 1.1]) against **0.098** for uniform roughness. Like for like at a
+20% perturbation: 0.075 m versus 0.020 m. And the plausibility runs the
+same way -- a 20% error in water stored after a 29-hour spin-up under
+radar rainfall is far easier to defend than Manning at 30% of the
+published table.
+
+Monotone over the whole range with no interior optimum; straight to
+about 1% between 0.8 and 1.1 and CONVEX above (second differences
+0.0030, 0.0030, 0.0142), i.e. adding water hurts at an accelerating
+rate. Roughness by contrast is concave and saturating. That difference
+in curvature is the diagnosis: the model does not hold the wrong
+DISTRIBUTION of water at hour 29, it holds too much.
+
+**This is a diagnosis, not a knob.** Over this window the initial state
+is ~8.8M unknowns against 46 peak observations; calibrating it would fit
+the marks exactly and mean nothing. And the checkpoint is a MODEL state,
+so an IC calibration would absorb accumulated forcing and elevation
+error rather than correct it -- and could launder the downstream
+drainage defect into a "corrected" initial state, the same trap as
+scoring against the 37 marks the model cannot drain.
+
