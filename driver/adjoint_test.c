@@ -51,7 +51,9 @@ static const char *help_str =
     "  -adjoint_forward_only       one forward over the window, then exit (no adjoint/FD/TAO)\n"
     "  -adjoint_classes_dump <path>  classes mode: write the solution (NLCD code, n) per line\n"
     "  -adjoint_classes_init <path>  classes mode: warm-start TAO from such a file, so a\n"
-    "                              calibration too long for one queue slot can be continued\n";
+    "                              calibration too long for one queue slot can be continued\n"
+    "  -adjoint_classes_active <codes>  classes mode: calibrate only these NLCD classes,\n"
+    "                              holding the rest at their prior (comma-separated)\n";
 
 #define NDOF 3
 
@@ -1864,6 +1866,56 @@ int main(int argc, char *argv[]) {
       PetscCall(VecSet(p, n0));  // start from a uniform guess (default 0.03)
       PetscCall(VecSet(lb, 0.005));
       PetscCall(VecSet(ub, 0.30));
+
+      // -adjoint_classes_active <code,code,...>: calibrate ONLY the listed
+      // land-cover classes and hold the rest at their prior, by pinning
+      // lb = ub = prior for the frozen ones (TAO treats an equal-bound
+      // component as fixed). A sensitivity scan can show that nearly all of
+      // the observable's response lives in a few classes; asking the data
+      // for the others then buys nothing and costs the bound-pinning of
+      // weakly constrained parameters. Freezing them is the structural fix
+      // -- fewer, better-determined parameters -- as opposed to leaning on
+      // the Tikhonov weight to suppress them after the fact.
+      {
+        PetscInt  active[64], nactive = 64;
+        PetscBool have_active = PETSC_FALSE;
+        PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-adjoint_classes_active", active, &nactive, &have_active));
+        if (have_active) {
+          PetscCheck(nactive > 0, comm, PETSC_ERR_USER, "-adjoint_classes_active needs at least one class code");
+          const PetscScalar *pr;
+          PetscInt           lo, hi, nfroz = 0;
+          Vec                prior_all;
+          VecScatter         sc;
+          PetscCall(VecScatterCreateToAll(cc.p_prior, &sc, &prior_all));
+          PetscCall(VecScatterBegin(sc, cc.p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
+          PetscCall(VecScatterEnd(sc, cc.p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
+          PetscCall(VecGetArrayRead(prior_all, &pr));
+          PetscCall(VecGetOwnershipRange(p, &lo, &hi));
+          for (PetscInt kk = 0; kk < nclass; ++kk) {
+            PetscBool on = PETSC_FALSE;
+            for (PetscInt a = 0; a < nactive; ++a)
+              if (cc.class_codes[kk] == active[a]) on = PETSC_TRUE;
+            if (on) continue;
+            ++nfroz;
+            if (kk >= lo && kk < hi) {
+              PetscReal v = PetscRealPart(pr[kk]);
+              PetscCall(VecSetValue(lb, kk, v, INSERT_VALUES));
+              PetscCall(VecSetValue(ub, kk, v, INSERT_VALUES));
+              PetscCall(VecSetValue(p, kk, v, INSERT_VALUES));
+            }
+          }
+          PetscCall(VecRestoreArrayRead(prior_all, &pr));
+          PetscCall(VecScatterDestroy(&sc));
+          PetscCall(VecDestroy(&prior_all));
+          Vec fixed_vecs[3] = {lb, ub, p};
+          for (PetscInt v = 0; v < 3; ++v) {
+            PetscCall(VecAssemblyBegin(fixed_vecs[v]));
+            PetscCall(VecAssemblyEnd(fixed_vecs[v]));
+          }
+          PetscCall(PetscPrintf(comm, "class calibration: %" PetscInt_FMT " of %" PetscInt_FMT " classes active, %" PetscInt_FMT " frozen at prior\n",
+                                nclass - nfroz, nclass, nfroz));
+        }
+      }
 
       // -adjoint_classes_init <file>: start TAO from a previously dumped
       // parameter vector instead of the uniform n0. A production calibration
