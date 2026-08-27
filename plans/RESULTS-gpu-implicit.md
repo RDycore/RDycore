@@ -2048,7 +2048,79 @@ below what the prior and bounds allow. Total displacement 9.2 sigma
 (from 9.6), with 2.9% of it in the one data-constrained direction,
 85.6% in comparable directions and 11.5% where the prior alone decides.
 
-CAUTION: the job was killed by the wall before its final evaluation, so
-there is no MAE at this field yet -- one eval-only forward gets it, and
-o59 does that first.
+The job was killed by the wall before its final evaluation, so it
+carried no MAE; o59 Part A supplies it below.
+
+
+### o59 Part A (57649525): the converged 15-class field, scored (2026-08-27)
+
+One eval-only forward of `o48_p_57627058.txt` on the production window
+(43,200 steps, 46 marks, 144 obs times):
+
+    hwm eval (class table): J 6.153969e+02, peak-WSE MAE 0.6116 m,
+                            model dry at 0 of 46 marks
+
+**This is the paper's headline calibration number** and it replaces the
+2-iteration 0.6242 everywhere:
+
+| field | MAE | vs NLCD | defensible |
+| --- | --- | --- | --- |
+| NLCD lookup | 0.7188 | -- | yes |
+| uniform alpha 0.70 (prior-consistent optimum) | 0.6894 | -0.029 | yes |
+| uniform alpha 0.30 (unregularized floor) | 0.6392 | -0.080 | no, n to 0.008 |
+| **calibrated, 15 classes, 9 its** | **0.6116** | **-0.107** | mostly; 1 class pinned |
+
+Roughness accounts for **15%** of the 0.72 m discrepancy (was 13% at 2
+iterations). Against the honest one-parameter competitor (alpha 0.70) it
+wins by **0.078 m**, ~3.6x what the best defensible uniform field
+reaches.
+
+**The J-vs-MAE divergence did NOT blow up** -- the risk flagged before
+this run was that iterations 3-9 might buy objective the MAE does not
+credit. They did not: J fell 6.849e2 -> 6.573e2 and MAE fell 0.6242 ->
+0.6116, the same direction. The efficiency gap did widen slightly.
+Sliding the uniform scan's measured MAE-vs-J relation
+(dMAE/dJ = 7.37e-4, from the alpha 0.30/0.45 points) down to the
+calibrated misfit gives 0.596 against the calibrated 0.6116, a gap of
+0.015 m (was 0.011 at 2 its). But that comparison is now a
+counterfactual: J 615.4 is 58 units BELOW 673.7, the lowest objective
+the uniform knob reaches before the implicit solve fails, so the
+uniform field it compares against cannot be run. The calibration
+reaches an objective global scaling cannot attain at all.
+
+FREE VERIFICATION, the same check that validated o53: TAO reported
+J_total 6.573355e+02; the prior term computed from the class table
+against sigma_n = 0.015 is 41.94 (displacement norm 9.16 sigma, so
+9.16^2/2); the eval-only misfit is 6.153969e+02. 615.40 + 41.94 =
+657.34. Matches to every printed digit, which validates the sigma_n
+arithmetic and the eval-only-on-a-class-table path against the
+optimizer's own accounting.
+
+**The converged field, as alpha = n/n_prior** (recomputed from
+`o48_p_57627058.txt` against the make_nlcd_manning.py lookup; confirms
+the log's 0.983 / 1.006 / 1.098 / 0.300 / 0.355 spot values):
+
+| code | class | prior n | calibrated n | alpha | sigma |
+| --- | --- | --- | --- | --- | --- |
+| 11 | open water | 0.038 | 0.04785 | 1.259 | +0.66 |
+| 21 | developed open | 0.040 | 0.07218 | 1.804 | +2.15 |
+| 22 | developed low | 0.090 | 0.14642 | 1.627 | +3.76 |
+| 23 | developed medium | 0.120 | 0.03600 | **0.300** | **-5.60** (bound) |
+| 24 | developed high | 0.160 | 0.12299 | 0.769 | -2.47 |
+| 31 | barren | 0.027 | 0.04033 | 1.494 | +0.89 |
+| 41 | deciduous forest | 0.150 | 0.14742 | 0.983 | -0.17 |
+| 42 | evergreen forest | 0.120 | 0.11537 | 0.961 | -0.31 |
+| 43 | mixed forest | 0.140 | 0.14086 | 1.006 | +0.06 |
+| 52 | shrub/scrub | 0.115 | 0.08585 | 0.746 | -1.94 |
+| 71 | grassland | 0.038 | 0.02408 | 0.634 | -0.93 |
+| 81 | pasture/hay | 0.038 | 0.05884 | 1.548 | +1.39 |
+| 82 | cultivated crops | 0.035 | 0.03843 | 1.098 | +0.23 |
+| 90 | woody wetland | 0.098 | 0.03476 | **0.355** | **-4.22** |
+| 95 | emergent wetland | 0.068 | 0.08886 | 1.307 | +1.39 |
+
+NOTE for the paper's question 5: at 9 iterations pasture and
+developed-open are at 1.55 and 1.80 of table value, NOT "above twice"
+-- that was true of the 2-iteration field. And deciduous forest is back
+at 0.983, so the "moved 2.6 sigma in a direction the data cannot see"
+example no longer describes the headline field. Both fixed in the draft.
 

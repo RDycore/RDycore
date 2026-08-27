@@ -44,7 +44,7 @@ roughness in this basin — one strongly. That is measured, not inferred:
 the prior-preconditioned Gauss-Newton spectrum is
 λ = 3.03, 0.64, 0.33, 0.32, 0.21, … , one eigenvalue above unity with a
 gap of 4.8. Calibrated as well as we can currently calibrate it,
-roughness accounts for **13% of a 0.72 m peak-elevation discrepancy**;
+roughness accounts for **15% of a 0.72 m peak-elevation discrepancy**;
 a uniform scale within defensible values accounts for 4%. The same
 measurement pointed at the initial condition finds **four times the
 authority** from a more defensible perturbation, and the residual is
@@ -62,8 +62,8 @@ hours 29–41, IC from the o37 hour-29 checkpoint):
 | NLCD lookup (uncalibrated) | 0.7188 | — | yes, by construction |
 | uniform α = 0.70 (the prior-consistent optimum) | 0.6894 | −0.029 | yes |
 | uniform α = 0.30 (unregularized floor) | 0.6392 | −0.080 | no — n to 0.008 |
-| **15-class calibration, 2 iterations** | **0.6242** | **−0.095** | one class on a bound |
-| 15-class calibration, 9 iterations (J 6.573e2) | *pending o59 Part A* | | |
+| 15-class calibration, 2 iterations | 0.6242 | −0.095 | one class on a bound |
+| **15-class calibration, 9 iterations** (J 6.573e2) | **0.6116** | **−0.107** | one class on a bound |
 | **IC scaled 0.6** (antecedent water −40%) | **0.5818** | **−0.137** | plausible; no turnover found |
 
 All in-sample. Cross-validation is the outstanding gap (Section 6).
@@ -187,7 +187,7 @@ to the running total.
    be reported as caveats in a feedback draft.
 
 **Cross-validation is deliberately NOT next.** It is required before
-submission — the reported MAE is in-sample and §7.5 says so — but it
+submission — the reported MAE is in-sample and §8.3 says so — but it
 costs days of wall-clock, and whether readers consider that caveat
 disqualifying is exactly the kind of thing to *ask* rather than guess.
 Circulate the draft with the caveat stated, and run it knowing whether
@@ -218,12 +218,12 @@ every calibration estimate here is a range rather than a number.
 
 Already spent on calibration for comparison: the 15-parameter run
 (`57627058`) cost 48 node-hours for 9 iterations and is *not* wasted —
-it is the control the spectrum interprets, and §7.6 uses it to show what
+it is the control the spectrum interprets, and §8.4 uses it to show what
 fitting fifteen parameters to a one-parameter observable does.
 
 ### What the production-window spectrum adds
 
-§7.6's spectrum is measured on a 7,200-step pilot; the calibration runs
+§8.4's spectrum is measured on a 7,200-step pilot; the calibration runs
 on 43,200. Re-running it at the production window costs 16 forwards
 (~4 hours on 4 nodes, no adjoint) and does two things. It puts the
 paper's identifiability number on the same window as its calibration
@@ -259,15 +259,16 @@ the laptop (`build-claude`, `PETSC_ARCH=arch-macosx-gnu-rdycore-kokkos-O`).
 PM repo at the same commit; use **`build-claude-gpu8`** — it has every
 option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
 
-**In flight: `57649525` (o59), pending.** 6-hour slot, 4 nodes. Two parts:
+**In flight: `57649525` (o59), RUNNING** since ~05:23 PDT 2026-08-27.
+6-hour slot, 4 nodes. Two parts:
 
-- **Part A** scores the converged 15-class field (`o48_p_57627058.txt`,
-  J 6.573e2 after 9 iterations) with one eval-only forward. **That MAE is
-  the paper's headline number and does not exist yet.** Compare against
-  NLCD 0.7188, uniform α = 0.70 → 0.6894, and the 2-iteration field's
-  0.6242. *If it comes out worse than 0.6242 despite lower J*, iterations
-  3–9 bought objective that MAE does not credit, and §7.5's J-vs-MAE
-  divergence is larger than reported — say so rather than burying it.
+- **Part A is DONE and in the paper.** The converged 15-class field
+  (`o48_p_57627058.txt`) scores **J 6.153969e2, peak-WSE MAE 0.6116 m**,
+  0 of 46 marks dry. Better than the 2-iteration 0.6242, so the feared
+  J-vs-MAE divergence did *not* blow up. Roughness now accounts for 15%
+  of the 0.72 m discrepancy and beats uniform α = 0.70 by 0.078 m. Full
+  entry, the free J_total = misfit + prior verification, and the
+  per-class α table are in `RESULTS-gpu-implicit.md` under "o59 Part A".
 - **Part B** calibrates only classes 23, 90, 22 — chosen from the leading
   eigenvector, not from gradient magnitude, and the two criteria disagree
   on the third parameter. **First check the twelve frozen classes show
@@ -276,7 +277,7 @@ option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
   falsification test the script states for itself: three well-chosen
   parameters landing near J 6.573e2 means twelve were decoration and the
   spectrum called it; landing far short means the information lives
-  outside the leading eigenspace and §7.6's one-parameter reading is too
+  outside the leading eigenspace and §8.4's one-parameter reading is too
   narrow — which would matter more than any number currently in the paper.
 
 **Monitoring does not survive a session.** The tracking job was a
@@ -294,8 +295,12 @@ means expired, not "nothing new". This cost two monitoring cycles on
 
 **Next actions, in order.**
 
-1. Read o59 Part A, put the MAE into §7.5 and the ladder in Section 3.
-2. Read o59 Part B against the falsification test; adjust §7.6 if it
+1. ~~Read o59 Part A, put the MAE into §8.3 and the ladder in Section 3.~~
+   **Done 2026-08-27.** The frozen-class gate for Part B has already
+   passed its first half — the log reports `3 of 15 classes active, 12
+   frozen at prior`; the `rel_err` = 0.000 check still needs doing when
+   Part B finishes.
+2. Read o59 Part B against the falsification test; adjust §8.4 if it
    fails. If Part B is unconverged at the wall, chain a second link:
    `sbatch o59_spectral_active_set.sh 12 23,90,22 o59_p_57649525.txt`
 3. Cross-validation within cluster A. Needs a split of

@@ -13,8 +13,9 @@
 
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
 
-\title{Adjoint Sensitivities and Gradient-Based Manning Roughness
-Calibration in RDycore\\[4pt]\large DRAFT for internal review}
+\title{How much of a flood model's error can roughness explain?
+Adjoint-based measurement and calibration in E3SM's river dynamical
+core\\[4pt]\large DRAFT for internal review}
 % author roster and affiliations from the RDycore EMS paper (Bisht et al.,
 % Environ. Model. Softw. 197 (2026) 106804); order provisional pending the
 % venue/authorship decision
@@ -68,15 +69,16 @@ network recovers almost none.
 Against the real survey we then ask a question calibration studies
 rarely ask: not how much misfit an optimizer removed, but how much of
 the model's error the parameter is \emph{able} to explain. Scanning
-the dominant roughness direction bounds it, before any optimizer runs,
+a uniform scaling of the whole roughness field bounds it, before any
+optimizer runs,
 at $0.08$\,m of a $0.72$\,m peak-elevation discrepancy --- and only at
 roughness $30\%$ of published values; within defensible values, three
 centimetres. A calibration over fifteen land-cover classes beats every
-global scaling, at $0.095$\,m, so spatial redistribution reaches
-authority a single scale cannot; but that is still only $13\%$ of the
+global scaling, at $0.107$\,m, so spatial redistribution reaches
+authority a single scale cannot; but that is still only $15\%$ of the
 error, and the eigenvalues of the prior-preconditioned Hessian show why
 it cannot be more: these 46 surveyed marks support \emph{one} roughness
-parameter, so a fifteen-parameter fit moves nine about which the data is
+parameter, so a fifteen-parameter fit moves seven about which the data is
 silent. That count follows from sixteen forward runs and no optimizer. Applying the identical measurement to the initial condition
 finds more: a $20\%$ reduction in antecedent water storage is worth
 $0.075$\,m, from a perturbation far easier to defend than the roughness
@@ -548,7 +550,7 @@ and report $\sigma_n$. This matters because $\beta$ is dimensional: a
 bare value is uninterpretable across problems, and ours had been chosen
 independently in every experiment, spanning six orders of magnitude.
 Against the measured $J(\alpha)$ curve, $\sigma_n = 0.015$ places the
-minimum of the dominant identifiable direction at $\alpha \approx 0.70$,
+minimum of the uniform-scaling direction at $\alpha \approx 0.70$,
 while $\sigma_n = 0.020$ leaves no interior minimum there at all --- the
 same pathology the hand-chosen weight had. The prediction is measured:
 the scan point at $\alpha = 0.70$ was run afterwards and returned MAE
@@ -689,8 +691,8 @@ operational flood code is not only a differentiability question ---
 it is a nonlinear-solver question.
 
 \begin{table}
-\centering\small
-\begin{tabular}{@{}lll@{}}
+\centering\footnotesize
+\begin{tabular}{@{}p{6.4cm}lp{5.4cm}@{}}
 \toprule
 Rain-forced configuration (land-cover prior) & Outlet & Outcome \\
 \midrule
@@ -849,8 +851,7 @@ remains open.
         it calibrates against.
 \end{itemize}
 
-\section{Hurricane Harvey twin experiments: regularization and the
-real-network limit}
+\section{Twin experiments: what the observing network can recover}
 \label{sec:houston}
 
 The per-cell twin runs on the Houston 1\,km Hurricane Harvey mesh
@@ -1009,8 +1010,8 @@ discrepancy-principle stopping (stop at the noise level, do not
 descend past it) in the production run.
 
 \begin{table}
-\centering\small
-\begin{tabular}{@{}llll@{}}
+\centering\footnotesize
+\begin{tabular}{@{}llp{2.6cm}p{5.9cm}@{}}
 \toprule
 Configuration & Signal & Observation noise & Outcome \\
 \midrule
@@ -1031,7 +1032,22 @@ observations, so the comparison is reproducible across rank counts.}
 \label{tab:snr}
 \end{table}
 
-\subsection{Changing the observable: high-water marks}
+\section{The real survey: what roughness can explain}
+\label{sec:realsurvey}
+
+The twins establish what the machinery can recover under controlled
+conditions; this section turns it on the real Hurricane Harvey survey.
+The observable changes first --- the stage gauges are unusable at this
+resolution --- and everything after that is measured against surveyed
+high-water marks: the uncalibrated baseline and the drainage defect it
+exposes (Section~\ref{sec:hwm}), the authority of roughness over the
+remaining error (Section~\ref{sec:authority}), the calibration
+(Section~\ref{sec:calibrated}), the spectrum that counts the parameters
+the marks support (Section~\ref{sec:spectrum}), and the same
+measurement pointed at the initial condition
+(Section~\ref{sec:icauthority}).
+
+\subsection{High-water marks and the uncalibrated baseline}
 \label{sec:hwm}
 
 Calibration against the actual stage records is blocked by geometry,
@@ -1109,7 +1125,8 @@ horizons, so strict monotonicity across them is not expected;
 single-class directions sit one to three orders lower at every
 window.}
 \label{tab:fdwindow}
-\end{table} The remaining scientific choice --- confirmed or corrected by
+\end{table}
+The remaining scientific choice --- confirmed or corrected by
 the domain team --- is the calibration window, which for marks that
 record the event maximum must cover the flood peak.
 
@@ -1198,8 +1215,10 @@ serve as held-out data.}
 Before asking an optimizer to fit fifteen land-cover classes it is
 worth asking what any roughness field could achieve, and that question
 has an optimizer-independent answer. Scaling the entire NLCD field by
-a single factor $\alpha$ traverses the most identifiable direction of
-the problem; evaluating the peak-WSE misfit along it bounds the
+a single factor $\alpha$ traverses the natural first direction of the
+problem --- close to, though as Section~\ref{sec:spectrum} measures,
+not exactly, its most identifiable one; evaluating the peak-WSE misfit
+along it bounds the
 authority of roughness over this observable without reference to how,
 or whether, a calibration converges.
 
@@ -1223,9 +1242,13 @@ since the downstream marks sit in a reach it cannot drain
 (Section~\ref{sec:hwm}) --- a defect no window length repairs. The 46
 marks used throughout this paper are therefore those for which the
 observable means what it is meant to mean, and every number reported
-here --- the uncalibrated baseline, the scans, the calibration, and the
-spectrum of Section~\ref{sec:spectrum} --- is measured on that same
-window, so they compose.
+here --- the uncalibrated baseline, the scans, and the calibration ---
+is measured on that same window, so they compose. The one exception is
+the spectrum of Section~\ref{sec:spectrum}, measured against the same
+46 marks but on a $7{,}200$-step (two-event-hour) pilot of this
+configuration rather than the full $43{,}200$-step window;
+Section~\ref{sec:spectrum} states the gap, and re-measuring it on the
+production window is planned before submission.
 
 \begin{table}
 \centering\small
@@ -1271,7 +1294,7 @@ redistributes roughness rather than scaling it.}
 \end{figure}
 
 \textbf{The entire uniform-roughness knob is worth $0.08$\,m against a
-$0.72$\,m error} --- about $11\%$ --- and it reaches that only at
+$0.72$\,m error} (Figure~\ref{fig:authority}) --- about $11\%$ --- and it reaches that only at
 $\alpha = 0.3$, i.e.\ Manning values $30\%$ of the published NLCD
 lookup, as low as $n = 0.008$ where smooth concrete is $\approx 0.012$.
 Over a physically defensible range ($\alpha \gtrsim 0.7$) the knob is
@@ -1375,14 +1398,14 @@ Manning field & MAE & $\Delta$ & physically defensible? \\
 NLCD lookup (uncalibrated) & $0.7188$ & --- & yes, by construction \\
 uniform $\alpha = 0.70$ & $0.6894$ & $-0.029$ & yes \\
 uniform $\alpha = 0.30$ & $0.6392$ & $-0.080$ & no ($n$ to $0.008$) \\
-\textbf{calibrated, 15 classes} & $\mathbf{0.6242}$ & $\mathbf{-0.095}$ & mostly; one class at a bound \\
+\textbf{calibrated, 15 classes} & $\mathbf{0.6116}$ & $\mathbf{-0.107}$ & mostly; one class at a bound \\
 \bottomrule
 \end{tabular}
 \caption{Peak-WSE MAE against the 46 cluster-A marks. The calibration
 beats the entire uniform-roughness knob --- including its physically
 indefensible end --- and beats the best \emph{defensible} uniform field
-by $0.065$\,m. Spatial redistribution is therefore worth roughly three
-times what a single global scale can reach.}
+by $0.078$\,m. Spatial redistribution is therefore worth roughly three
+and a half times what a single global scale can reach.}
 \label{tab:ladder}
 \end{table}
 
@@ -1394,21 +1417,31 @@ $\alpha = 0.70$, not $\alpha = 0.30$. The latter is the misfit's
 unconstrained preference and reaches $n = 0.008$, which no one would
 defend; the former is the optimum implied by the same prior the
 calibration itself uses, and is the honest one-parameter competitor.
-Against it the calibration wins by $0.065$\,m, so the fifteen
+Against it the calibration wins by $0.078$\,m, so the fifteen
 parameters are not decoration --- \emph{spatial redistribution accesses
 authority that global scaling cannot}, which is a stronger statement
 than the scan alone supports and the one the half-domain experiment
 (Table~\ref{tab:halves}) would not have predicted.
 
 Limiting, and there are three. First, the objective and the MAE do not
-move together: a \emph{uniform} field with the calibrated field's misfit
-would score $0.6135$\,m where the calibrated field scores $0.6242$, so
-redistribution buys objective slightly less MAE-efficiently than scaling
-does and the two should not be quoted interchangeably. Second, the run
-is not converged and one class sits at its lower bound;
+move together. The calibrated field's misfit is $J = 615.4$; sliding
+along the uniform scan's measured MAE-versus-$J$ relation to that same
+objective gives $\approx 0.596$\,m, where the calibrated field scores
+$0.6116$, so redistribution buys objective slightly less MAE-efficiently
+than scaling does and the two should not be quoted interchangeably. That
+comparison is a counterfactual, though, and in the calibration's favour:
+$J = 615.4$ lies below $673.7$, the lowest objective the uniform knob
+reaches before the implicit solve fails, so the uniform field being
+compared against cannot actually be run. \emph{The calibration reaches
+an objective global scaling cannot attain at all.} Second, the run is
+nine BLMVM iterations from the NLCD prior and was stopped by the
+12-hour wall rather than by a tolerance: $J$ fell $18.7\%$ overall but
+only $0.01\%$ on the last iteration while the gradient norm fell
+$8.5\times$, which is convergence behaviour without being a converged
+run, and developed-medium sits at its lower bound throughout;
 Section~\ref{sec:calibration} discusses why that bound is partly an
 artifact of how the prior was stated. Third and most important,
-\textbf{$0.6242$\,m is an in-sample score}: the 46 marks that define the
+\textbf{$\mathbf{0.6116}$\,m is an in-sample score}: the 46 marks that define the
 objective are the 46 marks it is evaluated on. We report it as a fit,
 not as skill. Out-of-sample validation has to be cross-validation
 \emph{within} the upstream band, because the middle band carries the
@@ -1416,14 +1449,14 @@ drainage defect (Table~\ref{tab:bands}) and would not test
 generalization so much as re-measure that defect.
 
 Section~\ref{sec:spectrum} makes the second and third caveats concrete
-rather than conventional: the calibrated field lies $9.6$ prior standard
-deviations from the NLCD lookup, and only $3\%$ of that displacement is
-in a direction these marks constrain.
+rather than conventional: the calibrated field lies $9.2$ prior standard
+deviations from the NLCD lookup, and only $2.9\%$ of that displacement
+is in a direction these marks constrain.
 
 Set against the error budget: the model--survey discrepancy on these
 marks is $0.72$\,m and roughness, calibrated as well as we can
-currently calibrate it, accounts for $13\%$ of it. The remaining
-$87\%$ is rainfall forcing, mesh elevation, datum, and representation
+currently calibrate it, accounts for $15\%$ of it. The remaining
+$85\%$ is rainfall forcing, mesh elevation, datum, and representation
 error at 30\,m --- and Section~\ref{sec:icauthority} shows that one of
 those is measurable with the same method, and larger.
 
@@ -1460,7 +1493,14 @@ do not move under small probes --- and we verify it rather than assume
 it: across all 690 mark--column pairs only 27 ($3.9\%$) changed their
 peak time. It costs 16 forwards rather than 16 forward-plus-adjoints,
 and it is positive semi-definite by construction, so the failure mode
-that invalidated the first attempt cannot recur silently.
+that invalidated the first attempt cannot recur silently. One caveat
+of scope: the spectrum is measured on a $7{,}200$-step
+(two-event-hour) pilot of the production configuration, against the
+same 46 marks, while the calibration it interprets runs on the full
+$43{,}200$-step window. A longer window should raise the sensitivity
+each peak integrates, and with it $\lambda$; re-measuring the spectrum
+on the production window costs sixteen forwards and is planned before
+submission.
 
 \paragraph{The answer is one.}
 \begin{figure}[t]
@@ -1476,7 +1516,8 @@ a linear one the cliff, which is the result, would be invisible.}
 \label{fig:spectrum}
 \end{figure}
 
-$\lambda = 3.03,\ 0.64,\ 0.33,\ 0.32,\ 0.21,\ 0.10, \dots$ --- a single
+$\lambda = 3.03,\ 0.64,\ 0.33,\ 0.32,\ 0.21,\ 0.10, \dots$
+(Figure~\ref{fig:spectrum}) --- a single
 eigenvalue above unity, a spectral gap of $4.8$, and $2.02$ degrees of
 freedom for signal in Rodgers' sense. \textbf{These 46 marks support one
 roughness parameter.} The scans and the spectrum agree, and they are
@@ -1493,25 +1534,45 @@ which for fifteen classes is indistinguishable from random ($0.258$).
 Its overlap with the same physical change weighted per \emph{cell} is
 $0.768$. So the informative mode is the domain-scale conveyance mode we
 claimed, but area-weighted; the $\alpha$-scan probes it only obliquely.
-That is why the class calibration beats uniform scaling by $0.065$\,m
+That is why the class calibration beats uniform scaling by $0.078$\,m
 (Table~\ref{tab:ladder}): it is not that fifteen parameters beat one, it
 is that the scan's one parameter was the wrong one.
 
 \paragraph{What the calibration actually did.}
-Projecting the calibrated displacement onto the eigenbasis is
-unflattering and worth reporting. The calibrated field sits
-\textbf{9.6 prior standard deviations} from the NLCD lookup, and of that
-motion only $3.0\%$ lies in the single data-constrained direction;
-$78.4\%$ lies in directions where data and prior are comparable and
-$18.5\%$ where the prior alone determines the answer. Per class
-(Table~\ref{tab:learned}) the picture is the same: the marks shrink the
-prior uncertainty by $36\%$ on developed-medium and by $12$--$17\%$ on
-four more, and by $5\%$ or less on the remaining nine --- yet the
-optimizer moved deciduous forest by $2.6\sigma$ having learned
-\emph{nothing} about it. This is not overfitting in the fit-the-noise
-sense; it is an optimizer moving parameters about which the data is
-silent, because the misfit gradient in those directions is not zero,
-merely uninformative.
+Projecting the calibrated displacement onto the eigenbasis is worth
+reporting, and it cuts both ways. The calibrated field sits
+\textbf{9.2 prior standard deviations} from the NLCD lookup, and of that
+motion only $2.9\%$ lies in the single data-constrained direction;
+$85.6\%$ lies in directions where data and prior are comparable and
+$11.5\%$ where the prior alone determines the answer. Per class
+(Table~\ref{tab:learned}) the marks shrink the prior uncertainty by
+$36\%$ on developed-medium and by $12$--$17\%$ on four more, and by
+$5\%$ or less on the remaining ten.
+
+The reassuring half is that the null space behaved. Two iterations in,
+the optimizer had moved deciduous forest to $\alpha = 0.739$, mixed
+forest to $1.096$ and cropland to $1.274$ --- three classes these marks
+teach nothing about --- and by iteration nine accumulated curvature had
+returned all three essentially to the prior ($0.983$, $1.006$,
+$1.098$). Those excursions were transients of an under-informed
+quasi-Newton approximation rather than features of the minimizer: the
+misfit gradient in uninformative directions is not zero, merely
+uninformative, and given enough iterations the prior wins. A
+calibration stopped early would have reported them as results, which is
+an argument for running these problems to convergence even when the
+objective has visibly flattened.
+
+The unreassuring half is what survives. The residual $9.2\sigma$ is
+concentrated in the two \emph{best}-informed classes, and both are
+pressed against the edge of what the prior permits: developed-medium
+sits at its $\alpha = 0.3$ lower bound for all nine iterations, and
+woody wetland is driven to $\alpha = 0.355$, some $4.2\sigma$ from its
+lookup value. So the displacement is not an optimizer wandering where
+the data is silent. It is the data asking, in the one direction it can
+speak, for roughness below what the published table and our stated
+prior width jointly allow. Whether that request is admissible is not
+something the optimizer can settle; it is the first of the questions we
+put to the domain team.
 
 \begin{table}
 \centering\small
@@ -1555,7 +1616,7 @@ including the $62\%$ that failed QC because they are channel surveys a
 \toprule
 Marks & Supported & That data set is \\
 \midrule
-46 & 1 & the 12-hour cluster-A window (this study) \\
+46 & 1 & the cluster-A marks (this study) \\
 71 & 1 & all admissible marks, 24-hour window \\
 108 & 2 & every QC-passed mark, 72-hour window \\
 324 & 5 & every Harvey mark in-domain, \emph{before} QC \\
@@ -1565,7 +1626,10 @@ $7\times10^5$ & 15 & --- \\
 \caption{How the supported-parameter count scales with survey size at
 fixed quality ($\sigma = 0.15$\,m). At fixed size, improving quality to
 $\sigma = 0.10$\,m buys a second parameter and $\sigma = 0.05$\,m --- better
-than any high-water-mark survey achieves --- buys five.}
+than any high-water-mark survey achieves --- buys five. The scaling
+holds the measured per-mark sensitivity fixed, so the longer-window
+rows describe mark populations only; a longer window also raises each
+mark's sensitivity, which this table does not credit.}
 \label{tab:scaling}
 \end{table}
 
@@ -1614,7 +1678,7 @@ much water at hour 29. No mark is dry at any point.}
 Three things follow, and they matter more than the roughness result.
 
 \textbf{The initial state has about four times the authority of
-roughness.} Per unit fractional change, $\mathrm{d}\,\mathrm{MAE}$ is
+roughness} (Figure~\ref{fig:authority}). Per unit fractional change, $\mathrm{d}\,\mathrm{MAE}$ is
 $0.392$ for the initial condition over its well-sampled range
 ($a \in [0.8, 1.1]$) against $0.098$ for a uniform roughness scale. Like for like at a $20\%$ perturbation: $0.075$\,m
 versus $0.020$\,m. And the plausibility runs the same way --- a $20\%$
@@ -1628,7 +1692,10 @@ out --- consistent with a parameter acting indirectly through
 path-integrated conveyance. $J(a)$ for the initial state is straight to
 about $1\%$ between $a = 0.8$ and $1.1$ and \emph{convex} above,
 steepening as water is added, and it does not turn over anywhere in the
-range. Neither the slope nor the sign gives any indication of an
+range. Extending the scan below the table confirms it: at $a = 0.6$ ---
+a $40\%$ reduction in antecedent water --- the MAE is still falling, to
+$0.5818$\,m (Figure~\ref{fig:authority}). Neither the slope nor the
+sign gives any indication of an
 optimum near the checkpoint value. That is the signature of a
 systematic bias rather than a poorly-tuned parameter: the model does not
 hold slightly the wrong \emph{distribution} of water at hour 29, it
@@ -1674,7 +1741,7 @@ a model's error a parameter is \emph{able} to explain is cheap,
 optimizer-independent, and it reframes what a calibration result
 means. Here it bounded roughness at $4\%$ of the error within
 defensible values and $11\%$ at the edge of plausibility; the
-calibration then reached $13\%$, beating every global scaling and
+calibration then reached $15\%$, beating every global scaling and
 confirming that spatial redistribution accesses authority a single
 scale cannot. What makes the measurement worth copying is not that
 number but the two it led to. Pointed at the residual instead of the
@@ -1878,7 +1945,7 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         defensible field requires believing the lookup is good to
         $\pm 15\%$; allow $\pm 30\%$ and the data drives developed-medium
         urban to $n = 0.036$ (smoother than concrete) while
-        developed-low, interleaved with it, goes to $0.27$. We are
+        developed-low, interleaved with it, goes to $0.24$. We are
         currently using a width at the tight end of that range and
         saying so. \emph{If $\pm 15\%$ is defensible}, the calibration
         stands as reported. \emph{If the honest width is $\pm 30\%$ or
@@ -1886,9 +1953,9 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         support a defensible distributed roughness field at all --- a
         stronger negative claim than the paper currently makes, and one
         we would want to make deliberately.
-  \item \textbf{Is $13\%$ of peak-WSE error being roughness-attributable
+  \item \textbf{Is $15\%$ of peak-WSE error being roughness-attributable
         what you would expect} for a 30\,m model of this event?
-        Calibrated, roughness accounts for $0.095$\,m of a $0.72$\,m
+        Calibrated, roughness accounts for $0.107$\,m of a $0.72$\,m
         discrepancy (Table~\ref{tab:ladder}); a global scale within
         defensible values accounts for $0.029$\,m. \emph{If that is
         unsurprising}, the paper's framing --- measure what a parameter
@@ -1923,11 +1990,12 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         symptom rather than a cause.
   \item \textbf{Is the calibrated field itself acceptable?} We can
         report a field that fits better than any global scaling, but it
-        sits $9.6$ prior standard deviations from the NLCD lookup ---
-        raising pasture and developed-open above twice their table
-        values, holding developed-medium at its lower bound, and moving
-        deciduous forest by $2.6\sigma$ in a direction the data cannot
-        see at all (Section~\ref{sec:spectrum}). We would rather be told
+        sits $9.2$ prior standard deviations from the NLCD lookup ---
+        raising developed-open by $80\%$ and pasture by $55\%$ above
+        their table values, holding developed-medium at its lower bound
+        ($n = 0.036$, smoother than concrete), and cutting woody wetland
+        to $n = 0.035$, some $4.2\sigma$ below its lookup value
+        (Section~\ref{sec:spectrum}). We would rather be told
         this is uninterpretable than publish it as a calibrated
         roughness map. The specific judgment we need is which classes
         have credible ranges, as opposed to one width applied to all
@@ -2049,7 +2117,8 @@ the event.]}
         steps and better preconditioning.} Backward Euler with the
         assembled Jacobian carries the 2.93M-cell mesh at
         $\Delta t = 1$\,s at
-        $\sim$4--5 Newton iterations per step with
+        about two Newton iterations per step on the spun-up production
+        window (four to five in cold early transients) with
         \texttt{pbjacobi}-preconditioned GMRES; at $\Delta t = 5$\,s
         the very first Newton \emph{linear} solve diverges (300 GMRES
         iterations, \texttt{pbjacobi}) --- a preconditioner failure
