@@ -2175,3 +2175,46 @@ predicts for a direction the data sees only in combination.
 MISSING and cheap to get when PM returns: an eval-only MAE for this
 field (one forward). Methods-check number, not a headline.
 
+
+
+### Mesh forensics: the domain has ONE 400 m outlet (2026-08-27)
+
+Prompted by the question "could the drainage defect be the outflow BC?"
+Measured on the login node from the production mesh
+(`Turning_30m_with_z.updated.with_sidesets.exo`, netCDF inspection --
+no run needed):
+
+- The 75 km x 37 km domain (x 3,159,075-3,234,464, y
+  3,615,882-3,652,776) has exactly ONE side set: **ss1 with 13 edges**,
+  spanning x 3,233,652-3,234,079, y 3,633,846-3,634,017 -- a ~400 m
+  opening at the eastern boundary, mid-height in y.
+- The production yaml (`o43_window.yaml`) binds free-outflow to that
+  side set alone. **Every other perimeter edge is an untagged
+  reflecting wall.**
+
+Reading: this does not indict the free-outflow BC *formulation* -- the
+upstream reach recedes realistically through it, and marks there
+calibrate sensibly. But it makes the outlet *placement/capacity* a
+strong candidate for the drainage defect, and it explains the defect's
+observed shape: a basin that must pass ALL its discharge through one
+400 m gap develops a backwater profile upstream of the choke, and the
+band-wise bias gradient (+0.30 / +2.85 / +7.06 m, worst nearest the
+outlet) is exactly a backwater signature. During Harvey the real
+floodplain flow is kilometres wide; a 13-edge opening passes channel
+flow only, and overbank water piles against the eastern wall --
+consistent with 10-18 m of standing water in the censored reach.
+
+Both candidate causes in the earlier entry remain live (under-resolved
+channel conveyance vs outlet connectivity), but this narrows the
+second to something specific and checkable: WHERE ss1 sits relative to
+the bayou thalweg, and whether 400 m of critical-depth outflow can
+pass the basin's peak discharge. Distinguishing test when PM compute
+returns: sum the free-outflow boundary flux over the late window from
+the o37 checkpoints and compare with the lateral inflow rate
+(~+0.05 m/hr over the censored cells); if the outlet is saturated, the
+flux will sit at its capacity while the reach rises.
+
+For the paper: sharpens domain-team question 3 from "does this match
+known mesh/outlet behaviour" to "is a single 400 m side-set the
+intended outlet configuration for this mesh, and who owns the side-set
+generation?"
