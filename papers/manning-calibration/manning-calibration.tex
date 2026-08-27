@@ -44,55 +44,51 @@ University of Alabama, Tuscaloosa, AL, USA}
 \maketitle
 
 \begin{abstract}
-We present a discrete-adjoint capability for RDycore, the exascale
-river dynamical core of the Energy Exascale Earth System Model (E3SM),
-and use it for gradient-based calibration of spatially distributed
-Manning roughness. An exact assembled Jacobian of the finite-volume
-shallow-water right-hand side --- closed-form Roe-flux blocks by
-hand-written forward-mode differentiation, with source-term and
-boundary-condition blocks --- drives adjoint sensitivities through
-PETSc's \texttt{TSAdjoint}, bound-constrained calibration with TAO,
-and fully implicit time stepping; one gradient costs about one extra
-forward solve, independent of the parameter count, and every
-derivative is validated against finite differences of the full
-nonlinear solve. Implicit time stepping, which the
-same Jacobian makes practical, also proves necessary: the
-differentiable form of Manning drag is friction-stiff, and explicit
-stepping is unstable at operational time steps. Twin calibrations --- which use model
-output from a known synthetic roughness field as the observations, so
-that recovery can be scored against the truth --- show that whether
-the field can be recovered at all depends on the observing geometry
-and on the observable, not on observation counts: surveyed high-water
-marks recover the land-cover roughness classes covering $83\%$ of a
-2.93M-cell Hurricane Harvey domain, where the real stream-gauge
-network recovers almost none.
-Against the real survey we then ask a question calibration studies
-rarely ask: not how much misfit an optimizer removed, but how much of
-the model's error the parameter is \emph{able} to explain. Scanning
-a uniform scaling of the whole roughness field bounds it, before any
-optimizer runs,
-at $0.08$\,m of a $0.72$\,m peak-elevation discrepancy --- and only at
-roughness $30\%$ of published values; within defensible values, three
-centimetres. A calibration over fifteen land-cover classes beats every
-global scaling, at $0.107$\,m, so spatial redistribution reaches
-authority a single scale cannot; but that is still only $15\%$ of the
-error, and the eigenvalues of the prior-preconditioned Hessian show why
-it cannot be more: these 46 surveyed marks support \emph{one} roughness
-parameter, so a fifteen-parameter fit moves seven about which the data is
-silent. That count follows from sixteen forward runs and no optimizer. Applying the identical measurement to the initial condition
-finds more: a $20\%$ reduction in antecedent water storage is worth
-$0.075$\,m, from a perturbation far easier to defend than the roughness
-one. The same evaluation isolates a downstream reach the model cannot
-drain --- a defect no roughness value can absorb, and a finding in its
-own right. We suggest this bound as a routine precondition for
-calibration studies, which commonly report the misfit reduction
-achieved without establishing the ceiling it was approaching.
-This is, to our knowledge, the first \emph{transient}
-discrete adjoint in an E3SM component (the land-ice component inverts
-a \emph{steady} solve), obtained by differentiating the production
-solver in place --- its discretization, data structures, and GPU
-backends --- rather than rewriting the model in a
-differentiable-programming framework.
+We present what is, to our knowledge, the first \emph{transient}
+discrete adjoint in a component of the Energy Exascale Earth System
+Model (E3SM): its river dynamical core, RDycore, differentiated in
+place --- the production discretization, data structures, and GPU
+backends --- rather than rewritten in a differentiable-programming
+framework. One gradient costs about one extra forward solve regardless
+of how many parameters are being calibrated, and every derivative is
+validated against finite differences of the full nonlinear solve.
+
+We use the capability to ask a question calibration studies rarely
+ask: not how much error an optimizer removed, but how much of the
+model's error a parameter is \emph{able} to remove. Tests with
+synthetic observations first show that what a calibration can recover
+depends on where the observations are taken and what they measure, not
+on how many there are; the observations with leverage in this flood
+domain are peak water levels at surveyed high-water marks. For
+Hurricane Harvey on a 2.93M-cell Houston-area mesh, scored against 46
+such marks, the ceiling for Manning roughness --- the dominant tunable
+parameter of depth-averaged flood models --- can then be measured
+before any optimizer runs. Multiplying the whole roughness field by a
+single factor closes at most $0.08$\,m of a $0.72$\,m gap between
+modelled and surveyed peak water levels, and only at roughness values
+far below anything physically defensible; calibrating fifteen
+land-cover classes separately does better, closing $0.107$\,m --- but
+that is still only $15\%$ of the error. Sixteen forward runs show why
+it cannot be more: the marks carry about \emph{one} parameter's worth
+of independent information about roughness, so most of what a
+fifteen-class calibration reports comes from the prior, not from the
+data.
+
+Pointing the same measurement at the model's initial state finds a
+larger effect: reducing the water stored in the domain at the start of
+the calibration window by $20\%$ is worth $0.075$\,m, from a
+perturbation far easier to defend than the extreme roughness values
+needed to match it. This is a diagnosis rather than a better knob to
+turn --- fitting an initial state of millions of unknowns to 46
+observations would mean little --- but it places most of the remaining
+error in the model's water balance rather than in its friction. The
+comparison against the marks also exposed a stretch of river
+downstream that the model fills and never drains --- an error no
+roughness value can absorb, and a finding in its own right.
+
+We suggest measuring this ceiling as a routine step before a
+calibration study, which commonly reports how much error an optimizer
+removed without establishing how much it could ever have removed.
 \end{abstract}
 
 \section{Introduction}
