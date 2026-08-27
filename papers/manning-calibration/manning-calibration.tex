@@ -8,6 +8,8 @@
 \usepackage{xcolor}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
 
@@ -1252,6 +1254,22 @@ numerical, not drying --- one mark stays dry throughout.}
 \label{tab:alpha}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\input{fig_authority}
+\caption{What each parameter can do to the peak-WSE error, on identical
+axes: the horizontal axis scales the parameter, the vertical axis is the
+same mean absolute error over the same 46 marks, and both curves pass
+through the uncalibrated model at $1.0$. Roughness is concave and runs
+out --- and its useful end is physically indefensible, reaching
+$n = 0.008$ before the implicit solve fails. The initial condition is
+about four times steeper per unit fractional change, convex, and has not
+turned over at a $40\%$ reduction in antecedent water. The dotted line is
+the fifteen-class calibration, which lies off both curves because it
+redistributes roughness rather than scaling it.}
+\label{fig:authority}
+\end{figure}
+
 \textbf{The entire uniform-roughness knob is worth $0.08$\,m against a
 $0.72$\,m error} --- about $11\%$ --- and it reaches that only at
 $\alpha = 0.3$, i.e.\ Manning values $30\%$ of the published NLCD
@@ -1445,6 +1463,19 @@ and it is positive semi-definite by construction, so the failure mode
 that invalidated the first attempt cannot recur silently.
 
 \paragraph{The answer is one.}
+\begin{figure}[t]
+\centering
+\input{fig_spectrum}
+\caption{Eigenvalues of the prior-preconditioned Gauss--Newton Hessian
+over the fifteen land-cover classes, sorted. Above $\lambda = 1$ the
+marks say more than the prior does; below it the prior answers. One
+direction clears the line, and the remaining fourteen fall away over four
+decades --- so a fifteen-parameter calibration is fitting one parameter
+and inheriting fourteen from its prior. The log axis is not cosmetic: on
+a linear one the cliff, which is the result, would be invisible.}
+\label{fig:spectrum}
+\end{figure}
+
 $\lambda = 3.03,\ 0.64,\ 0.33,\ 0.32,\ 0.21,\ 0.10, \dots$ --- a single
 eigenvalue above unity, a spectral gap of $4.8$, and $2.02$ degrees of
 freedom for signal in Rodgers' sense. \textbf{These 46 marks support one
