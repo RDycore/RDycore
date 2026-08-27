@@ -1,3 +1,7 @@
+> **SUPERSEDED.** Read `plans/PROJECT-STATE.md` for current status.
+> This file is kept for history. Claims here that are now known to be
+> wrong are listed at the top of that document.
+
 # Session Handoff — August 26, 2026 (afternoon)
 
 Branch `adams/gpu-implicit`, committed and pushed. Laptop tree clean, **22**

@@ -1,3 +1,7 @@
+> **SUPERSEDED.** Read `plans/PROJECT-STATE.md` for current status.
+> This file is kept for history. Claims here that are now known to be
+> wrong are listed at the top of that document.
+
 # RDycore adjoint calibration — project state, findings, and where to go next
 
 Written 2026-08-26 for the team (and for future-us). Branch

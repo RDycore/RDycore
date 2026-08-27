@@ -2,13 +2,21 @@
 #SBATCH -A m1516_g
 #SBATCH -C gpu
 #SBATCH -q regular
-#SBATCH -t 720
+#SBATCH -t 360
 #SBATCH -N 4
 #SBATCH -o o59_slurm_%j.out
 # o59: calibrate the parameters the data actually supports.
 #
 #   sbatch o59_spectral_active_set.sh [TAO_ITS] [CODES] [INIT_FILE]
 #   default:  sbatch o59_spectral_active_set.sh 12 23,90,22
+#
+# SIX-HOUR SLOT, not twelve. The 15-parameter run measured ~80 min per TAO
+# iteration once line-search trials are counted (7 iterations in 12 hours), so
+# TAO_ITS = 12 is deliberately above what fits and the wall is the stopping
+# rule -- the dump is rewritten every iteration. Three free parameters should
+# converge in far fewer iterations than fifteen did, and a 6-hour request
+# schedules enormously faster than a 12-hour one: the 12-hour job queued for
+# most of a day.
 #
 # THE POINT. o58 measured that these 46 marks support ONE roughness
 # parameter: the prior-preconditioned Gauss-Newton spectrum is
