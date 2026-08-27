@@ -83,6 +83,30 @@ above every surveyed value. The bias is a smooth gradient across the
 domain (+0.30 / +2.85 / +7.06 m by band), so the middle band is
 contaminated too and cannot serve as held-out data.
 
+## 3a. The experimental setup, stated plainly
+
+Every calibration number above comes from a **12-hour restart slice of a
+72-hour event**, not from the full event:
+
+- o37 ran a 72-hour rain-forced forward from 2017-08-26 18:00 (259,200
+  steps at Δt = 1 s) at converged inner tolerances, writing 73 hourly
+  checkpoints. That run is the uncalibrated baseline and the source of
+  every initial condition.
+- Calibrations restart from `checkpoints_o37/o37.rdycore.r.104400.bin`
+  — **event hour 29** — and integrate 43,200 steps to hour 41, with the
+  rainfall clock re-aligned by `-adjoint_rain_start_hour 29`. The
+  restart path is validated bit-exactly against a continuous run.
+- The 46 marks are those whose modelled crest falls inside that slice.
+
+**Why a slice.** Crests are bimodal (h29–42 and h60–72) with an empty
+gap, so no 12-hour window covers both; the downstream marks are
+unusable at any window length because the model cannot drain that reach;
+and a full-event calibration is ~8 hours per TAO iteration at n16, so a
+five-iteration run is ~160 node-hours — most of the remaining budget for
+one experiment.
+
+**Why that needs a better defence than cost.** See Section 6.
+
 ## 4. Why the calibration had never worked, and the fix
 
 A scaling defect, not the adjoint — the FD gates always passed. BLMVM's
@@ -128,17 +152,34 @@ running total; a defensible paper needs the first two.
 
 | item | adds | running total | status |
 | --- | --- | --- | --- |
-| o59: score the converged field, then calibrate the 3 supported classes | 24 | 154 | **running** (`57649525`) |
-| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220 | **required** — fixes the in-sample caveat |
-| ε-robustness of the spectrum (a second ε) | 3 | ~223 | cheap insurance |
-| production-window spectrum (43,200 steps) | 18 | ~241 | upgrade — §7.6 is a 2-hour-window pilot |
-| σ_α rerun | 24 | ~265 | only if the domain team answers; otherwise future work |
+| o59: score the converged field, then calibrate the 3 supported classes | 24–48 | 154–178 | **running** (`57649525`) |
+| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220–250 | **required** — fixes the in-sample caveat |
+| production-window spectrum (43,200 steps) | 18 | ~240–270 | **upgrade to required** — see below |
+| ε-robustness of the spectrum (a second ε) | 3 | | cheap insurance |
+| σ_α rerun | 24–48 | | only if the domain team answers; otherwise future work |
 
-The cross-validation range is wide because it depends on how fast three
-parameters converge, which nothing has measured yet. At the observed rate
-(~80 min per TAO iteration plus a ~50 min start-point evaluation) a
-five-iteration fold is 33 node-hours and two folds is 66; three
-iterations would make it ~45. **o59 is the measurement that settles it.**
+**Every calibration row is a range because chaining is the norm here,
+not the exception.** The 15-parameter run needed more than a 12-hour
+slot and was still cut off at iteration 9 with J flattening. Three
+parameters should converge faster, but nothing has measured that, so
+o59 may need a second 6-hour link — and cross-validation, which is two
+such calibrations, inherits the same uncertainty (a five-iteration fold
+is 33 node-hours at the observed ~80 min per TAO iteration; three
+iterations would make it ~22). **o59 is the measurement that settles
+both rows.**
+
+### Why the production-window spectrum is worth more than "an upgrade"
+
+The mark-count scaling in Section 3 assumes λ grows with the *number* of
+marks at fixed sensitivity. A longer window also raises the sensitivity
+*per* mark, because each peak integrates more of the trajectory. So the
+question a reviewer will certainly ask — *why calibrate 12 hours of a
+72-hour event?* — is not answered by "cost" alone, and it is answerable:
+running the o58 spectrum at 43,200 steps instead of 7,200 measures how
+λ scales with window length directly. If it grows strongly, a longer
+window buys identifiability that more marks cannot, and the 12-hour
+choice needs defending on cost with a number attached. If it does not,
+the 12-hour window is simply the right experiment and we can say so.
 
 **Five questions for the domain team**, stated in full at the end of the
 paper draft. The first is load-bearing:
