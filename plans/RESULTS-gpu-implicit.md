@@ -2155,7 +2155,7 @@ gap decomposes exactly: the 15-class run pays 8.8 MORE prior (41.94 vs
 33.16) to buy 33.5 more misfit (615.40 vs 648.95). So the twelve
 non-leading classes are not pure decoration -- they carry ~5% of J in
 aggregate -- but the leading eigenspace holds the great majority of
-what the marks can teach, which is what Section 8.4 claims.
+what the marks can teach, which is what Section 7.4 claims (8.4 before the 2026-08-27 restructure).
 
 **The sharpest confirmation is WHERE the three parameters landed:**
 

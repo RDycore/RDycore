@@ -187,7 +187,7 @@ to the running total.
    be reported as caveats in a feedback draft.
 
 **Cross-validation is deliberately NOT next.** It is required before
-submission — the reported MAE is in-sample and §8.3 says so — but it
+submission — the reported MAE is in-sample and §7.3 says so — but it
 costs days of wall-clock, and whether readers consider that caveat
 disqualifying is exactly the kind of thing to *ask* rather than guess.
 Circulate the draft with the caveat stated, and run it knowing whether
@@ -218,12 +218,12 @@ every calibration estimate here is a range rather than a number.
 
 Already spent on calibration for comparison: the 15-parameter run
 (`57627058`) cost 48 node-hours for 9 iterations and is *not* wasted —
-it is the control the spectrum interprets, and §8.4 uses it to show what
+it is the control the spectrum interprets, and §7.4 uses it to show what
 fitting fifteen parameters to a one-parameter observable does.
 
 ### What the production-window spectrum adds
 
-§8.4's spectrum is measured on a 7,200-step pilot; the calibration runs
+§7.4's spectrum is measured on a 7,200-step pilot; the calibration runs
 on 43,200. Re-running it at the production window costs 16 forwards
 (~4 hours on 4 nodes, no adjoint) and does two things. It puts the
 paper's identifiability number on the same window as its calibration
@@ -278,7 +278,7 @@ option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
   23 reproduce their 15-class values to three digits. The 24.8-unit gap
   decomposes exactly (12 frozen classes carry ~5% of J in aggregate).
   Full entry in `RESULTS-gpu-implicit.md` under "o59 Part B". Not yet in
-  the paper — §8.4 gains one paragraph when the numbers are reviewed.
+  the paper — §7.4 gains one paragraph when the numbers are reviewed.
   Missing and cheap when PM returns: eval-only MAE for the 3-param field.
 
 **Monitoring does not survive a session.** The tracking job was a
@@ -296,12 +296,12 @@ means expired, not "nothing new". This cost two monitoring cycles on
 
 **Next actions, in order.**
 
-1. ~~Read o59 Part A, put the MAE into §8.3 and the ladder in Section 3.~~
+1. ~~Read o59 Part A, put the MAE into §7.3 and the ladder in Section 3.~~
    **Done 2026-08-27.** The frozen-class gate for Part B has already
    passed its first half — the log reports `3 of 15 classes active, 12
    frozen at prior`; the `rel_err` = 0.000 check still needs doing when
    Part B finishes.
-2. Read o59 Part B against the falsification test; adjust §8.4 if it
+2. Read o59 Part B against the falsification test; adjust §7.4 if it
    fails. If Part B is unconverged at the wall, chain a second link:
    `sbatch o59_spectral_active_set.sh 12 23,90,22 o59_p_57649525.txt`
 3. Cross-validation within cluster A. Needs a split of
