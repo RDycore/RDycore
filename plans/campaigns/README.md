@@ -29,6 +29,7 @@ to that directory to use.
 | `o54_ic_authority.sh` | MAE at a dumped calibration iterate, and the initial-condition authority scan | ~90 min, 4 nodes |
 | `o55_continue_calibration.sh` | continues a calibration from a dumped iterate, with the armijo line search | 4-hr session, 4 nodes |
 | `o56_hessian_spectrum.sh` + `o56_hessian.py` | full Hessian by differencing the gradient field. **Its self-check rejects the production result** -- see `RESULTS`; kept because it is correct on short windows and the failure is the finding | ~100 min, 4 nodes |
+| `o59_spectral_active_set.sh` | scores the converged 15-class field, then calibrates only the classes the spectrum says the data determines | 12-hr slot, 4 nodes |
 | `o58_gauss_newton_spectrum.sh` + `o58_gauss_newton.py` | the same question via the Gauss-Newton Hessian from observation sensitivities: PSD by construction, 16 forwards not 16 forward+adjoints, and it verifies argmax stability per mark | ~40 min, 4 nodes |
 
 ## Staged inputs these expect in `$SCRATCH/gpu-implicit`

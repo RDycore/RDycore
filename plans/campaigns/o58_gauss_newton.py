@@ -145,8 +145,29 @@ print(f"  degrees of freedom for signal (Rodgers): {dofs:.2f}")
 if K > 1 and lam[1] > 0:
     print(f"  spectral gap lambda_0/lambda_1 = {lam[0]/lam[1]:.2f}")
 
-# is the leading direction the uniform mode the alpha-scan assumed?
-u = np.ones(K) / np.sqrt(K)
-print(f"\n  |<v_0, uniform>| = {abs(V[:,0] @ u):.3f}  "
-      f"(1.0 would mean the leading mode IS the uniform roughness scale the")
-print(f"  alpha scan measured; near 0 means the scan probed a different direction)")
+# Is the leading direction the uniform mode the alpha-scan assumed? Two
+# comparisons, because "uniform" is ambiguous and the difference matters.
+# The alpha scan multiplies every class by one factor, which is equal weight
+# PER CLASS. But the classes are wildly unequal in extent -- developed-medium
+# alone is 31.7% of cells, mixed forest 0.4% -- so a direction that changes
+# the same total wetted area is equal weight PER CELL. If v_0 aligns with the
+# second and not the first, the scan and the data prefer the same physical
+# change described in different coordinates, which is a much weaker statement
+# than the scan having probed the wrong thing.
+CELLS = {11: 12323, 21: 177961, 22: 438583, 23: 928301, 24: 551909, 31: 33039,
+         41: 15937, 42: 43306, 43: 11975, 52: 23169, 71: 16927, 81: 428136,
+         82: 85715, 90: 122128, 95: 37123}
+u_class = np.ones(K) / np.sqrt(K)
+a = np.array([CELLS[c] for c in codes], float)
+u_area = a / np.linalg.norm(a)
+print(f"\n  leading eigenvector v_0:")
+print(f"    |<v_0, uniform per class>| = {abs(V[:,0] @ u_class):.3f}   "
+      f"(the direction the alpha scan actually varies)")
+print(f"    |<v_0, uniform per cell>|  = {abs(V[:,0] @ u_area):.3f}   "
+      f"(the same physical change, area-weighted)")
+conc = np.sort(V[:, 0]**2)[::-1]
+top = np.argsort(np.abs(V[:, 0]))[::-1]
+print(f"    concentration: largest single class {codes[top[0]]} holds "
+      f"{100*conc[0]:.0f}% of its energy, top three {100*conc[:3].sum():.0f}%")
+print(f"    (near 100% for one class means the observable constrains THAT class,")
+print(f"     not a domain-scale mode -- which the alpha scan could not have told us)")
