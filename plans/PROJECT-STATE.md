@@ -186,13 +186,20 @@ to the running total.
 4. Everything below, which is science rather than presentation and can
    be reported as caveats in a feedback draft.
 
+**Cross-validation is deliberately NOT next.** It is required before
+submission — the reported MAE is in-sample and §7.5 says so — but it
+costs days of wall-clock, and whether readers consider that caveat
+disqualifying is exactly the kind of thing to *ask* rather than guess.
+Circulate the draft with the caveat stated, and run it knowing whether
+it matters.
+
 **The paper's headline calibration is o59** — three parameters over the
 12-hour window, chained until converged. That is the row to protect.
 
 | item | adds | running total | status |
 | --- | --- | --- | --- |
 | **o59: the production calibration**, 3 parameters, chained to convergence | **24–48** | 154–178 | **running** (`57649525`, link 1 of 1–2) |
-| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220–250 | **required** — makes the reported MAE out-of-sample |
+| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220–250 | **required before submission**, not before circulating — see below |
 | production-window spectrum (43,200 steps) | 16 | ~235–265 | **required** — puts identifiability on the calibration's window |
 | ε-robustness of the spectrum (a second ε) | 3 | | cheap insurance |
 | σ_α rerun | 24–48 | | only if the domain team answers; otherwise future work |
