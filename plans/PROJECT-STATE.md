@@ -123,16 +123,22 @@ move" question costs five minutes, not twelve hours.
 
 ## 6. What remains, and what it costs
 
-**Budget: ~130 of 300 node-hours spent.** A defensible stopping point is
-~94 more (total ~224); with the optional upgrades ~115 (total ~244).
+**Budget: ~130 of 300 node-hours spent.** Each row below *adds* to the
+running total; a defensible paper needs the first two.
 
-| item | node-hr | status |
-| --- | --- | --- |
-| o59: score the converged field, then calibrate the 3 supported classes | 24 | **running** (`57649525`) |
-| cross-validation within cluster A, 2 folds × 3 parameters | 46 | **required** — fixes the in-sample caveat |
-| ε-robustness of the spectrum (a second ε) | 3 | cheap insurance |
-| production-window spectrum (43,200 steps) | 18 | upgrade — §7.6 is a 2-hour-window pilot |
-| σ_α rerun | 48 | only if the domain team answers; otherwise future work |
+| item | adds | running total | status |
+| --- | --- | --- | --- |
+| o59: score the converged field, then calibrate the 3 supported classes | 24 | 154 | **running** (`57649525`) |
+| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220 | **required** — fixes the in-sample caveat |
+| ε-robustness of the spectrum (a second ε) | 3 | ~223 | cheap insurance |
+| production-window spectrum (43,200 steps) | 18 | ~241 | upgrade — §7.6 is a 2-hour-window pilot |
+| σ_α rerun | 24 | ~265 | only if the domain team answers; otherwise future work |
+
+The cross-validation range is wide because it depends on how fast three
+parameters converge, which nothing has measured yet. At the observed rate
+(~80 min per TAO iteration plus a ~50 min start-point evaluation) a
+five-iteration fold is 33 node-hours and two folds is 66; three
+iterations would make it ~45. **o59 is the measurement that settles it.**
 
 **Five questions for the domain team**, stated in full at the end of the
 paper draft. The first is load-bearing:
