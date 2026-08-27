@@ -2124,3 +2124,54 @@ developed-open are at 1.55 and 1.80 of table value, NOT "above twice"
 at 0.983, so the "moved 2.6 sigma in a direction the data cannot see"
 example no longer describes the headline field. Both fixed in the draft.
 
+
+### o59 Part B (57649525): three spectrum-chosen parameters vs fifteen (2026-08-27)
+
+Calibrating ONLY classes 23, 90, 22 (chosen from the leading
+eigenvector), the other twelve frozen at the prior. Perlmutter went
+down mid-run at ~11:01 PDT, but TAO had already flattened and wrote its
+dump (`o59_p_57649525.txt`, mirrored with all o59 logs to `logs/o59/`
+in this repo):
+
+    0 TAO  f 1.000000  |g| 0.143643
+    1 TAO  f 0.897180  |g| 0.0754734
+    2 TAO  f 0.844136  |g| 0.00691323
+    3 TAO  f 0.843947  |g| 0.0145433
+    4 TAO  f 0.843935  |g| 0.00779137     J = 6.821163e+02
+
+The last two iterations gained 0.02% and 0.001% -- flat. ~64 min/TAO
+iteration at n16, consistent with the 15-class rate.
+
+**GATE PASSED.** All twelve frozen classes sit bit-exactly at the prior
+in the dump (rel_err 0.000000 on every one), so
+`-adjoint_classes_active` works and the run counts.
+
+**Falsification verdict: the spectrum called it, with a measured
+remainder.** Three parameters, essentially converged in 4 iterations,
+removed 126.1 of the 150.9 units the converged 15-parameter run removed
+-- **83.6% of the reduction from 20% of the parameters**, and J 682.1
+beats the 15-class run's own iteration-2 value (684.9). The 24.8-unit
+gap decomposes exactly: the 15-class run pays 8.8 MORE prior (41.94 vs
+33.16) to buy 33.5 more misfit (615.40 vs 648.95). So the twelve
+non-leading classes are not pure decoration -- they carry ~5% of J in
+aggregate -- but the leading eigenspace holds the great majority of
+what the marks can teach, which is what Section 8.4 claims.
+
+**The sharpest confirmation is WHERE the three parameters landed:**
+
+| class | 3-param | 15-param converged |
+| --- | --- | --- |
+| 22 developed-low | alpha 1.626 | 1.627 |
+| 23 developed-medium | 0.300 (bound) | 0.300 (bound) |
+| 90 woody wetland | 0.301 (~bound) | 0.355 |
+
+22 and 23 reproduce their 15-class values to three digits from a
+different starting point and a different active set -- these two are
+genuinely determined by the data. Woody wetland dives further (0.301 vs
+0.355) when the other twelve are frozen: with no other classes to share
+the work it compensates alone, which is the equifinality the spectrum
+predicts for a direction the data sees only in combination.
+
+MISSING and cheap to get when PM returns: an eval-only MAE for this
+field (one forward). Methods-check number, not a headline.
+

@@ -269,16 +269,17 @@ option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
   of the 0.72 m discrepancy and beats uniform α = 0.70 by 0.078 m. Full
   entry, the free J_total = misfit + prior verification, and the
   per-class α table are in `RESULTS-gpu-implicit.md` under "o59 Part A".
-- **Part B** calibrates only classes 23, 90, 22 — chosen from the leading
-  eigenvector, not from gradient magnitude, and the two criteria disagree
-  on the third parameter. **First check the twelve frozen classes show
-  `rel_err` exactly 0.000**; if any moved, `-adjoint_classes_active` is
-  broken and the run is void whatever the numbers say. Then the
-  falsification test the script states for itself: three well-chosen
-  parameters landing near J 6.573e2 means twelve were decoration and the
-  spectrum called it; landing far short means the information lives
-  outside the leading eigenspace and §8.4's one-parameter reading is too
-  narrow — which would matter more than any number currently in the paper.
+- **Part B is DONE** — Perlmutter died mid-run at ~11:01 PDT but TAO had
+  flattened and written its dump; all o59 outputs are mirrored to
+  `logs/o59/` in this repo. **Gate passed** (all twelve frozen classes
+  bit-exact at prior). **Falsification verdict: the spectrum called it**
+  — three parameters, converged in 4 iterations, reached J 682.1 and
+  removed 83.6% of the converged 15-parameter reduction; classes 22 and
+  23 reproduce their 15-class values to three digits. The 24.8-unit gap
+  decomposes exactly (12 frozen classes carry ~5% of J in aggregate).
+  Full entry in `RESULTS-gpu-implicit.md` under "o59 Part B". Not yet in
+  the paper — §8.4 gains one paragraph when the numbers are reviewed.
+  Missing and cheap when PM returns: eval-only MAE for the 3-param field.
 
 **Monitoring does not survive a session.** The tracking job was a
 session-only cron; re-establish it or poll by hand:

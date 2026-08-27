@@ -1,0 +1,9 @@
+=== o59 Part A: scoring the converged 15-class field o48_p_57627058.txt Thu Aug 27 05:23:17 AM PDT 2026
+Part A exit=0 Thu Aug 27 05:38:05 AM PDT 2026
+hwm eval: evaluating the class table o48_p_57627058.txt, not the prior field
+hwm eval (class table): J 6.153969e+02, peak-WSE MAE 0.6116 m, model dry at 0 of 46 marks (144 obs times over 43200 steps)
+
+=== o59 Part B: calibrating classes 23,90,22 only Thu Aug 27 05:38:05 AM PDT 2026
+    the other twelve are frozen at the NLCD prior, on the spectrum's
+    evidence that the marks cannot determine them
+[2026-08-27T18:23:37.464] error: *** JOB 57649525 ON nid002268 CANCELLED AT 2026-08-27T18:23:37 DUE TO TIME LIMIT ***
