@@ -2192,29 +2192,51 @@ no run needed):
   side set alone. **Every other perimeter edge is an untagged
   reflecting wall.**
 
-Reading: this does not indict the free-outflow BC *formulation* -- the
-upstream reach recedes realistically through it, and marks there
-calibrate sensibly. But it makes the outlet *placement/capacity* a
-strong candidate for the drainage defect, and it explains the defect's
-observed shape: a basin that must pass ALL its discharge through one
-400 m gap develops a backwater profile upstream of the choke, and the
-band-wise bias gradient (+0.30 / +2.85 / +7.06 m, worst nearest the
-outlet) is exactly a backwater signature. During Harvey the real
-floodplain flow is kilometres wide; a 13-edge opening passes channel
-flow only, and overbank water piles against the eastern wall --
-consistent with 10-18 m of standing water in the censored reach.
+**CORRECTION, same session.** The first draft of this entry called
+outlet placement "a strong candidate" for the drainage defect. A
+second measurement refutes that, and the mesh is vindicated:
 
-Both candidate causes in the earlier entry remain live (under-resolved
-channel conveyance vs outlet connectivity), but this narrows the
-second to something specific and checkable: WHERE ss1 sits relative to
-the bayou thalweg, and whether 400 m of critical-depth outflow can
-pass the basin's peak discharge. Distinguishing test when PM compute
-returns: sum the free-outflow boundary flux over the late window from
-the o37 checkpoints and compare with the lateral inflow rate
-(~+0.05 m/hr over the censored cells); if the outlet is saturated, the
-flux will sit at its capacity while the reach rises.
+- **The domain is a delineated watershed, not a rectangular cutout.**
+  Only **35 of 6,198 boundary nodes (0.6%)** lie on the bounding box;
+  the perimeter is an irregular polygon. Reflecting walls on the
+  untagged perimeter are therefore physically right -- it is a
+  catchment divide, not an artificial cut.
+- **The side set sits exactly at the catchment's low point.** Outlet
+  nodes span z = -0.10 to 5.50 m and the twelve lowest boundary nodes
+  in the entire 6,198-node perimeter (z = -0.10) ARE the outlet nodes.
+  Boundary median z is 29.85 m. The one gap in a high rim is at the
+  drainage point.
 
-For the paper: sharpens domain-team question 3 from "does this match
-known mesh/outlet behaviour" to "is a single 400 m side-set the
-intended outlet configuration for this mesh, and who owns the side-set
-generation?"
+So a single 400 m side set is exactly what a correctly delineated
+watershed mesh should have. **There is no side-set question to ask the
+domain team**, and asking one would have implied an error that is not
+there.
+
+What survives is narrower and is a *physics* question about the
+event, not a configuration question: whether a catchment-divide domain
+is the right idealization for a storm that exceeded the divide. The
+censored reach ponds ~10.7 m mean depth (cells to 18 m) on bed
+elevations of 0-6 m near the outlet, so its modelled water surface
+sits above parts of its own perimeter; a reflecting wall holds in
+water that would have spilled. This is a known limitation of
+watershed-delineated domains under extreme events, NOT a defect in
+this mesh.
+
+Mark geography, for whoever picks this up (local, from
+`turning30m_hwm_cells.csv`, distances to the outlet centroid): the 122
+above-bed marks span 1.1-66.1 km from the outlet, median 35.8 km. The
+near-outlet marks sit at bed z = 0.3-6.1 m on Buffalo Bayou; the
+farthest sit at z = 39-48 m on Willow Fork. So mark distance to the
+outlet and bed elevation are strongly collinear, which means the
+band-wise bias gradient (+0.30 / +2.85 / +7.06 m) CANNOT by itself
+distinguish a backwater/outlet story from a "low-lying downstream
+cells pond" story. Any future attribution needs the boundary flux, not
+the bias gradient.
+
+Distinguishing test if anyone wants it, when PM compute returns: sum
+the free-outflow boundary flux over the late window from the o37
+checkpoints and compare with the lateral inflow rate (~+0.05 m/hr over
+the censored cells). A saturated outlet sits at capacity while the
+reach rises. **Not needed for the paper** -- the paper's claim is only
+that the reach does not drain and that no roughness value repairs it,
+which is measured and stands regardless of mechanism.
