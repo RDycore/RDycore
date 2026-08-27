@@ -120,7 +120,9 @@ scale and with a Tapenade-generated adjoint of a solver built for
 assimilation. What we add is neither the adjoint nor the observable but
 the setting and the question: a production Earth-system component
 differentiated in place, and a measurement of how much of the model's
-error the parameter can explain at all.
+error the parameter can explain at all. The measurement is not
+specific to roughness, and Section~\ref{sec:icauthority} turns it on
+the model's initial state --- where it finds more.
 
 A recent generation of \emph{differentiable} flood and hydrology codes
 obtains gradients by rewriting simplified solvers inside
@@ -1053,10 +1055,10 @@ resolution --- and everything after that is measured against surveyed
 high-water marks: the uncalibrated baseline and the drainage defect it
 exposes (Section~\ref{sec:hwm}), the authority of roughness over the
 remaining error (Section~\ref{sec:authority}), the calibration
-(Section~\ref{sec:calibrated}), the spectrum that counts the parameters
-the marks support (Section~\ref{sec:spectrum}), and the same
-measurement pointed at the initial condition
-(Section~\ref{sec:icauthority}).
+(Section~\ref{sec:calibrated}), and the spectrum that counts the
+parameters the marks support (Section~\ref{sec:spectrum}).
+Section~\ref{sec:icauthority} then points the same measurement at the
+initial condition.
 
 \subsection{High-water marks and the uncalibrated baseline}
 \label{sec:hwm}
@@ -1653,14 +1655,24 @@ limitation is a property of the observing system rather than of the
 method. A study that reported only its misfit reduction would have
 concluded the opposite.
 
-\subsection{The same measurement, pointed at the initial condition}
+\section{What explains the rest: the initial condition}
 \label{sec:icauthority}
 
-Nothing in Section~\ref{sec:authority} is specific to roughness, so we
-applied it to the other parameter a calibration window has: the state it
-starts from. Our window begins at event hour 29 from a checkpoint of the
-72-hour forward, and the natural single direction is the amount of water
-that checkpoint holds. Scaling all three conserved variables by a common
+Roughness, calibrated as well as we can calibrate it, explains $15\%$
+of this model's error against the marks. Something explains the other
+$85\%$, and the candidates --- rainfall forcing, mesh elevation,
+datum, representation error, the state the window starts from --- are
+not all equally measurable. This section points the ceiling
+measurement of Section~\ref{sec:authority} at the one candidate it can
+probe with a single scan direction: the initial condition. The
+initial state is also the input a variational initialization would
+control, so the measurement doubles as a feasibility probe for
+initial-state estimation with the same adjoint machinery, which the
+conclusions take up.
+
+Our window begins at event hour 29 from a checkpoint of the
+72-hour forward, and the natural single direction to scan is the
+amount of water that checkpoint holds. Scaling all three conserved variables by a common
 factor $a$ changes antecedent storage while leaving every velocity
 unchanged, since $u = (hu)/h$ is invariant. Each point is one forward
 (Table~\ref{tab:ic}).
