@@ -72,7 +72,10 @@ roughness $30\%$ of published values; within defensible values, three
 centimetres. A calibration over fifteen land-cover classes beats every
 global scaling, at $0.095$\,m, so spatial redistribution reaches
 authority a single scale cannot; but that is still only $13\%$ of the
-error. Applying the identical measurement to the initial condition
+error, and the eigenvalues of the prior-preconditioned Hessian show why
+it cannot be more: these 46 surveyed marks support \emph{one} roughness
+parameter, so a fifteen-parameter fit moves nine about which the data is
+silent. That count follows from sixteen forward runs and no optimizer. Applying the identical measurement to the initial condition
 finds more: a $20\%$ reduction in antecedent water storage is worth
 $0.075$\,m, from a perturbation far easier to defend than the roughness
 one. The same evaluation isolates a downstream reach the model cannot
@@ -1362,15 +1365,25 @@ authority that global scaling cannot}, which is a stronger statement
 than the scan alone supports and the one the half-domain experiment
 (Table~\ref{tab:halves}) would not have predicted.
 
-Limiting: the objective and the MAE do not move together. A
-\emph{uniform} field with the calibrated field's misfit would score
-$0.6135$\,m; the calibrated field scores $0.6242$. Redistribution
-therefore buys objective slightly less MAE-efficiently than scaling
-does --- it is reducing the weighted misfit in ways that mean absolute
-error weights less --- so the two should not be quoted
-interchangeably. The run is also not converged, and one class sits at
-its lower bound; Section~\ref{sec:calibration} discusses why that bound
-is partly an artifact of how the prior was stated.
+Limiting, and there are three. First, the objective and the MAE do not
+move together: a \emph{uniform} field with the calibrated field's misfit
+would score $0.6135$\,m where the calibrated field scores $0.6242$, so
+redistribution buys objective slightly less MAE-efficiently than scaling
+does and the two should not be quoted interchangeably. Second, the run
+is not converged and one class sits at its lower bound;
+Section~\ref{sec:calibration} discusses why that bound is partly an
+artifact of how the prior was stated. Third and most important,
+\textbf{$0.6242$\,m is an in-sample score}: the 46 marks that define the
+objective are the 46 marks it is evaluated on. We report it as a fit,
+not as skill. Out-of-sample validation has to be cross-validation
+\emph{within} the upstream band, because the middle band carries the
+drainage defect (Table~\ref{tab:bands}) and would not test
+generalization so much as re-measure that defect.
+
+Section~\ref{sec:spectrum} makes the second and third caveats concrete
+rather than conventional: the calibrated field lies $9.6$ prior standard
+deviations from the NLCD lookup, and only $3\%$ of that displacement is
+in a direction these marks constrain.
 
 Set against the error budget: the model--survey discrepancy on these
 marks is $0.72$\,m and roughness, calibrated as well as we can
@@ -1378,6 +1391,144 @@ currently calibrate it, accounts for $13\%$ of it. The remaining
 $87\%$ is rainfall forcing, mesh elevation, datum, and representation
 error at 30\,m --- and Section~\ref{sec:icauthority} shows that one of
 those is measurable with the same method, and larger.
+
+\subsection{How many parameters does the observable support?}
+\label{sec:spectrum}
+
+Everything above infers the answer from scans. The eigenvalues of the
+prior-preconditioned Hessian give it directly. In coordinates where the
+prior is white, the posterior precision is $I + \Gamma^{1/2} H_{\rm mis}
+\Gamma^{1/2}$, so each eigenvalue $\lambda_i$ of the whitened misfit
+Hessian compares data information against prior information in one
+direction: the count with $\lambda_i > 1$ is the number of parameters
+the observable supports, and the eigenvectors say which
+\emph{combinations} of classes those are --- which no scan can.
+
+\paragraph{Assembling it.} With fifteen classes this needs no low-rank
+machinery, but it does need the right matrix. Differencing the
+\emph{gradient} field fails here, and instructively: over a window of
+this length the objective is dense with wet/dry branch surfaces
+(Section~\ref{sec:hwm}), and while the adjoint is exact on its own
+branch the gradient jumps between branches, so a difference quotient
+samples a discontinuity. Our first attempt returned a matrix with
+$45\%$ relative asymmetry and eigenvalues to $-6.8$, which its own
+consistency check rejected. We therefore assemble the
+\emph{Gauss--Newton} Hessian from observation sensitivities,
+\begin{equation}
+H = \tfrac{1}{\sigma^2} S^\top W S, \qquad
+S_{ik} = \partial(\max_k H u)_i / \partial \alpha_k ,
+\label{eq:gn}
+\end{equation}
+which differences the mark peaks rather than the gradient. This works
+for the reason Section~\ref{sec:nondiff} established --- mark argmaxes
+do not move under small probes --- and we verify it rather than assume
+it: across all 690 mark--column pairs only 27 ($3.9\%$) changed their
+peak time. It costs 16 forwards rather than 16 forward-plus-adjoints,
+and it is positive semi-definite by construction, so the failure mode
+that invalidated the first attempt cannot recur silently.
+
+\paragraph{The answer is one.}
+$\lambda = 3.03,\ 0.64,\ 0.33,\ 0.32,\ 0.21,\ 0.10, \dots$ --- a single
+eigenvalue above unity, a spectral gap of $4.8$, and $2.02$ degrees of
+freedom for signal in Rodgers' sense. \textbf{These 46 marks support one
+roughness parameter.} The scans and the spectrum agree, and they are
+independent: no optimizer, no line search, and no calibration enters
+Eq.~\eqref{eq:gn}.
+
+\paragraph{But the scan varied nearly the wrong direction.}
+The leading mode, with components
+$-0.81$ on developed-medium, $+0.41$ on woody wetland, $-0.36$ on
+developed-low and $-0.18$ on developed-high, is dominated by the
+large-area classes. Its overlap with the uniform direction the
+$\alpha$-scan varies --- equal weight per \emph{class} --- is $0.263$,
+which for fifteen classes is indistinguishable from random ($0.258$).
+Its overlap with the same physical change weighted per \emph{cell} is
+$0.768$. So the informative mode is the domain-scale conveyance mode we
+claimed, but area-weighted; the $\alpha$-scan probes it only obliquely.
+That is why the class calibration beats uniform scaling by $0.065$\,m
+(Table~\ref{tab:ladder}): it is not that fifteen parameters beat one, it
+is that the scan's one parameter was the wrong one.
+
+\paragraph{What the calibration actually did.}
+Projecting the calibrated displacement onto the eigenbasis is
+unflattering and worth reporting. The calibrated field sits
+\textbf{9.6 prior standard deviations} from the NLCD lookup, and of that
+motion only $3.0\%$ lies in the single data-constrained direction;
+$78.4\%$ lies in directions where data and prior are comparable and
+$18.5\%$ where the prior alone determines the answer. Per class
+(Table~\ref{tab:learned}) the picture is the same: the marks shrink the
+prior uncertainty by $36\%$ on developed-medium and by $12$--$17\%$ on
+four more, and by $5\%$ or less on the remaining nine --- yet the
+optimizer moved deciduous forest by $2.6\sigma$ having learned
+\emph{nothing} about it. This is not overfitting in the fit-the-noise
+sense; it is an optimizer moving parameters about which the data is
+silent, because the misfit gradient in those directions is not zero,
+merely uninformative.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+NLCD & class & prior $\sigma_n$ & posterior $\sigma_n$ & learned \\
+\midrule
+23 & developed medium & $0.015$ & $0.010$ & $36\%$ \\
+22 & developed low & $0.015$ & $0.012$ & $17\%$ \\
+90 & woody wetland & $0.015$ & $0.012$ & $17\%$ \\
+81 & pasture & $0.015$ & $0.013$ & $15\%$ \\
+21 & developed open & $0.015$ & $0.013$ & $12\%$ \\
+24, 95, 11 & & $0.015$ & $0.014$--$0.015$ & $2$--$5\%$ \\
+41, 43, 82, 31, 42, 71, 52 & & $0.015$ & $0.015$ & $\le 1\%$ \\
+\bottomrule
+\end{tabular}
+\caption{What the 46 marks teach about each land-cover class, as the
+fractional reduction from prior to posterior standard deviation. Seven
+classes learn essentially nothing: any value a calibration reports for
+them is the prior speaking, not the data.}
+\label{tab:learned}
+\end{table}
+
+\paragraph{Would more marks fix it?}
+This is the natural objection --- 46 observations for 15 parameters
+sounds like too few --- and Eq.~\eqref{eq:gn} answers it, because
+$\lambda$ scales linearly in the number of comparable observations and
+as $\sigma^{-2}$ in their quality (Table~\ref{tab:scaling}). The answer
+is that more marks help, slowly, and that the supply is exhausted long
+before the parameterization is justified. Going from the 46 marks of
+this window to \emph{all} 71 the model can legitimately be scored
+against still supports one parameter. Every QC-passed mark in the
+domain, over a window long enough to catch all of them, supports two.
+Reaching five would take every Harvey mark that falls in the domain
+including the $62\%$ that failed QC because they are channel surveys a
+30\,m cell cannot represent. Fifteen would take of order $10^5$ marks.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}rrl@{}}
+\toprule
+Marks & Supported & That data set is \\
+\midrule
+46 & 1 & the 12-hour cluster-A window (this study) \\
+71 & 1 & all admissible marks, 24-hour window \\
+108 & 2 & every QC-passed mark, 72-hour window \\
+324 & 5 & every Harvey mark in-domain, \emph{before} QC \\
+$7\times10^5$ & 15 & --- \\
+\bottomrule
+\end{tabular}
+\caption{How the supported-parameter count scales with survey size at
+fixed quality ($\sigma = 0.15$\,m). At fixed size, improving quality to
+$\sigma = 0.10$\,m buys a second parameter and $\sigma = 0.05$\,m --- better
+than any high-water-mark survey achieves --- buys five.}
+\label{tab:scaling}
+\end{table}
+
+The conclusion is therefore not that Manning roughness is
+unidentifiable. It is that \emph{surveyed peak water-surface elevations
+at survey accuracy carry about two degrees of freedom of information
+about distributed roughness in this basin}; that this can be computed
+from sixteen forward runs before any optimizer is written; and that the
+limitation is a property of the observing system rather than of the
+method. A study that reported only its misfit reduction would have
+concluded the opposite.
 
 \subsection{The same measurement, pointed at the initial condition}
 \label{sec:icauthority}
@@ -1724,14 +1875,18 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         symptom rather than a cause.
   \item \textbf{Is the calibrated field itself acceptable?} We can
         report a field that fits better than any global scaling, but it
-        raises pasture and developed-open roughness above twice their
-        NLCD values and holds developed-medium at its lower bound. We
-        would rather be told that this is uninterpretable than publish
-        it as a calibrated roughness map. A judgment on which classes
-        have credible ranges --- as opposed to a single width applied to
-        all fifteen --- would let us calibrate the ones the data
-        constrains and freeze the rest on physical grounds rather than
-        on gradient magnitude.
+        sits $9.6$ prior standard deviations from the NLCD lookup ---
+        raising pasture and developed-open above twice their table
+        values, holding developed-medium at its lower bound, and moving
+        deciduous forest by $2.6\sigma$ in a direction the data cannot
+        see at all (Section~\ref{sec:spectrum}). We would rather be told
+        this is uninterpretable than publish it as a calibrated
+        roughness map. The specific judgment we need is which classes
+        have credible ranges, as opposed to one width applied to all
+        fifteen: the spectrum says the marks inform developed-medium
+        (a $36\%$ uncertainty reduction) and four others weakly, and
+        seven classes not at all, so those seven should be frozen on
+        physical grounds rather than left for an optimizer to move.
 \end{enumerate}
 
 \section*{Open issues and current positions, in order of importance}
