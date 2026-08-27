@@ -226,7 +226,22 @@ treatment (\texttt{source.method: explicit}), used on every adjoint
 path; Section~\ref{sec:implicit} shows how the resulting stiffness is
 then handled properly, by the integrator rather than inside $f$.
 
-\section{Exact Jacobian}
+\section{Differentiating the production solver}
+\label{sec:diff}
+
+Two design decisions shape everything downstream. The derivative of
+the right-hand side is obtained by hand --- forward-mode
+differentiation of the flux computation itself, branch by branch ---
+and it is \emph{assembled} into a sparse matrix rather than applied
+matrix-free. Assembly is what lets one artifact serve three consumers:
+the implicit solver preconditions with it
+(Section~\ref{sec:implicit}), \texttt{TSAdjoint} transposes it, and
+the calibration couples it to the parameter Jacobian. This section
+builds that Jacobian (Section~\ref{sec:jacobian}) and the adjoint
+sensitivities on top of it (Section~\ref{sec:adjoint}); every
+derivative is gated by finite differences of the full nonlinear solve.
+
+\subsection{Exact Jacobian}
 \label{sec:jacobian}
 
 The RHS Jacobian is block sparse with $3\times3$ blocks on the
@@ -300,7 +315,7 @@ every change to the repository.}
 \label{tab:verification}
 \end{table}
 
-\section{Adjoint sensitivities}
+\subsection{Adjoint sensitivities}
 \label{sec:adjoint}
 
 For gauge observations $y_k$ at times $t_k$ with observation operator
