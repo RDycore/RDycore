@@ -156,3 +156,12 @@ add_test(adjoint_classes_relative_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoin
 # the same point (eps 1e-4).
 add_test(adjoint_classes_relprior_fd_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_relprior_np1.txt -adjoint_obs_freq 10 -tao_max_it 1 -adjoint_classes_relative -adjoint_classes_init classes_p_np1.txt -adjoint_sigma_alpha 0.3 -adjoint_hwm_fd -adjoint_fd_samples 3 -adjoint_fd_eps 1e-4)
 set_tests_properties(adjoint_classes_relprior_fd_np_1 PROPERTIES DEPENDS "adjoint_classes_dump_np_1")
+
+# -adjoint_classes_active combined with -adjoint_classes_relative. Each was
+# gated separately but never together, and the production few-parameter run
+# uses both: freezing pins lb = ub = the prior IN THE OPTIMIZER'S VARIABLE,
+# which is 1 under relative variables and n_prior under absolute ones, so the
+# two paths differ. Gate: exactly the three named classes move.
+add_test(adjoint_classes_active_relative_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${adjoint_driver} adjoint_classes_houston.yaml -adjoint_calibrate_classes -adjoint_classes_twin -adjoint_class_file houston1km_class.bin -adjoint_prior_file houston1km_manning.bin -adjoint_obs_file classes_actrel_np1.txt -adjoint_obs_freq 10 -tao_max_it 4 -adjoint_classes_relative -adjoint_sigma_n 0.015 -adjoint_classes_active 23,90,22 -tao_ls_type armijo)
+set_tests_properties(adjoint_classes_active_relative_np_1 PROPERTIES
+  PASS_REGULAR_EXPRESSION "3 of 15 classes active, 12 frozen at prior")

@@ -47,6 +47,7 @@ RAIN=/global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/m
 export MPICH_GPU_SUPPORT_ENABLED=1
 EPS=${EPS:-0.05}
 WINDOW=${WINDOW:-7200}
+TAG=${TAG:-e${EPS}w${WINDOW}}   # outputs are tagged, so a second eps or window does not clobber the first
 
 CKPT=checkpoints_o37/o37.rdycore.r.104400.bin
 test -f o43_window.yaml || { echo "MISSING o43_window.yaml"; exit 1; }
@@ -62,10 +63,10 @@ EV="-adjoint_calibrate_classes -adjoint_hwm_file turning30m_hwm_obs_clusterA.txt
 peaks_at () {  # $1 = tag, $2 = class table
   srun -N 4 -n 16 -c 32 --cpu-bind=cores -G 16 --gpu-bind=none \
     $ADJ o58_window.yaml $COM $EV -adjoint_classes_init "$2" \
-    -adjoint_hwm_dump o58_pk_$1.txt \
+    -adjoint_hwm_dump o58_${TAG}_pk_$1.txt \
     -restart $CKPT -adjoint_rain_start_hour 29 \
-    -raster_rain_dir $RAIN -raster_rain_start_date 2017,8,26,18,0 > o58_$1.log 2>&1
-  echo "  $1 exit=$? $(grep -o 'MAE [0-9.]* m' o58_$1.log)"
+    -raster_rain_dir $RAIN -raster_rain_start_date 2017,8,26,18,0 > o58_${TAG}_$1.log 2>&1
+  echo "  $1 exit=$? $(grep -o 'MAE [0-9.]* m' o58_${TAG}_$1.log)"
 }
 
 echo "=== o58 base (NLCD prior), window ${WINDOW} steps, eps ${EPS} $(date)"
@@ -80,4 +81,4 @@ done
 
 echo
 echo "=== o58 done $(date). Assemble with:"
-echo "    python3 o58_gauss_newton.py $EPS o58_pk_base.txt o58_pk_col*.txt"
+echo "    python3 o58_gauss_newton.py $EPS o58_${TAG}_pk_base.txt o58_${TAG}_pk_col*.txt --sigma-obs 0.15"
