@@ -1,5 +1,11 @@
 # RDycore adjoint calibration — project state
 
+**Goal: a complete draft to circulate to experts for feedback** — not a
+submission. Completeness and legibility therefore rank above closing every
+scientific gap; a caveat clearly stated is fine, a hole in a table is not.
+**Node-hours are not the binding constraint** (the 300 figure is soft), so
+prioritise by what makes the argument visible, not by what is cheap.
+
 **Authoritative document.** Last substantive update 2026-08-27. This
 supersedes `PROJECT-STATE-2026-08-26.md` and both
 `session-handoff-2026-08-26*.md` files, which are kept for history and
@@ -153,8 +159,32 @@ move" question costs five minutes, not twelve hours.
 
 ## 6. What remains, and what it costs
 
-**Budget: ~130 of 300 node-hours spent.** Each row below *adds* to the
-running total; a defensible paper needs the first two.
+**~130 node-hours spent.** The 300 figure is a soft target, not a hard
+limit, so these are for planning rather than rationing. Each row *adds*
+to the running total.
+
+**Priorities, for a draft that experts can react to.** In order:
+
+1. **Figures.** The paper has 12 tables and one figure, and that figure is
+   from the old twin work — every headline result is currently a table.
+   A reader skimming for the argument sees no picture of it. Three would
+   carry the paper, and every number for them already exists:
+   - **the authority figure**: MAE against relative parameter change,
+     with the roughness α-scan and the IC scan *on the same axes*. This
+     single plot is the thesis — the IC line is 4× steeper and does not
+     turn over.
+   - **the spectrum**: eigenvalues on a log axis with the λ = 1 line, one
+     above it and a cliff below; optionally the per-class "learned" bars
+     beside it.
+   - **the ladder**: uncalibrated → uniform → calibrated → IC, as a
+     single bar or dot plot against the 0.72 m error budget.
+   No GPU time. This is the highest-value work remaining.
+2. **o59 Part A**, which fills the one actual hole — the converged
+   15-class MAE, currently written as *pending* in Section 3.
+3. **A read-through.** The paper has been edited in pieces across a long
+   session; nobody has read it end to end since.
+4. Everything below, which is science rather than presentation and can
+   be reported as caveats in a feedback draft.
 
 **The paper's headline calibration is o59** — three parameters over the
 12-hour window, chained until converged. That is the row to protect.
