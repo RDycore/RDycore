@@ -1169,7 +1169,18 @@ ten metres of standing water whose late-window inflow arrives
 laterally, after the rain has ended. Those cells sit in the downstream
 Buffalo Bayou reach: the model cannot drain it, a conveyance/outlet
 defect that no roughness value can absorb and that would corrupt any
-calibration asked to fit it. The calibration target is therefore the
+calibration asked to fit it. The obvious suspicion --- that we simply
+failed to give the domain an exit --- does not survive inspection of
+the mesh. The domain is a delineated watershed rather than a
+rectangular cutout ($35$ of its $6{,}198$ boundary nodes lie on the
+bounding box), so its unflagged perimeter is a catchment divide and a
+reflecting wall is the right condition there; and its single
+free-outflow side set sits at the perimeter's lowest point, the only
+boundary nodes at $z \approx 0$ against a boundary median of
+$29.9$\,m. The exit is present and correctly placed. What the ponded
+reach then reveals is a limitation of the idealization itself: it
+holds water above the elevation of parts of its own divide, which a
+reflecting wall retains and the real event would have spilled. The calibration target is therefore the
 71 admissible marks; the drainage defect is reported as a finding in
 its own right; and the remaining bundle (initial-condition, rainfall,
 mesh-elevation, and datum error) is what the calibration must be
@@ -1619,6 +1630,40 @@ them is the prior speaking, not the data.}
 \label{tab:learned}
 \end{table}
 
+\paragraph{A direct test: calibrate three classes instead of fifteen.}
+Everything above is a statement about a matrix. It makes a prediction
+an optimizer can falsify: if the marks really inform one direction,
+then calibrating only the classes that carry that direction should
+recover most of what all fifteen achieved --- and if it does not, the
+information lives outside the leading eigenspace and the
+one-parameter reading is too narrow. We ran it. Taking the three
+classes with the largest components in the leading eigenvector
+(developed-medium, woody wetland, developed-low), freezing the other
+twelve at the prior, and calibrating from the NLCD lookup gives
+$J = 682.1$ after four iterations --- the last two changing $J$ by
+$0.02\%$ and $0.001\%$. Against the NLCD prior's $808.3$, three
+parameters remove $126.1$ units where fifteen remove $150.9$:
+\textbf{$84\%$ of the reduction from $20\%$ of the parameters.} The
+twelve frozen classes were verified to sit bit-exactly at the prior in
+the output, so the comparison is what it claims to be.
+
+Two details sharpen it. The remaining $16\%$ is real, not noise, and
+it decomposes exactly: the fifteen-parameter field pays $8.8$ more
+units of prior penalty to buy $33.5$ more units of misfit reduction.
+So the twelve non-leading classes are not literally decoration --- in
+aggregate they reach a few per cent of $J$ --- but they are not where
+the information is. And the three parameters land where the
+fifteen-parameter calibration put them: developed-low at
+$\alpha = 1.626$ against $1.627$, developed-medium on its
+$\alpha = 0.3$ bound in both. Two classes reproduced to three digits
+from a different starting point and a different active set is the
+behaviour of parameters the data actually determines. Woody wetland is
+the exception and is instructive: alone it dives to $\alpha = 0.301$
+where the full calibration left it at $0.355$, because with its
+partners frozen it must supply their share of a change the marks
+constrain only in combination --- equifinality, exactly where the
+eigenvector says to expect it.
+
 \paragraph{Would more marks fix it?}
 This is the natural objection --- 46 observations for 15 parameters
 sounds like too few --- and Eq.~\eqref{eq:gn} answers it, because
@@ -2005,9 +2050,11 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         72 hours with zero recession, ending $+7.1$\,m above every
         surveyed value while the upstream marks are already draining
         (Table~\ref{tab:bands}). We have excluded them from calibration
-        and report the defect as a finding. We need to know whether this
-        is understood, whether it is a mesh, outlet-placement or
-        bathymetry issue, and who owns it --- because the bias is a
+        and report the defect as a finding. We have ruled out a missing
+        or misplaced exit (Section~\ref{sec:hwm}), so the question is
+        whether this is understood behaviour, whether the cause is
+        channel bathymetry, outlet capacity, or a domain that the event
+        simply overtopped, and who owns it --- because the bias is a
         smooth gradient across the domain, so it is contaminating the
         middle band as well, not only the reach we excluded.
   \item \textbf{Is a $20\%$ error in antecedent water storage plausible
