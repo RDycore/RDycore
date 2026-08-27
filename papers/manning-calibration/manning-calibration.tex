@@ -68,8 +68,10 @@ single factor closes at most $0.08$\,m of a $0.72$\,m gap between
 modelled and surveyed peak water levels, and only at roughness values
 far below anything physically defensible; calibrating fifteen
 land-cover classes separately does better, closing $0.107$\,m --- but
-that is still only $15\%$ of the error. Sixteen forward runs show why
-it cannot be more: the marks carry about \emph{one} parameter's worth
+that is still only $15\%$ of the error. Sixteen forward runs --- one
+per land-cover class, perturbing that class and watching how the 46
+modelled peaks respond, plus an unperturbed baseline --- show why it
+cannot be more: the marks carry about \emph{one} parameter's worth
 of independent information about roughness, so most of what a
 fifteen-class calibration reports comes from the prior, not from the
 data.
@@ -86,9 +88,13 @@ comparison against the marks also exposed a stretch of river
 downstream that the model fills and never drains --- an error no
 roughness value can absorb, and a finding in its own right.
 
-We suggest measuring this ceiling as a routine step before a
-calibration study, which commonly reports how much error an optimizer
-removed without establishing how much it could ever have removed.
+We suggest making this a routine step in any calibration study:
+before running an optimizer, measure --- in a handful of forward runs
+--- how much of the model's error the parameter is able to remove at
+best, and report that ceiling beside the reduction actually achieved.
+It is common to report only the reduction; without the ceiling, a
+successful-looking calibration can hide that most of the model's
+error was never the parameter's to remove.
 \end{abstract}
 
 \section{Introduction}
