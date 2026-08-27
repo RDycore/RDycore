@@ -215,6 +215,74 @@ paper draft. The first is load-bearing:
 5. Is the calibrated field acceptable? It sits 9.2σ from the lookup and
    moved seven classes the marks cannot see.
 
+## 6a. Resuming: operational state as of 2026-08-27 04:30 PDT
+
+**Tree clean, everything pushed** through `cda43e77`. 23 ctests pass on
+the laptop (`build-claude`, `PETSC_ARCH=arch-macosx-gnu-rdycore-kokkos-O`).
+PM repo at the same commit; use **`build-claude-gpu8`** — it has every
+option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
+
+**In flight: `57649525` (o59), pending.** 6-hour slot, 4 nodes. Two parts:
+
+- **Part A** scores the converged 15-class field (`o48_p_57627058.txt`,
+  J 6.573e2 after 9 iterations) with one eval-only forward. **That MAE is
+  the paper's headline number and does not exist yet.** Compare against
+  NLCD 0.7188, uniform α = 0.70 → 0.6894, and the 2-iteration field's
+  0.6242. *If it comes out worse than 0.6242 despite lower J*, iterations
+  3–9 bought objective that MAE does not credit, and §7.5's J-vs-MAE
+  divergence is larger than reported — say so rather than burying it.
+- **Part B** calibrates only classes 23, 90, 22 — chosen from the leading
+  eigenvector, not from gradient magnitude, and the two criteria disagree
+  on the third parameter. **First check the twelve frozen classes show
+  `rel_err` exactly 0.000**; if any moved, `-adjoint_classes_active` is
+  broken and the run is void whatever the numbers say. Then the
+  falsification test the script states for itself: three well-chosen
+  parameters landing near J 6.573e2 means twelve were decoration and the
+  spectrum called it; landing far short means the information lives
+  outside the leading eigenspace and §7.6's one-parameter reading is too
+  narrow — which would matter more than any number currently in the paper.
+
+**Monitoring does not survive a session.** The tracking job was a
+session-only cron; re-establish it or poll by hand:
+
+    ssh -o BatchMode=yes -i ~/.ssh/nersc madams@perlmutter-p1.nersc.gov \
+      'cd /pscratch/sd/m/madams/gpu-implicit && squeue -u madams -h; \
+       grep -h "hwm eval" o59_score15.log; \
+       grep -hE "TAO,|class recovery" o59_57649525.log | tail -5'
+
+**If ssh returns nothing at all, the NERSC cert has expired** — it dies
+at ~24 h and fails silently with exit 0 and no output. An empty result
+means expired, not "nothing new". This cost two monitoring cycles on
+2026-08-26.
+
+**Next actions, in order.**
+
+1. Read o59 Part A, put the MAE into §7.5 and the ladder in Section 3.
+2. Read o59 Part B against the falsification test; adjust §7.6 if it
+   fails. If Part B is unconverged at the wall, chain a second link:
+   `sbatch o59_spectral_active_set.sh 12 23,90,22 o59_p_57649525.txt`
+3. Cross-validation within cluster A. Needs a split of
+   `turning30m_hwm_obs_clusterA.txt` into two folds, then one
+   3-parameter calibration per fold and an eval-only score on the
+   held-out half. This is the run that makes the reported MAE
+   out-of-sample, which is the paper's weakest remaining claim.
+4. Production-window spectrum: `WINDOW=43200 bash o58_gauss_newton_spectrum.sh`
+   then `o58_gauss_newton.py 0.05 <dumps> --sigma-obs 0.15`. Outputs are
+   tagged by ε and window so they cannot clobber the 7,200-step pilot.
+
+**Things that are easy to get wrong**, all learned the hard way:
+
+- `o58_gauss_newton.py` **requires** `--sigma-obs`; every eigenvalue
+  scales as 1/σ², and 0.15 vs the driver default 0.01 is a factor of 225
+  — enough to turn 7 supported directions into 0.
+- Read the analysis's **self-checks before its numbers**: the argmax
+  count (how many marks moved their peak time) and, for the o56-style
+  full Hessian, that an unconstrained direction returns λ = 1. The second
+  caught a real error that would otherwise have reached the paper.
+- Peak dumps and class tables are matched by NLCD code, not position.
+- `-adjoint_hwm_twin` **overwrites its table**; `-adjoint_hwm_fd` and
+  `-adjoint_hwm_eval_only` are read-only.
+
 ## 7. Where the leverage is, if this continues
 
 Our own measurements point away from roughness. The initial condition
