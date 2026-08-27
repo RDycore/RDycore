@@ -1964,3 +1964,91 @@ error rather than correct it -- and could launder the downstream
 drainage defect into a "corrected" initial state, the same trap as
 scoring against the 37 marks the model cannot drain.
 
+
+### o56/o58: the observable supports ONE roughness parameter (2026-08-26/27)
+
+**o56 failed, and the failure is the method note.** Assembling the full
+Hessian by differencing the GRADIENT field returned 45% relative
+asymmetry and eigenvalues to -6.8, where an unconstrained direction must
+return exactly 1. Its own self-check rejected it. The cause is the
+paper's own S6.1: over a 7200-step window the objective is dense with
+wet/dry branch surfaces, and while the adjoint is exact ON its branch --
+o56's J values reproduced the adjoint gradient to 0.1-4% -- the gradient
+FIELD jumps between branches, so a difference quotient samples a
+discontinuity. Neither a smaller nor a larger eps escapes it.
+
+**o58 is the right object.** The Gauss-Newton Hessian from observation
+sensitivities, H = S^T W S / sigma^2 with S = d(peak)/d(alpha),
+differences the mark peaks rather than the gradient. It is PSD by
+construction, costs 16 FORWARDS rather than 16 forward+adjoints, and it
+verifies the argmax assumption instead of relying on it: 27 of 690
+mark-column pairs (3.9%) changed their peak time.
+
+Prior-preconditioned spectrum (sigma_n 0.015, sigma_obs 0.15, 46 marks):
+
+    lambda = 3.03, 0.64, 0.33, 0.32, 0.21, 0.10, 0.05, ...
+
+**One eigenvalue above unity. Gap 4.8. Rodgers DOF for signal 2.02.**
+The scans and the spectrum agree, independently -- no optimizer enters
+the Hessian.
+
+**The alpha scan varies nearly the wrong direction.** The leading mode
+is 23(-0.81), 90(+0.41), 22(-0.36), 24(-0.18), dominated by the
+large-area classes. Overlap with the equal-per-CLASS uniform direction
+the scan varies: **0.263**, where random for 15 classes is 0.258.
+Overlap with the same physical change weighted per CELL: **0.768**. The
+informative mode is the area-weighted conveyance mode; the scan probes
+it obliquely. That is why the class calibration beats uniform scaling --
+not because 15 parameters beat 1, but because the scan's 1 was the wrong
+one. A single WELL-CHOSEN parameter should do nearly as well, which o59
+tests.
+
+**Per-class information** (fractional reduction from prior to posterior
+standard deviation): 23 **36%**; 22, 90 17%; 81 15%; 21 12%; 24, 95, 11
+2-5%; **41, 43, 82, 31, 42, 71, 52 all <=1%**.
+
+**More marks do not rescue it.** lambda scales linearly in observation
+count and as 1/sigma^2 in quality:
+
+| marks | supported | data set |
+| --- | --- | --- |
+| 46 | 1 | the 12-hr cluster-A window (this study) |
+| 71 | 1 | all admissible marks, 24-hr window |
+| 108 | 2 | every QC-passed mark, 72-hr window |
+| 324 | 5 | every Harvey mark in-domain, BEFORE QC |
+| 7e5 | 15 | -- |
+
+At fixed size, sigma 0.10 m buys a second parameter and sigma 0.05 m --
+better than any HWM survey achieves -- buys five. **The limitation is a
+property of the observing system, not of the method.**
+
+### o48 (57627058): the calibration converges, and what it converges to
+
+Warm-started from o53's iteration 2, armijo, 12-hr slot, stopped by the
+wall after 7 more iterations (9 total from the NLCD prior):
+
+    0 TAO  f 1.000000  |g| 0.135663
+    ...
+    7 TAO  f 0.959753  |g| 0.0159113     <- gradient norm fell 8.5x
+
+J 8.083e2 (NLCD) -> 6.849e2 (it 2) -> 6.573e2 (it 9), an 18.7% total
+reduction, with J flattening (the last iteration gained 0.01%) while the
+gradient collapsed. This is convergence behaviour.
+
+**The null space behaved.** The classes the data cannot see drifted BACK
+toward the prior as curvature accumulated: deciduous forest 0.739 ->
+0.983, mixed forest 1.096 -> 1.006, cropland 1.274 -> 1.098. Iteration
+2's excursions there were transients, not the minimizer. That is the
+prior doing its job.
+
+**What remains is signal.** Developed-medium sat at the alpha 0.3 bound
+for all nine iterations and woody wetland was driven to alpha 0.355
+(-4.2 sigma) -- the two best-informed classes, both wanting roughness
+below what the prior and bounds allow. Total displacement 9.2 sigma
+(from 9.6), with 2.9% of it in the one data-constrained direction,
+85.6% in comparable directions and 11.5% where the prior alone decides.
+
+CAUTION: the job was killed by the wall before its final evaluation, so
+there is no MAE at this field yet -- one eval-only forward gets it, and
+o59 does that first.
+
