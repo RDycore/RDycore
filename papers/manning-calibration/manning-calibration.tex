@@ -595,7 +595,7 @@ excursion requires $\sigma_\alpha \approx 0.15$: one must believe the
 NLCD values are good to $\pm 15\%$ for the calibration to stay
 physical, while at $\pm 30\%$ the data drives it somewhere no
 hydrologist would defend. \emph{Within a prior wide enough to be
-honest, this observable does not support a defensible distributed
+honest, this observable cannot deliver a defensible distributed
 roughness field.} We report the prior width used with every number and
 regard its value as an open question for the domain team --- it heads
 the list of questions at the end of this draft --- not as a tuning
@@ -1053,10 +1053,11 @@ conditions; this section turns it on the real Hurricane Harvey survey.
 The observable changes first --- the stage gauges are unusable at this
 resolution --- and everything after that is measured against surveyed
 high-water marks: the uncalibrated baseline and the drainage defect it
-exposes (Section~\ref{sec:hwm}), the authority of roughness over the
-remaining error (Section~\ref{sec:authority}), the calibration
-(Section~\ref{sec:calibrated}), and the spectrum that counts the
-parameters the marks support (Section~\ref{sec:spectrum}).
+exposes (Section~\ref{sec:hwm}), how much of the remaining error
+roughness can remove (Section~\ref{sec:authority}), the calibration
+(Section~\ref{sec:calibrated}), and the spectrum that counts how many
+parameters the marks can actually determine
+(Section~\ref{sec:spectrum}).
 Section~\ref{sec:icauthority} then points the same measurement at the
 initial condition.
 
@@ -1231,9 +1232,10 @@ has an optimizer-independent answer. Scaling the entire NLCD field by
 a single factor $\alpha$ traverses the natural first direction of the
 problem --- close to, though as Section~\ref{sec:spectrum} measures,
 not exactly, its most identifiable one; evaluating the peak-WSE misfit
-along it bounds the
-authority of roughness over this observable without reference to how,
-or whether, a calibration converges.
+along it bounds what we will call the \emph{authority} of roughness
+over this observable --- the amount of the model--survey error that
+changing roughness can remove --- without reference to how, or
+whether, a calibration converges.
 
 We ran that scan on the production configuration: a 12-hour window over
 the upstream crest cluster (event hours 29--41), initialized from an
@@ -1431,10 +1433,10 @@ unconstrained preference and reaches $n = 0.008$, which no one would
 defend; the former is the optimum implied by the same prior the
 calibration itself uses, and is the honest one-parameter competitor.
 Against it the calibration wins by $0.078$\,m, so the fifteen
-parameters are not decoration --- \emph{spatial redistribution accesses
-authority that global scaling cannot}, which is a stronger statement
-than the scan alone supports and the one the half-domain experiment
-(Table~\ref{tab:halves}) would not have predicted.
+parameters are not decoration --- \emph{letting roughness vary by
+class removes error that no global scaling can}, which is a stronger
+statement than the scan alone justifies and the one the half-domain
+experiment (Table~\ref{tab:halves}) would not have predicted.
 
 Limiting, and there are three. First, the objective and the MAE do not
 move together. The calibrated field's misfit is $J = 615.4$; sliding
@@ -1532,8 +1534,10 @@ a linear one the cliff, which is the result, would be invisible.}
 $\lambda = 3.03,\ 0.64,\ 0.33,\ 0.32,\ 0.21,\ 0.10, \dots$
 (Figure~\ref{fig:spectrum}) --- a single
 eigenvalue above unity, a spectral gap of $4.8$, and $2.02$ degrees of
-freedom for signal in Rodgers' sense. \textbf{These 46 marks support one
-roughness parameter.} The scans and the spectrum agree, and they are
+freedom for signal in Rodgers' sense. \textbf{These 46 marks support
+one roughness parameter} --- one combination of the fifteen class
+values on which the data out-weighs the prior, and no second. The
+scans and the spectrum agree, and they are
 independent: no optimizer, no line search, and no calibration enters
 Eq.~\eqref{eq:gn}.
 
@@ -1637,7 +1641,8 @@ $7\times10^5$ & 15 & --- \\
 \bottomrule
 \end{tabular}
 \caption{How the supported-parameter count scales with survey size at
-fixed quality ($\sigma = 0.15$\,m). At fixed size, improving quality to
+fixed quality ($\sigma = 0.15$\,m); a parameter is \emph{supported}
+when the data narrows it more than the prior does ($\lambda > 1$). At fixed size, improving quality to
 $\sigma = 0.10$\,m buys a second parameter and $\sigma = 0.05$\,m --- better
 than any high-water-mark survey achieves --- buys five. The scaling
 holds the measured per-mark sensitivity fixed, so the longer-window
@@ -1730,8 +1735,8 @@ the initial state carries $3$ unknowns on each of 2.93M cells against
 46 peak observations, and everything Section~\ref{sec:authority}
 establishes about identifiability applies with three more orders of
 magnitude of freedom: such a calibration would fit the marks essentially
-exactly and mean nothing. What the scan supports is the weaker and more
-useful claim that the residual these marks measure lives substantially
+exactly and mean nothing. What the scan does establish is the weaker
+and more useful claim that the residual these marks measure lives substantially
 in the water balance --- in the rainfall forcing or the antecedent state
 --- rather than in the friction, which is where a roughness calibration
 alone would have kept looking.
@@ -1765,19 +1770,20 @@ optimizer-independent, and it reframes what a calibration result
 means. Here it bounded roughness at $4\%$ of the error within
 defensible values and $11\%$ at the edge of plausibility; the
 calibration then reached $15\%$, beating every global scaling and
-confirming that spatial redistribution accesses authority a single
-scale cannot. What makes the measurement worth copying is not that
+confirming that letting roughness vary by class removes error a
+single global factor cannot. What makes the measurement worth copying is not that
 number but the two it led to. Pointed at the residual instead of the
 parameter, the same machinery isolated a reach the model cannot drain;
 pointed at the initial condition, it found more authority than
 roughness has. A calibration study that had only reported its misfit
 reduction would have found neither.
 
-Next steps, in order. First, converge and cross-validate the
-calibration reported here --- two quasi-Newton iterations with one
-class on a bound is a result, not a converged one, and out-of-sample
-skill has to be tested within the upstream band because the middle band
-carries the drainage defect. Second, calibrate the number of parameters
+Next steps, in order. First, cross-validate the
+calibration reported here --- nine quasi-Newton iterations stopped by
+a wall-clock limit, with one class on a bound, is a fit, not
+demonstrated skill --- and the held-out marks must come from within
+the upstream band, because the middle band carries the drainage
+defect. Second, calibrate the number of parameters
 the observable supports rather than the number the land-cover map
 offers; the spectrum of the prior-preconditioned Hessian would settle
 that count directly, and at fifteen parameters it is a small dense
