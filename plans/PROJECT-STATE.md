@@ -83,29 +83,35 @@ above every surveyed value. The bias is a smooth gradient across the
 domain (+0.30 / +2.85 / +7.06 m by band), so the middle band is
 contaminated too and cannot serve as held-out data.
 
-## 3a. The experimental setup, stated plainly
+## 3a. The experiment
 
-Every calibration number above comes from a **12-hour restart slice of a
-72-hour event**, not from the full event:
+The calibration experiment is a **12-hour window over the upstream crest
+cluster**, event hours 29–41, run as a restart from a 72-hour forward:
 
-- o37 ran a 72-hour rain-forced forward from 2017-08-26 18:00 (259,200
-  steps at Δt = 1 s) at converged inner tolerances, writing 73 hourly
-  checkpoints. That run is the uncalibrated baseline and the source of
-  every initial condition.
+- o37 ran the full 72 hours rain-forced from 2017-08-26 18:00 (259,200
+  steps at Δt = 1 s) at converged inner tolerances with zero Newton
+  failures, writing 73 hourly checkpoints. That run is the uncalibrated
+  baseline and the source of every initial condition.
 - Calibrations restart from `checkpoints_o37/o37.rdycore.r.104400.bin`
-  — **event hour 29** — and integrate 43,200 steps to hour 41, with the
+  — event hour 29 — and integrate 43,200 steps to hour 41, with the
   rainfall clock re-aligned by `-adjoint_rain_start_hour 29`. The
-  restart path is validated bit-exactly against a continuous run.
-- The 46 marks are those whose modelled crest falls inside that slice.
+  restart path reproduces a continuous run bit-exactly.
+- The 46 marks are those whose modelled crest falls inside the window.
 
-**Why a slice.** Crests are bimodal (h29–42 and h60–72) with an empty
-gap, so no 12-hour window covers both; the downstream marks are
-unusable at any window length because the model cannot drain that reach;
-and a full-event calibration is ~8 hours per TAO iteration at n16, so a
-five-iteration run is ~160 node-hours — most of the remaining budget for
-one experiment.
+**This is the right window for the question, not a compromise.** The
+observable is a *peak*, so a mark only carries information if its crest
+happens inside the window; crests here are bimodal (h29–42 and h60–72)
+with an empty gap between, so a window covering both would spend most of
+its length integrating marks that have already crested. The 46 in
+cluster A are the population where peak WSE means what it is supposed to
+mean, and they sit in the reach the model drains correctly — the
+downstream 37 are unusable at any window length. Every result in this
+document is internally consistent on that window, including the
+uncalibrated baseline, the scans, the calibration, and the spectrum.
 
-**Why that needs a better defence than cost.** See Section 6.
+For scale, a full-event calibration would run ~8 hours per TAO iteration
+at n16 and a converged one ~160 node-hours. That is a fact about what a
+longer experiment would cost, not the reason this one was chosen.
 
 ## 4. Why the calibration had never worked, and the fix
 
@@ -150,36 +156,46 @@ move" question costs five minutes, not twelve hours.
 **Budget: ~130 of 300 node-hours spent.** Each row below *adds* to the
 running total; a defensible paper needs the first two.
 
+**The paper's headline calibration is o59** — three parameters over the
+12-hour window, chained until converged. That is the row to protect.
+
 | item | adds | running total | status |
 | --- | --- | --- | --- |
-| o59: score the converged field, then calibrate the 3 supported classes | 24–48 | 154–178 | **running** (`57649525`) |
-| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220–250 | **required** — fixes the in-sample caveat |
-| production-window spectrum (43,200 steps) | 18 | ~240–270 | **upgrade to required** — see below |
+| **o59: the production calibration**, 3 parameters, chained to convergence | **24–48** | 154–178 | **running** (`57649525`, link 1 of 1–2) |
+| cross-validation within cluster A, 2 folds × 3 parameters | 40–70 | ~220–250 | **required** — makes the reported MAE out-of-sample |
+| production-window spectrum (43,200 steps) | 16 | ~235–265 | **required** — puts identifiability on the calibration's window |
 | ε-robustness of the spectrum (a second ε) | 3 | | cheap insurance |
 | σ_α rerun | 24–48 | | only if the domain team answers; otherwise future work |
 
-**Every calibration row is a range because chaining is the norm here,
-not the exception.** The 15-parameter run needed more than a 12-hour
-slot and was still cut off at iteration 9 with J flattening. Three
-parameters should converge faster, but nothing has measured that, so
-o59 may need a second 6-hour link — and cross-validation, which is two
-such calibrations, inherits the same uncertainty (a five-iteration fold
-is 33 node-hours at the observed ~80 min per TAO iteration; three
-iterations would make it ~22). **o59 is the measurement that settles
-both rows.**
+**Calibration rows are ranges because chaining is the norm here, not the
+exception**, and the plan should not pretend a slot equals a run. The
+15-parameter calibration used a full 12-hour slot (48 node-hours) and
+was still cut off at iteration 9 with J flattening and the gradient
+down 8.5×. Three free parameters should converge in fewer iterations,
+but nothing has measured that yet, so o59 is budgeted for a second
+6-hour link. Cross-validation is two more such calibrations and inherits
+the same uncertainty: at the observed ~80 min per TAO iteration a
+five-iteration fold is 33 node-hours, a three-iteration fold ~22.
+**o59 is the measurement that settles both rows**, and until it lands
+every calibration estimate here is a range rather than a number.
 
-### Why the production-window spectrum is worth more than "an upgrade"
+Already spent on calibration for comparison: the 15-parameter run
+(`57627058`) cost 48 node-hours for 9 iterations and is *not* wasted —
+it is the control the spectrum interprets, and §7.6 uses it to show what
+fitting fifteen parameters to a one-parameter observable does.
 
-The mark-count scaling in Section 3 assumes λ grows with the *number* of
-marks at fixed sensitivity. A longer window also raises the sensitivity
-*per* mark, because each peak integrates more of the trajectory. So the
-question a reviewer will certainly ask — *why calibrate 12 hours of a
-72-hour event?* — is not answered by "cost" alone, and it is answerable:
-running the o58 spectrum at 43,200 steps instead of 7,200 measures how
-λ scales with window length directly. If it grows strongly, a longer
-window buys identifiability that more marks cannot, and the 12-hour
-choice needs defending on cost with a number attached. If it does not,
-the 12-hour window is simply the right experiment and we can say so.
+### What the production-window spectrum adds
+
+§7.6's spectrum is measured on a 7,200-step pilot; the calibration runs
+on 43,200. Re-running it at the production window costs 16 forwards
+(~4 hours on 4 nodes, no adjoint) and does two things. It puts the
+paper's identifiability number on the same window as its calibration
+number, which it should be. And it measures how λ scales with window
+length — the mark-count scaling in Section 3 holds sensitivity fixed,
+whereas a longer window raises the sensitivity *per* mark because each
+peak integrates more trajectory. That converts "how much would a longer
+experiment buy?" from speculation into a measured quantity, which is
+the same move this project makes everywhere else.
 
 **Five questions for the domain team**, stated in full at the end of the
 paper draft. The first is load-bearing:
