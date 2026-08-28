@@ -6,7 +6,7 @@ scientific gap; a caveat clearly stated is fine, a hole in a table is not.
 **Node-hours are not the binding constraint** (the 300 figure is soft), so
 prioritise by what makes the argument visible, not by what is cheap.
 
-**Authoritative document.** Last substantive update 2026-08-27. This
+**Authoritative document.** Last substantive update 2026-08-28. This
 supersedes `PROJECT-STATE-2026-08-26.md` and both
 `session-handoff-2026-08-26*.md` files, which are kept for history and
 should not be read for current status — the older PROJECT-STATE's
