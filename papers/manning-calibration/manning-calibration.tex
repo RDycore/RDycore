@@ -59,10 +59,13 @@ discrete adjoint in a component of the Energy Exascale Earth System
 Model (E3SM): its river dynamical core, RDycore. Rather than rewrite
 the model in a differentiable-programming framework, we differentiated
 the production solver in place, keeping its discretization, data
-structures, and GPU backends. One gradient costs about one extra
-forward solve regardless of how many parameters are being calibrated,
-and every derivative is validated against finite differences of the
-full nonlinear solve.
+structures, and GPU backends. An objective-plus-gradient evaluation
+costs about two forward solves, most of the excess being the
+checkpoint recomputation a nonlinear model needs rather than the
+adjoint sweep itself --- and, the property that matters, that cost is
+independent of how many parameters are being calibrated. Every
+derivative is validated against finite differences of the full
+nonlinear solve.
 
 We use the capability to ask a question calibration studies rarely
 ask: not how much error an optimizer removed, but how much of the
@@ -101,8 +104,10 @@ a model's error was ever the parameter's to remove.
 Manning roughness is the dominant tunable parameter of depth-averaged
 flood models, and its calibration is traditionally manual or ensemble
 based. Adjoint methods deliver the gradient of an observation misfit
-with respect to \emph{every} cell's roughness at the cost of about one
-extra forward solve, making distributed calibration tractable. The
+with respect to \emph{every} cell's roughness at a cost that does not
+grow with the number of parameters --- a few forward solves, measured
+in Section~\ref{sec:calibration} --- making distributed calibration
+tractable. The
 approach is well established in shallow-water modeling, from channel
 networks~\cite{ding2004manning} and unstructured finite-volume
 \emph{twin experiments} --- calibrations against observations the
@@ -262,6 +267,25 @@ two cell rows, local sources contribute diagonal blocks, and boundary
 edges contribute diagonal blocks through the ghost-state map of the
 boundary condition.
 
+One consequence of that structure is worth stating explicitly, because
+edge orientation is a classical source of sign errors in this
+construction. The pair
+$(\partial\mathcal{F}/\partial u_L, \partial\mathcal{F}/\partial u_R)$
+is evaluated \emph{once} per edge, in the edge's own stored normal
+direction, and then scattered to both cell rows with opposite area
+weights $-L_e/|\Omega_i|$ and $+L_e/|\Omega_j|$: the downwind cell
+receives the same two blocks with the roles of $u_L$ and $u_R$
+exchanged between diagonal and off-diagonal positions. The normal is
+never flipped and the flux routine is never re-entered with reversed
+arguments, so conservation is structural rather than something the
+signs must be made to reproduce --- exactly mirroring how the
+right-hand side itself accumulates the flux. The assembled-matrix
+checks in Table~\ref{tab:verification} would expose any lapse
+regardless, since they compare the full assembly against a
+matrix-coloring finite-difference Jacobian of the actual RHS on
+unstructured meshes with mixed boundary conditions, where a single
+mis-oriented edge is visible.
+
 \paragraph{Flux blocks by forward-mode differentiation.}
 Rather than deriving the dissipation-matrix derivatives symbolically, we
 differentiate the flux \emph{computation}: a hand-written forward-mode
@@ -374,8 +398,13 @@ the Manning field and, optionally, the initial state). Each objective
 evaluation performs one checkpointed forward sweep that records the
 gauge residuals $r_k$ at the observation times, followed by one
 backward sweep of the discrete adjoint (Algorithm~\ref{alg:sweep}).
-The per-iteration cost is therefore one forward plus one adjoint
-solve, independent of the number of parameters. Throughout, the
+The per-iteration cost is therefore one forward sweep, the checkpoint
+recomputation the backward sweep requires, and one adjoint sweep ---
+about two forward solves in total at production settings, and
+independent of the number of parameters. That constant is measured
+rather than assumed (Eq.~\eqref{eq:gradcost}), since for a nonlinear
+model on a memory-limited device it is the checkpointing scheme, not
+the adjoint, that sets it. Throughout, the
 objective splits as $J = J_{\mathrm{mis}} + J_{\rm prior}$, where the
 \emph{misfit} $J_{\mathrm{mis}} = (2\sigma^2)^{-1}\sum_k\lVert
 r_k\rVert^2$ measures disagreement with the observations and
@@ -521,9 +550,38 @@ $\{(s_i, y_i)\}$, bounds $[n_{\min}, n_{\max}]$
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Practical execution.}
-One objective evaluation costs one checkpointed forward sweep plus one
-adjoint sweep, independent of the number of parameters; each trial step
+\paragraph{What a gradient actually costs.}
+The textbook statement that an adjoint gradient costs ``about one
+extra forward solve'' assumes the forward trajectory is available to
+the backward sweep. For a nonlinear model it is not: the trajectory
+must be stored or recomputed, and at basin scale on GPUs it cannot be
+stored. Checkpoint recomputation is therefore a real and unavoidable
+term, and we measure it rather than assert it. On a one-simulated-hour
+window of the 2.93M-cell mesh (3{,}600 implicit steps at
+$\Delta t = 1$\,s, 400 in-memory checkpoints, four A100 nodes) a
+forward step costs $62.9$\,ms and an adjoint step $14.8$\,ms, and the
+backward sweep triggers $3{,}199$ revolve recomputation steps ---
+$0.89$ of an additional forward. One objective-plus-gradient
+evaluation is thus
+\begin{equation}
+  \underbrace{1.00}_{\text{forward}}
+  + \underbrace{0.89}_{\text{recomputation}}
+  + \underbrace{0.24}_{\text{adjoint sweep}}
+  \;\approx\; 2.1 \ \text{forward solves},
+\label{eq:gradcost}
+\end{equation}
+about nine minutes at four nodes. Note where the cost sits: the
+adjoint sweep itself is the \emph{cheapest} of the three terms, and
+recomputation is the expensive one, so the ratio is a property of the
+checkpoint budget rather than of the adjoint. More checkpoints buy
+less recomputation until device memory runs out, and the 400 used here
+are near optimal for this step count. What does \emph{not} change with
+the parameter count is the whole of Eq.~\eqref{eq:gradcost}: the same
+$2.1$ forwards deliver a gradient with respect to one parameter or to
+2.93 million, which is the property that makes distributed calibration
+tractable and the one worth quoting.
+
+Each trial step
 of the BLMVM line search costs one such evaluation. A basin-scale
 window needs more iterations than a single batch allocation provides,
 so a run writes its parameter vector on exit and the next reads it back
