@@ -53,6 +53,7 @@
 # large fraction moved, the Gauss-Newton assembly is sampling a discontinuity
 # and the spectrum is not trustworthy.
 set -u
+trap 'echo; echo "o61 INTERRUPTED at $(date) -- completed dumps are kept, rerun to resume"; exit 130' INT TERM
 cd $SCRATCH/gpu-implicit
 ADJ=$HOME/Codes/rdycore-manning/build-claude-gpu8/driver/rdycore_adjoint
 RAIN=/global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin
@@ -79,7 +80,7 @@ RUN="srun -N 4 -n 16 -c 32 --cpu-bind=cores -G 16 --gpu-bind=none"
 # ---------------------------------------------------------------------------
 # PART A -- the MAE of o59 Part B's three-parameter field
 # ---------------------------------------------------------------------------
-if [ -f o59_p_57649525.txt ] && [ ! -s o61_p3_score.log ]; then
+if [ -f o59_p_57649525.txt ] && ! grep -q "hwm eval (class table)" o61_p3_score.log 2>/dev/null; then
   echo "=== o61 Part A: scoring the 3-parameter field $(date)"
   $RUN $ADJ o43_window.yaml $COM $EV -adjoint_classes_init o59_p_57649525.txt \
     -restart $CKPT -adjoint_rain_start_hour 29 \
@@ -103,7 +104,15 @@ peaks_at () {  # $1 = tag, $2 = class table
     -restart $CKPT -adjoint_rain_start_hour 29 \
     -raster_rain_dir $RAIN -raster_rain_start_date 2017,8,26,18,0 \
     > o58_${TAG}_$1.log 2>&1
-  echo "  $1 exit=$? $(grep -o 'MAE [0-9.]* m' o58_${TAG}_$1.log)"
+  local RC=$?
+  echo "  $1 exit=$RC $(grep -o 'MAE [0-9.]* m' o58_${TAG}_$1.log)"
+  if [ $RC -ne 0 ] || [ ! -s "$DUMP" ]; then
+    echo "  ABORTING: $1 produced no dump (rc=$RC). A failed srun usually means the"
+    echo "  allocation or environment is wrong, and the remaining columns would fail"
+    echo "  the same way. Fix, then rerun -- completed dumps are kept."
+    tail -5 o58_${TAG}_$1.log
+    exit 1
+  fi
 }
 
 echo "=== o61 spectrum: window ${WINDOW} steps, eps ${EPS}, tag ${TAG} $(date)"
