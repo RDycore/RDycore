@@ -2240,3 +2240,36 @@ the censored cells). A saturated outlet sits at capacity while the
 reach rises. **Not needed for the paper** -- the paper's claim is only
 that the reach does not drain and that no roughness value repairs it,
 which is measured and stands regardless of mechanism.
+
+
+### The audit closes: o57 existed all along, and the dry counts too (2026-08-28)
+
+When Perlmutter came back, the content greps that had died three times
+mid-connection finally ran, and both remaining audit flags resolved as
+**sourced after all**:
+
+- **The IC extension points were run on 2026-08-26 as o57** -- a tag
+  the audit's `ls o54*` listing could not see, which is why "no o54
+  log exists" hardened into "never ran". The values match the paper
+  to every digit (logs mirrored to `logs/o57/`):
+
+      o57_ic0.6.log  ic scale: state x 0.6 (max h 17.7573 -> 10.6544 m)
+                     J 5.969400e+02, MAE 0.5818 m, 0/46 dry
+      o57_ic0.7.log  ic scale: state x 0.7 (max h 17.7573 -> 12.4301 m)
+                     J 6.188921e+02, MAE 0.6117 m, 0/46 dry
+
+  Figure 2 and Section 8 were right all along; what was missing was
+  the pointer, which this entry now is.
+- **The dry-mark counts in tab:alpha are in the o49 logs**: the
+  `hwm eval` lines report `dry at 1 of 46` at alpha = 0.70
+  (J 7.654816e2, MAE 0.6894) and `0 of 46` at alpha = 0.80
+  (J 7.812901e2, MAE 0.6991) -- exactly the table's 1/46 and 0/46.
+
+**o60 (job `57670045`, still PD PartitionDown) is therefore
+redundant.** If it runs it becomes a free cross-check of o57 under
+the gpu8 binary; cancelling it costs nothing either. Either way it is
+no longer *before circulating* -- nothing in the paper waits on it.
+
+LESSON, for the next audit: a negative claim scoped by a name pattern
+(`ls o54*`) is a claim about the pattern, not the filesystem. The
+content grep was the right check and it eventually said so.

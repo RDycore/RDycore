@@ -259,13 +259,10 @@ the laptop (`build-claude`, `PETSC_ARCH=arch-macosx-gnu-rdycore-kokkos-O`).
 PM repo at the same commit; use **`build-claude-gpu8`** — it has every
 option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
 
-**In flight: `57670045` (o60), queued `PartitionDown`** since
-2026-08-28 05:20 PDT — two eval-only forwards at `-adjoint_ic_scale`
-0.7 and 0.6, sourcing the IC points Figure 2 plots. The script's
-`strings` gate on `-adjoint_ic_scale` runs at job start, not submit,
-so a stale `build-claude-gpu8` would show up as an immediate
-`STALE BINARY` exit; fall back to `gpu7` (what o54 used) if so.
-Read the two `hwm eval` lines against MAE(0.6) < MAE(0.7) < 0.6434.
+**In flight: `57670045` (o60), queued `PartitionDown` — now
+REDUNDANT** (see next-actions item 3: the points it would source
+turned out to exist as o57). Harmless if it runs (a free gpu8
+cross-check of o57), fine to `scancel`.
 
 **Done: `57649525` (o59)**, 2026-08-27. Two parts, both landed:
 
@@ -308,28 +305,19 @@ means expired, not "nothing new". This cost two monitoring cycles on
 2. ~~Read o59 Part B against the falsification test.~~ **Done
    2026-08-27.** Gate passed; the spectrum was confirmed (84% of the
    reduction from 20% of the parameters) and §7.4 has the paragraph.
-3. **o60 — SUBMITTED 2026-08-28 05:20 PDT as `57670045`**, 4 nodes,
-   1-hour limit, sitting `PD (PartitionDown)` until the partition
-   returns. Filesystem verified intact first: the o37 checkpoint
-   (70,237,820 B = 2,926,532 x 3 dof x 8 + header) and both
-   class/manning vectors (23,412,264 B = 2,926,532 x 8 + 8) are
-   byte-exact for the mesh, with pre-outage timestamps. An audit found the two IC
-   points the paper plots and quotes, a = 0.6 → 0.5818 and a = 0.7 →
-   0.6117, have **no run behind them**: `o54_ic_authority.sh` loops over
-   `0.8 0.9 1.1 1.2`, and the only o54 evaluation logs on scratch are
-   ic0.8/0.9/1.1/1.2 and sol_it2. (A content grep of all 209 logs for
-   the values was attempted three times and never completed — PM died
-   mid-audit — so this is strong but not airtight. If o60 reproduces
-   the plotted numbers exactly, an unlogged ad hoc run is the likely
-   explanation.)
-   `plans/campaigns/o60_ic_extend.sh` runs them (two eval-only
-   forwards, 4 nodes, ~30 min). PM was down with a filesystem problem
-   on 2026-08-27 afternoon, so `o60_submit_when_up.sh` plus a durable
-   cron submit it on the first reachable poll. **Do this before
-   circulating** — the science is unaffected either way, but a reader
-   asking where 0.5818 comes from currently has no answer. The claim
-   that must survive is monotone decrease, MAE(0.6) < MAE(0.7) <
-   0.6434, not the exact values.
+3. ~~o60: source the two IC points.~~ **CLOSED 2026-08-28 — they were
+   sourced all along.** When PM returned, the content grep that had
+   died three times finally ran: the points were computed 2026-08-26
+   as **o57** (a tag the audit's `ls o54*` could not see), matching
+   the paper to every digit — a=0.6 → J 5.9694e2, MAE 0.5818, 0/46
+   dry; a=0.7 → J 6.1889e2, MAE 0.6117, 0/46 dry. Logs mirrored to
+   `logs/o57/`. The tab:alpha dry counts are likewise in the o49 logs
+   (1/46 at α=0.70, 0/46 at α=0.80). **Nothing in the paper waits on
+   any run.** Job `57670045` (o60) is still queued PD and now
+   redundant — if it runs it is a free gpu8 cross-check of o57;
+   cancelling it is equally fine. Filesystem verified intact after
+   the outage: checkpoint and input vectors byte-exact with
+   pre-outage timestamps.
 4. Cross-validation within cluster A. Needs a split of
    `turning30m_hwm_obs_clusterA.txt` into two folds, then one
    3-parameter calibration per fold and an eval-only score on the
