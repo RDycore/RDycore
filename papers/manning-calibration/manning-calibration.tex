@@ -57,37 +57,29 @@ full nonlinear solve.
 We use the capability to ask a question calibration studies rarely
 ask: not how much error an optimizer removed, but how much of the
 model's error a parameter is \emph{able} to remove. Tests with
-synthetic observations first show that what a calibration can recover
-depends on where the observations are taken and what they measure, not
-on how many there are; the observations that carry information in this
-flood domain are peak water levels at surveyed high-water marks.
-Manning roughness is the dominant tunable parameter of depth-averaged
-flood models, and for Hurricane Harvey on a 2.93M-cell Houston-area
-mesh, scored against 46 such marks, its ceiling can be measured before
-any optimizer runs. Multiplying the whole roughness field by a
-single factor closes at most $0.08$\,m of a $0.72$\,m gap between
-modelled and surveyed peak water levels, and only at roughness values
-far below anything physically defensible; calibrating fifteen
-land-cover classes separately does better, closing $0.107$\,m --- but
-that is still only $15\%$ of the error. Sixteen forward runs show why
-it cannot be more: one run per land-cover class, perturbing that class
-to see how the 46 modelled peaks respond, plus an unperturbed
-baseline. The marks carry about \emph{one} parameter's worth of
-independent information about roughness, so most of what a
-fifteen-class calibration reports comes from the prior, not from the
-data.
+synthetic observations show that what a calibration can recover
+depends on where the observations are taken and what they measure,
+not on how many there are. Manning roughness is the parameter
+depth-averaged flood models usually calibrate, and for Hurricane
+Harvey on a 2.93M-cell Houston-area mesh, scored against 46 surveyed
+high-water marks, its ceiling can be measured before any optimizer
+runs: a single factor on the whole roughness field closes at most
+$0.08$\,m of a $0.72$\,m gap, and only at physically indefensible
+roughness values; fifteen land-cover classes calibrated separately
+close $0.107$\,m --- still only $15\%$ of the error. Sixteen forward
+runs (one per class, perturbed, plus a baseline) show why: the marks
+carry about \emph{one} parameter's worth of independent information
+about roughness, so most of what a fifteen-class calibration reports
+comes from the prior, not from the data.
 
 Pointing the same measurement at the model's initial state finds a
 larger effect: reducing the water stored in the domain at the start of
 the calibration window by $20\%$ is worth $0.075$\,m, from a
 perturbation far easier to defend than the extreme roughness values
-needed to match it. This is a diagnosis rather than a better knob to
-turn, since fitting an initial state of millions of unknowns to 46
-observations would mean little, but it places most of the remaining
-error in the model's water balance rather than in its friction. The
-comparison against the marks also exposed a stretch of river
-downstream that the model fills and never drains, an error no
-roughness value can absorb and a finding in its own right.
+needed to match it. Fitting an initial state of millions of unknowns
+to 46 observations would mean little, so we read the result as a
+diagnosis: most of the remaining error lives in the model's water
+balance, not in its friction.
 
 A few forward runs are enough to establish this ceiling, and reporting
 it alongside the error an optimizer actually removed shows how much of
