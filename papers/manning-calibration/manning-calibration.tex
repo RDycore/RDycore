@@ -46,33 +46,34 @@ University of Alabama, Tuscaloosa, AL, USA}
 \begin{abstract}
 We present what is, to our knowledge, the first \emph{transient}
 discrete adjoint in a component of the Energy Exascale Earth System
-Model (E3SM): its river dynamical core, RDycore, differentiated in
-place --- the production discretization, data structures, and GPU
-backends --- rather than rewritten in a differentiable-programming
-framework. One gradient costs about one extra forward solve regardless
-of how many parameters are being calibrated, and every derivative is
-validated against finite differences of the full nonlinear solve.
+Model (E3SM): its river dynamical core, RDycore. Rather than rewrite
+the model in a differentiable-programming framework, we differentiated
+the production solver in place, keeping its discretization, data
+structures, and GPU backends. One gradient costs about one extra
+forward solve regardless of how many parameters are being calibrated,
+and every derivative is validated against finite differences of the
+full nonlinear solve.
 
 We use the capability to ask a question calibration studies rarely
 ask: not how much error an optimizer removed, but how much of the
 model's error a parameter is \emph{able} to remove. Tests with
 synthetic observations first show that what a calibration can recover
 depends on where the observations are taken and what they measure, not
-on how many there are; the observations with leverage in this flood
-domain are peak water levels at surveyed high-water marks. For
-Hurricane Harvey on a 2.93M-cell Houston-area mesh, scored against 46
-such marks, the ceiling for Manning roughness --- the dominant tunable
-parameter of depth-averaged flood models --- can then be measured
-before any optimizer runs. Multiplying the whole roughness field by a
+on how many there are; the observations that carry information in this
+flood domain are peak water levels at surveyed high-water marks.
+Manning roughness is the dominant tunable parameter of depth-averaged
+flood models, and for Hurricane Harvey on a 2.93M-cell Houston-area
+mesh, scored against 46 such marks, its ceiling can be measured before
+any optimizer runs. Multiplying the whole roughness field by a
 single factor closes at most $0.08$\,m of a $0.72$\,m gap between
 modelled and surveyed peak water levels, and only at roughness values
 far below anything physically defensible; calibrating fifteen
 land-cover classes separately does better, closing $0.107$\,m --- but
-that is still only $15\%$ of the error. Sixteen forward runs --- one
-per land-cover class, perturbing that class and watching how the 46
-modelled peaks respond, plus an unperturbed baseline --- show why it
-cannot be more: the marks carry about \emph{one} parameter's worth
-of independent information about roughness, so most of what a
+that is still only $15\%$ of the error. Sixteen forward runs show why
+it cannot be more: one run per land-cover class, perturbing that class
+to see how the 46 modelled peaks respond, plus an unperturbed
+baseline. The marks carry about \emph{one} parameter's worth of
+independent information about roughness, so most of what a
 fifteen-class calibration reports comes from the prior, not from the
 data.
 
@@ -81,20 +82,16 @@ larger effect: reducing the water stored in the domain at the start of
 the calibration window by $20\%$ is worth $0.075$\,m, from a
 perturbation far easier to defend than the extreme roughness values
 needed to match it. This is a diagnosis rather than a better knob to
-turn --- fitting an initial state of millions of unknowns to 46
-observations would mean little --- but it places most of the remaining
+turn, since fitting an initial state of millions of unknowns to 46
+observations would mean little, but it places most of the remaining
 error in the model's water balance rather than in its friction. The
 comparison against the marks also exposed a stretch of river
-downstream that the model fills and never drains --- an error no
-roughness value can absorb, and a finding in its own right.
+downstream that the model fills and never drains, an error no
+roughness value can absorb and a finding in its own right.
 
-We suggest making this a routine step in any calibration study:
-before running an optimizer, measure --- in a handful of forward runs
---- how much of the model's error the parameter is able to remove at
-best, and report that ceiling beside the reduction actually achieved.
-It is common to report only the reduction; without the ceiling, a
-successful-looking calibration can hide that most of the model's
-error was never the parameter's to remove.
+A few forward runs are enough to establish this ceiling, and reporting
+it alongside the error an optimizer actually removed shows how much of
+a model's error was ever the parameter's to remove.
 \end{abstract}
 
 \section{Introduction}
