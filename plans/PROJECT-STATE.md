@@ -252,15 +252,22 @@ paper draft. The first is load-bearing:
 5. Is the calibrated field acceptable? It sits 9.2σ from the lookup and
    moved seven classes the marks cannot see.
 
-## 6a. Resuming: operational state as of 2026-08-27 04:30 PDT
+## 6a. Resuming: operational state as of 2026-08-28 05:20 PDT
 
 **Tree clean, everything pushed** through `ebbc2c35`. 23 ctests pass on
 the laptop (`build-claude`, `PETSC_ARCH=arch-macosx-gnu-rdycore-kokkos-O`).
 PM repo at the same commit; use **`build-claude-gpu8`** — it has every
 option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
 
-**In flight: `57649525` (o59), RUNNING** since ~05:23 PDT 2026-08-27.
-6-hour slot, 4 nodes. Two parts:
+**In flight: `57670045` (o60), queued `PartitionDown`** since
+2026-08-28 05:20 PDT — two eval-only forwards at `-adjoint_ic_scale`
+0.7 and 0.6, sourcing the IC points Figure 2 plots. The script's
+`strings` gate on `-adjoint_ic_scale` runs at job start, not submit,
+so a stale `build-claude-gpu8` would show up as an immediate
+`STALE BINARY` exit; fall back to `gpu7` (what o54 used) if so.
+Read the two `hwm eval` lines against MAE(0.6) < MAE(0.7) < 0.6434.
+
+**Done: `57649525` (o59)**, 2026-08-27. Two parts, both landed:
 
 - **Part A is DONE and in the paper.** The converged 15-class field
   (`o48_p_57627058.txt`) scores **J 6.153969e2, peak-WSE MAE 0.6116 m**,
@@ -301,7 +308,12 @@ means expired, not "nothing new". This cost two monitoring cycles on
 2. ~~Read o59 Part B against the falsification test.~~ **Done
    2026-08-27.** Gate passed; the spectrum was confirmed (84% of the
    reduction from 20% of the parameters) and §7.4 has the paragraph.
-3. **o60 — armed, waiting on Perlmutter.** An audit found the two IC
+3. **o60 — SUBMITTED 2026-08-28 05:20 PDT as `57670045`**, 4 nodes,
+   1-hour limit, sitting `PD (PartitionDown)` until the partition
+   returns. Filesystem verified intact first: the o37 checkpoint
+   (70,237,820 B = 2,926,532 x 3 dof x 8 + header) and both
+   class/manning vectors (23,412,264 B = 2,926,532 x 8 + 8) are
+   byte-exact for the mesh, with pre-outage timestamps. An audit found the two IC
    points the paper plots and quotes, a = 0.6 → 0.5818 and a = 0.7 →
    0.6117, have **no run behind them**: `o54_ic_authority.sh` loops over
    `0.8 0.9 1.1 1.2`, and the only o54 evaluation logs on scratch are
