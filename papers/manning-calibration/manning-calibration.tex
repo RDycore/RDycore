@@ -204,21 +204,20 @@ primitives are reconstructed with a regularized division and a dry
 cutoff $h_{\min}$, and $S$ contains bed slope, Manning drag, and
 external forcing.
 
-One piece of vocabulary recurs throughout the paper. The flux and
-source terms are piecewise-defined: alternative closed-form
-expressions --- \emph{branches}, in the sense that $|x|$ has a
-positive and a negative branch --- selected at run time by conditions
-on the state. The Roe flux's dissipation is built from the moduli
-$|\lambda_p|$ of its characteristic wave speeds, so it switches branch
-wherever a wave speed changes sign, and the entropy fix substitutes a
-third, smoothed expression when a wave speed is near zero (a
-transcritical state); the dry cutoff switches drag and flux terms on
-and off at $h_{\min}$; boundary ghost maps switch with the flow
-direction. Away from a switching surface the map is smooth and equals
-its active branch, and the derivative machinery of
+The Roe flux's dissipation is built from the moduli $|\lambda_p|$ of
+its characteristic wave speeds, so the closed-form expression it
+evaluates switches wherever a wave speed changes sign. Switches like
+this --- \emph{branches}, in the sense that $|x|$ has a positive and a
+negative branch --- recur throughout the discretization, and they
+belong to the model rather than to the derivative: a nonlinear solver
+must accommodate them whether or not anyone differentiates the code,
+which is the argument of Section~\ref{sec:implicit}, and
+Section~\ref{sec:nondiff} catalogs the ones this work encountered.
+Away from a switching surface the map is smooth and equals its active
+branch; the derivative machinery of
 Sections~\ref{sec:jacobian}--\ref{sec:adjoint} is
-\emph{branch-faithful}: it differentiates the expression the condition
-actually selected --- the correct one-sided derivative.
+\emph{branch-faithful}, differentiating the expression the condition
+actually selected to give the correct one-sided derivative.
 
 \paragraph{A differentiable right-hand side.}
 A prerequisite that deserves emphasis: RDycore's existing friction
