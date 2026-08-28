@@ -254,7 +254,7 @@ paper draft. The first is load-bearing:
 
 ## 6a. Resuming: operational state as of 2026-08-27 04:30 PDT
 
-**Tree clean, everything pushed** through `cda43e77`. 23 ctests pass on
+**Tree clean, everything pushed** through `ebbc2c35`. 23 ctests pass on
 the laptop (`build-claude`, `PETSC_ARCH=arch-macosx-gnu-rdycore-kokkos-O`).
 PM repo at the same commit; use **`build-claude-gpu8`** — it has every
 option below. Do not rebuild gpu7 or gpu8 while a job may launch from them.
