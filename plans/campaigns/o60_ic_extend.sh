@@ -12,9 +12,15 @@
 # WHY THIS EXISTS. Figure 2 of papers/manning-calibration draws the initial-
 # condition curve through a = 0.6 (MAE 0.5818) and a = 0.7 (0.6117), the
 # paper's Section 8 quotes 0.5818 in prose, and PROJECT-STATE Section 3
-# carries it as a headline row. An audit on 2026-08-27 found that o54 only
-# ever ran a = 0.8, 0.9, 1.1, 1.2 -- there is no o54_ic0.6.log or
-# o54_ic0.7.log on $SCRATCH and no log anywhere contains those values. The
+# carries it as a headline row. An audit on 2026-08-27 found no run behind
+# them. Precisely what was verified, since PM went down mid-audit: (a) the
+# only o54 evaluation logs on $SCRATCH are ic0.8, ic0.9, ic1.1, ic1.2 and
+# sol_it2 -- no ic0.6 or ic0.7; (b) o54_ic_authority.sh loops over
+# "0.8 0.9 1.1 1.2" and nothing else. NOT verified: a content grep of all
+# 209 logs for the values themselves -- three attempts died with the login
+# node. So the conclusion is strongly supported but not airtight; if this
+# run reproduces the plotted numbers exactly, an earlier ad hoc run
+# somewhere is the likely explanation and no harm is done either way. The
 # numbers are almost certainly right (they sit exactly on the measured
 # curve's continuation) but nothing sources them, so this run makes them
 # real before the draft is circulated.

@@ -303,8 +303,13 @@ means expired, not "nothing new". This cost two monitoring cycles on
    reduction from 20% of the parameters) and §7.4 has the paragraph.
 3. **o60 — armed, waiting on Perlmutter.** An audit found the two IC
    points the paper plots and quotes, a = 0.6 → 0.5818 and a = 0.7 →
-   0.6117, were **never run**: `o54_ic_authority.sh` loops over
-   `0.8 0.9 1.1 1.2` and no log on scratch contains either value.
+   0.6117, have **no run behind them**: `o54_ic_authority.sh` loops over
+   `0.8 0.9 1.1 1.2`, and the only o54 evaluation logs on scratch are
+   ic0.8/0.9/1.1/1.2 and sol_it2. (A content grep of all 209 logs for
+   the values was attempted three times and never completed — PM died
+   mid-audit — so this is strong but not airtight. If o60 reproduces
+   the plotted numbers exactly, an unlogged ad hoc run is the likely
+   explanation.)
    `plans/campaigns/o60_ic_extend.sh` runs them (two eval-only
    forwards, 4 nodes, ~30 min). PM was down with a filesystem problem
    on 2026-08-27 afternoon, so `o60_submit_when_up.sh` plus a durable
