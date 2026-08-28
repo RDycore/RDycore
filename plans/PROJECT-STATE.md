@@ -297,19 +297,28 @@ means expired, not "nothing new". This cost two monitoring cycles on
 **Next actions, in order.**
 
 1. ~~Read o59 Part A, put the MAE into §7.3 and the ladder in Section 3.~~
-   **Done 2026-08-27.** The frozen-class gate for Part B has already
-   passed its first half — the log reports `3 of 15 classes active, 12
-   frozen at prior`; the `rel_err` = 0.000 check still needs doing when
-   Part B finishes.
-2. Read o59 Part B against the falsification test; adjust §7.4 if it
-   fails. If Part B is unconverged at the wall, chain a second link:
-   `sbatch o59_spectral_active_set.sh 12 23,90,22 o59_p_57649525.txt`
-3. Cross-validation within cluster A. Needs a split of
+   **Done 2026-08-27**, and §7.3 carries 0.6116.
+2. ~~Read o59 Part B against the falsification test.~~ **Done
+   2026-08-27.** Gate passed; the spectrum was confirmed (84% of the
+   reduction from 20% of the parameters) and §7.4 has the paragraph.
+3. **o60 — armed, waiting on Perlmutter.** An audit found the two IC
+   points the paper plots and quotes, a = 0.6 → 0.5818 and a = 0.7 →
+   0.6117, were **never run**: `o54_ic_authority.sh` loops over
+   `0.8 0.9 1.1 1.2` and no log on scratch contains either value.
+   `plans/campaigns/o60_ic_extend.sh` runs them (two eval-only
+   forwards, 4 nodes, ~30 min). PM was down with a filesystem problem
+   on 2026-08-27 afternoon, so `o60_submit_when_up.sh` plus a durable
+   cron submit it on the first reachable poll. **Do this before
+   circulating** — the science is unaffected either way, but a reader
+   asking where 0.5818 comes from currently has no answer. The claim
+   that must survive is monotone decrease, MAE(0.6) < MAE(0.7) <
+   0.6434, not the exact values.
+4. Cross-validation within cluster A. Needs a split of
    `turning30m_hwm_obs_clusterA.txt` into two folds, then one
    3-parameter calibration per fold and an eval-only score on the
    held-out half. This is the run that makes the reported MAE
    out-of-sample, which is the paper's weakest remaining claim.
-4. Production-window spectrum: `WINDOW=43200 bash o58_gauss_newton_spectrum.sh`
+5. Production-window spectrum: `WINDOW=43200 bash o58_gauss_newton_spectrum.sh`
    then `o58_gauss_newton.py 0.05 <dumps> --sigma-obs 0.15`. Outputs are
    tagged by ε and window so they cannot clobber the 7,200-step pilot.
 
