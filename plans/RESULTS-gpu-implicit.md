@@ -2273,3 +2273,37 @@ no longer *before circulating* -- nothing in the paper waits on it.
 LESSON, for the next audit: a negative claim scoped by a name pattern
 (`ls o54*`) is a claim about the pattern, not the filesystem. The
 content grep was the right check and it eventually said so.
+
+
+### o60 (57670045): the redundant run pays for itself as a determinism check
+
+o60 was submitted before the audit closed and was redundant by the time
+it ran. It is worth keeping anyway, because it reproduced o57 **to
+every printed digit**, two days and a separate allocation apart:
+
+| a | J | MAE | dry | o57 (2026-08-26) | o60 (2026-08-28) |
+| --- | --- | --- | --- | --- | --- |
+| 0.7 | 6.188921e+02 | 0.6117 | 0/46 | yes | identical |
+| 0.6 | 5.969400e+02 | 0.5818 | 0/46 | yes | identical |
+
+`diff` of the two log files, with only timing/MPI-noise lines
+filtered, is empty. The `ic scale` lines agree too (max h 17.7573 ->
+12.4301 at a=0.7, -> 10.6544 at a=0.6). ~15 min per forward at n16,
+confirming the planning number.
+
+**What this does and does not establish.** It confirms the restart +
+`-adjoint_ic_scale` + eval-only path is deterministic across
+allocations and node sets. It is NOT confirmed to be a cross-build
+check: o60 pinned `build-claude-gpu8`, but o57 was an ad hoc run with
+no script and no build string in its log, and it ran at 15:46 on
+2026-08-26 -- after gpu8 was built at 14:36 -- so it could have used
+either gpu7 or gpu8. The binaries do differ (1,682,232 vs 1,686,328
+bytes).
+
+ACTIONABLE GAP, and the direct cause of the o57 confusion: **our logs
+do not record which binary produced them.** Every campaign script
+should echo the resolved `$ADJ` path, its mtime and size, and ideally
+the git describe of the build, before the first srun. Two hours of
+audit went into a question one echo line would have answered. (Not
+retrofitted into o61 while it is queued -- do not edit a script a
+pending job may launch from.)

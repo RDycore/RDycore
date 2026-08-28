@@ -1,0 +1,10 @@
+=== o60 ic0.7 start Fri Aug 28 09:04:41 AM PDT 2026
+ic0.7 exit=0
+ic scale: state x 0.7 (max h 17.7573 -> 12.4301 m), velocities unchanged
+hwm eval (prior field): J 6.188921e+02, peak-WSE MAE 0.6117 m, model dry at 0 of 46 marks (144 obs times over 43200 steps)
+=== o60 ic0.6 start Fri Aug 28 09:19:29 AM PDT 2026
+ic0.6 exit=0
+ic scale: state x 0.6 (max h 17.7573 -> 10.6544 m), velocities unchanged
+hwm eval (prior field): J 5.969400e+02, peak-WSE MAE 0.5818 m, model dry at 0 of 46 marks (144 obs times over 43200 steps)
+=== confirm: paper plots a=0.7 -> 0.6117, a=0.6 -> 0.5818
+=== claim that matters: MAE(0.6) < MAE(0.7) < 0.6434 (a=0.8, sourced)
