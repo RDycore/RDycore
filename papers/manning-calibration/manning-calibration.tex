@@ -102,8 +102,12 @@ based. Adjoint methods deliver the gradient of an observation misfit
 with respect to \emph{every} cell's roughness at the cost of about one
 extra forward solve, making distributed calibration tractable. The
 approach is well established in shallow-water modeling, from channel
-networks~\cite{ding2004manning} and unstructured finite-volume twin
-experiments~\cite{yan2014adjoint} to GPU-accelerated
+networks~\cite{ding2004manning} and unstructured finite-volume
+\emph{twin experiments} --- calibrations against observations the
+model itself generated from a known roughness field, so that the
+recovered field can be scored against a truth, and unrelated to the
+``digital twin'' of a physical asset~\cite{yan2014adjoint} --- to
+GPU-accelerated
 optimizers~\cite{lacasta2016gpu}. It is deployed in
 variational-assimilation platforms such as
 DassFlow~\cite{dassflow,lai2009assimilation,brisset2018swot} and the
@@ -228,7 +232,8 @@ consistent only with forward Euler and admits no well-defined
 $\partial f/\partial u$. We therefore added a plain explicit source
 treatment (\texttt{source.method: explicit}), used on every adjoint
 path; Section~\ref{sec:implicit} shows how the resulting stiffness is
-then handled properly, by the integrator rather than inside $f$.
+then handled properly, by the implicit integrator rather than inside
+the explicit right-hand side $f$.
 
 \section{Differentiating the production solver}
 \label{sec:diff}
@@ -368,7 +373,13 @@ evaluation performs one checkpointed forward sweep that records the
 gauge residuals $r_k$ at the observation times, followed by one
 backward sweep of the discrete adjoint (Algorithm~\ref{alg:sweep}).
 The per-iteration cost is therefore one forward plus one adjoint
-solve, independent of the number of parameters.
+solve, independent of the number of parameters. Throughout, the
+objective splits as $J = J_{\mathrm{mis}} + J_{\rm prior}$, where the
+\emph{misfit} $J_{\mathrm{mis}} = (2\sigma^2)^{-1}\sum_k\lVert
+r_k\rVert^2$ measures disagreement with the observations and
+$J_{\rm prior}$ is the Tikhonov term of Eq.~\eqref{eq:sigman}. Only
+$J_{\mathrm{mis}}$ needs the adjoint; the prior term's gradient is
+closed form.
 
 The backward sweep carries two vectors with distinct roles. The
 \emph{adjoint state} $\lambda$ holds
@@ -405,10 +416,7 @@ back onto parameters.
 \caption{Strong-constraint 4D-Var calibration of the Manning field, as
 implemented with TAO/BLMVM and \texttt{TSAdjoint}. The window map
 $M_{t_{k-1}\to t_k}$ is the composition of $m$ steps of the discrete
-forward stepper (explicit RK, backward Euler, or ARK-IMEX);
-Algorithm~\ref{alg:sweep} differentiates exactly this stepper, so the
-gradient is exact to roundoff (and inner-solver tolerance,
-Section~\ref{sec:adjoint}) for the computed trajectory.}
+forward stepper (explicit RK, backward Euler, or ARK-IMEX).}
 \label{alg:var4d}
 \begin{algorithmic}[1]
 \Require prior/initial guess $n_0$, bounds $[n_{\min}, n_{\max}]$,
@@ -433,8 +441,9 @@ tolerance $\varepsilon_g$, iteration budget $I_{\max}$
   \State $J \gets \dfrac{1}{2\sigma^2}\sum_{k=1}^{K}\lVert r_k\rVert^2
           + \dfrac{\beta}{2}\lVert n - n_0\rVert^2$
   \State $(\lambda, \mu) \gets \Call{AdjointSweep}{\{r_k\}}$
-         \Comment{Algorithm~\ref{alg:sweep}:
-         $\mu = dJ_{\mathrm{mis}}/dn$}
+         \Comment{Algorithm~\ref{alg:sweep} differentiates the stepper
+         above, so $\mu = dJ_{\mathrm{mis}}/dn$ is exact to roundoff
+         and inner-solver tolerance (Section~\ref{sec:adjoint})}
   \State $g \gets \mu + \beta\,(n - n_0)$
   \State $n \gets \Call{BlmvmStep}{n, J, g}$
          \Comment{Algorithm~\ref{alg:blmvm}}
@@ -498,12 +507,12 @@ $\{(s_i, y_i)\}$, bounds $[n_{\min}, n_{\max}]$
 \State $d \gets -B\,g^P$
        \Comment{$B \approx (\nabla^2 J)^{-1}$ by the L-BFGS two-loop
        recursion over the stored pairs}
-\State find $\alpha > 0$ with a projected line search on
-       $n(\alpha) = P_{[n_{\min},n_{\max}]}(n + \alpha\, d)$
+\State find a step length $\tau > 0$ with a projected line search on
+       $n(\tau) = P_{[n_{\min},n_{\max}]}(n + \tau\, d)$
        satisfying sufficient decrease of $J$
-       \Comment{each trial $\alpha$ costs one forward-plus-adjoint
+       \Comment{each trial $\tau$ costs one forward-plus-adjoint
        evaluation (lines 3--11 of Algorithm~\ref{alg:var4d})}
-\State $n^{+} \gets n(\alpha)$; evaluate $g^{+}$ at $n^{+}$
+\State $n^{+} \gets n(\tau)$; evaluate $g^{+}$ at $n^{+}$
 \State $s \gets n^{+} - n$;\; $y \gets g^{+} - g$; store $(s, y)$ if
        $s^T y > 0$, discarding the oldest pair beyond the memory limit
 \State \Return $n^{+}$
@@ -528,23 +537,25 @@ one twin, not a rule; the point for planning is that chaining did not
 cost convergence there.
 
 \paragraph{Scaling the optimization problem.}
-Algorithm~\ref{alg:var4d} is written in physical Manning units, and at
-basin scale that is not a usable parameterization. The quasi-Newton
-step of Algorithm~\ref{alg:blmvm} begins from $B = I$, so the first
-trial point is $n - g$; on the production window
-$\lVert g\rVert \approx 1.5\times10^{3}$ while $n \approx 0.05$, five
-orders apart. The projection onto $[n_{\min}, n_{\max}]$ then sends
-every component to the lower bound --- which is exactly where the model
-cannot solve, since a uniform $\alpha = 0.2$ diverges
+A quasi-Newton method needs its variables and its objective to be
+$O(1)$, and in physical Manning units this problem is not: on the
+production window $\lVert g\rVert \approx 1.5\times10^{3}$ while
+$n \approx 0.05$. Starting from $B = I$, the first trial point $n - g$
+therefore projects every component onto the lower bound --- exactly
+where the model cannot solve, since a uniform $\alpha = 0.2$ diverges
 (Table~\ref{tab:alpha}) --- so every line-search trial fails and the
-optimizer terminates having taken no step at all. Nothing is wrong
-with the gradient when this happens; the finite-difference gates pass
-throughout.
+optimizer returns having taken no step at all. The failure is worth
+recording because of how it presents: nothing is wrong with the
+gradient, and the finite-difference gates pass throughout.
 
 Two changes make the problem well scaled, and both have physical
 readings rather than being tuning constants. First, optimize the
 \emph{relative} field $\alpha_k = n_k / n_{{\rm prior},k}$ and the
-relative objective $J / J(n_{\rm prior})$. Both are then $O(1)$ and the
+relative objective $J / J(n_{\rm prior})$. Here and throughout,
+$\alpha$ is a multiplier on roughness, never a step length: a class
+at $\alpha = 1.5$ carries $1.5$ times its lookup value, and the
+uniform scans of Section~\ref{sec:authority} set every class to the
+same $\alpha$. Both are then $O(1)$ and the
 unit quasi-Newton step becomes a roughness change of order $10\%$: at
 the NLCD start point of the production configuration, over a shortened
 window that reproduces the zero-step failure exactly,
@@ -556,8 +567,10 @@ $\alpha \in [0.3, 3]$, which additionally excludes the region where the
 implicit solve fails. Second, set the Tikhonov weight from a prior
 standard deviation on Manning $n$ rather than by hand,
 \begin{equation}
-J = \frac{1}{2\sigma^2}\sum_k \lVert r_k\rVert^2
-  + \frac{1}{2\sigma_n^2}\lVert n - n_{\rm prior}\rVert^2 ,
+J = \underbrace{\frac{1}{2\sigma^2}\sum_k \lVert r_k\rVert^2}_{
+      J_{\mathrm{mis}}}
+  + \underbrace{\frac{\beta}{2}\lVert n - n_{\rm prior}\rVert^2}_{
+      J_{\rm prior}} ,
   \qquad \beta = \sigma_n^{-2},
 \label{eq:sigman}
 \end{equation}
@@ -645,10 +658,10 @@ gravity-wave CFL limit. Its adjoint passes the same gates
 it carries the Harvey window at $\Delta t = 30$\,s at 6.7\,s per
 forward-plus-adjoint sweep, with gradients matching backward Euler to
 three digits. The splitting also runs under RDycore's libCEED operator
-backend --- the explicit side uses the friction-free source Q-functions
-prepared in PR \#359, and the two backends agree to machine precision
-($5\times10^{-16}$ relative) after 100 ARK-IMEX steps; a
-device-resident implicit part is the natural follow-up.
+backend, whose explicit side uses friction-free source Q-functions;
+the two backends agree to machine precision ($5\times10^{-16}$
+relative) after 100 ARK-IMEX steps. A device-resident implicit part is
+the natural follow-up.
 
 Three implementation facts others will hit:
 \begin{itemize}
@@ -869,8 +882,11 @@ remains open.
 \section{Twin experiments: what the observing network can recover}
 \label{sec:houston}
 
-The per-cell twin runs on the Houston 1\,km Hurricane Harvey mesh
-(2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s). Truth is a
+In a twin experiment the observations are model output generated from
+a roughness field we chose, so a calibration can be scored against a
+known truth rather than against a real survey whose own errors are
+unknown. The per-cell twin runs on the Houston 1\,km Hurricane Harvey
+mesh (2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s). Truth is a
 two-zone field split at the domain midline, observed at 343 synthetic
 gauges over 14 observation times, calibrated with implicit stepping and
 Tikhonov regularization ($\beta = 10^{-5}$). Every cell is wet and
@@ -925,8 +941,9 @@ null-space structure pinned against both bounds.}
 \paragraph{The real gauge network.}
 The synthetic gauge sets above are a controlled ramp; the network that
 matters is the real one. Twenty USGS gauges fall inside the Houston
-mesh, seventeen with Hurricane Harvey stage records
-(HydroShare DOI 10.4211/hs.c037167e497546a1bc1508dfb32a9cff).
+mesh, seventeen with Hurricane Harvey stage
+records.\footnote{HydroShare DOI
+\texttt{10.4211/hs.c037167e497546a1bc1508dfb32a9cff}.}
 Re-running the same twin with the observation operator built at those
 seventeen gauge cells --- 238 observations (17 gauges $\times$ 14
 times) against 2{,}746 parameters --- is a sobering experiment. BLMVM
@@ -1294,7 +1311,9 @@ $1.00$ (NLCD) & $0.027$--$0.160$ & $8.083\times10^{2}$ & $0.7188$ & 0/46 \\
 \bottomrule
 \end{tabular}
 \caption{Uniform roughness scan on the production configuration
-(12-hour window, 46 cluster-A marks). $J$ falls monotonically toward
+(12-hour window, 46 cluster-A marks); every cell carries
+$n = \alpha\,n_{\rm NLCD}$, so the \emph{n} range column is the whole
+lookup table scaled by $\alpha$. $J$ falls monotonically toward
 lower roughness with no interior minimum: the entire uniform-roughness
 knob is worth $0.08$\,m against a $0.72$\,m error, and only at roughness
 $30\%$ of published values, where $n$ reaches $0.008$ and smooth
@@ -1707,7 +1726,7 @@ limitation is a property of the observing system rather than of the
 method. A study that reported only its misfit reduction would have
 concluded the opposite.
 
-\section{What explains the rest: the initial condition}
+\section{Where else the error lives: the initial condition}
 \label{sec:icauthority}
 
 Roughness, calibrated as well as we can calibrate it, explains $15\%$
