@@ -2404,10 +2404,21 @@ piecewise-smooth function. The 10 pairs with multi-hour shifts are
 real peak relocations (bimodal hydrographs) and are 1.6% of the
 sample. Confidence: good, with the caveat stated.
 
-**Interlacing bounds the missing class.** Adding col95 adds a
-dimension to H, so by eigenvalue interlacing every lambda can only
-rise: lambda_0(15) >= 2.779 and lambda_1(15) >= 0.669, with
-lambda_1(15) <= 2.779. A second supported parameter is therefore not
-excluded by arithmetic -- but class 95 is one of the least informative
-(2-5% learned, Table 10), so it is unlikely. **Do not write "one
-parameter on the production window" into the paper until col95 lands.**
+**RESOLVED 2026-08-29: col95 landed, count confirmed at ONE of 15.**
+The interlacing prediction held exactly -- lambda_0 unchanged at
+2.779, lambda_1 rose only 0.669 -> 0.6823, and class 95 surfaced where
+expected as a weak direction (lambda_4 = 0.2255 with 95 at +0.38,
+lambda_5 = 0.09968 with 95 at +0.77). Full 15-class production
+spectrum, analysis mirrored to `logs/o61/`:
+
+    lambda = 2.779, 0.6823, 0.6127, 0.324, 0.2255, 0.09968, ...
+    eigenvalues > 1 : 1 of 15
+    Rodgers dof for signal: 2.20     spectral gap: 4.07
+    v_0 = 23(-0.64), 90(+0.59), 22(-0.36), 81(-0.23)
+    overlap with uniform-per-class 0.218, per-cell 0.699
+    argmax: 156 of 690 pairs (22.6%) moved
+    class 23 holds 41% of v_0's energy, top three 89%
+
+Note v_0's fourth component changed identity between windows: pasture
+(81) on the production window where the pilot had developed-high (24).
+The top three are stable.

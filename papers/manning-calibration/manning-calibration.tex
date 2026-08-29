@@ -1348,12 +1348,8 @@ since the downstream marks sit in a reach it cannot drain
 marks used throughout this paper are therefore those for which the
 observable means what it is meant to mean, and every number reported
 here --- the uncalibrated baseline, the scans, and the calibration ---
-is measured on that same window, so they compose. The one exception is
-the spectrum of Section~\ref{sec:spectrum}, measured against the same
-46 marks but on a $7{,}200$-step (two-event-hour) pilot of this
-configuration rather than the full $43{,}200$-step window;
-Section~\ref{sec:spectrum} states the gap, and re-measuring it on the
-production window is planned before submission.
+is measured on that same window, so they compose --- including the
+spectrum of Section~\ref{sec:spectrum}.
 
 \begin{table}
 \centering\small
@@ -1594,20 +1590,35 @@ H = \tfrac{1}{\sigma^2} S^\top W S, \qquad
 S_{ik} = \partial(\max_k H u)_i / \partial \alpha_k ,
 \label{eq:gn}
 \end{equation}
-which differences the mark peaks rather than the gradient. This works
-for the reason Section~\ref{sec:nondiff} established --- mark argmaxes
-do not move under small probes --- and we verify it rather than assume
-it: across all 690 mark--column pairs only 27 ($3.9\%$) changed their
-peak time. It costs 16 forwards rather than 16 forward-plus-adjoints,
-and it is positive semi-definite by construction, so the failure mode
-that invalidated the first attempt cannot recur silently. One caveat
-of scope: the spectrum is measured on a $7{,}200$-step
-(two-event-hour) pilot of the production configuration, against the
-same 46 marks, while the calibration it interprets runs on the full
-$43{,}200$-step window. A longer window should raise the sensitivity
-each peak integrates, and with it $\lambda$; re-measuring the spectrum
-on the production window costs sixteen forwards and is planned before
-submission.
+which differences the mark peaks rather than the gradient. It costs 16
+forwards rather than 16 forward-plus-adjoints, and it is positive
+semi-definite by construction, so the failure mode that invalidated
+the first attempt cannot recur silently.
+
+Its own assumption --- that a mark's peak \emph{time} is locally
+constant, so that the peak \emph{value} is smooth in $\alpha$ ---
+deserves the same scrutiny, and on the production window it is not
+satisfied cleanly: $156$ of $690$ mark--column pairs ($22.6\%$) move
+their peak time, against $27$ ($3.9\%$) on a two-event-hour pilot of
+the same configuration. The longer window is the reason. It admits
+more of each hydrograph, so a crest that was a monotone rising limb
+over two hours becomes a genuine, and therefore flat, maximum over
+twelve.
+
+That flatness is what makes the movement harmless, and we checked
+rather than assumed it. Of the $156$, $107$ ($71\%$) shift by a single
+$300$-step observation sample, and the resulting change in the peak
+\emph{value} has median $2.3$\,mm against a typical peak of $1.5$\,m
+--- two parts in a thousand, the second-order $O(\Delta t^2 h'')$ cost
+of stepping one sample off a flat crest. Only ten pairs ($1.6\%$)
+relocate by more than an hour, which is a genuinely different crest on
+a bimodal hydrograph. The distinction from the gradient-differencing
+attempt above is exact rather than rhetorical: there the differenced
+quantity \emph{jumps} across a branch, whereas $\max_t h$ is
+\emph{continuous} in $\alpha$ even where its argmax moves, since the
+two competing maxima are equal at the crossover. A secant of a
+continuous, piecewise-smooth function remains a valid finite
+difference; a secant across a discontinuity does not.
 
 \paragraph{The answer is one.}
 \begin{figure}[t]
@@ -1616,32 +1627,48 @@ submission.
 \caption{Eigenvalues of the prior-preconditioned Gauss--Newton Hessian
 over the fifteen land-cover classes, sorted. Above $\lambda = 1$ the
 marks say more than the prior does; below it the prior answers. One
-direction clears the line, and the remaining fourteen fall away over four
+direction clears the line, and the remaining fourteen fall away over three
 decades --- so a fifteen-parameter calibration is fitting one parameter
 and inheriting fourteen from its prior. The log axis is not cosmetic: on
 a linear one the cliff, which is the result, would be invisible.}
 \label{fig:spectrum}
 \end{figure}
 
-$\lambda = 3.03,\ 0.64,\ 0.33,\ 0.32,\ 0.21,\ 0.10, \dots$
+$\lambda = 2.78,\ 0.68,\ 0.61,\ 0.32,\ 0.23,\ 0.10, \dots$
 (Figure~\ref{fig:spectrum}) --- a single
-eigenvalue above unity, a spectral gap of $4.8$, and $2.02$ degrees of
+eigenvalue above unity, a spectral gap of $4.1$, and $2.20$ degrees of
 freedom for signal in Rodgers' sense. \textbf{These 46 marks support
 one roughness parameter} --- one combination of the fifteen class
-values on which the data out-weighs the prior, and no second. The
-scans and the spectrum agree, and they are
+values on which the data out-weighs the prior, and no second.
+
+A shorter pilot of the same configuration ($7{,}200$ steps, two event
+hours) gives $\lambda = 3.03,\ 0.64,\ \dots$: the same count, the same
+three leading classes, and a slightly \emph{larger} leading
+eigenvalue. We had expected the opposite, since a longer window lets
+each peak integrate more trajectory, and the reason it does not is
+worth stating. Over two event hours many marks have not crested, so
+the pilot's ``peak'' is often a point on a rising limb, and a rising
+limb responds to roughness more sharply than a crest does --- at a
+true maximum the first-order response in time has vanished by
+definition. The longer window measures the observable the calibration
+actually uses, and it is marginally less informative, not more. Any
+argument that a longer experiment buys identifiability has to come
+from more marks crossing into the window, not from more trajectory per
+mark.
+
+The scans and the spectrum agree, and they are
 independent: no optimizer, no line search, and no calibration enters
 Eq.~\eqref{eq:gn}.
 
 \paragraph{But the scan varied nearly the wrong direction.}
 The leading mode, with components
-$-0.81$ on developed-medium, $+0.41$ on woody wetland, $-0.36$ on
-developed-low and $-0.18$ on developed-high, is dominated by the
+$-0.64$ on developed-medium, $+0.59$ on woody wetland, $-0.36$ on
+developed-low and $-0.23$ on pasture, is dominated by the
 large-area classes. Its overlap with the uniform direction the
-$\alpha$-scan varies --- equal weight per \emph{class} --- is $0.263$,
+$\alpha$-scan varies --- equal weight per \emph{class} --- is $0.218$,
 which for fifteen classes is indistinguishable from random ($0.258$).
 Its overlap with the same physical change weighted per \emph{cell} is
-$0.768$. So the informative mode is the domain-scale conveyance mode we
+$0.699$. So the informative mode is the domain-scale conveyance mode we
 claimed, but area-weighted; the $\alpha$-scan probes it only obliquely.
 That is why the class calibration beats uniform scaling by $0.078$\,m
 (Table~\ref{tab:ladder}): it is not that fifteen parameters beat one, it
@@ -1786,8 +1813,9 @@ when the data narrows it more than the prior does ($\lambda > 1$). At fixed size
 $\sigma = 0.10$\,m buys a second parameter and $\sigma = 0.05$\,m --- better
 than any high-water-mark survey achieves --- buys five. The scaling
 holds the measured per-mark sensitivity fixed, so the longer-window
-rows describe mark populations only; a longer window also raises each
-mark's sensitivity, which this table does not credit.}
+rows describe mark populations only. That is the conservative reading
+and, as it turns out, the correct one: we expected a longer window to
+raise each mark's sensitivity and it does not (see text).}
 \label{tab:scaling}
 \end{table}
 

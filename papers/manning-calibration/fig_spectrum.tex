@@ -36,30 +36,30 @@
 
 % stems
 \addplot[ycomb, gray!45, line width=0.7pt, forget plot]
-  coordinates {(1,3.033) (2,0.6353) (3,0.3292) (4,0.3183) (5,0.2055)
-               (6,0.1025) (7,0.05008) (8,0.02742) (9,0.01917) (10,0.01448)
-               (11,0.00953) (12,0.007093) (13,0.003043) (14,0.001495)
-               (15,0.00006272)};
+  coordinates {(1,2.779) (2,0.6823) (3,0.6127) (4,0.324) (5,0.2255)
+               (6,0.09968) (7,0.06136) (8,0.03434) (9,0.02256) (10,0.01849)
+               (11,0.01133) (12,0.007279) (13,0.003104) (14,0.002383)
+               (15,0.0003867)};
 
 % the fourteen the prior determines
 \addplot[only marks, mark=*, mark size=2.1pt,
          color={rgb,255:red,42;green,120;blue,214},
          mark options={fill=white, line width=0.9pt}, forget plot]
-  coordinates {(2,0.6353) (3,0.3292) (4,0.3183) (5,0.2055)
-               (6,0.1025) (7,0.05008) (8,0.02742) (9,0.01917) (10,0.01448)
-               (11,0.00953) (12,0.007093) (13,0.003043) (14,0.001495)
-               (15,0.00006272)};
+  coordinates {(2,0.6823) (3,0.6127) (4,0.324) (5,0.2255)
+               (6,0.09968) (7,0.06136) (8,0.03434) (9,0.02256) (10,0.01849)
+               (11,0.01133) (12,0.007279) (13,0.003104) (14,0.002383)
+               (15,0.0003867)};
 
 % the one the data determines
 \addplot[only marks, mark=*, mark size=3.2pt,
          color={rgb,255:red,235;green,104;blue,52},
          mark options={fill={rgb,255:red,235;green,104;blue,52}}, forget plot]
-  coordinates {(1,3.033)};
+  coordinates {(1,2.779)};
 
 \node[font=\scriptsize, color={rgb,255:red,235;green,104;blue,52},
       anchor=west, align=left]
   at (axis cs:1.45,4.6) {one supported direction\\[-1pt]
-                         \textcolor{black!60}{$0.81$ developed-med, $0.41$ woody wetland}};
+                         \textcolor{black!60}{$0.64$ developed-med, $0.59$ woody wetland}};
 \node[font=\scriptsize, color=black!60, anchor=west, align=left]
   at (axis cs:1.6,0.0016) {the prior answers for these fourteen};
 \end{axis}

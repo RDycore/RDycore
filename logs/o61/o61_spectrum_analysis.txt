@@ -1,0 +1,35 @@
+46 marks (46 weighted), 15 classes, eps = 0.05
+argmax check -- marks whose peak TIME moved, per column (of 46):
+  11:2, 21:7, 22:24, 23:23, 24:22, 31:3, 41:5, 42:6, 43:4, 52:5, 71:1, 81:18, 82:8, 90:23, 95:5
+  total 156 of 690 mark-column pairs (22.6%); the peak misfit is differentiable where this is 0
+
+Gauss-Newton Hessian: symmetric by construction; min eigenvalue 0.006635 (PSD as required)
+
+prior-preconditioned Gauss-Newton spectrum (sigma_n = 0.015, sigma_obs = 0.15):
+  i       lambda data vs prior     err reduction  leading classes
+  0        2.779 data > prior              0.51x  23(-0.64), 90(+0.59), 22(-0.36), 81(-0.23)
+  1       0.6823 comparable                0.77x  23(+0.64), 90(+0.61), 81(+0.30), 22(-0.22)
+  2       0.6127 comparable                0.79x  81(-0.78), 22(+0.32), 90(+0.28), 23(+0.28)
+  3        0.324 comparable                0.87x  22(-0.64), 21(-0.45), 81(-0.41), 90(-0.36)
+  4       0.2255 comparable                0.90x  21(+0.74), 22(-0.49), 95(+0.38), 42(-0.14)
+  5      0.09968 prior-determined          0.95x  95(+0.77), 24(-0.45), 31(+0.23), 21(-0.22)
+  6      0.06136 prior-determined          0.97x  24(-0.67), 11(+0.35), 52(+0.31), 95(-0.27)
+  7      0.03434 prior-determined          0.98x  11(+0.64), 52(-0.51), 42(+0.33), 31(+0.29)
+  8      0.02256 prior-determined          0.99x  31(+0.75), 71(-0.38), 52(+0.34), 95(-0.27)
+  9      0.01849 prior-determined          0.99x  71(-0.55), 11(-0.45), 42(+0.39), 43(+0.31)
+ 10      0.01133 prior-determined          0.99x  42(+0.60), 71(+0.51), 31(+0.39), 11(-0.28)
+ 11     0.007279 prior-determined          1.00x  52(-0.64), 11(-0.36), 24(-0.36), 71(+0.33)
+ 12     0.003104 prior-determined          1.00x  41(-0.77), 82(+0.57), 43(-0.20), 42(+0.15)
+ 13     0.002383 prior-determined          1.00x  82(+0.65), 43(+0.49), 42(-0.41), 41(+0.29)
+ 14    0.0003867 prior-determined          1.00x  43(-0.69), 41(+0.54), 82(+0.41), 42(+0.19)
+
+  eigenvalues > 1 : 1 of 15   <- parameters the observable supports
+  degrees of freedom for signal (Rodgers): 2.20
+  spectral gap lambda_0/lambda_1 = 4.07
+
+  leading eigenvector v_0:
+    |<v_0, uniform per class>| = 0.218   (the direction the alpha scan actually varies)
+    |<v_0, uniform per cell>|  = 0.699   (the same physical change, area-weighted)
+    concentration: largest single class 23 holds 41% of its energy, top three 89%
+    (near 100% for one class means the observable constrains THAT class,
+     not a domain-scale mode -- which the alpha scan could not have told us)
