@@ -75,7 +75,17 @@ sed -e "s/^  stop             : .*/  stop             : ${WINDOW}.0/" \
 
 COM="-ts_adapt_type none -snes_max_it 50 -snes_rtol 1e-5 -ksp_max_it 300 -ksp_type gmres -ksp_pc_side right -ksp_rtol 1e-4 -pc_type pbjacobi -dm_vec_type kokkos -dm_mat_type baijkokkos -ts_trajectory_type memory -ts_trajectory_max_cps_ram 400 -adjoint_fd_samples 0"
 EV="-adjoint_calibrate_classes -adjoint_hwm_file turning30m_hwm_obs_clusterA.txt -adjoint_class_file turning30m_class.bin -adjoint_prior_file turning30m_manning.bin -adjoint_obs_freq 300 -adjoint_obs_error 0.15 -adjoint_hwm_eval_only"
-RUN="srun -N 4 -n 16 -c 32 --cpu-bind=cores -G 16 --gpu-bind=none"
+# Adapt to whatever allocation we are given: 4 GPUs/ranks per Perlmutter node.
+# Measured per 43,200-step forward -- 1 node 36m21s, 2 nodes 21m55s, 4 nodes
+# 15m01s -- so 4 nodes is 2.42x for 4x the resource (61% efficient, 1.00
+# node-hr per forward) while 2 nodes is 1.66x for 2x (83%, 0.73 node-hr) and
+# 1 node is cheapest at 0.61 node-hr. Smaller jobs also schedule far faster in
+# a loaded queue, which on 2026-08-28 was worth more than the speedup: the
+# 4-node request sat PD for 7 hours behind 8,430 pending jobs.
+NODES=${SLURM_JOB_NUM_NODES:-4}
+RANKS=$((NODES * 4))
+RUN="srun -N $NODES -n $RANKS -c 32 --cpu-bind=cores -G $RANKS --gpu-bind=none"
+echo "o61: running on $NODES node(s), $RANKS ranks"
 
 # ---------------------------------------------------------------------------
 # PART A -- the MAE of o59 Part B's three-parameter field

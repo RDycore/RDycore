@@ -133,12 +133,33 @@ move" question costs five minutes, not twelve hours.
 
 ## 5. Practical facts that cost time to learn
 
-- **Run production on 4 nodes / 16 ranks.** Measured on the production
-  window: n4 36m21s, n8 21m55s, n16 15m01s, all reproducing J and MAE to
-  every printed digit. n16 is 2.42× at 61% efficiency, which is worth
-  paying because queue wait, not node-hours, is the binding constraint.
-  (n64 is 2.8× *slower* than n4 — it does not scale to 64, but it scales
-  usefully to 16.)
+- **Prefer 2 nodes / 8 ranks; 4 nodes only when wall-clock genuinely
+  binds.** *(Revised 2026-08-29 — this reverses the earlier "run
+  production at n16" advice, for a reason that advice got backwards.)*
+  Measured on the production window, all reproducing J and MAE to every
+  printed digit:
+
+  | ranks | nodes | per forward | speedup | efficiency | node-hr/forward |
+  | --- | --- | --- | --- | --- | --- |
+  | 4 | 1 | 36m21s | 1.00× | 100% | **0.61** |
+  | 8 | 2 | 21m55s | 1.66× | **83%** | 0.73 |
+  | 16 | 4 | 15m01s | 2.42× | 61% | 1.00 |
+
+  The old note justified n16 on the grounds that "queue wait, not
+  node-hours, is the binding constraint." That is true and it argues
+  the *opposite* way: **smaller jobs schedule faster**, so paying 65%
+  more node-hours for a 2.42× speedup can lose wall-clock overall. On
+  2026-08-28 the 4-node 6-hour request sat `PD` for **7 hours** behind
+  8,430 pending jobs and was eventually abandoned for an interactive
+  allocation. A 1- or 2-node request backfills into gaps a 4-node one
+  cannot use. (n64 is 2.8× *slower* than n4 — it does not scale past
+  ~16 ranks at all.)
+- **For independent work, submit a job array, not one big job.** The
+  16 spectrum forwards are embarrassingly parallel. As 16 one-node
+  array tasks they cost 9.7 node-hours and each backfills separately;
+  as one 4-node sequential job they cost 16.0 node-hours and wait for
+  a 4-node slot. `o61_spectrum_production.sh` now derives `-N/-n` from
+  `SLURM_JOB_NUM_NODES`, so it runs unchanged at any size.
 - **~80 min per TAO iteration** at n16 on the 12-hour window, line-search
   trials included. A 6-hour slot schedules far faster than a 12-hour one.
 - **`-tao_ls_type armijo`.** More-Thuente expands past −g and overshoots:
