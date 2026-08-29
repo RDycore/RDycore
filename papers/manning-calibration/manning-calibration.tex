@@ -1722,9 +1722,23 @@ parameters remove $126.1$ units where fifteen remove $150.9$:
 twelve frozen classes were verified to sit bit-exactly at the prior in
 the output, so the comparison is what it claims to be.
 
-Two details sharpen it. The remaining $16\%$ is real, not noise, and
-it decomposes exactly: the fifteen-parameter field pays $8.8$ more
-units of prior penalty to buy $33.5$ more units of misfit reduction.
+The prediction survives the change of metric, which is the sharper
+test. Scored on peak-WSE MAE rather than on the objective it was fit
+to, the three-parameter field reaches $0.6274$\,m against the NLCD
+prior's $0.7188$ --- $85\%$ of the $0.107$\,m that fifteen parameters
+achieve, and within a hair of the $84\%$ it recovered of the
+objective. The two agree here, and they did not for the fifteen-class
+field (Section~\ref{sec:calibrated}): a fit confined to the directions
+the data constrains buys MAE at the same rate it buys objective, while
+one free to move all fifteen does not. Three of these parameters also
+beat the best physically defensible uniform field by $0.062$\,m,
+so nearly all of what class-by-class calibration achieves over global
+scaling is achieved by three classes.
+
+Two details sharpen it further. The remaining $16\%$ is real, not
+noise, and it decomposes exactly: the fifteen-parameter field pays
+$8.8$ more units of prior penalty to buy $33.5$ more units of misfit
+reduction.
 So the twelve non-leading classes are not literally decoration --- in
 aggregate they reach a few per cent of $J$ --- but they are not where
 the information is. And the three parameters land where the

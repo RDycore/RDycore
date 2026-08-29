@@ -2307,3 +2307,42 @@ the git describe of the build, before the first srun. Two hours of
 audit went into a question one echo line would have answered. (Not
 retrofitted into o61 while it is queued -- do not edit a script a
 pending job may launch from.)
+
+
+### o61 Part A: the 3-parameter field scored (2026-08-28)
+
+The MAE o59 Part B never got, from one eval-only forward on the
+production window:
+
+    hwm eval (class table): J 6.489523e+02, peak-WSE MAE 0.6274 m,
+                            model dry at 0 of 46 marks
+
+| field | MAE | vs NLCD | share of the 15-param gain |
+| --- | --- | --- | --- |
+| NLCD lookup | 0.7188 | -- | -- |
+| uniform alpha 0.70 | 0.6894 | -0.0294 | 27% |
+| **3 params (23, 90, 22)** | **0.6274** | **-0.0914** | **85.3%** |
+| 15 params, converged | 0.6116 | -0.1072 | 100% |
+
+**The falsification test passes in a second, independent metric.**
+Three spectrum-chosen parameters recovered 83.6% of the objective
+reduction; scored on MAE -- which they were NOT fit to -- they recover
+85.3%. The two agree to under two points.
+
+That agreement is itself a result, because for the 15-class field they
+did NOT agree: Section 7.3 records that redistribution buys objective
+less MAE-efficiently than scaling, with the calibrated field scoring
+0.6116 where the uniform relation extrapolates to 0.596. A fit
+confined to the directions the data constrains converts objective into
+MAE at the honest rate; a fit free to move all fifteen does not. That
+is a cleaner statement of what the spectrum buys than the objective
+comparison alone.
+
+Also: 3 parameters beat the best defensible uniform field (alpha 0.70)
+by 0.062 m, against 0.078 m for all fifteen -- so ~80% of what
+class-by-class calibration wins over global scaling comes from three
+classes.
+
+Timing confirms the planning number: ~14.9 min per 43,200-step
+eval-only forward at n16 (base 17:00:15 -> 17:15:08, col11 ->
+17:29:59).
