@@ -6,7 +6,7 @@ scientific gap; a caveat clearly stated is fine, a hole in a table is not.
 **Node-hours are not the binding constraint** (the 300 figure is soft), so
 prioritise by what makes the argument visible, not by what is cheap.
 
-**Authoritative document.** Last substantive update 2026-08-28. This
+**Authoritative document.** Last substantive update 2026-08-29. This
 supersedes `PROJECT-STATE-2026-08-26.md` and both
 `session-handoff-2026-08-26*.md` files, which are kept for history and
 should not be read for current status — the older PROJECT-STATE's
@@ -42,8 +42,9 @@ Surveyed peak water-surface elevations at survey accuracy carry about
 **two degrees of freedom of information** about distributed Manning
 roughness in this basin — one strongly. That is measured, not inferred:
 the prior-preconditioned Gauss-Newton spectrum is
-λ = 3.03, 0.64, 0.33, 0.32, 0.21, … , one eigenvalue above unity with a
-gap of 4.8. Calibrated as well as we can currently calibrate it,
+λ = 2.78, 0.68, 0.61, 0.32, 0.23, … , one eigenvalue above unity with a
+gap of 4.1, measured on the full 43,200-step production window.
+Calibrated as well as we can currently calibrate it,
 roughness accounts for **15% of a 0.72 m peak-elevation discrepancy**;
 a uniform scale within defensible values accounts for 4%. The same
 measurement pointed at the initial condition finds **four times the
@@ -68,8 +69,9 @@ hours 29–41, IC from the o37 hour-29 checkpoint):
 
 All in-sample. Cross-validation is the outstanding gap (Section 6).
 
-**Identifiability** (o58, Gauss-Newton spectrum from 16 forwards):
-one supported parameter; 2.02 degrees of freedom for signal; the marks
+**Identifiability** (o61, Gauss-Newton spectrum from 16 forwards on the
+production window; o58 was the 7,200-step pilot):
+one supported parameter; 2.20 degrees of freedom for signal; the marks
 reduce prior uncertainty by 36% on developed-medium, 12–17% on four
 more, and ≤1% on seven. More marks do not rescue it — all 71 admissible
 marks still support one parameter, every QC-passed mark supports two,
@@ -78,8 +80,8 @@ rejected as channel surveys. **The limitation is the observing system.**
 
 **A finding the scans could not have produced:** the leading mode
 overlaps the equal-per-*class* uniform direction the α-scan varies by
-0.263 — random is 0.258 — and the per-*cell* area-weighted version by
-0.768. The α-scan probes the informative direction obliquely, which is
+0.218 — random is 0.258 — and the per-*cell* area-weighted version by
+0.699. The α-scan probes the informative direction obliquely, which is
 why class redistribution beat uniform scaling. It is not that fifteen
 parameters beat one; the scan's one was the wrong one.
 
