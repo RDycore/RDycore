@@ -2346,3 +2346,68 @@ classes.
 Timing confirms the planning number: ~14.9 min per 43,200-step
 eval-only forward at n16 (base 17:00:15 -> 17:15:08, col11 ->
 17:29:59).
+
+
+### o61 Part B: the production-window spectrum -- SAME COUNT (2026-08-28/29)
+
+15 of 16 forwards landed before the 4-hour interactive wall (col95
+cut off; job 57700665 queued to finish it). Analysis on base + 14
+columns, sigma_obs 0.15, eps 0.05:
+
+| | 7,200-step pilot | 43,200-step production |
+| --- | --- | --- |
+| lambda_0 | 3.03 | **2.779** |
+| lambda_1 | 0.64 | 0.669 |
+| eigenvalues > 1 | **1** | **1** |
+| Rodgers dof for signal | 2.02 | 2.10 |
+| spectral gap | 4.8 | 4.15 |
+| overlap, uniform per class | 0.263 | 0.230 |
+| overlap, uniform per cell | 0.768 | 0.700 |
+| leading vector | 23(-.81) 90(+.41) 22(-.36) | 23(-.64) 90(+.59) 22(-.36) 81(-.23) |
+
+**The paper's central claim survives on the correct window.** One
+supported parameter, same three classes leading, same
+obliquely-probed-by-the-alpha-scan story.
+
+**A prediction of ours FAILED and should be reported.** The o61 header
+predicted lambda would RISE with window length, because each peak
+integrates more trajectory. It fell, 3.03 -> 2.78. The reason is that
+the two windows do not measure the same observable: over 7,200 steps
+(2 event-hours) many marks have not crested, so the pilot's "peak" is
+a truncated rising limb, which is MORE sensitive to roughness than a
+true crest. Table 11's mark-count scaling is unaffected -- it varies
+mark counts at fixed sensitivity -- but the claim that a longer window
+buys more lambda is now measured to be false, and Section 7.4 should
+say so rather than repeat the speculation.
+
+**THE ARGMAX CHECK IS THE HEADLINE CAVEAT.** 151 of 644 mark-column
+pairs (23.4%) moved their peak TIME, against 27 of 690 (3.9%) on the
+pilot. Investigated rather than waved through:
+
+    shift 300 steps (1 obs sample): 107 pairs (71%)
+    shift 600-1200 steps:            34 pairs
+    shift 2100-6900 steps:           10 pairs  <- genuine relocations
+    median |change in peak value|: 2.3e-3 m   (max 2.7e-2 m)
+    typical peak magnitude:        1.5 m
+
+So 71% are single-sample jitter and the median peak VALUE moves 2.3 mm
+on a 1.5 m peak -- 0.15%. That is the expected behaviour of a max near
+a flat crest, where a one-sample shift costs O(dt^2 h'') and is second
+order.
+
+**Why this is not the o56 failure.** o56 differenced the GRADIENT
+field, which genuinely JUMPS across a branch, so half the differenced
+signal was noise. Here max_t h(t) is CONTINUOUS in alpha even when its
+argmax moves -- at the crossover the two competing maxima are equal --
+so the secant is a valid finite difference of a continuous,
+piecewise-smooth function. The 10 pairs with multi-hour shifts are
+real peak relocations (bimodal hydrographs) and are 1.6% of the
+sample. Confidence: good, with the caveat stated.
+
+**Interlacing bounds the missing class.** Adding col95 adds a
+dimension to H, so by eigenvalue interlacing every lambda can only
+rise: lambda_0(15) >= 2.779 and lambda_1(15) >= 0.669, with
+lambda_1(15) <= 2.779. A second supported parameter is therefore not
+excluded by arithmetic -- but class 95 is one of the least informative
+(2-5% learned, Table 10), so it is unlikely. **Do not write "one
+parameter on the production window" into the paper until col95 lands.**
