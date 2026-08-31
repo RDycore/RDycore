@@ -5,7 +5,7 @@ physics:
 
 numerics:
   spatial: fv
-  temporal: euler
+  temporal: rk4
   riemann: roe
 
 logging:

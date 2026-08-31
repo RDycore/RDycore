@@ -20,13 +20,23 @@
 // The water DEPTH h = eta - z is ALSO reconstructed with an independent limited
 // slope (Buttinger-Kreuzhuber et al. 2019, eq 14/20-22). The interface bottom is
 // b* = max(eta_L - h_face_L, eta_R - h_face_R) and the hydrostatic interface depth
-// is capped by the reconstructed depth: h* = max(0, min(eta - b*, h_face)), giving
-// 0 <= h* <= h_face by construction. This bounds h* by the cell's own reconstructed
-// depth instead of the unbounded eta - max(z), which a thin cell on a slope can
-// inflate into an over-large interface depth that collapses the timestep. The
-// pressure correction stays the (cell-referenced) Audusse well-balanced form, so
-// lake-at-rest is preserved bit-for-bit -- the depth reconstruction only tightens
-// positivity, it does not perturb well-balancing.
+// is h* = max(0, min(eta - b*, h_face)).
+//
+// The invariant that matters for positivity is h* <= h_CELL (Audusse 2004), NOT
+// h* <= h_face: the interface may not carry more water than the cell holds. The
+// first-order operator satisfies it for free, since h* = max(0, eta_cell - z_max)
+// and z_max >= z_cell. Second order breaks it twice over -- the reconstructed eta
+// can exceed the cell surface, and the reconstructed depth can exceed the cell
+// depth -- so h_face is no more bounded by the cell mean than eta - max(z) was.
+// It is therefore re-imposed explicitly by clamping h_face into [0, h_cell] in
+// ReconstructFaceValuesEta; see the comment there.
+//
+// The pressure correction stays the (cell-referenced) Audusse well-balanced form.
+// Lake-at-rest is preserved bit-for-bit and is INDEPENDENT of the depth
+// reconstruction: at rest eta_L == eta_R, so the max in b* and the min in the cap
+// invert one another and both sides collapse to max(0, min(h_face_L, h_face_R)).
+// Equal states -> no Roe dissipation; the correction then telescopes to a constant
+// 1/2 g h_cell^2 per edge, which sums to zero around a closed polygon.
 //
 // Structure mirrors ApplyInteriorFlux2R in swe_petsc.c: only the owning rank
 // solves each interior edge, contributions are accumulated into a local vector
@@ -131,15 +141,32 @@ static PetscErrorCode ReconstructFaceValuesEta(RDyMesh *mesh, const PetscScalar 
     // NOTE: no clamp on component 0 here -- it is the free surface eta, not depth.
 
     // Independent limited reconstruction of the DEPTH h = eta - z (cell-referenced),
-    // Buttinger 2019 eq 14/20-22. No clamp here -- the Apply loop takes
-    // max(0, min(eta - b*, h_face)), which is where positivity is enforced.
+    // Buttinger 2019 eq 14/20-22, clamped into [0, h_cell].
+    //
+    // The upper clamp is the Audusse (2004) positivity bound h* <= h_cell: the
+    // interface depth may never exceed the water the cell actually holds, or the
+    // outgoing flux can drain the cell past zero in a single step. The first-order
+    // operator gets this for free -- h* = max(0, eta_cell - z_max) <= h_cell because
+    // z_max >= z_cell -- but BOTH of the second-order ingredients break it: the
+    // reconstructed eta can exceed the cell surface, and the reconstructed depth can
+    // exceed the cell depth by up to half the cell-to-cell jump. Capping h* by h_face
+    // alone does not restore it, since h_face is itself unbounded above relative to
+    // the cell mean. With per-edge limiting the face values of a cell do not average
+    // back to the cell mean either, so no CFL restriction recovers the guarantee;
+    // it has to be imposed here.
+    //
+    // The lower clamp keeps b_recon = eta - h_face from rising ABOVE eta, which would
+    // inflate b* and drive BOTH interface depths to zero, silently severing the edge.
+    //
+    // Well-balancing is unaffected: at rest eta_L == eta_R, so h*_L and h*_R both
+    // collapse to max(0, min(h_face_L, h_face_R)) whatever the depth slopes did.
     PetscReal hcell_L   = q_eta[cl * 3 + 0] - zc[cl];
     PetscReal hcell_R   = q_eta[cr * 3 + 0] - zc[cr];
     PetscReal extrapd_L = grad_depth[cl * 2 + 0] * dx_L + grad_depth[cl * 2 + 1] * dy_L;
     PetscReal extrapd_R = grad_depth[cr * 2 + 0] * dx_R + grad_depth[cr * 2 + 1] * dy_R;
     PetscReal dqd       = hcell_R - hcell_L;
-    q_face[owned_edge * 8 + 6] = hcell_L + LimitSlope(limiter, extrapd_L, 0.5 * dqd);
-    q_face[owned_edge * 8 + 7] = hcell_R + LimitSlope(limiter, extrapd_R, -0.5 * dqd);
+    q_face[owned_edge * 8 + 6] = fmin(fmax(0.0, hcell_L + LimitSlope(limiter, extrapd_L, 0.5 * dqd)), hcell_L);
+    q_face[owned_edge * 8 + 7] = fmin(fmax(0.0, hcell_R + LimitSlope(limiter, extrapd_R, -0.5 * dqd)), hcell_R);
 
     owned_edge++;
   }

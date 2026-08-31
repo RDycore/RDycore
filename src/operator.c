@@ -356,6 +356,17 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   PetscBool use_slope_reconstruction = config->numerics.second_order;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
   config->numerics.second_order = use_slope_reconstruction;
+  // MUSCL reconstruction with forward Euler is linearly unstable: the growth rate
+  // scales with CFL, so it can look fine on a coarse mesh and then blow up on
+  // refinement. Warn rather than fail, since existing configs rely on the default.
+  PetscBool hr_muscl_on = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-hr_muscl", &hr_muscl_on, NULL));
+  if ((use_slope_reconstruction || hr_muscl_on) && config->numerics.temporal == TEMPORAL_EULER) {
+    PetscCall(PetscPrintf(comm,
+                          "WARNING: second-order reconstruction with 'temporal: euler' is linearly unstable; "
+                          "use 'temporal: rk4' (or another SSP integrator) for a stable MUSCL scheme\n"));
+  }
+
   if (use_slope_reconstruction) {
     PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
     PetscCheck(!has_tracers, comm, PETSC_ERR_USER,
