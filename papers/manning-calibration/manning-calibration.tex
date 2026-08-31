@@ -30,9 +30,7 @@ explain?''}\\[4pt]\large DRAFT for internal review}
 % Environ. Model. Softw. 197 (2026) 106804); order provisional pending the
 % venue/authorship decision
 \author{Mark Adams$^1$, Gautam Bisht$^2$, Donghui Xu$^2$, Jeffrey
-Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$,\\
-Dongyu Feng$^2$, Dalei Hao$^2$, Darren Engwirda$^{6,7}$, Mukesh
-Kumar$^8$, Zeli Tan$^2$\\[2pt]
+Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$\\[2pt]
 \footnotesize $^1$Applied Mathematics \& Computational Research Division,
 Lawrence Berkeley National Laboratory, Berkeley, CA, USA\\
 \footnotesize $^2$Atmospheric, Climate, \& Earth Sciences Division, Pacific
@@ -41,13 +39,7 @@ Northwest National Laboratory, Richland, WA, USA\\
 \footnotesize $^4$Department of Computer Science, University of Colorado
 Boulder, Boulder, CO, USA\\
 \footnotesize $^5$Computer Science and Engineering, University at Buffalo,
-Buffalo, NY, USA\\
-\footnotesize $^6$Fluid Dynamics and Solid Mechanics Group (T-3), Los Alamos
-National Laboratory, Los Alamos, NM, USA\\
-\footnotesize $^7$Environment, Commonwealth Scientific and Industrial Research
-Organisation, Hobart, TAS, Australia\\
-\footnotesize $^8$Civil, Construction and Environmental Engineering,
-University of Alabama, Tuscaloosa, AL, USA}
+Buffalo, NY, USA}
 \date{}
 
 \begin{document}
@@ -189,7 +181,10 @@ a catalog of the nondifferentiable structures encountered --- useful,
 we believe, to anyone retrofitting adjoints onto an operational flood
 code.
 
-\section{Forward model}
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Forward model}
 \label{sec:forward}
 
 RDycore solves the 2D shallow water equations in conservative variables
@@ -242,7 +237,7 @@ path; Section~\ref{sec:implicit} shows how the resulting stiffness is
 then handled properly, by the implicit integrator rather than inside
 the explicit right-hand side $f$.
 
-\section{Differentiating the production solver}
+\subsection{Differentiating the production solver}
 \label{sec:diff}
 
 Two design decisions shape everything downstream. The derivative of
@@ -252,12 +247,12 @@ and it is \emph{assembled} into a sparse matrix rather than applied
 matrix-free. Assembly is what lets one artifact serve three consumers:
 the implicit solver preconditions with it
 (Section~\ref{sec:implicit}), \texttt{TSAdjoint} transposes it, and
-the calibration couples it to the parameter Jacobian. This section
-builds that Jacobian (Section~\ref{sec:jacobian}) and the adjoint
+the calibration couples it to the parameter Jacobian. The two parts
+below build that Jacobian (Section~\ref{sec:jacobian}) and the adjoint
 sensitivities on top of it (Section~\ref{sec:adjoint}); every
 derivative is gated by finite differences of the full nonlinear solve.
 
-\subsection{Exact Jacobian}
+\subsubsection{Exact Jacobian}
 \label{sec:jacobian}
 
 The RHS Jacobian is block sparse with $3\times3$ blocks on the
@@ -321,7 +316,8 @@ harness that differences the flux routine itself on sampled states (with
 a Richardson self-check of the FD order); full-matrix comparisons of the
 assembled Jacobian against a matrix-coloring FD Jacobian of the actual
 RHS on three state/boundary combinations, boundary rows included; and
-end-to-end gradient checks through the adjoint (next section). A
+end-to-end gradient checks through the adjoint
+(Section~\ref{sec:adjoint}). A
 finite-difference coloring Jacobian (\texttt{numerics.jacobian: fd})
 remains available permanently as the verification baseline.
 
@@ -350,7 +346,7 @@ every change to the repository.}
 \label{tab:verification}
 \end{table}
 
-\subsection{Adjoint sensitivities}
+\subsubsection{Adjoint sensitivities}
 \label{sec:adjoint}
 
 For gauge observations $y_k$ at times $t_k$ with observation operator
@@ -388,7 +384,7 @@ cannot certify at production scale is a different matter entirely ---
 the objective's own nonsmoothness over long windows --- quantified in
 Section~\ref{sec:hwm}.
 
-\section{The calibration algorithm: strong-constraint 4D-Var}
+\subsection{The calibration algorithm: strong-constraint 4D-Var}
 \label{sec:calibration}
 
 The complete calibration loop is summarized in
@@ -683,7 +679,7 @@ scaling defect, and the cheapest test is to compare
 $\lVert g \rVert$ against the scale of the variable before suspecting
 the derivative.
 
-\section{Implicit stepping, enabled and required}
+\subsection{Implicit stepping, enabled and required}
 \label{sec:implicit}
 
 The explicit drag term is stiff in thin water: linearizing gives a
@@ -817,7 +813,7 @@ aggregate) bound the recompute overhead by a factor of about four,
 making the long-window adjoint memory-feasible; the remaining cost is
 the forward compute itself, addressed next.
 
-\subsection{Nondifferentiability catalog}
+\subsubsection{Nondifferentiability catalog}
 \label{sec:nondiff}
 
 \textcolor{red}{[Reviewers: do we want this subsection at all? It is
@@ -938,6 +934,110 @@ remains open.
         maximum) is the alternative, at the cost of biasing the peak
         it calibrates against.
 \end{itemize}
+
+\section{Model configurations}
+\label{sec:configs}
+
+The results that follow run the machinery of Section~\ref{sec:methods}
+on three domains, at resolutions two orders of magnitude apart and
+against four different observables. Because the paper's central claim
+is comparative --- what a parameter can explain \emph{on a given
+observable and window} --- the configuration is part of every result
+rather than background to it, and Table~\ref{tab:configs} collects the
+configurations so that later sections can name one instead of
+restating it.
+
+\begin{table}
+\centering\footnotesize
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Configuration & Mesh & Window & Observable & Parameters \\
+\midrule
+Verification twin
+  & planar, single region
+  & $1.8$\,s, 40 steps
+  & water height
+  & per-cell, per-region \\
+Houston twin
+  & $1$\,km, 2{,}746 cells
+  & $4200$\,s, $\Delta t = 30$\,s
+  & 343 or 686 gauges, 14 times
+  & 2{,}746 per-cell \\
+Houston, real network
+  & $1$\,km, 2{,}746 cells
+  & $4200$\,s, $\Delta t = 30$\,s
+  & 17 USGS gauges, 238 obs
+  & 2{,}746 per-cell \\
+Turning, class twin
+  & $30$\,m, 2.93M cells
+  & early transient
+  & 13 gauges, 260 obs
+  & 15 NLCD classes \\
+Turning, dense twin
+  & $30$\,m, 2.93M cells
+  & early transient
+  & 418{,}076 strided cells
+  & 15 NLCD classes \\
+Turning, mark twin
+  & $30$\,m, 2.93M cells
+  & $1$\,h, rain-forced
+  & 108 marks, peak WSE
+  & 15 NLCD classes \\
+\textbf{Turning, production}
+  & $30$\,m, 2.93M cells
+  & $12$\,h, event h29--41
+  & 46 marks, peak WSE
+  & global scale, 15 classes \\
+\bottomrule
+\end{tabular}
+\caption{The configurations used in Sections~\ref{sec:houston}--\ref{sec:icauthority}.
+The first three establish what the machinery recovers against a known
+truth; the last four are the 30\,m Hurricane Harvey domain, where the
+observable changes from stage gauges to surveyed high-water marks for
+the reason given in Section~\ref{sec:hwm}. Every number reported
+against the real survey --- baseline, scans, calibration, and spectrum
+--- is measured on the production row, so those results compose.}
+\label{tab:configs}
+\end{table}
+
+\paragraph{The twins.}
+The verification twin is a planar, 40-step configuration whose only
+purpose is to exercise the derivative machinery where the objective is
+smooth; it carries the finite-difference gates of
+Table~\ref{tab:verification} and the noise study of
+Table~\ref{tab:snr}. The Houston twin is a $1$\,km Hurricane Harvey
+mesh of 2{,}746 cells in which every cell is wet and moving, so all
+2{,}746 per-cell parameters are observable in principle; truth is a
+two-zone field ($n = 0.03$ west, $n = 0.06$ east of the domain
+midline) and the recovered field is scored against it. Its real-network
+variant replaces the synthetic gauges with the seventeen in-mesh USGS
+gauges carrying Harvey stage records.
+
+\paragraph{The 30\,m Harvey domain.}
+The Turning mesh resolves the Houston area at $30$\,m in 2.93M cells,
+with one Manning value per NLCD land-cover class (15 classes) and the
+published NLCD lookup as both prior and, for twins, truth. Three
+configurations share it. The class and dense twins ask whether fifteen
+classes are identifiable from the real gauge geometry and from a
+saturating observation set respectively. The mark twin replaces stage
+with peak water-surface elevation at the 108 QC-passed high-water-mark
+cells. The production configuration is the one every real-survey number
+is measured on: a 12-hour window over the upstream crest cluster (event
+hours 29--41), initialized from an hourly checkpoint of the 72-hour
+forward with the rain re-aligned to the window start (both validated
+bit-exactly), scored against the 46 surveyed marks whose modelled crest
+falls inside it. Section~\ref{sec:authority} explains why the observable,
+not the budget, sets that window.
+
+\paragraph{Shared solver settings.}
+Every adjoint-path configuration uses the explicit source treatment
+(\texttt{source.method: explicit}) with stiffness handled by the
+implicit integrator rather than inside the right-hand side
+(Section~\ref{sec:forward}), and runs at converged inner tolerances
+(Krylov $10^{-4}$, nonlinear $10^{-5}$) so that the verified gradients
+are the production gradients (Section~\ref{sec:adjoint}). Calibrations
+use TAO/BLMVM with Manning bounds $[0.01, 0.2]$, and long windows use
+revolve checkpointing (Section~\ref{sec:implicit}).
 
 \section{Twin experiments: what the observing network can recover}
 \label{sec:houston}
