@@ -489,16 +489,17 @@ assembled RHS Jacobian $\partial f/\partial u$
 f/\partial n$ according to the integrator's discrete-adjoint formula.}
 \label{alg:sweep}
 \begin{algorithmic}[1]
-\Require checkpointed trajectory $\{u_s\}_{s=0}^{Km}$, residuals
-$\{r_k\}_{k=1}^{K}$ at steps $s = km$, gauge operator $H$, error
-$\sigma$
+\Require checkpointed trajectory $\{u_s\}_{s=0}^{K\,m}$, residuals
+$\{r_k\}_{k=1}^{K}$ at steps $s = k\,m$, gauge operator $H$, error $\sigma$; as in
+Algorithm~\ref{alg:var4d}, $m$ is the number of steps between
+consecutive observation times, so the window is $K\,m$ steps long
 \Ensure $\lambda = dJ_{\mathrm{mis}}/du_0$,\;
 $\mu = dJ_{\mathrm{mis}}/dn$
 \State $\lambda \gets \sigma^{-2} H^T r_K$
        \Comment{$\lambda$ holds
        $\partial J_{\mathrm{mis}}/\partial u(t_s)$ throughout}
 \State $\mu \gets 0$
-\For{$s = Km, \dots, 1$}
+\For{$s = K\,m, \dots, 1$}
    \State restore $u_{s-1}$ (and stage values): read the checkpoint,
           or recompute forward from the nearest one when the
           checkpoint schedule demands
@@ -508,9 +509,9 @@ $\mu = dJ_{\mathrm{mis}}/dn$
    \State $\lambda \gets
           \big(\partial\Phi_s/\partial u_{s-1}\big)^T \lambda$
           \Comment{backward model step (transposed step Jacobian)}
-   \If{$s - 1 = km$ for some $1 \le k < K$}
+   \If{$s - 1 = k\,m$ for some $1 \le k < K$}
       \State $\lambda \gets \lambda + \sigma^{-2} H^T r_{k}$
-      \Comment{observation jump: $u_{km}$ enters
+      \Comment{observation jump: $u_{k\,m}$ enters
       $J_{\mathrm{mis}}$ directly}
    \EndIf
 \EndFor
@@ -740,12 +741,20 @@ Turning, full event
 \bottomrule
 \end{tabular}
 \caption{The configurations used in Sections~\ref{sec:implicit}--\ref{sec:icauthority}.
-The first three establish what the machinery recovers against a known
-truth; the last four are the 30\,m Hurricane Harvey domain, where the
-observable changes from stage gauges to surveyed high-water marks for
-the reason given in Section~\ref{sec:hwm}. Every number reported
-against the real survey --- baseline, scans, calibration, and spectrum
---- is measured on the production row, so those results compose.}
+Every row above \emph{Turning, full event} is a twin, observing model
+output generated from a roughness field we chose. The twins are
+load-bearing rather than preparatory: a recovered field can be scored
+only against a known truth, and that score is what separates
+\emph{this observable cannot determine the parameter} from \emph{the
+derivative is wrong}. The real survey admits no such check, so the
+twins are what license reading
+Sections~\ref{sec:realsurvey}--\ref{sec:icauthority} as statements
+about information rather than about correctness. The last five rows are
+the 30\,m Hurricane Harvey domain, where the observable changes from
+stage gauges to surveyed high-water marks for the reason given in
+Section~\ref{sec:hwm}. Every number reported against the real survey
+--- baseline, scans, calibration, and spectrum --- is measured on the
+production row, so those results compose.}
 \label{tab:configs}
 \end{table}
 
