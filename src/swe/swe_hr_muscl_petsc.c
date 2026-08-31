@@ -160,11 +160,11 @@ static PetscErrorCode ReconstructFaceValuesEta(RDyMesh *mesh, const PetscScalar 
     //
     // Well-balancing is unaffected: at rest eta_L == eta_R, so h*_L and h*_R both
     // collapse to max(0, min(h_face_L, h_face_R)) whatever the depth slopes did.
-    PetscReal hcell_L   = q_eta[cl * 3 + 0] - zc[cl];
-    PetscReal hcell_R   = q_eta[cr * 3 + 0] - zc[cr];
-    PetscReal extrapd_L = grad_depth[cl * 2 + 0] * dx_L + grad_depth[cl * 2 + 1] * dy_L;
-    PetscReal extrapd_R = grad_depth[cr * 2 + 0] * dx_R + grad_depth[cr * 2 + 1] * dy_R;
-    PetscReal dqd       = hcell_R - hcell_L;
+    PetscReal hcell_L          = q_eta[cl * 3 + 0] - zc[cl];
+    PetscReal hcell_R          = q_eta[cr * 3 + 0] - zc[cr];
+    PetscReal extrapd_L        = grad_depth[cl * 2 + 0] * dx_L + grad_depth[cl * 2 + 1] * dy_L;
+    PetscReal extrapd_R        = grad_depth[cr * 2 + 0] * dx_R + grad_depth[cr * 2 + 1] * dy_R;
+    PetscReal dqd              = hcell_R - hcell_L;
     q_face[owned_edge * 8 + 6] = fmin(fmax(0.0, hcell_L + LimitSlope(limiter, extrapd_L, 0.5 * dqd)), hcell_L);
     q_face[owned_edge * 8 + 7] = fmin(fmax(0.0, hcell_R + LimitSlope(limiter, extrapd_R, -0.5 * dqd)), hcell_R);
 
@@ -183,18 +183,18 @@ typedef struct {
   RDyMesh             *mesh;
   PetscReal            tiny_h;
   PetscReal            h_anuga_regular;
-  PetscReal            wetdry_h;        // depth below which an edge falls back to first order (wet/dry robustness)
-  PetscReal           *zc;             // per-cell bed elevation (local indexing)
-  RDyLimiterType       limiter;        // MUSCL slope limiter
-  PetscReal           *ls_grad_coeffs; // [num_internal_edges * 4] precomputed LS gradient coeffs
-  PetscScalar         *q_eta;          // [num_cells * 3]: (eta, u, v) per cell -- primitive velocity in comps 1,2
-  PetscScalar         *grad_eta;       // [num_cells * 2]: cell-centered gradient of eta
-  PetscScalar         *grad_hu;        // [num_cells * 2]: gradient of primitive u
-  PetscScalar         *grad_hv;        // [num_cells * 2]: gradient of primitive v
-  PetscScalar         *grad_depth;     // [num_cells * 2]: gradient of depth h = eta - z (Buttinger 2019 eq 14)
-  PetscScalar         *q_reconstructed;// [num_owned_internal_edges * 8]: reconstructed face states {eta,u,v}_L/R + h_face_L/R
-  RiemannStateData     left_states;    // reconstructed "left" states on owned interior edges
-  RiemannStateData     right_states;   // reconstructed "right" states on owned interior edges
+  PetscReal            wetdry_h;         // depth below which an edge falls back to first order (wet/dry robustness)
+  PetscReal           *zc;               // per-cell bed elevation (local indexing)
+  RDyLimiterType       limiter;          // MUSCL slope limiter
+  PetscReal           *ls_grad_coeffs;   // [num_internal_edges * 4] precomputed LS gradient coeffs
+  PetscScalar         *q_eta;            // [num_cells * 3]: (eta, u, v) per cell -- primitive velocity in comps 1,2
+  PetscScalar         *grad_eta;         // [num_cells * 2]: cell-centered gradient of eta
+  PetscScalar         *grad_hu;          // [num_cells * 2]: gradient of primitive u
+  PetscScalar         *grad_hv;          // [num_cells * 2]: gradient of primitive v
+  PetscScalar         *grad_depth;       // [num_cells * 2]: gradient of depth h = eta - z (Buttinger 2019 eq 14)
+  PetscScalar         *q_reconstructed;  // [num_owned_internal_edges * 8]: reconstructed face states {eta,u,v}_L/R + h_face_L/R
+  RiemannStateData     left_states;      // reconstructed "left" states on owned interior edges
+  RiemannStateData     right_states;     // reconstructed "right" states on owned interior edges
   RiemannEdgeData      edges;
   OperatorDiagnostics *diagnostics;
 } InteriorFluxHR2ROperator;
@@ -211,9 +211,9 @@ typedef struct {
 // is undefined in a dry cell, from polluting a wet neighbor's velocity gradient.
 // (grad_eta passed as grad_h below; the extra grad_depth output is the gradient of
 // the water depth h = eta - z, reconstructed independently per Buttinger 2019 eq 14.)
-static PetscErrorCode ComputeLeastSquaresGradientsWetDry(RDyMesh *mesh, const PetscReal *ls_grad_coeffs, const PetscScalar *q,
-                                                         const PetscReal *zc, PetscReal tiny_h, PetscScalar *grad_h,
-                                                         PetscScalar *grad_hu, PetscScalar *grad_hv, PetscScalar *grad_depth) {
+static PetscErrorCode ComputeLeastSquaresGradientsWetDry(RDyMesh *mesh, const PetscReal *ls_grad_coeffs, const PetscScalar *q, const PetscReal *zc,
+                                                         PetscReal tiny_h, PetscScalar *grad_h, PetscScalar *grad_hu, PetscScalar *grad_hv,
+                                                         PetscScalar *grad_depth) {
   PetscFunctionBeginUser;
   RDyEdges *edges = &mesh->edges;
   PetscCall(PetscArrayzero(grad_h, mesh->num_cells * 2));
@@ -221,23 +221,31 @@ static PetscErrorCode ComputeLeastSquaresGradientsWetDry(RDyMesh *mesh, const Pe
   PetscCall(PetscArrayzero(grad_hv, mesh->num_cells * 2));
   PetscCall(PetscArrayzero(grad_depth, mesh->num_cells * 2));
   for (PetscInt ie = 0; ie < mesh->num_internal_edges; ie++) {
-    PetscInt e  = edges->internal_edge_ids[ie];
-    PetscInt cl = edges->cell_ids[2 * e];
-    PetscInt cr = edges->cell_ids[2 * e + 1];
+    PetscInt  e  = edges->internal_edge_ids[ie];
+    PetscInt  cl = edges->cell_ids[2 * e];
+    PetscInt  cr = edges->cell_ids[2 * e + 1];
     PetscReal hl = q[cl * 3 + 0] - zc[cl], hr = q[cr * 3 + 0] - zc[cr];
     if (hl < tiny_h || hr < tiny_h) continue;  // skip wet/dry edges
     PetscReal cx_LR = ls_grad_coeffs[ie * 4 + 0], cy_LR = ls_grad_coeffs[ie * 4 + 1];
     PetscReal cx_RL = ls_grad_coeffs[ie * 4 + 2], cy_RL = ls_grad_coeffs[ie * 4 + 3];
     PetscReal dq_h = q[cr * 3 + 0] - q[cl * 3 + 0], dq_hu = q[cr * 3 + 1] - q[cl * 3 + 1], dq_hv = q[cr * 3 + 2] - q[cl * 3 + 2];
     PetscReal dq_d = hr - hl;  // depth jump (eta jump minus bed jump)
-    grad_h[cl * 2 + 0] += cx_LR * dq_h;  grad_h[cl * 2 + 1] += cy_LR * dq_h;
-    grad_hu[cl * 2 + 0] += cx_LR * dq_hu; grad_hu[cl * 2 + 1] += cy_LR * dq_hu;
-    grad_hv[cl * 2 + 0] += cx_LR * dq_hv; grad_hv[cl * 2 + 1] += cy_LR * dq_hv;
-    grad_depth[cl * 2 + 0] += cx_LR * dq_d; grad_depth[cl * 2 + 1] += cy_LR * dq_d;
-    grad_h[cr * 2 + 0] += cx_RL * dq_h;  grad_h[cr * 2 + 1] += cy_RL * dq_h;
-    grad_hu[cr * 2 + 0] += cx_RL * dq_hu; grad_hu[cr * 2 + 1] += cy_RL * dq_hu;
-    grad_hv[cr * 2 + 0] += cx_RL * dq_hv; grad_hv[cr * 2 + 1] += cy_RL * dq_hv;
-    grad_depth[cr * 2 + 0] += cx_RL * dq_d; grad_depth[cr * 2 + 1] += cy_RL * dq_d;
+    grad_h[cl * 2 + 0] += cx_LR * dq_h;
+    grad_h[cl * 2 + 1] += cy_LR * dq_h;
+    grad_hu[cl * 2 + 0] += cx_LR * dq_hu;
+    grad_hu[cl * 2 + 1] += cy_LR * dq_hu;
+    grad_hv[cl * 2 + 0] += cx_LR * dq_hv;
+    grad_hv[cl * 2 + 1] += cy_LR * dq_hv;
+    grad_depth[cl * 2 + 0] += cx_LR * dq_d;
+    grad_depth[cl * 2 + 1] += cy_LR * dq_d;
+    grad_h[cr * 2 + 0] += cx_RL * dq_h;
+    grad_h[cr * 2 + 1] += cy_RL * dq_h;
+    grad_hu[cr * 2 + 0] += cx_RL * dq_hu;
+    grad_hu[cr * 2 + 1] += cy_RL * dq_hu;
+    grad_hv[cr * 2 + 0] += cx_RL * dq_hv;
+    grad_hv[cr * 2 + 1] += cy_RL * dq_hv;
+    grad_depth[cr * 2 + 0] += cx_RL * dq_d;
+    grad_depth[cr * 2 + 1] += cy_RL * dq_d;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -280,10 +288,10 @@ static PetscErrorCode ApplyInteriorFluxHR2R(void *context, PetscOperatorFields f
   // (the true conserved value) -- never a reconstructed thin face depth -- so the
   // Audusse-Bristeau positivity property holds. Dry cells carry u = v = 0.
   for (PetscInt c = 0; c < mesh->num_cells; c++) {
-    PetscReal h   = u_ptr[n_dof * c + 0];
-    PetscReal hu  = u_ptr[n_dof * c + 1];
-    PetscReal hv  = u_ptr[n_dof * c + 2];
-    PetscReal reg = Square(h) + Square(h_anuga);
+    PetscReal h          = u_ptr[n_dof * c + 0];
+    PetscReal hu         = u_ptr[n_dof * c + 1];
+    PetscReal hv         = u_ptr[n_dof * c + 2];
+    PetscReal reg        = Square(h) + Square(h_anuga);
     op->q_eta[3 * c + 0] = h + zc[c];
     op->q_eta[3 * c + 1] = (h > tiny_h) ? hu * h / reg : 0.0;
     op->q_eta[3 * c + 2] = (h > tiny_h) ? hv * h / reg : 0.0;
@@ -297,8 +305,8 @@ static PetscErrorCode ApplyInteriorFluxHR2R(void *context, PetscOperatorFields f
   // Communicate the 4th (depth) gradient through the same bs=3 halo exchange by
   // packing it into all three slots (an idempotent round-trip for a single field).
   PetscCall(CommunicateCellGradients(dm, mesh, op->grad_depth, op->grad_depth, op->grad_depth));
-  PetscCall(ReconstructFaceValuesEta(mesh, op->q_eta, op->zc, op->grad_eta, op->grad_hu, op->grad_hv, op->grad_depth, op->limiter,
-                                     op->q_reconstructed));
+  PetscCall(
+      ReconstructFaceValuesEta(mesh, op->q_eta, op->zc, op->grad_eta, op->grad_hu, op->grad_hv, op->grad_depth, op->limiter, op->q_reconstructed));
 
   // Wet/dry first-order fallback (Godunov barrier): where either cell is shallower
   // than wetdry_h, replace the MUSCL face states with the first-order cell-centered
@@ -333,14 +341,14 @@ static PetscErrorCode ApplyInteriorFluxHR2R(void *context, PetscOperatorFields f
     PetscInt l = edges->cell_ids[2 * edge_id];
     PetscInt r = edges->cell_ids[2 * edge_id + 1];
 
-    PetscReal eta_L    = op->q_reconstructed[owned_e * 8 + 0];
-    PetscReal u_rec_L  = op->q_reconstructed[owned_e * 8 + 1];  // reconstructed primitive velocity
-    PetscReal v_rec_L  = op->q_reconstructed[owned_e * 8 + 2];
-    PetscReal eta_R    = op->q_reconstructed[owned_e * 8 + 3];
-    PetscReal u_rec_R  = op->q_reconstructed[owned_e * 8 + 4];
-    PetscReal v_rec_R  = op->q_reconstructed[owned_e * 8 + 5];
-    PetscReal hface_L  = op->q_reconstructed[owned_e * 8 + 6];  // independently reconstructed depth
-    PetscReal hface_R  = op->q_reconstructed[owned_e * 8 + 7];
+    PetscReal eta_L   = op->q_reconstructed[owned_e * 8 + 0];
+    PetscReal u_rec_L = op->q_reconstructed[owned_e * 8 + 1];  // reconstructed primitive velocity
+    PetscReal v_rec_L = op->q_reconstructed[owned_e * 8 + 2];
+    PetscReal eta_R   = op->q_reconstructed[owned_e * 8 + 3];
+    PetscReal u_rec_R = op->q_reconstructed[owned_e * 8 + 4];
+    PetscReal v_rec_R = op->q_reconstructed[owned_e * 8 + 5];
+    PetscReal hface_L = op->q_reconstructed[owned_e * 8 + 6];  // independently reconstructed depth
+    PetscReal hface_R = op->q_reconstructed[owned_e * 8 + 7];
 
     // physical reconstructed depths (relative to each cell's own bed). These stay
     // CELL-referenced (eta_face - zc[cell]) so the pressure correction below is the
@@ -410,8 +418,8 @@ static PetscErrorCode ApplyInteriorFluxHR2R(void *context, PetscOperatorFields f
     PetscReal hphys_L = fmax(0.0, eta_L - zc[l]);
     PetscReal hphys_R = fmax(0.0, eta_R - zc[r]);
     // capped HR interface depths computed in the reconstruction loop above
-    PetscReal hL_rec  = datal->h[owned_e];
-    PetscReal hR_rec  = datar->h[owned_e];
+    PetscReal hL_rec = datal->h[owned_e];
+    PetscReal hR_rec = datar->h[owned_e];
 
     if (!(hphys_R < tiny_h && hphys_L < tiny_h)) {
       PetscReal edge_len     = edges->lengths[edge_id];

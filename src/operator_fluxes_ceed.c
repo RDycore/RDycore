@@ -955,7 +955,7 @@ PetscErrorCode PrecomputeLSGradCoeffs(MPI_Comm comm, RDyMesh *mesh, PetscReal *l
     }
     PetscReal lfloor = lmax / kappa_max;
     if (lmin < lfloor) {
-      PetscReal shift = lfloor - lmin;   // shifts BOTH eigenvalues, so kappa -> kappa_max
+      PetscReal shift = lfloor - lmin;  // shifts BOTH eigenvalues, so kappa -> kappa_max
       m00 += shift;
       m11 += shift;
       regularized_count++;
