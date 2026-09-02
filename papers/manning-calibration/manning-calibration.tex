@@ -1,3 +1,37 @@
+% =====================================================================
+% ASKING CLAUDE FOR SOMETHING IN THIS PAPER
+%
+% Write your request as a LaTeX comment, in the TEXT, on the line above
+% the passage it is about, and sign it:
+%
+%     % [CLAUDE/GB: is the 12 h window defensible, or should it be 24?]
+%
+% Claude answers in place, leaving both lines for you to find:
+%
+%     % [CLAUDE-REPLY: crest times are bimodal (h29-42, h60-72) with an
+%     %  empty gap, so 24 h integrates marks that already peaked. Kept.]
+%
+% Delete the pair once you are satisfied.
+%
+% Three things to know:
+%
+%   1. Overleaf MARGIN COMMENTS DO NOT REACH CLAUDE. They are stored
+%      outside the document and never appear in the git history Claude
+%      reads. A request left in a comment thread will not be seen.
+%      Use the code editor, not the visual editor, which hides % lines.
+%
+%   2. Nothing notifies Claude. Mark triggers the read, so expect the
+%      latency to be "next working session", not minutes.
+%
+%   3. Claude acts directly on editorial requests -- wording, structure,
+%      notation, citations, captions. Anything that would change a
+%      NUMBER, a SCIENTIFIC CLAIM, an attribution, or the author list is
+%      routed to Mark instead of executed: those come from runs, and a
+%      comment cannot change what a run produced.
+%
+% Sign your marker. The answer often depends on who is asking.
+% =====================================================================
+
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
