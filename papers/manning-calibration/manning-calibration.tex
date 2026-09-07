@@ -168,12 +168,21 @@ A recent generation of \emph{differentiable} flood and hydrology codes
 obtains gradients by rewriting simplified solvers inside
 machine-learning frameworks: Inunda (PyTorch, local-inertial, calibrated on a Hurricane
 Harvey hindcast)~\cite{li2026inunda}, Hydrograd
-(Julia)~\cite{liu2025uswe}, AegirJAX~\cite{cardoso2026aegir},
-CaMa-Flood-GPU~\cite{kang2026cama}, and differentiable
-routing~\cite{bindas2024routing}. These demonstrate demand for exactly
-this capability, but none is a production Earth-system component: they
-trade the validated numerics, unstructured meshes, and coupling
-infrastructure of codes like RDycore for differentiability.
+(Julia)~\cite{liu2025uswe}, AegirJAX~\cite{cardoso2026aegir}, and
+differentiable routing~\cite{bindas2024routing}. These demonstrate
+demand for exactly this capability, but none is a production
+Earth-system component: they trade the validated numerics, unstructured
+meshes, and coupling infrastructure of codes like RDycore for
+differentiability. A parallel line ports production hydrodynamics to
+GPUs without differentiating them --- CaMa-Flood-GPU~\cite{kang2026cama}
+is a GPU reimplementation of CaMa-Flood, with gradient-based
+calibration named as future work rather than demonstrated.
+% [CLAUDE: CaMa-Flod-GPU is not differentiable]
+% [CLAUDE-REPLY/DX: correct, and thank you -- checked the GMD paper, it
+%  reports no adjoint. Moved out of the differentiable list into its own
+%  clause as a GPU port. Kept the citation because it makes our point
+%  better there: the GPU work exists and *wants* the gradient. Please
+%  confirm the "future work" characterization is fair to Kang et al.]
 
 This paper takes the complementary route: make the production code
 differentiable. That route has a long precedent outside E3SM --- most
@@ -1401,7 +1410,25 @@ boundary nodes at $z \approx 0$ against a boundary median of
 $29.9$\,m. The exit is present and correctly placed. What the ponded
 reach then reveals is a limitation of the idealization itself: it
 holds water above the elevation of parts of its own divide, which a
-reflecting wall retains and the real event would have spilled. The calibration target is therefore the
+reflecting wall retains and the real event would have spilled.
+
+Three measurements on the 72-hour forward make that concrete. The 37
+never-cresting mark cells are not local depressions in the terrain:
+one of the 37 is lower than every edge-neighbour, against six of the
+71 marks that crest normally. Rainfall is not what fills them: on the
+basin-mean MRMS series, simulation hours 60--72 carry $1.7\%$ of the
+event's rain and the hours beyond 72 carry none. What the model holds
+there is a lake. Its peak water surface across all 37 cells is
+$20.0 \pm 1.1$\,m, over surveyed peaks that run from $6.2$ to $20.2$\,m
+and beds from $0.3$ to $18.2$\,m: the surveyed water surface slopes
+toward the outlet and the modelled one does not (the correlation of
+surveyed WSE with the model's excess is $-0.93$, and a flat pond at
+$20.3$\,m predicts that excess to $1.1$\,m RMS). The divide sets the
+level. A quarter of the perimeter's $6{,}198$ nodes, all in the
+domain's eastern quarter, lie below $20$\,m, while the free-outflow
+side set is thirteen element edges wide: the real flood left across
+the low divide, and the model can leave only through the outlet, so
+it ponds to the height its walls impose. The calibration target is therefore the
 71 admissible marks; the drainage defect is reported as a finding in
 its own right; and the remaining bundle (initial-condition, rainfall,
 mesh-elevation, and datum error) is what the calibration must be
@@ -1830,8 +1857,8 @@ motion only $2.9\%$ lies in the single data-constrained direction;
 $85.6\%$ lies in directions where data and prior are comparable and
 $11.5\%$ where the prior alone determines the answer. Per class
 (Table~\ref{tab:learned}) the marks shrink the prior uncertainty by
-$36\%$ on developed-medium and by $12$--$17\%$ on four more, and by
-$5\%$ or less on the remaining ten.
+$30\%$ on developed-medium and $28\%$ on woody wetland, by
+$11$--$20\%$ on three more, and by $5\%$ or less on the remaining ten.
 
 The reassuring half is that the null space behaved. Two iterations in,
 the optimizer had moved deciduous forest to $\alpha = 0.739$, mixed
@@ -1864,19 +1891,19 @@ put to the domain team.
 \toprule
 NLCD & class & prior $\sigma_n$ & posterior $\sigma_n$ & learned \\
 \midrule
-23 & developed medium & $0.015$ & $0.010$ & $36\%$ \\
-22 & developed low & $0.015$ & $0.012$ & $17\%$ \\
-90 & woody wetland & $0.015$ & $0.012$ & $17\%$ \\
-81 & pasture & $0.015$ & $0.013$ & $15\%$ \\
-21 & developed open & $0.015$ & $0.013$ & $12\%$ \\
-24, 95, 11 & & $0.015$ & $0.014$--$0.015$ & $2$--$5\%$ \\
-41, 43, 82, 31, 42, 71, 52 & & $0.015$ & $0.015$ & $\le 1\%$ \\
+23 & developed medium & $0.015$ & $0.0105$ & $30\%$ \\
+90 & woody wetland & $0.015$ & $0.0109$ & $28\%$ \\
+81 & pasture & $0.015$ & $0.0121$ & $20\%$ \\
+22 & developed low & $0.015$ & $0.0125$ & $17\%$ \\
+21 & developed open & $0.015$ & $0.0133$ & $11\%$ \\
+95, 24, 11, 31 & & $0.015$ & $0.014$--$0.015$ & $2$--$5\%$ \\
+41, 43, 82, 42, 71, 52 & & $0.015$ & $0.015$ & $\le 1\%$ \\
 \bottomrule
 \end{tabular}
 \caption{What the 46 marks teach about each land-cover class, as the
-fractional reduction from prior to posterior standard deviation. Seven
-classes learn essentially nothing: any value a calibration reports for
-them is the prior speaking, not the data.}
+fractional reduction from prior to posterior standard deviation, on the
+production-window spectrum. Ten classes learn $5\%$ or less: any value
+a calibration reports for them is the prior speaking, not the data.}
 \label{tab:learned}
 \end{table}
 
@@ -1928,6 +1955,26 @@ partners frozen it must supply their share of a change the marks
 constrain only in combination --- equifinality, exactly where the
 eigenvector says to expect it.
 
+% [Emil, 2026-09-06: Use tab:scaling as a benchmark with independent,
+%  equal-variance residual errors and comparable per-mark sensitivities
+%  for the fixed prior and linearization; do not frame it as a prediction
+%  for the actual expanded datasets. Correlated residual errors enter
+%  through Gamma^{1/2} S^T C^{-1} S Gamma^{1/2}. No separate OED study
+%  needed if claims stay restricted to the benchmark; the count of
+%  data-informed combinations is the important part. Scaling arithmetic:
+%  71 and 108 marks give 2 and 3 directions with lambda>1; 46 marks at
+%  sigma=0.10 m also gives 3.]
+% [CLAUDE-REPLY/Emil: your three counts are right and ours were stale --
+%  tab:scaling and tab:learned were computed from the two-hour PILOT
+%  spectrum (lambda_3 = 0.33) and never recomputed when the production
+%  spectrum (lambda_3 = 0.61) replaced it on 08-29; the 46-mark count was
+%  the only row rechecked. Both tables now use the production spectrum
+%  (reproduced from the o61 dumps: 2.779, 0.682, 0.613). Benchmark
+%  framing and the covariance form added to the caption; no OED study.
+%  One caveat we will add once the prior question settles: the count
+%  depends on the prior width (1 at +/-15%, 2 at +/-20%, 3 at +/-30%,
+%  uniform relative), so we will report it alongside the width.]
+
 \paragraph{Would more marks fix it?}
 This is the natural objection --- 46 observations for 15 parameters
 sounds like too few --- and Eq.~\eqref{eq:gn} answers it, because
@@ -1936,8 +1983,8 @@ as $\sigma^{-2}$ in their quality (Table~\ref{tab:scaling}). The answer
 is that more marks help, slowly, and that the supply is exhausted long
 before the parameterization is justified. Going from the 46 marks of
 this window to \emph{all} 71 the model can legitimately be scored
-against still supports one parameter. Every QC-passed mark in the
-domain, over a window long enough to catch all of them, supports two.
+against supports two parameters. Every QC-passed mark in the
+domain, over a window long enough to catch all of them, supports three.
 Reaching five would take every Harvey mark that falls in the domain
 including the $62\%$ that failed QC because they are channel surveys a
 30\,m cell cannot represent. Fifteen would take of order $10^5$ marks.
@@ -1949,8 +1996,8 @@ including the $62\%$ that failed QC because they are channel surveys a
 Marks & Supported & That data set is \\
 \midrule
 46 & 1 & the cluster-A marks (this study) \\
-71 & 1 & all admissible marks, 24-hour window \\
-108 & 2 & every QC-passed mark, 72-hour window \\
+71 & 2 & all admissible marks, 24-hour window \\
+108 & 3 & every QC-passed mark, 72-hour window \\
 324 & 5 & every Harvey mark in-domain, \emph{before} QC \\
 $7\times10^5$ & 15 & --- \\
 \bottomrule
@@ -1958,10 +2005,14 @@ $7\times10^5$ & 15 & --- \\
 \caption{How the supported-parameter count scales with survey size at
 fixed quality ($\sigma = 0.15$\,m); a parameter is \emph{supported}
 when the data narrows it more than the prior does ($\lambda > 1$). At fixed size, improving quality to
-$\sigma = 0.10$\,m buys a second parameter and $\sigma = 0.05$\,m --- better
-than any high-water-mark survey achieves --- buys five. The scaling
-holds the measured per-mark sensitivity fixed, so the longer-window
-rows describe mark populations only. That is the conservative reading
+$\sigma = 0.10$\,m buys two more parameters (three in all) and $\sigma = 0.05$\,m --- better
+than any high-water-mark survey achieves --- buys five. The table is a
+benchmark, not a forecast: it assumes independent, equal-variance
+residual errors and holds the measured per-mark sensitivity, the prior,
+and the linearization fixed, so the longer-window rows describe mark
+populations only, and a survey with correlated errors would enter
+through $\Gamma^{1/2} S^\top C^{-1} S\, \Gamma^{1/2}$ rather than
+through a count. That is the conservative reading
 and, as it turns out, the correct one: we expected a longer window to
 raise each mark's sensitivity and it does not (see text).}
 \label{tab:scaling}
@@ -2298,6 +2349,7 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         support a defensible distributed roughness field at all --- a
         stronger negative claim than the paper currently makes, and one
         we would want to make deliberately.
+\textcolor{red}{Donghui: I think $\pm 30\%$ or more is possible.}
   \item \textbf{Is $15\%$ of peak-WSE error being roughness-attributable
         what you would expect} for a 30\,m model of this event?
         Calibrated, roughness accounts for $0.107$\,m of a $0.72$\,m
@@ -2309,6 +2361,7 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         scrutiny before any further calibration work, because it would
         mean the error budget is dominated by something we have not
         looked at.
+\textcolor{red}{Donghui: I think precipitation and DEM uncertainties should dominate the WSE error.Especially in the river channels, any bias of bathymetry will directly convert to WSE error.}
   \item \textbf{Does the downstream reach's failure to drain match known
         behaviour of this mesh and outlet configuration?} Thirty-seven
         of 108 surveyed marks sit in cells that fill monotonically for
@@ -2322,6 +2375,20 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         simply overtopped, and who owns it --- because the bias is a
         smooth gradient across the domain, so it is contaminating the
         middle band as well, not only the reach we excluded.
+% [Donghui, 2026-09-06: check the elevation of those 37 cells and their
+%  neighbours -- if they are local depressions, water could legitimately
+%  accumulate for 72 h. Also check whether the rainfall series lasted
+%  more than 72 h.]
+% [CLAUDE-REPLY/Donghui: both checked on the 30 m mesh and the 72-h run;
+%  the measurements are now in Section 6.1. Not depressions: 1 of the 37
+%  cells is lower than all its edge-neighbours, versus 6 of the 71 marks
+%  that crest normally. Not rain: simulation hours 60-72 carry 1.7% of
+%  the event and hours after 72 carry none (basin-mean MRMS, hour 0 =
+%  2017-08-26 18:00). What they are is a lake: the model's peak water
+%  surface across all 37 is 20.0 +/- 1.1 m over surveyed peaks of
+%  6.2-20.2 m, and 26% of the perimeter lies below 20 m while the exit
+%  is 13 element edges wide. The reach ponds to the height its walls
+%  impose.]
   \item \textbf{Is a $20\%$ error in antecedent water storage plausible
         at event hour 29?} Scaling the initial state down by $20\%$
         improves peak-WSE MAE by $0.075$\,m
@@ -2335,6 +2402,7 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         source. \emph{If it is not plausible}, then something else is
         producing a systematic high bias and the scan has found a
         symptom rather than a cause.
+\textcolor{red}{Donghui: 20\% error in antecedent water storage is possible. Actually, the initial condition remains highly uncertainty but can significantly affect the prediction accuracy in the next few days. It will be an interesting study to infer the IC based on target.} 
   \item \textbf{Is the calibrated field itself acceptable?} We can
         report a field that fits better than any global scaling, but it
         sits $9.2$ prior standard deviations from the NLCD lookup ---
@@ -2347,9 +2415,10 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
         roughness map. The specific judgment we need is which classes
         have credible ranges, as opposed to one width applied to all
         fifteen: the spectrum says the marks inform developed-medium
-        (a $36\%$ uncertainty reduction) and four others weakly, and
-        seven classes not at all, so those seven should be frozen on
-        physical grounds rather than left for an optimizer to move.
+        and woody wetland ($30\%$ and $28\%$ uncertainty reductions),
+        three others weakly, and ten classes by $5\%$ or less, so those
+        ten should be frozen on physical grounds rather than left for
+        an optimizer to move.
 \end{enumerate}
 
 \section*{Open issues and current positions, in order of importance}
@@ -2378,6 +2447,7 @@ the event.]}
         misfit restricted to times when model and observation are both
         above the cell bed, and flood-extent agreement is a candidate
         third; neither is needed for the headline number.
+\textcolor{red}{Donghui: There is a mismatch between of the spatial resoltion of the high water marks (point) and mesh. So, I would suggest to calibrate with gauge observation.} 
   \item \textbf{[Science + numerics] Which parameterization the data
         actually supports.} The evidence: 238 gauge
         observations fit essentially perfectly while a per-cell field
@@ -2408,6 +2478,7 @@ the event.]}
         control that shows why. Freezing weakly-constrained parameters
         is the structural fix; leaning on the Tikhonov weight to
         suppress them after the fact is not.
+\textcolor{red}{Donghui: I prefer calibrating the Manning coefficient per NLCD class instead of per cell.}
   \item \textbf{[Numerics] Inner tolerances and gradient fidelity.}
         Resolved by measurement: loose Krylov tolerances were a false
         economy (tightening $10^{-2} \to 10^{-3}$ is \emph{faster};
