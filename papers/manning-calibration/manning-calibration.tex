@@ -2335,20 +2335,35 @@ on the answer. The longer list of open issues, tagged by team, follows.]}
 
 \begin{enumerate}
   \item \textbf{How far can the NLCD Manning lookup be wrong, in
-        percent?} \emph{This one sets a number in the method directly.}
-        The prior width is the regularization: $\beta = \sigma^{-2}$.
-        We measured that holding the calibration to a physically
-        defensible field requires believing the lookup is good to
-        $\pm 15\%$; allow $\pm 30\%$ and the data drives developed-medium
-        urban to $n = 0.036$ (smoother than concrete) while
-        developed-low, interleaved with it, goes to $0.24$. We are
-        currently using a width at the tight end of that range and
-        saying so. \emph{If $\pm 15\%$ is defensible}, the calibration
-        stands as reported. \emph{If the honest width is $\pm 30\%$ or
-        more}, then the headline result is that this observable cannot
-        support a defensible distributed roughness field at all --- a
-        stronger negative claim than the paper currently makes, and one
-        we would want to make deliberately.
+        percent --- and for which classes?} \emph{This one sets a number
+        in the method directly.} The prior width is the regularization:
+        $\beta = \sigma^{-2}$. Two facts to answer against. First, what
+        has actually been run: every calibration and the spectrum in
+        this draft use an \emph{absolute} width $\sigma_n = 0.015$, which
+        is $\pm 12.5\%$ on developed-medium --- the class that carries
+        the leading eigenvector --- but $\pm 9\%$ on developed-high and
+        $\pm 56\%$ on barren. Under that prior the first quasi-Newton
+        step drove developed-low up $2.6\times$ and developed-medium to
+        its floor ($n = 0.036$, smoother than concrete), an excursion
+        ordered by prior value rather than by hydrology
+        (Section~\ref{sec:calibration}). The uniform relative width the
+        text describes is what we intend; calibrations under it, at
+        $\pm 15\%$ and $\pm 30\%$ for fifteen classes and for three, are
+        running as this is written and will replace this paragraph.
+        Second, what the spectrum already says, since its prior enters
+        only in the whitening: under a uniform relative width these 46
+        marks support one roughness combination at $\pm 15\%$, two at
+        $\pm 20\%$, three at $\pm 30\%$, four at $\pm 50\%$. \emph{If
+        $\pm 15\%$ is defensible}, the one-parameter reading and the
+        calibration stand as reported. \emph{If the honest width is
+        $\pm 30\%$} --- the answer below --- the marks determine three
+        combinations, which is the three-class active set of
+        Section~\ref{sec:spectrum}, and the headline becomes that
+        calibration; what a $\pm 30\%$ prior cannot support is the
+        \emph{fifteen}-class field, whose twelve undetermined directions
+        it releases. The part of the answer we still need is whether
+        $\pm 30\%$ is meant for the developed classes specifically,
+        which dominate both the area and the spectrum.
 \textcolor{red}{Donghui: I think $\pm 30\%$ or more is possible.}
   \item \textbf{Is $15\%$ of peak-WSE error being roughness-attributable
         what you would expect} for a 30\,m model of this event?
