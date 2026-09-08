@@ -44,7 +44,21 @@
 set -u
 export MPICH_GPU_SUPPORT_ENABLED=1
 cd $SCRATCH/gpu-implicit
-ADJ=$HOME/Codes/rdycore-manning/build-claude-gpu8/driver/rdycore_adjoint
+ADJ=$HOME/Codes/rdycore-manning/build-claude-gpu9/driver/rdycore_adjoint
+
+# gpu9, not gpu8. gpu8 was linked against a PETSc arch that was replaced on
+# 2026-09-03, and the first o62 submission died in 9 s with exit 127
+# ("libmuparser.so.2: cannot open shared object file"). gpu9 is built against
+# petsc-claude main's arch-perlmutter-opt-gcc-kokkos-cuda after that arch was
+# reconfigured with the RDycore package set. The binary has no RPATH, so
+# PETSc, muparser, hdf5, libCEED and Kokkos resolve through LD_LIBRARY_PATH --
+# which earlier campaigns inherited from the submitting login shell and a job
+# submitted over non-interactive ssh does not. Set it here and refuse to run
+# if anything is unresolved: a 6-hour slot is not the place to find out.
+export LD_LIBRARY_PATH=$HOME/Codes/petsc-claude/arch-perlmutter-opt-gcc-kokkos-cuda/lib:${LD_LIBRARY_PATH:-}
+if ldd $ADJ | grep -q "not found"; then
+  echo "UNRESOLVED SHARED LIBRARIES for $ADJ:"; ldd $ADJ | grep "not found"; exit 1
+fi
 RAIN=/global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin
 CKPT=checkpoints_o37/o37.rdycore.r.104400.bin
 
