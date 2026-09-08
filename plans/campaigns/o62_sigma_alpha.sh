@@ -56,8 +56,11 @@ ADJ=$HOME/Codes/rdycore-manning/build-claude-gpu9/driver/rdycore_adjoint
 # submitted over non-interactive ssh does not. Set it here and refuse to run
 # if anything is unresolved: a 6-hour slot is not the place to find out.
 export LD_LIBRARY_PATH=$HOME/Codes/petsc-claude/arch-perlmutter-opt-gcc-kokkos-cuda/lib:${LD_LIBRARY_PATH:-}
-if ldd $ADJ | grep -q "not found"; then
-  echo "UNRESOLVED SHARED LIBRARIES for $ADJ:"; ldd $ADJ | grep "not found"; exit 1
+# ("visibility=hidden => not found" is an ldd artifact of the -fvisibility=hidden
+# token in PETSc's pkg-config output, not a library: readelf shows no such
+# NEEDED entry and the binary loads and runs. Only real libraries count.)
+if ldd $ADJ | grep "not found" | grep -qv "visibility=hidden"; then
+  echo "UNRESOLVED SHARED LIBRARIES for $ADJ:"; ldd $ADJ | grep "not found" | grep -v "visibility=hidden"; exit 1
 fi
 RAIN=/global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin
 CKPT=checkpoints_o37/o37.rdycore.r.104400.bin
