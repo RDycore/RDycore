@@ -80,49 +80,42 @@ Buffalo, NY, USA}
 \maketitle
 
 \begin{abstract}
-We present what is, to our knowledge, the first \emph{transient}
-discrete adjoint in a component of the Energy Exascale Earth System
-Model (E3SM): its river dynamical core, RDycore. Rather than rewrite
-the model in a differentiable-programming framework, we differentiated
-the production solver in place, keeping its discretization, data
-structures, and GPU backends. An objective-plus-gradient evaluation
-costs about two forward solves, most of the excess being the
-checkpoint recomputation a nonlinear model needs rather than the
-adjoint sweep itself --- and, the property that matters, that cost is
-independent of how many parameters are being calibrated. Every
-derivative is validated against finite differences of the full
-nonlinear solve.
+This paper presents a transient discrete adjoint of RDycore, the river
+dynamical core of the Energy Exascale Earth System Model (E3SM), and
+uses it to measure how much of a flood model's error its roughness
+parameter is able to remove. We differentiate the production solver in
+place rather than rewrite it in a differentiable-programming
+framework: one exact, assembled Jacobian of the shallow-water
+right-hand side serves the implicit time integrator, the adjoint, and
+the calibration. An objective and its gradient cost about two forward
+solves regardless of the number of parameters, every derivative passes
+a finite-difference gate on the full nonlinear solve, and the whole
+gradient path runs on GPUs, where four NVIDIA A100s run a calibration
+iteration on a dense-gauge twin $19\times$ faster than a 64-core CPU
+node.
 
-We use the capability to ask a question calibration studies rarely
-ask: not how much error an optimizer removed, but how much of the
-model's error a parameter is \emph{able} to remove. Tests with
-synthetic observations show that what a calibration can recover
-depends on where the observations are taken and what they measure,
-not on how many there are. Manning roughness is the parameter
-depth-averaged flood models usually calibrate, and for Hurricane
-Harvey on a 2.93M-cell Houston-area mesh, scored against 46 surveyed
-high-water marks, its ceiling can be measured before any optimizer
-runs: a single factor on the whole roughness field closes at most
-$0.08$\,m of a $0.72$\,m gap, and only at physically indefensible
-roughness values; fifteen land-cover classes calibrated separately
-close $0.107$\,m --- still only $15\%$ of the error. Sixteen forward
-runs (one per class, perturbed, plus a baseline) show why: the marks
-carry about \emph{one} parameter's worth of independent information
-about roughness, so most of what a fifteen-class calibration reports
-comes from the prior, not from the data.
-
-Pointing the same measurement at the model's initial state finds a
-larger effect: reducing the water stored in the domain at the start of
-the calibration window by $20\%$ is worth $0.075$\,m, from a
-perturbation far easier to defend than the extreme roughness values
-needed to match it. Fitting an initial state of millions of unknowns
-to 46 observations would mean little, so we read the result as a
-diagnosis: most of the remaining error lives in the model's water
-balance, not in its friction.
-
-A few forward runs are enough to establish this ceiling, and reporting
-it alongside the error an optimizer actually removed shows how much of
-a model's error was ever the parameter's to remove.
+For Hurricane Harvey on a 2.93M-cell, 30\,m mesh of the Houston area,
+scored against 46 surveyed high-water marks, the ceiling of Manning
+roughness is measurable before any optimizer runs. A single factor on
+the whole roughness field removes at most $0.08$\,m of a $0.72$\,m
+error, and only at roughness values no hydrologist would defend;
+fifteen land-cover classes calibrated separately remove $0.107$\,m,
+$15\%$ of the error. The spectrum of the prior-preconditioned
+Gauss--Newton Hessian, from sixteen forward runs, shows why: at the
+$\pm 30\%$ width the land-cover lookup deserves, the marks determine
+about three combinations of the fifteen classes, and calibrating those
+three recovers $85\%$ of what fifteen achieve, with objective and error
+metrics in agreement where the fifteen-class field's are not.
+% [PENDING o62: refresh 85% / 0.6274 with the sigma_alpha = 0.30 numbers]
+What a $\pm 30\%$ prior cannot support is the fifteen-class field. The
+survey is the observable because at seven of twelve stream gauges the
+30\,m cell's bed sits above the peak observed water surface: the mesh
+holds the bank of an incised bayou, not its channel.
+% [PENDING o63: one sentence -- does the gauge-calibrated field predict the marks?]
+Pointed at the initial state, the same measurement finds more: a
+$20\%$ reduction in stored water is worth $0.075$\,m. Most of the
+remaining error lives in the model's water balance, not in its
+friction.
 \end{abstract}
 
 \section{Introduction}
@@ -157,12 +150,17 @@ sensitivity measures to decide how to spatialize the friction field
 before assimilating --- the same observable and the same design move
 that Sections~\ref{sec:hwm} and~\ref{sec:authority} employ, at street
 scale and with a Tapenade-generated adjoint of a solver built for
-assimilation. What we add is neither the adjoint nor the observable but
-the setting and the question: a production Earth-system component
-differentiated in place, and a measurement of how much of the model's
-error the parameter can explain at all. The measurement is not
-specific to roughness, and Section~\ref{sec:icauthority} turns it on
-the model's initial state --- where it finds more.
+assimilation. What this paper adds is neither the adjoint nor the
+observable but the setting and the question: a production Earth-system
+component differentiated in place, and a measurement of how much of
+the model's error the parameter can explain at all. For this event and
+this observable the answer is $15\%$, and the spectrum of the
+calibration problem explains it: the marks determine about three
+roughness combinations, so a calibration of three parameters recovers
+most of what fifteen achieve and a wide prior releases the twelve it
+cannot determine. The measurement is not specific to roughness, and
+Section~\ref{sec:icauthority} turns it on the model's initial state,
+where it finds more.
 
 A recent generation of \emph{differentiable} flood and hydrology codes
 obtains gradients by rewriting simplified solvers inside
@@ -208,21 +206,36 @@ assembled Jacobian and TSAdjoint-based sensitivities
 \cite{zhang2022tsadjoint} --- entirely behind a configuration flag, with
 no impact on existing runs and no new dependencies.
 
-Contributions: (i) an exact, FD-verified Jacobian of the SWE right-hand
-side, including Roe dissipation, entropy-fix branches, wet/dry
-branches, and reflecting/Dirichlet/critical-outflow boundary
-conditions; (ii) adjoint gradients $dJ/du_0$ and $dJ/dn$ with
-respect to water-height observations at gauge locations at multiple
-observation times, FD-validated to $10^{-5}$ or better;
-(iii) TAO-based recovery of per-region, per-cell and land-cover-class
-roughness fields, with a quantified study of when the observing network
-makes them identifiable at all; (iv) implicit
-(backward Euler) stepping and its adjoint, enabled by the same
-Jacobian, with an empirical demonstration that explicit friction fails
-at operational time steps on a Hurricane Harvey configuration; and (v)
-a catalog of the nondifferentiable structures encountered --- useful,
-we believe, to anyone retrofitting adjoints onto an operational flood
-code.
+This paper contributes:
+\begin{itemize}
+  \item an exact Jacobian of the shallow-water right-hand side ---
+        Roe dissipation, entropy-fix and wet/dry branches, and
+        reflecting, Dirichlet and critical-outflow boundaries ---
+        verified against finite differences to $10^{-6}$
+        (Section~\ref{sec:jacobian});
+  \item adjoint gradients with respect to the initial state and the
+        roughness field, at multiple observation times, verified to
+        $10^{-5}$ or better (Section~\ref{sec:adjoint});
+  \item implicit backward-Euler stepping and its adjoint from the same
+        Jacobian, with the measurement that the explicit friction term
+        returns a non-finite state at every step tested on the 30\,m
+        Hurricane Harvey mesh (Section~\ref{sec:implicit});
+  \item a measurement of when an observing network makes a roughness
+        field identifiable at all, from twin experiments and from the
+        spectrum of the prior-preconditioned Gauss--Newton Hessian,
+        which counts the roughness combinations the observations
+        determine (Sections~\ref{sec:houston} and~\ref{sec:spectrum});
+  \item the ceiling of roughness on the Hurricane Harvey survey error,
+        $15\%$, and the three-parameter calibration the spectrum
+        selects (Sections~\ref{sec:authority}--\ref{sec:spectrum});
+  % [PENDING o63: a validation item -- gauge-calibrated, mark-validated]
+  \item the same measurement applied to the initial state, where it
+        finds more, and the diagnosis of the downstream reach as a
+        ponded lake behind the domain's outlet
+        (Sections~\ref{sec:hwm} and~\ref{sec:icauthority});
+  \item a catalog of the nondifferentiable structures a production
+        flood code presents to an adjoint (Section~\ref{sec:nondiff}).
+\end{itemize}
 
 \section{Methods}
 \label{sec:methods}
@@ -1165,8 +1178,9 @@ records.\footnote{HydroShare DOI
 Re-running the same twin with the observation operator built at those
 seventeen gauge cells --- 238 observations (17 gauges $\times$ 14
 times) against 2{,}746 parameters --- is a sobering experiment. BLMVM
-drives the misfit down by a factor of $2\times10^{7}$, an essentially
-perfect fit of the observations, while the recovered field is
+drives the misfit down by a factor of $2\times10^{7}$ --- the
+synthetic observations carry no noise, and are fit to roundoff ---
+while the recovered field is
 $44.9\%$ from the truth and saturates both bounds
 (Figure~\ref{fig:map}, far right). This is semiconvergence in its
 purest form: the real network's null space is so large that data fit
@@ -1305,9 +1319,54 @@ Calibration against the actual stage records is blocked by geometry,
 not software: at all 13 rain-driven USGS gauges in the 30\,m domain,
 modelled water-surface elevation sits 1--11\,m \emph{above} observed
 stage, because a 30\,m cell stores one mean ground elevation ---
-essentially the bank of an incised bayou --- while the gauge hangs in
+the bank of an incised bayou --- while the gauge hangs in
 the channel below it; the offset is time-varying as the real channel
-fills, so no per-gauge datum correction can repair it. We therefore
+fills, so no per-gauge datum correction can repair it. Comparing the
+mesh directly against the stage record makes the geometry explicit
+(Table~\ref{tab:gauges}): over the calibration window the cell bed
+sits above the \emph{peak} observed water surface at seven of the
+twelve gauges with data, and above the water surface for $71\%$ of all
+gauge-hours. Only the two Buffalo Bayou main-stem gauges, where the
+channel is wider than a cell, and the two gauges in the Addicks and
+Barker reservoir pools hold their water for the whole window. The
+mesh resolves the major channel and not the tributaries, which is
+where nine of the thirteen gauges sit.
+% [PENDING o63: the gauge-calibrated / mark-validated design and its result]
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Gauge & cell bed (m) & window WSE (m) & above bed \\
+\midrule
+Buffalo Bayou nr Katy & $33.27$ & $35.56$--$36.05$ & $100\%$ \\
+Buffalo Bayou at Houston & $6.93$ & $10.64$--$12.77$ & $100\%$ \\
+Langham Ck nr Addicks & $28.23$ & $30.70$--$31.28$ & $100\%$ \\
+Bear Ck nr Barker & $34.73$ & $34.96$ & $100\%$ \\
+Buffalo Bayou nr Fulshear & $31.47$ & $31.23$--$31.56$ & $29\%$ \\
+Langham Ck at W Little York & $34.10$ & $32.76$--$34.09$ & $0\%$ \\
+S Mayde Ck & $34.60$ & $34.07$--$34.29$ & $0\%$ \\
+Whiteoak Bayou at Alabonson & $23.60$ & $22.26$--$23.48$ & $0\%$ \\
+Brickhouse Gully & $20.40$ & $16.24$--$19.64$ & $0\%$ \\
+Cole Ck & $25.30$ & $20.95$--$22.51$ & $0\%$ \\
+Little Whiteoak Bayou & $14.50$ & $10.65$--$13.37$ & $0\%$ \\
+Whiteoak Bayou at Main St & $11.80$ & $9.66$--$11.33$ & $0\%$ \\
+Whiteoak Bayou at Houston & $15.03$ & \multicolumn{2}{l}{no record in window} \\
+\bottomrule
+\end{tabular}
+\caption{The 30\,m mesh against the stage record at the thirteen
+rain-driven USGS gauges over the calibration window (event hours
+29--41). Stage at these gauges is published as water-surface elevation
+(WSE) in NAVD88, the datum of the mesh, so the cell's mean bed
+elevation and the observed water surface compare directly. ``Above
+bed'' is the fraction of the window's 15-minute records with the
+observed water surface above the cell bed. At seven gauges the bed
+sits above even the window's peak stage: the cell holds the bank, and
+no roughness value places water in it at the elevation the gauge
+reads.}
+\label{tab:gauges}
+\end{table}
+We therefore
 changed the observable to the USGS high-water-mark archive: surveyed
 \emph{peak} water-surface elevations on structures and debris lines,
 i.e.\ on the floodplain surfaces a 30\,m cell does represent, and the
@@ -1625,9 +1684,11 @@ fast/slow junction ponds water, so partial changes \emph{raise} peaks.
 Only a domain-coherent change lowers them.
 
 The conclusion is a design finding, not a tuning observation. The
-peak-WSE observable at these marks constrains essentially \emph{one}
-roughness degree of freedom --- the domain-scale, path-integrated
-conveyance --- worth $\sim 10\%$ of the model--survey discrepancy. It
+peak-WSE observable at these marks constrains \emph{one} roughness
+degree of freedom at the prior width used here --- the domain-scale,
+path-integrated conveyance --- worth $\sim 10\%$ of the model--survey
+discrepancy, and about three at the width the lookup deserves
+(Section~\ref{sec:spectrum}). It
 does not carry fifteen classes' worth of information. This unifies the
 earlier evidence rather than sitting beside it: the perfect-data twin
 recovers only the classes that move the domain mean, and the noisy twin
@@ -1865,7 +1926,7 @@ The reassuring half is that the null space behaved. Two iterations in,
 the optimizer had moved deciduous forest to $\alpha = 0.739$, mixed
 forest to $1.096$ and cropland to $1.274$ --- three classes these marks
 teach nothing about --- and by iteration nine accumulated curvature had
-returned all three essentially to the prior ($0.983$, $1.006$,
+returned all three to within $10\%$ of the prior ($0.983$, $1.006$,
 $1.098$). Those excursions were transients of an under-informed
 quasi-Newton approximation rather than features of the minimizer: the
 misfit gradient in uninformative directions is not zero, merely
@@ -2104,8 +2165,8 @@ calibrate the initial condition against these marks. Over this window
 the initial state carries $3$ unknowns on each of 2.93M cells against
 46 peak observations, and everything Section~\ref{sec:authority}
 establishes about identifiability applies with three more orders of
-magnitude of freedom: such a calibration would fit the marks essentially
-exactly and mean nothing. What the scan does establish is the weaker
+magnitude of freedom: such a calibration would fit the marks exactly
+and mean nothing. What the scan does establish is the weaker
 and more useful claim that the residual these marks measure lives substantially
 in the water balance --- in the rainfall forcing or the antecedent state
 --- rather than in the friction, which is where a roughness calibration
