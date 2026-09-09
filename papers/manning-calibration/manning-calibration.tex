@@ -45,24 +45,8 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 
-\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
-
-% Title candidates, shortest first (the question-form original was
-% "How much of a flood model's error can roughness explain?
-%  Adjoint-based measurement and calibration in E3SM's river dynamical core"):
-%   A. Adjoint measurement and calibration of Manning roughness in
-%      E3SM's river dynamical core                      <- current
-%   B. How much flood-model error can roughness explain?
-%      An adjoint study in E3SM's river dynamical core
-%   C. What roughness calibration can achieve: an adjoint measurement
-%      in E3SM's river dynamical core
 \title{Adjoint measurement and calibration of Manning roughness in
-E3SM's river dynamical core\thanks{Cut from the title but still the
-paper's question: ``How much of a flood model's error can roughness
-explain?''}\\[4pt]\large DRAFT for internal review}
-% author roster and affiliations from the RDycore EMS paper (Bisht et al.,
-% Environ. Model. Softw. 197 (2026) 106804); order provisional pending the
-% venue/authorship decision
+E3SM's river dynamical core\\[4pt]\large DRAFT for internal review}
 \author{Mark Adams$^1$, Gautam Bisht$^2$, Donghui Xu$^2$, Jeffrey
 Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$\\[2pt]
 \footnotesize $^1$Applied Mathematics \& Computational Research Division,
@@ -175,12 +159,6 @@ differentiability. A parallel line ports production hydrodynamics to
 GPUs without differentiating them --- CaMa-Flood-GPU~\cite{kang2026cama}
 is a GPU reimplementation of CaMa-Flood, with gradient-based
 calibration named as future work rather than demonstrated.
-% [CLAUDE: CaMa-Flod-GPU is not differentiable]
-% [CLAUDE-REPLY/DX: correct, and thank you -- checked the GMD paper, it
-%  reports no adjoint. Moved out of the differentiable list into its own
-%  clause as a GPU port. Kept the citation because it makes our point
-%  better there: the GPU work exists and *wants* the gradient. Please
-%  confirm the "future work" characterization is fair to Kang et al.]
 
 This paper takes the complementary route: make the production code
 differentiable. That route has a long precedent outside E3SM --- most
@@ -1262,7 +1240,15 @@ Of 2{,}364 Harvey marks, 324 fall in the Turning domain; applying to
 the marks the same QC that disqualified the gauges --- is the surveyed
 elevation above the containing cell's bed? --- rejects $62\%$ of them
 (they are channel surveys), leaving 108 marks of quality fair or
-better. The misfit compares each mark cell's peak simulated WSE over
+better. The mismatch this QC addresses is the one Xu et al.\ measured on
+a 30\,m simulation of the same event: validated against 48 marks, their
+simulation had an RMSE of $0.9$\,m with 25 of 48 within $25\%$, which they
+attribute to comparing a point survey with a cell average~\cite{xu2025harvey}.
+Two choices here reduce that exposure. The QC keeps only marks on surfaces
+a cell represents, and the misfit compares water-surface elevations rather
+than depths, so the difference between the ground at the point and the
+mean ground of the cell enters once, through the cell bed, and not a
+second time through the depth. The misfit compares each mark cell's peak simulated WSE over
 the window, $\max_k H u(t_k)$, against the surveyed value; its
 adjoint needs no new machinery, because each mark's residual can be
 injected at its own argmax time in the segmented backward sweep of
@@ -1907,25 +1893,6 @@ partners frozen it must supply their share of a change the marks
 constrain only in combination --- equifinality, exactly where the
 eigenvector says to expect it.
 
-% [Emil, 2026-09-06: Use tab:scaling as a benchmark with independent,
-%  equal-variance residual errors and comparable per-mark sensitivities
-%  for the fixed prior and linearization; do not frame it as a prediction
-%  for the actual expanded datasets. Correlated residual errors enter
-%  through Gamma^{1/2} S^T C^{-1} S Gamma^{1/2}. No separate OED study
-%  needed if claims stay restricted to the benchmark; the count of
-%  data-informed combinations is the important part. Scaling arithmetic:
-%  71 and 108 marks give 2 and 3 directions with lambda>1; 46 marks at
-%  sigma=0.10 m also gives 3.]
-% [CLAUDE-REPLY/Emil: your three counts are right and ours were stale --
-%  tab:scaling and tab:learned were computed from the two-hour PILOT
-%  spectrum (lambda_3 = 0.33) and never recomputed when the production
-%  spectrum (lambda_3 = 0.61) replaced it on 08-29; the 46-mark count was
-%  the only row rechecked. Both tables now use the production spectrum
-%  (reproduced from the o61 dumps: 2.779, 0.682, 0.613). Benchmark
-%  framing and the covariance form added to the caption; no OED study.
-%  One caveat we will add once the prior question settles: the count
-%  depends on the prior width (1 at +/-15%, 2 at +/-20%, 3 at +/-30%,
-%  uniform relative), so we will report it alongside the width.]
 
 \paragraph{Would more marks fix it?}
 This is the natural objection --- 46 observations for 15 parameters
@@ -2072,7 +2039,10 @@ water-balance error at hour 29 is physically plausible is a question for
 the forcing data, not for the optimizer. The domain team's answer is
 that it is: the antecedent state after a 29-hour spin-up under radar
 rainfall is among the least certain inputs the model has, and an error
-of that size in it is plausible.
+of that size in it is plausible. The same group's uncertainty study of this
+event finds precipitation and mesh resolution to dominate the simulated
+inundation over the choice of outlet boundary condition~\cite{xu2025harvey},
+which points the same way.
 
 \section{Conclusions and outlook}
 
@@ -2146,6 +2116,21 @@ finite-difference gates of Table~\ref{tab:verification} carry over
 unchanged. Third, land-cover-class parameterization (tens of TAO
 evaluations instead of hundreds) and calibration windows placed on
 the storm peak rather than the full event.
+
+\section*{Code and data availability}
+RDycore is open source at \url{https://github.com/RDycore/RDycore}; the
+adjoint, Jacobian, implicit-stepping and calibration capability of this
+paper is on the \texttt{adams/gpu-implicit} branch behind the
+\texttt{numerics.jacobian} and \texttt{adjoint} configuration flags, and
+the verification gates of Table~\ref{tab:verification} run in its
+\texttt{ctest} suite. The exact revision, the campaign scripts, the
+observation tables, and the per-mark peak dumps behind
+Figures~\ref{fig:authority} and~\ref{fig:spectrum} will be archived on
+Zenodo at submission \textbf{[DOI to be minted]}. Hurricane Harvey
+high-water marks are the USGS survey served by the Short-Term Network
+Flood Event Viewer (\url{https://stn.wim.usgs.gov}); stage records are
+USGS NWIS; rainfall is MRMS. \textbf{[Mesh, checkpoint, and rainfall archive: location to be
+stated.]}
 
 \bibliographystyle{unsrt}
 \bibliography{manning-calibration}
