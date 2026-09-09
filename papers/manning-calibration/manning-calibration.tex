@@ -711,10 +711,11 @@ NLCD values are good to $\pm 15\%$ for the calibration to stay
 physical, while at $\pm 30\%$ the data drives it somewhere no
 hydrologist would defend. \emph{Within a prior wide enough to be
 honest, this observable cannot deliver a defensible distributed
-roughness field.} We report the prior width used with every number and
-regard its value as an open question for the domain team --- it heads
-the list of questions at the end of this draft --- not as a tuning
-parameter.
+roughness field.} We report the prior width used with every number. Its
+value is a judgment about the land-cover lookup, not a tuning
+parameter, and the domain team's judgment is that the lookup can be
+wrong by $30\%$ or more; Section~\ref{sec:spectrum} turns that width
+into a count of the roughness combinations the marks determine.
 
 The diagnosis is worth separating from the fix, because the failure
 mode is not specific to this model: an optimizer that takes zero steps
@@ -1882,8 +1883,10 @@ lookup value. So the displacement is not an optimizer wandering where
 the data is silent. It is the data asking, in the one direction it can
 speak, for roughness below what the published table and our stated
 prior width jointly allow. Whether that request is admissible is not
-something the optimizer can settle; it is the first of the questions we
-put to the domain team.
+something the optimizer can settle. The domain team puts the lookup's
+uncertainty at $30\%$ or more, which admits the request for the classes
+the marks constrain and, as the spectrum shows, releases twelve that
+they do not.
 
 \begin{table}
 \centering\small
@@ -2117,8 +2120,10 @@ launder the downstream drainage defect of Section~\ref{sec:hwm} into a
 ``corrected'' initial state --- the same trap as scoring against the 37
 marks the model cannot drain. Establishing whether a $20\%$
 water-balance error at hour 29 is physically plausible is a question for
-the forcing data, not for the optimizer, and it heads our list of
-questions at the end of this draft.
+the forcing data, not for the optimizer. The domain team's answer is
+that it is: the antecedent state after a 29-hour spin-up under radar
+rainfall is among the least certain inputs the model has, and an error
+of that size in it is plausible.
 
 \section{Conclusions and outlook}
 
@@ -2192,250 +2197,6 @@ finite-difference gates of Table~\ref{tab:verification} carry over
 unchanged. Third, land-cover-class parameterization (tens of TAO
 evaluations instead of hundreds) and calibration windows placed on
 the storm peak rather than the full event.
-
-\section*{Red/tiger-team review: the weakest parts of this draft}
-\textcolor{red}{[Temporary section, removed before submission. Our own
-adversarial read of the draft --- the places a hostile reviewer (or a
-careful friend) will push, ranked by how much damage they could do,
-each stated as of today. Cross-references Q$n$ point into the numbered
-issues of the next section.]}
-
-\begin{enumerate}
-  \item \textbf{The calibration is real but not converged.} The
-        abstract's differentiator --- production code made
-        differentiable, versus reduced solvers rewritten in ML
-        frameworks --- invites comparison with Inunda's calibrated
-        $0.67$\,m MAE against surveyed Harvey high-water marks, and that
-        comparison must not be made: the mark sets differ, and ours is a
-        favourable upstream subset chosen because the model drains it.
-        What now exists is a calibrated field that beats every uniform
-        alternative (Table~\ref{tab:ladder}), reached from the NLCD
-        prior by the scaled optimization problem of
-        Section~\ref{sec:calibration}. The first attempt took
-        \emph{zero} steps --- a scaling defect in the optimization
-        problem, not in the gradient, diagnosed, fixed and gated --- and
-        the exposure that leaves is worth stating plainly: a reviewer
-        may reasonably ask whether the negative identifiability result
-        is a property of the problem or of an optimizer we could not
-        drive. The $\alpha$-scan answers that independently of any
-        optimizer, and the calibration now lands where the scan implies
-        it should. What is still missing is convergence: the reported
-        field is two quasi-Newton iterations in, one class rests on a
-        bound, and there is no out-of-sample test --- which must be
-        cross-validation \emph{within} the upstream band, since the
-        middle band carries the drainage defect
-        (Table~\ref{tab:bands}). (Q1, Q2)
-  \item \textbf{The identifiability caveats are weaker than they were,
-        but the twins still carry them.} The measured study
-        (Section~\ref{sec:identifiability}) --- 13 gauges fail, 108
-        marks identify the classes covering $83\%$ of the domain ---
-        rests on a one-hour window, a 15-iteration cap and no
-        representation error, which is exactly where a reviewer will
-        push. Section~\ref{sec:authority} now answers that push from a
-        different direction: the $\alpha$ and half-domain scans are on
-        the \emph{production} 12-hour window against \emph{real}
-        survey data, carry no iteration cap because no optimizer is
-        involved, and reach the same conclusion the twins did. The
-        remaining exposure is narrower --- the twins are still the only
-        evidence about \emph{which} classes are recoverable, as opposed
-        to how many. (Q2)
-  \item \textbf{Long-window FD gates measure the objective's
-        nonsmoothness, not gradient error --- and the paper must not
-        be read as claiming more.} The gradient is verified to the
-        inner-solve floor on short windows at the production
-        tolerances (which are now converged tolerances, closing the
-        old verified-versus-production gap), and the long-window
-        failure of the naive gate is measured and explained
-        (Section~\ref{sec:hwm}). The exposure is a reviewer reading
-        ``FD-gated in CI'' as covering production window lengths.
-        (Q3)
-  \item \textbf{``Implicit stepping is required'' means required for
-        the differentiable right-hand side.} The operator-split
-        friction the forward-only code uses is stable under explicit
-        stepping but buries $\Delta t$ inside the RHS; the
-        differentiable RHS is friction-stiff
-        ($\Delta t \lesssim 2.4$\,ms on the spun-up 30\,m state) and
-        diverged at every tested explicit step. Any wall-clock
-        comparison against operator-split explicit stepping compares
-        different discretizations and is labeled as such. Still open:
-        $\Delta t \ge 5$\,s is blocked by a preconditioner failure.
-        (Q6)
-  \item \textbf{We changed the physics to fix the solver, and the
-        changes await domain sign-off.} The regularized drag velocity
-        ($h_{\rm anuga} = 0.001$\,m, chosen as ``smallest that cures
-        the stall''; $0.01$\,m observed unstable and the mechanism only
-        conjectured) and the transmissive outlet (replacing critical
-        outflow; alters outlet physics; weakly reflective for
-        subcritical flow) are both defensible and both flagged opt-in,
-        but a reviewer can fairly ask whether the calibrated $n$
-        compensates for boundary and regularization choices rather
-        than physics. Sensitivity of the calibrated field to
-        $h_{\rm anuga}$ and to the outlet choice should be
-        demonstrated, not asserted. (Q4, Q5)
-  \item \textbf{Noise response is measured but only partly built into
-        the method.} The basin-scale noisy twin shows the failure mode
-        (misfit falls $9.4\times$ while five classes pin to bounds,
-        Table~\ref{tab:snr}). The Tikhonov weight is no longer chosen
-        by judgment --- it is $\sigma_n^{-2}$ for a stated prior
-        standard deviation on Manning $n$, Eq.~\eqref{eq:sigman} ---
-        but that only relocates the judgment into $\sigma_n$, which the
-        domain team has not yet fixed, and the value we are using
-        ($0.015$) is close to the largest that leaves the dominant
-        direction with an interior minimum. Discrepancy-principle
-        stopping still does not exist, and in any case the discrepancy
-        target $J \approx N/2$ is unreachable here: the achievable
-        floor is set by structural error an order of magnitude larger
-        than the $0.15$\,m survey error, so the floor must be reported
-        as measured rather than assumed. (Q7)
-  \item \textbf{The peak-WSE argmax remains formally open.} Its kinks
-        are measured absent at this geometry twice over --- no argmax
-        moved across any FD probe, and the production objective is
-        bit-identical across three domain decompositions --- but a
-        remedy is proposed (frozen-argmax outer iteration) and not
-        implemented, and the theoretical footing is the standard one
-        for $\max$-type observables rather than a theorem. (Q2, Q3)
-  \item \textbf{Reproducibility currently rests on an unmerged PETSc
-        fork.} The device-resident assembled-Jacobian path (blocked-COO
-        BAIJ assembly on GPU) exists only on our PETSc branch. Until it
-        is upstreamed or the paper's results are reproducible with
-        stock PETSc (AIJ path, at some cost), the artifact story is
-        weaker than the ``behind a flag, FD-gated in CI'' framing
-        suggests. (Q8)
-  \item \textbf{The novelty claim is narrowed twice over, and what is
-        left is not the adjoint.} ``First E3SM component with built-in
-        discrete-adjoint parameter estimation'' was wrong (MALI inverts
-        for basal friction with an AD adjoint of its steady velocity
-        solver~\cite{perego2014initialization,hoffman2018mali}); the
-        claim now reads first \emph{transient} discrete adjoint in an
-        E3SM component. A reviewer who knows MITgcm will press further
-        and should: an exact AD adjoint of a production ocean model has
-        driven ECCO estimation for two
-        decades~\cite{heimbach2005mitgcm,forget2015ecco}, so
-        ``production code made differentiable'' is a route with a long
-        pedigree, not an innovation. Nor is the observable ours: Pujol
-        et al.\ assimilate high-water marks variationally for
-        distributed friction, and use adjoint sensitivity to choose the
-        parameterization~\cite{pujol2024urban}. What survives is (i) the
-        exact assembled Jacobian serving the implicit solve and the
-        adjoint from one artifact, with the argument that implicit
-        stepping is required for a differentiable friction RHS, (ii)
-        basin scale on GPU, and (iii) the authority measurement of
-        Section~\ref{sec:authority}, which we have not seen reported
-        for any flood-model parameter. The draft should lead with
-        (iii). Remaining check before submission: ocean/MPAS adjoint
-        efforts, and whether any E3SM land-model calibration uses a
-        true adjoint rather than ensemble or surrogate gradients.
-\end{enumerate}
-
-\section*{Questions we need domain guidance on}
-\textcolor{red}{[Temporary section, removed before submission. Five
-questions where a domain judgment, not another run, is what is missing.
-Each states what we measured, what we need, and what changes depending
-on the answer. The longer list of open issues, tagged by team, follows.]}
-
-\begin{enumerate}
-  \item \textbf{How far can the NLCD Manning lookup be wrong, in
-        percent --- and for which classes?} \emph{This one sets a number
-        in the method directly.} The prior width is the regularization:
-        $\beta = \sigma^{-2}$. Two facts to answer against. First, what
-        has actually been run: every calibration and the spectrum in
-        this draft use an \emph{absolute} width $\sigma_n = 0.015$, which
-        is $\pm 12.5\%$ on developed-medium --- the class that carries
-        the leading eigenvector --- but $\pm 9\%$ on developed-high and
-        $\pm 56\%$ on barren. Under that prior the first quasi-Newton
-        step drove developed-low up $2.6\times$ and developed-medium to
-        its floor ($n = 0.036$, smoother than concrete), an excursion
-        ordered by prior value rather than by hydrology
-        (Section~\ref{sec:calibration}). The uniform relative width the
-        text describes is what we intend; a calibration under it costs
-        one 2-node, 6-hour Perlmutter slot (12 GPU node-hours) per width
-        per parameterization, and we will run the agreed width once
-        this question is answered rather than guess at it.
-        Second, what the spectrum already says, since its prior enters
-        only in the whitening: under a uniform relative width these 46
-        marks support one roughness combination at $\pm 15\%$, two at
-        $\pm 20\%$, three at $\pm 30\%$, four at $\pm 50\%$. \emph{If
-        $\pm 15\%$ is defensible}, the one-parameter reading and the
-        calibration stand as reported. \emph{If the honest width is
-        $\pm 30\%$} --- the answer below --- the marks determine three
-        combinations, which is the three-class active set of
-        Section~\ref{sec:spectrum}, and the headline becomes that
-        calibration; what a $\pm 30\%$ prior cannot support is the
-        \emph{fifteen}-class field, whose twelve undetermined directions
-        it releases. The part of the answer we still need is whether
-        $\pm 30\%$ is meant for the developed classes specifically,
-        which dominate both the area and the spectrum.
-\textcolor{red}{Donghui: I think $\pm 30\%$ or more is possible.}
-  \item \textbf{Is $15\%$ of peak-WSE error being roughness-attributable
-        what you would expect} for a 30\,m model of this event?
-        Calibrated, roughness accounts for $0.107$\,m of a $0.72$\,m
-        discrepancy (Table~\ref{tab:ladder}); a global scale within
-        defensible values accounts for $0.029$\,m. \emph{If that is
-        unsurprising}, the paper's framing --- measure what a parameter
-        can explain, then report it --- is the contribution. \emph{If it
-        is far lower than expected}, the forcing or the DEM deserves
-        scrutiny before any further calibration work, because it would
-        mean the error budget is dominated by something we have not
-        looked at.
-\textcolor{red}{Donghui: I think precipitation and DEM uncertainties should dominate the WSE error.Especially in the river channels, any bias of bathymetry will directly convert to WSE error.}
-  \item \textbf{Does the downstream reach's failure to drain match known
-        behaviour of this mesh and outlet configuration?} Thirty-seven
-        of 108 surveyed marks sit in cells that fill monotonically for
-        72 hours with zero recession, ending $+7.1$\,m above every
-        surveyed value while the upstream marks are already draining
-        (Table~\ref{tab:bands}). We have excluded them from calibration
-        and report the defect as a finding. We have ruled out a missing
-        or misplaced exit (Section~\ref{sec:hwm}), so the question is
-        whether this is understood behaviour, whether the cause is
-        channel bathymetry, outlet capacity, or a domain that the event
-        simply overtopped, and who owns it --- because the bias is a
-        smooth gradient across the domain, so it is contaminating the
-        middle band as well, not only the reach we excluded.
-% [Donghui, 2026-09-06: check the elevation of those 37 cells and their
-%  neighbours -- if they are local depressions, water could legitimately
-%  accumulate for 72 h. Also check whether the rainfall series lasted
-%  more than 72 h.]
-% [CLAUDE-REPLY/Donghui: both checked on the 30 m mesh and the 72-h run;
-%  the measurements are now in Section 6.1. Not depressions: 1 of the 37
-%  cells is lower than all its edge-neighbours, versus 6 of the 71 marks
-%  that crest normally. Not rain: simulation hours 60-72 carry 1.7% of
-%  the event and hours after 72 carry none (basin-mean MRMS, hour 0 =
-%  2017-08-26 18:00). What they are is a lake: the model's peak water
-%  surface across all 37 is 20.0 +/- 1.1 m over surveyed peaks of
-%  6.2-20.2 m, and 26% of the perimeter lies below 20 m while the exit
-%  is 13 element edges wide. The reach ponds to the height its walls
-%  impose.]
-  \item \textbf{Is a $20\%$ error in antecedent water storage plausible
-        at event hour 29?} Scaling the initial state down by $20\%$
-        improves peak-WSE MAE by $0.075$\,m
-        (Section~\ref{sec:icauthority}) --- more than the entire
-        physically defensible roughness range, from a perturbation that
-        seems far easier to defend given MRMS rainfall uncertainty over
-        a 29-hour spin-up. \emph{If a $20\%$ water-balance error is
-        plausible}, the next study is the forcing and the initial
-        state, not the friction, and we would want to know whether the
-        rainfall product or the antecedent condition is the more likely
-        source. \emph{If it is not plausible}, then something else is
-        producing a systematic high bias and the scan has found a
-        symptom rather than a cause.
-\textcolor{red}{Donghui: 20\% error in antecedent water storage is possible. Actually, the initial condition remains highly uncertainty but can significantly affect the prediction accuracy in the next few days. It will be an interesting study to infer the IC based on target.} 
-  \item \textbf{Is the calibrated field itself acceptable?} We can
-        report a field that fits better than any global scaling, but it
-        sits $9.2$ prior standard deviations from the NLCD lookup ---
-        raising developed-open by $80\%$ and pasture by $55\%$ above
-        their table values, holding developed-medium at its lower bound
-        ($n = 0.036$, smoother than concrete), and cutting woody wetland
-        to $n = 0.035$, some $4.2\sigma$ below its lookup value
-        (Section~\ref{sec:spectrum}). We would rather be told
-        this is uninterpretable than publish it as a calibrated
-        roughness map. The specific judgment we need is which classes
-        have credible ranges, as opposed to one width applied to all
-        fifteen: the spectrum says the marks inform developed-medium
-        and woody wetland ($30\%$ and $28\%$ uncertainty reductions),
-        three others weakly, and ten classes by $5\%$ or less, so those
-        ten should be frozen on physical grounds rather than left for
-        an optimizer to move.
-\end{enumerate}
 
 \section*{Open issues and current positions, in order of importance}
 \textcolor{red}{[Temporary section, removed before submission. These
