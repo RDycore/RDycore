@@ -232,9 +232,7 @@ This paper contributes:
   \item the same measurement applied to the initial state, where it
         finds more, and the diagnosis of the downstream reach as a
         ponded lake behind the domain's outlet
-        (Sections~\ref{sec:hwm} and~\ref{sec:icauthority});
-  \item a catalog of the nondifferentiable structures a production
-        flood code presents to an adjoint (Section~\ref{sec:nondiff}).
+        (Sections~\ref{sec:hwm} and~\ref{sec:icauthority}).
 \end{itemize}
 
 \section{Methods}
@@ -273,8 +271,7 @@ this --- \emph{branches}, in the sense that $|x|$ has a positive and a
 negative branch --- recur throughout the discretization, and they
 belong to the model rather than to the derivative: a nonlinear solver
 must accommodate them whether or not anyone differentiates the code,
-which is the argument of Section~\ref{sec:implicit}, and
-Section~\ref{sec:nondiff} catalogs the ones this work encountered.
+which is the argument of Section~\ref{sec:implicit}.
 Away from a switching surface the map is smooth and equals its active
 branch; the derivative machinery of
 Sections~\ref{sec:jacobian}--\ref{sec:adjoint} is
@@ -925,10 +922,21 @@ land-cover roughness prior, rather than the twins' smooth low-$n$
 fields, backward Euler descends cleanly for a dozen iterations and
 then freezes --- a vanishingly small line-search step changes the
 residual norm severalfold, the signature of a jump, not of
-ill-conditioning. Two mechanisms are responsible, both catalogued in
-Section~\ref{sec:nondiff} and both invisible until the parameter field
-is realistic: the drag's wet/dry cutoff, whose amplitude scales as
-$n^2$, and the critical-outflow boundary's stagnation switch.
+ill-conditioning. Two mechanisms are responsible, both invisible until the parameter
+field is realistic: the drag's wet/dry cutoff, whose amplitude scales
+as $n^2$, and the critical-outflow boundary's stagnation switch. Both
+are discontinuities of the residual rather than of its derivative, and
+both are removed by changing the model rather than the solver. The
+drag $g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$, gated at the
+dry cutoff with a plain $\mathbf{q}/h$ velocity, switches an
+$O(h^{-7/3})$ term on and off as a cell crosses the cutoff; evaluating
+it with the regularized velocity
+$\mathbf{u} = \mathbf{q}h/(h^2 + h_{\rm anuga}^2)$ of
+ANUGA, with $h_{\rm anuga} = 0.001$\,m, makes the drag vanish as
+$h^{5/3}$ instead and reduces to the plain form at
+$h_{\rm anuga} = 0$. The value is the smallest that removes the stall:
+$0.003$\,m is indistinguishable from it and $0.01$\,m is unstable. The
+outflow condition is replaced in the same spirit.
 
 Both fixes are implemented, gated, and opt-in (open issues~4--5).
 Regularizing the drag velocity removes the first and restores honest
@@ -987,128 +995,6 @@ scale. For the full window, a few hundred checkpoints ($\sim$14\,GB
 aggregate) bound the recompute overhead by a factor of about four,
 making the long-window adjoint memory-feasible; the remaining cost is
 the forward compute itself, addressed next.
-
-\subsection{Nondifferentiability catalog}
-\label{sec:nondiff}
-
-\textcolor{red}{[Reviewers: do we want this subsection at all? It is
-the least conventional part of the paper. Five of its six entries are
-now resolved with gated fixes, which is an argument for keeping it as
-the record of what retrofitting an adjoint onto an operational flood
-code actually costs --- and the counter-argument is that a resolved
-catalog is engineering detail that belongs in an issue tracker. Cut,
-keep here, or move to an appendix.]}
-
-Retrofitting an adjoint onto an operational flood code surfaces
-nonsmooth structure worth documenting. Every entry below is annotated
-with its status: five are resolved and gated in the test suite, and one
-remains open.
-
-\begin{itemize}
-  \item \textbf{Time step inside the RHS.} \emph{(Resolved.)}
-        Operator-split friction treatments (here: semi-implicit and
-        XQ2018) make $f$ depend on $\Delta t$ and on intermediate flux
-        divergences; no consistent $\partial f/\partial u$ exists. The
-        remedy is an explicit $f$ plus a genuinely implicit
-        integrator, not a smarter derivative --- which is the
-        architectural choice this section exists to justify, and the
-        reason the implicit-versus-explicit cost comparison above is
-        not the one a forward-only code would make.
-  \item \textbf{Entropy-fix branches.} \emph{(Resolved.)} The
-        critical-flow fix is piecewise smooth; branch-faithful
-        one-sided derivatives pass FD checks even on transcritical
-        states (Table~\ref{tab:verification}).
-  \item \textbf{Critical-outflow stagnation.} \emph{(Resolved by
-        changing the boundary condition.)} The outflow ghost map
-        $h_g = (q^2/g)^{1/3}$ has an unbounded one-sided derivative at
-        $q = 0$, and the inflow branch switches there: a genuine
-        subgradient point. Unlike the others in this list it is not
-        merely a derivative subtlety --- the branch switch is a
-        discontinuity of the \emph{residual} itself, since the
-        $u_\perp < 0$ branch zeroes both states (a wall) while the
-        $u_\perp \ge 0$ branch imposes the critical ghost, so the edge
-        flux jumps by the full wet-onto-dry Roe flux, $O(g h^2/2)$, as
-        a boundary cell crosses stagnation. With an implicit
-        integrator this stalls Newton outright: the line search
-        collapses to $\lambda \sim 10^{-6}$ with the residual pinned
-        at a floor of $10^{-4}$--$10^{-5}$ relative. Explicit stepping
-        never sees it. The cure is to change the boundary condition,
-        not the solver: a transmissive (zero-gradient) free outflow ---
-        ghost state equal to the interior state, the standard free
-        outflow of finite-volume shallow-water codes --- is continuous
-        by construction, has an identity ghost map in the Jacobian,
-        and removes the stall entirely. Provided as an opt-in
-        condition alongside the original, and gated: a 72-hour
-        rain-forced basin forward completed $259{,}200$ implicit solves
-        with zero nonlinear failures.
-  \item \textbf{Drag at the wet/dry cutoff.} \emph{(Resolved by
-        regularizing the drag velocity.)} The drag
-        $g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$ gated at
-        $h_{\min}$ with a plain $\mathbf{q}/h$ velocity is likewise
-        residual-discontinuous: a cell crossing the cutoff with
-        retained momentum switches an $O(h^{-7/3})$ term on and off.
-        The amplitude scales with $n^2$, so it is invisible in
-        smooth-$n$ twin experiments and disabling at land-cover
-        roughness. Evaluating the drag with the ANUGA-regularized
-        velocity $\mathbf{u} = \mathbf{q}h/(h^2 + h_{\rm anuga}^2)$
-        removes it (the drag then vanishes as $h^{5/3}$), and reduces
-        identically to the plain form at $h_{\rm anuga} = 0$. The value of
-        $h_{\rm anuga}$ itself is an empirical choice rather than a
-        physical one (open issue~5).
-  \item \textbf{Wet/dry branches.} \emph{(Resolved in the derivative;
-        measured as objective nonsmoothness at basin scale.)} That a
-        moving wet/dry front is the awkward part of a shallow-water
-        adjoint is well known: Funke et al.\ built an adjoint wetting
-        and drying scheme precisely to make derivative-based
-        optimization usable for inundation
-        problems~\cite{funke2017wetdry}. In our setting the RHS's
-        dry cutoffs are honored branch-faithfully in every block; fully
-        wet validation cases keep FD comparisons clean, and dry cells
-        are correctly insensitive to their roughness. At basin scale
-        the branches also make the \emph{objective} nonsmooth: over
-        long rain-forced windows the trajectory crosses so many
-        per-cell depth-cutoff surfaces that a finite-step central
-        difference measures a smoothed slope rather than the
-        one-branch derivative the adjoint returns --- quantified, with
-        the verification policy it implies, in
-        Section~\ref{sec:hwm}.
-  \item \textbf{The argmax in the peak-WSE observable.}
-        \emph{(Open --- the one entry we have not closed.)} The
-        high-water-mark misfit (Section~\ref{sec:hwm}) depends on the
-        state through $\max_k H u(t_k)$: piecewise smooth, with kinks
-        where two sampled times tie for a mark's peak. The adjoint
-        injects each mark's residual at its recorded argmax time, which
-        is the exact gradient away from ties (a measure-zero set); but
-        the peak time \emph{moves} across optimizer iterates, so the
-        objective the quasi-Newton method sees is only piecewise smooth
-        and its line search can straddle kinks. Practice is untroubled
-        --- the FD gates pass away from ties and the twin calibrations
-        descend monotonically --- and the instrumented basin-scale gate
-        adds a measurement: across every FD probe on the real 108-mark
-        configuration, \emph{no} mark's argmax moved and none flipped
-        wet/dry, so at this geometry the argmax kinks are far sparser
-        than the dynamics' wet/dry kinks (previous entry). A second,
-        independent measurement points the same way: evaluating the
-        production window on 4, 8 and 16 MPI ranks --- three different
-        domain decompositions, hence three different reduction orders
-        --- reproduces the peak-WSE objective and MAE to every printed
-        digit ($J = 8.082566\times10^{2}$, MAE $0.7188$\,m), so no
-        mark's recorded peak time is sensitive to partitioning at the
-        level roundoff perturbs it. This remains the standard footing
-        of $\max$-type observables in calibration rather than a
-        theorem.
-        \emph{Proposed remedy, not yet implemented:} freeze the argmax
-        assignment across an outer iteration, so each inner subproblem
-        is genuinely smooth in the parameters, and re-evaluate the peak
-        times between outer iterations --- a fixed point on peak times,
-        converged when the assignment stops changing. This costs one
-        extra forward per outer iteration and makes the smoothness
-        assumption the line search relies on true by construction
-        rather than true in practice. A smooth surrogate
-        (softmax over the sampled times, tempered toward the true
-        maximum) is the alternative, at the cost of biasing the peak
-        it calibrates against.
-\end{itemize}
 
 \section{Twin experiments: what the observing network can recover}
 \label{sec:houston}
@@ -1381,7 +1267,7 @@ the window, $\max_k H u(t_k)$, against the surveyed value; its
 adjoint needs no new machinery, because each mark's residual can be
 injected at its own argmax time in the segmented backward sweep of
 Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
-peak time is locally constant (Section~\ref{sec:nondiff}). The
+peak time is locally constant. The
 parameter gradient of the peak misfit passes the same central-difference
 gates as every other block on the smooth verification twin. At basin
 scale the naive check fails, and a set of instrumented measurements
@@ -1410,8 +1296,7 @@ a finite-step central difference converges to a locally
 \emph{smoothed} slope that sits several percent from any one branch. The quasi-Newton iteration consumes one-branch
 derivatives of a piecewise-smooth objective --- standard practice for
 $\max$-type and switching systems --- and its observed descent
-(Section~\ref{sec:identifiability}) is consistent with that footing
-(Section~\ref{sec:nondiff}).
+(Section~\ref{sec:identifiability}) is consistent with that footing.
 
 \begin{table}
 \centering\small
@@ -1557,10 +1442,13 @@ has an optimizer-independent answer. Scaling the entire NLCD field by
 a single factor $\alpha$ traverses the natural first direction of the
 problem --- close to, though as Section~\ref{sec:spectrum} measures,
 not exactly, its most identifiable one; evaluating the peak-WSE misfit
-along it bounds what we will call the \emph{authority} of roughness
-over this observable --- the amount of the model--survey error that
-changing roughness can remove --- without reference to how, or
-whether, a calibration converges.
+along it bounds what this paper calls the \emph{authority} of a
+parameter over an observable: the amount of the model--survey error
+that changing the parameter can remove, measured without reference to
+how, or whether, a calibration converges. The largest such amount over
+the parameter's defensible range is the parameter's \emph{ceiling}.
+Both are lengths, in metres, and fractions of the uncalibrated error,
+and the paper uses the two words in that sense only.
 
 We ran that scan on the production configuration: a 12-hour window over
 the upstream crest cluster (event hours 29--41), initialized from an
@@ -2258,221 +2146,6 @@ finite-difference gates of Table~\ref{tab:verification} carry over
 unchanged. Third, land-cover-class parameterization (tens of TAO
 evaluations instead of hundreds) and calibration windows placed on
 the storm peak rather than the full event.
-
-\section*{Open issues and current positions, in order of importance}
-\textcolor{red}{[Temporary section, removed before submission. These
-are the open issues, in the order they matter to the paper, tagged with
-the team each belongs to: science (Gautam, Donghui, and colleagues),
-numerics (Matt, Jed), engineering (Jeff). Each states what we found,
-what we did, and the position we are proceeding from --- we are not
-blocked on any of them. Nomenclature: ``WSE'' is water-surface
-elevation (bed elevation plus water depth), which is what a stage gauge
-reports once put on the NAVD88 datum; ``cell bed'' is the single mean
-ground elevation our 30\,m mesh stores for a cell; ``HWM'' is a
-USGS-surveyed high-water mark, the peak WSE reached at a point during
-the event.]}
-
-\begin{enumerate}
-  \item \textbf{[Science] The real-data calibration stands on
-        high-water marks, not stage.}
-        The gauges are unusable at this resolution: modelled WSE sits
-        1--11\,m above observed stage with a time-varying offset,
-        because a 30\,m cell stores the floodplain's mean elevation
-        while the gauge hangs in the incised channel below it
-        (Section~\ref{sec:hwm} has the full account and the mark QC).
-        \emph{Position:} peak WSE at the 108 QC-passed marks is the
-        primary observable. Gauge stage stays available as a secondary
-        misfit restricted to times when model and observation are both
-        above the cell bed, and flood-extent agreement is a candidate
-        third; neither is needed for the headline number.
-\textcolor{red}{Donghui: There is a mismatch between of the spatial resoltion of the high water marks (point) and mesh. So, I would suggest to calibrate with gauge observation.} 
-  \item \textbf{[Science + numerics] Which parameterization the data
-        actually supports.} The evidence: 238 gauge
-        observations fit essentially perfectly while a per-cell field
-        is $45\%$ wrong; a class-parameterized twin at the real
-        13-gauge geometry (short window) drove the objective down
-        $128\times$ with class values still $66\%$ wrong; the same
-        experiment at the 108 HWM locations identifies the classes
-        covering $83\%$ of the domain (Section~\ref{sec:identifiability}).
-        The draft's counting argument (``overdetermined $18\times$'')
-        is indefensible and is gone. Three further measurements on the
-        production configuration settle the question quantitatively:
-        the uniform-$\alpha$ scan bounds the whole roughness knob at
-        $0.08$\,m of a $0.72$\,m error; the half-domain scans show the
-        modes are not separable, each half alone making the fit worse
-        (Section~\ref{sec:authority}); and one BLMVM step with all
-        fifteen classes free drives $69.7\%$ of the domain onto or
-        against a bound, with developed-low rising $2.6\times$ while
-        developed-medium falls to the floor --- a compensating pair of
-        interleaved classes that is nearly null-space for a
-        path-integrated observable.
-        \emph{Position:} the identifiability study --- which classes
-        are observable from which networks and windows --- is a paper
-        contribution in its own right. The production parameterization
-        is \emph{not} all fifteen NLCD classes: the observable supports
-        roughly one degree of freedom, so the production run
-        calibrates one to three parameters with the remainder frozen at
-        the NLCD prior, and reports the fifteen-class run as the
-        control that shows why. Freezing weakly-constrained parameters
-        is the structural fix; leaning on the Tikhonov weight to
-        suppress them after the fact is not.
-\textcolor{red}{Donghui: I prefer calibrating the Manning coefficient per NLCD class instead of per cell.}
-  \item \textbf{[Numerics] Inner tolerances and gradient fidelity.}
-        Resolved by measurement: loose Krylov tolerances were a false
-        economy (tightening $10^{-2} \to 10^{-3}$ is \emph{faster};
-        the converged setting \texttt{ksp} $10^{-4}$ / \texttt{snes}
-        $10^{-5}$ reproduces the fully converged 72-hour answer to
-        every printed digit at $\sim$$25\%$ extra cost), so campaigns
-        now run at converged tolerances and the verified gradients are
-        the production gradients (Section~\ref{sec:adjoint}). The
-        long-window FD-gate question is the objective's nonsmoothness,
-        not tolerance (Section~\ref{sec:hwm}). \emph{Open:} principled
-        handling of the remaining inexactness --- forcing terms tied
-        to line-search decrease, and nonsmooth-aware stopping for the
-        quasi-Newton outer loop.
-  \item \textbf{[Science] Outflow boundary at zero velocity.}
-        The critical-outflow condition
-        switches abruptly at zero normal velocity: below it the
-        boundary acts as a wall, above it it imposes critical outflow,
-        so the flux jumps by roughly $gh^2/2$ as a boundary cell
-        crosses stagnation, which pins the implicit solver (isolated
-        by controls: a reflecting outlet completes the identical run;
-        $5\times$ stronger friction regularization changes nothing;
-        tolerance relief is a treadmill because the pin level follows
-        the local flow state). We implemented the least clever
-        standard treatment: a \emph{transmissive} (zero-gradient) free
-        outflow --- ghost state equal to the interior state, as in
-        ANUGA and Clawpack --- continuous by construction,
-        differentiated exactly through host and device Jacobians. It
-        cures the stall: the failing control completes with zero
-        failures and two-iteration Newton solves, and a 72-hour
-        rain-forced forward completes $259{,}200$ implicit solves with
-        zero failures. It is opt-in (\texttt{type: free-outflow}); the
-        original remains the default. Caveats: exactly non-reflecting
-        only for supercritical outflow; does not prevent inflow if the
-        interior velocity points inward. \emph{Position:} transmissive
-        outflow for the production runs, with a Froude-limited or
-        blended form as the fallback if those caveats bite on Buffalo
-        Bayou.
-  \item \textbf{[Science] Bed-friction regularization.} The friction
-        term $\tau_b = g n^2 h^{-7/3}\mathbf{q}\lVert\mathbf{q}\rVert$
-        switched off below the depth cutoff makes the equations jump
-        as a cell crosses it; the jump grows like $n^2$, invisible in
-        the twins but disabling at land-cover roughness
-        ($\bar n = 0.10$). We now evaluate the friction with the
-        ANUGA-regularized velocity, so drag fades smoothly to zero
-        with depth. Off by default; runs use
-        $h_{\rm anuga} = 0.001$\,m, the smallest value that cures the
-        stall; $0.003$\,m is indistinguishable; $0.01$\,m is unstable
-        (mechanism conjectured: weaker damping lets an iterate reach
-        $h < 0$). \emph{Position:} keep the ANUGA form at
-        $h_{\rm anuga} = 0.001$\,m. The value is an empirical choice,
-        not a physical one, and the sensitivity above is the whole of
-        our evidence for it.
-  \item \textbf{[Numerics] Implicit solver headroom: bigger
-        steps and better preconditioning.} Backward Euler with the
-        assembled Jacobian carries the 2.93M-cell mesh at
-        $\Delta t = 1$\,s at
-        about two Newton iterations per step on the spun-up production
-        window (four to five in cold early transients) with
-        \texttt{pbjacobi}-preconditioned GMRES; at $\Delta t = 5$\,s
-        the very first Newton \emph{linear} solve diverges (300 GMRES
-        iterations, \texttt{pbjacobi}) --- a preconditioner failure
-        before nonlinearity even enters. A wall-clock ratio against
-        \emph{explicit stepping of the same right-hand side} is not
-        the modest number one might expect: with the $\Delta t$-free
-        drag the adjoint requires, forward Euler is limited by the
-        friction rate, $\Delta t < 1/t_b$ with
-        $t_b = g n^2 h^{-4/3} |v|$, and not by the CFL. On the
-        spun-up 30\,m state ($99.9\%$ wet, median depth 6\,mm,
-        $t_b$ up to $420\,\mathrm{s}^{-1}$) that is
-        $\Delta t \lesssim 2.4$\,ms against a CFL-limited $0.25$\,s ---
-        a factor $\sim$400 in step count, in the implicit path's
-        favour. Confirmed end to end on the rain-forced window: forward
-        Euler returns a non-finite state at $\Delta t = 0.25$, $0.125$
-        \emph{and} $0.05$\,s, on configurations differing from the
-        backward-Euler run in the integrator and step size alone, while
-        backward Euler at $\Delta t = 1$\,s completes cleanly. The
-        comparison that \emph{would} be modest --- explicit stepping at
-        $0.25$\,s using the operator-split friction --- is a comparison
-        against a different, non-differentiable discretization, and we
-        note it as such rather than quoting it as this method's cost.
-        \emph{Open:} what unlocks $\Delta t \ge 5$\,s. The candidates
-        are a stronger preconditioner (AMG on a reduced system, block
-        ILU, field-split), pseudo-transient continuation or another
-        globalization once the linear solve holds, or simply accepting
-        more Krylov iterations; whether to keep reassembling the
-        Jacobian every step is open alongside it.
-  \item \textbf{[Science] Production-run design:
-        window, observation error, gauge trust.} Four choices remain,
-        two of them now settled by measurement.
-        (a) \emph{Settled.} Which phase of Harvey to calibrate on: the
-        per-mark crest times decide it, and they are bimodal (hours
-        29--42 and 60--72) with an empty gap, so no 12-hour window
-        covers both. The window is the upstream cluster, event hours
-        29--41, whose 46 marks are the only population in a reach the
-        model drains correctly (Table~\ref{tab:bands}); the middle
-        band carries the same defect at intermediate strength and so
-        cannot serve as held-out data either, which forces
-        cross-validation \emph{within} the upstream band.
-        (b) The observation error
-        $\sigma$ per observable, which sets the data-versus-prior
-        weight directly --- USGS quality codes give 0.1--0.3\,m for
-        HWMs, and we are using 0.15\,m. (c) The exclusion of eight
-        reservoir-influenced sites (Addicks/Barker and Buffalo Bayou
-        downstream), on the grounds that gate releases are unmodelled
-        --- now backed by a measurement on the mark side: the 37
-        downstream marks that never crest sit in cells the model
-        demonstrably cannot drain (monotone filling through all 72
-        hours, zero recession, $+7.1$\,m above every surveyed value;
-        Section~\ref{sec:hwm}), so scoring or calibrating against them
-        would fold a conveyance defect into the roughness field.
-        (d) \emph{Superseded.} The bounds are no longer stated in
-        physical $n$: the production problem optimizes
-        $\alpha = n / n_{\rm prior}$ with $\alpha \in [0.3, 3]$
-        (Section~\ref{sec:calibration}), which is both a physical
-        statement about how wrong the NLCD lookup can be and a bound
-        that excludes the region where the implicit solve fails --- a
-        box in $n$ did neither. The NLCD field remains the prior
-        throughout, replacing the two-zone twins' constant prior.
-        \emph{Newly open, and the most consequential of the four:} the
-        prior width $\sigma_n$, which now sets the regularization
-        directly through $\beta = \sigma_n^{-2}$. It is not a free
-        knob: at $\sigma_n = 0.015$ the misfit still outbids the prior
-        on the fifteen-class problem (the prior charged $118.5$ units
-        of objective and the misfit paid $146.5$), and the value that
-        would make that step net-unfavourable is $\sigma_n < 0.0135$,
-        while $\sigma_n = 0.010$ leaves the dominant direction with an
-        optimum at $\alpha \approx 0.88$ --- a well-posed problem worth
-        almost nothing. That tension is the result, not a tuning
-        difficulty: within a defensible prior the observable cannot
-        support a defensible roughness field. How wrong the NLCD
-        lookup can plausibly be is a question for the domain team, and
-        it now has a number attached to it.
-  \item \textbf{[Numerics + engineering] Upstreaming
-        the PETSc-side pieces.} The device-resident assembled-Jacobian
-        path relies on our PETSc branch: blocked-COO assembly for BAIJ
-        matrices on GPU (\texttt{MatCOOUseBlockIndices};
-        \texttt{baijkokkos}/\texttt{baijcuda} classes) plus small
-        TSAdjoint fixes. We think it is generally useful --- one index
-        pair per block is the natural COO for FV systems --- and
-        intend to upstream it as is. \emph{Open:} whether the API
-        needs changes before it hardens, and whether the paper's
-        artifact claim should be scoped to the stock-PETSc AIJ path
-        until it lands.
-  \item \textbf{[Engineering] Public API and CI.} The adjoint
-        driver reaches through \texttt{private/rdycoreimpl.h} (the
-        LETKF-driver pattern). \emph{Open:} which calls deserve
-        promotion to \texttt{rdycore.h}
-        (\texttt{RDySetObservations}, \texttt{RDyAdjointSolve},
-        \texttt{RDyGetSensitivities} are the candidates), and whether
-        Fortran bindings are needed at that point. The new tests need
-        a TSAdjoint-capable PETSc and run in seconds; the CEED-only
-        lanes correctly skip \texttt{numerics.jacobian} configs.
-  \item \textbf{[All] Venue and authorship.} Target journal
-        (WRR / JAMES / GMD) and the co-author list remain to be
-        settled.
-\end{enumerate}
 
 \bibliographystyle{unsrt}
 \bibliography{manning-calibration}
