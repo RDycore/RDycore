@@ -74,6 +74,10 @@ case ${SLURM_ARRAY_TASK_ID:-0} in
   1) TAG=c15_sa0.30; SA=0.30; ACTIVE="" ;;
   2) TAG=c3_sa0.15;  SA=0.15; ACTIVE="-adjoint_classes_active 23,90,22" ;;
   3) TAG=c3_sa0.30;  SA=0.30; ACTIVE="-adjoint_classes_active 23,90,22" ;;
+  # 2026-09-09: coauthors say +/-30% "is very believable, and higher". Task 0
+  # (+/-15%) was cancelled and this bracket added: the spectrum supports four
+  # combinations at +/-50%, so this shows how the headline field moves with width.
+  4) TAG=c3_sa0.50;  SA=0.50; ACTIVE="-adjoint_classes_active 23,90,22" ;;
   *) echo "bad task id"; exit 1 ;;
 esac
 

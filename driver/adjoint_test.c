@@ -38,6 +38,9 @@ static const char *help_str =
     "  -adjoint_fd_tol <real>      relative L2 gate for adjoint-vs-FD (default: 1e-5)\n"
     "  -adjoint_calibrate_gauges   per-cell Manning calibration from a gauge WSE table\n"
     "  -adjoint_obs_file <path>    observation table (see data/harvey_gauges/README.md)\n"
+    "  -adjoint_obs_above_bed      keep a gauge observation only while the observed WSE is\n"
+    "                              above the cell bed (+ -adjoint_obs_min_depth <m>, default 0):\n"
+    "                              a 30 m cell stores the bank, not the channel\n"
     "  -adjoint_hwm_file <path>    high-water-mark table (cell + peak WSE; see data/harvey_hwm/):\n"
     "                              switches the gauge/class misfit to peak WSE at the marks\n"
     "  -adjoint_hwm_twin           synthesize the mark WSE values from the truth forward's peaks\n"
@@ -1695,6 +1698,18 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_map_file", map_file, sizeof(map_file), &have_map_file));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_stride", &obs_stride, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_error", &sigma, NULL));
+    // -adjoint_obs_above_bed: keep a gauge observation only when the observed
+    // water surface is above the cell's bed by more than -adjoint_obs_min_depth.
+    // A 30 m cell stores the mean ground elevation, which at an incised bayou is
+    // the bank; the gauge hangs in the channel below it, and while the real
+    // water is below the cell bed no roughness can make the model match it.
+    // Masking sets w_k = 0 for that (gauge, time), which removes it from both the
+    // misfit and the adjoint injection; the count of masked observations is
+    // reported so the paper can state how much of the record survived.
+    PetscBool obs_above_bed = PETSC_FALSE;
+    PetscReal obs_min_depth = 0.0;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_obs_above_bed", &obs_above_bed, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_min_depth", &obs_min_depth, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_ic_perturb", &ic_perturb, NULL));
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_fd_samples", &fd_samples, NULL));
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_fd_eps", &fd_eps, NULL));
@@ -1946,7 +1961,7 @@ int main(int argc, char *argv[]) {
         PetscCall(PetscFree(zbg));
       }
 
-      PetscInt n_present = 0;
+      PetscInt n_present = 0, n_below_bed = 0;
       if (!have_hwm_file) {
         PetscCall(ReadObsTable(comm, obs_file, &ngauges, &gauge_cells, &K, &obs_times, &obs_wse));
         PetscInt freq = (PetscInt)llround(obs_times[0] / rdy->dt);
@@ -1975,6 +1990,13 @@ int main(int argc, char *argv[]) {
             if (PetscIsNanReal(wse)) {
               ya[g - rlo] = 0.0;
               wa[g - rlo] = 0.0;
+            } else if (obs_above_bed && wse - zbg[g] <= obs_min_depth) {
+              // the observed water surface is at or below the cell bed: the
+              // cell does not contain this water, so the observation says
+              // nothing about the model's roughness there
+              ya[g - rlo] = 0.0;
+              wa[g - rlo] = 0.0;
+              n_below_bed++;
             } else {
               ya[g - rlo] = PetscMax(wse - zbg[g], 0.0);
               wa[g - rlo] = 1.0;
@@ -1985,6 +2007,12 @@ int main(int argc, char *argv[]) {
           PetscCall(VecRestoreArray(w_k[kk], &wa));
         }
         PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &n_present, 1, MPIU_INT, MPI_SUM, comm));  // each rank counted its owned rows
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &n_below_bed, 1, MPIU_INT, MPI_SUM, comm));
+        if (obs_above_bed)
+          PetscCall(PetscPrintf(comm,
+                                "gauge observations: %" PetscInt_FMT " kept, %" PetscInt_FMT " masked with observed WSE within %g m of the cell bed "
+                                "(-adjoint_obs_above_bed), of %" PetscInt_FMT " gauges x %" PetscInt_FMT " times\n",
+                                n_present, n_below_bed, (double)obs_min_depth, ngauges, K));
       }
 
       cc.pc = (PerCellCtx){.base        = {.rdy = rdy, .H = Hg, .u_ic = u_ic, .sigma = sigma, .t_final = t_final},
