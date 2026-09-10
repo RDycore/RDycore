@@ -354,7 +354,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscCall(ResetOperatorDiagnostics(rdy->operator));
 
   // advance the solution to the specified time (handling preloading if requested)
-  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance solve");
+  PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance flow solve");
   if (PetscPreLoadingOn) {
     PetscCall(CalibrateSolverTimers(rdy));
     PetscCall(TSSetTime(rdy->ts, time));
@@ -365,10 +365,12 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   PetscPreLoadEnd();
 
   if (rdy->config.physics.heat) {
+    PetscPreLoadBegin(PETSC_FALSE, "RDyAdvance heat solve");
     // Production heat forcing is currently autonomous, so evaluating it at the
     // coupling interval's left endpoint preserves the existing behavior.
     PetscCall(RDyHeatUpdateForcing(rdy, time));
     PetscCall(RDyHeatAdvance(rdy, time, next_coupling_time));
+    PetscPreLoadEnd();
   }
 
   if (time_adapt->enable) {
