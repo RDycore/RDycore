@@ -2422,3 +2422,29 @@ spectrum, analysis mirrored to `logs/o61/`:
 Note v_0's fourth component changed identity between windows: pasture
 (81) on the production window where the pilot had developed-high (24).
 The top three are stable.
+
+### o62 -- the calibration under the prior the paper describes (sigma_alpha, uniform relative)
+
+Background: every production run used `-adjoint_sigma_n 0.015`, an
+ABSOLUTE width the driver applies as |n - n_prior|^2 -- +/-12.5% on
+developed-medium but +/-9% on developed-high and +/-56% on barren -- while
+the paper's prose described a uniform fractional width. The coauthors
+(2026-09-09) put the honest width at +/-30% "and higher". o62 runs the
+fractional prior: 15 classes at 0.30 (task 1), 3 classes {23,90,22} at 0.30
+(task 3) and at 0.50 (task 4; replaced the +/-15% task). 2 nodes, 6-h
+slots, 300-min calibration budget then an eval-only score on the 46 marks.
+gpu9 binary (gpu8 was orphaned by the 09-03 PETSc rebuild; see the memory
+note). Job 58069233_1 / _3, 58125983_4.
+
+**Task 1 RESULT (2026-09-10, 5:22 wall, COMPLETED):** 15 classes,
+sigma_alpha = 0.30, 3 TAO iterations. Scored: **MAE 0.6154 m, J_mis
+615.44** -- against the absolute-prior 15-class field's 0.6116 m /
+615.40 after nine iterations, and the prior's 0.7188. The first step put
+SEVEN classes on a bound (21, 22, 81 at alpha = 3; 23, 24, 52, 90 at
+0.3). Final table: developed-medium 0.036 and shrub 0.0345 on the floor,
+developed-low 0.179 (2x), developed-high 0.127, pasture 0.062, woody
+wetland 0.063. Reading: the wider prior reaches the same misfit floor
+faster and by the same indefensible route -- this is the fifteen-class
+CONTROL the paper's thesis needs. Files:
+`o62_p_c15_sa0.30_it{1..4}.txt`, `o62_score_c15_sa0.30.log`.
+Tasks 3 and 4 (the three-class headline candidates) pending.

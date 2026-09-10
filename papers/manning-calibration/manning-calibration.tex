@@ -693,17 +693,25 @@ the classes alike, and asks the domain expert a question they can
 answer: how far can the lookup be wrong, in percent?
 
 The tension survives the reformulation, and that is the substantive
-result rather than an implementation detail. Holding the first step's
-excursion requires $\sigma_\alpha \approx 0.15$: one must believe the
-NLCD values are good to $\pm 15\%$ for the calibration to stay
-physical, while at $\pm 30\%$ the data drives it somewhere no
-hydrologist would defend. \emph{Within a prior wide enough to be
-honest, this observable cannot deliver a defensible distributed
-roughness field.} We report the prior width used with every number. Its
-value is a judgment about the land-cover lookup, not a tuning
-parameter, and the domain team's judgment is that the lookup can be
-wrong by $30\%$ or more; Section~\ref{sec:spectrum} turns that width
-into a count of the roughness combinations the marks determine.
+result rather than an implementation detail. We ran the fifteen-class
+calibration under the fractional prior at the width the domain team
+considers honest, $\sigma_\alpha = 0.30$. Its first quasi-Newton step
+drove seven of the fifteen classes to a bound --- developed-open,
+developed-low and pasture to $\alpha = 3$, developed-medium,
+developed-high, shrub and woody wetland to $\alpha = 0.3$ --- and after
+three iterations developed-medium and shrub were still on the floor
+($n = 0.036$ and $0.0345$, smoother than concrete) with developed-low at
+twice its lookup value, for a peak-WSE MAE of $0.6154$\,m
+(Table~\ref{tab:ladder}) against the $0.6116$\,m the absolute prior
+reached in nine. A wider prior reaches the same fit sooner, by the
+same route, and the route is the problem. \emph{Within a prior wide
+enough to be honest, this observable cannot deliver a defensible
+fifteen-class roughness field.} What it can deliver is the subject of
+Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}: the marks
+determine about three roughness combinations at this width, and a
+calibration confined to those stays physical. We report the prior
+width used with every number; its value is a judgment about the
+land-cover lookup, not a tuning parameter.
 
 The diagnosis is worth separating from the fix, because the failure
 mode is not specific to this model: an optimizer that takes zero steps
@@ -1612,16 +1620,22 @@ Manning field & MAE & $\Delta$ & physically defensible? \\
 NLCD lookup (uncalibrated) & $0.7188$ & --- & yes, by construction \\
 uniform $\alpha = 0.70$ & $0.6894$ & $-0.029$ & yes \\
 uniform $\alpha = 0.30$ & $0.6392$ & $-0.080$ & no ($n$ to $0.008$) \\
-\textbf{calibrated, 15 classes} & $\mathbf{0.6116}$ & $\mathbf{-0.107}$ & mostly; one class at a bound \\
+calibrated, 15 classes, $\sigma_n = 0.015$ & $0.6116$ & $-0.107$ & mostly; one class at a bound \\
+calibrated, 15 classes, $\sigma_\alpha = 0.30$ & $0.6154$ & $-0.103$ & no; two classes at the floor \\
 \bottomrule
 \end{tabular}
-\caption{Peak-WSE MAE against the 46 cluster-A marks. The calibration
-beats the entire uniform-roughness knob --- including its physically
-indefensible end --- and beats the best \emph{defensible} uniform field
-by $0.078$\,m. Spatial redistribution is therefore worth roughly three
-and a half times what a single global scale can reach.}
+\caption{Peak-WSE MAE against the 46 cluster-A marks. Both fifteen-class
+calibrations beat the entire uniform-roughness knob --- including its
+physically indefensible end --- and beat the best \emph{defensible}
+uniform field by $0.078$\,m; spatial redistribution is worth about three
+and a half times what a single global scale can reach. The
+$\sigma_n = 0.015$ field took nine quasi-Newton iterations, the
+$\sigma_\alpha = 0.30$ field three, and they agree in misfit to four
+figures ($J_{\rm mis} = 615.4$), which suggests a floor that roughness
+does not set.}
 \label{tab:ladder}
 \end{table}
+% [PENDING o62: add the 3-class rows at sigma_alpha = 0.30 and 0.50 to tab:ladder -- the headline rows]
 
 Two things about this number deserve emphasis, one supporting and one
 limiting.
