@@ -82,17 +82,17 @@ For Hurricane Harvey on a 2.93M-cell, 30\,m mesh of the Houston area,
 scored against 46 surveyed high-water marks, the ceiling of Manning
 roughness is measurable before any optimizer runs. A single factor on
 the whole roughness field removes at most $0.08$\,m of a $0.72$\,m
-error, and only at roughness values no hydrologist would defend;
+error, and only at roughness values below any entry in the lookup;
 fifteen land-cover classes calibrated separately remove $0.107$\,m,
 $15\%$ of the error. The spectrum of the prior-preconditioned
-Gauss--Newton Hessian, from sixteen forward runs, shows why: at the
-$\pm 30\%$ width the land-cover lookup deserves, the marks determine
-about three combinations of the fifteen classes, and calibrating those
-three recovers $84\%$ of what fifteen achieve. What the three reach is
-the same at every prior width we ran: developed-medium and woody
-wetland at $0.3\times$ their lookup values, which no land-cover table
-defends. The marks are asking friction to compensate for an error that
-is not in the friction.
+Gauss--Newton Hessian, from sixteen forward runs, shows why: at a
+$\pm 30\%$ width on the land-cover lookup, the marks determine about
+three combinations of the fifteen classes, and calibrating those three
+recovers $84\%$ of what fifteen achieve. What the three reach is the
+same at every prior width we ran: developed-medium and woody wetland
+at $0.3\times$ their lookup values, below the lookup's value for
+developed open land. The calibrated friction is compensating for an
+error that is not in the friction.
 What a $\pm 30\%$ prior cannot support is the fifteen-class field. The
 survey is the observable because at seven of twelve stream gauges the
 30\,m cell's bed sits above the peak observed water surface: the mesh
@@ -671,8 +671,8 @@ while $\sigma_n = 0.020$ leaves no interior minimum there at all, the
 same pathology the hand-chosen weight had. We ran the scan point at
 $\alpha = 0.70$ afterwards and measured an MAE of $0.6894$\,m against
 the $0.6895$\,m the balance implied (Table~\ref{tab:alpha}). Stating
-the prior turns the choice into an arithmetic consequence of a quantity
-the domain team can argue about.
+the prior turns the choice into an arithmetic consequence of a stated
+uncertainty on Manning $n$.
 
 \paragraph{Absolute or fractional prior.}
 Equation~\eqref{eq:sigman} states the prior as an absolute departure in
@@ -688,25 +688,24 @@ every class driven to the lower bound was large-$n$ (developed-high
 $0.160$, developed-medium $0.120$, shrub $0.115$, woody wetland
 $0.098$), an ordering by prior value, not by hydrology. Penalizing the
 fractional departure $n_k/n_{{\rm prior},k} - 1$ with a width
-$\sigma_\alpha$ instead treats the classes alike, and turns the prior
-into a question the domain expert can answer, the percentage by which
-the lookup can be wrong.
+$\sigma_\alpha$ instead treats the classes alike, and states the prior
+as the percentage by which the lookup can be wrong.
 
 The tension survives the reformulation, and that is the substantive
 result rather than an implementation detail. We ran the fifteen-class
-calibration under the fractional prior at the width the domain team
-puts on the lookup, $\sigma_\alpha = 0.30$. Its first quasi-Newton
-step drove seven of the fifteen classes to a bound (developed-open,
-developed-low and pasture to $\alpha = 3$; developed-medium,
-developed-high, shrub and woody wetland to $\alpha = 0.3$), and after
-three iterations developed-medium and shrub were still on the floor
-($n = 0.036$ and $0.0345$, smoother than concrete) with developed-low at
-twice its lookup value, for a peak-WSE MAE of $0.6154$\,m
-(Table~\ref{tab:ladder}) against the $0.6116$\,m the absolute prior
-reached in nine. A wider prior reaches the same fit sooner, by the
-same route, and the route is the problem. \emph{At the width the
-lookup deserves, this observable cannot deliver a defensible
-fifteen-class roughness field.} What it can deliver is the subject of
+calibration under the fractional prior at the width we assign to the
+lookup, $\sigma_\alpha = 0.30$. Its first quasi-Newton step drove
+seven of the fifteen classes to a bound (developed-open, developed-low
+and pasture to $\alpha = 3$; developed-medium, developed-high, shrub
+and woody wetland to $\alpha = 0.3$), and after three iterations
+developed-medium and shrub were still on the floor ($n = 0.036$ and
+$0.0345$, below the lookup's $0.040$ for developed open land) with
+developed-low at twice its lookup value, for a peak-WSE MAE of
+$0.6154$\,m (Table~\ref{tab:ladder}) against the $0.6116$\,m the
+absolute prior reached in nine. A wider prior reaches the same fit
+sooner, by the same route, and the route is the problem. \emph{At that
+width, this observable cannot deliver a fifteen-class roughness field
+inside the prior.} What it can deliver is the subject of
 Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}: the marks
 determine about three roughness combinations at this width, and a
 calibration confined to those converges and reaches the same answer
@@ -1312,13 +1311,12 @@ single-class directions sit one to three orders lower at every
 window.}
 \label{tab:fdwindow}
 \end{table}
-The remaining scientific choice --- confirmed or corrected by
-the domain team --- is the calibration window, which for marks that
-record the event maximum must cover the flood peak.
+The remaining scientific choice is the calibration window, which for
+marks that record the event maximum must cover the flood peak.
 
 \paragraph{The uncalibrated baseline against the real survey.}
-Because the marks record the event maximum, the honest baseline
-evaluation must simulate through the crest: a 72-hour rain-forced
+Because the marks record the event maximum, the baseline evaluation
+must simulate through the crest: a 72-hour rain-forced
 forward from the available initial state (2017-08-26 18:00, reaching
 past the Buffalo Bayou crest), NLCD-prior Manning, free outflow,
 backward Euler at $\Delta t = 1$\,s on the 2.93M-cell mesh ---
@@ -1566,7 +1564,7 @@ The conclusion is a design finding, not a tuning observation. The
 peak-WSE observable at these marks constrains \emph{one} roughness
 degree of freedom at the prior width used here --- the domain-scale,
 path-integrated conveyance --- worth $\sim 10\%$ of the model--survey
-discrepancy, and about three at the width the lookup deserves
+discrepancy, and about three at a $\pm 30\%$ width
 (Section~\ref{sec:spectrum}). It
 does not carry fifteen classes' worth of information. This unifies the
 earlier evidence rather than sitting beside it: the perfect-data twin
@@ -1639,14 +1637,14 @@ land on the floor under all three.}
 \label{tab:ladder}
 \end{table}
 
-Two things about this number deserve emphasis, one supporting and one
-limiting.
+Two things qualify this number, one supporting and one limiting.
 
 Supporting: the comparison that matters is against
 $\alpha = 0.70$, not $\alpha = 0.30$. The latter is the misfit's
-unconstrained preference and reaches $n = 0.008$, which no one would
-defend; the former is the optimum implied by the same prior the
-calibration itself uses, and is the honest one-parameter competitor.
+unconstrained minimum and reaches $n = 0.008$, below any entry in the
+lookup; the former is the optimum implied by the same prior the
+calibration itself uses, and is the one-parameter competitor that
+prior allows.
 Against it the calibration wins by $0.078$\,m, so the fifteen
 parameters are not decoration --- \emph{letting roughness vary by
 class removes error that no global scaling can}, which is a stronger
@@ -1724,7 +1722,7 @@ the first attempt cannot recur silently.
 
 Its own assumption --- that a mark's peak \emph{time} is locally
 constant, so that the peak \emph{value} is smooth in $\alpha$ ---
-deserves the same scrutiny, and on the production window it is not
+needs the same scrutiny, and on the production window it is not
 satisfied cleanly: $156$ of $690$ mark--column pairs ($22.6\%$) move
 their peak time, against $27$ ($3.9\%$) on a two-event-hour pilot of
 the same configuration. The longer window is the reason. It admits
@@ -1753,7 +1751,8 @@ difference; a secant across a discontinuity does not.
 \input{fig_spectrum}
 \caption{Eigenvalues of the prior-preconditioned Gauss--Newton Hessian
 over the fifteen land-cover classes, sorted. Above $\lambda = 1$ the
-marks say more than the prior does; below it the prior answers. One
+marks constrain a direction more than the prior does; below it the
+prior sets the answer. One
 direction clears the line, and the remaining fourteen fall away over three
 decades --- so a fifteen-parameter calibration is fitting one parameter
 and inheriting fourteen from its prior. The log axis is not cosmetic: on
@@ -1812,7 +1811,7 @@ $11.5\%$ where the prior alone determines the answer. Per class
 $30\%$ on developed-medium and $28\%$ on woody wetland, by
 $11$--$20\%$ on three more, and by $5\%$ or less on the remaining ten.
 
-The reassuring half is that the null space behaved. Two iterations in,
+The reassuring half is the null space. Two iterations in,
 the optimizer had moved deciduous forest to $\alpha = 0.739$, mixed
 forest to $1.096$ and cropland to $1.274$ --- three classes these marks
 teach nothing about --- and by iteration nine accumulated curvature had
@@ -1820,7 +1819,7 @@ returned all three to within $10\%$ of the prior ($0.983$, $1.006$,
 $1.098$). Those excursions were transients of an under-informed
 quasi-Newton approximation rather than features of the minimizer: the
 misfit gradient in uninformative directions is not zero, merely
-uninformative, and given enough iterations the prior wins. A
+uninformative, and given enough iterations the prior term dominates. A
 calibration stopped early would have reported them as results, which is
 an argument for running these problems to convergence even when the
 objective has visibly flattened.
@@ -1830,14 +1829,13 @@ concentrated in the two \emph{best}-informed classes, and both are
 pressed against the edge of what the prior permits: developed-medium
 sits at its $\alpha = 0.3$ lower bound for all nine iterations, and
 woody wetland is driven to $\alpha = 0.355$, some $4.2\sigma$ from its
-lookup value. So the displacement is not an optimizer wandering where
-the data is silent. It is the data asking, in the one direction it can
-speak, for roughness below what the published table and our stated
-prior width jointly allow. Whether that request is admissible is not
-something the optimizer can settle. The domain team puts the lookup's
-uncertainty at $30\%$ or more, which admits the request for the classes
-the marks constrain and, as the spectrum shows, releases twelve that
-they do not.
+lookup value. So the displacement is not motion in directions the data
+does not constrain. It lies in the one direction the data constrains,
+toward roughness below what the published table and our stated prior
+width jointly allow. Whether that value is admissible is not something
+the optimizer can settle. We put the lookup's uncertainty at $30\%$ or
+more, which admits it for the classes the marks constrain and, as the
+spectrum shows, releases twelve that they do not.
 
 \begin{table}
 \centering\small
@@ -1854,10 +1852,10 @@ NLCD & class & prior $\sigma_n$ & posterior $\sigma_n$ & learned \\
 41, 43, 82, 42, 71, 52 & & $0.015$ & $0.015$ & $\le 1\%$ \\
 \bottomrule
 \end{tabular}
-\caption{What the 46 marks teach about each land-cover class, as the
+\caption{What the 46 marks constrain in each land-cover class, as the
 fractional reduction from prior to posterior standard deviation, on the
-production-window spectrum. Ten classes learn $5\%$ or less: any value
-a calibration reports for them is the prior speaking, not the data.}
+production-window spectrum. Ten classes narrow by $5\%$ or less: any
+value a calibration reports for them is the prior, not the data.}
 \label{tab:learned}
 \end{table}
 
@@ -1909,10 +1907,10 @@ partners frozen it must supply their share of a change the marks
 constrain only in combination --- equifinality, exactly where the
 eigenvector says to expect it.
 
-\paragraph{The same three classes under the honest prior.}
+\paragraph{The same three classes under the fractional prior.}
 The three-class run above used the absolute prior. Repeating it under
-the fractional prior at $\sigma_\alpha = 0.30$, the width the domain
-team calls honest, and at $0.50$ as a bracket above it, gives $0.6290$
+the fractional prior at $\sigma_\alpha = 0.30$, the width we assign to
+the lookup, and at $0.50$ as a bracket above it, gives $0.6290$
 and $0.6295$\,m (Table~\ref{tab:ladder}): $84\%$ and $83\%$ of the
 fifteen-class error reduction, and $90\%$ and $94\%$ of its objective
 reduction. The optimizer's path is short. At $\pm 30\%$ the first step
@@ -1929,17 +1927,17 @@ Three things follow. Developed-medium reaches $\alpha = 0.3$ under
 every prior and every active set we have run, and woody wetland does
 whenever its two partners are frozen ($0.355$ and $0.64$ when they are
 not --- the equifinality above), so in the three-class problem those
-values are the data's, and they are $n = 0.036$ and $0.029$, below
-anything a land-cover table assigns to developed or wetland ground.
-Developed-low's value is the prior's: it moves from $1.63\times$ to
-$2.34\times$ to $3\times$ its lookup as the width opens while the MAE
-moves $0.002$\,m, which is the flat direction the eigenvector
-predicted. And the three-parameter field is therefore not physically
-defensible either. What the spectrum selects is the calibration the
-marks can determine; what they determine is a request for roughness
-the lookup cannot supply, at any width we are prepared to call honest
---- evidence that the marks are asking friction to compensate for an
-error that lives elsewhere (Section~\ref{sec:icauthority}).
+values are set by the data, and they are $n = 0.036$ and $0.029$,
+below the lookup's $0.040$ for developed open land. Developed-low's
+value is set by the prior: it moves from $1.63\times$ to $2.34\times$
+to $3\times$ its lookup as the width opens while the MAE moves
+$0.002$\,m, which is the flat direction the eigenvector predicted. The
+three-parameter field therefore lies outside the prior as well. What
+the spectrum selects is the calibration the marks can determine, and
+what they determine is a roughness below the lookup's range at any
+width we assign to it, which is evidence that the calibrated friction
+is compensating for an error that lives elsewhere
+(Section~\ref{sec:icauthority}).
 
 
 \paragraph{Would more marks fix it?}
@@ -2043,10 +2041,11 @@ Three things follow, and they matter more than the roughness result.
 roughness} (Figure~\ref{fig:authority}). Per unit fractional change, $\mathrm{d}\,\mathrm{MAE}$ is
 $0.392$ for the initial condition over its well-sampled range
 ($a \in [0.8, 1.1]$) against $0.098$ for a uniform roughness scale. Like for like at a $20\%$ perturbation: $0.075$\,m
-versus $0.020$\,m. And the plausibility runs the same way --- a $20\%$
-error in water stored after a 29-hour spin-up under radar-derived
-rainfall is far easier to defend than Manning values at $30\%$ of the
-published table.
+versus $0.020$\,m. The plausibility runs the same way: a $20\%$ error
+in water stored after a 29-hour spin-up under radar-derived rainfall
+is within the uncertainty of that forcing~\cite{xu2025harvey}, while
+Manning values at $30\%$ of the published table lie below the table's
+own value for open land.
 
 \textbf{The response has the opposite curvature to roughness's.}
 $J(\alpha)$ for roughness is concave and saturating --- the knob runs
@@ -2084,11 +2083,11 @@ launder the downstream drainage defect of Section~\ref{sec:hwm} into a
 ``corrected'' initial state --- the same trap as scoring against the 37
 marks the model cannot drain. Establishing whether a $20\%$
 water-balance error at hour 29 is physically plausible is a question for
-the forcing data, not for the optimizer. The domain team's answer is
-that it is: the antecedent state after a 29-hour spin-up under radar
-rainfall is among the least certain inputs the model has, and an error
-of that size in it is plausible. The same group's uncertainty study of this
-event finds precipitation and mesh resolution to dominate the simulated
+the forcing data, not for the optimizer. Our answer is that it is:
+the antecedent state after a 29-hour spin-up under radar rainfall is
+among the least certain inputs the model has, and an error of that
+size in it is plausible. The uncertainty study of this event
+in~\cite{xu2025harvey} finds precipitation and mesh resolution to dominate the simulated
 inundation over the choice of outlet boundary condition~\cite{xu2025harvey},
 which points the same way.
 
