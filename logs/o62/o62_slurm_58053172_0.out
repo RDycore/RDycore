@@ -1,0 +1,9 @@
+=== o62 c15_sa0.15: sigma_alpha=0.15 all 15 classes on 2 nodes, Tue Sep  8 12:52:11 AM PDT 2026
+calibration exit=127 (124 = wall budget, dump kept) Tue Sep  8 12:52:13 AM PDT 2026
+/var/spool/slurmd/job58053173/slurm_script: line 92: 494415 Terminated              ( k=0; last=""; while sleep 30; do
+    [ -f $DUMP ] || continue; cur=$(md5sum < $DUMP); if [ "$cur" != "$last" ]; then
+        k=$((k+1)); cp $DUMP o62_p_${TAG}_it${k}.txt; last=$cur;
+    fi;
+done )
+
+compare against (absolute sigma_n 0.015):  NLCD prior MAE 0.7188 | 15 classes 0.6116 | 3 classes 0.6274

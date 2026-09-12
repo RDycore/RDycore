@@ -88,9 +88,11 @@ $15\%$ of the error. The spectrum of the prior-preconditioned
 Gauss--Newton Hessian, from sixteen forward runs, shows why: at the
 $\pm 30\%$ width the land-cover lookup deserves, the marks determine
 about three combinations of the fifteen classes, and calibrating those
-three recovers $85\%$ of what fifteen achieve, with objective and error
-metrics in agreement where the fifteen-class field's are not.
-% [PENDING o62: refresh 85% / 0.6274 with the sigma_alpha = 0.30 numbers]
+three recovers $84\%$ of what fifteen achieve. What the three reach is
+the same at every prior width we ran: developed-medium and woody
+wetland at $0.3\times$ their lookup values, which no land-cover table
+defends. The marks are asking friction to compensate for an error that
+is not in the friction.
 What a $\pm 30\%$ prior cannot support is the fifteen-class field. The
 survey is the observable because at seven of twelve stream gauges the
 30\,m cell's bed sits above the peak observed water surface: the mesh
@@ -709,7 +711,9 @@ enough to be honest, this observable cannot deliver a defensible
 fifteen-class roughness field.} What it can deliver is the subject of
 Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}: the marks
 determine about three roughness combinations at this width, and a
-calibration confined to those stays physical. We report the prior
+calibration confined to those converges and reaches the same answer
+from every prior we ran --- an answer that puts two of the three
+classes on the same $\alpha = 0.3$ floor. We report the prior
 width used with every number; its value is a judgment about the
 land-cover lookup, not a tuning parameter.
 
@@ -1622,6 +1626,9 @@ uniform $\alpha = 0.70$ & $0.6894$ & $-0.029$ & yes \\
 uniform $\alpha = 0.30$ & $0.6392$ & $-0.080$ & no ($n$ to $0.008$) \\
 calibrated, 15 classes, $\sigma_n = 0.015$ & $0.6116$ & $-0.107$ & mostly; one class at a bound \\
 calibrated, 15 classes, $\sigma_\alpha = 0.30$ & $0.6154$ & $-0.103$ & no; two classes at the floor \\
+calibrated, 3 classes, $\sigma_n = 0.015$ & $0.6274$ & $-0.091$ & no; two classes at the floor \\
+calibrated, 3 classes, $\sigma_\alpha = 0.30$ & $0.6290$ & $-0.090$ & no; two at the floor, one at $2.3\times$ \\
+calibrated, 3 classes, $\sigma_\alpha = 0.50$ & $0.6295$ & $-0.089$ & no; all three at a bound \\
 \bottomrule
 \end{tabular}
 \caption{Peak-WSE MAE against the 46 cluster-A marks. Both fifteen-class
@@ -1632,10 +1639,12 @@ and a half times what a single global scale can reach. The
 $\sigma_n = 0.015$ field took nine quasi-Newton iterations, the
 $\sigma_\alpha = 0.30$ field three, and they agree in misfit to four
 figures ($J_{\rm mis} = 615.4$), which suggests a floor that roughness
-does not set.}
+does not set. The three-class rows are the calibration
+Section~\ref{sec:spectrum} selects: their MAE moves by $0.002$\,m across
+a threefold change in prior width, and their two best-informed classes
+land on the floor under all three.}
 \label{tab:ladder}
 \end{table}
-% [PENDING o62: add the 3-class rows at sigma_alpha = 0.30 and 0.50 to tab:ladder -- the headline rows]
 
 Two things about this number deserve emphasis, one supporting and one
 limiting.
@@ -1906,6 +1915,38 @@ where the full calibration left it at $0.355$, because with its
 partners frozen it must supply their share of a change the marks
 constrain only in combination --- equifinality, exactly where the
 eigenvector says to expect it.
+
+\paragraph{The same three classes under the honest prior.}
+The three-class run above used the absolute prior. Repeating it under
+the fractional prior at $\sigma_\alpha = 0.30$, the width the domain
+team calls honest, and at $0.50$ as a bracket above it, gives $0.6290$
+and $0.6295$\,m (Table~\ref{tab:ladder}): $84\%$ and $83\%$ of the
+fifteen-class error reduction, and $90\%$ and $94\%$ of its objective
+reduction. The optimizer's path is short. At $\pm 30\%$ the first step
+puts all three classes on a bound, exactly as it put seven of fifteen
+there (Section~\ref{sec:calibration}), and two more iterations bring
+developed-low back from $\alpha = 3$ to $2.34$; at $\pm 50\%$ the first
+step lands on the corner of the box, the projected gradient there is
+zero, and the run converges in one iteration. The Gaussian prior is not
+what stops it: it contributes $15$ units to $J$ at $\pm 30\%$ and $10$
+at $\pm 50\%$ against a misfit near $630$, so the bounds
+$\alpha \in [0.3, 3]$ do the constraining.
+
+Three things follow. Developed-medium reaches $\alpha = 0.3$ under
+every prior and every active set we have run, and woody wetland does
+whenever its two partners are frozen ($0.355$ and $0.64$ when they are
+not --- the equifinality above), so in the three-class problem those
+values are the data's, and they are $n = 0.036$ and $0.029$, below
+anything a land-cover table assigns to developed or wetland ground.
+Developed-low's value is the prior's: it moves from $1.63\times$ to
+$2.34\times$ to $3\times$ its lookup as the width opens while the MAE
+moves $0.002$\,m, which is the flat direction the eigenvector
+predicted. And the three-parameter field is therefore not physically
+defensible either. What the spectrum selects is the calibration the
+marks can determine; what they determine is a request for roughness
+the lookup cannot supply, at any width we are prepared to call honest
+--- evidence that the marks are asking friction to compensate for an
+error that lives elsewhere (Section~\ref{sec:icauthority}).
 
 
 \paragraph{Would more marks fix it?}

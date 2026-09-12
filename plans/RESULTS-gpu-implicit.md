@@ -2447,4 +2447,51 @@ wetland 0.063. Reading: the wider prior reaches the same misfit floor
 faster and by the same indefensible route -- this is the fifteen-class
 CONTROL the paper's thesis needs. Files:
 `o62_p_c15_sa0.30_it{1..4}.txt`, `o62_score_c15_sa0.30.log`.
-Tasks 3 and 4 (the three-class headline candidates) pending.
+Calibration J (with prior term) 631.98 after 3 its; prior term 16.5.
+
+**Tasks 3 and 4 RESULT (2026-09-11/12):** three classes {23, 90, 22}
+from the NLCD lookup, 2 nodes, scored on the 46 marks (all artifacts in
+`logs/o62/`):
+
+| prior | MAE | dMAE | of c15 | J_mis | J_tot | its | final alpha (22 / 23 / 90) |
+|---|---|---|---|---|---|---|---|
+| sigma_n 0.015 (o59) | 0.6274 | -0.091 | 85% | 648.9 | 682.1 | 4 | 1.63 / 0.30 / 0.301 |
+| sigma_alpha 0.30 (task 3, 58069233_3, 5:22 wall) | **0.6290** | -0.090 | 84% | 633.94 | 649.31 | 3 (wall) | 2.34 / 0.30 / 0.30 |
+| sigma_alpha 0.50 (task 4, 58125983_4, 3:23) | 0.6295 | -0.089 | 83% | 627.01 | 636.97 | **1 (converged)** | 3.00 / 0.30 / 0.30 |
+
+(c15 = the absolute-prior fifteen-class field's 0.107 m; J_mis 615.4.)
+Objective-reduction share vs the fifteen-class sigma_alpha 0.30 field
+(J_tot 631.98): 90% at 0.30, 94% at 0.50. Iterates: at +/-30% the FIRST
+step puts all three on a bound (22 -> 0.27 = 3x, 23 -> 0.036, 90 ->
+0.0294 = 0.3x), then 22 relaxes 3.0 -> 2.52 -> 2.34 over two more
+iterations (J_tot 654.7 -> 650.1 -> 649.3); at +/-50% the first step
+lands on the same corner and TAO reports Residual 0 (projected gradient
+zero on the box) -- converged in one iteration. Check: the +/-30% step-1
+point (J_tot 654.68 - prior 27.67 at all-bounds with beta 11.1) has
+J_mis 627.0, identical to the +/-50% final -- same point.
+
+**Reading.** (1) Width does not matter above 30%: the Gaussian prior
+contributes 15 (0.30) / 10 (0.50) J-units against a misfit near 630;
+the box [0.3, 3] does the constraining. (2) Developed-medium and woody
+wetland reach the 0.3x floor under every prior in the three-class
+problem (n = 0.036, 0.0294): that value is the data's, and it is
+indefensible for developed/wetland ground -- the three-class field is
+NOT physically defensible either; the paper's "a calibration confined to
+those stays physical" (Sec 4, prior paragraph) was measured false and
+rewritten. (3) Developed-low is the prior's: 1.63x -> 2.34x -> 3x as the
+width opens, MAE moves 0.002 m -- the flat direction. (4) The
+three-class field is DETERMINED (same answer for 23/90 from three
+priors, 1-3 iterations vs 9), and what it determines is a request for
+roughness the lookup cannot supply -> thesis item 5 (the error is
+elsewhere). o63 (gauge-calibrated, mark-validated) is now the decisive
+test: do the gauges send the same classes to the floor?
+
+**o63 first submission FAILED (58126942, 2026-09-12 07:58, 8 s):**
+`srun: Job step's --cpus-per-task value exceeds that of job (32 > 1)`.
+It was sbatch'ed from inside the gpu10 build job (58126286, shared QOS,
+`-c 1`-shaped step); sbatch reads a parent allocation's SLURM_* as
+options and they outrank the script's #SBATCH lines. Resubmitted from a
+login shell as **58241452** with `--ntasks-per-node=4 --cpus-per-task=32`
+pinned in the header (belt and braces; the real fix is never to sbatch
+from inside a job). Scheduler estimate 09-24 -- the killed job's three
+days of priority age are lost; premium QOS is the lever if needed.

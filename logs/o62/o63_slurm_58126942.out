@@ -1,0 +1,9 @@
+=== o63 gauge_c3_sa0.30: calibrating classes 23,90,22 on above-bed gauge stage, 2 nodes, Sat Sep 12 07:58:07 AM PDT 2026
+calibration exit=1 (124 = wall budget, dump kept) Sat Sep 12 07:58:08 AM PDT 2026
+/var/spool/slurmd/job58126942/slurm_script: line 75: 1111173 Terminated              ( k=0; last=""; while sleep 30; do
+    [ -f $DUMP ] || continue; cur=$(md5sum < $DUMP); if [ "$cur" != "$last" ]; then
+        k=$((k+1)); cp $DUMP o63_p_${TAG}_it${k}.txt; last=$cur;
+    fi;
+done )
+
+compare (peak-WSE MAE on the 46 marks):  NLCD prior 0.7188 | 3 classes calibrated ON the marks 0.6274 (absolute prior) | o62 sigma_alpha runs

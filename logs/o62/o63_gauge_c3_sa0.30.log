@@ -1,0 +1,2 @@
+srun: Job step's --cpus-per-task value exceeds that of job (32 > 1). Job step may never run.
+srun: error: Unable to create step for job 58126942: More processors requested than permitted

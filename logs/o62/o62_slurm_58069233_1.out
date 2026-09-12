@@ -1,0 +1,35 @@
+=== o62 c15_sa0.30: sigma_alpha=0.30 all 15 classes on 2 nodes, Wed Sep  9 11:26:51 PM PDT 2026
+calibration exit=124 (124 = wall budget, dump kept) Thu Sep 10 04:26:55 AM PDT 2026
+/var/spool/slurmd/job58069236/slurm_script: line 109: 464536 Terminated              ( k=0; last=""; while sleep 30; do
+    [ -f $DUMP ] || continue; cur=$(md5sum < $DUMP); if [ "$cur" != "$last" ]; then
+        k=$((k+1)); cp $DUMP o62_p_${TAG}_it${k}.txt; last=$cur;
+    fi;
+done )
+class calibration: prior sigma_alpha = 0.3000 (beta = 1.1111e+01), relative variables alpha = n/n_prior
+hwm init: J 8.082566e+02, peak-WSE MAE 0.7188 m, model dry at 0 of 46 marks
+  0 TAO,  Function value: 1.,  Residual: 0.15745 
+  1 TAO,  Function value: 0.822395,  Residual: 0.0605284 
+  2 TAO,  Function value: 0.795407,  Residual: 0.11856 
+  3 TAO,  Function value: 0.781903,  Residual: 0.35211 
+=== o62 c15_sa0.30: scoring final dump Thu Sep 10 04:26:55 AM PDT 2026
+score exit=0 Thu Sep 10 04:48:40 AM PDT 2026
+hwm eval (class table): J 6.154375e+02, peak-WSE MAE 0.6154 m, model dry at 0 of 46 marks (144 obs times over 43200 steps)
+--- final class table ---
+# NLCD_code  manning_n   (after 3 TAO iterations, J 6.319779e+02)
+11 0.04477217585
+21 0.05889953381
+22 0.1794520333
+23 0.036
+24 0.1268371475
+31 0.03105447968
+41 0.1553244385
+42 0.08237173221
+43 0.1222623519
+52 0.0345
+71 0.03244505663
+81 0.06164891833
+82 0.03762514071
+90 0.06298267839
+95 0.08002874623
+
+compare against (absolute sigma_n 0.015):  NLCD prior MAE 0.7188 | 15 classes 0.6116 | 3 classes 0.6274

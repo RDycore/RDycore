@@ -4,11 +4,21 @@
 #SBATCH -q regular
 #SBATCH -t 360
 #SBATCH -N 2
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=32
 #SBATCH -o o63_slurm_%j.out
 # o63: calibrate on the gauges, validate on the marks -- Donghui's design,
 # accepted at the 2026-09-09 coauthor meeting as the paper's validation.
 #
 #   sbatch o63_gauge_validation.sh          # resumes from its own dump on resubmit
+#
+# SUBMIT FROM A LOGIN SHELL, NEVER FROM INSIDE ANOTHER JOB. The first
+# submission (58126942, 2026-09-12) was issued by the gpu10 build job -- a
+# shared-QOS allocation -- and died in 8 s: "srun: Job step's --cpus-per-task
+# value exceeds that of job (32 > 1)". sbatch reads SLURM_* from a parent
+# allocation as if they were command-line options, and those outrank the
+# #SBATCH lines below. The two task-shape lines above are belt and braces;
+# they do not protect against a parent job's environment.
 #
 # The observable is USGS stage at the 13 rain-driven gauges over the production
 # window (event hours 29-41, 15-minute cadence, obs_turning_h29_41.txt), with
