@@ -247,11 +247,11 @@ external forcing.
 The Roe flux's dissipation is built from the moduli $|\lambda_p|$ of
 its characteristic wave speeds, so the closed-form expression it
 evaluates switches wherever a wave speed changes sign. Switches like
-this --- \emph{branches}, in the sense that $|x|$ has a positive and a
-negative branch --- recur throughout the discretization, and they
-belong to the model rather than to the derivative: a nonlinear solver
-must accommodate them whether or not anyone differentiates the code,
-which is the argument of Section~\ref{sec:implicit}.
+this, \emph{branches} in the sense that $|x|$ has a positive and a
+negative branch, recur throughout the discretization. They belong to
+the model rather than to the derivative: a nonlinear solver must
+accommodate them whether or not anyone differentiates the code, which
+is the argument of Section~\ref{sec:implicit}.
 Away from a switching surface the map is smooth and equals its active
 branch; the derivative machinery of
 Sections~\ref{sec:jacobian}--\ref{sec:adjoint} is
@@ -259,24 +259,23 @@ Sections~\ref{sec:jacobian}--\ref{sec:adjoint} is
 actually selected to give the correct one-sided derivative.
 
 \paragraph{A differentiable right-hand side.}
-A prerequisite that deserves emphasis: RDycore's existing friction
-treatments (a semi-implicit splitting and the implicit scheme of Xia and
-Liang) embed the time step --- and, in the semi-implicit case, the flux
-divergence --- \emph{inside} the RHS callback. The resulting map is
-consistent only with forward Euler and admits no well-defined
-$\partial f/\partial u$. We therefore added a plain explicit source
-treatment (\texttt{source.method: explicit}), used on every adjoint
-path; Section~\ref{sec:implicit} shows how the resulting stiffness is
-then handled properly, by the implicit integrator rather than inside
-the explicit right-hand side $f$.
+RDycore's existing friction treatments (a semi-implicit splitting and
+the implicit scheme of Xia and Liang) embed the time step, and in the
+semi-implicit case the flux divergence, inside the RHS callback. The
+resulting map is consistent only with forward Euler and admits no
+well-defined $\partial f/\partial u$. We therefore added a plain
+explicit source treatment (\texttt{source.method: explicit}), used on
+every adjoint path, and Section~\ref{sec:implicit} shows how the
+implicit integrator, rather than the right-hand side $f$, then handles
+the resulting stiffness.
 
 \subsection{Differentiating the production solver}
 \label{sec:diff}
 
-Two design decisions shape everything downstream. The derivative of
-the right-hand side is obtained by hand --- forward-mode
-differentiation of the flux computation itself, branch by branch ---
-and it is \emph{assembled} into a sparse matrix rather than applied
+Two design decisions shape everything downstream. We obtain the
+derivative of the right-hand side by hand, as forward-mode
+differentiation of the flux computation itself, branch by branch, and
+we \emph{assemble} it into a sparse matrix rather than apply it
 matrix-free. Assembly is what lets one artifact serve three consumers:
 the implicit solver preconditions with it
 (Section~\ref{sec:implicit}), \texttt{TSAdjoint} transposes it, and
@@ -295,9 +294,9 @@ two cell rows, local sources contribute diagonal blocks, and boundary
 edges contribute diagonal blocks through the ghost-state map of the
 boundary condition.
 
-One consequence of that structure is worth stating explicitly, because
-edge orientation is a classical source of sign errors in this
-construction. The pair
+Edge orientation is a classical source of sign errors in this
+construction, so one consequence of that structure needs stating. The
+pair
 $(\partial\mathcal{F}/\partial u_L, \partial\mathcal{F}/\partial u_R)$
 is evaluated \emph{once} per edge, in the edge's own stored normal
 direction, and then scattered to both cell rows with opposite area
@@ -306,8 +305,8 @@ receives the same two blocks with the roles of $u_L$ and $u_R$
 exchanged between diagonal and off-diagonal positions. The normal is
 never flipped and the flux routine is never re-entered with reversed
 arguments, so conservation is structural rather than something the
-signs must be made to reproduce --- exactly mirroring how the
-right-hand side itself accumulates the flux. The assembled-matrix
+signs must reproduce, mirroring how the right-hand side itself
+accumulates the flux. The assembled-matrix
 checks in Table~\ref{tab:verification} would expose any lapse
 regardless, since they compare the full assembly against a
 matrix-coloring finite-difference Jacobian of the actual RHS on
@@ -318,14 +317,14 @@ mis-oriented edge is visible.
 Rather than deriving the dissipation-matrix derivatives symbolically, we
 differentiate the flux \emph{computation}: a hand-written forward-mode
 (tangent) version of the Roe flux routine propagates directionals
-through every intermediate --- Roe averages, eigenvectors, eigenvalues
+through every intermediate (Roe averages, eigenvectors, eigenvalues
 including both branches of the critical-flow fix, wave strengths, and
-physical fluxes --- taking the code's own branch at every $|\cdot|$ and
-switch (a consistent one-sided derivative). Seeding unit directions
-through the primitive-reconstruction chain rule yields the two
-conservative-space blocks in six tangent evaluations per edge. The
-approach mirrors the flux code line by line, which makes it reviewable
-and, in our experience, correct on first assembly against the
+physical fluxes), taking the code's own branch at every $|\cdot|$ and
+switch. The result is a consistent one-sided derivative. Seeding unit
+directions through the primitive-reconstruction chain rule yields the
+two conservative-space blocks in six tangent evaluations per edge. The
+tangent code mirrors the flux code line by line, so it can be reviewed
+against it, and we found it correct on first assembly against the
 verification harness below.
 
 \paragraph{Boundary blocks.}
@@ -390,7 +389,7 @@ $\sigma^2$,
 \end{equation}
 \texttt{TSAdjoint}~\cite{zhang2022tsadjoint} differentiates the discrete
 time stepper, so gradients are exact to roundoff for the computed
-trajectory --- the property that makes the FD gates in
+trajectory, which is the property that makes the FD gates in
 Table~\ref{tab:verification} meaningful. Multi-time observations are
 handled by a segmented backward sweep: the adjoint is advanced between
 observation times with \texttt{TSAdjointSetSteps} and receives a jump
@@ -404,18 +403,17 @@ integrator implements no adjoint, so adjoint-path configurations use the
 Runge--Kutta family. And for implicit integrators the discrete-adjoint
 gradient is only as exact as the inner solves: the Manning gradient
 fails its gate at default inner tolerances and passes once they are
-tightened (Table~\ref{tab:verification}, implicit rows). Loose inner
-tolerances also turned out to be a false economy on this problem: a
-tighter Krylov tolerance makes the implicit forward \emph{faster},
-because better linear solves let Newton converge in fewer iterations,
-and the production setting (Krylov $10^{-4}$, nonlinear $10^{-5}$)
-reproduces the fully converged answer to every printed digit for about
-a quarter more wall time than the loosest usable setting. Campaigns
-therefore run at converged inner tolerances, and the verified
-gradients \emph{are} the production gradients. What the FD gates
-cannot certify at production scale is a different matter entirely ---
-the objective's own nonsmoothness over long windows --- quantified in
-Section~\ref{sec:hwm}.
+tightened (Table~\ref{tab:verification}, implicit rows). We found
+loose inner tolerances a false economy on this problem: a tighter
+Krylov tolerance makes the implicit forward \emph{faster}, because
+better linear solves let Newton converge in fewer iterations, and the
+production setting (Krylov $10^{-4}$, nonlinear $10^{-5}$) reproduces
+the fully converged answer to every printed digit for about $25\%$
+more wall time than the loosest usable setting. Campaigns therefore
+run at converged inner tolerances, and the verified gradients
+\emph{are} the production gradients. The FD gates cannot certify the
+objective's own nonsmoothness over long windows, which
+Section~\ref{sec:hwm} quantifies.
 
 \subsection{The calibration algorithm: strong-constraint 4D-Var}
 \label{sec:calibration}
@@ -428,12 +426,12 @@ evaluation performs one checkpointed forward sweep that records the
 gauge residuals $r_k$ at the observation times, followed by one
 backward sweep of the discrete adjoint (Algorithm~\ref{alg:sweep}).
 The per-iteration cost is therefore one forward sweep, the checkpoint
-recomputation the backward sweep requires, and one adjoint sweep ---
-about two forward solves in total at production settings, and
-independent of the number of parameters. That constant is measured
-rather than assumed (Eq.~\eqref{eq:gradcost}), since for a nonlinear
-model on a memory-limited device it is the checkpointing scheme, not
-the adjoint, that sets it. Throughout, the
+recomputation the backward sweep requires, and one adjoint sweep,
+about $2.1$ forward solves in total at production settings
+(Eq.~\eqref{eq:gradcost}) and independent of the number of parameters.
+We measure that constant rather than assume it, since for a nonlinear
+model on a memory-limited device the checkpointing scheme, not the
+adjoint, sets it. Throughout, the
 objective splits as $J = J_{\mathrm{mis}} + J_{\rm prior}$, where the
 \emph{misfit} $J_{\mathrm{mis}} = (2\sigma^2)^{-1}\sum_k\lVert
 r_k\rVert^2$ measures disagreement with the observations and
@@ -455,17 +453,17 @@ contribution $(\partial\Phi_s/\partial n)^T\lambda$ of that step's
 Manning dependence. When the sweep reaches $t = 0$, $\mu$ is the
 complete misfit gradient $dJ_{\mathrm{mis}}/dn$ and $\lambda$ is
 $dJ_{\mathrm{mis}}/du_0$. Both transposed Jacobians are the analytic
-operators of Sections~\ref{sec:jacobian}--\ref{sec:adjoint} --- the
-assembled RHS Jacobian for the state propagation, the two-nonzero
-parameter Jacobian for the $\mu$ accumulation --- applied within
+operators of Sections~\ref{sec:jacobian}--\ref{sec:adjoint}, the
+assembled RHS Jacobian for the state propagation and the two-nonzero
+parameter Jacobian for the $\mu$ accumulation, applied within
 \texttt{TSAdjoint}'s discrete adjoint of the chosen integrator.
 
 The outer update is TAO's bound-constrained limited-memory
 quasi-Newton method BLMVM~\cite{benson2001blmvm}
 (Algorithm~\ref{alg:blmvm}). The loop terminates on the standard
-bound-constrained test: the projected gradient $g^P$ --- the gradient
-with components pointing out of the feasible box zeroed --- drops
-below an absolute tolerance, or an iteration budget is reached. The
+bound-constrained test: the projected gradient $g^P$ (the gradient
+with components pointing out of the feasible box zeroed) drops below
+an absolute tolerance, or an iteration budget is reached. The
 same loop serves every parameterization in this paper: per-region,
 per-cell, and land-cover-class fields differ only in the expansion of
 the parameter vector onto cells (line~\ref{ln:apply} of
@@ -590,8 +588,8 @@ term, and we measure it rather than assert it. On a one-simulated-hour
 window of the 2.93M-cell mesh (3{,}600 implicit steps at
 $\Delta t = 1$\,s, 400 in-memory checkpoints, four A100 nodes) a
 forward step costs $62.9$\,ms and an adjoint step $14.8$\,ms, and the
-backward sweep triggers $3{,}199$ revolve recomputation steps ---
-$0.89$ of an additional forward. One objective-plus-gradient
+backward sweep triggers $3{,}199$ revolve recomputation steps, $0.89$
+of an additional forward. One objective-plus-gradient
 evaluation is thus
 \begin{equation}
   \underbrace{1.00}_{\text{forward}}
@@ -609,34 +607,34 @@ are near optimal for this step count. What does \emph{not} change with
 the parameter count is the whole of Eq.~\eqref{eq:gradcost}: the same
 $2.1$ forwards deliver a gradient with respect to one parameter or to
 2.93 million, which is the property that makes distributed calibration
-tractable and the one worth quoting.
+tractable.
 
 Each trial step
 of the BLMVM line search costs one such evaluation. A basin-scale
 window needs more iterations than a single batch allocation provides,
 so a run writes its parameter vector on exit and the next reads it back
 as its starting iterate, matched by land-cover class rather than by
-position. The resume is exact in the parameters --- the continuing
-run's first objective reproduces the previous run's last to six digits
---- but BLMVM's stored curvature pairs do not survive it, so a chain of
-jobs is not step-for-step identical to one long run. On a twin at the
-Houston mesh the restart was not a penalty: a chained $2 + 2$ iteration
-run reached a lower objective than a single cold four-iteration run,
-the restart acting as a rescaling of the quasi-Newton model. That is
-one twin, not a rule; the point for planning is that chaining did not
-cost convergence there.
+position. The resume is exact in the parameters (the continuing run's
+first objective reproduces the previous run's last to six digits), but
+BLMVM's stored curvature pairs do not survive it, so a chain of jobs
+is not step-for-step identical to one long run. On a twin at the
+Houston mesh we found the restart was not a penalty: a chained $2 + 2$
+iteration run reached a lower objective than a single cold
+four-iteration run, the restart acting as a rescaling of the
+quasi-Newton model. That is one twin, not a rule, and the point for
+planning is that chaining did not cost convergence there.
 
 \paragraph{Scaling the optimization problem.}
 A quasi-Newton method needs its variables and its objective to be
 $O(1)$, and in physical Manning units this problem is not: on the
 production window $\lVert g\rVert \approx 1.5\times10^{3}$ while
 $n \approx 0.05$. Starting from $B = I$, the first trial point $n - g$
-therefore projects every component onto the lower bound --- exactly
-where the model cannot solve, since a uniform $\alpha = 0.2$ diverges
-(Table~\ref{tab:alpha}) --- so every line-search trial fails and the
-optimizer returns having taken no step at all. The failure is worth
-recording because of how it presents: nothing is wrong with the
-gradient, and the finite-difference gates pass throughout.
+therefore projects every component onto the lower bound, where the
+model cannot solve (a uniform $\alpha = 0.2$ diverges,
+Table~\ref{tab:alpha}), so every line-search trial fails and the
+optimizer returns having taken no step. The failure presents as a
+solver defect: nothing is wrong with the gradient, and the
+finite-difference gates pass throughout.
 
 Two changes make the problem well scaled, and both have physical
 readings rather than being tuning constants. First, optimize the
@@ -669,58 +667,57 @@ bare value is uninterpretable across problems, and ours had been chosen
 independently in every experiment, spanning six orders of magnitude.
 Against the measured $J(\alpha)$ curve, $\sigma_n = 0.015$ places the
 minimum of the uniform-scaling direction at $\alpha \approx 0.70$,
-while $\sigma_n = 0.020$ leaves no interior minimum there at all --- the
-same pathology the hand-chosen weight had. The prediction is measured:
-the scan point at $\alpha = 0.70$ was run afterwards and returned MAE
-$0.6894$ against the $0.6895$ the balance implied
-(Table~\ref{tab:alpha}). Stating the prior turns the choice into an
-arithmetic consequence of a quantity the domain team can argue about.
+while $\sigma_n = 0.020$ leaves no interior minimum there at all, the
+same pathology the hand-chosen weight had. We ran the scan point at
+$\alpha = 0.70$ afterwards and measured an MAE of $0.6894$\,m against
+the $0.6895$\,m the balance implied (Table~\ref{tab:alpha}). Stating
+the prior turns the choice into an arithmetic consequence of a quantity
+the domain team can argue about.
 
-\paragraph{Absolute or fractional prior --- not a cosmetic choice.}
+\paragraph{Absolute or fractional prior.}
 Equation~\eqref{eq:sigman} states the prior as an absolute departure in
 $n$, and for a land-cover table that is the wrong statement. A single
 $\sigma_n = 0.015$ over an NLCD lookup spanning $n = 0.027$ (barren) to
 $n = 0.16$ (developed high) asserts a $\pm 56\%$ prior on one class and
-$\pm 9\%$ on another; and because the penalty scales as
-$n_{\rm prior}^2$, a small-$n$ class buys a large \emph{fractional}
-excursion cheaply. The iterates show exactly that signature: at the
-production configuration's first quasi-Newton step, every class driven
-to the upper bound was small-$n$ (pasture $0.038$, developed-open
-$0.040$, developed-low $0.090$) and every class driven to the lower
-bound was large-$n$ (developed-high $0.160$, developed-medium $0.120$,
-shrub $0.115$, woody wetland $0.098$) --- an ordering by prior value,
-not by hydrology. Penalizing the fractional departure
-$n_k/n_{{\rm prior},k} - 1$ with a width $\sigma_\alpha$ instead treats
-the classes alike, and asks the domain expert a question they can
-answer: how far can the lookup be wrong, in percent?
+$\pm 9\%$ on another. Because the penalty scales as $n_{\rm prior}^2$,
+a small-$n$ class buys a large \emph{fractional} excursion cheaply. The
+iterates show that signature: at the production configuration's first
+quasi-Newton step, every class driven to the upper bound was small-$n$
+(pasture $0.038$, developed-open $0.040$, developed-low $0.090$) and
+every class driven to the lower bound was large-$n$ (developed-high
+$0.160$, developed-medium $0.120$, shrub $0.115$, woody wetland
+$0.098$), an ordering by prior value, not by hydrology. Penalizing the
+fractional departure $n_k/n_{{\rm prior},k} - 1$ with a width
+$\sigma_\alpha$ instead treats the classes alike, and turns the prior
+into a question the domain expert can answer, the percentage by which
+the lookup can be wrong.
 
 The tension survives the reformulation, and that is the substantive
 result rather than an implementation detail. We ran the fifteen-class
 calibration under the fractional prior at the width the domain team
-considers honest, $\sigma_\alpha = 0.30$. Its first quasi-Newton step
-drove seven of the fifteen classes to a bound --- developed-open,
-developed-low and pasture to $\alpha = 3$, developed-medium,
-developed-high, shrub and woody wetland to $\alpha = 0.3$ --- and after
+puts on the lookup, $\sigma_\alpha = 0.30$. Its first quasi-Newton
+step drove seven of the fifteen classes to a bound (developed-open,
+developed-low and pasture to $\alpha = 3$; developed-medium,
+developed-high, shrub and woody wetland to $\alpha = 0.3$), and after
 three iterations developed-medium and shrub were still on the floor
 ($n = 0.036$ and $0.0345$, smoother than concrete) with developed-low at
 twice its lookup value, for a peak-WSE MAE of $0.6154$\,m
 (Table~\ref{tab:ladder}) against the $0.6116$\,m the absolute prior
 reached in nine. A wider prior reaches the same fit sooner, by the
-same route, and the route is the problem. \emph{Within a prior wide
-enough to be honest, this observable cannot deliver a defensible
+same route, and the route is the problem. \emph{At the width the
+lookup deserves, this observable cannot deliver a defensible
 fifteen-class roughness field.} What it can deliver is the subject of
 Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}: the marks
 determine about three roughness combinations at this width, and a
 calibration confined to those converges and reaches the same answer
-from every prior we ran --- an answer that puts two of the three
-classes on the same $\alpha = 0.3$ floor. We report the prior
-width used with every number; its value is a judgment about the
-land-cover lookup, not a tuning parameter.
+from every prior we ran, with two of the three classes on the same
+$\alpha = 0.3$ floor. We report the prior width used with every
+number; its value is a judgment about the land-cover lookup, not a
+tuning parameter.
 
-The diagnosis is worth separating from the fix, because the failure
-mode is not specific to this model: an optimizer that takes zero steps
-on a problem whose gradient passes every verification gate is a
-scaling defect, and the cheapest test is to compare
+The failure mode is not specific to this model: an optimizer that
+takes zero steps on a problem whose gradient passes every verification
+gate is a scaling defect, and the cheapest test is to compare
 $\lVert g \rVert$ against the scale of the variable before suspecting
 the derivative.
 
@@ -730,9 +727,9 @@ the derivative.
 The results that follow run the machinery of Section~\ref{sec:methods}
 on three domains, at resolutions two orders of magnitude apart and
 against four different observables. Because the paper's central claim
-is comparative --- what a parameter can explain \emph{on a given
-observable and window} --- the configuration is part of every result
-rather than background to it, and Table~\ref{tab:configs} collects the
+is comparative (what a parameter can explain \emph{on a given
+observable and window}), the configuration is part of every result
+rather than background to it. Table~\ref{tab:configs} collects the
 configurations so that later sections can name one instead of
 restating it.
 
@@ -797,7 +794,7 @@ about information rather than about correctness. The last five rows are
 the 30\,m Hurricane Harvey domain, where the observable changes from
 stage gauges to surveyed high-water marks for the reason given in
 Section~\ref{sec:hwm}. Every number reported against the real survey
---- baseline, scans, calibration, and spectrum --- is measured on the
+(baseline, scans, calibration, and spectrum) is measured on the
 production row, so those results compose.}
 \label{tab:configs}
 \end{table}
@@ -845,23 +842,22 @@ revolve checkpointing (Section~\ref{sec:implicit}).
 \label{sec:implicit}
 
 The explicit drag term is stiff in thin water: linearizing gives a
-stability limit $\Delta t \lesssim 2 h^{4/3}/(g n^2 |v|)$, which for
-sheet flow at centimeter depths is seconds --- far below the
-gravity-wave CFL limit of kilometer-scale meshes. Our Hurricane Harvey
-test configuration (Houston at 1\,km, $\Delta t = 30$\,s) confirms this
-empirically: the explicit source treatment produces NaN within the
-first objective evaluation, in quantitative agreement with the
-analysis. The same holds at basin scale, where the margin is far
-wider: on the spun-up 30\,m, 2.93M-cell Harvey mesh ($99.9\%$ wet,
-median depth 6\,mm) the friction-rate limit is
+stability limit $\Delta t \lesssim 2 h^{4/3}/(g n^2 |v|)$, seconds
+for sheet flow at centimeter depths, against the $30$\,s gravity-wave
+step of the 1\,km mesh. On the Houston 1\,km configuration
+($\Delta t = 30$\,s) we found the explicit source treatment returns a
+non-finite state within the first objective evaluation, as the
+estimate predicts. The same holds at basin scale, where the margin is
+a factor of 400: on the spun-up 30\,m, 2.93M-cell Harvey mesh
+($99.9\%$ wet, median depth 6\,mm) the friction-rate limit is
 $\Delta t \lesssim 2.4$\,ms, and forward Euler of the differentiable
 right-hand side returns a non-finite state at every tested step
 ($\Delta t = 0.25$, $0.125$, $0.05$\,s) while backward Euler at
-$\Delta t = 1$\,s completes a 72-hour window without a single Newton
+$\Delta t = 1$\,s completes a 72-hour window without a Newton
 failure. There is no viable explicit path for the differentiable
 right-hand side at this resolution.
 
-The assembled exact Jacobian makes the remedy nearly free: backward
+The assembled exact Jacobian supplies the remedy directly: backward
 Euler via PETSc's theta method, with SNES driven by the same Jacobian,
 carries the Harvey window at $\Delta t = 30$\,s, and the theta-method
 adjoint passes the same FD gates (Table~\ref{tab:verification}).
@@ -869,8 +865,8 @@ adjoint passes the same FD gates (Table~\ref{tab:verification}).
 We also implemented the sharper tool: an ARK-IMEX splitting with the
 Manning drag as the stiff implicit part
 (\texttt{temporal: arkimex}). The implicit stage system is
-block-diagonal --- an independent $3\times3$ Newton per cell, no global
-solve --- while fluxes and bed slope remain explicit under the
+block-diagonal (an independent $3\times3$ Newton per cell, no global
+solve) while fluxes and bed slope remain explicit under the
 gravity-wave CFL limit. Its adjoint passes the same gates
 ($2.0\times10^{-8}$ for $dJ/du_0$, $2.5\times10^{-6}$ for $dJ/dn$) and
 it carries the Harvey window at $\Delta t = 30$\,s at 6.7\,s per
@@ -881,7 +877,8 @@ the two backends agree to machine precision ($5\times10^{-16}$
 relative) after 100 ARK-IMEX steps. A device-resident implicit part is
 the natural follow-up.
 
-Three implementation facts others will hit:
+Three implementation facts apply to any adjoint retrofit on PETSc's
+time steppers:
 \begin{itemize}
   \item PETSc's ARKIMEX adjoint dereferences \emph{both} the
         implicit- and explicit-part parameter Jacobians, so a zero
@@ -909,9 +906,9 @@ Where implicit stepping fails on this problem, it fails for a reason
 that is invisible in the smooth twin experiments: the residual is
 discontinuous, so Newton has nothing to converge \emph{to}. At the
 land-cover roughness prior, rather than the twins' smooth low-$n$
-fields, backward Euler descends cleanly for a dozen iterations and
-then freezes --- a vanishingly small line-search step changes the
-residual norm severalfold, the signature of a jump, not of
+fields, backward Euler descends for a dozen iterations and then
+stalls: a line-search step of negligible length changes the residual
+norm severalfold, which is the signature of a jump, not of
 ill-conditioning. Two mechanisms are responsible, both invisible until the parameter
 field is realistic: the drag's wet/dry cutoff, whose amplitude scales
 as $n^2$, and the critical-outflow boundary's stagnation switch. Both
@@ -928,24 +925,23 @@ $h_{\rm anuga} = 0$. The value is the smallest that removes the stall:
 $0.003$\,m is indistinguishable from it and $0.01$\,m is unstable. The
 outflow condition is replaced in the same spirit.
 
-Both fixes are implemented, gated, and opt-in (open issues~4--5).
-Regularizing the drag velocity removes the first and restores honest
-convergence over the early transient. The second we removed by
-replacing the outlet condition itself: a transmissive (zero-gradient)
-free outflow --- the ghost state copies the interior state, the
-convention of most finite-volume shallow-water codes --- is continuous
-in the interior state by construction, and its ghost map is the
-identity, so the analytic Jacobian and adjoint carry it exactly,
-FD-gated like every other block. The effect is not an improvement but
-a cure (Table~\ref{tab:cure}): the identical failing control completes
-with zero nonlinear failures, and the fix holds through the longest
-windows we run. Before the replacement we absorbed the pin by
-loosening the nonlinear tolerance; a class-twin calibration under that
-crutch still recovered all fifteen class values to machine precision,
-so the gradient path was unimpaired --- tolerable, but a crutch. The
-general lesson for adjoint retrofits is that nonsmoothness in an
-operational flood code is not only a differentiability question ---
-it is a nonlinear-solver question.
+Both fixes are implemented, gated, and opt-in. Regularizing the drag
+velocity removes the first and restores convergence over the early
+transient. The second we removed by replacing the outlet condition
+itself: a transmissive (zero-gradient) free outflow, in which the
+ghost state copies the interior state (the convention of most
+finite-volume shallow-water codes), is continuous in the interior
+state by construction, and its ghost map is the identity, so the
+analytic Jacobian and adjoint carry it exactly, FD-gated like every
+other block. The effect is not an improvement but a cure
+(Table~\ref{tab:cure}): the identical failing control completes with
+zero nonlinear failures, and the fix holds through the longest windows
+we run. Before the replacement we absorbed the stall by loosening the
+nonlinear tolerance, and a class-twin calibration under that setting
+still recovered all fifteen class values to machine precision, so the
+gradient path was unimpaired. The general lesson for adjoint retrofits
+is that nonsmoothness in an operational flood code is a
+nonlinear-solver question as well as a differentiability question.
 
 \begin{table}
 \centering\footnotesize
@@ -967,7 +963,7 @@ one attempted.}
 \end{table}
 
 \paragraph{Checkpointed adjoints for long windows.}
-A naive stored trajectory for a full 36-hour Hurricane Harvey window
+A stored trajectory for a full 36-hour Hurricane Harvey window
 at the 30\,m mesh's CFL-limited $\Delta t = 0.25$\,s (518{,}400 steps,
 2.93M cells) would occupy tens of petabytes. PETSc's checkpointing
 trajectory (\texttt{-ts\_trajectory\_type memory} with the revolve
@@ -979,12 +975,12 @@ implicit integrators need the same tight inner tolerances as in
 Section~\ref{sec:adjoint}, since checkpoint recomputation re-solves
 the stage systems). On the 30\,m mesh, a forward-plus-adjoint sweep
 with only \emph{three} states checkpointed in memory matches the
-disk-trajectory gradient to all printed digits --- and runs slightly
-faster, because recomputation is cheaper than trajectory I/O at this
-scale. For the full window, a few hundred checkpoints ($\sim$14\,GB
-aggregate) bound the recompute overhead by a factor of about four,
-making the long-window adjoint memory-feasible; the remaining cost is
-the forward compute itself, addressed next.
+disk-trajectory gradient to all printed digits, and runs faster
+(recomputation is cheaper than trajectory I/O at this scale). For the
+full window, a few hundred checkpoints ($\sim$14\,GB aggregate) bound
+the recompute overhead by a factor of about four, making the
+long-window adjoint memory-feasible; the remaining cost is the forward
+compute itself, measured in Eq.~\eqref{eq:gradcost}.
 
 \section{Twin experiments: what the observing network can recover}
 \label{sec:houston}
@@ -998,26 +994,25 @@ two-zone field split at the domain midline, observed at 343 synthetic
 gauges over 14 observation times, calibrated with implicit stepping and
 Tikhonov regularization ($\beta = 10^{-5}$). Every cell is wet and
 moving in this configuration, so all 2{,}746 parameters are observable.
-The configuration is deliberately gauge-sparse --- 343 gauges for
-2{,}746 parameters, an 8:1 ratio --- and it exhibits the classic
+The configuration is deliberately gauge-sparse (343 gauges for
+2{,}746 parameters, an 8:1 ratio) and it exhibits the classic
 \emph{semiconvergence} of underdetermined inverse problems
 (Figure~\ref{fig:map}). At 300 BLMVM iterations ($\sim$22 minutes on
 one laptop core, $\sim$4.4\,s per forward-plus-adjoint) the recovered
-map shows the two-zone truth structure cleanly at $26.3\%$ relative
-$L^2$ error. Continuing the same weakly regularized optimization to
-2000 iterations \emph{degrades} recovery to $38.0\%$: the misfit keeps
+map shows the two-zone truth structure at $26.3\%$ relative $L^2$
+error. Continuing the same weakly regularized optimization to 2000
+iterations \emph{degrades} recovery to $38.0\%$: the misfit keeps
 decreasing while the parameters drift along observation-null
 directions, ultimately pinning cells against both bound constraints
 (Figure~\ref{fig:map}, center left). Early stopping was acting as the
 effective regularizer. The behavior disappears when the problem is
 made well posed: a properly regularized Houston run
-($\beta = 10^{-4}$, 686 gauges)
-reaches $19.4\%$ at a 1000-iteration budget with no drift
-(Figure~\ref{fig:map}, center right) --- the sharpest recovery of the
-three, with the zone boundary resolved at the truth midline. This is
-precisely the overfitting risk documented for distributed friction
-estimation~\cite{warder2021storm}, here reproduced in a controlled
-twin setting. It motivates the regularization studies (total
+($\beta = 10^{-4}$, 686 gauges) reaches $19.4\%$ at a 1000-iteration
+budget with no drift (Figure~\ref{fig:map}, center right), the
+sharpest recovery of the three, with the zone boundary resolved at
+the truth midline. This is the overfitting risk documented for
+distributed friction estimation~\cite{warder2021storm}, reproduced in
+a controlled twin. It motivates the regularization studies (total
 variation, land-cover priors, discrepancy-principle stopping) planned
 as follow-on work.
 
@@ -1051,23 +1046,21 @@ matters is the real one. Twenty USGS gauges fall inside the Houston
 mesh, seventeen with Hurricane Harvey stage
 records.\footnote{HydroShare DOI
 \texttt{10.4211/hs.c037167e497546a1bc1508dfb32a9cff}.}
-Re-running the same twin with the observation operator built at those
-seventeen gauge cells --- 238 observations (17 gauges $\times$ 14
-times) against 2{,}746 parameters --- is a sobering experiment. BLMVM
-drives the misfit down by a factor of $2\times10^{7}$ --- the
-synthetic observations carry no noise, and are fit to roundoff ---
-while the recovered field is
-$44.9\%$ from the truth and saturates both bounds
-(Figure~\ref{fig:map}, far right). This is semiconvergence in its
-purest form: the real network's null space is so large that data fit
-says almost nothing about parameter recovery, and no Tikhonov weight
-or stopping rule rescues a per-cell field from 238 observations. The
-practical conclusion for real-data calibration is to shrink the
-parameter space to match the network --- but, as the next subsection
-measures, shrinking the parameter space is necessary and not
-sufficient: whether a reduced parameterization is identifiable depends
-on the observation geometry and window, not on the ratio of
-observation to parameter counts.
+In the same twin with the observation operator built at those
+seventeen gauge cells (238 observations, 17 gauges $\times$ 14 times,
+against 2{,}746 parameters), BLMVM drives the misfit down by a factor
+of $2\times10^{7}$ (the synthetic observations carry no noise and are
+fit to roundoff) while the recovered field is $44.9\%$ from the truth
+and saturates both bounds (Figure~\ref{fig:map}, far right). This is
+semiconvergence in its purest form: the real network's null space is
+so large that data fit says almost nothing about parameter recovery,
+and no Tikhonov weight or stopping rule rescues a per-cell field from
+238 observations. The practical conclusion for real-data calibration
+is to shrink the parameter space to match the network. Shrinking it
+is necessary and not sufficient, as the next subsection measures:
+whether a reduced parameterization is identifiable depends on the
+observation geometry and window, not on the ratio of observation to
+parameter counts.
 
 \subsection{Identifiability is a property of the observable: gauges
 versus high-water marks at 30\,m}
@@ -1076,20 +1069,20 @@ versus high-water marks at 30\,m}
 The natural reduced parameterization for this domain is one Manning
 value per NLCD land-cover class (15 classes at the 30\,m Turning mesh,
 2.93M cells), with the published NLCD lookup as prior and truth for
-twins. Counting is deceptively favourable: even the sparse real
-network supplies an order of magnitude more observations than
-parameters. Measurement says otherwise. In a class twin on the 30\,m
-mesh at the real 13-gauge geometry (260 observations, a short
-early-transient window), the objective falls $128\times$ while the
-recovered class values remain $66\%$ wrong in relative $L^2$, worst
-class $81\%$ --- and the failure is structural: classes whose cells
-are dynamically distant from every gauge (the three forest classes)
-never move from the starting value, because within the window nothing
-their roughness does can reach a gauge. The identical configuration
-observed at 418{,}076 strided cells recovers all fifteen classes to
-machine precision, so the failure is the network, not the method.
-Fifteen parameters, thirteen gauges, and an ``overdetermined''
-observation count: still unidentifiable.
+twins. Counting favours it: even the sparse real network supplies an
+order of magnitude more observations than parameters. Measurement
+says otherwise. In a class twin on the 30\,m mesh at the real
+13-gauge geometry (260 observations, a short early-transient window),
+the objective falls $128\times$ while the recovered class values
+remain $66\%$ wrong in relative $L^2$, worst class $81\%$. The
+failure is structural: classes whose cells are dynamically distant
+from every gauge (the three forest classes) never move from the
+starting value, because within the window nothing their roughness
+does reaches a gauge. The identical configuration observed at
+418{,}076 strided cells recovers all fifteen classes to machine
+precision, so the failure is the network, not the method. Fifteen
+parameters and thirteen gauges, an ``overdetermined'' observation
+count, remain unidentifiable.
 
 The same question re-asked with the peak observable comes out
 differently. Observing the same NLCD-truth twin at the 108
@@ -1098,21 +1091,21 @@ rain-forced window, implicit stepping, free-outflow outlet;
 Section~\ref{sec:hwm}) and calibrating fifteen classes from a uniform
 start: the objective falls $81\times$, the peak-WSE error at the marks
 drops from $0.103$\,m to $0.017$\,m MAE, and the area-dominant classes
-are identified --- the three developed-intensity classes, pasture, and
+are identified: the three developed-intensity classes, pasture, and
 crops recover to $0.7$--$10.5\%$, together $83\%$ of the domain's
-cells; area-weighted relative $L^2$ error is $0.20$ (unweighted
+cells, for an area-weighted relative $L^2$ error of $0.20$ (unweighted
 $0.58$). The residual errors concentrate in small-area classes
 (forests, shrub, emergent wetland, $\sim$5\% of cells), which now
-\emph{move} --- they are sensitive, unlike in the gauge experiment ---
-but overshoot to the bounds along weakly constrained directions:
+\emph{move} (they are sensitive, unlike in the gauge experiment) but
+overshoot to the bounds along weakly constrained directions. That is
 ordinary semiconvergence, treatable with regularization and longer
-windows rather than a structural absence of signal. Three caveats
-keep this honest: the one-hour window samples early-transient peaks,
-not flood peaks (the real calibration windows are $6$--$12$ hours and
-should only help); the run was capped at 15 quasi-Newton iterations;
-and twin marks synthesized from the truth trajectory carry no
-representation error, so this is an identifiability statement --- an
-upper bound on real-data performance, not a forecast of it.
+windows, rather than a structural absence of signal. Three caveats
+apply: the one-hour window samples early-transient peaks, not flood
+peaks (the real calibration windows are $6$--$12$ hours and should
+only help); the run was capped at 15 quasi-Newton iterations; and
+twin marks synthesized from the truth trajectory carry no
+representation error, so this is an identifiability statement, an
+upper bound on real-data performance rather than a forecast of it.
 
 \paragraph{Noise turns identifiability into a signal-to-noise question.}
 Every recovery above is noise-free, as are the verification twins
@@ -1125,29 +1118,29 @@ magnitude with the configuration (Table~\ref{tab:snr}). On a short
 verification window the entire Manning-induced observation signal is a
 few microns of water height, so a noise-free optimizer descends on it
 indefinitely while a tenth of a millimetre of observation noise
-destroys the recovery outright --- and no Tikhonov weight in a sweep
-up to $\beta = 1$ rescues it. At basin scale the same quantity is
+destroys the recovery outright, and no Tikhonov weight in a sweep up
+to $\beta = 1$ rescues it. At basin scale the same quantity is
 $\sim$$0.1$\,m of peak water-surface elevation after one simulated
-hour, five orders of magnitude larger, which is the regime in which
-survey-grade high-water-mark error becomes a fair fight rather than a
-foregone conclusion. The lesson is not that the method is fragile: it
-is that friction must act long enough to imprint a signal above the
-noise floor, which makes window length a first-class calibration
-decision rather than a cost parameter. The basin-scale noisy row shows
-what marginal signal-to-noise looks like in practice, and why misfit
-at the marks is the objective but not the result. With $0.15$\,m of
-observation noise, even the \emph{true} field cannot beat a mark MAE
-of about $\sigma\sqrt{2/\pi} \approx 0.12$\,m against the noisy
-values --- and the optimizer reaches exactly that floor while driving
-a third of the classes onto their bounds (pasture, $428$k cells, to
-the ceiling) and ending far from the true field it was supposed to
-recover. The data fit is as good as truth could achieve; the
-parameters that achieve it are wrong, because the last of the misfit
-was removed by matching noise. On real data the parameter error is
-invisible and the bound-pinning is its symptom --- which is the
-concrete argument for stronger regularization, a longer window, and
-discrepancy-principle stopping (stop at the noise level, do not
-descend past it) in the production run.
+hour, five orders of magnitude larger, which is the regime in which a
+parameter signal can exceed survey-grade high-water-mark error. The
+lesson is not that the method is fragile: it is that friction must
+act long enough to imprint a signal above the noise floor, which
+makes window length a first-class calibration decision rather than a
+cost parameter. The basin-scale noisy row shows what marginal
+signal-to-noise looks like in practice, and why misfit at the marks
+is the objective but not the result. With $0.15$\,m of observation
+noise, even the \emph{true} field cannot beat a mark MAE of about
+$\sigma\sqrt{2/\pi} \approx 0.12$\,m against the noisy values, and
+the optimizer reaches that floor while driving five of the fifteen
+classes onto their bounds (pasture, $428$k cells, to the ceiling) and
+ending far from the true field it was supposed to recover. The data
+fit is as good as truth could achieve; the parameters that achieve it
+are wrong, because the last of the misfit was removed by matching
+noise. On real data the parameter error is invisible and the
+bound-pinning is its symptom, which is the argument for stronger
+regularization, a longer window, and discrepancy-principle stopping
+(stop at the noise level rather than descend past it) in the
+production run.
 
 \begin{table}
 \centering\footnotesize
@@ -2182,9 +2175,10 @@ the verification gates of Table~\ref{tab:verification} run in its
 observation tables, and the per-mark peak dumps behind
 Figures~\ref{fig:authority} and~\ref{fig:spectrum} will be archived on
 Zenodo at submission \textbf{[DOI to be minted]}. Hurricane Harvey
-high-water marks are the USGS survey served by the Short-Term Network
-Flood Event Viewer (\url{https://stn.wim.usgs.gov}); stage records are
-USGS NWIS; rainfall is MRMS. \textbf{[Mesh, checkpoint, and rainfall archive: location to be
+high-water marks are the USGS Short-Term Network survey, retrieved
+through the STN Flood Event Viewer API (\url{https://stn.wim.usgs.gov})
+with the retrieval script and the filtered mark table in the archive;
+stage records are USGS NWIS; rainfall is MRMS. \textbf{[Mesh, checkpoint, and rainfall archive: location to be
 stated.]}
 
 \bibliographystyle{unsrt}
