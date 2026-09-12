@@ -1,0 +1,29 @@
+=== o64 c15_sa0.30: gauge objective of the -adjoint_classes_init o62_p_c15_sa0.30.txt field, 2 nodes, Sat Sep 12 12:19:08 PM PDT 2026
+/var/spool/slurmd/job58242097/slurm_script: line 77: 328938 Terminated              ( while sleep 30; do
+    grep -q "objective scaled by 1/J0" $LOG 2> /dev/null && { sleep 20; kill $PID 2> /dev/null; break; };
+done )
+run exit=63 (143 = killed by the watcher after J0, as intended) Sat Sep 12 01:07:47 PM PDT 2026
+gauge observations: 134 kept, 331 masked with observed WSE within 0. m of the cell bed (-adjoint_obs_above_bed), of 13 gauges x 48 times
+class calibration: 3 of 15 classes active, 12 frozen at prior
+class calibration: prior sigma_alpha = 0.3000 (beta = 1.1111e+01), relative variables alpha = n/n_prior
+class calibration: objective scaled by 1/J0 = 3.5269e-05; first trial step |g|/J0 = 0.4056 in alpha
+[0]PETSC ERROR: -adjoint_classes_init o62_p_c15_sa0.30.txt (source: command line)
+--- gauge gradient at this field ---
+# NLCD_code  manning_n  dJ/dn   (J 2.835347e+04, peak-WSE MAE 0.0000 m)
+11 0.04477217585 -260.2932403
+21 0.05889953381 -5122.913056
+22 0.1794520333 -19602.49566
+23 0.036 -41027.44359
+24 0.1268371475 63667.0463
+31 0.03105447968 2746.824881
+41 0.1553244385 499.588679
+42 0.08237173221 -7353.690526
+43 0.1222623519 -104.3604598
+52 0.0345 761.5756196
+71 0.03244505663 -405.0529769
+81 0.06164891833 845.6997618
+82 0.03762514071 -2633.339442
+90 0.06298267839 4427.461389
+95 0.08002874623 3985.504667
+
+compare: J0 of the prior (task 0) against the mark-calibrated fields (tasks 1, 2); RMSE = 0.15*sqrt(2*J/134)

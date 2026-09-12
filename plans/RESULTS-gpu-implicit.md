@@ -2495,3 +2495,43 @@ login shell as **58241452** with `--ntasks-per-node=4 --cpus-per-task=32`
 pinned in the header (belt and braces; the real fix is never to sbatch
 from inside a job). Scheduler estimate 09-24 -- the killed job's three
 days of priority age are lost; premium QOS is the lever if needed.
+
+### o64 -- the mark-calibrated fields scored on the above-bed gauges (2026-09-12)
+
+The converse of o63, run before it: the gauge objective (134 above-bed
+observations of 13 gauges x 48 times, sigma 0.15 m, window h29-41) and
+its class gradient at three fields, one forward+adjoint each on 2 nodes
+(~50 min; job array 58242097_[0-2], backfilled within 3 h of submission).
+Script `plans/campaigns/o64_gauge_score.sh`; artifacts in `logs/o64/`.
+RMSE = 0.15 sqrt(2J/134).
+
+| field | J_gauge | RMSE at the gauges | vs prior |
+|---|---|---|---|
+| NLCD prior | 31313.3 | **3.24 m** | -- |
+| 3 classes, sigma_alpha 0.30 (o62 task 3; marks MAE 0.6290) | 30333.4 | 3.19 m | -3.1% |
+| 15 classes, sigma_alpha 0.30 (o62 task 1; marks MAE 0.6154) | 28353.5 | 3.09 m | -9.5% |
+
+**Reading.** (1) The gauge misfit is 3.2 m RMSE at the prior, against
+0.72 m MAE at the marks, and the mark-calibrated fields move it by 3-10%.
+The kept observations are those with observed WSE above the cell bed,
+but nothing requires the MODEL to hold that depth there: a 30 m cell on
+the bank of an incised bayou carries sheet flow while the gauge reads
+the channel, so the residual is metres of representation error that
+roughness cannot remove. The gauge observable at this resolution is
+dominated by the same defect that disqualified seven of twelve gauges
+outright. (2) The gauge gradient at the prior is LARGER relative to J
+than the marks' (|g|/J0 = 0.44 in alpha vs 0.16), so o63 will move --
+roughness can deepen the water on the bank. (3) **The gauges and the
+marks disagree on the two best-informed classes**: at the prior,
+dJ_gauge/dn is -53129 on developed-medium (23) and -6903 on woody
+wetland (90) -- the gauges want MORE roughness there -- where the marks
+sent both to the 0.3x floor (dJ_marks/dn +756, +675). They agree on
+developed-low (22; both want more) and on 8 of the 12 frozen classes.
+The largest gauge gradient of all is on developed-high (24, +72214,
+wants less), which is not in the active set. Prediction for o63: the
+gauge-calibrated field raises 23 and 22, and scores WORSE than the prior
+on the marks (outcome 3 of the table given to Mark on 09-12) -- friction
+compensating for different errors at the two observables. (4) There is
+no per-gauge residual dump in the driver; which gauges carry the 3 m is
+a one-line addition worth making before any gauge result is interpreted
+(build a gpu11; never touch gpu10 while 58241452 is queued).

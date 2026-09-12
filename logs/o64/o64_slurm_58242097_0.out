@@ -1,0 +1,28 @@
+=== o64 prior: gauge objective of the prior field, 2 nodes, Sat Sep 12 12:11:28 PM PDT 2026
+/var/spool/slurmd/job58242107/slurm_script: line 77: 1948654 Terminated              ( while sleep 30; do
+    grep -q "objective scaled by 1/J0" $LOG 2> /dev/null && { sleep 20; kill $PID 2> /dev/null; break; };
+done )
+run exit=63 (143 = killed by the watcher after J0, as intended) Sat Sep 12 01:02:34 PM PDT 2026
+gauge observations: 134 kept, 331 masked with observed WSE within 0. m of the cell bed (-adjoint_obs_above_bed), of 13 gauges x 48 times
+class calibration: 3 of 15 classes active, 12 frozen at prior
+class calibration: prior sigma_alpha = 0.3000 (beta = 1.1111e+01), relative variables alpha = n/n_prior
+class calibration: objective scaled by 1/J0 = 3.1935e-05; first trial step |g|/J0 = 0.4418 in alpha
+--- gauge gradient at this field ---
+# NLCD_code  manning_n  dJ/dn   (J 3.131332e+04, peak-WSE MAE 0.0000 m)
+11 0.038 -3007.140207
+21 0.04 -5337.325824
+22 0.09 -44619.87548
+23 0.12 -53129.23959
+24 0.16 72213.86152
+31 0.027 4477.112664
+41 0.15 315.7459855
+42 0.12 -2267.530147
+43 0.14 1137.640186
+52 0.115 526.2112391
+71 0.038 93.29879854
+81 0.038 -15849.28349
+82 0.035 -3499.824536
+90 0.098 -6902.503731
+95 0.068 4661.5069
+
+compare: J0 of the prior (task 0) against the mark-calibrated fields (tasks 1, 2); RMSE = 0.15*sqrt(2*J/134)
