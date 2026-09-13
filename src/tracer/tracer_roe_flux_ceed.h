@@ -1,7 +1,7 @@
 #ifndef TRACER_ROE_FLUX_CEED_H
 #define TRACER_ROE_FLUX_CEED_H
 
-#include <private/config.h>
+#include "tracer_ceed.h"
 
 #include "../swe/swe_fluxes_ceed.h"
 

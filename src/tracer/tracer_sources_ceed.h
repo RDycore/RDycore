@@ -1,7 +1,6 @@
 #ifndef TRACER_SOURCES_CEED_H
 #define TRACER_SOURCES_CEED_H
 
-#include "private/config.h"
 #include "tracer_types_ceed.h"
 
 // supported bed friction source term methods

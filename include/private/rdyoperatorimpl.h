@@ -146,6 +146,15 @@ typedef struct Operator {
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;
 
+      // restriction/vector backing the interior flux operator's passive
+      // "q_right" field, manually refreshed from u_local before every flux
+      // operator application (NULL/unused for the MUSCL path). CEED's CUDA
+      // backends support only a single active input field per operator, so
+      // q_right can't be made active alongside q_left; see
+      // CreateCeedInteriorFluxSuboperator for details.
+      CeedElemRestriction q_right_restrict;
+      CeedVector          q_right_restricted;
+
       // MUSCL slope reconstruction data (only allocated when use_slope_reconstruction is true)
       PetscBool    use_slope_reconstruction;
       PetscBool    use_limiter;                 // minmod limiter (default on with -second_order)
@@ -216,8 +225,10 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 // CEED/PETSc Flux and Source Operator Constructors
 //--------------------------------------------------
 
-PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedElemRestriction *,
+                                                   CeedVector *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedElemRestriction *,
+                                                     CeedVector *, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig, RDyMesh *, CeedVector *, RDyBoundary *, RDyCondition, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *,
                                                                 CeedVector *, CeedOperator *, CeedOperator *);

@@ -92,8 +92,6 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 /// Active input fields:
 ///    * `q_left[num_interior_edges][3]` - an array associating a 3-DOF left cell
 ///      input state with each edge separating two interior cells
-///    * `q_right[num_interior_edges][3]` - an array associating a 3-DOF right cell
-///      input state with each edge separating two interior cells
 ///
 /// Passive input fields:
 ///    * `geom[num_interior_edges][4]` - an array associating 4 geometric factors
@@ -102,6 +100,14 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 ///        2. cos(theta), where theta is the angle between the edge and the y axis
 ///        3. -L / A_l, where L is the edge's length and A_l is the area of the "left" cell
 ///        4. L / A_r, where L is the edge's length and A_r is the area of the "right" cell
+///    * `q_right[num_interior_edges][3]` - an array associating a 3-DOF right cell
+///      input state with each edge separating two interior cells. NOTE: this field is
+///      bound to the passive vector returned in `q_right_restricted`, which the caller
+///      must refresh (via CeedElemRestrictionApply() with `q_right_restrict`, from the
+///      same active input vector) before every application of `subop`. It cannot be
+///      made active here alongside `q_left` because CEED's CUDA backends only support
+///      a single active input field per operator (see the accompanying bug report
+///      shared with the libCEED team).
 ///
 /// Active output fields:
 ///    * `cell_left[num_interior_edges][3]` - an array associating a 3-DOF left cell
@@ -121,12 +127,17 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 ///    * `small h value` - the water height below which dry conditions are assumed
 ///    * `gravity` - the acceleration due to gravity [m/s/s]
 ///
-/// @param [in]  config        RDycore's configuration
-/// @param [in]  mesh          mesh defining the computational domain of the operator
-/// @param [out] eta_vertices  a CeedVector containing the eta values at vertices, used for well-balancing
-/// @param [out] subop         the CeedOperator representing the newly created suboperator
+/// @param [in]  config              RDycore's configuration
+/// @param [in]  mesh                mesh defining the computational domain of the operator
+/// @param [out] eta_vertices        a CeedVector containing the eta values at vertices, used for well-balancing
+/// @param [out] q_right_restrict    the CeedElemRestriction used to refresh q_right_restricted from the active
+///                                  input vector ahead of every application of `subop`
+/// @param [out] q_right_restricted  the passive CeedVector backing `subop`'s `q_right` field
+/// @param [out] subop               the CeedOperator representing the newly created suboperator
 /// @return 0 on success, or a non-zero error code on failure
-static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices, CeedOperator *subop) {
+static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices,
+                                                        CeedElemRestriction *q_right_restrict, CeedVector *q_right_restricted_out,
+                                                        CeedOperator *subop) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
@@ -163,8 +174,8 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
 
   // create vectors (and their supporting restrictions) for the operator
   CeedElemRestriction q_restrict_l, q_restrict_r, c_restrict_l, c_restrict_r, restrict_geom, restrict_flux, restrict_cnum, eta_beg_restrict,
-      eta_end_restrict;
-  CeedVector geom, flux, cnum;
+      eta_end_restrict, restrict_q_right_local;
+  CeedVector geom, flux, cnum, q_right_restricted;
   {
     CeedInt num_edges = mesh->num_owned_internal_edges;
 
@@ -250,13 +261,23 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
       PetscCallCEED(CeedElemRestrictionView(c_restrict_l, stdout));
       PetscCallCEED(CeedElemRestrictionView(c_restrict_r, stdout));
     }
+
+    // CEED's CUDA backends support only a single active input field per operator
+    // (see the libCEED bug report accompanying this fix), so q_right can't be
+    // active here alongside q_left. Instead, it is bound to a passive
+    // q_right_restricted vector that the caller refreshes (via
+    // CeedElemRestrictionApply() with q_restrict_r, from the same active input
+    // vector) ahead of every application of *subop.
+    CeedInt qr_strides[] = {num_comp, 1, num_comp};
+    PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp, num_edges * num_comp, qr_strides, &restrict_q_right_local));
+    PetscCallCEED(CeedElemRestrictionCreateVector(restrict_q_right_local, &q_right_restricted, NULL));
   }
 
   // create the operator itself and assign its active/passive inputs/outputs
   PetscCallCEED(CeedOperatorCreate(ceed, qf, NULL, NULL, subop));
   PetscCallCEED(CeedOperatorSetField(*subop, "geom", restrict_geom, CEED_BASIS_NONE, geom));
   PetscCallCEED(CeedOperatorSetField(*subop, "q_left", q_restrict_l, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
-  PetscCallCEED(CeedOperatorSetField(*subop, "q_right", q_restrict_r, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(*subop, "q_right", restrict_q_right_local, CEED_BASIS_NONE, q_right_restricted));
   if (NumTracers(config) == 0) {
     PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_beg", eta_beg_restrict, CEED_BASIS_NONE, *eta_vertices));
     PetscCallCEED(CeedOperatorSetField(*subop, "eta_vert_end", eta_end_restrict, CEED_BASIS_NONE, *eta_vertices));
@@ -266,14 +287,20 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
   PetscCallCEED(CeedOperatorSetField(*subop, "flux", restrict_flux, CEED_BASIS_NONE, flux));
   PetscCallCEED(CeedOperatorSetField(*subop, "courant_number", restrict_cnum, CEED_BASIS_NONE, cnum));
 
+  // hand ownership of the q_right restriction/vector to the caller, which must
+  // refresh q_right_restricted ahead of every application of *subop and
+  // destroy both when the operator is torn down
+  *q_right_restrict     = q_restrict_r;
+  *q_right_restricted_out = q_right_restricted;
+
   // clean up
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_geom));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_flux));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_cnum));
   PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_l));
-  PetscCallCEED(CeedElemRestrictionDestroy(&q_restrict_r));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_l));
   PetscCallCEED(CeedElemRestrictionDestroy(&c_restrict_r));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_q_right_local));
   if (NumTracers(config) == 0) {
     PetscCallCEED(CeedElemRestrictionDestroy(&eta_beg_restrict));
     PetscCallCEED(CeedElemRestrictionDestroy(&eta_end_restrict));
@@ -599,7 +626,8 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
 /// @param [out]   flux_op             the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
 PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
-                                      RDyCondition *boundary_conditions, CeedVector *eta_vertices, CeedOperator *flux_op) {
+                                      RDyCondition *boundary_conditions, CeedVector *eta_vertices, CeedElemRestriction *q_right_restrict,
+                                      CeedVector *q_right_restricted, CeedOperator *flux_op) {
   PetscFunctionBegin;
 
   Ceed ceed = CeedContext();
@@ -611,9 +639,8 @@ PetscErrorCode CreateCeedFluxOperator(RDyConfig *config, RDyMesh *mesh, PetscInt
   }
 
   // flux suboperator 0: fluxes between interior cells
-
   CeedOperator interior_flux_op;
-  PetscCall(CreateCeedInteriorFluxSuboperator(*config, mesh, eta_vertices, &interior_flux_op));
+  PetscCall(CreateCeedInteriorFluxSuboperator(*config, mesh, eta_vertices, q_right_restrict, q_right_restricted, &interior_flux_op));
   PetscCall(CeedOperatorCompositeAddSub(*flux_op, interior_flux_op));
   PetscCall(CeedOperatorDestroy(&interior_flux_op));
 
