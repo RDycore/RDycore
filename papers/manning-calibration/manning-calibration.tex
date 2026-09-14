@@ -96,8 +96,11 @@ error that is not in the friction.
 What a $\pm 30\%$ prior cannot support is the fifteen-class field. The
 survey is the observable because at seven of twelve stream gauges the
 30\,m cell's bed sits above the peak observed water surface: the mesh
-holds the bank of an incised bayou, not its channel.
-% [PENDING o63: one sentence -- does the gauge-calibrated field predict the marks?]
+holds the bank of an incised bayou, not its channel. Calibrating the
+same three classes on the gauges that do hold water sends them the
+opposite way, to the top of the prior instead of the bottom, and the
+resulting field scores worse at the marks than no calibration at all.
+Roughness is absorbing each observable's own error.
 Pointed at the initial state, the same measurement finds more: a
 $20\%$ reduction in stored water is worth $0.075$\,m. Most of the
 remaining error lives in the model's water balance, not in its
@@ -208,7 +211,11 @@ This paper contributes:
   \item the ceiling of roughness on the Hurricane Harvey survey error,
         $15\%$, and the three-parameter calibration the spectrum
         selects (Sections~\ref{sec:authority}--\ref{sec:spectrum});
-  % [PENDING o63: a validation item -- gauge-calibrated, mark-validated]
+  \item a cross-observable validation: the three classes calibrated on
+        the stream gauges move to the opposite edge of the same prior
+        and score worse at the high-water marks than the uncalibrated
+        lookup, which makes the survey-only result a fit rather than a
+        skill (Section~\ref{sec:hwm});
   \item the same measurement applied to the initial state, where it
         finds more, and the diagnosis of the downstream reach as a
         ponded lake behind the domain's outlet
@@ -1199,7 +1206,67 @@ channel is wider than a cell, and the two gauges in the Addicks and
 Barker reservoir pools hold their water for the whole window. The
 mesh resolves the major channel and not the tributaries, which is
 where nine of the thirteen gauges sit.
-% [PENDING o63: the gauge-calibrated / mark-validated design and its result]
+\paragraph{Calibrating on the gauges instead.}
+The four gauges that hold their water for the whole window are enough
+to pose the calibration the other way round, and doing so tests
+whether a roughness field fitted to one observable predicts the other.
+We calibrated the same three classes on the above-bed gauge stage
+(134 observations, an observation counting only while the observed
+water surface is above the cell bed) and scored the result on the 46
+marks. The answer is that it does not, and the failure is
+directional rather than marginal (Table~\ref{tab:crossobs}). The
+gauge calibration raises all three classes --- developed-low and
+developed-medium to the $3\times$ upper bound, woody wetland to
+$1.74\times$ --- where the mark calibration puts the latter two on the
+$0.3\times$ floor. The two observables place the same class a factor
+of ten apart, each at an edge of the same prior. Scored on the marks,
+the gauge-calibrated field reaches $0.7609$\,m against the
+uncalibrated prior's $0.7188$: \emph{calibrating on the gauges makes
+the model worse at the marks than not calibrating at all}, while
+lowering the gauge misfit by $23\%$.
+
+The mechanism is the geometry of the preceding paragraph. At a mark on
+the floodplain the modelled peak is too high, so the misfit gradient
+asks for less conveyance; at a gauge on a bank cell the modelled stage
+is too low by the representation offset, so it asks for more. Neither
+request is about friction. The gauge residual is the size of that
+offset rather than of a roughness error: at the NLCD prior the
+above-bed gauge misfit is $3.24$\,m RMSE, and the best field we
+obtained against it leaves $2.84$\,m, so roughness spans $12\%$ of a
+discrepancy that a $30$\,m mesh of an incised channel would produce
+with no friction error at all. A calibration reported against the
+gauges alone would show a $23\%$ misfit reduction and a physically
+impossible field.
+
+We report this as the paper's validation result. It is negative, and
+it is the one the survey-only numbers of
+Section~\ref{sec:calibrated} need: a three-parameter field that
+removes $12.5\%$ of the mark error does not transfer to a second
+observable in the same basin and window, so that $12.5\%$ is a fit and
+not a skill. The two observables agree on one thing, that the
+land-cover table is not where this model's error lives.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Manning field & 22 & 23 & 90 & gauge $J$ & mark MAE \\
+\midrule
+NLCD lookup & $0.090$ & $0.120$ & $0.098$ & $31{,}313$ & $0.7188$ \\
+calibrated on the gauges & $0.27$ & $0.36$ & $0.171$ & $24{,}007$ & $0.7609$ \\
+calibrated on the marks & $0.210$ & $0.036$ & $0.029$ & $30{,}333$ & $0.6290$ \\
+\bottomrule
+\end{tabular}
+\caption{The same three classes (developed-low 22, developed-medium 23,
+woody wetland 90) calibrated against each observable and scored against
+both, at $\sigma_\alpha = 0.30$ with the other twelve classes frozen at
+the lookup. Manning $n$ in $\mathrm{s\,m^{-1/3}}$, gauge $J$
+over 134 above-bed stage observations, mark MAE in metres over the 46
+cluster-A marks. Each calibration improves its own observable and the
+gauge calibration degrades the other, past the uncalibrated prior. The
+bound is $\alpha \in [0.3, 3]$, so $0.27$ and $0.36$ are at it.}
+\label{tab:crossobs}
+\end{table}
 
 \begin{table}
 \centering\small
