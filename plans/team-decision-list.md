@@ -17,12 +17,13 @@ like the group's decision on four points.
    path, every derivative gated against finite differences in CI. An
    objective and its gradient cost about 2.1 forward solves regardless
    of the number of parameters.
-2. Before optimizing, we can measure what a parameter is able to
-   explain. For Hurricane Harvey on the 30 m mesh scored against 46
-   surveyed high-water marks, Manning roughness can remove at most
-   about 15% of a 0.72 m model-survey error. The initial condition can
-   remove more: a 20% change in stored water is worth 0.075 m against
-   roughness's 0.020 m at the same 20% perturbation.
+2. Before running a calibration, we can measure what the parameter it
+   would fit is able to explain -- from forward runs alone, with no
+   optimizer involved. For Hurricane Harvey on the 30 m mesh scored
+   against 46 surveyed high-water marks, Manning roughness can remove
+   at most about 15% of a 0.72 m model-survey error. The initial
+   condition can remove more: a 20% change in stored water is worth
+   0.075 m against roughness's 0.020 m at the same 20% perturbation.
 3. The spectrum of the calibration problem says why. The 46 marks
    determine about three combinations of the fifteen land-cover
    classes at a +/-30% prior; calibrating those three recovers 84% of
