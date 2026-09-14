@@ -2586,3 +2586,18 @@ driver) to say WHICH gauges carry the 3 m -- the two reservoirs (water
 balance) or the two main-stem gauges (channel geometry). One-line
 driver addition, ~3 node-hours to rerun the three fields; worth doing
 before the coauthors read this.
+
+**Audit (2026-09-14, `plans/o63-gauge-weight-audit.md`):** the gauge
+objective used the survey grade sigma 0.15 m and 134 autocorrelated
+records as independent. Decomposed: J_tot 24006.6 = J_mis 23959.1 +
+prior 47.5 (1:505). The SIGN disagreement on 23 and the first-order
+worsening of the marks along the gauge step (+171 predicted, +86.7
+measured) are exactly sigma-independent; the excursion to the bound is
+not a data verdict -- it is where one projected BLMVM step landed (TAO
+tolerances 1e-12, never converged, killed at 300 min), and neither
+sigma alone (needs ~5 m under iid) nor N_eff alone brings the field
+inside the prior; both together do. "Converged" and "factor of ten"
+must not appear in the paper. The 134 = Katy 48 + Houston 48 + Langham
+20 + Fulshear 14 + Bear Ck 4 (five gauges, reconstructed exactly). The
+principled instrument is the gauge Gauss-Newton spectrum: 16 forwards,
+~12 node-hours wall on 2 nodes, every weighting a post-processing step.
