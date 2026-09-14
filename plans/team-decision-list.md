@@ -188,7 +188,12 @@ streamflow uncertainty, and name the spin-up run as the way to
 quantify it. Do not write "a 20% error in stored water is plausible"
 as a measured fact.
 
-**On decision 4.** No response.
+**On decision 4.** No response from Donghui. **Mark's ruling
+(2026-09-14): closed.** Gautam is the PI and prefers GMD, so GMD is
+assumed. Timing is not a decision: this is a new configuration of
+authors and the effort goes into the paper, not the venue or the
+calendar. The DOI and archive-location placeholders stay on the to-do
+list as logistics, not as an open decision.
 
 ## What we'd do next, once you've decided
 
