@@ -126,6 +126,70 @@ Event Viewer API). The draft is 32 pages. Open placeholders: the
 Zenodo DOI, and the archive location for the mesh, the checkpoint and
 the rainfall. **Who mints the DOI, and where do the inputs live?**
 
+## Responses received
+
+### Donghui (2026-09-14)
+
+**On (c), the ordering argument.** Donghui reads the gauge-calibrated
+field as physically consistent because it raises both developed
+classes and keeps developed-medium (0.36) above developed-low (0.27),
+whereas the mark-calibrated field inverts them (0.036 vs 0.210), and
+medium-intensity development should be rougher than low.
+
+What the artifacts say about that:
+
+- The gauge field's ordering is the lookup's, not the gauges'. Both
+  classes sit at 3x their prior (0.12 and 0.09), the same relative
+  bound, and a common factor cannot reorder them. The gauges did not
+  determine that 23 > 22; the box did. The marks' inversion IS
+  data-driven (23 to the floor under three different priors, 22 up).
+  So "physically consistent" is true of the gauge field in exactly the
+  sense it is true of the prior.
+- The 3x itself is not the gauges' verdict either: it is where one
+  projected quasi-Newton step landed under an over-tight observation
+  weight (survey-grade sigma, 134 autocorrelated records counted as
+  independent). See `plans/o63-gauge-weight-audit.md`. At an honest
+  weight the gauges move the classes less; the direction (up) and the
+  disagreement with the marks on 23 are what is robust.
+- Donghui's criticism of the mark field is the paper's own
+  (RESULTS o62 reading 2: the three-class field is not defensible for
+  developed/wetland ground). The two claims are about different things:
+  his is ordering, the paper's is magnitude. Both hold.
+
+**Question to put back to Donghui:** is n = 0.36 for medium-intensity
+developed land (3x the lookup's 0.12) a value you would defend in a
+table? The paper currently says the gauge field is "outside the
+land-cover table"; if a hydrologist would accept 0.36, that sentence
+weakens and Sec 6.1 must say so.
+
+**On decision 1.** "It makes sense to reduce 15% of the uncertainty by
+calibrating the Manning coefficient": Donghui wants the calibration
+reported as worth having. That is compatible with option A (lead with
+the measurement, the three parameters capture most of the 15%) and
+argues against dropping the calibration from the abstract. Record as a
+lean toward keeping the 15% prominent, not a vote for B.
+
+**On decision 2.** Agrees the two observables' error sources differ,
+and reads the cross results as we do (gauges do not help marks; marks
+barely help gauges, -3%). No opinion given on Emil's hold-out (2b).
+Still open.
+
+**On decision 3.** "20% is possible, but we cannot quantify without a
+long-term simulation" (one to two months of spin-up before Harvey).
+Citation offered: Kiang et al. 2018, WRR, doi:10.1029/2018WR022708,
+"A Comparison of Methods for Streamflow Uncertainty Estimation". That
+paper measures stage-discharge rating-curve uncertainty (observed
+streamflow), which is a different quantity from antecedent stored
+water; it supports "20% is a normal scale of hydrologic uncertainty at
+high flow", not the stored-water number itself. For the paper: state
+the 20% as an illustrative perturbation whose plausibility a domain
+coauthor accepts but has not quantified, cite Kiang for the scale of
+streamflow uncertainty, and name the spin-up run as the way to
+quantify it. Do not write "a 20% error in stored water is plausible"
+as a measured fact.
+
+**On decision 4.** No response.
+
 ## What we'd do next, once you've decided
 
 - Add a per-gauge residual dump to the driver (one-line change, ~3
