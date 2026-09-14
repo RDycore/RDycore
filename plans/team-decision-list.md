@@ -1,0 +1,137 @@
+# Manning paper: where we are, and four decisions for the team
+
+*Draft for Mark to send. Everything below is measured; run IDs and file
+names are in plans/RESULTS-gpu-implicit.md. Last updated 2026-09-14
+after o63.*
+
+---
+
+All the runs we were waiting on have finished. Three of them changed
+what the paper can claim, so before we converge on a final draft I'd
+like the group's decision on four points.
+
+## The thesis, as it stands
+
+1. RDycore is differentiated in place: exact assembled Jacobian,
+   TSAdjoint sensitivities, implicit stepping, a GPU-resident gradient
+   path, every derivative gated against finite differences in CI. An
+   objective and its gradient cost about 2.1 forward solves regardless
+   of the number of parameters.
+2. Before optimizing, we can measure what a parameter is able to
+   explain. For Hurricane Harvey on the 30 m mesh scored against 46
+   surveyed high-water marks, Manning roughness can remove at most
+   about 15% of a 0.72 m model-survey error. The initial condition can
+   remove more: a 20% change in stored water is worth 0.075 m against
+   roughness's 0.020 m at the same 20% perturbation.
+3. The spectrum of the calibration problem says why. The 46 marks
+   determine about three combinations of the fifteen land-cover
+   classes at a +/-30% prior; calibrating those three recovers 84% of
+   what all fifteen achieve.
+4. **New, and the reason for this email:** the three-parameter field
+   does not survive a change of observable, and neither field is
+   inside the land-cover table. Details below.
+5. The downstream reach is a lake behind a 13-edge outlet. The water
+   balance and the mesh, not the friction, are where the remaining
+   error lives.
+
+## What the last three runs measured
+
+**(a) The prior width does not matter above 30%.** Three classes
+(developed-low 22, developed-medium 23, woody wetland 90) calibrated on
+the marks:
+
+| prior width | mark MAE | iterations | 22 | 23 | 90 |
+|---|---|---|---|---|---|
+| absolute, sigma_n = 0.015 | 0.6274 m | 4 | 1.63x | 0.30x | 0.30x |
+| +/-30% | 0.6290 m | 3 | 2.34x | 0.30x | 0.30x |
+| +/-50% | 0.6295 m | 1 | 3.00x | 0.30x | 0.30x |
+
+Developed-medium and woody wetland go to the bottom of the prior under
+every width we ran, i.e. n = 0.036 and 0.029 -- below the lookup's own
+value for developed open land (0.040). Developed-low goes wherever the
+prior lets it while the MAE moves 0.002 m. What the marks determine is
+a roughness the table does not contain; what they don't determine, the
+prior sets.
+
+**(b) The gauges see a different problem entirely.** Using the
+above-bed mask (an observation counts only while the observed water
+surface is above the model cell's bed), the gauge misfit at the NLCD
+prior is **3.24 m RMSE**. The mark-calibrated fields lower it by 3-10%.
+At 30 m the model cell holds the bank of an incised bayou while the
+gauge hangs in the channel, so most of that 3 m is representation
+error that no roughness value can remove.
+
+**(c) Calibrate on the gauges and the model gets worse at the marks.**
+Donghui's design, run as specified -- calibrate the three classes on
+the above-bed gauge stage, validate on the 46 marks:
+
+| field | 22 | 23 | 90 | gauge J | mark MAE |
+|---|---|---|---|---|---|
+| NLCD lookup | 0.090 | 0.120 | 0.098 | 31,313 | 0.7188 m |
+| calibrated on GAUGES | 0.27 (3x) | 0.36 (3x) | 0.171 | 24,007 (-23%) | **0.7609 m** |
+| calibrated on MARKS | 0.210 | 0.036 | 0.029 | 30,333 (-3%) | 0.6290 m |
+
+The two observables put developed-medium a factor of ten apart, each at
+an edge of the same prior. The gauge-calibrated field is *worse at the
+marks than not calibrating at all*. The marks sit on floodplain cells
+where the modelled peak is too high and ask for less friction; the
+gauges sit on bank cells where the modelled stage is too low and ask
+for more. Neither request is about friction.
+
+We predicted this in writing before the run, from the sign of the gauge
+gradient, and recorded the prediction in the repository first. That is
+worth a sentence in the paper on its own.
+
+## The four decisions
+
+### 1. Does the paper lead with the three-parameter calibration, or with the reason there isn't one?
+
+| option | what the abstract says | risk |
+|---|---|---|
+| **A. Lead with the measurement (recommended)** | roughness can explain 15% of this error; three parameters capture most of that; neither observable's answer is inside the table, so the error is elsewhere | a reviewer may want a "successful" calibration; we don't have one |
+| B. Lead with the three-parameter field | a three-parameter calibration removes 12.5% of the survey error | we would be reporting as a result a field we then show does not transfer and is outside the prior |
+
+I lean strongly to A: it is what we measured, it is the more useful
+paper, and B invites exactly the review question we cannot answer.
+
+### 2. How do we present a negative validation result?
+
+The cross-observable test is now the paper's validation, and it fails.
+Options: (a) report it in Section 6 as it stands, with the 3.24 m gauge
+RMSE beside it so no one reads "calibrated on gauges" at face value;
+(b) also add a hold-out within the marks (Emil's two spatial folds,
+~24 node-hours) so the paper has an in-observable generalization
+number as well; (c) drop the gauge test and report only the marks.
+
+(c) is not honest given that we ran it. (a) is the minimum. (b) costs a
+day of machine time and is the only thing that would let us say
+anything positive about generalization -- **does the group want it?**
+
+### 3. Is a 20% error in antecedent stored water plausible?
+
+The paper's last section says the initial condition has more authority
+than roughness (0.075 m vs 0.020 m at a 20% perturbation), and that
+the next target is the water balance rather than the friction. That
+rests on a 20% error in water stored at event hour 29, after a 29-hour
+spin-up under radar rainfall, being physically plausible. Donghui has
+said it is; I'd like that confirmed on the record, ideally with a
+sentence we can cite.
+
+### 4. Venue and timing.
+
+GMD is the current target (abstract length is fine, a code-and-data
+availability section is in, the marks come from the USGS STN Flood
+Event Viewer API). The draft is 32 pages. Open placeholders: the
+Zenodo DOI, and the archive location for the mesh, the checkpoint and
+the rainfall. **Who mints the DOI, and where do the inputs live?**
+
+## What we'd do next, once you've decided
+
+- Add a per-gauge residual dump to the driver (one-line change, ~3
+  node-hours to rerun) so we can say *which* gauges carry the 3 m: the
+  two reservoir gauges would point at the water balance, the two
+  main-stem gauges at the channel geometry. I'd like this before the
+  gauge result goes out to reviewers.
+- Emil's hold-out, if the group wants it (decision 2).
+- A final pass over Sections 2-5 is done; Section 6 gets restructured
+  once decision 1 lands.
