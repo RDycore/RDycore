@@ -2511,6 +2511,7 @@ RMSE = 0.15 sqrt(2J/134).
 | 3 classes, sigma_alpha 0.30 (o62 task 3; marks MAE 0.6290) | 30333.4 | 3.19 m | -3.1% |
 | 15 classes, sigma_alpha 0.30 (o62 task 1; marks MAE 0.6154) | 28353.5 | 3.09 m | -9.5% |
 
+
 **Reading.** (1) The gauge misfit is 3.2 m RMSE at the prior, against
 0.72 m MAE at the marks, and the mark-calibrated fields move it by 3-10%.
 The kept observations are those with observed WSE above the cell bed,
@@ -2535,3 +2536,53 @@ compensating for different errors at the two observables. (4) There is
 no per-gauge residual dump in the driver; which gauges carry the 3 m is
 a one-line addition worth making before any gauge result is interpreted
 (build a gpu11; never touch gpu10 while 58241452 is queued).
+
+### o63 -- gauge-calibrated, mark-validated: the two observables disagree (2026-09-14)
+
+Donghui's design, accepted 09-09. Calibrate the three classes {23, 90, 22}
+on the 134 above-bed gauge observations at sigma_alpha 0.30; validate by
+scoring the resulting field on the 46 cluster-A marks. Job **58241452**,
+2 nodes, 5:22 wall (exit 124 on the calibration budget after 1 TAO
+iteration; TAO Residual 7.97e-4, so the projected gradient was near zero
+-- two classes sat on the upper bound). Artifacts in `logs/o63/`.
+
+| | 22 dev-low | 23 dev-med | 90 woody-wet | gauge J | marks MAE |
+|---|---|---|---|---|---|
+| NLCD prior | 0.090 | 0.120 | 0.098 | 31313 | 0.7188 |
+| calibrated on GAUGES (o63) | 0.27 (3.0x) | 0.36 (3.0x) | 0.171 (1.74x) | **24007 (-23%)** | **0.7609 (+5.9%)** |
+| calibrated on MARKS (o62 task 3) | 0.210 (2.34x) | 0.036 (0.30x) | 0.029 (0.30x) | 30333 (-3.1%) | 0.6290 (-12.5%) |
+
+**THE RESULT: the gauge-calibrated field is WORSE on the marks than no
+calibration at all** (0.7609 vs 0.7188 m, J 894.9 vs 808.3, +10.7%). The
+two observables send the same two classes to OPPOSITE bounds: the gauges
+put developed-medium at 3x its lookup, the marks at 0.3x -- a factor of
+ten apart, both at the edge of the same prior. Gauge RMSE 3.24 -> 2.84 m.
+
+**This was predicted in writing before the run** (o64, commit 727a82fd,
+09-12): from the gauge gradient's signs at the prior (dJ/dn < 0 on 23
+and 90, where the marks' gradient is > 0) the prediction was "the
+gauge-calibrated field raises 23 and 22, and scores WORSE than the prior
+on the marks (outcome 3)". Direction, classes and sign all held; only
+90's magnitude was under-called (it moved 1.74x, not to the bound).
+
+**Reading.** Friction is not being calibrated, it is absorbing whatever
+error each observable sees. The marks sit on floodplain cells where the
+model's peak is too HIGH, so they want less friction; the gauges sit on
+bank cells where the model's stage is too LOW by metres of
+representation error, so they want more. No single roughness field can
+satisfy both, and the one that satisfies either is outside the
+land-cover table. That is the strongest evidence in the paper for
+thesis item 5 (the error is in the water balance and the mesh, not in
+the friction), and it retires the in-sample caveat in the opposite way
+to the one we hoped: the three-parameter fit does not generalize to a
+second observable, so it must be reported as a fit, never as skill.
+
+**For the paper:** this replaces the three `[PENDING o63]` slots and
+makes Sec 6 a negative validation result rather than a headline
+calibration. The gauge observable's 2.8-3.2 m RMSE must be stated
+alongside it, or a reader will take "calibrated on gauges" at face
+value. Still missing: a per-gauge residual dump (no such option in the
+driver) to say WHICH gauges carry the 3 m -- the two reservoirs (water
+balance) or the two main-stem gauges (channel geometry). One-line
+driver addition, ~3 node-hours to rerun the three fields; worth doing
+before the coauthors read this.

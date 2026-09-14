@@ -1,0 +1,34 @@
+=== o63 gauge_c3_sa0.30: calibrating classes 23,90,22 on above-bed gauge stage, 2 nodes, Sun Sep 13 09:27:19 PM PDT 2026
+calibration exit=124 (124 = wall budget, dump kept) Mon Sep 14 02:27:22 AM PDT 2026
+/var/spool/slurmd/job58241452/slurm_script: line 85: 1400297 Terminated              ( k=0; last=""; while sleep 30; do
+    [ -f $DUMP ] || continue; cur=$(md5sum < $DUMP); if [ "$cur" != "$last" ]; then
+        k=$((k+1)); cp $DUMP o63_p_${TAG}_it${k}.txt; last=$cur;
+    fi;
+done )
+gauge observations: 134 kept, 331 masked with observed WSE within 0. m of the cell bed (-adjoint_obs_above_bed), of 13 gauges x 48 times
+class calibration: 3 of 15 classes active, 12 frozen at prior
+class calibration: prior sigma_alpha = 0.3000 (beta = 1.1111e+01), relative variables alpha = n/n_prior
+  0 TAO,  Function value: 1.,  Residual: 0.241595 
+  1 TAO,  Function value: 0.766657,  Residual: 0.000796516 
+=== o63 gauge_c3_sa0.30: VALIDATION -- scoring the gauge-calibrated field on the 46 marks Mon Sep 14 02:27:22 AM PDT 2026
+score exit=0 Mon Sep 14 02:49:49 AM PDT 2026
+hwm eval (class table): J 8.949259e+02, peak-WSE MAE 0.7609 m, model dry at 0 of 46 marks (144 obs times over 43200 steps)
+--- gauge-calibrated class table ---
+# NLCD_code  manning_n   (after 1 TAO iterations, J 2.400656e+04)
+11 0.038
+21 0.04
+22 0.27
+23 0.36
+24 0.16
+31 0.027
+41 0.15
+42 0.12
+43 0.14
+52 0.115
+71 0.038
+81 0.038
+82 0.035
+90 0.1705411928
+95 0.068
+
+compare (peak-WSE MAE on the 46 marks):  NLCD prior 0.7188 | 3 classes calibrated ON the marks 0.6274 (absolute prior) | o62 sigma_alpha runs
