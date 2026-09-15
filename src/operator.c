@@ -166,7 +166,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
           PetscCall(PrecomputeLSGradCoeffs(comm, op->mesh, op->ceed.ls_grad_coeffs));
         } else {
           PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                           &op->ceed.q_right_restrict, &op->ceed.q_right_restricted, &op->ceed.flux));
+                                           &op->ceed.q_right_refresh_op, &op->ceed.q_right_restricted, &op->ceed.flux));
         }
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
@@ -183,13 +183,13 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
           PetscCall(PrecomputeLSGradCoeffs(comm, op->mesh, op->ceed.ls_grad_coeffs));
         } else {
           PetscCall(CreateCeedFluxOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.eta_vertices,
-                                           &op->ceed.q_right_restrict, &op->ceed.q_right_restricted, &op->ceed.flux));
+                                           &op->ceed.q_right_refresh_op, &op->ceed.q_right_restricted, &op->ceed.flux));
         }
         PetscCall(CreateCeedSourceOperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_HR:
         PetscCall(CreateCeedFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
-                                           &op->ceed.q_right_restrict, &op->ceed.q_right_restricted, &op->ceed.flux));
+                                           &op->ceed.q_right_refresh_op, &op->ceed.q_right_restricted, &op->ceed.flux));
         PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
         break;
     }
@@ -438,8 +438,8 @@ PetscErrorCode DestroyOperator(Operator** op) {
     if ((*op)->ceed.flux_divergence) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.flux_divergence)));
     }
-    if ((*op)->ceed.q_right_restrict) {
-      PetscCallCEED(CeedElemRestrictionDestroy(&((*op)->ceed.q_right_restrict)));
+    if ((*op)->ceed.q_right_refresh_op) {
+      PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.q_right_refresh_op)));
     }
     if ((*op)->ceed.q_right_restricted) {
       PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.q_right_restricted)));
@@ -597,9 +597,8 @@ static PetscErrorCode ApplyCeedOperator(Operator* op, PetscReal dt, Vec u_local,
       // refresh the interior flux operator's passive q_right field from the active
       // input vector (CEED's CUDA backends support only one active input field per
       // operator, so q_right can't be active alongside q_left; see
-      // CreateCeedInteriorFluxSuboperator in operator_fluxes_ceed.c for details)
-      PetscCallCEED(CeedElemRestrictionApply(op->ceed.q_right_restrict, CEED_NOTRANSPOSE, op->ceed.u_local, op->ceed.q_right_restricted,
-                                             CEED_REQUEST_IMMEDIATE));
+      // CreateCeedInteriorFluxSuboperator in operator_fluxes_ceed.c for details).
+      PetscCallCEED(CeedOperatorApply(op->ceed.q_right_refresh_op, op->ceed.u_local, op->ceed.q_right_restricted, CEED_REQUEST_IMMEDIATE));
     }
     // Boundary composite (always 1st-order), accumulated on top of interior
     PetscCallCEED(CeedOperatorApplyAdd(op->ceed.flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
