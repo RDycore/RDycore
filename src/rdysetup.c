@@ -577,7 +577,7 @@ PetscErrorCode InitMaterialProperties(RDy rdy) {
 
   // set the properties on the operator
   OperatorData material_properties;
-  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, &material_properties));
+  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & material_properties));
   for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
     if (rdy->mesh.cells.is_owned[i]) {
       PetscInt owned_cell = rdy->mesh.cells.local_to_owned[i];
@@ -586,7 +586,7 @@ PetscErrorCode InitMaterialProperties(RDy rdy) {
       }
     }
   }
-  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, &material_properties));
+  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & material_properties));
   for (PetscInt p = 0; p < NUM_MATERIAL_PROPERTIES; ++p) {
     PetscCall(PetscFree(material_property_values[p]));
   }
@@ -719,8 +719,8 @@ static PetscErrorCode InitSources(RDy rdy) {
                      src->heat->name, region.name);
           PetscCheck(src->heat->air_temperature, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing air_temperature",
                      src->heat->name, region.name);
-          PetscCheck(src->heat->specific_humidity, rdy->comm, PETSC_ERR_USER, "Heat source condition '%s' for region '%s' is missing specific_humidity",
-                     src->heat->name, region.name);
+          PetscCheck(src->heat->specific_humidity, rdy->comm, PETSC_ERR_USER,
+                     "Heat source condition '%s' for region '%s' is missing specific_humidity", src->heat->name, region.name);
         }
       }
     }

@@ -1,9 +1,8 @@
 #ifndef TRACER_ROE_FLUX_CEED_H
 #define TRACER_ROE_FLUX_CEED_H
 
-#include "tracer_ceed.h"
-
 #include "../swe/swe_fluxes_ceed.h"
+#include "tracer_ceed.h"
 
 // we disable compiler warnings for implicitly-declared math functions known to
 // the JIT compiler

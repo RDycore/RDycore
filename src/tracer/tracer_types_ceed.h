@@ -2,6 +2,7 @@
 #define TRACER_TYPES_CEED_H
 
 #include <ceed.h>
+
 #include "tracer_ceed.h"
 
 // Q-function context with data attached

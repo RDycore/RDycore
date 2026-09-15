@@ -18,9 +18,9 @@ static PetscBool HasTracers(const RDyConfig* config) {
 /// @param [inout] boundary_fluxes_accum an array of sequential Vecs that can store accumulated boundary fluxes for each boundary
 /// @param [out]   flux_op               the newly created operator
 /// @return 0 on success, or a non-zero error code on failure
-PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, MPI_Comm comm, PetscInt num_boundaries, RDyBoundary *boundaries,
-                                       RDyCondition *boundary_conditions, Vec *boundary_values, Vec *boundary_fluxes, Vec *boundary_fluxes_accum,
-                                       OperatorDiagnostics *diagnostics, PetscOperator *flux_op) {
+PetscErrorCode CreatePetscFluxOperator(RDyConfig* config, RDyMesh* mesh, MPI_Comm comm, PetscInt num_boundaries, RDyBoundary* boundaries,
+                                       RDyCondition* boundary_conditions, Vec* boundary_values, Vec* boundary_fluxes, Vec* boundary_fluxes_accum,
+                                       OperatorDiagnostics* diagnostics, PetscOperator* flux_op) {
   PetscFunctionBegin;
 
   PetscCall(PetscOperatorCreateComposite(flux_op));

@@ -1575,5 +1575,5 @@ PetscErrorCode RestoreOperatorDomainMaterialProperties(Operator* op, OperatorDat
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#pragma GCC diagnostic pop
+#pragma GCC diagnostic   pop
 #pragma clang diagnostic pop

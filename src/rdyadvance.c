@@ -228,7 +228,7 @@ static PetscErrorCode CreateOutputViewer(RDy rdy) {
       // CGNS output is handled via the Options database. We need to set monitoring
       // for all formats that aren't XDMF or CGNS.
       if (rdy->config.output.format != OUTPUT_CGNS) {
-        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode (*)(TS, PetscInt, PetscReal, Vec, void*))TSMonitorSolution, rdy->output_vf, NULL));
+        PetscCall(TSMonitorSet(rdy->ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, void*))TSMonitorSolution, rdy->output_vf, NULL));
       }
     }
   }
@@ -304,7 +304,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
   RDyTimeAdaptiveSection* time_adapt = &rdy->config.time.adaptive;
   if (time_adapt->enable) {
     OperatorDiagnostics diagnostics;
-    PetscCall(GetOperatorDiagnostics(rdy->operator, &diagnostics));
+    PetscCall(GetOperatorDiagnostics(rdy->operator, & diagnostics));
 
     // if previous courant number is valid
     if (diagnostics.updated) {
@@ -375,7 +375,7 @@ PetscErrorCode RDyAdvance(RDy rdy) {
 
   if (time_adapt->enable) {
     OperatorDiagnostics diagnostics;
-    PetscCall(GetOperatorDiagnostics(rdy->operator, &diagnostics));
+    PetscCall(GetOperatorDiagnostics(rdy->operator, & diagnostics));
     if (!diagnostics.updated) {
       PetscCall(UpdateOperatorDiagnostics(rdy->operator));
     }

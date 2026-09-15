@@ -342,11 +342,11 @@ static PetscErrorCode SetDomainSourceComponent(RDy rdy, PetscInt component, Pets
   PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_USER,
              "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
   OperatorData source_data;
-  PetscCall(GetOperatorDomainExternalSource(rdy->operator, &source_data));
+  PetscCall(GetOperatorDomainExternalSource(rdy->operator, & source_data));
   for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
     source_data.values[component][c] = values[c];
   }
-  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, &source_data));
+  PetscCall(RestoreOperatorDomainExternalSource(rdy->operator, & source_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -542,11 +542,11 @@ PetscErrorCode RDySetDomainManningsN(RDy rdy, const PetscInt size, PetscReal* n_
              "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
 
   OperatorData property_data;
-  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, &property_data));
+  PetscCall(GetOperatorDomainMaterialProperties(rdy->operator, & property_data));
   for (PetscInt c = 0; c < rdy->mesh.num_owned_cells; ++c) {
     property_data.values[MATERIAL_PROPERTY_MANNINGS][c] = n_values[c];
   }
-  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, &property_data));
+  PetscCall(RestoreOperatorDomainMaterialProperties(rdy->operator, & property_data));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

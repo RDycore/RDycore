@@ -142,8 +142,7 @@ static PetscErrorCode CreateInteriorFluxQFunction(Ceed ceed, const RDyConfig con
 /// @param [out] subop               the CeedOperator representing the newly created suboperator
 /// @return 0 on success, or a non-zero error code on failure
 static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, RDyMesh *mesh, CeedVector *eta_vertices,
-                                                        CeedOperator *q_right_refresh_op, CeedVector *q_right_restricted_out,
-                                                        CeedOperator *subop) {
+                                                        CeedOperator *q_right_refresh_op, CeedVector *q_right_restricted_out, CeedOperator *subop) {
   PetscFunctionBeginUser;
 
   Ceed ceed = CeedContext();
