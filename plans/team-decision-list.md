@@ -225,6 +225,71 @@ open.
 - A final pass over Sections 2-5 is done; Section 6 gets restructured
   once decision 1 lands.
 
+### Donghui on n = 0.36 (2026-09-15)
+
+Asked whether 0.36 for developed-medium is defensible in a table:
+"a little bit high, but is reasonable... the bottom line is to have
+Manning n in consistent magnitude among developed land with different
+intensity."
+
+**What this settles.** The paper's Sec 6.1 sentence "a calibration
+reported against the gauges alone would show a 23% misfit reduction and
+a **physically impossible field**" (line 1239) is contradicted by our
+own domain coauthor and must go. The gauge field's magnitudes are
+acceptable.
+
+**What it does not settle, because the criterion has four rungs, not
+two.** The NLCD developed ladder is 21 open 0.040, 22 low 0.090, 23
+medium 0.120, 24 high 0.160 -- monotone in intensity. The three-class
+design freezes 21 and 24 at the lookup and moves only 22 and 23, so any
+large move breaks the ladder somewhere:
+
+| field | 21 open | 22 low | 23 med | 24 high | ladder |
+|---|---|---|---|---|---|
+| NLCD lookup | 0.040 | 0.090 | 0.120 | 0.160 | monotone |
+| gauge-calibrated (o63) | 0.040 | **0.27** | **0.36** | 0.160 | breaks at 23->24: high is *less* rough than low |
+| mark-calibrated, 3 class (o62) | 0.040 | **0.210** | **0.036** | 0.160 | breaks at 22->23: medium below *open* |
+| mark-calibrated, 15 class (o62) | 0.059 | 0.179 | 0.036 | 0.127 | breaks at 22->23 |
+| gauge, offset removed (o65 GN) | 0.040 | 0.030 | 0.041 | 0.160 | 22 and 23 ordered, but both below open |
+
+Donghui compared 22 against 23 and found the gauge field consistent. On
+the full ladder it is not: developed-high, pinned at 0.160 because it is
+outside the active set, ends up rougher than nothing and smoother than
+both classes below it. By his own stated bottom line no field we have
+produced is consistent -- which is the paper's "neither field is inside
+the table", now on a sharper criterion than "the values are too low".
+
+**Question back to Donghui:** does the consistency requirement include
+developed-high? In the three-class design 21 and 24 are frozen at the
+lookup, so 22 = 0.27 sits beside 24 = 0.16. If that ordering matters,
+the physically admissible calibration is one that moves the developed
+classes *together*, which is a constraint none of our runs imposed and
+which the spectrum says the marks cannot resolve anyway (the
+developed-low direction has lambda = 1.13, data and prior contributing
+almost equally).
+
+**Interaction with o65, and why this makes the gauge result stronger
+evidence, not weaker.** o65 showed the gauge calibration is absorbing a
+4.9 m model-high bias at Buffalo Bayou at Houston, 82% of the gauge
+misfit, in a reach the drainage analysis already flagged. Donghui's
+ruling means that fit produces roughness values a reviewer would wave
+through. A plausible-looking field obtained by soaking up a drainage
+defect is the more dangerous outcome, and it is exactly the cautionary
+case the paper should report: the misfit reduction is real, the field
+looks reasonable, and both come from a bug.
+
+**Replacement for the Sec 6.1 sentence** (claim only, not the section):
+
+> A calibration reported against the gauges alone would show a $23\%$
+> misfit reduction and roughness values a reviewer would accept ---
+> $0.27$ and $0.36$ on developed-low and developed-medium, high but
+> within argument, and in the lookup's own order. That is what makes it
+> worth reporting. Neither the reduction nor the plausibility of the
+> field is evidence about friction.
+
+(The $23\%$ should still become the RMSE statement, $3.24 \to 2.84$\,m,
+per the denominator cleanup.)
+
 ### o65 answers Emil's question (2026-09-15)
 
 Sixteen forwards, same construction as Sec 6.4, gauge observable

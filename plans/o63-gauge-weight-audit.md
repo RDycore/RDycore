@@ -243,9 +243,12 @@ Paragraph "The mechanism is the geometry":
    roughness spans 12%" -- numbers survive (3.243, 2.837); "best" ->
    "the field one projected step reached".
 9. "A calibration reported against the gauges alone would show a 23%
-   misfit reduction and a physically impossible field" -- survives;
-   prefer "a field outside the land-cover table" to "physically
-   impossible".
+   misfit reduction and a physically impossible field" -- does NOT
+   survive. Donghui (2026-09-15) rules 0.36 for developed-medium "a
+   little bit high, but reasonable", so "physically impossible" is
+   contradicted by our own domain coauthor. Replacement text and the
+   four-rung ladder check (both fields break it, at different rungs)
+   are in the decision list. Prefer 3.24 -> 2.84 m to the 23%.
 
 Paragraph "We report this as the paper's validation result": survives.
 Add that the two observables also agree on developed-low (both raise
