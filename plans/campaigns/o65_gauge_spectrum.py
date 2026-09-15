@@ -105,7 +105,7 @@ def code_of(path):
 # ---------------------------------------------------------------- arguments
 consumed = set()
 for name, n in (('--sigma-obs', 1), ('--sigma-alpha', 1), ('--ar1', 1), ('--demean', 0), ('--no-mask', 0),
-                ('--sigma-scan', 0), ('--marks', 0)):
+                ('--sigma-scan', 0), ('--marks', 0), ('--drop', 1), ('--central', 0)):
     if name in sys.argv:
         i = sys.argv.index(name); consumed.add(i)
         if n: consumed.add(i + 1)
@@ -124,6 +124,12 @@ if SIGMA is None or SIG_A is None:
 SIGMA = float(SIGMA); SIG_A = float(SIG_A)
 RHO = flag('--ar1'); RHO = float(RHO) if RHO is not None else None
 DEMEAN = flag('--demean', False, 0); NOMASK = flag('--no-mask', False, 0); SCAN = flag('--sigma-scan', False, 0)
+# --drop 24,95   : leave these classes out of S (o65: the +5% class-24 column is 12x its
+#                  adjoint prediction -- a nonlinear response, not a sensitivity)
+# --central      : where a matching -eps column exists (o66 names them col<C>_e-<eps>.txt),
+#                  use the central difference (f(+eps) - f(-eps)) / 2 eps for that class
+DROP = {int(c) for c in flag('--drop', '').split(',') if c}
+CENTRAL = flag('--central', False, 0)
 
 eps = float(gauge_pos[0]); obs_path = gauge_pos[1]; base_path = gauge_pos[2]; col_paths = gauge_pos[3:]
 
@@ -153,19 +159,40 @@ for g in range(ng):
         print(f'  gauge {g:2d} cell {cells_b[g]:8d}: {int(m.sum()):2d} kept, mean {rg.mean():+7.3f} m, rms {np.sqrt((rg**2).mean()):6.3f} m,'
               f' obs depth {(OBS[m,g]-zb[g]).min():.2f}-{(OBS[m,g]-zb[g]).max():.2f} m')
 
-cols = {}
+cols, minus = {}, {}
 for p in col_paths:
     c = code_of(p)
     if c is None:
         print(f'  skipping {p}: no col<CODE> in the name'); continue
+    me = re.search(r'_e(-?[0-9.]+)\.txt$', p)     # signed-eps columns from o66
+    if me and abs(float(me.group(1))) != eps:
+        print(f'  skipping {p}: eps {me.group(1)} is not +/-{eps}'); continue
     cc, tt, M = read_table(p)
     assert cc == cells_b and np.allclose(tt, t_b), p
-    cols[c] = M
+    if me and float(me.group(1)) < 0:
+        minus[c] = M
+    else:
+        cols[c] = M
+for c in DROP:
+    if c in cols:
+        cols.pop(c); print(f'  dropping class {c} from S (--drop)')
 codes = sorted(cols)
 Kc = len(codes)
 S_full = np.zeros((K * ng, Kc))                  # row index i = k*ng + g
+central_used = []
 for j, c in enumerate(codes):
-    S_full[:, j] = ((cols[c] - MOD0) / eps).reshape(-1)
+    if CENTRAL and c in minus:
+        S_full[:, j] = ((cols[c] - minus[c]) / (2 * eps)).reshape(-1); central_used.append(c)
+    else:
+        S_full[:, j] = ((cols[c] - MOD0) / eps).reshape(-1)
+if central_used:
+    print(f'central differences used for classes {central_used}; one-sided +{eps} for the rest')
+    for c in central_used:   # the nonlinearity check the o66 columns exist for
+        fp = ((cols[c] - MOD0) / eps).reshape(-1)
+        fm = ((MOD0 - minus[c]) / eps).reshape(-1)
+        mm = mask.reshape(-1)
+        print(f'  class {c}: |S| kept rows from +eps {np.linalg.norm(fp[mm]):.3f}, from -eps {np.linalg.norm(fm[mm]):.3f}'
+              f' (equal if linear); J(+eps)-J0 vs J0-J(-eps) is in the slurm logs')
 mvec = mask.reshape(-1)
 print(f'{Kc} classes; |S| per class over kept rows (m per unit alpha): '
       + ', '.join(f'{c}:{np.linalg.norm(S_full[mvec, j]):.2f}' for j, c in enumerate(codes)))
