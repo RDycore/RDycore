@@ -258,6 +258,24 @@ bound" for "are at it". Also the first sentence of Sec 6.1 (line 1195,
 "1-11 m above") must be re-sourced or removed before the coauthors read
 the mechanism paragraph.
 
+## UPDATE 2026-09-15 (o65 base dump): the untraced sentence is settled
+
+The per-gauge residual now exists (`logs/o65/o65_gauge_base.txt` minus
+the obs table). Model minus observed at the kept records: Houston
++4.90 m, Katy +1.94, Fulshear +1.97, Bear Ck +1.20, Langham/Addicks
+-0.61. The model is too HIGH at the gauges, as Sec 6.1's first
+paragraph says; the mechanism paragraph's "modelled stage is too low
+... asks for more" is wrong on the measurement as well as on the sign.
+Item 7 above therefore does not survive in either half, and the
+replacement mechanism sentence should read: at the gauges the model is
+metres too high and the gradient asks for more upstream friction,
+which slows runoff into the main stem; Buffalo Bayou at Houston, 4.9 m
+high, carries ~82% of the gauge misfit and sits in the reach the o37
+drainage analysis identified. The gauge calibration was fitting the
+lake with friction. Qualification 1 of Q2 (one gauge carrying the sign)
+is now the expected case, not a hypothetical: the gauge gradient IS
+essentially the Houston gauge's.
+
 ## The strongest defensible claim
 
 Mark's candidate: "at 30 m neither observable constrains roughness to

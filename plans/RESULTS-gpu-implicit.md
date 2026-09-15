@@ -2624,3 +2624,46 @@ reproduce o64's dJ/dalpha (22 -4016, 23 -6376, 90 -676); its mark
 gradient must reproduce o62's (22 -29.5, 23 +90.7, 90 +66.2). The base
 dump minus the obs table is the per-gauge residual the 09-14 to-do asked
 for. Expected cost 16 x 2 nodes x ~22 min = 12 node-hours wall.
+
+**o65 partial (2026-09-15 12:05 PDT, 10 of 16 columns in, self-check
+PASSED: task 0 J 3.131332e+04 = o64's J0 to seven digits).** Two
+results that do not depend on the remaining columns:
+
+(1) **The per-gauge residual, at last** (base dump minus obs table,
+kept records, model minus observed):
+
+| gauge | kept | mean residual | share of J |
+|---|---|---|---|
+| Buffalo Bayou at Houston (cell 2858868, bed 6.93) | 48 | **+4.90 m** | ~82% |
+| Buffalo Bayou nr Katy (803709, bed 33.27) | 48 | +1.94 m | ~13% |
+| Buffalo Bayou nr Fulshear (877521) | 14 | +1.97 m | ~4% |
+| Bear Ck nr Barker (1825690, reservoir) | 4 | +1.20 m | <1% |
+| Langham Ck nr Addicks (1858212, reservoir) | 20 | -0.61 m | <1% |
+
+The model is too HIGH at four of five gauges, including both main-stem
+gauges. This CONTRADICTS the o64 reading (2)-(3) and the o63 reading
+("the model's stage is too LOW by metres of representation error ...
+roughness can deepen the water on the bank") and the paper's Sec 6.1
+mechanism paragraph; it CONFIRMS the paper's Sec 6.1 first paragraph
+(modelled WSE above observed). dJ_gauge/dn_23 < 0 therefore means: more
+friction on developed-medium land LOWERS the main-stem stage (slower
+runoff), not "deepens the bank cell". The gauge misfit is one gauge,
+Buffalo Bayou at Houston, 4.9 m too high -- the downstream reach, i.e.
+the drainage/lake defect of the o37 analysis reaching the main stem.
+The gauge calibration was fitting the lake with friction.
+
+(2) **The class-24 (developed-high) column is not in the linear
+regime at +5%.** Its J moves 31313 -> 38258 (+6944) where the adjoint
+gradient predicts +578 (12x); its dWSE at the Houston gauge is +0.63 m
+mean, +1.05 m max, against ~0.02 m for every other class; the largest
+change anywhere is +1.39 m at the (masked) Whiteoak Main St gauge. The
+other nine columns reproduce the adjoint gradient within a factor ~2
+(22: -1728 from S vs -4016 adjoint; 23: -3617 vs -6376; 21, 31, 41, 42,
+43 within 20-60%), i.e. the one-sided 5% secant under-reads the two
+leading classes by ~2x -- the same saturation the o63 step showed (35%
+of linear). With 24 included the raw spectrum has lambda_0 = 4e4 on
+pure class 24 -- an artifact of the secant, not a measurement. NEEDED:
+class 24 at +/-1% and a -5% column for 22, 23, 24, 90 (central
+differences) -- 6 forwards, ~4.4 node-hours. Until then the gauge
+spectrum is read WITHOUT 24, and the mark spectrum's own 24 column
+(22 of 46 marks moved their peak time in o61) deserves the same check.
