@@ -224,3 +224,32 @@ open.
 - Emil's hold-out, if the group wants it (decision 2).
 - A final pass over Sections 2-5 is done; Section 6 gets restructured
   once decision 1 lands.
+
+### o65 answers Emil's question (2026-09-15)
+
+Sixteen forwards, same construction as Sec 6.4, gauge observable
+(`logs/o65/`, RESULTS o65). Class 24 excluded (its +5% column is a
+>1 m stage response at Houston, not a sensitivity; central differences
+pending in o66).
+
+- **Not complementary.** 98% of the marks' informative subspace (3
+  combinations at +/-30%) lies inside the gauges' (5 at the survey
+  weighting). The gauges see what the marks see, plus pasture/hay.
+- **Opposed in sign along both leading directions** -- at o63's
+  weighting.
+- **The opposition is the per-gauge offset.** Remove each gauge's mean
+  residual (offset as nuisance parameter, hydrograph shape only) and the
+  two gradients have the same sign and the gauges also send the
+  developed classes DOWN. The disagreement is the 4.9 m bias at Buffalo
+  Bayou at Houston (82% of the gauge misfit), i.e. the ponded reach.
+- **How many combinations the gauges determine at their own error:**
+  5 at 0.15 m iid, 1 at 1 m, 0 at 2 m and beyond.
+- The per-gauge residual exists now: model HIGH by 4.90 (Houston), 1.94
+  (Katy), 1.97 (Fulshear), 1.20 (Bear Ck); low by 0.61 (Langham).
+
+For the paper this replaces "the two observables disagree" with "the
+two observables agree about roughness once the downstream bias is
+removed, and the bias is not a roughness error" -- a stronger and
+cleaner statement of thesis item 5. Sec 6.1's mechanism paragraph must
+be rewritten (model is too HIGH at the gauges). Emil's hold-out
+(decision 2b) is still open.

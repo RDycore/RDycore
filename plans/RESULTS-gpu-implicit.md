@@ -2667,3 +2667,79 @@ class 24 at +/-1% and a -5% column for 22, 23, 24, 90 (central
 differences) -- 6 forwards, ~4.4 node-hours. Until then the gauge
 spectrum is read WITHOUT 24, and the mark spectrum's own 24 column
 (22 of 46 marks moved their peak time in o61) deserves the same check.
+
+**o65 COMPLETE (2026-09-15 12:20 PDT; 16/16, ~22 min each, 2 nodes;
+artifacts `logs/o65/`, analyses `logs/o65/o65_spectrum_*.txt`).**
+
+*Self-checks.* Base J = 3.131332e+04 (o64, exact). The MARK sensitivity
+matrix from the o58 columns reproduces the o62 adjoint gradient on every
+class to within 4% (22 -28.4/-29.5, 23 +89.7/+90.7, 90 +65.1/+66.2,
+81 -31.3/-34.1 in alpha): the paper's Sec 6.4 construction is validated
+against the adjoint for the first time. The GAUGE matrix does NOT: the
++5% secant is 0.43x the adjoint on 22, 0.56x on 23, 2.1x on 90, 3.4x on
+81 and 12x on 24, while the small classes (41, 82, 95, 31, 42, 43) are
+within 40%. The gauge observable is nonlinear over a 5% class step in
+exactly the classes that matter (the Houston stage responds to upstream
+roughness through a ponded reach); the gauge spectrum below is therefore
+soft by a factor 2-4 in lambda (+/-1-2 in the count) until o66's
+central differences land. The mark spectrum is not affected.
+
+*Mark spectrum at the paper's prior (sigma_alpha 0.30, class 24 dropped,
+14 classes):* lambda = 12.0, 2.98, 1.13, 0.31, ... -> **3 supported**,
+dofs 3.01, leading 23(-0.79) 90(+0.52) 22(-0.30). Consistent with the
+abstract's "about three combinations at +/-30%".
+
+*Gauge spectrum (class 24 dropped; see (2) above), iid:*
+
+| weighting | lambda (top 5) | supported | leading direction |
+|---|---|---|---|
+| sigma 0.15, iid (o63's) | 141, 25.3, 5.1, 1.28, 1.08 | 5 of 14 | 81(-0.67) 23(-0.56) 90(-0.45) |
+| sigma 0.30 | 35, 6.3, 1.3, ... | 3 | same |
+| sigma 0.50 | 12.7, ... | 2 | same |
+| sigma 1.0 | 3.2, 0.56, ... | 1 | same |
+| sigma 2.0 / 3.0 / 5.0 | 0.79 / 0.35 / 0.13 | **0** | -- |
+| sigma 0.15, AR(1) rho 0.9 | 13.9, 7.9, 4.0, 2.9, 1.3, 1.0 | 6 | 23(-0.67) 81(-0.60) 90(-0.41) |
+| sigma 0.15, per-gauge demeaned | 26, 10, 1.96, 0.95 | 3 | 81(-0.77) 90(-0.55) 23(-0.26) |
+| with class 24 (raw) | 3.99e4 on pure 24, then 139, 12.4, ... | 5 of 15 | artifact |
+
+At the representation-dominated sigma of 1-3 m the gauges determine 0-1
+roughness combination (iid; with the AR(1) whitening lambda_0 is 10x
+smaller still). The GN prediction of the o63 solution under o63's own
+weighting is alpha = 16, 3.1, 5.9 for 22/23/90 (unconstrained; the box
+made it 3, 3, 1.74) -- the o63 excursion is what that weighting demands.
+
+*Emil's question (complementary / redundant / opposed), iid no-24:*
+angle between leading eigenvectors 75.6 deg; **98% of the marks'
+3-dim informative subspace lies inside the gauges' 5-dim one** (59% the
+other way). Not complementary: the gauges see everything the marks see,
+plus pasture/hay (81). Along BOTH leading directions the two gradients
+are OPPOSED (gauge v0: +4112 vs marks -59; mark u0: +2777 vs -24).
+
+*Where the opposition comes from -- the decisive variant.* With each
+gauge's mean residual projected out (per-gauge demeaning: hydrograph
+SHAPE only, the offset treated as a nuisance parameter), the sign
+agreement flips: along the gauge leading direction dJ_gauge = -35 and
+dJ_marks = -39, SAME sign, and the GN step for 22/23/90 is alpha =
+0.33, 0.34, 1.03 -- developed classes DOWN, exactly where the marks put
+them. The entire gauge-vs-mark disagreement is carried by the per-gauge
+OFFSET, i.e. by the 4.9 m bias at Buffalo Bayou at Houston (82% of J),
+which is the ponded downstream reach. The time-varying part of the
+gauge record agrees with the marks about roughness.
+
+**Reading for the paper.** (a) The o63 gauge calibration fitted the
+Houston lake with friction: the bias is the drainage defect, the
+roughness request is its shadow. (b) Sec 6.1's mechanism paragraph is
+wrong (model too HIGH at the gauges, 4.9 m at Houston) and its
+"opposite edges" framing overstates: the observables agree once the
+offset is removed. (c) The defensible cross-observable statement is
+now measured: the marks' informative directions lie inside the gauges';
+the gauges at their own error and correlation determine 0-1 roughness
+combination; the sign disagreement is the downstream bias, not the
+roughness physics. (d) Class 24's +5% column is a >1 m stage response
+at Houston: whatever it is, it is not a sensitivity, and the mark
+spectrum's 24 column (22/46 argmax moves in o61) needs the same check.
+
+**Pending: o66** (`plans/campaigns/o66_gauge_spectrum_central.sh`, 6
+forwards, ~4.4 node-hours): 24 at +/-1%, and -5% for 22/23/24/90 so the
+gauge S can be built from central differences and re-checked against
+the adjoint. Awaiting Mark's go.

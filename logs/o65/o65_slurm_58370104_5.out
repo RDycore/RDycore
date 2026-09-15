@@ -1,0 +1,7 @@
+=== o65 col24: gauge-series forward of o65_pert_e0.05_24.txt, 2 nodes, Tue Sep 15 11:21:36 AM PDT 2026
+run exit=0 Tue Sep 15 11:45:32 AM PDT 2026
+gauge observations: 134 kept, 331 masked with observed WSE within 0. m of the cell bed (-adjoint_obs_above_bed), of 13 gauges x 48 times
+gauge eval: evaluating the class table o65_pert_e0.05_24.txt, not the prior field
+gauge eval (class table): J 3.825755e+04, RMSE 3.5844 m over 134 kept observations (13 gauges x 48 times, 43200 steps)
+gauge eval: modelled WSE table written to o65_gauge_col24.txt (+ .zb)
+dump: 13 48 gauges x times; 50 lines
