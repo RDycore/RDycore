@@ -2602,7 +2602,7 @@ must not appear in the paper. The 134 = Katy 48 + Houston 48 + Langham
 principled instrument is the gauge Gauss-Newton spectrum: 16 forwards,
 ~12 node-hours wall on 2 nodes, every weighting a post-processing step.
 
-### o65 -- the Gauss-Newton spectrum of the GAUGE observable (submitted 2026-09-15)
+### o65 -- the Gauss-Newton spectrum of the GAUGE observable (job 58370104, submitted 2026-09-15 10:41 PDT)
 
 Agreed by Donghui and Emil (decision list, 09-14/15): the Sec 6.4
 construction pointed at the gauges. Sixteen forwards on the production
