@@ -2743,4 +2743,4 @@ spectrum's 24 column (22/46 argmax moves in o61) needs the same check.
 forwards, ~4.4 node-hours, **job 58382148 submitted 2026-09-15 12:34
 PDT**): 24 at +/-1%, and -5% for 22/23/24/90 so the
 gauge S can be built from central differences and re-checked against
-the adjoint. Awaiting Mark's go.
+the adjoint. Mark approved 09-15.
