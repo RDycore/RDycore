@@ -41,6 +41,12 @@ static const char *help_str =
     "  -adjoint_obs_above_bed      keep a gauge observation only while the observed WSE is\n"
     "                              above the cell bed (+ -adjoint_obs_min_depth <m>, default 0):\n"
     "                              a 30 m cell stores the bank, not the channel\n"
+    "  -adjoint_obs_eval_only      classes mode, gauge table: one forward of the prior field (or\n"
+    "                              of -adjoint_classes_init <table>), J and RMSE over the kept\n"
+    "                              observations, no adjoint, no TAO\n"
+    "  -adjoint_obs_model_dump <path>  with -adjoint_obs_eval_only: write the modelled WSE at every\n"
+    "                              gauge and observation time in the obs-table format, plus\n"
+    "                              <path>.zb with each gauge's cell and bed elevation\n"
     "  -adjoint_hwm_file <path>    high-water-mark table (cell + peak WSE; see data/harvey_hwm/):\n"
     "                              switches the gauge/class misfit to peak WSE at the marks\n"
     "  -adjoint_hwm_twin           synthesize the mark WSE values from the truth forward's peaks\n"
@@ -2069,6 +2075,86 @@ int main(int argc, char *argv[]) {
                               " marks (%" PetscInt_FMT " obs times over %" PetscInt_FMT " steps)\n",
                               have_eval_init ? "class table" : "prior field", (double)Jp, (double)mae, ndry, ngauges, K,
                               total_steps));
+        PetscCall(RDyDestroy(&rdy));
+        PetscCall(RDyFinalize());
+        return 0;
+      }
+
+      // -adjoint_obs_eval_only: the gauge analogue of -adjoint_hwm_eval_only.
+      // One forward of the prior field (or of a -adjoint_classes_init class
+      // table) against the gauge table: J and RMSE over the kept observations,
+      // no adjoint, no TAO. The forward runs in RECORD mode into its own
+      // vectors, so the modelled water height is kept at every (gauge, time),
+      // masked or not, and J is formed here with the kept-observation weights.
+      // With -adjoint_obs_model_dump <file> the modelled WSE table is written
+      // in the observation-table format (ReadObsTable reads it back), plus
+      // <file>.zb with each gauge's cell and bed elevation, so the above-bed
+      // mask and any observation weighting can be rebuilt offline. Sixteen
+      // such forwards (the prior + one per perturbed class) are the
+      // observation-sensitivity matrix of the gauge Gauss-Newton spectrum,
+      // the gauge counterpart of the -adjoint_hwm_dump columns; the prior's
+      // dump minus the table is the per-gauge residual.
+      PetscBool obs_eval_only = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_obs_eval_only", &obs_eval_only, NULL));
+      if (!have_hwm_file && obs_eval_only) {
+        char      eval_init[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_eval_init                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_init", eval_init, sizeof(eval_init), &have_eval_init));
+        if (have_eval_init) {
+          PetscReal *nk;
+          PetscCall(PetscCalloc1(nclass, &nk));
+          PetscCall(ReadClassTable(comm, eval_init, nclass, cc.class_codes, nk));
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = nk[cc.cell_class[i]];
+          PetscCall(PetscPrintf(comm, "gauge eval: evaluating the class table %s, not the prior field\n", eval_init));
+          PetscCall(PetscFree(nk));
+        } else {
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        }
+        PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
+
+        Vec *ym, tmp;
+        PetscCall(PetscMalloc1(K, &ym));
+        for (PetscInt kk = 0; kk < K; ++kk) PetscCall(MatCreateVecs(Hg, NULL, &ym[kk]));
+        PetscCall(MatCreateVecs(Hg, NULL, &tmp));
+        PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, ym, NULL, NULL, sigma, NULL));  // record mode
+        PetscCall(CheckTruthForward(rdy, "gauge eval"));
+        PetscReal Jg = 0.0;
+        for (PetscInt kk = 0; kk < K; ++kk) {  // J = 1/2 sigma^-2 sum_k |w_k (H u_k - y_k)|^2, as ObsMonitor forms it
+          PetscReal nrm;
+          PetscCall(VecWAXPY(tmp, -1.0, y_k[kk], ym[kk]));
+          PetscCall(VecPointwiseMult(tmp, tmp, w_k[kk]));
+          PetscCall(VecNorm(tmp, NORM_2, &nrm));
+          Jg += 0.5 * nrm * nrm / (sigma * sigma);
+        }
+        PetscCall(PetscPrintf(comm,
+                              "gauge eval (%s): J %.6e, RMSE %.4f m over %" PetscInt_FMT " kept observations (%" PetscInt_FMT " gauges x %" PetscInt_FMT
+                              " times, %" PetscInt_FMT " steps)\n",
+                              have_eval_init ? "class table" : "prior field", (double)Jg,
+                              (double)(n_present > 0 ? sigma * PetscSqrtReal(2.0 * Jg / (PetscReal)n_present) : 0.0), n_present, ngauges, K,
+                              total_steps));
+
+        char      model_dump[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_model_dump                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_obs_model_dump", model_dump, sizeof(model_dump), &have_model_dump));
+        if (have_model_dump) {
+          PetscCall(WriteObsTable(comm, model_dump, ngauges, gauge_cells, K, obs_freq * rdy->dt, ym, zbg));
+          PetscMPIInt rank;
+          PetscCallMPI(MPI_Comm_rank(comm, &rank));
+          if (rank == 0) {
+            char  zb_path[PETSC_MAX_PATH_LEN];
+            FILE *fp;
+            PetscCall(PetscSNPrintf(zb_path, sizeof(zb_path), "%s.zb", model_dump));
+            fp = fopen(zb_path, "w");
+            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write %s", zb_path);
+            fprintf(fp, "# gauge_index cell bed_elevation[m]\n");
+            for (PetscInt g = 0; g < ngauges; ++g) fprintf(fp, "%d %" PetscInt_FMT " %.10g\n", (int)g, gauge_cells[g], (double)zbg[g]);
+            fclose(fp);
+          }
+          PetscCall(PetscPrintf(comm, "gauge eval: modelled WSE table written to %s (+ .zb)\n", model_dump));
+        }
+        for (PetscInt kk = 0; kk < K; ++kk) PetscCall(VecDestroy(&ym[kk]));
+        PetscCall(PetscFree(ym));
+        PetscCall(VecDestroy(&tmp));
         PetscCall(RDyDestroy(&rdy));
         PetscCall(RDyFinalize());
         return 0;
