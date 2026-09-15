@@ -195,6 +195,25 @@ authors and the effort goes into the paper, not the venue or the
 calendar. The DOI and archive-location placeholders stay on the to-do
 list as logistics, not as an open decision.
 
+### Emil (2026-09-15)
+
+Supports computing the gauge spectrum and comparing its informative
+directions with the marks', "to assess whether the two sources
+constrain complementary roughness combinations using the same setup."
+
+What that adds to the plan: Emil's question is about the overlap of
+the two informative subspaces, not only the count. The analysis must
+therefore report, from the same S construction and prior, (i) the
+gauge eigenvalue count at a defensible weighting, (ii) the angle
+between the leading eigenvectors, and (iii) the projection of each
+observable's informative subspace onto the other's, so "complementary"
+(orthogonal), "redundant" (aligned), or "opposed" (aligned, opposite
+gradient sign) can be stated as numbers. Same 16 forwards; all three
+are post-processing. Two coauthors now support the run; no objections.
+
+Not addressed by Emil: decision 2(b), his own hold-out proposal. Still
+open.
+
 ## What we'd do next, once you've decided
 
 - Add a per-gauge residual dump to the driver (one-line change, ~3
