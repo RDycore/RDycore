@@ -2601,3 +2601,26 @@ must not appear in the paper. The 134 = Katy 48 + Houston 48 + Langham
 20 + Fulshear 14 + Bear Ck 4 (five gauges, reconstructed exactly). The
 principled instrument is the gauge Gauss-Newton spectrum: 16 forwards,
 ~12 node-hours wall on 2 nodes, every weighting a post-processing step.
+
+### o65 -- the Gauss-Newton spectrum of the GAUGE observable (submitted 2026-09-15)
+
+Agreed by Donghui and Emil (decision list, 09-14/15): the Sec 6.4
+construction pointed at the gauges. Sixteen forwards on the production
+window (NLCD prior + each class raised 5%, as o58/o61), each writing the
+modelled WSE at 13 gauges x 48 times via the new `-adjoint_obs_eval_only
+-adjoint_obs_model_dump` path (driver commit of 09-15; gpu11 binary,
+`cmake-claude-gpu11.sh`). Script `plans/campaigns/o65_gauge_spectrum.sh`
+(16-task array, 2 nodes, 40-min slots, m4267_g); analysis
+`plans/campaigns/o65_gauge_spectrum.py`, which rebuilds the above-bed
+mask from the obs table and the `.zb` file, forms H = S^T W S / sigma^2
+whitened by sigma_alpha, and reports the count, a sigma scan, an AR(1)
+and a per-gauge-demeaned variant, the GN prediction of the o63 solution
+under each weighting, and against the o58 mark columns the angle between
+leading eigenvectors and the mutual subspace overlaps (Emil's question).
+
+Self-checks to read first: task 0's printed J must be 3.131332e+04
+(o64's J0); the script's gradient from S and the base residual must
+reproduce o64's dJ/dalpha (22 -4016, 23 -6376, 90 -676); its mark
+gradient must reproduce o62's (22 -29.5, 23 +90.7, 90 +66.2). The base
+dump minus the obs table is the per-gauge residual the 09-14 to-do asked
+for. Expected cost 16 x 2 nodes x ~22 min = 12 node-hours wall.
