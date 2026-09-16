@@ -290,7 +290,37 @@ looks reasonable, and both come from a bug.
 (The $23\%$ should still become the RMSE statement, $3.24 \to 2.84$\,m,
 per the denominator cleanup.)
 
-### o65 answers Emil's question (2026-09-15)
+### CORRECTION to the o65 entry below (o66, 2026-09-15 evening)
+
+The gauge sensitivity matrix turned out not to be valid at a 5% step, so
+**the eigenvalue counts, the subspace overlap and the demeaning sign
+claim in the next section are withdrawn** (details in RESULTS o66). Do
+not send those numbers. What replaces them is simpler, needs no spectrum,
+and says the same thing more directly:
+
+**99.5% of the gauge misfit is a constant per-gauge offset.** Splitting
+J at the NLCD prior into each gauge's mean residual plus the variation
+about it gives 31145 offset and 168 shape, i.e. RMSE 3.243 m overall and
+**0.238 m in hydrograph shape alone**. Buffalo Bayou at Houston is
++4.90 m biased and carries 82% of the misfit. The model tracks the shape
+of every hydrograph to a quarter of a metre and has the level wrong by
+metres. A constant several-metre bias held for twelve hours is not
+something roughness produces, so the gauge observable at 30 m is a
+datum/storage measurement with a half-percent roughness-relevant part,
+and the o63 calibration spent its three parameters on the other 99.5%.
+
+Emil's question is therefore answered differently: not "the informative
+directions overlap" but "the gauges carry almost no roughness
+information at this resolution, and what little they carry agrees with
+the marks on developed-medium only". The sign disagreement between the
+two observables stands, because it comes from the adjoint, not from the
+spectrum.
+
+One thing improved rather than withdrawn: the same test applied to the
+MARK columns reproduces the adjoint gradient to within 4% on every class,
+so Sec 6.4's construction now has an independent check it never had.
+
+### o65 answers Emil's question (2026-09-15) -- SUPERSEDED, see the correction above
 
 Sixteen forwards, same construction as Sec 6.4, gauge observable
 (`logs/o65/`, RESULTS o65). Class 24 excluded (its +5% column is a
