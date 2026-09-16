@@ -290,6 +290,38 @@ looks reasonable, and both come from a bug.
 (The $23\%$ should still become the RMSE statement, $3.24 \to 2.84$\,m,
 per the denominator cleanup.)
 
+### Emil, 2026-09-16: "are the 0.33/0.34 values from a nonlinear calibration
+### or a linearized estimate?"
+
+**Linearized, and already withdrawn.** They were a Gauss-Newton step from the
+local sensitivity model (S^T W S plus the prior, against the gradient) under
+per-gauge demeaning. No optimizer ran and no forward was evaluated at that
+field. The correction below retracts them along with the rest of the gauge
+spectrum.
+
+**His methodological point is the right one** and is why. He asks that the
+derivatives be shown to stabilize as the perturbation shrinks. We have that
+test only for developed-high: the decreasing side converges (11426
+extrapolated vs the adjoint's 11554, 1.1%) while the increasing side is 4.9x
+the adjoint at 1% and 12x at 5% -- a kink at the prior, not a step-size
+artifact. For 22, 23 and 90 we have only +/-5%, and the adjoint check says
+22 and 23 are far off. **The test he is asking for is 6 forwards at +/-1%,
+~4.4 node-hours**, blocked on the Perlmutter maintenance.
+
+**What survives without any linearization** is the offset/shape split below.
+It is a decomposition of the measured misfit, not a model of it.
+
+**A caveat to carry even if the derivatives do stabilize:** the spectrum
+describes the linearization at the prior, while the calibration traverses
+alpha from 1 to 3, where the measured objective change was 35% of its linear
+prediction. A converged local spectrum still would not describe the
+calibration's path. Worth stating in the paper rather than leaving for a
+reviewer.
+
+**On his "the marks can add information within the overlapping directions":**
+agreed in principle, but the joint spectrum uses the same gauge sensitivities
+and is on hold behind the same convergence test.
+
 ### CORRECTION to the o65 entry below (o66, 2026-09-15 evening)
 
 The gauge sensitivity matrix turned out not to be valid at a 5% step, so
