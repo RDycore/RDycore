@@ -53,6 +53,39 @@ error is in the water balance and the mesh, not the friction.
 - **"A physically impossible field"** (Sec 6.1, ~line 1239). Donghui rules
   n = 0.36 for developed-medium "a little bit high, but reasonable".
 
+## MEASURED vs LINEARIZED -- a labelling rule, from Emil (2026-09-16)
+
+Emil asked whether the 0.33/0.34 roughness values came from a calibration or
+from "the local sensitivity model". They were linearized, and that is why they
+were withdrawn. His question generalizes into a check to run over the whole
+paper:
+
+**Every parameter value, error reduction and skill number must be identifiable
+as one of two things: MEASURED (a forward or a calibration actually ran and
+produced it) or LINEARIZED (it comes from the sensitivity model / the
+Gauss-Newton Hessian).** Where the text does not make that plain, fix it.
+
+- Measured: the 0.72 m prior MAE, the 0.6154 / 0.6290 / 0.7609 scored fields,
+  the 15% ceiling, the 84% three-vs-fifteen share, the gauge J values, the
+  99.5%/0.54% offset-shape split.
+- Linearized: every eigenvalue, every "supported parameter" count, the
+  error-reduction column of the spectrum table, the degrees of freedom for
+  signal, and everything in tab:scaling.
+
+**A caveat to state rather than let a reviewer find it:** the spectrum
+describes the linearization at the prior, while the calibration traverses
+alpha from 1 to 3. At the o63 step the measured objective change was 35% of
+its linear prediction. So a spectrum, even a converged one, does not describe
+the calibration's path -- it describes information content at the prior. The
+paper currently blurs these.
+
+**Emil's other point, still open:** he wants the finite-difference derivatives
+shown to stabilize as the perturbation shrinks before any conclusion is drawn
+from them. We have that only for developed-high. The test is 6 forwards at
++/-1% for classes 22, 23, 90, ~4.4 node-hours, blocked on the Perlmutter
+maintenance. Until it runs, the paper must not assert anything about a gauge
+spectrum in either direction -- not that one exists, and not that one cannot.
+
 ## Sec 6.1 rewrite, gated on decision 1 (do NOT restructure Sec 6)
 
 Replacement text for individual claims is in `plans/team-decision-list.md`
@@ -109,7 +142,16 @@ By his own criterion no field we have is consistent.
 ## Machine state
 
 Perlmutter went down for maintenance 09-16. Nothing of ours is queued; all
-o65/o66 artifacts are fetched into `logs/o65/` and committed. No run is
-needed for any of the writing above. The only candidate run left is Emil's
-hold-out (decision 2); do not chase a valid gauge spectrum, the offset split
-answers the question better.
+o65/o66 artifacts are fetched into `logs/o65/` and committed. No run is needed
+for any of the writing above.
+
+Two candidate runs, both blocked on the maintenance, neither blocking the
+writing:
+- **Emil's convergence test**: 22, 23, 90 at +/-1%, 6 forwards, ~4.4
+  node-hours. Decides whether a gauge spectrum can be computed at all. Until
+  it runs the paper asserts nothing either way.
+- **Emil's within-mark hold-out** (coauthor decision 2, ~24 node-hours),
+  unanswered by the group.
+
+Do not chase a gauge spectrum for the paper's argument; the offset split
+answers that question without one.
