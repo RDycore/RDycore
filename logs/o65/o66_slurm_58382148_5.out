@@ -1,0 +1,7 @@
+=== o66 col90_e-0.05: gauge-series forward of o66_pert_col90_e-0.05.txt (class 90, eps -0.05), 2 nodes, Tue Sep 15 04:31:50 PM PDT 2026
+run exit=0 Tue Sep 15 04:53:47 PM PDT 2026
+gauge observations: 134 kept, 331 masked with observed WSE within 0. m of the cell bed (-adjoint_obs_above_bed), of 13 gauges x 48 times
+gauge eval: evaluating the class table o66_pert_col90_e-0.05.txt, not the prior field
+gauge eval (class table): J 3.131246e+04, RMSE 3.2427 m over 134 kept observations (13 gauges x 48 times, 43200 steps)
+gauge eval: modelled WSE table written to o65_gauge_col90_e-0.05.txt (+ .zb)
+reference: base J 3.131332e+04; o65 +5% columns: 22 3.122705e+04, 23 3.113326e+04, 24 3.825755e+04

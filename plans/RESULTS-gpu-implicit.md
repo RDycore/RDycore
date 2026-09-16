@@ -2744,3 +2744,87 @@ forwards, ~4.4 node-hours, **job 58382148 submitted 2026-09-15 12:34
 PDT**): 24 at +/-1%, and -5% for 22/23/24/90 so the
 gauge S can be built from central differences and re-checked against
 the adjoint. Mark approved 09-15.
+
+### o66 (job 58382148, 2026-09-15) -- and the RETRACTION of the o65 spectrum numbers
+
+Six forwards: class 24 at +/-1%, and -5% columns for 22, 23, 24, 90
+(`logs/o65/o65_gauge_col*_e*.txt`, all exit 0, ~22 min each).
+
+**1. The gauge sensitivity matrix is not usable at 5%, and central
+differences do not rescue it.** The two one-sided columns of the SAME
+class differ by more than their own magnitude:
+`||S(+5%) - S(-5%)|| / ||S_central||` = 1.42 (22), 1.27 (23), 2.22 (90),
+1.56 (24). The gradient implied by each column, `S^T W r / sigma^2`,
+against the o64 adjoint (dJ/dalpha at the prior):
+
+| class | S from +5% | S from -5% | S central | adjoint |
+|---|---|---|---|---|
+| 22 | -1728 | +1123 | -303 | **-4016** |
+| 23 | -3617 | -2057 | -2837 | **-6376** |
+| 90 | -1448 | +18 | -715 | **-676** |
+| 24 | +127809 | +14222 | +71015 | **+11554** |
+
+Only class 90 agrees. The same numbers come out of the J secants
+(-309, -2832, -711, +76463), so the finite differences are internally
+consistent; it is the linearization that fails, not the arithmetic.
+
+**2. The adjoint is right; the objective is not smooth at 5%.** Class 24
+on the DECREASING side behaves smoothly and its slope extrapolates to
+11426 against the adjoint's 11554 (1.1%). On the increasing side it is
+4.9x the adjoint at 1% and 12.0x at 5%. That is a one-sided kink at the
+prior, not curvature. Physically, raising developed-high roughness moves
+the Whiteoak Main St gauge by 1.39 m and Houston by up to 1.05 m at +5%.
+
+**3. RETRACTED from o65** (everything that used the gauge S): the gauge
+eigenvalue counts (5 / 3 / 1 / 0 as sigma opens), the 75.6 deg angle
+between leading eigenvectors, "98% of the marks' informative subspace
+lies inside the gauges'", and the demeaned GN step. None of those are
+measurements. **A valid gauge Gauss-Newton spectrum has not been
+computed and may not exist at this step size.**
+
+**4. The demeaning claim, re-tested directly on the objective** (no S,
+no linearization: J evaluated at the base and at +/-5% per class):
+
+| class | demeaned J wants | marks want | |
+|---|---|---|---|
+| 22 dev-low | less | more | disagree |
+| 23 dev-med | less | less | AGREE |
+| 90 woody-wet | more | less | disagree |
+
+So the 09-15 statement "with per-gauge demeaning the signs agree and the
+gauges also send the developed classes down" is **wrong as written**: the
+agreement is on developed-medium only, and the differences are 1-5
+J-units on a base of 168, on a surface already shown to be nonlinear.
+
+**5. What replaces it, and it is stronger because it needs no
+sensitivity matrix at all** -- the offset/shape split of the gauge
+misfit at the NLCD prior, straight from the base dump:
+
+| gauge | n | mean residual | shape rms | share of J |
+|---|---|---|---|---|
+| Buffalo Bayou at Houston | 48 | **+4.901 m** | 0.382 m | **82.3%** |
+| Buffalo Bayou nr Katy | 48 | +1.944 m | 0.067 m | 12.9% |
+| Buffalo Bayou nr Fulshear | 14 | +1.965 m | 0.055 m | 3.8% |
+| Langham Ck nr Addicks | 20 | -0.613 m | 0.123 m | 0.6% |
+| Bear Ck nr Barker | 4 | +1.197 m | 0.012 m | 0.4% |
+
+**J 31313 = 31145 constant per-gauge offset (99.5%) + 168 hydrograph
+shape (0.54%).** RMSE 3.243 m overall, **0.238 m in shape alone.** The
+model tracks the shape of every hydrograph to a quarter of a metre and
+has the level wrong by metres. A constant 1.9-4.9 m bias held for twelve
+hours is not a friction signature. The gauge observable at 30 m is a
+datum/storage measurement with a 0.5% roughness-relevant component, and
+the o63 calibration spent its three parameters on the 99.5%.
+
+**6. The MARK sensitivity matrix IS validated** -- the same test on the
+o58 columns reproduces the o62 adjoint gradient to within 4% on every
+class (22 -28.4 vs -29.5, 23 +89.7 vs +90.7, 90 +65.1 vs +66.2). Sec 6.4's
+construction now has an independent check it never had. The peak
+observable is well-behaved where the time-series observable is not,
+which is itself worth a sentence: a peak has no phase, and a 5% roughness
+change shifts hydrograph timing.
+
+**For the paper.** Report (5). Drop every gauge-spectrum number. The
+cross-observable section becomes: the gauges disagree with the marks in
+sign (adjoint, solid), and the reason is that 99.5% of what they measure
+is an offset roughness cannot produce.
