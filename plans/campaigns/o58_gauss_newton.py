@@ -51,6 +51,9 @@ def _argval(flag, default):
 
 SIGMA = _argval("--sigma-obs", None) if "--sigma-obs" in sys.argv else None
 SIGMA_N = _argval("--sigma-n", 0.015)
+# --sigma-alpha S: a UNIFORM fractional prior width (the paper's +/-30% is 0.30),
+# overriding the absolute sigma_n. Matches -adjoint_sigma_alpha in the driver.
+SIGMA_A = _argval("--sigma-alpha", None) if "--sigma-alpha" in sys.argv else None
 if SIGMA is None:
     sys.exit("ERROR: pass --sigma-obs explicitly (the -adjoint_obs_error the runs used;\n"
              "       production is 0.15, the driver default is 0.01). Every eigenvalue\n"
@@ -72,7 +75,7 @@ def read_peaks(path):
 
 argv = [a for a in sys.argv[1:] if not a.startswith("--")]
 skip = set()
-for f in ("--sigma-obs", "--sigma-n"):
+for f in ("--sigma-obs", "--sigma-n", "--sigma-alpha"):
     if f in sys.argv:
         skip.add(sys.argv[sys.argv.index(f) + 1])
 argv = [a for a in argv if a not in skip]
@@ -122,13 +125,15 @@ print(f"\nGauss-Newton Hessian: symmetric by construction; "
 NLCD = {11: .038, 21: .040, 22: .090, 23: .120, 24: .160, 31: .027, 41: .150,
         42: .120, 43: .140, 52: .115, 71: .038, 81: .038, 82: .035, 90: .098, 95: .068}
 n_prior = np.array([NLCD[c] for c in codes])
-sig_alpha = SIGMA_N / n_prior
+sig_alpha = np.full(K, SIGMA_A) if SIGMA_A is not None else SIGMA_N / n_prior
+prior_label = (f"sigma_alpha = {SIGMA_A} uniform" if SIGMA_A is not None
+               else f"sigma_n = {SIGMA_N} absolute")
 
 Hw = (sig_alpha[:, None] * H) * sig_alpha[None, :]
 lam, V = np.linalg.eigh(Hw)
 o = np.argsort(lam)[::-1]; lam, V = lam[o], V[:, o]
 
-print(f"\nprior-preconditioned Gauss-Newton spectrum (sigma_n = {SIGMA_N}, sigma_obs = {SIGMA}):")
+print(f"\nprior-preconditioned Gauss-Newton spectrum ({prior_label}, sigma_obs = {SIGMA}):")
 print(f"{'i':>3} {'lambda':>12} {'data vs prior':<17} {'err reduction':>13}  leading classes")
 for i in range(K):
     L = max(lam[i], 0.0)
@@ -144,6 +149,16 @@ print(f"\n  eigenvalues > 1 : {n1} of {K}   <- parameters the observable support
 print(f"  degrees of freedom for signal (Rodgers): {dofs:.2f}")
 if K > 1 and lam[1] > 0:
     print(f"  spectral gap lambda_0/lambda_1 = {lam[0]/lam[1]:.2f}")
+
+# per-class posterior width: the diagonal of the whitened posterior
+# covariance (I + Hw)^-1, unwhitened; "learned" is the fractional reduction
+# from prior to posterior standard deviation, class by class.
+P = np.linalg.inv(np.eye(K) + Hw)
+print(f"\n  per-class prior -> posterior width (linearized at the lookup):")
+for j in np.argsort(np.diag(P)):
+    shrink = np.sqrt(P[j, j])
+    print(f"    {codes[j]:>3}  sigma_alpha {sig_alpha[j]:.3f} -> {sig_alpha[j]*shrink:.4f}"
+          f"   learned {100*(1-shrink):4.0f}%")
 
 # Is the leading direction the uniform mode the alpha-scan assumed? Two
 # comparisons, because "uniform" is ambiguous and the difference matters.
