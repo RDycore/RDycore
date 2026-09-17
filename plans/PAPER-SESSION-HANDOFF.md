@@ -244,10 +244,15 @@ gives 1.76 / 1.73 / 0.54 / 2.27 / 0.44 (non-monotone; best 0.44 at
 beta 1). Sec 5.1 now states the best-weight number instead of "no
 weight rescues it".
 
-**NEXT STEPS:** Mark's full read-through of the restructured draft;
-then the email to the coauthors (Emil's hold-out, the developed-ladder
-question, the three red notes, the perimeter note already drafted in
-the decision list). Nothing on the machine: every run is on hold for the
+**NEXT STEPS:** Mark's full read-through of the restructured draft, then
+the announcement email. **The email is drafted and ready to paste:
+`plans/note-to-team-restructure-2026-09-17.md`** -- thesis recap, what
+the rewrite did, then five numbered asks (Emil's hold-out; Donghui's
+developed ladder; Donghui's perimeter question with the weir caution and
+the two cheap diagnostics; the two missing citations; the archive
+location), plus a note to Gautam that his three Overleaf margin comments
+are unreadable from git and predate the rewrite. Every number in it was
+cross-checked against the built paper. Nothing on the machine: every run is on hold for the
 group's feedback. Also worth a line in RESULTS: its lines ~2016-17 still
 carry the pilot tab:scaling values (71 -> 1, 108 -> 2); the paper and
 the o61 log have the production values (2 and 3).
