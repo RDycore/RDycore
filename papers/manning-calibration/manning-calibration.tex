@@ -74,9 +74,9 @@ right-hand side serves the implicit time integrator, the adjoint, and
 the calibration. An objective and its gradient cost about two forward
 solves regardless of the number of parameters, every derivative passes
 a finite-difference gate on the full nonlinear solve, and the whole
-gradient path runs on GPUs, where four NVIDIA A100s run a calibration
-iteration on a dense-gauge twin $19\times$ faster than a 64-core CPU
-node.
+computation runs on GPUs, forward model and derivatives alike, where
+four NVIDIA A100s run a calibration iteration on a dense-gauge twin
+$19\times$ faster than a 64-core CPU node.
 
 For Hurricane Harvey on a 2.93M-cell, 30\,m mesh of the Houston area,
 scored against 46 surveyed high-water marks, what roughness can
