@@ -244,8 +244,17 @@ gives 1.76 / 1.73 / 0.54 / 2.27 / 0.44 (non-monotone; best 0.44 at
 beta 1). Sec 5.1 now states the best-weight number instead of "no
 weight rescues it".
 
-**NEXT STEPS:** Mark's full read-through of the restructured draft, then
-the announcement email. **The email is drafted and ready to paste:
+**Abstract compressed 09-17 evening (Mark: "too long").** Paragraph 1
+(capability) unchanged; paragraphs 2-4 (351 words, ~20 numbers) became
+one paragraph of ~200 words carrying only the 15% (labelled in sample),
+the +/-30% prior with its three-combination count, and 30 m. The gauge
+diagnosis and the initial-condition result are stated in words. Every
+number removed was confirmed present in the body before the cut, so
+nothing needed redistributing. Commit e7eca3f0; Overleaf a6b30d2. The
+PDF is 34 pp only because the last bibliography entry spills over.
+
+**Email SENT by Mark 09-17 evening; waiting on replies.** Then Mark's
+full read-through. **The email text is in:
 `plans/note-to-team-restructure-2026-09-17.md`** -- thesis recap, what
 the rewrite did, then five numbered asks (Emil's hold-out; Donghui's
 developed ladder; Donghui's perimeter question with the weir caution and
