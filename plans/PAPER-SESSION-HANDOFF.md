@@ -4,10 +4,10 @@
 replies at the end), `plans/RESULTS-gpu-implicit.md` sections o62-o66 and
 `plans/o63-gauge-weight-audit.md`. Paper:
 `papers/manning-calibration/manning-calibration.tex`, 33 pp, builds clean
-with latexmk. Branch `adams/gpu-implicit`. **Tree is NOT clean: the
-09-16 review edits and the 09-17 restructure edits are uncommitted** (tex, bib, fig_spectrum.tex, pdf,
-o58_gauss_newton.py, this file, the decision list, and six new files in
-`logs/o61/`). Mark has not asked for a commit.*
+with latexmk. Branch `adams/gpu-implicit`. **The 09-16 review and the
+09-17 restructure are committed and pushed to Overleaf** (see the
+Overleaf paragraph below); the branch is not pushed to GitHub. Only the
+two root-level `paper-*-prompt.md` files are untracked.*
 
 ## The one-paragraph version
 
@@ -98,8 +98,8 @@ Emil's feedback drove the order.
 ## RESTRUCTURE SESSION: start here (2026-09-17)
 
 Mark cleared a full restructure ("rearrange the paper as you like") and
-closed several questions. **The paper builds: 33 pp, no undefined refs.**
-Everything is uncommitted.
+closed several questions. **The paper builds: 33 pp, no undefined refs,
+and is committed and on Overleaf.**
 
 **Mark's rulings, 09-17:**
 - Rearrange freely. Rewrite the abstract (done). Ask about minor
@@ -255,11 +255,15 @@ the o61 log have the production values (2 and 3).
 **Committed and pushed to Overleaf, 09-17 evening (Mark: "you can
 commit and submit to Overleaf").** Repo commits a6e403f2 (logs),
 29cafc31 (paper + plans), 72765c0e (tex hygiene) on `adams/gpu-implicit`,
-then 4fd8b4b6 (noisy twins), not pushed to GitHub. Overleaf main is
-1c6c44a (after b872eb2), the new sync base;
-there were no coauthor commits since 363971e, so the merge was a plain
+then 4fd8b4b6 (noisy twins) and 3a32f5f6 (acknowledgements), not
+pushed to GitHub. Overleaf main is
+8f84bb2 (after b872eb2, 1c6c44a), the new sync base;
+there were no coauthor commits since 363971e, so each merge was a plain
 copy, and `manning-calibration-changes.pdf` (latexdiff against 363971e,
-37 pp) went with it. The two root-level `paper-*-prompt.md` files are
+38 pp) was rebuilt and pushed each time. An **Acknowledgements section**
+now precedes Code and Data Availability: Emil Constantinescu's review,
+then the verbatim FASTMath SciDAC and NERSC/ERCAP statements (award
+`ASCR-ERCAP0039362`, which is not the `m4267` job charge code). The two root-level `paper-*-prompt.md` files are
 Mark's session prompts and were left untracked. Three margin-comment
 threads from Gautam (08-31, 09-01) remain unreadable from git; Mark
 would have to relay them.
