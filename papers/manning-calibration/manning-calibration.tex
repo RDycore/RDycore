@@ -78,41 +78,25 @@ computation runs on GPUs, forward model and derivatives alike, where
 four NVIDIA A100s run a calibration iteration on a dense-gauge twin
 $19\times$ faster than a 64-core CPU node.
 
-For Hurricane Harvey on a 2.93M-cell, 30\,m mesh of the Houston area,
-scored against 46 surveyed high-water marks, what roughness can
-achieve is measurable before any optimizer runs. Scaling the whole
-published roughness field by one factor removes at most $0.08$\,m of a
-$0.72$\,m model--survey error, and only with the whole table scaled to
-$0.3$ of its values, where its smoothest classes fall below smooth
-concrete; calibrating the fifteen land-cover classes
-separately removes about $0.10$\,m, $15\%$ of the error. The
-eigenvalues of the calibration problem, computed at the published
-table from sixteen forward runs, show why: if that table is trusted to
-$\pm 30\%$, the marks outweigh it on only about three combinations of
-the fifteen classes, and calibrating those three recovers $84\%$ of
-what fifteen achieve. Where those three land is the same under every
-prior we ran: developed-medium and woody wetland at $0.3$ times their
-table values, below the table's own value for developed open land. The
-calibrated friction is compensating for an error that is not in the
-friction.
-
-The stream gauges cannot settle the question, and the reason is the
-mesh: at seven of twelve gauges the 30\,m cell's bed sits above the
-peak observed water surface, because the cell holds the bank of an
-incised bayou while the gauge hangs in the channel. Calibrated on the
-five gauges that do hold water, two of the same three classes move
-against the marks, and the resulting field scores worse at the marks
-than no calibration at all. Of the gauge misfit at the published
-table, $99.5\%$ is a constant level error at each gauge, of one to
-five metres at four of the five, while the model tracks hydrograph
-shape to $0.24$\,m. Roughness is absorbing whichever error each
-observable sees.
-
-Pointed at the model's initial state, the same measurement finds that
-the initial state moves the error more than roughness does: a $20\%$
-reduction in antecedent stored water is worth $0.075$\,m against
-roughness's $0.020$\,m at the same perturbation. The model's water balance and its mesh, rather than its
-friction, are where the rest of this error lives.
+For Hurricane Harvey on a 30\,m mesh of the Houston area, roughness
+calibrated as well as we can calibrate it removes about $15\%$ of the
+model's error against surveyed high-water marks, in sample, and that
+ceiling is measurable from forward runs alone. The eigenvalues of the
+calibration problem at the published land-cover table show why: if
+that table is trusted to $\pm 30\%$, the marks outweigh it on only
+about three combinations of its fifteen classes, and where those three
+land is the same under every prior we ran, below the table's own range
+for developed ground. The stream gauges cannot arbitrate. At most of
+them the 30\,m cell holds the bank of an incised bayou while the gauge
+hangs in the channel, and calibrating on the few that do hold water
+moves two of the same three classes against the marks and scores worse
+at the marks than no calibration at all; almost all of the gauge
+misfit is a constant level error at each gauge, while the model tracks
+hydrograph shape closely. Roughness is absorbing whichever error each
+observable sees. Pointed at the initial state instead, the same
+measurement finds a larger effect: the model holds too much water when
+the window opens. The water balance and the mesh, not the friction,
+are where this error lives.
 \end{abstract}
 
 \section{Introduction}
