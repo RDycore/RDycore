@@ -2013,13 +2013,22 @@ count and as 1/sigma^2 in quality:
 | marks | supported | data set |
 | --- | --- | --- |
 | 46 | 1 | the 12-hr cluster-A window (this study) |
-| 71 | 1 | all admissible marks, 24-hr window |
-| 108 | 2 | every QC-passed mark, 72-hr window |
+| 71 | **2** | all admissible marks, 24-hr window |
+| 108 | **3** | every QC-passed mark, 72-hr window |
 | 324 | 5 | every Harvey mark in-domain, BEFORE QC |
-| 7e5 | 15 | -- |
+| **1.2e5** | 15 | -- |
 
-At fixed size, sigma 0.10 m buys a second parameter and sigma 0.05 m --
-better than any HWM survey achieves -- buys five. **The limitation is a
+**CORRECTED 2026-09-17 (was 71->1, 108->2, 7e5->15).** Those three came
+from the PILOT spectrum; the production spectrum has lambda_3 = 0.613
+(not 0.329) and lambda_15 = 3.867e-4, which moves two rows and the
+15-parameter extrapolation. The values above are the production ones and
+match the paper's tab:scaling. Source
+`logs/o61/o61_spectrum_sigma_n0.015.txt`; see the memory note
+`manning-paper-stale-spectrum-tables`.
+
+At fixed size, sigma 0.10 m buys two more parameters (three in all) and
+sigma 0.05 m -- better than any HWM survey achieves -- buys five. **The
+limitation is a
 property of the observing system, not of the method.**
 
 ### o48 (57627058): the calibration converges, and what it converges to
