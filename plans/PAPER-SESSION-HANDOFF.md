@@ -119,8 +119,8 @@ Everything is uncommitted.
   `plans/team-decision-list.md`. Nothing in the paper depends on it.
 
 **DONE in the 09-17 sessions (all verified by a clean build, 33 pp, no
-undefined refs). Everything remains UNCOMMITTED; Mark has not asked for
-a commit.**
+undefined refs). Committed 09-17 evening and pushed to Overleaf; see the
+Overleaf paragraph below.**
 1. **Abstract rewritten** into four paragraphs (capability; measurement
    plus the count in plain language; gauges; initial condition).
 2. **Sec 6.3 reframed to option A** (what a calibration achieves against
@@ -245,11 +245,16 @@ group's feedback. Also worth a line in RESULTS: its lines ~2016-17 still
 carry the pilot tab:scaling values (71 -> 1, 108 -> 2); the paper and
 the o61 log have the production values (2 and 3).
 
-**Overleaf checked 09-17: nothing to merge.** Its head is my own 09-10
-push (363971e), no coauthor commits since, no `[CLAUDE/` requests, no
-red items. Three margin-comment threads from Gautam (08-31, 09-01)
-remain unreadable from git and predate the whole rewrite; Mark would
-have to relay them.
+**Committed and pushed to Overleaf, 09-17 evening (Mark: "you can
+commit and submit to Overleaf").** Repo commits a6e403f2 (logs),
+29cafc31 (paper + plans), 72765c0e (tex hygiene) on `adams/gpu-implicit`,
+not pushed to GitHub. Overleaf main is b872eb2, the new sync base;
+there were no coauthor commits since 363971e, so the merge was a plain
+copy, and `manning-calibration-changes.pdf` (latexdiff against 363971e,
+37 pp) went with it. The two root-level `paper-*-prompt.md` files are
+Mark's session prompts and were left untracked. Three margin-comment
+threads from Gautam (08-31, 09-01) remain unreadable from git; Mark
+would have to relay them.
 
 ## The labelling rule, defined (Emil, 09-16)
 
