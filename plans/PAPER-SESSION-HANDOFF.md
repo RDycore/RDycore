@@ -255,7 +255,8 @@ the o61 log have the production values (2 and 3).
 **Committed and pushed to Overleaf, 09-17 evening (Mark: "you can
 commit and submit to Overleaf").** Repo commits a6e403f2 (logs),
 29cafc31 (paper + plans), 72765c0e (tex hygiene) on `adams/gpu-implicit`,
-not pushed to GitHub. Overleaf main is b872eb2, the new sync base;
+then 4fd8b4b6 (noisy twins), not pushed to GitHub. Overleaf main is
+1c6c44a (after b872eb2), the new sync base;
 there were no coauthor commits since 363971e, so the merge was a plain
 copy, and `manning-calibration-changes.pdf` (latexdiff against 363971e,
 37 pp) went with it. The two root-level `paper-*-prompt.md` files are
