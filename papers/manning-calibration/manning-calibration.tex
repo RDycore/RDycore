@@ -79,32 +79,40 @@ iteration on a dense-gauge twin $19\times$ faster than a 64-core CPU
 node.
 
 For Hurricane Harvey on a 2.93M-cell, 30\,m mesh of the Houston area,
-scored against 46 surveyed high-water marks, the ceiling of Manning
-roughness is measurable before any optimizer runs. A single factor on
-the whole roughness field removes at most $0.08$\,m of a $0.72$\,m
-error, and only at roughness values below any entry in the lookup;
-fifteen land-cover classes calibrated separately remove $0.107$\,m,
-$15\%$ of the error. The spectrum of the prior-preconditioned
-Gauss--Newton Hessian, from sixteen forward runs, shows why: at a
-$\pm 30\%$ width on the land-cover lookup, the marks determine about
-three combinations of the fifteen classes, and calibrating those three
-recovers $84\%$ of what fifteen achieve. What the three reach is the
-same at every prior width we ran: developed-medium and woody wetland
-at $0.3\times$ their lookup values, below the lookup's value for
-developed open land. The calibrated friction is compensating for an
-error that is not in the friction.
-What a $\pm 30\%$ prior cannot support is the fifteen-class field. The
-survey is the observable because at seven of twelve stream gauges the
-30\,m cell's bed sits above the peak observed water surface: the mesh
-holds the bank of an incised bayou, not its channel. Calibrating the
-same three classes on the gauges that do hold water sends them the
-opposite way, to the top of the prior instead of the bottom, and the
-resulting field scores worse at the marks than no calibration at all.
-Roughness is absorbing each observable's own error.
-Pointed at the initial state, the same measurement finds more: a
-$20\%$ reduction in stored water is worth $0.075$\,m. Most of the
-remaining error lives in the model's water balance, not in its
+scored against 46 surveyed high-water marks, what roughness can
+achieve is measurable before any optimizer runs. Scaling the whole
+published roughness field by one factor removes at most $0.08$\,m of a
+$0.72$\,m model--survey error, and only with the whole table scaled to
+$0.3$ of its values, where its smoothest classes fall below smooth
+concrete; calibrating the fifteen land-cover classes
+separately removes about $0.10$\,m, $15\%$ of the error. The
+eigenvalues of the calibration problem, computed at the published
+table from sixteen forward runs, show why: if that table is trusted to
+$\pm 30\%$, the marks outweigh it on only about three combinations of
+the fifteen classes, and calibrating those three recovers $84\%$ of
+what fifteen achieve. Where those three land is the same under every
+prior we ran: developed-medium and woody wetland at $0.3$ times their
+table values, below the table's own value for developed open land. The
+calibrated friction is compensating for an error that is not in the
 friction.
+
+The stream gauges cannot settle the question, and the reason is the
+mesh: at seven of twelve gauges the 30\,m cell's bed sits above the
+peak observed water surface, because the cell holds the bank of an
+incised bayou while the gauge hangs in the channel. Calibrated on the
+five gauges that do hold water, two of the same three classes move
+against the marks, and the resulting field scores worse at the marks
+than no calibration at all. Of the gauge misfit at the published
+table, $99.5\%$ is a constant level error at each gauge, of one to
+five metres at four of the five, while the model tracks hydrograph
+shape to $0.24$\,m. Roughness is absorbing whichever error each
+observable sees.
+
+Pointed at the model's initial state, the same measurement finds that
+the initial state moves the error more than roughness does: a $20\%$
+reduction in antecedent stored water is worth $0.075$\,m against
+roughness's $0.020$\,m at the same perturbation. The model's water balance and its mesh, rather than its
+friction, are where the rest of this error lives.
 \end{abstract}
 
 \section{Introduction}
@@ -113,113 +121,122 @@ Manning roughness is the dominant tunable parameter of depth-averaged
 flood models, and its calibration is traditionally manual or ensemble
 based. Adjoint methods deliver the gradient of an observation misfit
 with respect to \emph{every} cell's roughness at a cost that does not
-grow with the number of parameters --- a few forward solves, measured
-in Section~\ref{sec:calibration} --- making distributed calibration
-tractable. The
-approach is well established in shallow-water modeling, from channel
-networks~\cite{ding2004manning} and unstructured finite-volume
-\emph{twin experiments} --- calibrations against observations the
-model itself generated from a known roughness field, so that the
-recovered field can be scored against a truth, and unrelated to the
-``digital twin'' of a physical asset~\cite{yan2014adjoint} --- to
-GPU-accelerated
-optimizers~\cite{lacasta2016gpu}. It is deployed in
+grow with the number of parameters, a few forward solves as measured
+in Section~\ref{sec:calibration}, which makes distributed calibration
+tractable. The approach is well established in shallow-water
+modeling, from channel networks~\cite{ding2004manning} and
+unstructured finite-volume twin experiments~\cite{yan2014adjoint} to
+GPU-accelerated optimizers~\cite{lacasta2016gpu}. (A \emph{twin
+experiment} calibrates against observations the model itself
+generated from a known roughness field, so that the recovered field
+can be scored against a truth; it is unrelated to the ``digital
+twin'' of a physical asset.) It is deployed in
 variational-assimilation platforms such as
 DassFlow~\cite{dassflow,lai2009assimilation,brisset2018swot} and the
-Thetis coastal model,
-which calibrated a spatially varying Manning field for the Baltic Sea
-with an automatically generated adjoint~\cite{karna2023baltic},
-following storm-surge sensitivity studies that addressed the
-overfitting inherent in distributed friction
-estimation~\cite{warder2021storm}. The closest published work to ours
-is Pujol et al.~\cite{pujol2024urban}, who infer distributed friction in
-a 2D urban flood model by variational assimilation of multi-source data
-\emph{including high-water marks}, and use adjoint-derived global
-sensitivity measures to decide how to spatialize the friction field
-before assimilating --- the same observable and the same design move
-that Sections~\ref{sec:hwm} and~\ref{sec:authority} employ, at street
-scale and with a Tapenade-generated adjoint of a solver built for
-assimilation. What this paper adds is neither the adjoint nor the
-observable but the setting and the question: a production Earth-system
-component differentiated in place, and a measurement of how much of
-the model's error the parameter can explain at all. For this event and
-this observable the answer is $15\%$, and the spectrum of the
-calibration problem explains it: the marks determine about three
-roughness combinations, so a calibration of three parameters recovers
-most of what fifteen achieve and a wide prior releases the twelve it
-cannot determine. The measurement is not specific to roughness, and
+Thetis coastal model, which calibrated a spatially varying Manning
+field for the Baltic Sea with an automatically generated
+adjoint~\cite{karna2023baltic}, following storm-surge sensitivity
+studies that addressed the overfitting inherent in distributed
+friction estimation~\cite{warder2021storm}. The closest published
+work to ours is Pujol et al.~\cite{pujol2024urban}, who infer
+distributed friction in a 2D urban flood model by variational
+assimilation of multi-source data including high-water marks, and who
+use adjoint-derived global sensitivity measures to decide how to
+spatialize the friction field before assimilating. That is the same
+observable and the same design move as Sections~\ref{sec:hwm}
+and~\ref{sec:authority}, at street scale and with a
+Tapenade-generated adjoint of a solver built for assimilation. What
+this paper adds is neither the adjoint nor the observable but the
+setting and the question: a production Earth-system component
+differentiated in place, and a measurement of how much of the model's
+error the parameter can explain at all. For this event and this
+observable the answer is $15\%$. The spectrum of the calibration
+problem explains it: at a $\pm 30\%$ prior the marks outweigh the
+land-cover table on about three combinations of its fifteen classes,
+so a calibration of three parameters recovers most of what fifteen
+achieve and a wide prior releases the twelve the marks cannot narrow.
+The measurement is not specific to roughness, and
 Section~\ref{sec:icauthority} turns it on the model's initial state,
 where it finds more.
 
 A recent generation of \emph{differentiable} flood and hydrology codes
 obtains gradients by rewriting simplified solvers inside
-machine-learning frameworks: Inunda (PyTorch, local-inertial, calibrated on a Hurricane
-Harvey hindcast)~\cite{li2026inunda}, Hydrograd
-(Julia)~\cite{liu2025uswe}, AegirJAX~\cite{cardoso2026aegir}, and
-differentiable routing~\cite{bindas2024routing}. These demonstrate
+machine-learning frameworks: Inunda (PyTorch, local-inertial,
+calibrated on a Hurricane Harvey hindcast)~\cite{li2026inunda},
+Hydrograd (Julia)~\cite{liu2025uswe}, AegirJAX~\cite{cardoso2026aegir},
+and differentiable routing~\cite{bindas2024routing}. These demonstrate
 demand for exactly this capability, but none is a production
-Earth-system component: they trade the validated numerics, unstructured
-meshes, and coupling infrastructure of codes like RDycore for
-differentiability. A parallel line ports production hydrodynamics to
-GPUs without differentiating them --- CaMa-Flood-GPU~\cite{kang2026cama}
+Earth-system component: they trade the validated numerics,
+unstructured meshes, and coupling infrastructure of codes like RDycore
+for differentiability. A parallel line ports production hydrodynamics
+to GPUs without differentiating them. CaMa-Flood-GPU~\cite{kang2026cama}
 is a GPU reimplementation of CaMa-Flood, with gradient-based
 calibration named as future work rather than demonstrated.
 
 This paper takes the complementary route: make the production code
-differentiable. That route has a long precedent outside E3SM --- most
-prominently MITgcm, whose exact adjoint is generated by automatic
+differentiable. That route has a long precedent outside E3SM. The most
+prominent is MITgcm, whose exact adjoint is generated by automatic
 differentiation of the production ocean model~\cite{heimbach2005mitgcm}
 and underpins two decades of ECCO state and parameter
-estimation~\cite{forget2015ecco}. Ours differs in how the derivative is
-obtained rather than in ambition: the Jacobian is hand-differentiated
-and assembled, which makes it available to the implicit solver as well
-as to the adjoint, and Section~\ref{sec:implicit} argues that for a
-differentiable friction term the implicit solve is not optional. Inside
-E3SM the precedent is narrower: the
-land-ice component MALI~\cite{hoffman2018mali} routinely inverts for
-basal friction with an adjoint obtained by automatic differentiation of
-its Albany velocity solver~\cite{perego2014initialization} --- but that
-is the adjoint of a \emph{steady} nonlinear solve, used for
-initialization; no E3SM component has, to our knowledge, a discrete
-adjoint of its transient time stepper. RDycore is a finite-volume
-shallow-water dynamical core
-(Roe fluxes, well balancing, wetting and drying) validated at up to 471M
-cells. We add the missing derivative infrastructure --- an exact
-assembled Jacobian and TSAdjoint-based sensitivities
-\cite{zhang2022tsadjoint} --- entirely behind a configuration flag, with
-no impact on existing runs and no new dependencies.
+estimation~\cite{forget2015ecco}. Ours differs in how the derivative
+is obtained rather than in ambition: the Jacobian is
+hand-differentiated and assembled, which makes it available to the
+implicit solver as well as to the adjoint, and
+Section~\ref{sec:implicit} argues that for a differentiable friction
+term the implicit solve is not optional. Inside E3SM the precedent is
+narrower. The land-ice component MALI~\cite{hoffman2018mali} routinely
+inverts for basal friction with an adjoint obtained by automatic
+differentiation of its Albany velocity
+solver~\cite{perego2014initialization}, but that is the adjoint of a
+\emph{steady} nonlinear solve, used for initialization. No E3SM
+component has, to our knowledge, a discrete adjoint of its transient
+time stepper. RDycore is a finite-volume shallow-water dynamical core
+(Roe fluxes, well balancing, wetting and drying) validated at up to
+471M cells\textcolor{red}{[NOTE: citation needed for the 471M-cell
+validation; none is in the bibliography]}. We add the missing
+derivative infrastructure, an exact
+assembled Jacobian and TSAdjoint-based
+sensitivities~\cite{zhang2022tsadjoint}, entirely behind a
+configuration flag, with no impact on existing runs and no new
+dependencies.
 
 This paper contributes:
 \begin{itemize}
-  \item an exact Jacobian of the shallow-water right-hand side ---
-        Roe dissipation, entropy-fix and wet/dry branches, and
-        reflecting, Dirichlet and critical-outflow boundaries ---
-        verified against finite differences to $10^{-6}$
-        (Section~\ref{sec:jacobian});
-  \item adjoint gradients with respect to the initial state and the
-        roughness field, at multiple observation times, verified to
-        $10^{-5}$ or better (Section~\ref{sec:adjoint});
-  \item implicit backward-Euler stepping and its adjoint from the same
-        Jacobian, with the measurement that the explicit friction term
-        returns a non-finite state at every step tested on the 30\,m
-        Hurricane Harvey mesh (Section~\ref{sec:implicit});
-  \item a measurement of when an observing network makes a roughness
-        field identifiable at all, from twin experiments and from the
-        spectrum of the prior-preconditioned Gauss--Newton Hessian,
-        which counts the roughness combinations the observations
-        determine (Sections~\ref{sec:houston} and~\ref{sec:spectrum});
-  \item the ceiling of roughness on the Hurricane Harvey survey error,
-        $15\%$, and the three-parameter calibration the spectrum
-        selects (Sections~\ref{sec:authority}--\ref{sec:spectrum});
-  \item a cross-observable validation: the three classes calibrated on
-        the stream gauges move to the opposite edge of the same prior
-        and score worse at the high-water marks than the uncalibrated
-        lookup, which makes the survey-only result a fit rather than a
-        skill (Section~\ref{sec:hwm});
-  \item the same measurement applied to the initial state, where it
-        finds more, and the diagnosis of the downstream reach as a
-        ponded lake behind the domain's outlet
-        (Sections~\ref{sec:hwm} and~\ref{sec:icauthority}).
+  \item a production Earth-system component differentiated in place:
+        one exact, assembled Jacobian of the shallow-water right-hand
+        side that serves the implicit integrator, the discrete
+        adjoint and the calibration, gated against finite differences
+        in continuous integration and resident on GPUs, with an
+        objective and its gradient costing about $2.1$ forward solves
+        independent of the number of parameters; and the measurement
+        that the explicit friction term cannot take a step on the
+        30\,m Hurricane Harvey mesh, so the implicit solve is not
+        optional (Sections~\ref{sec:methods} and~\ref{sec:implicit});
+  \item a measurement of how much of a flood model's error its
+        roughness parameter is able to remove, from forward runs
+        alone: about $15\%$ of a $0.72$\,m survey error for this
+        event, against more for the initial condition
+        (Sections~\ref{sec:authority}, \ref{sec:calibrated}
+        and~\ref{sec:icauthority});
+  \item the spectrum of the prior-preconditioned Gauss--Newton
+        Hessian, a linearization at the lookup that counts the
+        roughness combinations on which the observations outweigh the
+        prior: about three of fifteen at a $\pm 30\%$ prior, and a
+        three-class calibration that recovers $84\%$ of the
+        fifteen-class error reduction and lands below the lookup's own
+        range for developed ground
+        (Sections~\ref{sec:houston} and~\ref{sec:spectrum});
+  \item a cross-observable test the stream gauges cannot arbitrate:
+        $99.5\%$ of their misfit at the lookup is a constant per-gauge
+        level error, and a calibration on them moves two of the three
+        classes against the marks and scores worse at the marks than the
+        uncalibrated lookup, so the survey-only result is a fit and
+        not a skill (Section~\ref{sec:crossobs});
+  \item the identification of a downstream reach the model cannot
+        drain, attributed to the closed catchment-divide perimeter of
+        the domain under a storm that exceeded the divide, and of the
+        water balance rather than the friction as where the remaining
+        error lives (Sections~\ref{sec:hwm} and~\ref{sec:icauthority}).
 \end{itemize}
 
 \section{Methods}
@@ -418,20 +435,89 @@ production setting (Krylov $10^{-4}$, nonlinear $10^{-5}$) reproduces
 the fully converged answer to every printed digit for about $25\%$
 more wall time than the loosest usable setting. Campaigns therefore
 run at converged inner tolerances, and the verified gradients
-\emph{are} the production gradients. The FD gates cannot certify the
-objective's own nonsmoothness over long windows, which
-Section~\ref{sec:hwm} quantifies.
+\emph{are} the production gradients.
+
+\paragraph{The peak observable.}
+The real survey of Section~\ref{sec:hwm} records event maxima rather
+than stage series, so every real-data number in this paper is scored
+on a peak. The misfit compares each mark cell's peak simulated
+water-surface elevation (WSE) over the window, $\max_k H u(t_k)$,
+against the surveyed value, with $H$ now selecting the mark cells.
+Its adjoint needs no new machinery: each mark's residual is injected
+at the time of its own peak, the argmax, in the segmented backward
+sweep of Algorithm~\ref{alg:sweep}. That is the exact gradient
+wherever the peak time is locally constant, and the parameter
+gradient of the peak misfit passes the same central-difference gates
+as every other block on the smooth verification twin of
+Section~\ref{sec:configs}.
+
+At basin scale the naive check fails, and a set of instrumented
+measurements pins down why, in a way that validates the gradient
+rather than the check (Table~\ref{tab:fdwindow}). No mark's argmax
+moves and none flips wet/dry across any probe, so the discrepancy
+lives below the observable. The evaluations are deterministic to nine
+digits and the FD value is stable across a decade of probe step,
+which excludes noise, curvature truncation, and sparse kinks.
+Decisively, the gap accumulates with trajectory length: at the
+shortest window the gate passes at the inner-solve floor with every
+piece of machinery engaged, and it grows three orders of magnitude by
+basin window lengths. A proportional defect in $\partial f/\partial
+n$ or in the adjoint accumulation would err by the same fraction at
+any window length. Branch crossings accumulated along the trajectory,
+where the probe shifts which cells cross the depth cutoff at some
+step, predict exactly this profile. Two further checks close it. As
+the probe shrinks, the FD converges to the adjoint direction by
+direction, and the largest single-class direction passes the
+$10^{-5}$ gate outright at the smallest probe. And the fifteen
+per-class gaps sum to the domain-wide gap, the additivity that
+independent per-cell branch crossings predict and no plausible defect
+would arrange. We conclude that the adjoint returns the exact
+one-branch derivative. Over long windows the objective is dense with
+wet/dry branch surfaces, and a finite-step central difference
+converges to a locally smoothed slope that sits several percent from
+any one branch. The quasi-Newton iteration consumes one-branch
+derivatives of a piecewise-smooth objective, which is standard
+practice for $\max$-type and switching systems, and its observed
+descent (Section~\ref{sec:identifiability}) is consistent with that
+footing.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Window & Steps & FD-vs-adjoint gap, domain-wide direction \\
+\midrule
+smooth verification twin & 40 & $9\times10^{-7}$ (gate $10^{-5}$: pass) \\
+basin, 1 min & 60 & $9\times10^{-5}$ (inner-solve floor: pass) \\
+basin, 5 min & 300 & $8\times10^{-3}$ \\
+basin, 15 min & 900 & $2\times10^{-2}$ \\
+basin, 30 min & 1800 & $2\times10^{-1}$ \\
+basin, 1 h & 3600 & $7\times10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\caption{The FD gate's failure accumulates with trajectory length on
+identical basin, rain, marks, and converged tolerances, the signature
+of branch crossings along the trajectory and not of gradient error.
+The 30-minute and 1-hour rows sample peaks over different horizons,
+so strict monotonicity across them is not expected; single-class
+directions sit one to three orders lower at every window.}
+\label{tab:fdwindow}
+\end{table}
 
 \subsection{The calibration algorithm: strong-constraint 4D-Var}
 \label{sec:calibration}
 
 The complete calibration loop is summarized in
-Algorithms~\ref{alg:var4d}--\ref{alg:blmvm}. It is a strong-constraint
-4D-Var iteration: the model is enforced exactly (the only controls are
-the Manning field and, optionally, the initial state). Each objective
-evaluation performs one checkpointed forward sweep that records the
-gauge residuals $r_k$ at the observation times, followed by one
-backward sweep of the discrete adjoint (Algorithm~\ref{alg:sweep}).
+Algorithms~\ref{alg:var4d} and~\ref{alg:sweep}. It is a strong-constraint
+4D-Var iteration, the variational form of data assimilation in which a
+misfit summed over a time window is minimized by a gradient method
+with the model enforced exactly, so the only controls are the Manning
+field and, optionally, the initial state. Each objective evaluation
+performs one checkpointed forward sweep (the trajectory is stored at
+a subset of steps and recomputed between them when the backward sweep
+needs it) that records the gauge residuals $r_k$ at the observation
+times, followed by one backward sweep of the discrete adjoint
+(Algorithm~\ref{alg:sweep}).
 The per-iteration cost is therefore one forward sweep, the checkpoint
 recomputation the backward sweep requires, and one adjoint sweep,
 about $2.1$ forward solves in total at production settings
@@ -442,36 +528,31 @@ adjoint, sets it. Throughout, the
 objective splits as $J = J_{\mathrm{mis}} + J_{\rm prior}$, where the
 \emph{misfit} $J_{\mathrm{mis}} = (2\sigma^2)^{-1}\sum_k\lVert
 r_k\rVert^2$ measures disagreement with the observations and
-$J_{\rm prior}$ is the Tikhonov term of Eq.~\eqref{eq:sigman}. Only
+$J_{\rm prior}$ is the Tikhonov term of Eq.~\eqref{eq:sigman}, a
+quadratic penalty on departure from the prior field. Only
 $J_{\mathrm{mis}}$ needs the adjoint; the prior term's gradient is
 closed form.
 
-The backward sweep carries two vectors with distinct roles. The
-\emph{adjoint state} $\lambda$ holds
-$\partial J_{\mathrm{mis}}/\partial u(t)$ at the current point of the
-backward traversal. It is seeded with the terminal observation
-sensitivity $\sigma^{-2}H^T r_K$, propagated one step at a time by the
-transposed Jacobian of the forward step map (the backward ``model
-step''), and incremented by a jump $\sigma^{-2}H^T r_k$ each time the
-sweep crosses an observation time, because the state at that time
-enters the misfit directly. The \emph{parameter sensitivity} $\mu$
-starts at zero and accumulates, at every step, the chain-rule
-contribution $(\partial\Phi_s/\partial n)^T\lambda$ of that step's
-Manning dependence. When the sweep reaches $t = 0$, $\mu$ is the
-complete misfit gradient $dJ_{\mathrm{mis}}/dn$ and $\lambda$ is
-$dJ_{\mathrm{mis}}/du_0$. Both transposed Jacobians are the analytic
-operators of Sections~\ref{sec:jacobian}--\ref{sec:adjoint}, the
-assembled RHS Jacobian for the state propagation and the two-nonzero
-parameter Jacobian for the $\mu$ accumulation, applied within
+The backward sweep carries two vectors. The \emph{adjoint state}
+$\lambda$ holds $\partial J_{\mathrm{mis}}/\partial u(t)$ at the
+current point of the traversal: seeded with the terminal observation
+sensitivity, propagated by the transposed Jacobian of the forward
+step map, and incremented by a jump $\sigma^{-2}H^T r_k$ at each
+observation time. The \emph{parameter sensitivity} $\mu$ accumulates
+$(\partial\Phi_s/\partial n)^T\lambda$ at every step and is the
+complete misfit gradient $dJ_{\mathrm{mis}}/dn$ when the sweep
+reaches $t = 0$. Both transposed Jacobians are the analytic operators
+of Sections~\ref{sec:jacobian}--\ref{sec:adjoint}, applied within
 \texttt{TSAdjoint}'s discrete adjoint of the chosen integrator.
 
 The outer update is TAO's bound-constrained limited-memory
-quasi-Newton method BLMVM~\cite{benson2001blmvm}
-(Algorithm~\ref{alg:blmvm}). The loop terminates on the standard
+quasi-Newton method BLMVM~\cite{benson2001blmvm}: a projected L-BFGS
+step with a backtracking line search, each trial point costing one
+forward-plus-adjoint evaluation. The loop terminates on the standard
 bound-constrained test: the projected gradient $g^P$ (the gradient
 with components pointing out of the feasible box zeroed) drops below
-an absolute tolerance, or an iteration budget is reached. The
-same loop serves every parameterization in this paper: per-region,
+an absolute tolerance, or an iteration budget is reached. The same
+loop serves every parameterization in this paper: per-region,
 per-cell, and land-cover-class fields differ only in the expansion of
 the parameter vector onto cells (line~\ref{ln:apply} of
 Algorithm~\ref{alg:var4d}) and the corresponding summation of $\mu$
@@ -510,8 +591,8 @@ tolerance $\varepsilon_g$, iteration budget $I_{\max}$
          above, so $\mu = dJ_{\mathrm{mis}}/dn$ is exact to roundoff
          and inner-solver tolerance (Section~\ref{sec:adjoint})}
   \State $g \gets \mu + \beta\,(n - n_0)$
-  \State $n \gets \Call{BlmvmStep}{n, J, g}$
-         \Comment{Algorithm~\ref{alg:blmvm}}
+  \State $n \gets$ one projected BLMVM step from $(n, J, g)$
+         \Comment{clipped to $[n_{\min}, n_{\max}]$}
 \Until{$\lVert g^P \rVert \le \varepsilon_g$ or $I_{\max}$ iterations}
 \State \Return $n$
 \end{algorithmic}
@@ -557,34 +638,6 @@ $\mu = dJ_{\mathrm{mis}}/dn$
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}
-\caption{\textsc{BlmvmStep}: one iteration of TAO's bound-constrained
-limited-memory variable-metric method~\cite{benson2001blmvm}.
-$P_{[n_{\min},n_{\max}]}$ is componentwise clipping to the bound box;
-the curvature pairs $\{(s_i, y_i)\}$ persist across calls. The
-projected gradient used in the convergence test of
-Algorithm~\ref{alg:var4d} is $g^P_i = g_i$ for $n_i$ strictly inside
-the box, $\min(g_i, 0)$ at the lower bound, and $\max(g_i, 0)$ at the
-upper bound.}
-\label{alg:blmvm}
-\begin{algorithmic}[1]
-\Require iterate $n$, objective $J$, gradient $g$, stored pairs
-$\{(s_i, y_i)\}$, bounds $[n_{\min}, n_{\max}]$
-\State $d \gets -B\,g^P$
-       \Comment{$B \approx (\nabla^2 J)^{-1}$ by the L-BFGS two-loop
-       recursion over the stored pairs}
-\State find a step length $\tau > 0$ with a projected line search on
-       $n(\tau) = P_{[n_{\min},n_{\max}]}(n + \tau\, d)$
-       satisfying sufficient decrease of $J$
-       \Comment{each trial $\tau$ costs one forward-plus-adjoint
-       evaluation (lines 3--11 of Algorithm~\ref{alg:var4d})}
-\State $n^{+} \gets n(\tau)$; evaluate $g^{+}$ at $n^{+}$
-\State $s \gets n^{+} - n$;\; $y \gets g^{+} - g$; store $(s, y)$ if
-       $s^T y > 0$, discarding the oldest pair beyond the memory limit
-\State \Return $n^{+}$
-\end{algorithmic}
-\end{algorithm}
-
 \paragraph{What a gradient actually costs.}
 The textbook statement that an adjoint gradient costs ``about one
 extra forward solve'' assumes the forward trajectory is available to
@@ -593,7 +646,8 @@ must be stored or recomputed, and at basin scale on GPUs it cannot be
 stored. Checkpoint recomputation is therefore a real and unavoidable
 term, and we measure it rather than assert it. On a one-simulated-hour
 window of the 2.93M-cell mesh (3{,}600 implicit steps at
-$\Delta t = 1$\,s, 400 in-memory checkpoints, four A100 nodes) a
+$\Delta t = 1$\,s, 400 in-memory checkpoints, four A100 GPUs on one
+node) a
 forward step costs $62.9$\,ms and an adjoint step $14.8$\,ms, and the
 backward sweep triggers $3{,}199$ revolve recomputation steps, $0.89$
 of an additional forward. One objective-plus-gradient
@@ -605,7 +659,7 @@ evaluation is thus
   \;\approx\; 2.1 \ \text{forward solves},
 \label{eq:gradcost}
 \end{equation}
-about nine minutes at four nodes. Note where the cost sits: the
+about nine minutes on that node. Note where the cost sits: the
 adjoint sweep itself is the \emph{cheapest} of the three terms, and
 recomputation is the expensive one, so the ratio is a property of the
 checkpoint budget rather than of the adjoint. More checkpoints buy
@@ -624,18 +678,14 @@ as its starting iterate, matched by land-cover class rather than by
 position. The resume is exact in the parameters (the continuing run's
 first objective reproduces the previous run's last to six digits), but
 BLMVM's stored curvature pairs do not survive it, so a chain of jobs
-is not step-for-step identical to one long run. On a twin at the
-Houston mesh we found the restart was not a penalty: a chained $2 + 2$
-iteration run reached a lower objective than a single cold
-four-iteration run, the restart acting as a rescaling of the
-quasi-Newton model. That is one twin, not a rule, and the point for
-planning is that chaining did not cost convergence there.
+is not step-for-step identical to one long run.
 
 \paragraph{Scaling the calibration problem.}
 A quasi-Newton method needs its variables and its objective to be
-$O(1)$, and in physical Manning units this problem is not: on the
-production window $\lVert g\rVert \approx 1.5\times10^{3}$ while
-$n \approx 0.05$. Starting from $B = I$, the first trial point $n - g$
+$O(1)$, and in physical Manning units this problem is not: on a
+600-step window of the production configuration
+$\lVert g\rVert \approx 1.5\times10^{3}$ while $n \approx 0.05$.
+Starting from $B = I$, the first trial point $n - g$
 therefore projects every component onto the lower bound, where the
 model cannot solve (a uniform $\alpha = 0.2$ diverges,
 Table~\ref{tab:alpha}), so every line-search trial fails and the
@@ -671,7 +721,8 @@ J = \underbrace{\frac{1}{2\sigma^2}\sum_k \lVert r_k\rVert^2}_{
 \end{equation}
 and report $\sigma_n$. This matters because $\beta$ is dimensional: a
 bare value is uninterpretable across problems, and ours had been chosen
-independently in every experiment, spanning six orders of magnitude.
+independently in every experiment, spanning nearly ten orders of
+magnitude.
 Against the measured $J(\alpha)$ curve, $\sigma_n = 0.015$ places the
 minimum of the uniform-scaling direction at $\alpha \approx 0.70$,
 while $\sigma_n = 0.020$ leaves no interior minimum there at all, the
@@ -688,12 +739,12 @@ $\sigma_n = 0.015$ over an NLCD lookup spanning $n = 0.027$ (barren) to
 $n = 0.16$ (developed high) asserts a $\pm 56\%$ prior on one class and
 $\pm 9\%$ on another. Because the penalty scales as $n_{\rm prior}^2$,
 a small-$n$ class buys a large \emph{fractional} excursion cheaply. The
-iterates show that signature: at the production configuration's first
-quasi-Newton step, every class driven to the upper bound was small-$n$
-(pasture $0.038$, developed-open $0.040$, developed-low $0.090$) and
-every class driven to the lower bound was large-$n$ (developed-high
-$0.160$, developed-medium $0.120$, shrub $0.115$, woody wetland
-$0.098$), an ordering by prior value, not by hydrology. Penalizing the
+iterates show that signature: at the first quasi-Newton step of an
+absolute-prior run on a two-event-hour window, the three classes
+driven to the floor were the large-$n$ ones (developed-high $0.160$,
+developed-medium $0.120$, woody wetland $0.098$) and the one driven
+up, to $2.6$ times its lookup, was the small-$n$ developed-low
+($0.090$), an ordering by prior value. Penalizing the
 fractional departure $n_k/n_{{\rm prior},k} - 1$ with a width
 $\sigma_\alpha$ instead treats the classes alike, and states the prior
 as the percentage by which the lookup can be wrong.
@@ -701,25 +752,17 @@ as the percentage by which the lookup can be wrong.
 The tension survives the reformulation, and that is the substantive
 result rather than an implementation detail. We ran the fifteen-class
 calibration under the fractional prior at the width we assign to the
-lookup, $\sigma_\alpha = 0.30$. Its first quasi-Newton step drove
-seven of the fifteen classes to a bound (developed-open, developed-low
-and pasture to $\alpha = 3$; developed-medium, developed-high, shrub
-and woody wetland to $\alpha = 0.3$), and after three iterations
-developed-medium and shrub were still on the floor ($n = 0.036$ and
-$0.0345$, below the lookup's $0.040$ for developed open land) with
-developed-low at twice its lookup value, for a peak-WSE MAE of
-$0.6154$\,m (Table~\ref{tab:ladder}) against the $0.6116$\,m the
-absolute prior reached in nine. A wider prior reaches the same fit
-sooner, by the same route, and the route is the problem. \emph{At that
-width, this observable cannot deliver a fifteen-class roughness field
-inside the prior.} What it can deliver is the subject of
-Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}: the marks
-determine about three roughness combinations at this width, and a
-calibration confined to those converges and reaches the same answer
-from every prior we ran, with two of the three classes on the same
-$\alpha = 0.3$ floor. We report the prior width used with every
-number; its value is a judgment about the land-cover lookup, not a
-tuning parameter.
+lookup, $\sigma_\alpha = 0.30$ (Table~\ref{tab:ladder}). Its first
+quasi-Newton step drove seven of the fifteen classes to a bound, and
+it finished with two classes on the floor, below the lookup's value
+for developed open land, at the same misfit the absolute prior
+reached in three times the iterations. A wider prior reaches the same
+fit sooner, by the same route, and the route is the problem: at that
+width this observable cannot deliver a fifteen-class roughness field
+inside the prior. What it can deliver is the subject of
+Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}. We report the
+prior width used with every number; its value is a judgment about
+the land-cover lookup, not a tuning parameter.
 
 The failure mode is not specific to this model: an optimizer that
 takes zero steps on a problem whose gradient passes every verification
@@ -731,8 +774,8 @@ the derivative.
 \label{sec:configs}
 
 The results that follow run the machinery of Section~\ref{sec:methods}
-on three domains, at resolutions two orders of magnitude apart and
-against four different observables. Because the paper's central claim
+on three domains, at resolutions a factor of $30$ apart and against
+four different observables. Because the paper's central claim
 is comparative (what a parameter can explain \emph{on a given
 observable and window}), the configuration is part of every result
 rather than background to it. Table~\ref{tab:configs} collects the
@@ -746,7 +789,7 @@ restating it.
 Configuration & Mesh & Window & Observable & Parameters \\
 \midrule
 Verification twin
-  & planar, single region
+  & planar, two regions
   & $1.8$\,s, 40 steps
   & water height
   & per-cell, per-region \\
@@ -821,10 +864,12 @@ gauges carrying Harvey stage records.
 \paragraph{The 30\,m Harvey domain.}
 The Turning mesh resolves the Houston area at $30$\,m in 2.93M cells,
 with one Manning value per NLCD land-cover class (15 classes) and the
-published NLCD lookup as both prior and, for twins, truth. Three
-configurations share it. The class and dense twins ask whether fifteen
-classes are identifiable from the real gauge geometry and from a
-saturating observation set respectively. The mark twin replaces stage
+published NLCD lookup as both prior and, for twins, truth. Four
+calibration configurations and the 72-hour forward of
+Section~\ref{sec:hwm} share it. The class and dense twins ask whether fifteen
+classes are identifiable, that is, recoverable from the observations
+alone, from the real gauge geometry and from a saturating observation
+set respectively. The mark twin replaces stage
 with peak water-surface elevation at the 108 QC-passed high-water-mark
 cells. The production configuration is the one every real-survey number
 is measured on: a 12-hour window over the upstream crest cluster (event
@@ -847,9 +892,10 @@ revolve checkpointing (Section~\ref{sec:implicit}).
 \section{Implicit stepping, enabled and required}
 \label{sec:implicit}
 
-The explicit drag term is stiff in thin water: linearizing gives a
-stability limit $\Delta t \lesssim 2 h^{4/3}/(g n^2 |v|)$, seconds
-for sheet flow at centimeter depths, against the $30$\,s gravity-wave
+The explicit drag term is stiff in thin water: its linearized rate is
+$g n^2 h^{-4/3}|v|$, so an explicit step must stay below the inverse
+rate, $\Delta t \lesssim h^{4/3}/(g n^2 |v|)$, seconds for sheet flow
+at centimeter depths, against the $30$\,s gravity-wave
 step of the 1\,km mesh. On the Houston 1\,km configuration
 ($\Delta t = 30$\,s) we found the explicit source treatment returns a
 non-finite state within the first objective evaluation, as the
@@ -868,43 +914,11 @@ Euler via PETSc's theta method, with SNES driven by the same Jacobian,
 carries the Harvey window at $\Delta t = 30$\,s, and the theta-method
 adjoint passes the same FD gates (Table~\ref{tab:verification}).
 
-We also implemented the sharper tool: an ARK-IMEX splitting with the
-Manning drag as the stiff implicit part
-(\texttt{temporal: arkimex}). The implicit stage system is
-block-diagonal (an independent $3\times3$ Newton per cell, no global
-solve) while fluxes and bed slope remain explicit under the
-gravity-wave CFL limit. Its adjoint passes the same gates
-($2.0\times10^{-8}$ for $dJ/du_0$, $2.5\times10^{-6}$ for $dJ/dn$) and
-it carries the Harvey window at $\Delta t = 30$\,s at 6.7\,s per
-forward-plus-adjoint sweep, with gradients matching backward Euler to
-three digits. The splitting also runs under RDycore's libCEED operator
-backend, whose explicit side uses friction-free source Q-functions;
-the two backends agree to machine precision ($5\times10^{-16}$
-relative) after 100 ARK-IMEX steps. A device-resident implicit part is
-the natural follow-up.
-
-Three implementation facts apply to any adjoint retrofit on PETSc's
-time steppers:
-\begin{itemize}
-  \item PETSc's ARKIMEX adjoint dereferences \emph{both} the
-        implicit- and explicit-part parameter Jacobians, so a zero
-        explicit-part \texttt{TSSetRHSJacobianP} must be registered
-        even when the parameter appears only implicitly.
-  \item The embedded step-size controller must be disabled for
-        finite-difference gradient validation: perturbed solves
-        otherwise take different step sequences, which shows up as an
-        apparent $\sim$$10^{-4}$ gradient error that vanishes with
-        fixed steps.
-  \item PETSc's in-memory checkpointing trajectory cannot tolerate a
-        \emph{segmented} forward solve (one \texttt{TSSolve} per
-        observation window). \texttt{TSSolve} sets its converged
-        reason before the final trajectory write of every call, which
-        the memory trajectory interprets as the end of the forward
-        run, corrupting the checkpoint schedule at every interior
-        observation time. The forward sweep must be a single
-        \texttt{TSSolve} with observations recorded by a monitor; the
-        segmented backward sweep is unaffected.
-\end{itemize}
+An ARK-IMEX splitting with the Manning drag as the stiff implicit part
+is also implemented (\texttt{temporal: arkimex}); its implicit stage
+system is block-diagonal, an independent $3\times3$ Newton per cell,
+and its adjoint passes the same gates. No production number in this
+paper uses it.
 
 \paragraph{Newton robustness is set by residual discontinuities, not
 by conditioning.}
@@ -1001,26 +1015,19 @@ gauges over 14 observation times, calibrated with implicit stepping and
 Tikhonov regularization ($\beta = 10^{-5}$). Every cell is wet and
 moving in this configuration, so all 2{,}746 parameters are observable.
 The configuration is deliberately gauge-sparse (343 gauges for
-2{,}746 parameters, an 8:1 ratio) and it exhibits the classic
-\emph{semiconvergence} of underdetermined inverse problems
-(Figure~\ref{fig:map}). At 300 BLMVM iterations ($\sim$22 minutes on
-one laptop core, $\sim$4.4\,s per forward-plus-adjoint) the recovered
-map shows the two-zone truth structure at $26.3\%$ relative $L^2$
-error. Continuing the same weakly regularized optimization to 2000
-iterations \emph{degrades} recovery to $38.0\%$: the misfit keeps
-decreasing while the parameters drift along observation-null
-directions, ultimately pinning cells against both bound constraints
-(Figure~\ref{fig:map}, center left). Early stopping was acting as the
-effective regularizer. The behavior disappears when the problem is
-made well posed: a properly regularized Houston run
-($\beta = 10^{-4}$, 686 gauges) reaches $19.4\%$ at a 1000-iteration
-budget with no drift (Figure~\ref{fig:map}, center right), the
-sharpest recovery of the three, with the zone boundary resolved at
-the truth midline. This is the overfitting risk documented for
-distributed friction estimation~\cite{warder2021storm}, reproduced in
-a controlled twin. It motivates the regularization studies (total
-variation, land-cover priors, discrepancy-principle stopping) planned
-as follow-on work.
+2{,}746 parameters) and shows the classic \emph{semiconvergence} of
+underdetermined inverse problems, in which the recovered field first
+approaches the truth and then drifts away from it while the misfit
+keeps falling (Figure~\ref{fig:map}): at 300
+BLMVM iterations the recovered map shows the two-zone truth at
+$26.3\%$ relative $L^2$ error, and continuing the same weakly
+regularized optimization to 2000 iterations degrades it to $38.0\%$
+as the parameters drift along observation-null directions and pin
+against both bounds, early stopping having acted as the regularizer.
+A properly regularized run ($\beta = 10^{-4}$, 686 gauges) reaches
+$19.4\%$ at 1000 iterations with no drift. This is the overfitting
+risk documented for distributed friction
+estimation~\cite{warder2021storm}, reproduced in a controlled twin.
 
 \begin{figure}
 \centering
@@ -1058,8 +1065,9 @@ against 2{,}746 parameters), BLMVM drives the misfit down by a factor
 of $2\times10^{7}$ (the synthetic observations carry no noise and are
 fit to roundoff) while the recovered field is $44.9\%$ from the truth
 and saturates both bounds (Figure~\ref{fig:map}, far right). This is
-semiconvergence in its purest form: the real network's null space is
-so large that data fit says almost nothing about parameter recovery,
+semiconvergence in its purest form: the real network's null space,
+the set of roughness changes it cannot see, is so large that data fit
+says almost nothing about parameter recovery,
 and no Tikhonov weight or stopping rule rescues a per-cell field from
 238 observations. The practical conclusion for real-data calibration
 is to shrink the parameter space to match the network. Shrinking it
@@ -1101,7 +1109,8 @@ are identified: the three developed-intensity classes, pasture, and
 crops recover to $0.7$--$10.5\%$, together $83\%$ of the domain's
 cells, for an area-weighted relative $L^2$ error of $0.20$ (unweighted
 $0.58$). The residual errors concentrate in small-area classes
-(forests, shrub, emergent wetland, $\sim$5\% of cells), which now
+(forests, shrub, emergent wetland, each under $3\%$ of the domain's
+cells), which now
 \emph{move} (they are sensitive, unlike in the gauge experiment) but
 overshoot to the bounds along weakly constrained directions. That is
 ordinary semiconvergence, treatable with regularization and longer
@@ -1110,8 +1119,11 @@ apply: the one-hour window samples early-transient peaks, not flood
 peaks (the real calibration windows are $6$--$12$ hours and should
 only help); the run was capped at 15 quasi-Newton iterations; and
 twin marks synthesized from the truth trajectory carry no
-representation error, so this is an identifiability statement, an
-upper bound on real-data performance rather than a forecast of it.
+representation error, the part of a model--observation mismatch that
+comes from comparing a point measurement with a cell average rather
+than from any error in the model's parameters, so this is an
+identifiability statement, an upper bound on real-data performance
+rather than a forecast of it.
 
 \paragraph{Noise turns identifiability into a signal-to-noise question.}
 Every recovery above is noise-free, as are the verification twins
@@ -1127,7 +1139,7 @@ indefinitely while a tenth of a millimetre of observation noise
 destroys the recovery outright, and no Tikhonov weight in a sweep up
 to $\beta = 1$ rescues it. At basin scale the same quantity is
 $\sim$$0.1$\,m of peak water-surface elevation after one simulated
-hour, five orders of magnitude larger, which is the regime in which a
+hour, four orders of magnitude larger, which is the regime in which a
 parameter signal can exceed survey-grade high-water-mark error. The
 lesson is not that the method is fragile: it is that friction must
 act long enough to imprint a signal above the noise floor, which
@@ -1163,11 +1175,15 @@ rain-forced, 108 marks & peak WSE & $0.15$\,m (HWM grade) & misfit falls $9.4\ti
 \bottomrule
 \end{tabular}
 \caption{Parameter-induced observation signal versus observation error.
-The noise-free recoveries differ by seven orders of magnitude in the
+The noise-free recoveries differ by four orders of magnitude in the
 signal they descend on; only the basin-scale row is a fair test against
-survey-grade error ($0.1$--$0.3$\,m for high-water marks). Noise is a
+the $0.15$\,m survey-grade error used throughout. Noise is a
 deterministic, decomposition-independent perturbation of the twin
-observations, so the comparison is reproducible across rank counts.}
+observations, so the comparison is reproducible across rank counts.
+\textcolor{red}{[NOTE: the noisy verification-twin outcomes ($0.20 \to
+1.8$, $4\times10^{-7} \to 0.83$) and the Tikhonov sweep to
+$\beta = 1$ trace only to a commit message, not to a logged run;
+re-run and log, or drop the two noisy rows.]}}
 \label{tab:snr}
 \end{table}
 
@@ -1175,98 +1191,38 @@ observations, so the comparison is reproducible across rank counts.}
 \label{sec:realsurvey}
 
 The twins establish what the machinery can recover under controlled
-conditions; this section turns it on the real Hurricane Harvey survey.
-The observable changes first --- the stage gauges are unusable at this
-resolution --- and everything after that is measured against surveyed
-high-water marks: the uncalibrated baseline and the drainage defect it
-exposes (Section~\ref{sec:hwm}), how much of the remaining error
-roughness can remove (Section~\ref{sec:authority}), the calibration
-(Section~\ref{sec:calibrated}), and the spectrum that counts how many
-parameters the marks can actually determine
-(Section~\ref{sec:spectrum}).
-Section~\ref{sec:icauthority} then points the same measurement at the
-initial condition.
+conditions. This section turns it on the real Hurricane Harvey survey.
+The observable changes first, because the stage gauges are unusable
+at this resolution, and everything after that is measured against
+surveyed high-water marks: the uncalibrated baseline and the drainage
+defect it exposes (Section~\ref{sec:hwm}), how much of the remaining
+error roughness can remove (Section~\ref{sec:authority}), the
+calibration (Section~\ref{sec:calibrated}), the spectrum that counts
+the parameter combinations on which the marks outweigh the prior
+(Section~\ref{sec:spectrum}), and a validation of the calibrated
+field against the stream gauges, which fails
+(Section~\ref{sec:crossobs}). Section~\ref{sec:icauthority} then
+points the same measurement at the initial condition.
 
 \subsection{High-water marks and the uncalibrated baseline}
 \label{sec:hwm}
 
 Calibration against the actual stage records is blocked by geometry,
-not software: at all 13 rain-driven USGS gauges in the 30\,m domain,
-modelled water-surface elevation sits 1--11\,m \emph{above} observed
-stage, because a 30\,m cell stores one mean ground elevation ---
-the bank of an incised bayou --- while the gauge hangs in
-the channel below it; the offset is time-varying as the real channel
-fills, so no per-gauge datum correction can repair it. Comparing the
-mesh directly against the stage record makes the geometry explicit
-(Table~\ref{tab:gauges}): over the calibration window the cell bed
-sits above the \emph{peak} observed water surface at seven of the
-twelve gauges with data, and above the water surface for $71\%$ of all
-gauge-hours. Only the two Buffalo Bayou main-stem gauges, where the
-channel is wider than a cell, and the two gauges in the Addicks and
-Barker reservoir pools hold their water for the whole window. The
-mesh resolves the major channel and not the tributaries, which is
-where nine of the thirteen gauges sit.
-\paragraph{Calibrating on the gauges instead.}
-The four gauges that hold their water for the whole window are enough
-to pose the calibration the other way round, and doing so tests
-whether a roughness field fitted to one observable predicts the other.
-We calibrated the same three classes on the above-bed gauge stage
-(134 observations, an observation counting only while the observed
-water surface is above the cell bed) and scored the result on the 46
-marks. The answer is that it does not, and the failure is
-directional rather than marginal (Table~\ref{tab:crossobs}). The
-gauge calibration raises all three classes --- developed-low and
-developed-medium to the $3\times$ upper bound, woody wetland to
-$1.74\times$ --- where the mark calibration puts the latter two on the
-$0.3\times$ floor. The two observables place the same class a factor
-of ten apart, each at an edge of the same prior. Scored on the marks,
-the gauge-calibrated field reaches $0.7609$\,m against the
-uncalibrated prior's $0.7188$: \emph{calibrating on the gauges makes
-the model worse at the marks than not calibrating at all}, while
-lowering the gauge misfit by $23\%$.
-
-The mechanism is the geometry of the preceding paragraph. At a mark on
-the floodplain the modelled peak is too high, so the misfit gradient
-asks for less conveyance; at a gauge on a bank cell the modelled stage
-is too low by the representation offset, so it asks for more. Neither
-request is about friction. The gauge residual is the size of that
-offset rather than of a roughness error: at the NLCD prior the
-above-bed gauge misfit is $3.24$\,m RMSE, and the best field we
-obtained against it leaves $2.84$\,m, so roughness spans $12\%$ of a
-discrepancy that a $30$\,m mesh of an incised channel would produce
-with no friction error at all. A calibration reported against the
-gauges alone would show a $23\%$ misfit reduction and a physically
-impossible field.
-
-We report this as the paper's validation result. It is negative, and
-it is the one the survey-only numbers of
-Section~\ref{sec:calibrated} need: a three-parameter field that
-removes $12.5\%$ of the mark error does not transfer to a second
-observable in the same basin and window, so that $12.5\%$ is a fit and
-not a skill. The two observables agree on one thing, that the
-land-cover table is not where this model's error lives.
-
-\begin{table}
-\centering\small
-\begin{tabular}{@{}lrrrrr@{}}
-\toprule
-Manning field & 22 & 23 & 90 & gauge $J$ & mark MAE \\
-\midrule
-NLCD lookup & $0.090$ & $0.120$ & $0.098$ & $31{,}313$ & $0.7188$ \\
-calibrated on the gauges & $0.27$ & $0.36$ & $0.171$ & $24{,}007$ & $0.7609$ \\
-calibrated on the marks & $0.210$ & $0.036$ & $0.029$ & $30{,}333$ & $0.6290$ \\
-\bottomrule
-\end{tabular}
-\caption{The same three classes (developed-low 22, developed-medium 23,
-woody wetland 90) calibrated against each observable and scored against
-both, at $\sigma_\alpha = 0.30$ with the other twelve classes frozen at
-the lookup. Manning $n$ in $\mathrm{s\,m^{-1/3}}$, gauge $J$
-over 134 above-bed stage observations, mark MAE in metres over the 46
-cluster-A marks. Each calibration improves its own observable and the
-gauge calibration degrades the other, past the uncalibrated prior. The
-bound is $\alpha \in [0.3, 3]$, so $0.27$ and $0.36$ are at it.}
-\label{tab:crossobs}
-\end{table}
+not software. A 30\,m cell stores one mean ground elevation, the bank
+of an incised bayou, while the gauge hangs in the channel below it.
+Comparing the mesh directly against the stage record makes the
+geometry explicit (Table~\ref{tab:gauges}): over the calibration
+window the cell bed sits above the \emph{peak} observed water surface
+at seven of the twelve gauges with data, and above the water surface
+for $71\%$ of all gauge records. Only the two Buffalo Bayou main-stem
+gauges, where the channel is wider than a cell, hold their water for
+the whole window; the two gauges in the Addicks and Barker reservoir
+pools hold it for every record they have, 20 and 4 of the 48 slots,
+and a fifth, Fulshear, for $29\%$ of the window. Where the cell does
+hold water the model runs metres above the observed surface for most
+of the window (Section~\ref{sec:crossobs} measures this gauge by
+gauge). The mesh resolves the major channel and not the tributaries,
+which is where all but the three Buffalo Bayou gauges sit.
 
 \begin{table}
 \centering\small
@@ -1274,18 +1230,18 @@ bound is $\alpha \in [0.3, 3]$, so $0.27$ and $0.36$ are at it.}
 \toprule
 Gauge & cell bed (m) & window WSE (m) & above bed \\
 \midrule
-Buffalo Bayou nr Katy & $33.27$ & $35.56$--$36.05$ & $100\%$ \\
-Buffalo Bayou at Houston & $6.93$ & $10.64$--$12.77$ & $100\%$ \\
-Langham Ck nr Addicks & $28.23$ & $30.70$--$31.28$ & $100\%$ \\
-Bear Ck nr Barker & $34.73$ & $34.96$ & $100\%$ \\
+Buffalo Bayou nr Katy & $33.27$ & $35.58$--$36.05$ & $100\%$ \\
+Buffalo Bayou at Houston & $6.93$ & $10.71$--$12.77$ & $100\%$ \\
+Langham Ck nr Addicks & $28.23$ & $30.74$--$31.25$ & $100\%$ \\
+Bear Ck nr Barker & $34.73$ & $34.87$--$34.94$ & $100\%$ \\
 Buffalo Bayou nr Fulshear & $31.47$ & $31.23$--$31.56$ & $29\%$ \\
 Langham Ck at W Little York & $34.10$ & $32.76$--$34.09$ & $0\%$ \\
 S Mayde Ck & $34.60$ & $34.07$--$34.29$ & $0\%$ \\
 Whiteoak Bayou at Alabonson & $23.60$ & $22.26$--$23.48$ & $0\%$ \\
 Brickhouse Gully & $20.40$ & $16.24$--$19.64$ & $0\%$ \\
-Cole Ck & $25.30$ & $20.95$--$22.51$ & $0\%$ \\
+Cole Ck & $25.30$ & $20.95$--$22.47$ & $0\%$ \\
 Little Whiteoak Bayou & $14.50$ & $10.65$--$13.37$ & $0\%$ \\
-Whiteoak Bayou at Main St & $11.80$ & $9.66$--$11.33$ & $0\%$ \\
+Whiteoak Bayou at Main St & $11.80$ & $9.71$--$11.33$ & $0\%$ \\
 Whiteoak Bayou at Houston & $15.03$ & \multicolumn{2}{l}{no record in window} \\
 \bottomrule
 \end{tabular}
@@ -1307,11 +1263,11 @@ changed the observable to the USGS high-water-mark archive: surveyed
 i.e.\ on the floodplain surfaces a 30\,m cell does represent, and the
 benchmark currency of the flood-modeling literature (Inunda reports
 $0.67$\,m MAE against Harvey high-water marks~\cite{li2026inunda}).
-Of 2{,}364 Harvey marks, 324 fall in the Turning domain; applying to
-the marks the same QC that disqualified the gauges --- is the surveyed
-elevation above the containing cell's bed? --- rejects $62\%$ of them
-(they are channel surveys), leaving 108 marks of quality fair or
-better. The mismatch this QC addresses is the one Xu et al.\ measured on
+Of 2{,}364 Harvey marks, 324 fall in the Turning domain. Applying to
+the marks the same QC that disqualified the gauges, whether the
+surveyed elevation lies above the containing cell's bed, rejects
+$62\%$ of them (they are channel surveys), and keeping only survey
+quality fair or better leaves 108. The mismatch this QC addresses is the one Xu et al.\ measured on
 a 30\,m simulation of the same event: validated against 48 marks, their
 simulation had an RMSE of $0.9$\,m with 25 of 48 within $25\%$, which they
 attribute to comparing a point survey with a cell average~\cite{xu2025harvey}.
@@ -1319,123 +1275,54 @@ Two choices here reduce that exposure. The QC keeps only marks on surfaces
 a cell represents, and the misfit compares water-surface elevations rather
 than depths, so the difference between the ground at the point and the
 mean ground of the cell enters once, through the cell bed, and not a
-second time through the depth. The misfit compares each mark cell's peak simulated WSE over
-the window, $\max_k H u(t_k)$, against the surveyed value; its
-adjoint needs no new machinery, because each mark's residual can be
-injected at its own argmax time in the segmented backward sweep of
-Algorithm~\ref{alg:sweep}, which is the exact gradient wherever the
-peak time is locally constant. The
-parameter gradient of the peak misfit passes the same central-difference
-gates as every other block on the smooth verification twin. At basin
-scale the naive check fails, and a set of instrumented measurements
-pins down why, in a way that validates the gradient rather than the
-check (Table~\ref{tab:fdwindow}). No mark's argmax moves and none
-flips wet/dry across any probe, so the discrepancy lives below the
-observable; the evaluations are deterministic to nine digits and the
-FD value is stable across a decade of probe step, which excludes
-noise, curvature truncation, and sparse kinks. Decisively, the gap
-\emph{accumulates with trajectory length}: at the shortest window the
-gate passes at the inner-solve floor with every piece of machinery
-engaged, and it grows three orders of magnitude by basin window
-lengths. A proportional defect in $\partial f/\partial n$ or the
-adjoint accumulation would err the same fraction at any window length;
-trajectory-accumulated branch crossings --- the probe shifts which
-cells cross the depth cutoff at some step --- predict exactly this
-profile. Two further checks close it: as the probe shrinks, the FD
-converges to the adjoint direction by direction --- the largest
-single-class direction passes the $10^{-5}$ gate outright at the
-smallest probe --- and the fifteen per-class gaps \emph{sum} to the
-domain-wide gap, the additivity that independent per-cell branch
-crossings predict and no plausible defect would arrange. The measured
-conclusion: the adjoint returns the exact one-branch derivative; over
-long windows the objective is dense with wet/dry branch surfaces, and
-a finite-step central difference converges to a locally
-\emph{smoothed} slope that sits several percent from any one branch. The quasi-Newton iteration consumes one-branch
-derivatives of a piecewise-smooth objective --- standard practice for
-$\max$-type and switching systems --- and its observed descent
-(Section~\ref{sec:identifiability}) is consistent with that footing.
-
-\begin{table}
-\centering\small
-\begin{tabular}{@{}lrl@{}}
-\toprule
-Window & Steps & FD-vs-adjoint gap, domain-wide direction \\
-\midrule
-smooth verification twin & 40 & $9\times10^{-7}$ (gate $10^{-5}$: pass) \\
-basin, 1 min & 60 & $9\times10^{-5}$ (inner-solve floor: pass) \\
-basin, 5 min & 300 & $8\times10^{-3}$ \\
-basin, 15 min & 900 & $2\times10^{-2}$ \\
-basin, 30 min & 1800 & $2\times10^{-1}$ \\
-basin, 1 h & 3600 & $7\times10^{-2}$ \\
-\bottomrule
-\end{tabular}
-\caption{The FD gate's failure accumulates with trajectory length on
-identical basin, rain, marks, and converged tolerances --- the
-signature of branch crossings along the trajectory, not of gradient
-error. The 30-minute and 1-hour rows sample peaks over different
-horizons, so strict monotonicity across them is not expected;
-single-class directions sit one to three orders lower at every
-window.}
-\label{tab:fdwindow}
-\end{table}
-The remaining scientific choice is the calibration window, which for
-marks that record the event maximum must cover the flood peak.
+second time through the depth. The peak misfit and its adjoint are
+those of Section~\ref{sec:adjoint}. The remaining scientific choice
+is the calibration window, which for marks that record the event
+maximum must cover the flood peak.
 
 \paragraph{The uncalibrated baseline against the real survey.}
 Because the marks record the event maximum, the baseline evaluation
-must simulate through the crest: a 72-hour rain-forced
-forward from the available initial state (2017-08-26 18:00, reaching
-past the Buffalo Bayou crest), NLCD-prior Manning, free outflow,
-backward Euler at $\Delta t = 1$\,s on the 2.93M-cell mesh ---
-259{,}200 implicit steps, \emph{zero} Newton failures, two hours on
-one GPU node. The model wets all 108 marks, and the uncalibrated
-peak-WSE error decomposes into two distinct populations
-(Table~\ref{tab:baseline}; confirmed mark for mark at fully converged
-inner tolerances). The marks that crest inside the window carry the
-error a Manning field can plausibly address. The others never crest at
-all: their cells fill monotonically through the entire window ---
-every one peaks at the final hour with zero recession, still rising
-while the first population is already draining --- accumulating some
-ten metres of standing water whose late-window inflow arrives
-laterally, after the rain has ended. Those cells sit in the downstream
-Buffalo Bayou reach: the model cannot drain it, a conveyance/outlet
-defect that no roughness value can absorb and that would corrupt any
-calibration asked to fit it. The obvious suspicion --- that we simply
-failed to give the domain an exit --- does not survive inspection of
-the mesh. The domain is a delineated watershed rather than a
-rectangular cutout ($35$ of its $6{,}198$ boundary nodes lie on the
-bounding box), so its unflagged perimeter is a catchment divide and a
-reflecting wall is the right condition there; and its single
-free-outflow side set sits at the perimeter's lowest point, the only
-boundary nodes at $z \approx 0$ against a boundary median of
-$29.9$\,m. The exit is present and correctly placed. What the ponded
-reach then reveals is a limitation of the idealization itself: it
-holds water above the elevation of parts of its own divide, which a
-reflecting wall retains and the real event would have spilled.
+must simulate through the crest: a 72-hour rain-forced forward from
+the available initial state (2017-08-26 18:00, reaching past the
+Buffalo Bayou crest), NLCD-prior Manning, free outflow, backward Euler
+at $\Delta t = 1$\,s on the 2.93M-cell mesh. That is 259{,}200
+implicit steps with zero Newton failures, in two hours on one GPU
+node. The model wets all 108 marks, and the uncalibrated peak-WSE
+error separates into two populations (Table~\ref{tab:baseline};
+confirmed mark for mark at fully converged inner tolerances). The 71
+marks that crest inside the window carry the error a Manning field
+can plausibly address. The other 37 never crest. Their cells fill
+monotonically through the whole window, every one peaking at the
+final hour with zero recession, and accumulate some ten metres of
+standing water that arrives laterally after the rain has ended. Those
+cells sit in the downstream Buffalo Bayou reach, which the model
+cannot drain. No roughness value can absorb that, and a calibration
+asked to fit those marks would absorb the defect into the friction.
 
-Three measurements on the 72-hour forward make that concrete. The 37
-never-cresting mark cells are not local depressions in the terrain:
-one of the 37 is lower than every edge-neighbour, against six of the
-71 marks that crest normally. Rainfall is not what fills them: on the
-basin-mean MRMS series, simulation hours 60--72 carry $1.7\%$ of the
-event's rain and the hours beyond 72 carry none. What the model holds
-there is a lake. Its peak water surface across all 37 cells is
-$20.0 \pm 1.1$\,m, over surveyed peaks that run from $6.2$ to $20.2$\,m
-and beds from $0.3$ to $18.2$\,m: the surveyed water surface slopes
-toward the outlet and the modelled one does not (the correlation of
-surveyed WSE with the model's excess is $-0.93$, and a flat pond at
-$20.3$\,m predicts that excess to $1.1$\,m RMS). The divide sets the
-level. A quarter of the perimeter's $6{,}198$ nodes, all in the
-domain's eastern quarter, lie below $20$\,m, while the free-outflow
-side set is thirteen element edges wide: the real flood left across
-the low divide, and the model can leave only through the outlet, so
-it ponds to the height its walls impose. The calibration target is therefore the
-71 admissible marks; the drainage defect is reported as a finding in
-its own right; and the remaining bundle (initial-condition, rainfall,
-mesh-elevation, and datum error) is what the calibration must be
-prevented from absorbing along with the roughness signal. The
-literature's calibrated benchmark on this event is $0.67$\,m
-MAE~\cite{li2026inunda}.
+The exit is not missing. The domain is a delineated watershed rather
+than a rectangular cutout ($35$ of its $6{,}198$ boundary nodes lie on
+the bounding box), so its untagged perimeter is a catchment divide and
+a reflecting wall is the right condition there. Its single
+free-outflow side set, thirteen element edges wide, sits at the
+perimeter's lowest point: the only boundary nodes at $z \approx 0$,
+against a boundary median of $29.9$\,m. What the ponded reach exposes
+is the idealization itself. The perimeter follows the real watershed
+boundary, the terrain is flat enough that water plausibly crossed that
+boundary in an event of Harvey's size, and a closed boundary cannot
+represent the overtopping. That is our reading of the event, not a
+measurement of this paper.
+\textcolor{red}{[NOTE: is there a reference for Harvey's flow crossing
+the Buffalo Bayou watershed divide, or for the limits of closed
+watershed-delineated domains under extreme events? One citation here
+would turn this reading into a sourced statement.]}
+What this paper measures is that the model retains water the survey
+did not record: every one of the 37 marks is model-high, by $7$\,m on
+average (Table~\ref{tab:baseline}). The calibration target is
+therefore the 71 marks that crest, narrowed further below; the
+drainage defect is a finding in its own right; and the remaining
+error bundle (initial-condition, rainfall, mesh-elevation, and datum
+error) is what the calibration must be prevented from absorbing along
+with the roughness signal.
 
 \begin{table}
 \centering\small
@@ -1450,7 +1337,7 @@ all & 108 & $3.41$\,m & $+3.21$\,m \\
 \end{tabular}
 \caption{The uncalibrated baseline against the 108 surveyed high-water
 marks, decomposed. The second population is model-high at every single
-mark and identifies a reach with no working exit; the first is the
+mark and identifies a reach the model cannot drain; the first is the
 calibration target.}
 \label{tab:baseline}
 \end{table}
@@ -1463,12 +1350,13 @@ never-crest population is the end of a continuum, not a separate
 pathology: the intermediate band already carries $+2.85$\,m of the
 same model-high signature. Two consequences follow. First, a
 calibration window has to be placed on the upstream band, where the
-model is physically sound --- crests there fall in event hours
-29--41, and the 46 marks in that band are the target of every
-production number below. Second, the intermediate band is
-\emph{not} clean held-out data, which rules out the obvious
-validation design; out-of-sample skill has to be tested by
-cross-validation within the upstream band instead.
+model is physically sound. Crests there fall in event hours 29--41,
+and the 46 marks in that band are the target of every production
+number below. Second, the intermediate band is \emph{not} clean
+held-out data, which rules out the obvious validation design. The
+out-of-sample test this paper reports is against a second observable
+(Section~\ref{sec:crossobs}), and cross-validation within the
+upstream band is the remaining in-observable option.
 
 \begin{table}
 \centering\small
@@ -1482,8 +1370,8 @@ never crest (downstream) & 37 & $-95.440$ & $+7.06$\,m & $7.06$\,m \\
 \bottomrule
 \end{tabular}
 \caption{The crest-timing groups are spatial bands, and the model-high
-bias grows monotonically downstream toward the reach with no working
-exit. The upstream band is the calibration target; the middle band is
+bias grows monotonically downstream toward the reach the model cannot
+drain. The upstream band is the calibration target; the middle band is
 contaminated by the same defect at intermediate strength and cannot
 serve as held-out data.}
 \label{tab:bands}
@@ -1496,15 +1384,16 @@ Before asking an optimizer to fit fifteen land-cover classes it is
 worth asking what any roughness field could achieve, and that question
 has an optimizer-independent answer. Scaling the entire NLCD field by
 a single factor $\alpha$ traverses the natural first direction of the
-problem --- close to, though as Section~\ref{sec:spectrum} measures,
-not exactly, its most identifiable one; evaluating the peak-WSE misfit
+problem, close to its most identifiable one though not exactly it, as
+Section~\ref{sec:spectrum} measures. Evaluating the peak-WSE misfit
 along it bounds what this paper calls the \emph{authority} of a
 parameter over an observable: the amount of the model--survey error
 that changing the parameter can remove, measured without reference to
 how, or whether, a calibration converges. The largest such amount over
-the parameter's defensible range is the parameter's \emph{ceiling}.
-Both are lengths, in metres, and fractions of the uncalibrated error,
-and the paper uses the two words in that sense only.
+the parameter's defensible range, meaning the range inside the stated
+prior, is the parameter's \emph{ceiling}. Both are lengths, in metres,
+and fractions of the uncalibrated error, and the paper uses the three
+words in those senses only.
 
 We ran that scan on the production configuration: a 12-hour window over
 the upstream crest cluster (event hours 29--41), initialized from an
@@ -1517,18 +1406,18 @@ is one forward with no adjoint (Table~\ref{tab:alpha}).
 A high-water mark records an event maximum, so it carries information
 about roughness only if its crest occurs inside the calibration window;
 before its crest it is an inequality, and after it a constant. The
-measured crest times decide the window rather than any budget: they are
+measured crest times set the window rather than any budget: they are
 bimodal, clustering in event hours 29--42 and 60--72 with an empty gap
 between, so a window spanning both would spend most of its length
 integrating marks that had already peaked. The upstream cluster is also
 the population the model can legitimately be scored against at all,
 since the downstream marks sit in a reach it cannot drain
-(Section~\ref{sec:hwm}) --- a defect no window length repairs. The 46
+(Section~\ref{sec:hwm}), a defect no window length repairs. The 46
 marks used throughout this paper are therefore those for which the
-observable means what it is meant to mean, and every number reported
-here --- the uncalibrated baseline, the scans, and the calibration ---
-is measured on that same window, so they compose --- including the
-spectrum of Section~\ref{sec:spectrum}.
+observable means what it is meant to mean. Every number reported here
+(the uncalibrated baseline, the scans, the calibration, and the
+spectrum of Section~\ref{sec:spectrum}) is measured on that same
+window, so they compose.
 
 \begin{table}
 \centering\small
@@ -1549,13 +1438,14 @@ $1.00$ (NLCD) & $0.027$--$0.160$ & $8.083\times10^{2}$ & $0.7188$ & 0/46 \\
 (12-hour window, 46 cluster-A marks); every cell carries
 $n = \alpha\,n_{\rm NLCD}$, so the \emph{n} range column is the whole
 lookup table scaled by $\alpha$. $J$ falls monotonically toward
-lower roughness with no interior minimum: the entire uniform-roughness
-knob is worth $0.08$\,m against a $0.72$\,m error, and only at roughness
+lower roughness with no interior minimum: the entire uniform scale
+is worth $0.08$\,m against a $0.72$\,m error, and only at roughness
 $30\%$ of published values, where $n$ reaches $0.008$ and smooth
-concrete is $\approx 0.012$. Within a defensible range it is worth about
+concrete is $\approx 0.012$. Within the prior it is worth about
 $3$\,cm ($\alpha = 0.70$, itself the optimum implied by the prior width
 of Section~\ref{sec:calibration}). The limit at $\alpha = 0.2$ is
-numerical, not drying --- one mark stays dry throughout.}
+numerical, not drying; one mark is dry at every point below
+$\alpha = 0.8$ and none above.}
 \label{tab:alpha}
 \end{table}
 
@@ -1565,36 +1455,37 @@ numerical, not drying --- one mark stays dry throughout.}
 \caption{What each parameter can do to the peak-WSE error, on identical
 axes: the horizontal axis scales the parameter, the vertical axis is the
 same mean absolute error over the same 46 marks, and both curves pass
-through the uncalibrated model at $1.0$. Roughness is concave and runs
-out --- and its useful end is physically indefensible, reaching
-$n = 0.008$ before the implicit solve fails. The initial condition is
-about four times steeper per unit fractional change, convex, and has not
-turned over at a $40\%$ reduction in antecedent water. The dotted line is
-the fifteen-class calibration, which lies off both curves because it
-redistributes roughness rather than scaling it.}
+through the uncalibrated model at $1.0$. Roughness is concave and
+saturates, and its useful end scales the whole table to $0.3$,
+reaching $n = 0.008$ before the implicit solve fails. The
+initial condition is about four times steeper per unit fractional
+change, convex, and has not turned over at a $40\%$ reduction in
+antecedent water. The dotted line is the fifteen-class calibration,
+which lies off both curves because it redistributes roughness rather
+than scaling it.}
 \label{fig:authority}
 \end{figure}
 
-\textbf{The entire uniform-roughness knob is worth $0.08$\,m against a
-$0.72$\,m error} (Figure~\ref{fig:authority}) --- about $11\%$ --- and it reaches that only at
-$\alpha = 0.3$, i.e.\ Manning values $30\%$ of the published NLCD
-lookup, as low as $n = 0.008$ where smooth concrete is $\approx 0.012$.
-Over a physically defensible range ($\alpha \gtrsim 0.7$) the knob is
-worth about three centimetres. The curve is mildly concave with no
-interior minimum: $J$ falls monotonically toward lower roughness until
-the implicit solve fails.
+\textbf{The entire uniform scale is worth $0.08$\,m against a
+$0.72$\,m error} (Figure~\ref{fig:authority}), about $11\%$, and it
+reaches that only at $\alpha = 0.3$, Manning values $30\%$ of the
+published NLCD lookup, as low as $n = 0.008$ where smooth concrete is
+$\approx 0.012$. Inside the prior ($\alpha \gtrsim 0.7$) the scale is
+worth about three centimetres. The curve is concave with no interior
+minimum: $J$ falls monotonically toward lower roughness until the
+implicit solve fails.
 
-That number is corroborated from an independent direction. The
-identifiability twin of Section~\ref{sec:identifiability} measured the
-peak-WSE signal induced by a large class perturbation at
-$\sim 0.1$\,m --- the same authority scale, from a different
-experiment. So $85$--$90\%$ of the model-versus-survey residual is not
-roughness at all: it is rainfall forcing, mesh elevation, datum, and
-representation error at 30\,m.
+An independent measurement gives the same scale. The identifiability
+twin of Section~\ref{sec:identifiability} measured the peak-WSE
+signal induced by a large class perturbation at $\sim 0.1$\,m, the
+same authority from a different experiment. So about $85\%$ or more
+of the model-versus-survey residual is not roughness at all: it is
+rainfall forcing, mesh elevation, datum, and representation error at
+30\,m.
 
 \paragraph{The observable constrains one mode, not fifteen.}
 A natural objection is that spatial redistribution should beat uniform
-scaling --- that fifteen classes have freedom a single $\alpha$ does
+scaling, since fifteen classes have freedom a single $\alpha$ does
 not. We tested it directly by scaling only part of the domain to
 $\alpha = 0.45$ and leaving the rest at the NLCD prior
 (Table~\ref{tab:halves}).
@@ -1619,9 +1510,9 @@ that cross both groups, so only domain-coherent changes drain them.}
 \end{table}
 
 Each half alone makes the fit \emph{worse}, and the two together help
-by $45\times$ the sum of the parts --- a strong positive interaction,
-not two competing signs. The mechanism is consistent with every other
-measurement: a mark's peak is set by the \emph{path-integrated}
+by $45\times$ the sum of the parts: a positive interaction, not two
+competing signs. The mechanism is consistent with every other
+measurement. A mark's peak is set by the \emph{path-integrated}
 conveyance from upstream to that mark, and those paths cross both
 groups. Speeding part of a path does not drain it; the resulting
 fast/slow junction ponds water, so partial changes \emph{raise} peaks.
@@ -1629,15 +1520,16 @@ Only a domain-coherent change lowers them.
 
 The conclusion is a design finding, not a tuning observation. The
 peak-WSE observable at these marks constrains \emph{one} roughness
-degree of freedom at the prior width used here --- the domain-scale,
-path-integrated conveyance --- worth $\sim 10\%$ of the model--survey
-discrepancy, and about three at a $\pm 30\%$ width
-(Section~\ref{sec:spectrum}). It
-does not carry fifteen classes' worth of information. This unifies the
-earlier evidence rather than sitting beside it: the perfect-data twin
-recovers only the classes that move the domain mean, and the noisy twin
-pins the others to bounds precisely because they carry no signal to
-fit, so the optimizer fits noise in those directions instead.
+degree of freedom at the absolute prior width of the fifteen-class
+calibration below, the domain-scale, path-integrated conveyance,
+worth $0.08$\,m of the $0.72$\,m discrepancy. By the linearized count
+of Section~\ref{sec:spectrum} it constrains about three at a
+$\pm 30\%$ width. It does not carry fifteen classes' worth of
+information. This count unifies the earlier evidence rather than
+sitting beside it: the perfect-data twin recovers only the classes
+that move the domain mean, and the noisy twin pins the others to
+bounds because they carry no signal to fit, so the optimizer fits
+noise in those directions instead.
 
 \paragraph{Relation to equifinality.}
 None of this is a new phenomenon: that many different parameter sets
@@ -1650,145 +1542,190 @@ measurements above \emph{measure} its dominant direction directly:
 four forward evaluations bound the authority of the whole roughness
 field, and two more show that the modes are not separable. The result
 is the same kind of statement, obtained at a cost that does not grow
-with the number of parameters --- which is what makes it affordable
+with the number of parameters, which is what makes it affordable
 before a calibration rather than after one.
 
 \paragraph{Why this generalizes.}
 The measurement uses nothing specific to roughness. Given a
-parameter, an observable, and a model error to explain, the same three
-steps --- scan the dominant parameter direction, check whether
-sub-domain changes are separable, and compare the resulting authority
-against the residual --- bound what calibrating that parameter can
-ever accomplish, before any optimizer is written. We suggest it as a
-routine precondition for calibration studies, which commonly report the
+parameter, an observable, and a model error to explain, three steps
+bound what calibrating that parameter can ever accomplish, before any
+optimizer is written: scan the dominant parameter direction, check
+whether sub-domain changes are separable, and compare the resulting
+authority against the residual. We suggest it as a routine
+precondition for calibration studies, which commonly report the
 misfit reduction achieved without establishing the ceiling it was
 approaching.
 
 \subsection{The calibration against the real survey}
 \label{sec:calibrated}
 
-The scan sets the bar a multi-parameter calibration must clear to
-justify its parameters. Running the class calibration of
-Section~\ref{sec:calibration} on the same configuration --- fifteen NLCD
-classes, relative variables, prior width as discussed below, starting
-from the NLCD lookup --- clears it (Table~\ref{tab:ladder}).
+The scan bounds what any roughness field can do. The question this
+subsection answers is what a calibration actually achieves against
+that bound, and at what cost in roughness values. We run the class
+calibration of Section~\ref{sec:calibration} on the same
+configuration, fifteen NLCD classes in relative variables from the
+NLCD lookup, at both prior widths, and score every resulting field on
+the same 46 marks (Table~\ref{tab:ladder}).
 
 \begin{table}
 \centering\small
 \begin{tabular}{@{}lrrl@{}}
 \toprule
-Manning field & MAE & $\Delta$ & physically defensible? \\
+Manning field & MAE & $\Delta$ & where the field sits against the table \\
 \midrule
-NLCD lookup (uncalibrated) & $0.7188$ & --- & yes, by construction \\
-uniform $\alpha = 0.70$ & $0.6894$ & $-0.029$ & yes \\
-uniform $\alpha = 0.30$ & $0.6392$ & $-0.080$ & no ($n$ to $0.008$) \\
-calibrated, 15 classes, $\sigma_n = 0.015$ & $0.6116$ & $-0.107$ & mostly; one class at a bound \\
-calibrated, 15 classes, $\sigma_\alpha = 0.30$ & $0.6154$ & $-0.103$ & no; two classes at the floor \\
-calibrated, 3 classes, $\sigma_n = 0.015$ & $0.6274$ & $-0.091$ & no; two classes at the floor \\
-calibrated, 3 classes, $\sigma_\alpha = 0.30$ & $0.6290$ & $-0.090$ & no; two at the floor, one at $2.3\times$ \\
-calibrated, 3 classes, $\sigma_\alpha = 0.50$ & $0.6295$ & $-0.089$ & no; all three at a bound \\
+NLCD lookup (uncalibrated) & $0.7188$ & --- & the table itself \\
+uniform $\alpha = 0.70$ & $0.6894$ & $-0.029$ & every class at $0.70$ of table \\
+uniform $\alpha = 0.30$ & $0.6392$ & $-0.080$ & every class at $0.30$; $n$ down to $0.008$ \\
+calibrated, 15 classes, $\sigma_n = 0.015$ & $0.6116$ & $-0.107$ & developed-medium on the floor, $0.036$ \\
+calibrated, 15 classes, $\sigma_\alpha = 0.30$ & $0.6154$ & $-0.103$ & developed-medium $0.036$, shrub $0.035$ \\
+calibrated, 3 classes, $\sigma_n = 0.015$ & $0.6274$ & $-0.091$ & developed-medium $0.036$, woody wetland $0.029$ \\
+calibrated, 3 classes, $\sigma_\alpha = 0.30$ & $0.6290$ & $-0.090$ & the same two; developed-low $0.21$ ($2.3\times$) \\
+calibrated, 3 classes, $\sigma_\alpha = 0.50$ & $0.6295$ & $-0.089$ & the same two; developed-low $0.27$ ($3\times$) \\
 \bottomrule
 \end{tabular}
-\caption{Peak-WSE MAE against the 46 cluster-A marks. Both fifteen-class
-calibrations beat the entire uniform-roughness knob --- including its
-physically indefensible end --- and beat the best \emph{defensible}
-uniform field by $0.078$\,m; spatial redistribution is worth about three
-and a half times what a single global scale can reach. The
-$\sigma_n = 0.015$ field took nine quasi-Newton iterations, the
-$\sigma_\alpha = 0.30$ field three, and they agree in misfit to four
-figures ($J_{\rm mis} = 615.4$), which suggests a floor that roughness
-does not set. The three-class rows are the calibration
-Section~\ref{sec:spectrum} selects: their MAE moves by $0.002$\,m across
-a threefold change in prior width, and their two best-informed classes
-land on the floor under all three.}
+\caption{Peak-WSE MAE against the 46 cluster-A marks, every row an
+achieved in-sample fit. Both fifteen-class calibrations beat the entire
+uniform scale, including its low end, and beat the best
+uniform field the prior admits ($\alpha = 0.70$) by $0.078$\,m: spatial
+redistribution is worth about three and a half times what a single
+global scale reaches. The $\sigma_n = 0.015$ field took nine
+quasi-Newton iterations and the $\sigma_\alpha = 0.30$ field three, and
+they agree in misfit to four figures ($J_{\rm mis} = 615.4$), which
+suggests a floor roughness does not set. The last column is a fact, not
+a judgment: the lookup's own entries run from $0.027$ (barren) to
+$0.160$ (developed high), its lowest developed entry is $0.040$ for
+developed open land, and $n = 0.036$ and $0.029$ on developed-medium
+and woody wetland therefore sit below anything the table assigns to
+developed or wetland ground. Whether such values are admissible is a
+question for the land-cover literature, not for the optimizer. The
+three-class rows are the calibration Section~\ref{sec:spectrum}
+selects.}
 \label{tab:ladder}
 \end{table}
 
-Two things qualify this number, one supporting and one limiting.
+\textbf{Calibrated as well as we can currently calibrate it, roughness
+accounts for $15\%$ of the $0.72$\,m model--survey error on these
+marks.} That is the paper's central number and it is an in-sample fit:
+the 46 marks that define the objective are the 46 the field is scored
+on. The remaining $85\%$ is rainfall forcing, mesh elevation, datum,
+and representation error at 30\,m, and
+Section~\ref{sec:icauthority} shows one of those to be both measurable
+by the same method and larger.
 
-Supporting: the comparison that matters is against
-$\alpha = 0.70$, not $\alpha = 0.30$. The latter is the misfit's
-unconstrained minimum and reaches $n = 0.008$, below any entry in the
-lookup; the former is the optimum implied by the same prior the
-calibration itself uses, and is the one-parameter competitor that
-prior allows.
-Against it the calibration wins by $0.078$\,m, so the fifteen
-parameters are not decoration --- \emph{letting roughness vary by
-class removes error that no global scaling can}, which is a stronger
-statement than the scan alone justifies and the one the half-domain
-experiment (Table~\ref{tab:halves}) would not have predicted.
+The $15\%$ is worth having, and the comparison that establishes it is
+against $\alpha = 0.70$ rather than $\alpha = 0.30$. The latter is the
+misfit's unconstrained minimum and reaches $n = 0.008$, below any entry
+in the lookup; the former is the optimum implied by the same prior the
+calibration uses, and so is the one-parameter competitor that prior
+allows. Against it the calibration wins by $0.078$\,m, so the extra
+parameters are not decoration: \emph{letting roughness vary by class
+removes error that no global scaling can}, which is more than the scan
+alone justifies and the opposite of what the half-domain experiment
+(Table~\ref{tab:halves}) would have predicted. The reason is
+measured in Section~\ref{sec:spectrum}, and it is not that fifteen
+parameters beat one.
 
-Limiting, and there are three. First, the objective and the MAE do not
-move together. The calibrated field's misfit is $J = 615.4$; sliding
-along the uniform scan's measured MAE-versus-$J$ relation to that same
-objective gives $\approx 0.596$\,m, where the calibrated field scores
-$0.6116$, so redistribution buys objective slightly less MAE-efficiently
-than scaling does and the two should not be quoted interchangeably. That
-comparison is a counterfactual, though, and in the calibration's favour:
-$J = 615.4$ lies below $673.7$, the lowest objective the uniform knob
-reaches before the implicit solve fails, so the uniform field being
-compared against cannot actually be run. \emph{The calibration reaches
-an objective global scaling cannot attain at all.} Second, the run is
-nine BLMVM iterations from the NLCD prior and was stopped by the
-12-hour wall rather than by a tolerance: $J$ fell $18.7\%$ overall but
-only $0.01\%$ on the last iteration while the gradient norm fell
-$8.5\times$, which is convergence behaviour without being a converged
-run, and developed-medium sits at its lower bound throughout;
-Section~\ref{sec:calibration} discusses why that bound is partly an
-artifact of how the prior was stated. Third and most important,
-\textbf{$\mathbf{0.6116}$\,m is an in-sample score}: the 46 marks that define the
-objective are the 46 marks it is evaluated on. We report it as a fit,
-not as skill. Out-of-sample validation has to be cross-validation
-\emph{within} the upstream band, because the middle band carries the
-drainage defect (Table~\ref{tab:bands}) and would not test
-generalization so much as re-measure that defect.
+Three things qualify the number. First, the objective and the MAE do
+not move together. The calibrated field's misfit is $J = 615.4$;
+sliding along the uniform scan's measured MAE-versus-$J$ relation to
+that same objective gives $\approx 0.596$\,m where the calibrated field
+scores $0.6116$, so redistribution buys objective less
+MAE-efficiently than scaling does and the two should not be quoted
+interchangeably. That comparison is a counterfactual, and in the
+calibration's favour: $J = 615.4$ lies below $673.7$, the lowest
+objective the uniform scale reaches before the implicit solve fails,
+so the uniform field it compares against cannot be run at all.
 
-Section~\ref{sec:spectrum} makes the second and third caveats concrete
-rather than conventional: the calibrated field lies $9.2$ prior standard
-deviations from the NLCD lookup, and only $2.9\%$ of that displacement
-is in a direction these marks constrain.
+Second, the run is nine quasi-Newton iterations from the NLCD lookup
+and was stopped by the 12-hour wall rather than by a tolerance. $J$
+fell $18.7\%$ overall but $0.01\%$ on the last iteration while the
+gradient norm fell $8.5\times$, which is convergence behaviour without
+being a converged run.
 
-Set against the error budget: the model--survey discrepancy on these
-marks is $0.72$\,m and roughness, calibrated as well as we can
-currently calibrate it, accounts for $15\%$ of it. The remaining
-$85\%$ is rainfall forcing, mesh elevation, datum, and representation
-error at 30\,m --- and Section~\ref{sec:icauthority} shows that one of
-those is measurable with the same method, and larger.
+Third, and this is what the rest of the section is about, the field
+that achieves the $15\%$ is not one the land-cover table contains.
+Developed-medium sits on its lower bound throughout, at $n = 0.036$
+against the table's $0.040$ for developed open land, and
+Section~\ref{sec:calibration} has already shown that a wider prior
+sends seven of the fifteen classes to a bound on the first step.
+Projected on the Gauss--Newton eigenvectors of the same prior, the
+calibrated field lies $9.2$ prior standard deviations from the lookup
+with only $2.9\%$ of that displacement in a direction these marks
+constrain (Section~\ref{sec:spectrum}). A fit that improves the score
+is not thereby the true field: many roughness fields reproduce these
+peaks about equally well, and this one is chosen by an objective that
+also absorbs whatever else is wrong with the model.
+Sections~\ref{sec:spectrum} and~\ref{sec:crossobs} put numbers on both
+halves of that statement, first by counting the combinations on which
+the marks outweigh the prior and then by testing the result against a
+second observable.
 
 \subsection{How many parameters does the observable support?}
 \label{sec:spectrum}
 
 Everything above infers the answer from scans. The eigenvalues of the
-prior-preconditioned Hessian give it directly. In coordinates where the
-prior is white, the posterior precision is $I + \Gamma^{1/2} H_{\rm mis}
-\Gamma^{1/2}$, so each eigenvalue $\lambda_i$ of the whitened misfit
-Hessian compares data information against prior information in one
-direction: the count with $\lambda_i > 1$ is the number of parameters
-the observable supports, and the eigenvectors say which
-\emph{combinations} of classes those are --- which no scan can.
+prior-preconditioned Hessian give it directly. The Hessian of a
+least-squares misfit measures how sharply the observations pin each
+combination of parameters; the prior, a Gaussian of covariance
+$\Gamma$, measures how sharply the lookup pins them. In coordinates
+scaled so that the prior has unit variance in every class, the
+posterior precision, the inverse covariance the parameters would have
+after assimilating the marks under the linear model, is
+$I + \Gamma^{1/2} G\,\Gamma^{1/2}$, with $G$ the misfit Hessian. Each
+eigenvalue $\lambda_i$ of the whitened misfit Hessian
+$\Gamma^{1/2} G\,\Gamma^{1/2}$ therefore compares data information
+against prior information in one direction: the count with
+$\lambda_i > 1$ is the number of parameters the observable supports,
+and the eigenvectors say which \emph{combinations} of classes those
+are, which no scan can. Two
+limits of the statement should be stated before the numbers. It is a
+linearization at the lookup, and it describes the information the
+marks carry there, not the path a calibration takes; the calibrations
+below traverse $\alpha$ from $1$ to $3$, and along the one step we
+measured against its linear prediction (Section~\ref{sec:crossobs})
+the objective moved $35\%$ of the predicted amount. And it depends on
+the prior width, so a count is meaningful only with its width
+attached.
 
 \paragraph{Assembling it.} With fifteen classes this needs no low-rank
 machinery, but it does need the right matrix. Differencing the
 \emph{gradient} field fails here, and instructively: over a window of
 this length the objective is dense with wet/dry branch surfaces
-(Section~\ref{sec:hwm}), and while the adjoint is exact on its own
+(Section~\ref{sec:adjoint}), and while the adjoint is exact on its own
 branch the gradient jumps between branches, so a difference quotient
 samples a discontinuity. Our first attempt returned a matrix with
 $45\%$ relative asymmetry and eigenvalues to $-6.8$, which its own
 consistency check rejected. We therefore assemble the
-\emph{Gauss--Newton} Hessian from observation sensitivities,
+\emph{Gauss--Newton} Hessian, the approximation to the misfit Hessian
+that keeps the first derivatives of the observations and drops the
+residual-weighted second derivatives, exact for a linear observation
+and needing no gradient at all, from observation sensitivities,
 \begin{equation}
-H = \tfrac{1}{\sigma^2} S^\top W S, \qquad
-S_{ik} = \partial(\max_k H u)_i / \partial \alpha_k ,
+G = \sigma^{-2}\, S^\top W S, \qquad
+S_{ij} = \partial\big(\max_t H u(t)\big)_i / \partial \alpha_j ,
 \label{eq:gn}
 \end{equation}
-which differences the mark peaks rather than the gradient. It costs 16
-forwards rather than 16 forward-plus-adjoints, and it is positive
-semi-definite by construction, so the failure mode that invalidated
-the first attempt cannot recur silently.
+with $H$ the observation operator of Section~\ref{sec:adjoint} and
+$W$ the diagonal $0/1$ mark weight, which differences the mark peaks
+rather than the gradient: one forward per class at $\alpha_j$ raised
+by $5\%$. It costs 16 forwards rather than 16 forward-plus-adjoints,
+and it is positive semi-definite by construction, so the failure mode
+that invalidated the first attempt cannot recur silently. It also
+admits a check the first attempt did not: $S^\top W r/\sigma^2$ at
+the lookup is the misfit gradient, and against the adjoint gradient
+of the same objective it agrees to within $4\%$ on every class
+($-28.4$ against $-29.5$ on developed-low, $+89.7$ against $+90.7$ on
+developed-medium, $+65.1$ against $+66.2$ on woody wetland, in
+$\alpha$). That is one check at one step size. The columns are
+one-sided $5\%$ secants, finite differences of each peak between the
+lookup and a $5\%$ rougher class, and have not been shown to converge
+under
+step refinement, which a derivative used for inference should be;
+the same construction on the gauge observable failed exactly that
+test, which is why no gauge spectrum appears in this paper.
 
-Its own assumption --- that a mark's peak \emph{time} is locally
-constant, so that the peak \emph{value} is smooth in $\alpha$ ---
+The construction's own assumption, that a mark's peak \emph{time} is
+locally constant so that the peak \emph{value} is smooth in $\alpha$,
 needs the same scrutiny, and on the production window it is not
 satisfied cleanly: $156$ of $690$ mark--column pairs ($22.6\%$) move
 their peak time, against $27$ ($3.9\%$) on a two-event-hour pilot of
@@ -1798,13 +1735,13 @@ over two hours becomes a genuine, and therefore flat, maximum over
 twelve.
 
 That flatness is what makes the movement harmless, and we checked
-rather than assumed it. Of the $156$, $107$ ($71\%$) shift by a single
+rather than assumed it. Of the $156$, $112$ ($72\%$) shift by a single
 $300$-step observation sample, and the resulting change in the peak
-\emph{value} has median $2.3$\,mm against a typical peak of $1.5$\,m
---- two parts in a thousand, the second-order $O(\Delta t^2 h'')$ cost
-of stepping one sample off a flat crest. Only ten pairs ($1.6\%$)
-relocate by more than an hour, which is a genuinely different crest on
-a bimodal hydrograph. The distinction from the gradient-differencing
+\emph{value} has median $2.3$\,mm against a typical peak of $1.5$\,m:
+two parts in a thousand, the second-order $O(\Delta t^2 h'')$ cost of
+stepping one sample off a flat crest. Only ten pairs ($1.4\%$)
+relocate by more than half an hour, which is a different crest on a
+bimodal hydrograph. The distinction from the gradient-differencing
 attempt above is exact rather than rhetorical: there the differenced
 quantity \emph{jumps} across a branch, whereas $\max_t h$ is
 \emph{continuous} in $\alpha$ even where its argmax moves, since the
@@ -1812,53 +1749,63 @@ two competing maxima are equal at the crossover. A secant of a
 continuous, piecewise-smooth function remains a valid finite
 difference; a secant across a discontinuity does not.
 
-\paragraph{The answer is one.}
+\paragraph{The count depends on the prior width.}
 \begin{figure}[t]
 \centering
 \input{fig_spectrum}
 \caption{Eigenvalues of the prior-preconditioned Gauss--Newton Hessian
-over the fifteen land-cover classes, sorted. Above $\lambda = 1$ the
-marks constrain a direction more than the prior does; below it the
-prior sets the answer. One
-direction clears the line, and the remaining fourteen fall away over three
-decades --- so a fifteen-parameter calibration is fitting one parameter
-and inheriting fourteen from its prior. The log axis is not cosmetic: on
-a linear one the cliff, which is the result, would be invisible.}
+over the fifteen land-cover classes, sorted, at the two prior widths
+the paper uses: the absolute $\sigma_n = 0.015$ of the fifteen-class
+calibration (filled) and the fractional $\pm 30\%$ assigned to the
+lookup (open). Above $\lambda = 1$ the marks constrain a direction
+more than the prior does; below it the prior sets the answer. One
+direction clears the line at the absolute prior and three at
+$\pm 30\%$; the rest fall away over three decades. The figure
+describes the linearization at the lookup, not the path a calibration
+takes. The log axis is not cosmetic: on a linear one the cliff would
+be invisible.}
 \label{fig:spectrum}
 \end{figure}
 
+At the absolute prior of the fifteen-class calibration in
+Table~\ref{tab:ladder}, $\sigma_n = 0.015$, the spectrum is
 $\lambda = 2.78,\ 0.68,\ 0.61,\ 0.32,\ 0.23,\ 0.10, \dots$
-(Figure~\ref{fig:spectrum}) --- a single
-eigenvalue above unity, a spectral gap of $4.1$, and $2.20$ degrees of
-freedom for signal in Rodgers' sense. \textbf{These 46 marks support
-one roughness parameter} --- one combination of the fifteen class
-values on which the data out-weighs the prior, and no second.
+(Figure~\ref{fig:spectrum}): a single eigenvalue above unity, a
+spectral gap (the ratio of the first two eigenvalues) of $4.1$, and
+$2.20$ degrees of freedom for signal in Rodgers' sense, the sum of
+$\lambda_i/(1+\lambda_i)$ over all directions, which counts a partly
+determined direction as a fraction. At the fractional width this
+paper assigns to the
+lookup, $\sigma_\alpha = 0.30$, the same sensitivities give
+$\lambda = 12.7,\ 2.99,\ 1.13,\ 0.85,\ 0.25, \dots$: three
+combinations above unity, $3.4$ degrees of freedom, and the same
+three classes leading. Between them the count runs one, one, two,
+three, four at widths of $10$, $15$, $20$, $30$ and $50\%$. So the
+marks support one roughness combination at the absolute prior and
+about three at $\pm 30\%$; in both cases the data out-weighs the
+prior on a few combinations of the fifteen class values and on no
+others. These counts are properties of the linearization at the
+lookup.
 
-A shorter pilot of the same configuration ($7{,}200$ steps, two event
-hours) gives $\lambda = 3.03,\ 0.64,\ \dots$: the same count, the same
-three leading classes, and a slightly \emph{larger} leading
-eigenvalue. We had expected the opposite, since a longer window lets
-each peak integrate more trajectory, and the reason it does not is
-worth stating. Over two event hours many marks have not crested, so
-the pilot's ``peak'' is often a point on a rising limb, and a rising
-limb responds to roughness more sharply than a crest does --- at a
-true maximum the first-order response in time has vanished by
-definition. The longer window measures the observable the calibration
-actually uses, and it is marginally less informative, not more. Any
-argument that a longer experiment buys identifiability has to come
-from more marks crossing into the window, not from more trajectory per
-mark.
+A shorter pilot of the same configuration (two event hours) gives the
+same count with a larger leading eigenvalue, $3.03$ against
+$2.78$, because over two hours many marks have not crested and a
+rising limb responds to roughness more sharply than a crest does. The
+longer window measures the observable the calibration uses and is
+marginally less informative, not more; identifiability has to come
+from more marks crossing into the window, not from more trajectory
+per mark.
 
 The scans and the spectrum agree, and they are
 independent: no optimizer, no line search, and no calibration enters
 Eq.~\eqref{eq:gn}.
 
-\paragraph{But the scan varied nearly the wrong direction.}
+\paragraph{The scan varied nearly the wrong direction.}
 The leading mode, with components
 $-0.64$ on developed-medium, $+0.59$ on woody wetland, $-0.36$ on
 developed-low and $-0.23$ on pasture, is dominated by the
 large-area classes. Its overlap with the uniform direction the
-$\alpha$-scan varies --- equal weight per \emph{class} --- is $0.218$,
+$\alpha$-scan varies (equal weight per \emph{class}) is $0.218$,
 which for fifteen classes is indistinguishable from random ($0.258$).
 Its overlap with the same physical change weighted per \emph{cell} is
 $0.699$. So the informative mode is the domain-scale conveyance mode we
@@ -1868,22 +1815,25 @@ That is why the class calibration beats uniform scaling by $0.078$\,m
 is that the scan's one parameter was the wrong one.
 
 \paragraph{What the calibration actually did.}
-Projecting the calibrated displacement onto the eigenbasis is worth
-reporting, and it cuts both ways. The calibrated field sits
+Projecting the calibrated displacement of the absolute-prior
+fifteen-class field onto the eigenbasis of the same prior is worth
+reporting, and it has two parts. The calibrated field sits
 \textbf{9.2 prior standard deviations} from the NLCD lookup, and of that
 motion only $2.9\%$ lies in the single data-constrained direction;
 $85.6\%$ lies in directions where data and prior are comparable and
 $11.5\%$ where the prior alone determines the answer. Per class
-(Table~\ref{tab:learned}) the marks shrink the prior uncertainty by
-$30\%$ on developed-medium and $28\%$ on woody wetland, by
-$11$--$20\%$ on three more, and by $5\%$ or less on the remaining ten.
+(Table~\ref{tab:learned}), in the linearization, the marks narrow the
+prior by $30\%$ on developed-medium and $28\%$ on woody wetland at
+the absolute prior ($58\%$ and $49\%$ at $\pm 30\%$), by $11$--$20\%$
+on three more, and by $5\%$ or less on the remaining ten.
 
-The reassuring half is the null space. Two iterations in,
-the optimizer had moved deciduous forest to $\alpha = 0.739$, mixed
-forest to $1.096$ and cropland to $1.274$ --- three classes these marks
-teach nothing about --- and by iteration nine accumulated curvature had
-returned all three to within $10\%$ of the prior ($0.983$, $1.006$,
-$1.098$). Those excursions were transients of an under-informed
+The first part is the null space. Two iterations in, the optimizer
+had moved deciduous forest to $\alpha = 0.739$, mixed forest to
+$1.096$ and cropland to $1.274$, three classes on which the marks
+would narrow the prior by $2\%$ or less (Table~\ref{tab:learned}), and by
+iteration nine accumulated curvature had returned all three to within
+$10\%$ of the prior ($0.983$, $1.006$, $1.098$). Those excursions
+were transients of an under-informed
 quasi-Newton approximation rather than features of the minimizer: the
 misfit gradient in uninformative directions is not zero, merely
 uninformative, and given enough iterations the prior term dominates. A
@@ -1891,7 +1841,7 @@ calibration stopped early would have reported them as results, which is
 an argument for running these problems to convergence even when the
 objective has visibly flattened.
 
-The unreassuring half is what survives. The residual $9.2\sigma$ is
+The second part is what survives. The residual $9.2\sigma$ is
 concentrated in the two \emph{best}-informed classes, and both are
 pressed against the edge of what the prior permits: developed-medium
 sits at its $\alpha = 0.3$ lower bound for all nine iterations, and
@@ -1906,120 +1856,137 @@ spectrum shows, releases twelve that they do not.
 
 \begin{table}
 \centering\small
-\begin{tabular}{@{}llrrr@{}}
+\begin{tabular}{@{}llrr@{}}
 \toprule
-NLCD & class & prior $\sigma_n$ & posterior $\sigma_n$ & learned \\
+NLCD & class & absolute prior & $\pm 30\%$ prior \\
 \midrule
-23 & developed medium & $0.015$ & $0.0105$ & $30\%$ \\
-90 & woody wetland & $0.015$ & $0.0109$ & $28\%$ \\
-81 & pasture & $0.015$ & $0.0121$ & $20\%$ \\
-22 & developed low & $0.015$ & $0.0125$ & $17\%$ \\
-21 & developed open & $0.015$ & $0.0133$ & $11\%$ \\
-95, 24, 11, 31 & & $0.015$ & $0.014$--$0.015$ & $2$--$5\%$ \\
-41, 43, 82, 42, 71, 52 & & $0.015$ & $0.015$ & $\le 1\%$ \\
+23 & developed medium & $30\%$ & $58\%$ \\
+90 & woody wetland & $28\%$ & $49\%$ \\
+22 & developed low & $17\%$ & $33\%$ \\
+24 & developed high & $4\%$ & $25\%$ \\
+81 & pasture & $20\%$ & $12\%$ \\
+95 & emergent wetland & $5\%$ & $8\%$ \\
+21 & developed open & $11\%$ & $7\%$ \\
+52, 42, 43 & & $\le 1\%$ & $3$--$5\%$ \\
+11, 31, 41, 71, 82 & & $\le 2\%$ & $\le 1\%$ \\
 \bottomrule
 \end{tabular}
-\caption{What the 46 marks constrain in each land-cover class, as the
-fractional reduction from prior to posterior standard deviation, on the
-production-window spectrum. Ten classes narrow by $5\%$ or less: any
-value a calibration reports for them is the prior, not the data.}
+\caption{What the 46 marks would narrow in each land-cover class: the
+fractional reduction from prior to posterior standard deviation from
+the Gauss--Newton Hessian linearized at the lookup, at the absolute
+prior $\sigma_n = 0.015$ and at the $\pm 30\%$ fractional prior. Ten
+classes narrow by $5\%$ or less under the absolute prior and eight
+under the fractional one: any value a calibration reports for them
+is the prior, not the data.}
 \label{tab:learned}
 \end{table}
 
 \paragraph{A direct test: calibrate three classes instead of fifteen.}
 Everything above is a statement about a matrix. It makes a prediction
-an optimizer can falsify: if the marks really inform one direction,
-then calibrating only the classes that carry that direction should
-recover most of what all fifteen achieved --- and if it does not, the
-information lives outside the leading eigenspace and the
-one-parameter reading is too narrow. We ran it. Taking the three
-classes with the largest components in the leading eigenvector
-(developed-medium, woody wetland, developed-low), freezing the other
-twelve at the prior, and calibrating from the NLCD lookup gives
-$J = 682.1$ after four iterations --- the last two changing $J$ by
-$0.02\%$ and $0.001\%$. Against the NLCD prior's $808.3$, three
-parameters remove $126.1$ units where fifteen remove $150.9$:
-\textbf{$84\%$ of the reduction from $20\%$ of the parameters.} The
-twelve frozen classes were verified to sit bit-exactly at the prior in
-the output, so the comparison is what it claims to be.
+an optimizer can falsify: if the marks inform a few directions, then
+calibrating only the classes that carry the leading one should
+recover most of what all fifteen achieved, and if it does not, the
+information lives outside the leading eigenspace. We ran it
+(Table~\ref{tab:threefifteen}): the three classes with the largest
+components in the leading eigenvector (developed-medium, woody
+wetland, developed-low), the other twelve frozen at the prior and
+verified to sit there bit-exactly in the output.
 
-The prediction survives the change of metric, which is the sharper
-test. Scored on peak-WSE MAE rather than on the objective it was fit
-to, the three-parameter field reaches $0.6274$\,m against the NLCD
-prior's $0.7188$ --- $85\%$ of the $0.107$\,m that fifteen parameters
-achieve, and within a hair of the $84\%$ it recovered of the
-objective. The two agree here, and they did not for the fifteen-class
-field (Section~\ref{sec:calibrated}): a fit confined to the directions
-the data constrains buys MAE at the same rate it buys objective, while
-one free to move all fifteen does not. Three of these parameters also
-beat the best physically defensible uniform field by $0.062$\,m,
-so nearly all of what class-by-class calibration achieves over global
-scaling is achieved by three classes.
+\begin{table}
+\centering\small
+\begin{tabular}{@{}rlrrrrrrr@{}}
+\toprule
+classes & prior & its & $J_{\rm mis}$ & $J_{\rm prior}$ & $\alpha_{22}$ & $\alpha_{23}$ & $\alpha_{90}$ & MAE \\
+\midrule
+--- & NLCD lookup & 0 & $808.3$ & $0$ & $1$ & $1$ & $1$ & $0.7188$ \\
+15 & $\sigma_n = 0.015$ & 9 & $615.4$ & $41.9$ & $1.627$ & $0.300$ & $0.355$ & $0.6116$ \\
+3 & $\sigma_n = 0.015$ & 4 & $648.9$ & $33.2$ & $1.626$ & $0.300$ & $0.301$ & $0.6274$ \\
+15 & $\sigma_\alpha = 0.30$ & 3 & $615.4$ & $16.5$ & $1.99$ & $0.300$ & $0.64$ & $0.6154$ \\
+3 & $\sigma_\alpha = 0.30$ & 3 & $633.9$ & $15.4$ & $2.34$ & $0.300$ & $0.300$ & $0.6290$ \\
+3 & $\sigma_\alpha = 0.50$ & 1 & $627.0$ & $10.0$ & $3.00$ & $0.300$ & $0.300$ & $0.6295$ \\
+\bottomrule
+\end{tabular}
+\caption{Three spectrum-chosen classes against fifteen, calibrated
+from the NLCD lookup on the production window. ``its'' is
+quasi-Newton iterations: the fifteen-class runs and the three-class
+$\pm 30\%$ run were stopped by the wall clock with the objective
+flat, and the $\pm 50\%$ run stopped in one iteration at a corner of
+the box, where the projected gradient is zero. $J_{\rm mis}$ and
+$J_{\rm prior}$ in objective units; $\alpha = n / n_{\rm lookup}$
+for the three active classes, $0.300$ being the lower bound; MAE in
+metres over the 46 marks. Every entry is an achieved in-sample fit.}
+\label{tab:threefifteen}
+\end{table}
 
-Two details sharpen it further. The remaining $16\%$ is real, not
-noise, and it decomposes exactly: the fifteen-parameter field pays
-$8.8$ more units of prior penalty to buy $33.5$ more units of misfit
-reduction.
-So the twelve non-leading classes are not literally decoration --- in
-aggregate they reach a few per cent of $J$ --- but they are not where
-the information is. And the three parameters land where the
-fifteen-parameter calibration put them: developed-low at
-$\alpha = 1.626$ against $1.627$, developed-medium on its
-$\alpha = 0.3$ bound in both. Two classes reproduced to three digits
-from a different starting point and a different active set is the
-behaviour of parameters the data actually determines. Woody wetland is
-the exception and is instructive: alone it dives to $\alpha = 0.301$
-where the full calibration left it at $0.355$, because with its
+Under the absolute prior, three parameters remove $126$ of the $151$
+objective units fifteen remove, $84\%$ of the objective reduction
+from $20\%$ of the parameters, in four iterations against nine. The
+prediction survives the change of metric, which is the sharper test:
+scored on peak-WSE MAE, which they were not fit to, the three reach
+$0.6274$\,m, $85\%$ of the $0.107$\,m that fifteen achieve. The two
+shares agree here and did not for the fifteen-class field
+(Section~\ref{sec:calibrated}): a fit confined to the directions the
+data constrains buys MAE at the same rate it buys objective. The
+remaining $16\%$ decomposes exactly, the fifteen-parameter field
+paying $8.8$ more units of prior to buy $33.5$ more of misfit, so the
+twelve non-leading classes are not literally decoration but are not
+where the information is. And the three land where the fifteen put
+them: developed-low and developed-medium reproduce their
+fifteen-class values to three digits from a different starting point
+and active set, so those values come from the marks and not from the
+start point. Woody wetland is the exception: alone it dives to the
+floor where the full calibration left it at $0.355$, because with its
 partners frozen it must supply their share of a change the marks
-constrain only in combination --- equifinality, exactly where the
-eigenvector says to expect it.
+constrain only in combination, the equifinality the eigenvector
+predicts.
 
 \paragraph{The same three classes under the fractional prior.}
-The three-class run above used the absolute prior. Repeating it under
-the fractional prior at $\sigma_\alpha = 0.30$, the width we assign to
-the lookup, and at $0.50$ as a bracket above it, gives $0.6290$
-and $0.6295$\,m (Table~\ref{tab:ladder}): $84\%$ and $83\%$ of the
-fifteen-class error reduction, and $90\%$ and $94\%$ of its objective
-reduction. The optimizer's path is short. At $\pm 30\%$ the first step
-puts all three classes on a bound, exactly as it put seven of fifteen
-there (Section~\ref{sec:calibration}), and two more iterations bring
-developed-low back from $\alpha = 3$ to $2.34$; at $\pm 50\%$ the first
-step lands on the corner of the box, the projected gradient there is
-zero, and the run converges in one iteration. The Gaussian prior is not
-what stops it: it contributes $15$ units to $J$ at $\pm 30\%$ and $10$
-at $\pm 50\%$ against a misfit near $630$, so the bounds
-$\alpha \in [0.3, 3]$ do the constraining.
+Repeating the run at $\sigma_\alpha = 0.30$, the width we assign to
+the lookup, and at $0.50$ as a bracket above it, gives $0.6290$ and
+$0.6295$\,m (Table~\ref{tab:threefifteen}): $84\%$ and $83\%$ of the
+$0.107$\,m fifteen-class reduction, shares quoted throughout against
+the best fifteen-class field we obtained. The optimizer's path is short. At
+$\pm 30\%$ the first step puts all three classes on a bound, as it
+put seven of fifteen there (Section~\ref{sec:calibration}), and two
+more iterations bring developed-low back from $\alpha = 3$ to $2.34$;
+at $\pm 50\%$ the first step lands on a corner of the box, where the
+projected gradient is zero, and the run stops in one iteration. The
+Gaussian prior is not what stops it: it contributes $15$ units to $J$
+at $\pm 30\%$ and $10$ at $\pm 50\%$ against a misfit near $630$, so
+the bounds $\alpha \in [0.3, 3]$ do the constraining.
 
 Three things follow. Developed-medium reaches $\alpha = 0.3$ under
 every prior and every active set we have run, and woody wetland does
 whenever its two partners are frozen ($0.355$ and $0.64$ when they are
-not --- the equifinality above), so in the three-class problem those
+not, the equifinality above), so in the three-class problem those
 values are set by the data, and they are $n = 0.036$ and $0.029$,
 below the lookup's $0.040$ for developed open land. Developed-low's
 value is set by the prior: it moves from $1.63\times$ to $2.34\times$
 to $3\times$ its lookup as the width opens while the MAE moves
 $0.002$\,m, which is the flat direction the eigenvector predicted. The
-three-parameter field therefore lies outside the prior as well. What
-the spectrum selects is the calibration the marks can determine, and
-what they determine is a roughness below the lookup's range at any
-width we assign to it, which is evidence that the calibrated friction
-is compensating for an error that lives elsewhere
+three-parameter field therefore lies outside the prior as well. The
+spectrum selects the three classes, and the calibration of those
+three reaches a roughness below the lookup's range at every width we
+assign to it, which is evidence that the calibrated friction is
+compensating for an error that lives elsewhere
 (Section~\ref{sec:icauthority}).
 
 
-\paragraph{Would more marks fix it?}
-This is the natural objection --- 46 observations for 15 parameters
-sounds like too few --- and Eq.~\eqref{eq:gn} answers it, because
-$\lambda$ scales linearly in the number of comparable observations and
-as $\sigma^{-2}$ in their quality (Table~\ref{tab:scaling}). The answer
-is that more marks help, slowly, and that the supply is exhausted long
-before the parameterization is justified. Going from the 46 marks of
-this window to \emph{all} 71 the model can legitimately be scored
-against supports two parameters. Every QC-passed mark in the
-domain, over a window long enough to catch all of them, supports three.
+\paragraph{Scaling with survey size.}
+The natural objection is that 46 observations are too few for 15
+parameters, and Eq.~\eqref{eq:gn} answers it for the
+linearization, because $\lambda$ scales linearly in the number of
+comparable observations and as $\sigma^{-2}$ in their quality
+(Table~\ref{tab:scaling}, at the absolute prior). The answer is that
+more marks help, slowly, and that the supply is exhausted long before
+the parameterization is justified. Going from the 46 marks of this
+window to \emph{all} 71 the model can legitimately be scored against
+would support two parameters. Every QC-passed mark in the domain,
+over a window long enough to catch all of them, would support three.
 Reaching five would take every Harvey mark that falls in the domain
-including the $62\%$ that failed QC because they are channel surveys a
-30\,m cell cannot represent. Fifteen would take of order $10^5$ marks.
+including the $62\%$ that failed QC because they are channel surveys
+a 30\,m cell cannot represent. Fifteen would take of order $10^5$
+marks.
 
 \begin{table}
 \centering\small
@@ -2031,42 +1998,180 @@ Marks & Supported & That data set is \\
 71 & 2 & all admissible marks, 24-hour window \\
 108 & 3 & every QC-passed mark, 72-hour window \\
 324 & 5 & every Harvey mark in-domain, \emph{before} QC \\
-$7\times10^5$ & 15 & --- \\
+$1.2\times10^{5}$ & 15 & --- \\
 \bottomrule
 \end{tabular}
 \caption{How the supported-parameter count scales with survey size at
-fixed quality ($\sigma = 0.15$\,m); a parameter is \emph{supported}
-when the data narrows it more than the prior does ($\lambda > 1$). At fixed size, improving quality to
-$\sigma = 0.10$\,m buys two more parameters (three in all) and $\sigma = 0.05$\,m --- better
-than any high-water-mark survey achieves --- buys five. The table is a
-benchmark, not a forecast: it assumes independent, equal-variance
-residual errors and holds the measured per-mark sensitivity, the prior,
-and the linearization fixed, so the longer-window rows describe mark
-populations only, and a survey with correlated errors would enter
-through $\Gamma^{1/2} S^\top C^{-1} S\, \Gamma^{1/2}$ rather than
-through a count. That is the conservative reading
-and, as it turns out, the correct one: we expected a longer window to
-raise each mark's sensitivity and it does not (see text).}
+fixed quality ($\sigma = 0.15$\,m) and at the absolute prior
+$\sigma_n = 0.015$; a parameter is \emph{supported} when the data
+narrows it more than the prior does ($\lambda > 1$). At the
+$\pm 30\%$ width the 46-mark row is already three. At fixed size,
+improving quality to $\sigma = 0.10$\,m buys two more parameters
+(three in all) and $\sigma = 0.05$\,m, better than any
+high-water-mark survey achieves, buys five. The table is a linearized
+benchmark, not a forecast of what a calibration would do: it assumes
+independent, equal-variance residual errors and holds the measured
+per-mark sensitivity, the prior, and the linearization at the lookup
+fixed, so the longer-window rows describe mark populations only, and
+a survey with correlated errors would enter through
+$\Gamma^{1/2} S^\top C^{-1} S\, \Gamma^{1/2}$ rather than through a
+count.}
 \label{tab:scaling}
 \end{table}
 
 The conclusion is therefore not that Manning roughness is
-unidentifiable. It is that \emph{surveyed peak water-surface elevations
-at survey accuracy carry about two degrees of freedom of information
-about distributed roughness in this basin}; that this can be computed
-from sixteen forward runs before any optimizer is written; and that the
-limitation is a property of the observing system rather than of the
-method. A study that reported only its misfit reduction would have
-concluded the opposite.
+unidentifiable. It is that \emph{surveyed peak water-surface
+elevations at survey accuracy carry between one and three
+combinations' worth of information about distributed roughness in
+this basin}, depending on how far the lookup is trusted; that this
+can be computed from sixteen forward runs at the lookup before any
+optimizer is written; and that the limitation is a property of the
+observing system rather than of the method. A study that reported
+only its misfit reduction would have concluded the opposite.
+
+\subsection{Validation against a second observable}
+\label{sec:crossobs}
+
+The three-class field of Section~\ref{sec:spectrum} is an in-sample
+fit: the 46 marks that define its objective are the marks it is
+scored on. The stream gauges of Table~\ref{tab:gauges} are the only
+second observable in the basin. Five of them hold water above the
+cell bed for part of the window (Buffalo Bayou at Katy and at Houston
+for all 48 records, Langham Creek at Addicks for 20, Fulshear for 14,
+Bear Creek for 4: 134 records in all). We calibrated the same three
+classes on those 134 above-bed stage records, with the survey-grade
+$\sigma = 0.15$\,m and the records treated as independent, and scored
+the result on the 46 marks (Table~\ref{tab:crossobs}). The run took
+one accepted quasi-Newton iteration in its five-hour budget and was
+stopped by the wall clock; two classes were projected onto the upper
+bound of the box and the third is interior.
+
+The failure is directional. The gauge calibration raises all three
+classes where the mark calibration lowered two of them to the floor.
+The direction does not depend on the observation weight. At the
+lookup the two objectives' gradients on developed-medium have opposite
+sign ($\partial J/\partial n = -5.3\times10^{4}$ for the gauges and
+$+7.6\times10^{2}$ for the marks, the prior contributing nothing at
+its own centre), and no rescaling of $\sigma$ or of the number of
+independent records changes a sign; the two agree on developed-low,
+which both raise. The step the gauges chose also worsens the marks at
+first order: the mark gradient projected on the gauge step predicts
+$+171$ objective units, and the measured change was $+87$. Along its
+own objective the step reached $35\%$ of its linear prediction
+($-7354$ measured against $-21283$ predicted), the saturation
+Section~\ref{sec:spectrum} cites. Scored on
+the marks, the gauge-calibrated field reaches $0.7609$\,m against the
+uncalibrated $0.7188$: \emph{calibrating on the gauges at this weight
+makes the model worse at the marks than not calibrating at all}. The
+mark-calibrated field, scored on the gauges, lowers their RMSE from
+$3.24$ to $3.19$\,m.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Manning field & 22 & 23 & 90 & gauge $J$ & gauge RMSE & mark MAE \\
+\midrule
+NLCD lookup & $0.090$ & $0.120$ & $0.098$ & $31{,}313$ & $3.24$ & $0.7188$ \\
+calibrated on the gauges & $0.27$ & $0.36$ & $0.171$ & $24{,}007$ & $2.84$ & $0.7609$ \\
+calibrated on the marks & $0.210$ & $0.036$ & $0.029$ & $30{,}333$ & $3.19$ & $0.6290$ \\
+\bottomrule
+\end{tabular}
+\caption{The same three classes (developed-low 22, developed-medium 23,
+woody wetland 90) calibrated against each observable and scored on
+both, at $\sigma_\alpha = 0.30$ with the other twelve classes frozen at
+the lookup. Manning $n$ in $\mathrm{s\,m^{-1/3}}$; gauge $J$ over 134
+above-bed stage records at $\sigma = 0.15$\,m treated as independent,
+with RMSE $= \sigma\sqrt{2J/134}$ in metres; mark MAE in metres over
+the 46 cluster-A marks. The gauge calibration is one accepted
+quasi-Newton iteration stopped by the wall clock; $0.27$ and $0.36$
+were projected onto the $\alpha = 3$ bound. Every entry is an
+achieved fit on the observable it was calibrated to and a score on
+the other.}
+\label{tab:crossobs}
+\end{table}
+
+\paragraph{What the gauges measure.}
+The gauge residual at the lookup is not the size of a roughness
+error. Splitting the misfit at each gauge into its mean over the
+window and the variation about that mean (Table~\ref{tab:gaugeresid})
+puts $99.5\%$ of $J$ in the constant per-gauge offset. The model is
+$4.9$\,m too high at Buffalo Bayou at Houston, which carries $82\%$ of
+the misfit, and $1$--$2$\,m too high at three of the other four
+gauges. What remains in hydrograph shape is $0.24$\,m RMSE against
+$3.24$\,m in all. This is a decomposition of the residual, not of the
+roughness information: roughness does move the level at these gauges,
+and the one change tested against it, the field of
+Table~\ref{tab:crossobs} at three times the lookup on two developed
+classes, removed $0.4$\,m of the $3.24$. Whether any roughness field
+can remove the remaining $2.8$\,m is not something these runs
+measure. The Houston gauge sits in the reach that
+Section~\ref{sec:hwm} found the model cannot drain.
+
+\begin{table}
+\centering\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Gauge & records & mean residual & shape RMSE & share of $J$ \\
+\midrule
+Buffalo Bayou at Houston & 48 & $+4.90$\,m & $0.38$\,m & $82\%$ \\
+Buffalo Bayou nr Katy & 48 & $+1.94$\,m & $0.07$\,m & $13\%$ \\
+Buffalo Bayou nr Fulshear & 14 & $+1.97$\,m & $0.06$\,m & $4\%$ \\
+Langham Ck nr Addicks & 20 & $-0.61$\,m & $0.12$\,m & $0.6\%$ \\
+Bear Ck nr Barker & 4 & $+1.20$\,m & $0.01$\,m & $0.4\%$ \\
+\bottomrule
+\end{tabular}
+\caption{The gauge misfit at the NLCD lookup, gauge by gauge, over the
+134 above-bed records: model minus observed water-surface elevation
+averaged over the window, the RMS variation about that mean, and each
+gauge's share of $J$. Summed, the offsets carry $99.5\%$ of $J$ and
+the shape $0.5\%$: RMSE $3.24$\,m in all, $0.24$\,m in shape alone.}
+\label{tab:gaugeresid}
+\end{table}
+
+A calibration reported against the gauges alone would show the RMSE
+falling from $3.24$ to $2.84$\,m and roughness values with nothing to
+mark them as wrong: $0.27$ and $0.36$ on developed-low and
+developed-medium, above the lookup's entries but in the lookup's own
+order. That is what makes it worth reporting. Neither the reduction
+nor the plausibility of the field is evidence about friction.
+
+\paragraph{Fit, uncertainty, and skill.}
+Three kinds of number appear in this section and the last, and they
+are not interchangeable. An \emph{achieved fit} is the misfit of one
+specific roughness field on the observations its calibration used,
+from a forward run at that field: every MAE and objective in
+Tables~\ref{tab:ladder}, \ref{tab:threefifteen}
+and~\ref{tab:crossobs}, and the ceiling of
+Section~\ref{sec:authority}. It says what the model did at that field
+and nothing about whether the field is right or would transfer. A
+\emph{linearized uncertainty} comes from the sensitivity matrix at
+the lookup through the Gauss--Newton Hessian: the eigenvalues and
+counts, the widths in Table~\ref{tab:learned}, the benchmark of
+Table~\ref{tab:scaling}, and the first-order prediction above of the
+gauge step's effect on the marks. It says how far the observations
+could narrow each combination of classes under the linear model at
+the prior, for a stated prior width, and nothing about the values a
+calibration reaches or the error it removes. \emph{Held-out skill} is
+the score of a calibrated field on observations that did not enter
+its objective, either a second observable or a hold-out within the
+same one. This paper has only the first kind, the two cross-scores of
+Table~\ref{tab:crossobs}: the gauge-calibrated field is worse than
+the lookup at the marks, and the mark-calibrated field improves the
+gauges by $0.05$\,m of $3.24$. The three-class field's $0.090$\,m
+improvement at the marks is therefore a fit and not a skill, and the
+three-combination count is an uncertainty at the prior, not a result
+of the calibration. The two observables agree on one thing: the
+land-cover table is not where this model's error lives.
 
 \section{Where else the error lives: the initial condition}
 \label{sec:icauthority}
 
 Roughness, calibrated as well as we can calibrate it, explains $15\%$
 of this model's error against the marks. Something explains the other
-$85\%$, and the candidates --- rainfall forcing, mesh elevation,
-datum, representation error, the state the window starts from --- are
-not all equally measurable. This section points the ceiling
+$85\%$, and the candidates (rainfall forcing, mesh elevation, datum,
+representation error, the state the window starts from) are not all
+equally measurable. This section points the ceiling
 measurement of Section~\ref{sec:authority} at the one candidate it can
 probe with a single scan direction: the initial condition. The
 initial state is also the input a variational initialization would
@@ -2098,7 +2203,7 @@ $1.20$ & $1.025\times10^{3}$ & $0.8174$ & $+0.0564$ \\
 is monotone over the whole range with no interior optimum, straight to
 about $1\%$ between $a = 0.8$ and $1.1$ and convex above it: adding
 water hurts at an accelerating rate. The model holds systematically too
-much water at hour 29. No mark is dry at any point.}
+much water at hour 29.}
 \label{tab:ic}
 \end{table}
 
@@ -2108,38 +2213,38 @@ Three things follow, and they matter more than the roughness result.
 roughness} (Figure~\ref{fig:authority}). Per unit fractional change, $\mathrm{d}\,\mathrm{MAE}$ is
 $0.392$ for the initial condition over its well-sampled range
 ($a \in [0.8, 1.1]$) against $0.098$ for a uniform roughness scale. Like for like at a $20\%$ perturbation: $0.075$\,m
-versus $0.020$\,m. The plausibility runs the same way: a $20\%$ error
-in water stored after a 29-hour spin-up under radar-derived rainfall
-is within the uncertainty of that forcing~\cite{xu2025harvey}, while
-Manning values at $30\%$ of the published table lie below the table's
-own value for open land.
+versus $0.020$\,m. Whether a $20\%$ error in water stored after a
+29-hour spin-up under radar-derived rainfall is plausible is taken up
+at the end of this section; Manning values at $30\%$ of the published
+table lie below the table's own value for open land.
 
 \textbf{The response has the opposite curvature to roughness's.}
-$J(\alpha)$ for roughness is concave and saturating --- the knob runs
-out --- consistent with a parameter acting indirectly through
-path-integrated conveyance. $J(a)$ for the initial state is straight to
-about $1\%$ between $a = 0.8$ and $1.1$ and \emph{convex} above,
-steepening as water is added, and it does not turn over anywhere in the
-range. Extending the scan below the table confirms it: at $a = 0.6$ ---
-a $40\%$ reduction in antecedent water --- the MAE is still falling, to
-$0.5818$\,m (Figure~\ref{fig:authority}). Neither the slope nor the
-sign gives any indication of an
-optimum near the checkpoint value. That is the signature of a
-systematic bias rather than a poorly-tuned parameter: the model does not
-hold slightly the wrong \emph{distribution} of water at hour 29, it
-holds too much of it.
+$J(\alpha)$ for roughness is concave and saturating, consistent with
+a parameter acting indirectly through path-integrated conveyance.
+$J(a)$ for the initial state is straight to about $1\%$ between
+$a = 0.8$ and $1.1$ and \emph{convex} above, steepening as water is
+added, and it does not turn over anywhere in the range. Extending the
+scan below the table confirms it: at $a = 0.6$ (a $40\%$ reduction in
+antecedent water) the MAE is still falling, to $0.5818$\,m
+(Figure~\ref{fig:authority}). Neither the slope nor the sign gives
+any indication of an optimum near the checkpoint value. That is the
+signature of a systematic bias rather than a poorly-tuned parameter:
+the model does not hold the wrong \emph{distribution} of water at
+hour 29, it holds too much of it.
 
-\textbf{It is a diagnosis, not a knob.} We are not proposing to
-calibrate the initial condition against these marks. Over this window
-the initial state carries $3$ unknowns on each of 2.93M cells against
-46 peak observations, and everything Section~\ref{sec:authority}
-establishes about identifiability applies with three more orders of
-magnitude of freedom: such a calibration would fit the marks exactly
-and mean nothing. What the scan does establish is the weaker
-and more useful claim that the residual these marks measure lives substantially
-in the water balance --- in the rainfall forcing or the antecedent state
---- rather than in the friction, which is where a roughness calibration
-alone would have kept looking.
+\textbf{It is a diagnosis, not a calibration target.} We are not
+proposing to calibrate the initial condition against these marks.
+Over this window the initial state carries $3$ unknowns on each of
+2.93M cells against 46 peak observations, and everything
+Section~\ref{sec:authority} establishes about identifiability applies
+with almost six orders of magnitude more freedom than the fifteen
+classes: such a calibration
+would fit the marks exactly and mean nothing. What the scan does
+establish is the weaker and more useful claim that the residual these
+marks measure lives substantially in the water balance (in the
+rainfall forcing or the antecedent state) rather than in the
+friction, which is where a roughness calibration alone would have
+kept looking.
 
 One caveat bounds all three. The checkpoint is a \emph{model} state, not
 an observation, so it already contains accumulated forcing and elevation
@@ -2147,16 +2252,19 @@ error; the scan perturbs that state rather than an independent
 measurement of it. A calibration of the initial condition would
 therefore absorb such error rather than correct it, and could quietly
 launder the downstream drainage defect of Section~\ref{sec:hwm} into a
-``corrected'' initial state --- the same trap as scoring against the 37
+``corrected'' initial state, the same trap as scoring against the 37
 marks the model cannot drain. Establishing whether a $20\%$
-water-balance error at hour 29 is physically plausible is a question for
-the forcing data, not for the optimizer. Our answer is that it is:
-the antecedent state after a 29-hour spin-up under radar rainfall is
-among the least certain inputs the model has, and an error of that
-size in it is plausible. The uncertainty study of this event
-in~\cite{xu2025harvey} finds precipitation and mesh resolution to dominate the simulated
-inundation over the choice of outlet boundary condition~\cite{xu2025harvey},
-which points the same way.
+water-balance error at hour 29 is physically plausible is a question
+for the forcing data, not for the optimizer, and we have not
+quantified it: that needs a spin-up of one to two months before the
+event rather than 29 hours. What can be said is that $20\%$ is an
+ordinary scale of hydrologic uncertainty at high flow (observed
+streamflow itself carries uncertainty of that
+order~\cite{kiang2018streamflow}), and that the uncertainty study of
+this event in~\cite{xu2025harvey} finds precipitation and mesh
+resolution to dominate the simulated inundation over the choice of
+outlet boundary condition, which points the same way. The $20\%$ is
+an illustrative perturbation, not a measured error.
 
 \section{Conclusions and outlook}
 
@@ -2164,7 +2272,7 @@ An exact, verified Jacobian turns out to be the single artifact from
 which everything else follows cheaply: adjoint state and parameter
 sensitivities, gradient-based calibration, and implicit stepping. The
 capability is production-ready in the sense that matters for an
-operational code --- behind a flag, FD-gated in CI, and with the
+operational code: behind a flag, FD-gated in CI, and with the
 verification baseline (FD coloring) kept alive in the configuration
 system.
 
@@ -2172,33 +2280,28 @@ The second artifact is a measurement rather than a capability, and it
 is the one we would most like others to copy. Asking what fraction of
 a model's error a parameter is \emph{able} to explain is cheap,
 optimizer-independent, and it reframes what a calibration result
-means. Here it bounded roughness at $4\%$ of the error within
-defensible values and $11\%$ at the edge of plausibility; the
-calibration then reached $15\%$, beating every global scaling and
-confirming that letting roughness vary by class removes error a
-single global factor cannot. What makes the measurement worth copying is not that
-number but the two it led to. Pointed at the residual instead of the
-parameter, the same machinery isolated a reach the model cannot drain;
-pointed at the initial condition, it found more authority than
-roughness has. A calibration study that had only reported its misfit
-reduction would have found neither.
+means. Here it bounded roughness at $4\%$ of the error inside the
+prior and $11\%$ at the scan's low end, below the table; the
+calibration then reached $15\%$ in sample, beating every global
+scaling and confirming that letting roughness vary by class removes
+error a single global factor cannot. What makes the measurement worth
+copying is not that number but the two it led to. Pointed at the
+residual instead of the parameter, the same machinery isolated a
+reach the model cannot drain; pointed at the initial condition, it
+found more authority than roughness has. A calibration study that
+had only reported its misfit reduction would have found neither.
 
-Next steps, in order. First, cross-validate the
-calibration reported here --- nine quasi-Newton iterations stopped by
-a wall-clock limit, with one class on a bound, is a fit, not
-demonstrated skill --- and the held-out marks must come from within
-the upstream band, because the middle band carries the drainage
-defect. Second, calibrate the number of parameters
-the observable supports rather than the number the land-cover map
-offers; the spectrum of the prior-preconditioned Hessian would settle
-that count directly, and at fifteen parameters it is a small dense
-eigenproblem rather than a research project. Third, the water balance:
-the initial-condition scan says the antecedent state carries more of
-this residual than the friction does, which makes the forcing and the
-initial condition --- not the roughness --- the next thing to
-calibrate or diagnose, with the machinery applying unchanged and
-$dJ/du_0$ already verified. Fourth, the conveyance and outlet
-representation the drainage finding implicates. Finally, coupling the
+Next steps, in order. First, the one out-of-sample test we ran,
+against the stream gauges, failed in sign as well as in size
+(Section~\ref{sec:crossobs}); the remaining test of the three-class
+field is a hold-out within the upstream band, because the middle band
+carries the drainage defect. Second, the water balance: the
+initial-condition scan says the antecedent state carries more of this
+residual than the friction does, which makes the forcing and the
+initial condition, not the roughness, the next thing to calibrate or
+diagnose, with the machinery applying unchanged and $dJ/du_0$ already
+verified. Third, the closed-perimeter idealization the drainage
+finding implicates, a divide the event exceeded. Finally, coupling the
 gradient path to PyTorch through the existing
 PETSc--PyTorch bridge for learned-physics and hybrid data-assimilation
 experiments.
@@ -2210,8 +2313,8 @@ costs several forward sweeps over half a million steps. The
 affordable path stacks reductions that are all now in place. First,
 fully implicit stepping at CFL-free time steps: backward Euler with
 the assembled Jacobian carries the 30\,m, 2.93M-cell Harvey-region
-mesh at $\Delta t = 1$\,s --- a step the differentiable explicit path
-cannot take at any tested size (Section~\ref{sec:implicit}) --- with
+mesh at $\Delta t = 1$\,s, a step the differentiable explicit path
+cannot take at any tested size (Section~\ref{sec:implicit}), with
 Newton converging in about two iterations per step behind a
 block-Jacobi-preconditioned Krylov solve at converged inner
 tolerances; larger implicit steps are under investigation. Second, GPU execution of the entire gradient
@@ -2222,14 +2325,15 @@ all device-resident. On four A100 GPUs, a forward-plus-adjoint
 gradient of a one-simulated-hour window on that mesh (3{,}600
 implicit steps, 400 in-memory checkpoints) takes about nine minutes,
 and one TAO iteration of a dense-gauge twin calibration
-(418{,}076 gauges, 39-step window) takes 1.7\,s --- roughly
-$19\times$ one 64-core CPU node of the same system. Device and host
-runs produce bitwise-identical trajectories under a common compiler
-and gradients identical to every printed digit, so the
-finite-difference gates of Table~\ref{tab:verification} carry over
-unchanged. Third, land-cover-class parameterization (tens of TAO
-evaluations instead of hundreds) and calibration windows placed on
-the storm peak rather than the full event.
+(418{,}076 gauges, 39-step window) takes 1.7\,s, about $19\times$
+faster than one 64-core CPU node of the same system. Device and host
+runs of the same binary and partition produce objectives and gradients
+identical to every printed digit, so the finite-difference gates of
+Table~\ref{tab:verification} carry over unchanged. Third,
+land-cover-class parameterization (nine or fewer quasi-Newton
+iterations in Table~\ref{tab:threefifteen}, against the hundreds the
+per-cell twins of Section~\ref{sec:houston} needed) and calibration
+windows placed on the storm peak rather than the full event.
 
 \section*{Code and data availability}
 RDycore is open source at \url{https://github.com/RDycore/RDycore}; the

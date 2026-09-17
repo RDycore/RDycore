@@ -322,6 +322,188 @@ reviewer.
 agreed in principle, but the joint spectrum uses the same gauge sensitivities
 and is on hold behind the same convergence test.
 
+### Draft email to the group, 2026-09-16 (Mark to send; softened per Mark)
+
+Subject: Manning paper: where the draft now stands on the main claim
+
+All,
+
+The draft now carries the o62-o66 results and Emil's distinction between
+an achieved fit, a linearized uncertainty and held-out skill, kept
+separate throughout. Two things about the main claim are worth saying
+plainly before the next full read, so that the choices are visible
+rather than implicit.
+
+**1. The paper leads with the measurement, not with a calibrated
+field.** The abstract says roughness explains about 15% of the survey
+error, three land-cover classes capture most of that, neither
+observable's answer is inside the land-cover table, and the remaining
+error is in the water balance and the mesh. The three-class calibration
+is reported as a fit worth having, the "three combinations" count as a
+linearized uncertainty at the lookup, and the gauge test as the one
+measure of skill, which is negative. The alternative is to headline the
+three-parameter field as the result and carry the rest as
+qualification. I think the runs do not support that, but it is what a
+reader expects from an adjoint paper, so I want to be sure we agree the
+paper is not delivering a roughness table.
+
+**2. The downstream reach, the lake of the earlier email.** The paper
+keeps what is measured: 37
+marks never crest, the bias grows downstream through the middle band,
+no roughness value repairs it, and those marks are excluded from the
+calibration target. Unless someone objects, it will stop there and list
+the candidate causes (outlet capacity, a catchment-delineated domain
+under a storm that exceeded the divide, mesh elevation in the low
+reach, the numerics) without choosing one, because the bias gradient
+alone cannot separate them. Two questions would let it say more, if you
+can answer them:
+
+- Gautam, Donghui: does the Turning perimeter follow a catchment divide
+  by design, with the 13-edge side set meant as the only exit? If so,
+  and if Harvey is known to have overtopped that divide, the paper can
+  attribute the ponding to the domain idealization on your authority
+  rather than leave it open.
+- Is it worth running the outlet-flux check before submission? Summing
+  the free-outflow boundary flux over the late window from the existing
+  72-hour checkpoints, against the lateral inflow into the reach, would
+  separate an outlet at capacity from a domain that simply holds water.
+  It is a few node-hours and would turn the list of causes into a
+  finding. If nobody wants it, the list stands.
+
+Mark
+
+*(Session note: the lake-paragraph edit -- cut the untraced pond
+statistics and the divide mechanism, list the candidate sources, change
+contribution 5 -- is proposed and waits on Mark's word. What stays is
+measured: tab:baseline, tab:bands, "cannot drain", the exclusion.)*
+
+### Donghui, 2026-09-16: decision 1 CLOSED, and the lake attributed
+
+**On decision 1 (which result leads): option A.** "I agree with CLAUDE
+that we should not aim to deliver a roughness table. There are
+uncertainties from many sources that will affect the calibration of the
+Manning coefficient. Even the calibrated one leads to improvement, it may
+not represent the truth." Consistent with his 09-14 lean toward keeping
+the 15% prominent. Consequence for the paper: the abstract and
+contributions already read this way; Sec 6.3 still frames the
+fifteen-class field as the headline and must be brought into line. His
+last clause deserves a sentence of its own somewhere -- a calibrated field
+that improves the fit is not thereby the true field.
+
+**On the lake: the attribution is his, on the record.** "The domain
+extent was from actual watershed boundary. Due to the watershed is flat,
+it is possible for the water to flow through the watershed boundary for
+the very extreme Harvey event. We cannot simulate this overtopping as we
+set the closed boundary in RDycore." So the paper attributes the ponding
+to the domain idealization rather than listing candidate causes, and the
+"list the causes and give up" plan is superseded. Details and the
+follow-up technical assessment are in PAPER-SESSION-HANDOFF.md under "The
+lake: attribution CLOSED by Donghui".
+
+**His question -- open all the boundary edges?** Answer given: it is a
+yaml-only change (the untagged perimeter is already one auto-generated
+boundary, `grid_boundary_id: 0`), but `free-outflow` is transmissive with
+no inflow guard and no elevation threshold, so at a catchment divide,
+where the terrain slopes inward, it would manufacture inflow along the
+rim while draining the ponded reach -- and the rim is the upstream band
+that carries all 46 calibration marks. The physically right condition is
+an elevation-thresholded overflow (a weir at the divide). Two checks are
+scheduled for 09-17: a zero-cost post-processing test of how much inward
+flux a transmissive perimeter would pass, and one 72-hour open-perimeter
+forward to see whether the 37 downstream marks drain and whether the 46
+upstream marks move.
+
+### Note to Donghui on the perimeter BC (2026-09-16, drafted for Mark)
+
+Donghui,
+
+Opening the perimeter is a yaml-only change, no code: the untagged
+perimeter edges are already collected into one auto-generated boundary
+(grid_boundary_id 0, since the mesh's only side set is id 1), so naming
+it and binding free-outflow to it is a two-block edit.
+
+Two cautions before we do it.
+
+**Free-outflow is transmissive, with no elevation threshold.** The ghost
+state is a plain copy of the interior state, so the edge passes the
+interior advective flux in whichever direction the momentum points. A
+catchment divide slopes inward, so the generic perimeter cell has inward
+momentum: an open perimeter would drain the ponded reach and also
+manufacture inflow along the rim. The rim is the upstream band, where all
+46 calibration marks are.
+
+**The physically right condition is a weir at the divide, and it must be
+written as a flux formula, not as a switch.** Q = C_w L (eta - z_div)^{3/2}
+above the divide elevation and zero below: both the flux and its first
+derivative vanish at the threshold, so Newton sees a continuous residual
+and Jacobian. An `if eta > z_div then open else wall` switch instead
+jumps by the full wet-onto-dry Roe flux, O(g h^2 / 2) -- which is exactly
+the bug we hit in August. The critical-outflow outlet zeroed both states
+when the normal velocity went negative and imposed the critical ghost
+otherwise, and that crossing pinned the nonlinear solver at forward step
+4 of the class twin and step 498 of the 600-step control, at every drag
+regularization we tried. Replacing it with the transmissive outlet was a
+cure, not an improvement: zero nonlinear failures, and 259,200 solves
+across the 72-hour forward. A threshold switch on ~6,000 perimeter edges,
+with cells crossing it continuously as the flood rises, would be that
+same jump on 500x the edges, and it would cost us the tight nonlinear
+tolerance the verified gradients depend on.
+
+One way to see the trade: at the outlet we bought smoothness by giving up
+elevation awareness, and it was free, because the outlet sits at the
+catchment low point and is always wet and always draining. At the divide
+elevation awareness is the whole point, so the condition has to be made
+smooth some other way -- hence the weir formula.
+
+Cheap next steps if you want them, neither needing new code: sum the
+would-be transmissive flux over the perimeter edges from an existing
+checkpoint and split it by sign, which tells us how much inward leakage
+we would be buying; then one 72-hour forward with the perimeter open, to
+see whether the 37 never-cresting marks drain and whether the 46 upstream
+marks move. If the 37 drain and the 46 hold still, that confirms your
+mechanism at no cost to the paper's numbers.
+
+Mark
+
+### Emil, 2026-09-16 (second reply), on the labelling and the offset split
+
+Three points, relayed by Mark during the paper review session:
+
+1. "Local uncertainty estimates, achieved fit, and held-out predictive skill
+   are different things." Accepted as the labelling rule for the paper, with
+   a third category added to the measured/linearized check: every skill-like
+   number is one of (a) a linearized uncertainty at the prior (spectrum,
+   counts, tab:learned, tab:scaling), (b) an achieved in-sample fit (every
+   MAE and J the paper reports), or (c) held-out skill, of which the paper
+   has none except the cross-observable test, which failed. Nothing may be
+   written as (c) unless a hold-out ran.
+
+2. "The offset/shape misfit split is not a pure roughness-information
+   split." Agreed, and it corrects the handoff and the 09-15 correction
+   above. The split decomposes the RESIDUAL at the prior; it says nothing
+   about which part roughness can move. The o65 columns show roughness
+   moves the Houston level too (class 24 at +5%: +0.63 m mean at Houston),
+   and o63 measured that tripling 22 and 23 removed 0.4 m of the 3.24 m
+   RMSE (no per-gauge dump exists at the o63 field, so how that 0.4 m
+   splits between offset and shape is unmeasured). So "an offset
+   roughness cannot produce"
+   must not be written. What may be written: 99.5% of the gauge misfit is a
+   constant per-gauge level error, the model tracks hydrograph shape to
+   0.24 m, and the one measured roughness change against it (o63) bought
+   0.4 m of the 3.24 m at three times the lookup. Whether the remaining
+   2.8 m is reachable by roughness is unmeasured.
+
+3. Holding off every gauge-spectrum claim until derivative convergence is
+   established; "a single small % check is typically not sufficient." So
+   the pending convergence test is a step ladder (e.g. 0.5, 1, 2, 5%, both
+   sides), not one +/-1% point; redesign the 6-forward run before it is
+   submitted. The same standard applies to the MARK sensitivities: the 4%
+   adjoint agreement is one check at one step size (5%, one-sided), and
+   the paper must say the mark columns have not been shown to converge
+   under step refinement. The o39 evidence (FD stable across a decade of
+   probe step in the domain-wide direction) is for the objective secant,
+   not the per-mark peak sensitivities.
+
 ### CORRECTION to the o65 entry below (o66, 2026-09-15 evening)
 
 The gauge sensitivity matrix turned out not to be valid at a 5% step, so
