@@ -233,9 +233,16 @@ Overleaf paragraph below.**
      "about 25% more wall time" (26% vs rung A), "about nine minutes"
      (9.4 measured).
 
-**Three red notes are in the text** (grep `textcolor{red}`): the 471M
-citation (intro), the tab:snr noisy rows (Sec 5.1), the overtopping
-citation (Sec 6.1). Mark said red notes are fine while editing.
+**Two red notes are in the text** (grep `textcolor{red}`): the 471M
+citation (intro) and the overtopping citation (Sec 6.1). Mark said red
+notes are fine while editing. The third (tab:snr noisy rows) was closed
+09-17 evening by re-running the planar twins on the laptop
+(`logs/verification/noisy_twins_2026-09-17.txt`, seconds each): per-cell
+0.1 mm noise 0.199 -> 1.761, per-region 1 mm noise 4.1e-7 -> 0.833 with
+both regions at the 0.01 bound, and the beta sweep 1e-4..1 at 0.1 mm
+gives 1.76 / 1.73 / 0.54 / 2.27 / 0.44 (non-monotone; best 0.44 at
+beta 1). Sec 5.1 now states the best-weight number instead of "no
+weight rescues it".
 
 **NEXT STEPS:** Mark's full read-through of the restructured draft;
 then the email to the coauthors (Emil's hold-out, the developed-ladder
@@ -343,10 +350,8 @@ tab:learned, tab:scaling, tab:threefifteen and tab:crossobs.
 
 ## Still untraced / open in the text (after the 09-17 re-trace)
 
-- **tab:snr noisy rows** (0.20 -> 1.8 at 0.1 mm; 4e-7 -> 0.83 at 1 mm;
-  the beta sweep to 1): commit-message provenance only. Red note in the
-  caption. Re-run on the laptop (the verification twin runs in seconds)
-  and log, or drop the two rows.
+- **tab:snr noisy rows**: CLOSED 09-17, reproduced on the laptop
+  (`logs/verification/noisy_twins_2026-09-17.txt`).
 - **471M-cell validation**: no citation in the bib. Red note.
 - **Overtopping mechanism** in Sec 6.1: stated as our reading, red note
   asking for a citation.

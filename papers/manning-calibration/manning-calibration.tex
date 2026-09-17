@@ -1137,8 +1137,10 @@ magnitude with the configuration (Table~\ref{tab:snr}). On a short
 verification window the entire Manning-induced observation signal is a
 few microns of water height, so a noise-free optimizer descends on it
 indefinitely while a tenth of a millimetre of observation noise
-destroys the recovery outright, and no Tikhonov weight in a sweep up
-to $\beta = 1$ rescues it. At basin scale the same quantity is
+destroys the recovery outright, and the best Tikhonov weight in a
+sweep from $\beta = 10^{-4}$ to $1$ leaves the per-cell error at
+$0.44$, more than twice the noise-free $0.20$. At basin scale the
+same quantity is
 $\sim 0.1$\,m of peak water-surface elevation after one simulated
 hour, four orders of magnitude larger, which is the regime in which a
 parameter signal can exceed survey-grade high-water-mark error. The
@@ -1180,11 +1182,7 @@ The noise-free recoveries differ by four orders of magnitude in the
 signal they descend on; only the basin-scale row is a fair test against
 the $0.15$\,m survey-grade error used throughout. Noise is a
 deterministic, decomposition-independent perturbation of the twin
-observations, so the comparison is reproducible across rank counts.
-\textcolor{red}{[NOTE: the noisy verification-twin outcomes ($0.20 \to
-1.8$, $4\times10^{-7} \to 0.83$) and the Tikhonov sweep to
-$\beta = 1$ trace only to a commit message, not to a logged run;
-re-run and log, or drop the two noisy rows.]}}
+observations, so the comparison is reproducible across rank counts.}
 \label{tab:snr}
 \end{table}
 
