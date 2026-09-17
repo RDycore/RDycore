@@ -461,9 +461,10 @@ which excludes noise, curvature truncation, and sparse kinks.
 Decisively, the gap accumulates with trajectory length: at the
 shortest window the gate passes at the inner-solve floor with every
 piece of machinery engaged, and it grows three orders of magnitude by
-basin window lengths. A proportional defect in $\partial f/\partial
-n$ or in the adjoint accumulation would err by the same fraction at
-any window length. Branch crossings accumulated along the trajectory,
+basin window lengths. A proportional defect in
+$\partial f/\partial n$ or in the adjoint accumulation would err by
+the same fraction at any window length. Branch crossings accumulated
+along the trajectory,
 where the probe shifts which cells cross the depth cutoff at some
 step, predict exactly this profile. Two further checks close it. As
 the probe shrinks, the FD converges to the adjoint direction by
@@ -1138,7 +1139,7 @@ few microns of water height, so a noise-free optimizer descends on it
 indefinitely while a tenth of a millimetre of observation noise
 destroys the recovery outright, and no Tikhonov weight in a sweep up
 to $\beta = 1$ rescues it. At basin scale the same quantity is
-$\sim$$0.1$\,m of peak water-surface elevation after one simulated
+$\sim 0.1$\,m of peak water-surface elevation after one simulated
 hour, four orders of magnitude larger, which is the regime in which a
 parameter signal can exceed survey-grade high-water-mark error. The
 lesson is not that the method is fragile: it is that friction must
@@ -1170,7 +1171,7 @@ Verification twin & $5\,\mu$m & none & per-region recovery $4\times10^{-7}$ \\
 (planar, 40 steps, & water & $0.1$\,mm & per-cell recovery destroyed ($0.20 \to 1.8$) \\
 $1.8$\,s) & height & $1$\,mm & per-region destroyed ($4\times10^{-7} \to 0.83$, both at bounds) \\
 \midrule
-30\,m basin, 1\,h & $\sim$$0.1$\,m & none & area-weighted rel.\ $L^2$ $0.20$; MAE $0.103 \to 0.017$\,m \\
+30\,m basin, 1\,h & $\sim 0.1$\,m & none & area-weighted rel.\ $L^2$ $0.20$; MAE $0.103 \to 0.017$\,m \\
 rain-forced, 108 marks & peak WSE & $0.15$\,m (HWM grade) & misfit falls $9.4\times$, MAE $0.23 \to 0.12$\,m --- but 5 of 15 classes pin to bounds \\
 \bottomrule
 \end{tabular}
