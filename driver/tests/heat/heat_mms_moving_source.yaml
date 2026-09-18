@@ -1,0 +1,89 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+# Method of Manufactured Solutions, Case 2: moving transport plus a nonzero
+# prescribed heat source.
+#
+# The uniform flow (h = H, u = U, v = V, flat bed, n = 0) of Case 1 is retained,
+# but the translating temperature wave now has an exponentially growing
+# amplitude,
+#
+#   T = R + A exp(L t) sin(K (x - U t)) sin(K (y - V t)).
+#
+# The phase-advection terms cancel analytically, leaving
+#
+#   (hT)_t + div(huT, hvT) = H L A exp(L t) sin(K (x - U t)) sin(K (y - V t)),
+#
+# which is exactly what MMSPostStep installs as the prescribed heat source: at
+# the right endpoint for backward Euler, and as the endpoint average for
+# Crank-Nicolson. No manufactured heat source is added to the transport solve, so
+# d(hT)/dt is counted once across the Lie split, not twice.
+#
+# This is the first case with a genuine splitting error. Writing the transport
+# field as A(C) = -div(u C) and the source as the state-independent field B(t),
+# the commutator is [A, B] = -div(u B), nonzero precisely because B varies in
+# space. Case 1 has B == 0 and therefore no splitting error, which is why both
+# cases are needed.
+mms:
+  constants:
+    H: 0.1      # constant water depth (m)
+    U: 0.2      # constant x velocity (m/s)
+    V: 0.1      # constant y velocity (m/s)
+    A: 5.0      # temperature amplitude (deg C)
+    R: 20.0     # reference temperature (deg C)
+    L: 0.5      # amplitude growth rate (1/s)
+    K: 0.6283185307179586  # wave number (pi/5)
+
+  swe:
+    h:    H
+    dhdx: 0
+    dhdy: 0
+    dhdt: 0
+    u:    U
+    dudx: 0
+    dudy: 0
+    dudt: 0
+    v:    V
+    dvdx: 0
+    dvdy: 0
+    dvdt: 0
+    z:    0
+    dzdx: 0
+    dzdy: 0
+    n:    0
+
+  # NOTE: manufactured expressions are capped at 128 characters, which is why
+  # NOTE: dTdt below is written without spaces.
+  temperature:
+    T:    R + A * exp(L*t) * sin(K*(x - U*t)) * sin(K*(y - V*t))
+    dTdx: A * K * exp(L*t) * cos(K*(x - U*t)) * sin(K*(y - V*t))
+    dTdy: A * K * exp(L*t) * sin(K*(x - U*t)) * cos(K*(y - V*t))
+    dTdt: A*exp(L*t)*(L*sin(K*(x-U*t))*sin(K*(y-V*t))-K*U*cos(K*(x-U*t))*sin(K*(y-V*t))-K*V*sin(K*(x-U*t))*cos(K*(y-V*t)))
+
+logging:
+  level: none
+
+# (|u| + sqrt(g h)) dt / dx = 0.12 at the base refinement, as in Case 1.
+time:
+  time_step: 0.05
+  unit: seconds
+  stop: 2.0
+  coupling_interval: 0.05
+
+grid:
+  file: mms_triangles_dx1.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+boundaries:
+  - name: domain_boundary
+    grid_boundary_id: 1
