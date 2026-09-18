@@ -97,6 +97,44 @@ Emil's feedback drove the order.
 
 ## 09-18 STATE, and the next session
 
+**09-18 evening, narrative pass Secs 2-8 DONE (Fable), four commits
+1fc92f03..f3cca1f8, Overleaf main `2da5703` (the new sync base), no
+incoming coauthor commits at push time.** What changed, by check:
+- Terms at first use: NLCD, MAE, RK, TAO, USGS, QC, CFL, GLUE, NWIS,
+  MRMS expanded; "event hours" given its origin (start of the 72-h
+  forward); "cluster-A marks" (four captions, never defined) ->
+  "upstream-band marks".
+- Numbers corrected: stored trajectory "tens of petabytes" -> terabytes
+  (RESULTS-manning-draft.md:249 computes 70 MB x 518k = "36 PB", a unit
+  slip; it is 36 TB). Sec 3 "Manning bounds [0.01, 0.2]" was the
+  per-cell twins only; class twins use [0.005, 0.30] and the production
+  class runs alpha in [0.3, 3] (driver/adjoint_test.c:2182-2192).
+- Vague-enabling-false: Sec 4 "carries the Harvey window at 30 s" ->
+  the 1 km window at 30 s, the 30 m mesh at 1 s. Sec 6.1 "metres above
+  ... for most of the window" -> one to five metres at four of five.
+  Secs 6.2/6.3 "the residual IS rainfall, mesh, datum, representation
+  error" -> lies outside friction; candidate list gains the antecedent
+  state so Sec 7's "one of those" refers to a listed item.
+- Constraint-hitting stated (check 7): Sec 6.5's gauge-only values
+  "with nothing to mark them as wrong" -> on the ceiling of the search,
+  above the lookup's largest entry.
+- Mechanism named: Sec 6.4 "releases twelve" -> nothing to hold them but
+  the bounds. Sec 6.1 head "a gradient, not a switch" -> "grows
+  downstream rather than switching on" ("gradient" = derivative here).
+- Consistency: conclusions "a divide the event exceeded" -> our reading,
+  matching Sec 6.1.
+- Cuts: Sec 5's restatement of Sec 3's twin facts; Sec 6.2's restatement
+  of the production configuration; "correct on first assembly".
+
+**Open minor points for Mark (asked in chat 09-18 evening):** (1) Sec 2.1
+"the implicit scheme of Xia and Liang" has no citation and no bib entry;
+(2) the intro's "ECCO" is never expanded (intro was closed 09-18, not
+touched); (3) "Turning mesh" is used as a name with no gloss at first
+use (Sec 3). Not changed: Sec 2.3 "Absolute or fractional prior" second
+paragraph states a result ("seven of fifteen to a bound") inside
+Methods; Secs 6.3 and 6.4 both cite it, so it stays load-bearing.
+
+
 **Next session: a whole-paper narrative pass, prompt in
 `paper-narrative-prompt.md` at the repo root** (Mark's request, 09-18
 evening: precise, no ambiguity, compelling narrative, logical structure,
