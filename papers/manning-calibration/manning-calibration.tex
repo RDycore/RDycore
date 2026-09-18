@@ -1391,12 +1391,11 @@ prior, is the parameter's \emph{ceiling}. Both are lengths, in metres,
 and fractions of the uncalibrated error, and the paper uses the three
 words in those senses only.
 
-We ran that scan on the production configuration: a 12-hour window over
-the upstream crest cluster (event hours 29--41), initialized from an
-hourly checkpoint of the 72-hour forward and with the rain re-aligned
-to the window start (both validated bit-exactly), scored against the 46
-surveyed marks whose modelled crest falls inside the window. Each point
-is one forward with no adjoint (Table~\ref{tab:alpha}).
+We ran that scan on the production configuration of
+Table~\ref{tab:configs}: the 12-hour window over the upstream crest
+cluster, event hours 29--41, scored against the 46 surveyed marks whose
+modelled crest falls inside it. Each point is one forward with no
+adjoint (Table~\ref{tab:alpha}).
 
 \paragraph{The window is set by the observable.}
 A high-water mark records an event maximum, so it carries information
@@ -1431,7 +1430,7 @@ $1.00$ (NLCD) & $0.027$--$0.160$ & $8.083\times10^{2}$ & $0.7188$ & 0/46 \\
 \bottomrule
 \end{tabular}
 \caption{Uniform roughness scan on the production configuration
-(12-hour window, 46 cluster-A marks); every cell carries
+(12-hour window, the 46 upstream-band marks); every cell carries
 $n = \alpha\,n_{\rm NLCD}$, so the \emph{n} range column is the whole
 lookup table scaled by $\alpha$. $J$ falls monotonically toward
 lower roughness with no interior minimum: the entire uniform scale
@@ -1475,9 +1474,7 @@ An independent measurement gives the same scale. The identifiability
 twin of Section~\ref{sec:identifiability} measured the peak-WSE
 signal induced by a large class perturbation at $\sim 0.1$\,m, the
 same authority from a different experiment. So about $85\%$ or more
-of the model-versus-survey residual is not roughness at all: it is
-rainfall forcing, mesh elevation, datum, and representation error at
-30\,m.
+of the model-versus-survey residual lies outside the friction term.
 
 \paragraph{The observable constrains one mode, not fifteen.}
 A natural objection is that spatial redistribution should beat uniform
@@ -1514,15 +1511,14 @@ groups. Speeding part of a path does not drain it; the resulting
 fast/slow junction ponds water, so partial changes \emph{raise} peaks.
 Only a domain-coherent change lowers them.
 
-The conclusion is a design finding, not a tuning observation. The
-peak-WSE observable at these marks constrains \emph{one} roughness
-degree of freedom at the absolute prior width of the fifteen-class
-calibration below, the domain-scale, path-integrated conveyance,
-worth $0.08$\,m of the $0.72$\,m discrepancy. By the linearized count
-of Section~\ref{sec:spectrum} it constrains about three at a
-$\pm 30\%$ width. It does not carry fifteen classes' worth of
-information. This count unifies the earlier evidence rather than
-sitting beside it: the perfect-data twin recovers only the classes
+The conclusion is a design finding, not a tuning observation. What
+the peak-WSE observable at these marks constrains is the domain-scale,
+path-integrated conveyance, worth $0.08$\,m of the $0.72$\,m
+discrepancy, and not fifteen classes' worth of information.
+Section~\ref{sec:spectrum} counts the combinations on which the marks
+outweigh the prior: one at the absolute width of the fifteen-class
+calibration below and about three at $\pm 30\%$. That count unifies
+the earlier evidence rather than sitting beside it: the perfect-data twin recovers only the classes
 that move the domain mean, and the noisy twin pins the others to
 bounds because they carry no signal to fit, so the optimizer fits
 noise in those directions instead.
@@ -1532,11 +1528,13 @@ None of this is a new phenomenon: that many different parameter sets
 reproduce a hydrological observation about equally well is Beven's
 equifinality thesis~\cite{beven1992glue,beven2006equifinality}, and the
 usual response is to characterize the acceptable set by sampling it.
-What an adjoint changes is the cost of the diagnosis. Where GLUE-style
-methods \emph{sample} the equifinal set with many forward runs, the
+What an adjoint changes is the cost of the diagnosis. Where
+generalized likelihood uncertainty estimation (GLUE) and its relatives
+\emph{sample} the equifinal set with many forward runs, the
 measurements above \emph{measure} its dominant direction directly:
-four forward evaluations bound the authority of the whole roughness
-field, and two more show that the modes are not separable. The result
+the six forward runs of Table~\ref{tab:alpha} bound the authority of
+the whole roughness field, and the two of Table~\ref{tab:halves} show
+that the modes are not separable. The result
 is the same kind of statement, obtained at a cost that does not grow
 with the number of parameters, which is what makes it affordable
 before a calibration rather than after one.
@@ -1579,7 +1577,7 @@ calibrated, 3 classes, $\sigma_\alpha = 0.30$ & $0.6290$ & $-0.090$ & the same t
 calibrated, 3 classes, $\sigma_\alpha = 0.50$ & $0.6295$ & $-0.089$ & the same two; developed-low $0.27$ ($3\times$) \\
 \bottomrule
 \end{tabular}
-\caption{Peak-WSE MAE against the 46 cluster-A marks, every row an
+\caption{Peak-WSE MAE against the 46 upstream-band marks, every row an
 achieved in-sample fit. Both fifteen-class calibrations beat the entire
 uniform scale, including its low end, and beat the best
 uniform field the prior admits ($\alpha = 0.70$) by $0.078$\,m: spatial
@@ -1587,7 +1585,7 @@ redistribution is worth about three and a half times what a single
 global scale reaches. The $\sigma_n = 0.015$ field took nine
 quasi-Newton iterations and the $\sigma_\alpha = 0.30$ field three, and
 they agree in misfit to four figures ($J_{\rm mis} = 615.4$), which
-suggests a floor roughness does not set. The last column is a fact, not
+suggests a floor that roughness does not set. The last column is a fact, not
 a judgment: the lookup's own entries run from $0.027$ (barren) to
 $0.160$ (developed high), its lowest developed entry is $0.040$ for
 developed open land, and $n = 0.036$ and $0.029$ on developed-medium
@@ -1603,10 +1601,10 @@ selects.}
 accounts for $15\%$ of the $0.72$\,m model--survey error on these
 marks.} That is the paper's central number and it is an in-sample fit:
 the 46 marks that define the objective are the 46 the field is scored
-on. The remaining $85\%$ is rainfall forcing, mesh elevation, datum,
-and representation error at 30\,m, and
-Section~\ref{sec:icauthority} shows one of those to be both measurable
-by the same method and larger.
+on. The remaining $85\%$ lies in the rainfall forcing, the antecedent
+state, the mesh elevation, the datum, or representation error at
+30\,m, and Section~\ref{sec:icauthority} shows one of those, the
+antecedent state, to be both measurable by the same method and larger.
 
 The $15\%$ is worth having, and the comparison that establishes it is
 against $\alpha = 0.70$ rather than $\alpha = 0.30$. The latter is the
@@ -1677,8 +1675,8 @@ are, which no scan can. Two
 limits of the statement should be stated before the numbers. It is a
 linearization at the lookup, and it describes the information the
 marks carry there, not the path a calibration takes; the calibrations
-below traverse $\alpha$ from $1$ to $3$, and along the one step we
-measured against its linear prediction (Section~\ref{sec:crossobs})
+below move classes as far as both bounds, $\alpha = 0.3$ and $3$, and
+along the one step we measured against its linear prediction (Section~\ref{sec:crossobs})
 the objective moved $35\%$ of the predicted amount. And it depends on
 the prior width, so a count is meaningful only with its width
 attached.
@@ -1778,7 +1776,7 @@ combinations above unity, $3.4$ degrees of freedom, and the same
 three classes leading. Between them the count runs one, one, two,
 three, four at widths of $10$, $15$, $20$, $30$ and $50\%$. So the
 marks support one roughness combination at the absolute prior and
-about three at $\pm 30\%$; in both cases the data out-weighs the
+about three at $\pm 30\%$; in both cases the data outweighs the
 prior on a few combinations of the fifteen class values and on no
 others. These counts are properties of the linearization at the
 lookup.
@@ -1812,8 +1810,8 @@ is that the scan's one parameter was the wrong one.
 
 \paragraph{What the calibration actually did.}
 Projecting the calibrated displacement of the absolute-prior
-fifteen-class field onto the eigenbasis of the same prior is worth
-reporting, and it has two parts. The calibrated field sits
+fifteen-class field onto the eigenbasis of the same prior has two
+parts. The calibrated field sits
 \textbf{9.2 prior standard deviations} from the NLCD lookup, and of that
 motion only $2.9\%$ lies in the single data-constrained direction;
 $85.6\%$ lies in directions where data and prior are comparable and
@@ -1847,8 +1845,11 @@ does not constrain. It lies in the one direction the data constrains,
 toward roughness below what the published table and our stated prior
 width jointly allow. Whether that value is admissible is not something
 the optimizer can settle. We put the lookup's uncertainty at $30\%$ or
-more, which admits it for the classes the marks constrain and, as the
-spectrum shows, releases twelve that they do not.
+more. That width admits the value for the classes the marks constrain,
+and it leaves the twelve combinations they do not constrain with
+nothing to hold them but the bounds of the search, which is where the
+first step of the wider calibration put seven of the fifteen classes
+(Section~\ref{sec:calibration}).
 
 \begin{table}
 \centering\small
@@ -1990,7 +1991,7 @@ marks.
 \toprule
 Marks & Supported & That data set is \\
 \midrule
-46 & 1 & the cluster-A marks (this study) \\
+46 & 1 & the upstream-band marks (this study) \\
 71 & 2 & all admissible marks, 24-hour window \\
 108 & 3 & every QC-passed mark, 72-hour window \\
 324 & 5 & every Harvey mark in-domain, \emph{before} QC \\
@@ -2079,7 +2080,7 @@ both, at $\sigma_\alpha = 0.30$ with the other twelve classes frozen at
 the lookup. Manning $n$ in $\mathrm{s\,m^{-1/3}}$; gauge $J$ over 134
 above-bed stage records at $\sigma = 0.15$\,m treated as independent,
 with RMSE $= \sigma\sqrt{2J/134}$ in metres; mark MAE in metres over
-the 46 cluster-A marks. The gauge calibration is one accepted
+the 46 upstream-band marks. The gauge calibration is one accepted
 quasi-Newton iteration stopped by the wall clock; $0.27$ and $0.36$
 were projected onto the $\alpha = 3$ bound. Every entry is an
 achieved fit on the observable it was calibrated to and a score on
@@ -2126,11 +2127,13 @@ the shape $0.5\%$: RMSE $3.24$\,m in all, $0.24$\,m in shape alone.}
 \end{table}
 
 A calibration reported against the gauges alone would show the RMSE
-falling from $3.24$ to $2.84$\,m and roughness values with nothing to
-mark them as wrong: $0.27$ and $0.36$ on developed-low and
-developed-medium, above the lookup's entries but in the lookup's own
-order. That is what makes it worth reporting. Neither the reduction
-nor the plausibility of the field is evidence about friction.
+falling from $3.24$ to $2.84$\,m, and the roughness values that
+achieve it, $0.27$ and $0.36$ on developed-low and developed-medium,
+sit on the ceiling of the search at three times the lookup, above its
+largest entry ($0.160$ for developed high). The reduction is an
+achieved fit, and values on a bound are the sign, visible without the
+marks, that the fit has run to the edge of what the search allows.
+Neither is evidence about friction.
 
 \paragraph{Fit, uncertainty, and skill.}
 Three kinds of number appear in this section and the last, and they
