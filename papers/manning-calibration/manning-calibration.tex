@@ -273,7 +273,7 @@ actually selected to give the correct one-sided derivative.
 
 \paragraph{A differentiable right-hand side.}
 RDycore's existing friction treatments (a semi-implicit splitting and
-the implicit scheme of Xia and Liang) embed the time step, and in the
+the implicit scheme of Xia and Liang~\cite{xia2018implicit}) embed the time step, and in the
 semi-implicit case the flux divergence, inside the RHS callback. The
 resulting map is consistent only with forward Euler and admits no
 well-defined $\partial f/\partial u$. We therefore added a plain
