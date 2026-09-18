@@ -233,9 +233,39 @@ Overleaf paragraph below.**
      "about 25% more wall time" (26% vs rung A), "about nine minutes"
      (9.4 measured).
 
-**Two red notes are in the text** (grep `textcolor{red}`): the 471M
-citation (intro) and the overtopping citation (Sec 6.1). Mark said red
-notes are fine while editing. The third (tab:snr noisy rows) was closed
+**ONE red note is left** (grep `textcolor{red}`): the overtopping
+citation in Sec 6.1. Mark said red notes are fine while editing.
+
+**The 471M note is CLOSED (09-18, Gautam).** He added the RDycore
+overview paper on Overleaf (`bisht2025development`, Environ. Model.
+Softw. 197, 106804) and replaced the note with the citation. Merged
+back as a clean fast-forward -- the repo was byte-identical to the base
+he edited, so no three-way merge was needed. Two edits to his bib
+entry: brace-protect `{E3SM}` and `{Exascale}` (the unsrt style was
+rendering "e3sm", against the convention every other entry follows),
+and add the volume and DOI. His year 2025 was left alone; the issue is
+dated 2026 but his cite key and the DOI say 2025.
+
+**The overtopping note is NOT closed, and the suggestion for it does
+not fit.** Gautam proposed Feng et al., doi 10.1029/2025WR042040. That
+is "An Integrated Modeling Framework for Sediment Dynamics During Urban
+Flooding: Application to Hurricane Harvey in Houston" (Feng, Tan, Xu,
+Li, Bisht; WRR 62(5), 2026): E3SM land coupled to TELEMAC-GAIA for
+sediment transport on a 1,336 km^2 Houston watershed at 30 m. It says
+nothing about water crossing a watershed divide or about the limits of
+closed watershed-delineated domains, so it cannot source the claim.
+Gautam's reply opened "For Buffalo Bayou..." and the old note asked for
+"a reference for Harvey's flow crossing the Buffalo Bayou watershed
+divide", which reads as a request for a Buffalo Bayou reference -- the
+note has been rewritten to say what would and would not source it.
+**Donghui has not answered; Gautam asked him to.**
+
+*Feng et al. is worth citing elsewhere if Mark wants it:* same event,
+same city, same 30 m resolution, same group, and it explicitly names
+RDycore as the GPU path forward because TELEMAC-GAIA needed ~10 h on 40
+cores with limited parallel scalability. That is a motivation citation
+for the introduction, not evidence about the divide. Not added --
+waiting on Mark. The third (tab:snr noisy rows) was closed
 09-17 evening by re-running the planar twins on the laptop
 (`logs/verification/noisy_twins_2026-09-17.txt`, seconds each): per-cell
 0.1 mm noise 0.199 -> 1.761, per-region 1 mm noise 4.1e-7 -> 0.833 with
@@ -270,11 +300,13 @@ the o61 log have the production values (2 and 3).
 commit and submit to Overleaf").** Repo commits a6e403f2 (logs),
 29cafc31 (paper + plans), 72765c0e (tex hygiene) on `adams/gpu-implicit`,
 then 4fd8b4b6 (noisy twins) and 3a32f5f6 (acknowledgements), not
-pushed to GitHub. Overleaf main is
-8f84bb2 (after b872eb2, 1c6c44a), the new sync base;
-there were no coauthor commits since 363971e, so each merge was a plain
-copy, and `manning-calibration-changes.pdf` (latexdiff against 363971e,
-38 pp) was rebuilt and pushed each time. An **Acknowledgements section**
+pushed to GitHub. **Overleaf main is now `d32ed75` (09-18), the current
+sync base** -- after 8f84bb2, 28b9011, a6b30d2, then Gautam's own
+`36b42e8` and the merge-back. `manning-calibration-changes.pdf`
+(latexdiff against 363971e, 37 pp) is rebuilt and pushed every time.
+**The first coauthor commit has now arrived** (Gautam, 09-18), so the
+"plain copy" shortcut no longer holds by default: check
+`git rev-list <my-last-push>..HEAD` on every sync from here. An **Acknowledgements section**
 now precedes Code and Data Availability: Emil Constantinescu's review,
 then the verbatim FASTMath SciDAC and NERSC/ERCAP statements (award
 `ASCR-ERCAP0039362`, which is not the `m4267` job charge code). The two root-level `paper-*-prompt.md` files are
