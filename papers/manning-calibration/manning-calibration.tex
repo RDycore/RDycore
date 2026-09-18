@@ -124,12 +124,14 @@ studies that addressed the overfitting inherent in distributed
 friction estimation~\cite{warder2021storm}. The closest published
 work to ours is Pujol et al.~\cite{pujol2024urban}, who infer
 distributed friction in a 2D urban flood model by variational
-assimilation of multi-source survey data including high-water marks, and who
+assimilation of multi-source data including high-water marks, and who
 use adjoint-derived global sensitivity measures to decide how to
-spatialize the friction field before assimilating. That is the same
-observable and the same design move as Sections~\ref{sec:hwm}
-and~\ref{sec:authority}, at street scale and with a
-Tapenade-generated adjoint of a solver built for assimilation. What
+spatialize the friction field before assimilating. Their observable is
+this paper's: surveyed high-water marks, the peak water levels a flood
+leaves on structures and debris lines, which we call the survey
+throughout. The design move is the same as well
+(Sections~\ref{sec:hwm} and~\ref{sec:authority}), at street scale and
+with a Tapenade-generated adjoint of a solver built for assimilation. What
 this paper adds is neither the adjoint nor the observable but the
 setting and the question: a production Earth-system component
 differentiated in place, and a measurement of how much of the model's
