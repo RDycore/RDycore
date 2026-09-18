@@ -76,7 +76,7 @@ solves regardless of the number of parameters, every derivative passes
 a finite-difference gate on the full nonlinear solve, and the whole
 computation runs on GPUs, forward model and derivatives alike, where
 four NVIDIA A100s run a calibration iteration on a dense-gauge twin
-$19\times$ faster than a 64-core CPU node.
+$19\times$ faster than a 64-core CPU socket.
 
 For Hurricane Harvey on a 30\,m mesh of the Houston area, roughness
 calibrated as well as we can calibrate it removes about $15\%$ of the
@@ -124,7 +124,7 @@ studies that addressed the overfitting inherent in distributed
 friction estimation~\cite{warder2021storm}. The closest published
 work to ours is Pujol et al.~\cite{pujol2024urban}, who infer
 distributed friction in a 2D urban flood model by variational
-assimilation of multi-source data including high-water marks, and who
+assimilation of multi-source survey data including high-water marks, and who
 use adjoint-derived global sensitivity measures to decide how to
 spatialize the friction field before assimilating. That is the same
 observable and the same design move as Sections~\ref{sec:hwm}
@@ -2316,7 +2316,7 @@ gradient of a one-simulated-hour window on that mesh (3{,}600
 implicit steps, 400 in-memory checkpoints) takes about nine minutes,
 and one TAO iteration of a dense-gauge twin calibration
 (418{,}076 gauges, 39-step window) takes 1.7\,s, about $19\times$
-faster than one 64-core CPU node of the same system. Device and host
+faster than one 64-core CPU socket of the same system. Device and host
 runs of the same binary and partition produce objectives and gradients
 identical to every printed digit, so the finite-difference gates of
 Table~\ref{tab:verification} carry over unchanged. Third,
