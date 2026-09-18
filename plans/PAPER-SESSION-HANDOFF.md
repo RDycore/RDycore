@@ -95,6 +95,36 @@ Emil's feedback drove the order.
     linearized uncertainty and held-out skill in one sentence each.
     Paper is 33 pp after these.
 
+## 09-18 STATE, and the next session
+
+**Next session: a whole-paper narrative pass, prompt in
+`paper-narrative-prompt.md` at the repo root** (Mark's request, 09-18
+evening: precise, no ambiguity, compelling narrative, logical structure,
+consistency internally and with the data, paragraph by paragraph
+looking for "four facts doing the work of one" and tangents that break
+momentum). Abstract and introduction are done; start at Sec 2. Mark
+reads in parallel and routes comments through the session.
+
+**What 09-18 did, all committed and on Overleaf (base 6f1070e):**
+- Gautam's RDycore overview citation merged (bib entry brace-protected,
+  volume and DOI added). Feng et al. 2026 cited in Sec 7 for
+  event-scale deposition, NOT for the overtopping claim.
+- The last red note removed; no coauthor discussion in the text from
+  now on (see [[no-coauthor-discussion-in-the-paper]]).
+- Intro P1 rewritten three times against Mark's reading: the lookup
+  table defined at first use (it is not the NLCD map); "outweigh" ->
+  "more informative than"; the wide-prior cost stated as a cost with
+  its mechanism; plausibility put into the question; the 15% stated
+  as hitting the floor of the search; "the survey" defined where our
+  observable is introduced; the "digital twin" gloss cut.
+- Abstract: "in sample" -> "the marks it was fit to"; "cannot
+  arbitrate" given its object; the gauge material cut from four facts
+  to two (219 -> 185 words in paragraph 2).
+- Mark's own Overleaf edits merged (CPU node -> socket, applied to the
+  conclusions too; "survey" moved off the Pujol sentence).
+- Workflow: Mark's edits now come through the session; other coauthors
+  still edit Overleaf directly; fetch before every push.
+
 ## RESTRUCTURE SESSION: start here (2026-09-17)
 
 Mark cleared a full restructure ("rearrange the paper as you like") and
