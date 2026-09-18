@@ -1009,11 +1009,10 @@ In a twin experiment the observations are model output generated from
 a roughness field we chose, so a calibration can be scored against a
 known truth rather than against a real survey whose own errors are
 unknown. The per-cell twin runs on the Houston 1\,km Hurricane Harvey
-mesh (2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s). Truth is a
-two-zone field split at the domain midline, observed at 343 synthetic
-gauges over 14 observation times, calibrated with implicit stepping and
-Tikhonov regularization ($\beta = 10^{-5}$). Every cell is wet and
-moving in this configuration, so all 2{,}746 parameters are observable.
+mesh (2{,}746 cells, 4200\,s window at $\Delta t = 30$\,s). Truth is
+the two-zone field of Section~\ref{sec:configs}, observed at 343
+synthetic gauges over 14 observation times, calibrated with implicit
+stepping and Tikhonov regularization ($\beta = 10^{-5}$).
 The configuration is deliberately gauge-sparse (343 gauges for
 2{,}746 parameters) and shows the classic \emph{semiconvergence} of
 underdetermined inverse problems, in which the recovered field first
@@ -1084,8 +1083,8 @@ The natural reduced parameterization for this domain is one Manning
 value per NLCD land-cover class (15 classes at the 30\,m Turning mesh,
 2.93M cells), with the published NLCD lookup as prior and truth for
 twins. Counting favours it: even the sparse real network supplies an
-order of magnitude more observations than parameters. Measurement
-says otherwise. In a class twin on the 30\,m mesh at the real
+order of magnitude more observations than parameters. A twin shows
+otherwise. In a class twin on the 30\,m mesh at the real
 13-gauge geometry (260 observations, a short early-transient window),
 the objective falls $128\times$ while the recovered class values
 remain $66\%$ wrong in relative $L^2$, worst class $81\%$. The
@@ -1146,7 +1145,9 @@ parameter signal can exceed survey-grade high-water-mark error. The
 lesson is not that the method is fragile: it is that friction must
 act long enough to imprint a signal above the noise floor, which
 makes window length a first-class calibration decision rather than a
-cost parameter. The basin-scale noisy row shows what marginal
+cost parameter.
+
+The basin-scale noisy row shows what marginal
 signal-to-noise looks like in practice, and why misfit at the marks
 is the objective but not the result. With $0.15$\,m of observation
 noise, even the \emph{true} field cannot beat a mark MAE of about
@@ -1217,9 +1218,9 @@ gauges, where the channel is wider than a cell, hold their water for
 the whole window; the two gauges in the Addicks and Barker reservoir
 pools hold it for every record they have, 20 and 4 of the 48 slots,
 and a fifth, Fulshear, for $29\%$ of the window. Where the cell does
-hold water the model runs metres above the observed surface for most
-of the window (Section~\ref{sec:crossobs} measures this gauge by
-gauge). The mesh resolves the major channel and not the tributaries,
+hold water, the model runs one to five metres above the observed
+surface at four of those five gauges (Section~\ref{sec:crossobs}
+measures this gauge by gauge). The mesh resolves the major channel and not the tributaries,
 which is where all but the three Buffalo Bayou gauges sit.
 
 \begin{table}
@@ -1336,7 +1337,7 @@ calibration target.}
 \label{tab:baseline}
 \end{table}
 
-\paragraph{The defect is a gradient, not a switch.}
+\paragraph{The defect grows downstream rather than switching on.}
 Sorting the marks by crest time splits them into three groups, and
 those groups turn out to be three \emph{spatial bands} whose bias
 increases monotonically downstream (Table~\ref{tab:bands}). The
@@ -1344,7 +1345,8 @@ never-crest population is the end of a continuum, not a separate
 pathology: the intermediate band already carries $+2.85$\,m of the
 same model-high signature. Two consequences follow. First, a
 calibration window has to be placed on the upstream band, where the
-model is physically sound. Crests there fall in event hours 29--41,
+model-high bias is $0.30$\,m rather than metres. Crests there fall in
+event hours 29--41,
 and the 46 marks in that band are the target of every production
 number below. Second, the intermediate band is \emph{not} clean
 held-out data, which rules out the obvious validation design. The
