@@ -272,12 +272,21 @@ divide", which reads as a request for a Buffalo Bayou reference -- the
 note has been rewritten to say what would and would not source it.
 **Donghui has not answered; Gautam asked him to.**
 
-*Feng et al. is worth citing elsewhere if Mark wants it:* same event,
-same city, same 30 m resolution, same group, and it explicitly names
-RDycore as the GPU path forward because TELEMAC-GAIA needed ~10 h on 40
-cores with limited parallel scalability. That is a motivation citation
-for the introduction, not evidence about the divide. Not added --
-waiting on Mark. The third (tab:snr noisy rows) was closed
+**Feng et al. IS now cited, in Sec 7, on substance (Mark 09-18: "Feng,
+Dongyu is on the project so citing him would make sense").** Not for the
+divide -- for the bed. Sec 7 lists "mesh elevation" among the error the
+model cannot explain, and Feng et al. measures event-scale deposition in
+a Houston watershed under Harvey at 8.0 Mm^3, 2.3 Mm^3 of it along
+channels and floodplains, so one listed candidate is not static during
+the event. Entry `feng2026sediment`, WRR 62(5) e2025WR042040, 2026;
+metadata and the two deposition numbers taken from the Crossref
+abstract (Wiley 403s a direct fetch).
+
+*Unused stronger framing, if anyone confirms it from the full text:*
+the paper reportedly names GPU models such as RDycore as the way past
+TELEMAC-GAIA's ~10 h on 40 cores. That came from a search summary, NOT
+from the paper, so it is not in the draft. It would make a motivation
+citation for the introduction if Dongyu or Gautam confirms it. The third (tab:snr noisy rows) was closed
 09-17 evening by re-running the planar twins on the laptop
 (`logs/verification/noisy_twins_2026-09-17.txt`, seconds each): per-cell
 0.1 mm noise 0.199 -> 1.761, per-region 1 mm noise 4.1e-7 -> 0.833 with
