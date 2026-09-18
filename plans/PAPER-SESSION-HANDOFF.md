@@ -233,6 +233,14 @@ Overleaf paragraph below.**
      "about 25% more wall time" (26% vs rung A), "about nine minutes"
      (9.4 measured).
 
+**WORKFLOW, Mark 09-18:** *"I will not mix editing and you working, so
+I will go through you."* Mark's edits now come as requests in chat, not
+as direct Overleaf commits -- a sync push was rejected
+non-fast-forward when he edited mid-sync. Other coauthors still edit
+Overleaf directly (Gautam did, twice), so every sync must still
+`git fetch && git rev-list HEAD..origin/main --count` right before
+pushing, and merge rather than force.
+
 **NO red notes remain in the paper.** Mark, 09-18: *"Lets not do this
 discussion in the text (red), that is not working well (workflow is
 under development)."* Coauthor questions go by email and are tracked
