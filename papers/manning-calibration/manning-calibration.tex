@@ -337,8 +337,7 @@ switch. The result is a consistent one-sided derivative. Seeding unit
 directions through the primitive-reconstruction chain rule yields the
 two conservative-space blocks in six tangent evaluations per edge. The
 tangent code mirrors the flux code line by line, so it can be reviewed
-against it, and we found it correct on first assembly against the
-verification harness below.
+against it.
 
 \paragraph{Boundary blocks.}
 For a boundary edge, $F(u_{\mathrm{in}}, u_g(u_{\mathrm{in}}))$
@@ -380,8 +379,8 @@ Assembled matrix & dam break, reflecting BCs & $1.5\times10^{-8}$ & $10^{-6}$ \\
 Assembled matrix & dam break, Dirichlet + critical outflow & $1.9\times10^{-8}$ & $10^{-6}$ \\
 $dJ/du_0$ (explicit RK) & 8 sampled components & $1.0\times10^{-8}$ & $10^{-5}$ \\
 $dJ/dn$ (explicit RK) & domain aggregate & $2.9\times10^{-6}$ & $10^{-5}$ \\
-$dJ/du_0$ (implicit BE) & tight inner tolerances & $1.4\times10^{-8}$ & $10^{-5}$ \\
-$dJ/dn$ (implicit BE) & tight inner tolerances & $5.3\times10^{-6}$ & $10^{-5}$ \\
+$dJ/du_0$ (backward Euler) & tight inner tolerances & $1.4\times10^{-8}$ & $10^{-5}$ \\
+$dJ/dn$ (backward Euler) & tight inner tolerances & $5.3\times10^{-6}$ & $10^{-5}$ \\
 \bottomrule
 \end{tabular}
 \caption{Relative errors of analytic derivatives against central finite
@@ -413,7 +412,7 @@ two-nonzero parameter Jacobian).
 
 Two integrator facts constrain the design. PETSc's plain forward-Euler
 integrator implements no adjoint, so adjoint-path configurations use the
-Runge--Kutta family. And for implicit integrators the discrete-adjoint
+Runge--Kutta (RK) family. And for implicit integrators the discrete-adjoint
 gradient is only as exact as the inner solves: the Manning gradient
 fails its gate at default inner tolerances and passes once they are
 tightened (Table~\ref{tab:verification}, implicit rows). We found
@@ -455,7 +454,9 @@ $\partial f/\partial n$ or in the adjoint accumulation would err by
 the same fraction at any window length. Branch crossings accumulated
 along the trajectory,
 where the probe shifts which cells cross the depth cutoff at some
-step, predict exactly this profile. Two further checks close it. As
+step, predict exactly this profile.
+
+Two further checks close it. As
 the probe shrinks, the FD converges to the adjoint direction by
 direction, and the largest single-class direction passes the
 $10^{-5}$ gate outright at the smallest probe. And the fifteen
@@ -535,8 +536,9 @@ reaches $t = 0$. Both transposed Jacobians are the analytic operators
 of Sections~\ref{sec:jacobian}--\ref{sec:adjoint}, applied within
 \texttt{TSAdjoint}'s discrete adjoint of the chosen integrator.
 
-The outer update is TAO's bound-constrained limited-memory
-quasi-Newton method BLMVM~\cite{benson2001blmvm}: a projected L-BFGS
+The outer update is BLMVM~\cite{benson2001blmvm}, the bound-constrained
+limited-memory quasi-Newton method of PETSc's optimization component
+TAO: a projected L-BFGS
 step with a backtracking line search, each trial point costing one
 forward-plus-adjoint evaluation. The loop terminates on the standard
 bound-constrained test: the projected gradient $g^P$ (the gradient
@@ -692,11 +694,12 @@ at $\alpha = 1.5$ carries $1.5$ times its lookup value, and the
 uniform scans of Section~\ref{sec:authority} set every class to the
 same $\alpha$. Both are then $O(1)$ and the
 unit quasi-Newton step becomes a roughness change of order $10\%$: at
-the NLCD start point of the production configuration, over a shortened
-window that reproduces the zero-step failure exactly,
-$\lVert g\rVert / J_0 = 0.10$, and the same start point that took no
-step in physical units takes one that lowers the objective and the
-peak-WSE MAE together. The bounds become statements about relative
+the start point of the production configuration, the National Land
+Cover Database (NLCD) lookup, over a shortened window that reproduces
+the zero-step failure exactly, $\lVert g\rVert / J_0 = 0.10$, and the
+same start point that took no step in physical units takes one that
+lowers the objective and the mean absolute error (MAE) of the peak WSE
+together. The bounds become statements about relative
 roughness,
 $\alpha \in [0.3, 3]$, which additionally excludes the region where the
 implicit solve fails. Second, set the Tikhonov weight from a prior
@@ -822,8 +825,8 @@ Turning, full event
 \end{tabular}
 \caption{The configurations used in Sections~\ref{sec:implicit}--\ref{sec:icauthority}.
 Every row above \emph{Turning, full event} is a twin, observing model
-output generated from a roughness field we chose. The twins are
-load-bearing rather than preparatory: a recovered field can be scored
+output generated from a roughness field we chose. The twins are part of
+the argument rather than preparation for it: a recovered field can be scored
 only against a known truth, and that score is what separates
 \emph{this observable cannot determine the parameter} from \emph{the
 derivative is wrong}. The real survey admits no such check, so the
@@ -848,8 +851,8 @@ mesh of 2{,}746 cells in which every cell is wet and moving, so all
 2{,}746 per-cell parameters are observable in principle; truth is a
 two-zone field ($n = 0.03$ west, $n = 0.06$ east of the domain
 midline) and the recovered field is scored against it. Its real-network
-variant replaces the synthetic gauges with the seventeen in-mesh USGS
-gauges carrying Harvey stage records.
+variant replaces the synthetic gauges with the seventeen in-mesh
+U.S.\ Geological Survey (USGS) gauges carrying Harvey stage records.
 
 \paragraph{The 30\,m Harvey domain.}
 The Turning mesh resolves the Houston area at $30$\,m in 2.93M cells,
@@ -860,10 +863,12 @@ Section~\ref{sec:hwm} share it. The class and dense twins ask whether fifteen
 classes are identifiable, that is, recoverable from the observations
 alone, from the real gauge geometry and from a saturating observation
 set respectively. The mark twin replaces stage
-with peak water-surface elevation at the 108 QC-passed high-water-mark
-cells. The production configuration is the one every real-survey number
-is measured on: a 12-hour window over the upstream crest cluster (event
-hours 29--41), initialized from an hourly checkpoint of the 72-hour
+with peak water-surface elevation at the 108 high-water-mark cells that
+pass the quality control (QC) of Section~\ref{sec:hwm}. The production
+configuration is the one every real-survey number is measured on: a
+12-hour window over the upstream crest cluster, event hours 29--41
+counted from the start of the 72-hour forward of
+Section~\ref{sec:hwm}, initialized from an hourly checkpoint of that
 forward with the rain re-aligned to the window start (both validated
 bit-exactly), scored against the 46 surveyed marks whose modelled crest
 falls inside it. Section~\ref{sec:authority} explains why the observable,
@@ -876,8 +881,11 @@ implicit integrator rather than inside the right-hand side
 (Section~\ref{sec:forward}), and runs at converged inner tolerances
 (Krylov $10^{-4}$, nonlinear $10^{-5}$) so that the verified gradients
 are the production gradients (Section~\ref{sec:adjoint}). Calibrations
-use TAO/BLMVM with Manning bounds $[0.01, 0.2]$, and long windows use
-revolve checkpointing (Section~\ref{sec:implicit}).
+use TAO/BLMVM: the per-cell twins bound $n$ to $[0.01, 0.2]$, the class
+twins to $[0.005, 0.30]$, and the class calibrations against the real
+survey bound the relative field to $\alpha \in [0.3, 3]$
+(Section~\ref{sec:calibration}). Long windows use revolve
+checkpointing (Section~\ref{sec:implicit}).
 
 \section{Implicit stepping, enabled and required}
 \label{sec:implicit}
@@ -901,8 +909,9 @@ right-hand side at this resolution.
 
 The assembled exact Jacobian supplies the remedy directly: backward
 Euler via PETSc's theta method, with SNES driven by the same Jacobian,
-carries the Harvey window at $\Delta t = 30$\,s, and the theta-method
-adjoint passes the same FD gates (Table~\ref{tab:verification}).
+carries the 1\,km Houston window at $\Delta t = 30$\,s and the 30\,m
+mesh at $\Delta t = 1$\,s, and the theta-method adjoint passes the
+same FD gates (Table~\ref{tab:verification}).
 
 An ARK-IMEX splitting with the Manning drag as the stiff implicit part
 is also implemented (\texttt{temporal: arkimex}); its implicit stage
@@ -974,8 +983,9 @@ one attempted.}
 
 \paragraph{Checkpointed adjoints for long windows.}
 A stored trajectory for a full 36-hour Hurricane Harvey window
-at the 30\,m mesh's CFL-limited $\Delta t = 0.25$\,s (518{,}400 steps,
-2.93M cells) would occupy tens of petabytes. PETSc's checkpointing
+at the 30\,m mesh's explicit gravity-wave (CFL) limit of
+$\Delta t = 0.25$\,s (518{,}400 steps, 2.93M cells) would occupy tens
+of terabytes, far beyond device memory. PETSc's checkpointing
 trajectory (\texttt{-ts\_trajectory\_type memory} with the revolve
 optimal-schedule library) replaces storage with recomputation. We
 validated it across the full hierarchy. On the dam-break twin it
