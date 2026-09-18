@@ -233,8 +233,20 @@ Overleaf paragraph below.**
      "about 25% more wall time" (26% vs rung A), "about nine minutes"
      (9.4 measured).
 
-**ONE red note is left** (grep `textcolor{red}`): the overtopping
-citation in Sec 6.1. Mark said red notes are fine while editing.
+**NO red notes remain in the paper.** Mark, 09-18: *"Lets not do this
+discussion in the text (red), that is not working well (workflow is
+under development)."* Coauthor questions go by email and are tracked
+HERE, not in the .tex. The `\textbf{[...]}` submission placeholders in
+Code and Data Availability (Zenodo DOI, archive location) are not
+discussion and stay.
+
+**OPEN, tracked here:** the overtopping sentence in Sec 6.1 stands as
+*"That is our reading of the event, not a measurement of this paper."*
+It is self-contained and needs no note. If a source turns up for water
+crossing this divide during Harvey, or for the limits of closed
+watershed-delineated domains under extreme events, the hedge can
+become a citation. Mark replied to Gautam by email on the second
+citation (09-18).
 
 **The 471M note is CLOSED (09-18, Gautam).** He added the RDycore
 overview paper on Overleaf (`bisht2025development`, Environ. Model.
