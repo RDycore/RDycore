@@ -248,6 +248,31 @@ static PetscErrorCode SetHeatTSCallbacks(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// The implicit heat Jacobian is always exactly diagonal in the global DOF numbering
+// -- see HeatIJacobianPrescribedSource(), HeatIJacobianAtmosphericSource(), and
+// HeatIJacobianCeedAtmosphericSource() -- so heat_jac is preallocated with a COO
+// pattern that reflects this directly, rather than the wider FV-stencil sparsity
+// DMCreateMatrix() would otherwise give it (heat_jac is dedicated to the heat TS, so
+// narrowing its sparsity doesn't affect anything else built from rdy->dm). A COO
+// preallocation also lets the CEED backend write Jacobian values with
+// MatSetValuesCOO(), which (unlike MatSetValues()/MatShift()/MatDiagonalSet()) has a
+// device-native implementation for GPU Mat types, so the diagonal values it computes
+// on the GPU never have to round-trip through the host.
+static PetscErrorCode PreallocateHeatJacobianDiagonal(Mat heat_jac) {
+  PetscFunctionBegin;
+
+  PetscInt start, end;
+  PetscCall(MatGetOwnershipRange(heat_jac, &start, &end));
+
+  PetscInt *rows, *cols;
+  PetscCall(PetscMalloc2(end - start, &rows, end - start, &cols));
+  for (PetscInt i = start; i < end; ++i) rows[i - start] = cols[i - start] = i;
+  PetscCall(MatSetPreallocationCOO(heat_jac, (PetscCount)(end - start), rows, cols));
+  PetscCall(PetscFree2(rows, cols));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode FillForcingFromSources(RDy rdy) {
   PetscFunctionBegin;
   RDyHeat heat = rdy->heat_context;
@@ -300,6 +325,7 @@ PetscErrorCode RDyHeatCreate(RDy rdy) {
   heat->dt        = rdy->dt;
 
   PetscCall(DMCreateMatrix(rdy->dm, &rdy->heat_jac));
+  PetscCall(PreallocateHeatJacobianDiagonal(rdy->heat_jac));
 
   PetscInt num_owned_cells = rdy->mesh.num_owned_cells;
   PetscCall(PetscCalloc1(num_owned_cells, &heat->forcing.downwelling_shortwave));

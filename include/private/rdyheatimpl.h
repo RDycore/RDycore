@@ -26,10 +26,8 @@ typedef struct {
   CeedVector u;         // wraps the PETSc state vector during operator application
   CeedVector u_dot;     // wraps the PETSc state time derivative
   CeedVector residual;  // wraps the PETSc residual vector
-  CeedVector diagonal;  // wraps diagonal_vec below
+  CeedVector diagonal;  // CEED-owned: the Jacobian diagonal, read directly by MatSetValuesCOO()
   CeedVector forcing;   // owned: per-cell atmospheric forcing, refreshed by UpdateCeedHeatForcing()
-
-  Vec diagonal_vec;  // receives the Jacobian diagonal before MatDiagonalSet()
 
   CeedContextFieldLabel shift_label;  // "time shift" on ijacobian_op
 } RDyHeatCeed;

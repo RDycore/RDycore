@@ -163,9 +163,6 @@ PetscErrorCode CreateCeedHeatOperators(RDy rdy) {
   // cache the context field label used to update the shift between solves
   PetscCallCEED(CeedOperatorGetContextFieldLabel(heat->ceed.ijacobian_op, "time shift", &heat->ceed.shift_label));
 
-  // a PETSc Vec to receive the Jacobian diagonal before it is handed to MatDiagonalSet()
-  PetscCall(VecDuplicate(rdy->u_global, &heat->ceed.diagonal_vec));
-
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_state));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_forcing));
   PetscCallCEED(CeedQFunctionDestroy(&qf_ifunction_prescribed));
@@ -184,7 +181,6 @@ PetscErrorCode DestroyCeedHeatOperators(RDy rdy) {
   RDyHeat heat = rdy->heat_context;
   if (!heat) PetscFunctionReturn(PETSC_SUCCESS);
 
-  if (heat->ceed.diagonal_vec) PetscCall(VecDestroy(&heat->ceed.diagonal_vec));
   if (heat->ceed.ifunction_prescribed_op) PetscCallCEED(CeedOperatorDestroy(&heat->ceed.ifunction_prescribed_op));
   if (heat->ceed.ifunction_atmospheric_op) PetscCallCEED(CeedOperatorDestroy(&heat->ceed.ifunction_atmospheric_op));
   if (heat->ceed.ijacobian_op) PetscCallCEED(CeedOperatorDestroy(&heat->ceed.ijacobian_op));
@@ -283,8 +279,13 @@ PetscErrorCode HeatIFunctionCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec
 /// TS IJacobian callback for the implicit heat source step with the atmospheric
 /// Q_net parameterization, evaluated with the CEED backend. The residual is
 /// pointwise, so the Jacobian is exactly diagonal: the CEED operator produces the
-/// diagonal values and MatDiagonalSet() installs them. Equivalent to
-/// HeatIJacobianAtmosphericSource() in heat_petsc.c.
+/// diagonal values into a CEED-owned CeedVector, and MatSetValuesCOO() writes them
+/// straight into P using the diagonal COO layout PreallocateHeatJacobianDiagonal()
+/// (heat_petsc.c) installed on heat_jac. Unlike MatDiagonalSet()/MatSetValues(),
+/// MatSetValuesCOO() has a device-native implementation for GPU Mat types, so on a
+/// GPU run the diagonal never leaves the device between being computed by the CEED
+/// operator and being written into P. Equivalent to HeatIJacobianAtmosphericSource()
+/// in heat_petsc.c.
 PetscErrorCode HeatIJacobianCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat P, void *ctx) {
   (void)ts;
   (void)t;
@@ -298,28 +299,25 @@ PetscErrorCode HeatIJacobianCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec
   PetscCallCEED(CeedOperatorSetContextDouble(heat->ceed.ijacobian_op, heat->ceed.shift_label, &ceed_shift));
 
   const PetscScalar *u_ptr;
-  PetscScalar       *diag_ptr;
-  PetscMemType       u_mem_type, diag_mem_type;
+  PetscMemType       u_mem_type;
   PetscCall(VecGetArrayReadAndMemType(U, &u_ptr, &u_mem_type));
-  PetscCall(VecGetArrayAndMemType(heat->ceed.diagonal_vec, &diag_ptr, &diag_mem_type));
-
   PetscCallCEED(CeedVectorSetArray(heat->ceed.u, MemTypeP2C(u_mem_type), CEED_USE_POINTER, (CeedScalar *)u_ptr));
-  PetscCallCEED(CeedVectorSetArray(heat->ceed.diagonal, MemTypeP2C(diag_mem_type), CEED_USE_POINTER, diag_ptr));
 
   PetscCall(PetscLogGpuTimeBegin());
   PetscCallCEED(CeedOperatorApply(heat->ceed.ijacobian_op, heat->ceed.u, heat->ceed.diagonal, CEED_REQUEST_IMMEDIATE));
   PetscCall(PetscLogGpuTimeEnd());
 
-  PetscCallCEED(CeedVectorTakeArray(heat->ceed.diagonal, MemTypeP2C(diag_mem_type), &diag_ptr));
   PetscCallCEED(CeedVectorTakeArray(heat->ceed.u, MemTypeP2C(u_mem_type), (CeedScalar **)&u_ptr));
-
-  PetscCall(VecRestoreArrayAndMemType(heat->ceed.diagonal_vec, &diag_ptr));
   PetscCall(VecRestoreArrayReadAndMemType(U, &u_ptr));
 
-  PetscCall(MatZeroEntries(P));
-  PetscCall(MatDiagonalSet(P, heat->ceed.diagonal_vec, INSERT_VALUES));
-  PetscCall(MatAssemblyBegin(P, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(P, MAT_FINAL_ASSEMBLY));
+  // heat->ceed.diagonal is CEED-owned (its array was never overridden above), so this
+  // reads its data where the CEED operator left it -- device memory for a GPU backend --
+  // and MatSetValuesCOO() detects that memory type itself, so no host round trip occurs.
+  const CeedScalar *diag_values;
+  PetscCallCEED(CeedVectorGetArrayRead(heat->ceed.diagonal, MemTypeP2C(u_mem_type), &diag_values));
+  PetscCall(MatSetValuesCOO(P, (const PetscScalar *)diag_values, INSERT_VALUES));
+  PetscCallCEED(CeedVectorRestoreArrayRead(heat->ceed.diagonal, &diag_values));
+
   if (J != P) {
     PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
