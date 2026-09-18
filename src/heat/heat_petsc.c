@@ -270,6 +270,16 @@ static PetscErrorCode PreallocateHeatJacobianDiagonal(Mat heat_jac) {
   PetscCall(MatSetPreallocationCOO(heat_jac, (PetscCount)(end - start), rows, cols));
   PetscCall(PetscFree2(rows, cols));
 
+  // MatSetPreallocationCOO() alone leaves the matrix unassembled (mat->assembled ==
+  // PETSC_FALSE) until values are written with MatSetValuesCOO(), which the plain
+  // PETSc Jacobian callbacks (HeatIJacobianPrescribedSource(), MatShift() in
+  // particular) don't do -- they require an already-assembled matrix. DMCreateMatrix()
+  // used to hand back an assembled (all-zero) matrix; restore that guarantee here so
+  // heat_jac is usable by either the COO or the MatShift()/MatSetValue() write path,
+  // whichever runs first.
+  PetscCall(MatAssemblyBegin(heat_jac, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(heat_jac, MAT_FINAL_ASSEMBLY));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
