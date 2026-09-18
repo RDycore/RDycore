@@ -316,7 +316,18 @@ HERE, not in the .tex. The `\textbf{[...]}` submission placeholders in
 Code and Data Availability (Zenodo DOI, archive location) are not
 discussion and stay.
 
-**OPEN, tracked here:** the overtopping sentence in Sec 6.1 stands as
+**CLOSED 09-18 evening (Mark relayed a reference):** Sec 6.1 now cites
+`twdb2015cypress`, the TWDB/HCFCD "Cypress Creek Overflow Management
+Plan" (Contract Report 1248321466, 2015): overflow across the divide
+into the Addicks and Barker watersheds at 5-year storms and above, 83%
+of the 1% flood volume crossing. The reference Mark sent was Castro &
+Rifai, NHESS preprint nhess-2022-193 -- **withdrawn by the authors**
+(the landing page says so), and its Harvey-specific sentence cites
+HCFCD/USACE web pages; the TWDB report is its quantified source, so
+the paper cites that and not the preprint. The documented crossing is
+an INFLOW upstream, so the text says so and keeps the downstream
+outflow as "our reading". Overleaf base after this: see the memory.
+*Previous wording of this item:* the overtopping sentence in Sec 6.1 stood as
 *"That is our reading of the event, not a measurement of this paper."*
 It is self-contained and needs no note. If a source turns up for water
 crossing this divide during Harvey, or for the limits of closed
