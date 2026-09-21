@@ -1095,7 +1095,16 @@ does reaches a gauge. The identical configuration observed at
 418{,}076 strided cells recovers all fifteen classes to machine
 precision, so the failure is the network, not the method. Fifteen
 parameters and thirteen gauges, an ``overdetermined'' observation
-count, remain unidentifiable.
+count, remain unidentifiable. The separation between a structural
+limit and a shortage of observations is not specific to this code or
+this method: a benchmark of inverse physics-informed neural networks
+recovering a single Manning scalar in steady channel flow reports a
+residual error that added observations do not reduce, attributed to
+the configuration rather than to observation scarcity, and a recovery
+that collapses the scalar toward zero when depth alone is observed
+rather than depth and velocity~\cite{radfar2026pinn}. Those are
+idealized channels and one parameter; what carries over is the
+separation, not the numbers.
 
 The same question re-asked with the peak observable comes out
 differently. Observing the same NLCD-truth twin at the 108
