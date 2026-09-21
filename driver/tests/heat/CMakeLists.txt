@@ -15,6 +15,7 @@
 # correcting it, so it cannot verify it.)
 
 set(mms_c_driver ${mms_driver})
+set(rdycore_c_driver ${rdycore_driver})
 
 # arguments for specific configurations ("basic" config has no options)
 set(ceed_args -ceed /cpu/self)
@@ -25,6 +26,7 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_mms_moving_source.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_mms_conv_study.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_coupling_interval.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/heat_coupling_interval_atmospheric.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      ${MESH_DIR}/DamBreak_grid5x10.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -138,5 +140,22 @@ foreach(np 1 2)
   foreach(config basic ceed)
     add_test(heat_coupling_interval_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np}
              ${CMAKE_CURRENT_BINARY_DIR}/test_heat_coupling heat_coupling_interval.yaml ${${config}_args})
+  endforeach()
+endforeach()
+
+# Same coupling interval, but with the heat source given by the atmospheric
+# parameterization (HeatQNet()) instead of a prescribed heat_flux, so it exercises
+# HeatIJacobianAtmosphericSource()/HeatIJacobianCeedAtmosphericSource() -- on the
+# "ceed" config, this includes the GPU-resident MatSetValuesCOO() Jacobian assembly
+# path. HeatQNet() is nonlinear, so unlike heat_coupling_interval there's no
+# closed-form expected temperature to check against test_heat_coupling's regression
+# assertion; this is a smoke test run directly through the production rdycore driver,
+# asserting only that the run completes.
+foreach(np 1 2)
+  foreach(config basic ceed)
+    foreach(lang ${supported_languages})
+      add_test(heat_coupling_interval_atmospheric_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np}
+               ${rdycore_${lang}_driver} heat_coupling_interval_atmospheric.yaml ${${config}_args})
+    endforeach()
   endforeach()
 endforeach()

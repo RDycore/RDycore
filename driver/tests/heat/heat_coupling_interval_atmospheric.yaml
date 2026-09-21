@@ -1,0 +1,79 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: none
+
+# Variant of heat_coupling_interval.yaml that drives the heat solve with the
+# 5-parameter atmospheric forcing (downwelling_shortwave/downwelling_longwave/
+# wind_speed/air_temperature/specific_humidity) instead of a prescribed
+# heat_flux. This exercises HeatIJacobianAtmosphericSource /
+# HeatIJacobianCeedAtmosphericSource (heat->use_direct_source == PETSC_FALSE),
+# rather than the trivial shift*I Jacobian used by HeatIJacobianPrescribedSource.
+#
+# NOTE: HeatQNet() is a nonlinear function of the atmospheric parameters and
+# local water temperature, so unlike heat_coupling_interval.yaml this test has
+# no simple closed-form final temperature to assert against -- the values below
+# are placeholders chosen only to produce net surface warming, not to hit a
+# specific target temperature.
+time:
+  time_step: 0.25
+  unit: seconds
+  stop: 1.0
+  coupling_interval: 0.25
+
+grid:
+  file: DamBreak_grid5x10.exo  # flat bed (z = 0)
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: flat_domain
+
+materials:
+  - name: flat_domain
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: domain
+    flow: lake_at_rest
+    heat: initial_temperature
+
+sources:
+  - region: domain
+    flow: no_runoff
+    heat: atmospheric_forcing
+
+flow_conditions:
+  - name: lake_at_rest
+    type: dirichlet
+    height: 1.0
+    x_momentum: 0.0
+    y_momentum: 0.0
+  - name: no_runoff
+    type: runoff
+    value: 0.0
+
+heat_conditions:
+  - name: initial_temperature
+    type: dirichlet
+    water_temperature: 20.0
+  - name: atmospheric_forcing
+    type: runoff
+    downwelling_shortwave: 800.0   # W/m^2
+    downwelling_longwave: 350.0    # W/m^2
+    wind_speed: 3.0                # m/s
+    air_temperature: 25.0          # degrees C
+    specific_humidity: 0.012       # kg/kg
